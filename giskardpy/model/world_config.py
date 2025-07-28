@@ -26,6 +26,7 @@ class WorldConfig(ABC):
         Derivatives.acceleration: np.inf,
         Derivatives.jerk: None
     }
+    default_color = Color(0.5, 0.5, 0.5, 1)
 
     def __init__(self, register_on_god_map: bool = True):
         self._world = World()
