@@ -1,19 +1,17 @@
 from __future__ import annotations
 
-import abc
-from abc import ABC
+from functools import cached_property
 from typing import List, Union, Optional
 
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from giskardpy.motion_statechart.monitors.monitors import Monitor, Monitor
+import semantic_world.spatial_types.spatial_types as cas
+from giskardpy.data_types.data_types import PrefixName, Derivatives
+from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.god_map import god_map
+from giskardpy.model.joints import OneDofJoint
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.monitors.monitors import Monitor
 from giskardpy.motion_statechart.tasks.task import Task
 from semantic_world.spatial_types.symbol_manager import symbol_manager
-from giskardpy.utils.utils import string_shortener
-from giskardpy.data_types.exceptions import GoalInitalizationException
-from giskardpy.model.joints import OneDofJoint
-from giskardpy.data_types.data_types import PrefixName, Derivatives
-import semantic_world.spatial_types.spatial_types as cas
 
 
 class Goal(MotionStatechartNode):
@@ -26,16 +24,20 @@ class Goal(MotionStatechartNode):
         self.tasks = []
         self.monitors = []
         self.goals = []
-        self.obs_symbol = symbol_manager.register_symbol_provider(name=f'{self.name}.observation_state',
-                                                                  provider=lambda n=self.name: god_map.motion_statechart_manager.goal_state.get_observation_state(n))
-        self.life_cycle_symbol = symbol_manager.register_symbol_provider(name=f'{self.name}.life_cycle_state',
-                                                                         provider=lambda n=self.name: god_map.motion_statechart_manager.goal_state.get_life_cycle_state(n))
 
-    def get_observation_state_expression(self) -> cas.Symbol:
-        return self.obs_symbol
+    @cached_property
+    def observation_state_symbol(self) -> cas.Symbol:
+        return symbol_manager.register_symbol_provider(name=f'{self.name}.observation_state',
+                                                       provider=lambda
+                                                           n=self.name: god_map.motion_statechart_manager.goal_state.get_observation_state(
+                                                           n))
 
-    def get_life_cycle_state_expression(self) -> cas.Symbol:
-        return self.life_cycle_symbol
+    @cached_property
+    def life_cycle_state_symbol(self) -> cas.Symbol:
+        return symbol_manager.register_symbol_provider(name=f'{self.name}.life_cycle_state',
+                                                       provider=lambda
+                                                           n=self.name: god_map.motion_statechart_manager.goal_state.get_life_cycle_state(
+                                                           n))
 
     def has_tasks(self) -> bool:
         return len(self.tasks) > 0

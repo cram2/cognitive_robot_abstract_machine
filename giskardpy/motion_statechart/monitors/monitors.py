@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 from abc import ABC
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Optional
 from line_profiler import profile
@@ -16,97 +17,79 @@ from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from semantic_world.spatial_types.symbol_manager import symbol_manager
 
 
+@dataclass
 class Monitor(MotionStatechartNode):
-    obs_symbol: cas.Symbol
-    life_symbol: cas.Symbol
+    obs_symbol: cas.Symbol = field(init=False)
+    life_symbol: cas.Symbol = field(init=False)
 
-    def __init__(self, *,
-                 name: Optional[str] = None,
-                 plot: bool = True):
-        super().__init__(name=name,
-                         plot=plot)
-        symbol_name = f'{self.name}_observation_state'
-        self.obs_symbol = symbol_manager.register_symbol_provider(symbol_name,
-                                                                  lambda name=self.name: god_map.motion_statechart_manager.monitor_state.get_observation_state(name))
-        symbol_name = f'{self.name}_life_cycle_state'
-        self.life_symbol = symbol_manager.register_symbol_provider(symbol_name, lambda name=self.name: god_map.motion_statechart_manager.monitor_state.get_life_cycle_state(name))
+    @cached_property
+    def observation_state_symbol(self) -> cas.Symbol:
+        symbol_name = f'{self.name}.observation_state'
+        return symbol_manager.register_symbol_provider(symbol_name,
+                                                       lambda
+                                                           name=self.name: god_map.motion_statechart_manager.monitor_state.get_observation_state(
+                                                           name))
 
-    def get_observation_state_expression(self) -> cas.Symbol:
-        return self.obs_symbol
-
-    def get_life_cycle_state_expression(self) -> cas.Symbol:
-        return self.life_symbol
+    @cached_property
+    def life_cycle_state_symbol(self) -> cas.Symbol:
+        symbol_name = f'{self.name}.life_cycle_state'
+        return symbol_manager.register_symbol_provider(symbol_name, lambda
+            name=self.name: god_map.motion_statechart_manager.monitor_state.get_life_cycle_state(name))
 
 
+@dataclass
 class PayloadMonitor(Monitor, ABC):
-    state: ObservationState
-    run_call_in_thread: bool
-
-    def __init__(self, *,
-                 run_call_in_thread: bool,
-                 name: Optional[str] = None):
-        """
-        A monitor which executes its __call__ function when start_condition becomes True.
-        Subclass this and implement __init__.py and __call__. The __call__ method should change self.state to True when
-        it's done.
-        :param run_call_in_thread: if True, calls __call__ in a separate thread. Use for expensive operations
-        """
-        self.state = ObservationState.unknown
-        self.run_call_in_thread = run_call_in_thread
-        super().__init__(name=name)
-
-    def get_state(self) -> ObservationState:
-        return self.state
+    """
+    A monitor which executes its __call__ function when start_condition becomes True.
+    Subclass this and implement __init__.py and __call__. The __call__ method should change self.state to True when
+    it's done.
+    """
+    state: ObservationState = field(init=False, default=ObservationState.unknown)
 
     @abc.abstractmethod
     def __call__(self):
         pass
 
 
+@dataclass
+class ThreadedPayloadMonitor(Monitor, ABC):
+    """
+    A monitor which executes its __call__ function when start_condition becomes True.
+    Subclass this and implement __init__.py and __call__. The __call__ method should change self.state to True when
+    it's done.
+    Calls __call__ in a separate thread. Use for expensive operations
+    """
+    state: ObservationState = field(init=False, default=ObservationState.unknown)
+
+    @abc.abstractmethod
+    def __call__(self):
+        pass
+
+
+@dataclass
 class EndMotion(PayloadMonitor):
-    def __init__(self,
-                 name: Optional[str] = None):
-        super().__init__(name=name,
-                         run_call_in_thread=False)
 
     def __call__(self):
         self.state = ObservationState.true
 
-    def get_state(self) -> ObservationState:
-        return self.state
 
-
+@dataclass
 class CancelMotion(PayloadMonitor):
-    def __init__(self,
-                 exception: Exception = GiskardException,
-                 name: Optional[str] = None):
-        super().__init__(name=name,
-                         run_call_in_thread=False)
-        self.exception = exception
+    exception: Exception = field(default_factory=GiskardException)
 
-    @profile
     def __call__(self):
         self.state = ObservationState.true
         raise self.exception
 
-    def get_state(self) -> ObservationState:
-        return self.state
 
-
+@dataclass
 class LocalMinimumReached(Monitor):
-    def __init__(self,
-                 name: Optional[str] = None,
-                 min_cut_off: float = 0.01,
-                 max_cut_off: float = 0.06,
-                 joint_convergence_threshold: float = 0.01,
-                 windows_size: int = 1):
-        super().__init__(name=name)
-        self.joint_convergence_threshold = joint_convergence_threshold
-        self.min_cut_off = min_cut_off
-        self.max_cut_off = max_cut_off
-        self.windows_size = windows_size
+    min_cut_off: float = 0.01
+    max_cut_off: float = 0.06
+    joint_convergence_threshold: float = 0.01
+    windows_size: int = 1
 
-    def pre_compile(self):
+    def __post_init__(self):
         ref = []
         symbols = []
         for free_variable in god_map.world.active_degrees_of_freedom:
@@ -125,15 +108,13 @@ class LocalMinimumReached(Monitor):
                                                     cas.logic_all(cas.less(vel_symbols, ref)))
 
 
+@dataclass
 class TimeAbove(Monitor):
-    def __init__(self,
-                 threshold: float,
-                 name: Optional[str] = None):
-        super().__init__(name=name)
-        if threshold is None:
-            threshold = god_map.qp_controller_config.max_trajectory_length
+    threshold: float
+
+    def __post_init__(self):
         traj_length_in_sec = god_map.time_symbol
-        condition = cas.greater(traj_length_in_sec, threshold)
+        condition = cas.greater(traj_length_in_sec, self.threshold)
         self.observation_expression = condition
 
 

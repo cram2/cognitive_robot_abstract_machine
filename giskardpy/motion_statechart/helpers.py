@@ -54,13 +54,13 @@ class MotionGraphNodeStateManager(Generic[T]):
         return self.substitution_values[key][symbol]
 
     def get_life_cycle_state_symbols(self) -> List[cas.Symbol]:
-        return [node.get_life_cycle_state_expression() for node in self.nodes]
+        return [node.life_cycle_state_symbol for node in self.nodes]
 
     def get_observation_state_symbols(self) -> List[cas.Symbol]:
-        return [node.get_observation_state_expression() for node in self.nodes]
+        return [node.observation_state_symbol for node in self.nodes]
 
     def get_observation_state_symbol_map(self) -> Dict[str, cas.Symbol]:
-        return {node.name: node.get_observation_state_expression() for node in self.nodes}
+        return {node.name: node.observation_state_symbol for node in self.nodes}
 
     @profile
     def get_observation_state(self, key: str) -> float:
@@ -141,7 +141,7 @@ def compile_graph_node_state_updater(node_state: MotionGraphNodeStateManager) ->
     state_updater = []
     node: MotionStatechartNode
     for node in node_state.nodes:
-        state_symbol = node.get_life_cycle_state_expression()
+        state_symbol = node.life_cycle_state_symbol
 
         not_started_transitions = cas.if_else(condition=cas.is_true3(node.logic3_start_condition),
                                               if_result=LifeCycleState.running,

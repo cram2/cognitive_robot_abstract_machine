@@ -346,7 +346,12 @@ class LifeCycleState(IntEnum):
     failed = 4
 
 
-class ObservationState:
+class FloatEnum(float, Enum):
+    """Enum where members are also (and must be) floats"""
+    pass
+
+
+class ObservationState(FloatEnum):
     false = cas.TrinaryFalse
     unknown = cas.TrinaryUnknown
     true = cas.TrinaryTrue

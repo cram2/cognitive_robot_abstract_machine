@@ -64,7 +64,7 @@ class GraspSequence(Goal):
                              weight=self.weight)
         self.add_task(lift)
         self.arrange_in_sequence([gripper_open, grasp, gripper_closed, lift])
-        self.observation_expression = lift.get_observation_state_expression()
+        self.observation_expression = lift.observation_state_symbol
 
 
 class Cutting(Goal):
@@ -129,6 +129,6 @@ class Cutting(Goal):
         self.add_task(move_right)
 
         self.arrange_in_sequence([cut_down, cut_up, move_right])
-        self.observation_expression = cas.if_else(cas.is_true3(move_right.get_observation_state_expression()),
-                                      cas.TrinaryTrue,
-                                      cas.TrinaryFalse)
+        self.observation_expression = cas.if_else(cas.is_true3(move_right.observation_state_symbol),
+                                                  cas.TrinaryTrue,
+                                                  cas.TrinaryFalse)

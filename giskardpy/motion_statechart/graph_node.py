@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Optional, Union
 
 import semantic_world.spatial_types.spatial_types as cas
@@ -8,33 +11,22 @@ from giskardpy.god_map import god_map
 from giskardpy.utils.utils import string_shortener, quote_node_names
 
 
+@dataclass
 class MotionStatechartNode:
-    _unparsed_start_condition: Optional[str]
-    _unparsed_pause_condition: Optional[str]
-    _unparsed_end_condition: Optional[str]
-    _unparsed_reset_condition: Optional[str]
+    name: str
 
-    _observation_expression: cas.Expression
-    _name: str
-    _id: int
-    plot: bool
+    _plot: bool = field(default=True, kw_only=True)
+    _observation_expression: cas.Expression = field(default_factory=lambda: cas.TrinaryUnknown, init=False)
 
-    logic3_start_condition: cas.Expression
-    logic3_pause_condition: cas.Expression
-    logic3_end_condition: cas.Expression
-    logic3_reset_condition: cas.Expression
+    _unparsed_start_condition: Optional[str] = field(default=None, init=False)
+    _unparsed_pause_condition: Optional[str] = field(default=None, init=False)
+    _unparsed_end_condition: Optional[str] = field(default=None, init=False)
+    _unparsed_reset_condition: Optional[str] = field(default=None, init=False)
 
-    def __init__(self, *,
-                 name: str,
-                 plot: bool = True):
-        self._observation_expression = cas.TrinaryUnknown
-        self.plot = plot
-        self._id = -1
-        self._name = name
-        self._unparsed_start_condition = None
-        self._unparsed_pause_condition = None
-        self._unparsed_end_condition = None
-        self._unparsed_reset_condition = None
+    logic3_start_condition: cas.Expression = field(default=None, init=False)
+    logic3_pause_condition: cas.Expression = field(default=None, init=False)
+    logic3_end_condition: cas.Expression = field(default=None, init=False)
+    logic3_reset_condition: cas.Expression = field(default=None, init=False)
 
     def set_unparsed_conditions(self,
                                 start_condition: Optional[str] = None,
@@ -59,16 +51,6 @@ class MotionStatechartNode:
         self.logic3_pause_condition = pause_condition
         self.logic3_end_condition = end_condition
         self.logic3_reset_condition = reset_condition
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    def __str__(self) -> str:
-        return self._name
-
-    def __repr__(self) -> str:
-        return str(self)
 
     def __eq__(self, other: MotionStatechartNode) -> bool:
         return self.name == other.name
@@ -101,11 +83,13 @@ class MotionStatechartNode:
     def observation_expression(self, expression: cas.Expression) -> None:
         self._observation_expression = expression
 
-    def get_observation_state_expression(self) -> cas.Symbol:
-        raise NotImplementedError('get_state_expression is not implemented')
+    @cached_property
+    def observation_state_symbol(self) -> cas.Symbol:
+        raise NotImplementedError('observation_state property is not implemented')
 
-    def get_life_cycle_state_expression(self) -> cas.Symbol:
-        raise NotImplementedError('get_life_cycle_state_expression is not implemented')
+    @cached_property
+    def life_cycle_state_symbol(self) -> cas.Symbol:
+        raise NotImplementedError('life_cycle_state property is not implemented')
 
     @property
     def start_condition(self) -> str:
@@ -162,10 +146,3 @@ class MotionStatechartNode:
         if value == '':
             value = 'False'
         self._unparsed_reset_condition = value
-
-    def pre_compile(self) -> None:
-        """
-        Use this if you need to do stuff, after the qp controller has been initialized.
-        I only needed this once, so you probably don't either.
-        """
-        pass

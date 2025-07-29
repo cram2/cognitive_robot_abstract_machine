@@ -271,13 +271,13 @@ class MotionStatechartManager:
 
     def get_node_from_state_expr(self, expr: cas.Expression) -> MotionStatechartNode:
         for task in self.task_state.nodes:
-            if cas.is_true_symbol(task.get_observation_state_expression() == expr):
+            if cas.is_true_symbol(task.observation_state_symbol == expr):
                 return task
         for monitor in self.monitor_state.nodes:
-            if cas.is_true_symbol(monitor.get_observation_state_expression() == expr):
+            if cas.is_true_symbol(monitor.observation_state_symbol == expr):
                 return monitor
         for goal in self.goal_state.nodes:
-            if cas.is_true_symbol(goal.get_observation_state_expression() == expr):
+            if cas.is_true_symbol(goal.observation_state_symbol == expr):
                 return goal
         raise GiskardException(f'No goal/task/monitor found for {str(expr)}.')
 
@@ -326,13 +326,12 @@ class MotionStatechartManager:
         observation_state_updater = []
         node: MotionStatechartNode
         for node in node_state.nodes:
-            state_symbol = node.get_observation_state_expression()
-            node.pre_compile()
+            state_symbol = node.observation_state_symbol
             if isinstance(node, PayloadMonitor):
                 expression = state_symbol  # if payload monitor, copy last state
             else:
                 expression = node.observation_expression
-            state_f = cas.if_eq_cases(a=node.get_life_cycle_state_expression(),
+            state_f = cas.if_eq_cases(a=node.life_cycle_state_symbol,
                                       b_result_cases=[(int(LifeCycleState.running), expression),
                                                       (int(LifeCycleState.not_started), ObservationState.unknown)],
                                       else_result=state_symbol)
@@ -436,7 +435,7 @@ class MotionStatechartManager:
                     cancel_exception = e
             elif filtered_life_cycle_state[i] == LifeCycleState.not_started:
                 payload_monitor.state = ObservationState.unknown
-            next_state[i] = payload_monitor.get_state()
+            next_state[i] = payload_monitor.state
             done = done or (isinstance(payload_monitor, EndMotion) and next_state[i] == ObservationState.true)
         return next_state, done, cancel_exception
 

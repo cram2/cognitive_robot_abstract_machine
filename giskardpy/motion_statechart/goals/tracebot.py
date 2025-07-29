@@ -111,7 +111,7 @@ class InsertCylinder(Goal):
                                                        reference_velocity=0.1,
                                                        weight=self.weight)
         tilt_straight_task.start_condition = bottom_reached
-        # tilt_straight_task.end_condition = tilt_monitor.get_observation_state_expression()
+        # tilt_straight_task.end_condition = tilt_monitor.observation_state
         tilt_straight_task.observation_expression = cas.less_equal(tilt_error, 0.01)
 
         self.observation_expression = tilt_straight_task.observation_expression
