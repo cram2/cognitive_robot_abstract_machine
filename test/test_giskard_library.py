@@ -7,9 +7,6 @@ from rustworkx import NoPathFound
 import semantic_world.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
 from giskardpy.middleware import set_middleware
-from giskardpy.model.collision_avoidance_config import CollisionAvoidanceConfig, DisableCollisionAvoidanceConfig
-from giskardpy.model.collision_avoidance_config import DefaultCollisionAvoidanceConfig
-from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.model.world_config import EmptyWorld, WorldWithOmniDriveRobot
 from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -20,50 +17,8 @@ from semantic_world.connections import FixedConnection, PrismaticConnection, Omn
 from semantic_world.geometry import Box, Scale, Color
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.robots import AbstractRobot, Manipulator
-from semantic_world.spatial_types.derivatives import Derivatives
-from semantic_world.views import ControlledConnections
 from semantic_world.world import World
 from semantic_world.world_entity import Body
-
-
-class PR2CollisionAvoidance(CollisionAvoidanceConfig):
-    def __init__(self, drive_joint_name: str = 'brumbrum',
-                 collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
-        super().__init__(collision_checker=collision_checker)
-        self.drive_joint_name = drive_joint_name
-
-    def setup(self):
-        self.load_self_collision_matrix('self_collision_matrices/iai/pr2.srdf')
-        self.set_default_external_collision_avoidance(soft_threshold=0.1,
-                                                      hard_threshold=0.0)
-        for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:
-            self.overwrite_external_collision_avoidance(joint_name,
-                                                        number_of_repeller=4,
-                                                        soft_threshold=0.05,
-                                                        hard_threshold=0.0,
-                                                        max_velocity=0.2)
-        for joint_name in ['r_wrist_flex_joint', 'l_wrist_flex_joint']:
-            self.overwrite_external_collision_avoidance(joint_name,
-                                                        number_of_repeller=2,
-                                                        soft_threshold=0.05,
-                                                        hard_threshold=0.0,
-                                                        max_velocity=0.2)
-        for joint_name in ['r_elbow_flex_joint', 'l_elbow_flex_joint']:
-            self.overwrite_external_collision_avoidance(joint_name,
-                                                        soft_threshold=0.05,
-                                                        hard_threshold=0.0)
-        for joint_name in ['r_forearm_roll_joint', 'l_forearm_roll_joint']:
-            self.overwrite_external_collision_avoidance(joint_name,
-                                                        soft_threshold=0.025,
-                                                        hard_threshold=0.0)
-        self.fix_joints_for_collision_avoidance([
-            'r_gripper_l_finger_joint',
-            'l_gripper_l_finger_joint'
-        ])
-        self.overwrite_external_collision_avoidance(self.drive_joint_name,
-                                                    number_of_repeller=2,
-                                                    soft_threshold=0.2,
-                                                    hard_threshold=0.1)
 
 
 try:
@@ -181,8 +136,8 @@ def simple_two_arm_world() -> World:
     with config.world.modify_world():
         config.setup()
     # todo move to controller
-    controlled_joints = ControlledConnections(config.world.search_for_connections_of_type(ActiveConnection))
-    config.world.add_view(controlled_joints)
+    # controlled_joints = ControlledConnections(config.world.search_for_connections_of_type(ActiveConnection))
+    # config.world.add_view(controlled_joints)
     # config.world.register_controlled_joints(config.world.movable_joint_names)
     # collision_avoidance = DefaultCollisionAvoidanceConfig()
     # collision_avoidance.setup()

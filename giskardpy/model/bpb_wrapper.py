@@ -84,7 +84,7 @@ def create_shape_from_link(link: Body, collision_id: int = 0) -> pb.CollisionObj
             shape = create_shape_from_geometry(geometry)
         else:
             shape = create_shape_from_geometry(geometry)
-        link_T_geometry = pb.Transform.from_np(geometry.link_T_geometry.to_np())
+        link_T_geometry = pb.Transform.from_np(geometry.origin.to_np())
         shapes.append((link_T_geometry, shape))
     shape = create_compound_shape(shapes_poses=shapes)
     # else:

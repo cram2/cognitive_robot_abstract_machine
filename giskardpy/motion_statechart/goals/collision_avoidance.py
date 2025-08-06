@@ -313,10 +313,10 @@ class CollisionAvoidanceHint(Goal):
         self.observation_expression = cas.TrinaryUnknown
 
     def get_actual_distance(self):
-        return god_map.collision_scene.external_contact_distance_symbol(link_name=self.key[0], link_b_name=self.key[1])
+        return god_map.collision_scene.external_contact_distance_symbol(body=self.key[0], body_b=self.key[1])
 
     def get_link_b_hash(self):
-        return god_map.collision_scene.external_link_b_hash_symbol(link_name=self.key[0], link_b_name=self.key[1])
+        return god_map.collision_scene.external_link_b_hash_symbol(body=self.key[0], body_b=self.key[1])
 
 
 # use cases

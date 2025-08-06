@@ -1,5 +1,4 @@
 from semantic_world.prefixed_name import PrefixedName
-from giskardpy.model.collision_avoidance_config import DisableCollisionAvoidanceConfig
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.model.world_config import WorldWithOmniDriveRobot
 from giskardpy.qp.qp_controller_config import QPControllerConfig

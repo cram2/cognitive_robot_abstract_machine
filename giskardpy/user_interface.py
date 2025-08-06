@@ -8,8 +8,6 @@ from giskardpy.data_types.exceptions import EmptyProblemException
 from giskardpy.data_types.exceptions import SetupException
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
-from giskardpy.model.collision_avoidance_config import CollisionAvoidanceConfig, DisableCollisionAvoidanceConfig
-from giskardpy.model.collision_world_syncer import CollisionEntry
 from giskardpy.model.world_config import WorldConfig
 from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.motion_statechart.goals.goal import Goal
