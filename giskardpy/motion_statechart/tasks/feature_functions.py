@@ -145,8 +145,8 @@ class DistanceGoal(FeatureFunctionGoal):
 
         projected_vector = cas.distance_vector_projected_on_plane(self.root_P_controlled_feature,
                                                                   self.root_P_reference_feature,
-                                                                  cas.Vector3([0, 0, 1]))
-        expr = cas.norm(projected_vector)
+                                                                  cas.Vector3.Z())
+        expr = projected_vector.norm()
 
         self.add_inequality_constraint(reference_velocity=max_vel,
                                        upper_error=upper_limit - expr,

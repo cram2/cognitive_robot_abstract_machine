@@ -129,7 +129,7 @@ class CartesianPositionStraight(Task):
             god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link)).dot(
             god_map.world.compose_fk_expression(self.root_link, self.tip_link))
         expr_p = a_T_t.to_position()
-        dist = cas.norm(root_P_goal - root_P_tip)
+        dist = (root_P_goal - root_P_tip).norm()
 
         self.add_equality_constraint_vector(reference_velocities=[self.reference_velocity] * 3,
                                             equality_bounds=[dist, 0, 0],

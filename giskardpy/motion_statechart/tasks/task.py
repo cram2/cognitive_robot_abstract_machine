@@ -471,7 +471,7 @@ class Task(MotionStatechartNode):
         :param max_violation: m/s
         :param name:
         """
-        trans_error = cas.norm(frame_P_current)
+        trans_error = frame_P_current.norm()
         trans_error = cas.if_eq_zero(trans_error, 0.01, trans_error)
         god_map.debug_expression_manager.add_debug_expression('trans_error', trans_error)
         self.add_velocity_constraint(upper_velocity_limit=max_velocity,

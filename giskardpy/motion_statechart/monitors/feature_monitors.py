@@ -85,10 +85,11 @@ class DistanceMonitor(FeatureMonitor):
                          controlled_feature=tip_point,
                          name=name)
 
-        distance = cas.norm(cas.distance_vector_projected_on_plane(self.root_P_controlled_feature,
-                                                                   self.root_P_reference_feature,
-                                                                   cas.Vector3([0, 0, 1])))
-        self.observation_expression = cas.logic_and(cas.greater_equal(distance, lower_limit), cas.less_equal(distance, upper_limit))
+        distance = cas.distance_vector_projected_on_plane(self.root_P_controlled_feature,
+                                                          self.root_P_reference_feature,
+                                                          cas.Vector3.Z()).norm()
+        self.observation_expression = cas.logic_and(cas.greater_equal(distance, lower_limit),
+                                                    cas.less_equal(distance, upper_limit))
 
 
 class AngleMonitor(FeatureMonitor):

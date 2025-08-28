@@ -53,7 +53,7 @@ class InsertCylinder(Goal):
         distance_to_top = cas.euclidean_distance(root_P_tip, root_P_top)
 
         distance_to_line, root_P_on_line = cas.distance_point_to_line_segment(root_P_tip, root_P_hole, root_P_top)
-        distance_to_hole = cas.norm(root_P_hole - root_P_tip)
+        distance_to_hole = (root_P_hole - root_P_tip).norm()
 
         reach_top = Task(name='Reach Top')
         self.add_task(reach_top)
