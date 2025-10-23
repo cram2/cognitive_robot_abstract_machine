@@ -4,7 +4,7 @@ import pytest
 import urdf_parser_py.urdf as up
 from rustworkx import NoPathFound
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
 from giskardpy.middleware import set_middleware
 from giskardpy.model.utils import hacky_urdf_parser_fix
@@ -12,18 +12,18 @@ from giskardpy.model.world_config import EmptyWorld, WorldWithOmniDriveRobot
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.user_interface import GiskardWrapper
 from giskardpy.utils.utils import suppress_stderr
-from semantic_world.world_description.connections import (
+from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     PrismaticConnection,
     OmniDrive,
     ActiveConnection,
     RevoluteConnection,
 )
-from semantic_world.world_description.geometry import Box, Scale, Color
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.robots.abstract_robot import AbstractRobot, Manipulator
-from semantic_world.world import World
-from semantic_world.world_description.world_entity import Body
+from semantic_digital_twin.world_description.geometry import Box, Scale, Color
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Manipulator
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 try:

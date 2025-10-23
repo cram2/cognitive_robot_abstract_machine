@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from typing import List, Dict, TYPE_CHECKING, Optional, Union
 import numpy as np
 
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from giskardpy.qp.free_variable import FreeVariable
 import giskardpy.utils.math as giskard_math
 from giskardpy.utils.decorators import memoize
@@ -13,7 +13,7 @@ from line_profiler import profile
 
 
 if TYPE_CHECKING:
-    from semantic_world.world import World
+    from semantic_digital_twin.world import World
 
 
 @memoize

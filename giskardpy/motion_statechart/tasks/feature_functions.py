@@ -3,12 +3,12 @@ from __future__ import division
 from dataclasses import field
 from typing import Union
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, Task
 from giskardpy.utils.decorators import validated_dataclass
-from semantic_world.world_description.geometry import Color
-from semantic_world.world_description.world_entity import Body
+from semantic_digital_twin.world_description.geometry import Color
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @validated_dataclass

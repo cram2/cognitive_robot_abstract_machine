@@ -4,7 +4,7 @@ from typing import Dict, Optional, List, Tuple
 
 from line_profiler import profile
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.collision_matrix_manager import CollisionViewRequest
@@ -16,11 +16,11 @@ from giskardpy.motion_statechart.tasks.task import (
     Task,
 )
 from giskardpy.utils.decorators import validated_dataclass
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.robots.abstract_robot import AbstractRobot
-from semantic_world.world import World
-from semantic_world.world_description.connections import ActiveConnection
-from semantic_world.world_description.world_entity import Body
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import ActiveConnection
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @validated_dataclass

@@ -4,14 +4,14 @@ from typing import Dict, Optional, List, Union
 import numpy as np
 from line_profiler import profile
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.middleware import get_middleware
 from giskardpy.model.trajectory import Trajectory
-from semantic_world.world_description.geometry import Color
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.spatial_types.derivatives import Derivatives
-from semantic_world.spatial_types.symbol_manager import symbol_manager
-from semantic_world.world_description.world_state import WorldState
+from semantic_digital_twin.world_description.geometry import Color
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.world_description.world_state import WorldState
 
 
 class DebugExpressionManager:

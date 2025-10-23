@@ -4,7 +4,7 @@ from typing import Optional, List, Union, Dict, DefaultDict, TypeVar
 
 import numpy as np
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import (
     GoalInitalizationException,
     DuplicateNameException,
@@ -21,8 +21,8 @@ from giskardpy.qp.constraint import (
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.utils.decorators import validated_dataclass
-from semantic_world.spatial_types.derivatives import Derivatives
-from semantic_world.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
 
 WEIGHT_MAX = 10000.0
 WEIGHT_ABOVE_CA = 2500.0

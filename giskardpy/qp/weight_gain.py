@@ -1,7 +1,7 @@
 from typing import List, Dict, DefaultDict
 
-from semantic_world.spatial_types.derivatives import Derivatives
-from semantic_world.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 
 class WeightGain:

@@ -3,15 +3,15 @@ from __future__ import division
 from dataclasses import field
 from typing import Dict, Optional, Union, Type, Tuple
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.data_types import ObservationState
 from giskardpy.motion_statechart.monitors.monitors import PayloadMonitor
 from giskardpy.utils.decorators import validated_dataclass
 from giskardpy.utils.math import axis_angle_from_quaternion
-from semantic_world.world_description.connections import OmniDrive, ActiveConnection1DOF
-from semantic_world.world_description.world_entity import Connection
+from semantic_digital_twin.world_description.connections import OmniDrive, ActiveConnection1DOF
+from semantic_digital_twin.world_description.world_entity import Connection
 
 
 @validated_dataclass

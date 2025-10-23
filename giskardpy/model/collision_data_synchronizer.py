@@ -22,7 +22,7 @@ import numpy as np
 from line_profiler import profile
 from lxml import etree
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import UnknownGroupException, UnknownLinkException
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
@@ -30,12 +30,12 @@ from giskardpy.model.collision_data_synchronizer import CollisionDataSynchronize
 from giskardpy.model.collision_detector import CollisionDetector
 from giskardpy.model.collision_matrix_manager import CollisionMatrixManager
 from giskardpy.qp.free_variable import FreeVariable
-from semantic_world.world_description.connections import ActiveConnection
-from semantic_world.robots.abstract_robot import AbstractRobot
-from semantic_world.spatial_types.derivatives import Derivatives
-from semantic_world.spatial_types.symbol_manager import symbol_manager
-from semantic_world.utils import copy_lru_cache
-from semantic_world.world_description.world_entity import Body, Connection
+from semantic_digital_twin.world_description.connections import ActiveConnection
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.utils import copy_lru_cache
+from semantic_digital_twin.world_description.world_entity import Body, Connection
 
 
 class CollisionDataSynchronizer:

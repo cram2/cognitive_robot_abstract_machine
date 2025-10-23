@@ -13,10 +13,10 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_formulation import QPFormulation
 from giskardpy.qp.solvers.qp_solver_qpSWIFT import QPSolverQPSwift
 from giskardpy.qp.solvers.qp_solver_qpalm import QPSolverQPalm
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.spatial_types.derivatives import Derivatives
-from semantic_world.spatial_types.symbol_manager import symbol_manager
-from semantic_world.world_description.world_state import WorldState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.world_description.world_state import WorldState
 
 
 @dataclass

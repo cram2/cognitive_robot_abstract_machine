@@ -8,13 +8,13 @@ import numpy as np
 from line_profiler import profile
 
 from giskardpy.god_map import god_map
-from semantic_world.collision_checking.collision_detector import (
+from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionDetector,
     CollisionCheck,
 )
-from semantic_world.robots.abstract_robot import AbstractRobot
-from semantic_world.world_description.connections import ActiveConnection
-from semantic_world.world_description.world_entity import Body
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.world_description.connections import ActiveConnection
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(unsafe_hash=True)

@@ -13,12 +13,12 @@ from line_profiler import profile
 from giskardpy.data_types.key_default_dict import KeyDefaultDict
 from giskardpy.god_map import god_map
 from giskardpy.qp.free_variable import FreeVariable
-from semantic_world.collision_checking.collision_detector import CollisionCheck
-from semantic_world.robots.abstract_robot import AbstractRobot
-from semantic_world.world_description.connections import ActiveConnection
-from semantic_world.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_world.world import World
-from semantic_world.world_description.world_entity import Body
+from semantic_digital_twin.collision_checking.collision_detector import CollisionCheck
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.world_description.connections import ActiveConnection
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass

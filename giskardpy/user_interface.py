@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Tuple, Union, Type
 
 from giskard_msgs.msg import CollisionEntry
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import EmptyProblemException
 from giskardpy.data_types.exceptions import SetupException
 from giskardpy.god_map import god_map
@@ -32,9 +32,9 @@ from giskardpy.qp.constraint import (
     DerivativeEqualityConstraint,
     DerivativeInequalityConstraint,
 )
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.robots.abstract_robot import AbstractRobot
-from semantic_world.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
 from giskardpy.motion_statechart.monitors.monitors import EndMotion
 
 

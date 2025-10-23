@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import giskardpy.utils.math as giskard_math
-from semantic_world.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
 
 
 class TestMath(unittest.TestCase):

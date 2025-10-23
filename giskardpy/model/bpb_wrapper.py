@@ -9,10 +9,10 @@ from pkg_resources import resource_filename
 
 from giskardpy.god_map import god_map
 from giskardpy.model.collisions import GiskardCollision
-from semantic_world.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from giskardpy.middleware import get_middleware
 from giskardpy.utils.utils import suppress_stdout
-from semantic_world.world_description.geometry import (
+from semantic_digital_twin.world_description.geometry import (
     Shape,
     Box,
     Sphere,
@@ -20,9 +20,9 @@ from semantic_world.world_description.geometry import (
     Mesh,
     Scale,
 )
-from semantic_world.robots.abstract_robot import AbstractRobot
-from semantic_world.world import World
-from semantic_world.world_description.world_entity import Body
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
 CollisionObject = pb.CollisionObject
 

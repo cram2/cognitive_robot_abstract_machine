@@ -4,7 +4,7 @@ from dataclasses import field
 from functools import cached_property
 from typing import Optional, Union
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
 from giskardpy.utils.decorators import validated_dataclass
 from giskardpy.utils.utils import string_shortener, quote_node_names

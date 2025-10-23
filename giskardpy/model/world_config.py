@@ -8,13 +8,13 @@ from typing import Optional
 import numpy as np
 
 from giskardpy.model.utils import robot_name_from_urdf_string
-from semantic_world.adapters.urdf import URDFParser
-from semantic_world.world_description.connections import Connection6DoF, OmniDrive
-from semantic_world.world_description.geometry import Color
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.spatial_types.derivatives import Derivatives
-from semantic_world.world import World
-from semantic_world.world_description.world_entity import Body
+from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.world_description.connections import Connection6DoF, OmniDrive
+from semantic_digital_twin.world_description.geometry import Color
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass

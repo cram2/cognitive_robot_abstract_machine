@@ -2,7 +2,7 @@ from __future__ import division
 
 from line_profiler import profile
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.motion_statechart.tasks.task import (
@@ -11,11 +11,11 @@ from giskardpy.motion_statechart.tasks.task import (
     Task,
 )
 from giskardpy.utils.decorators import validated_dataclass
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.spatial_types.derivatives import Derivatives
-from semantic_world.spatial_types.symbol_manager import symbol_manager
-from semantic_world.world_description.connections import OmniDrive
-from semantic_world.world_description.world_entity import Connection
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.world_description.connections import OmniDrive
+from semantic_digital_twin.world_description.world_entity import Connection
 
 
 @validated_dataclass
@@ -123,13 +123,13 @@ class BaseTrajFollower(Goal):
         )
         for t in range(god_map.qp_controller.prediction_horizon):
             x = self.current_traj_point(
-                self.joint.x_vel.name,
+                self.joint.x_velocity.name,
                 t * god_map.qp_controller.mpc_dt,
                 Derivatives.velocity,
             )
             if isinstance(self.joint, OmniDrive):
                 y = self.current_traj_point(
-                    self.joint.y_vel.name,
+                    self.joint.y_velocity.name,
                     t * god_map.qp_controller.mpc_dt,
                     Derivatives.velocity,
                 )

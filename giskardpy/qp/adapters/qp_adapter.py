@@ -9,7 +9,7 @@ from typing import Tuple, List, Union, Dict, TYPE_CHECKING, DefaultDict, Optiona
 import numpy as np
 from line_profiler import profile
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import (
     InfeasibleException,
     VelocityLimitUnreachableException,
@@ -27,9 +27,9 @@ from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.utils.decorators import memoize
 from giskardpy.utils.math import mpc
-from semantic_world.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_world.spatial_types.derivatives import Derivatives, DerivativeMap
-from semantic_world.spatial_types.symbol_manager import SymbolManager
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
+from semantic_digital_twin.spatial_types.symbol_manager import SymbolManager
 
 if TYPE_CHECKING:
     import scipy.sparse as sp

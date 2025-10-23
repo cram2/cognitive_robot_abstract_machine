@@ -2,7 +2,7 @@ from typing import Tuple, Union, Dict, Type, Optional, List
 
 import numpy as np
 
-from semantic_world.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from giskardpy.qp.qp_data import QPData
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.utils.decorators import memoize

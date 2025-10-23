@@ -1,10 +1,10 @@
 from typing import Dict
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.motion_statechart.monitors.monitors import Monitor
 from giskardpy.utils.decorators import validated_dataclass
-from semantic_world.world_description.connections import (
+from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     ActiveConnection,
     ActiveConnection1DOF,

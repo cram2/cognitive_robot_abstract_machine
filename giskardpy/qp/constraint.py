@@ -3,9 +3,9 @@ from copy import copy
 from dataclasses import dataclass
 from typing import Optional
 
-import semantic_world.spatial_types.spatial_types as cas
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.spatial_types.derivatives import Derivatives
+import semantic_digital_twin.spatial_types.spatial_types as cas
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
 
 DebugConstraint = namedtuple("debug", ["expr"])
 

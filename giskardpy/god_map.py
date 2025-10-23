@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING, List, Dict, Tuple
 
 from giskardpy.middleware import get_middleware
 from giskardpy.utils.utils import create_path
-from semantic_world.adapters.ros.world_synchronizer import ModelSynchronizer, StateSynchronizer
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.adapters.ros.world_synchronizer import ModelSynchronizer, StateSynchronizer
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
 
 if TYPE_CHECKING:
-    from semantic_world.world_description.degree_of_freedom import DegreeOfFreedom
-    from semantic_world.world import World
+    from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+    from semantic_digital_twin.world import World
     from giskardpy.qp.next_command import NextCommands
     from giskardpy.model.trajectory import Trajectory
     from giskardpy.qp.qp_controller import QPController
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
         CollisionWorldSynchronizer,
         Collisions,
     )
-    import semantic_world.spatial_types.spatial_types as cas
+    import semantic_digital_twin.spatial_types.spatial_types as cas
 
 
 class GodMap:
@@ -55,7 +55,7 @@ class GodMap:
     def __getattr__(self, item):
         # automatically initialize certain attributes
         if item == "world":
-            from semantic_world.world import World
+            from semantic_digital_twin.world import World
 
             self.world = World()
         elif item == "motion_statechart_manager":

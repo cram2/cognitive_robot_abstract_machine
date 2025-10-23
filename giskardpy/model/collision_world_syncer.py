@@ -7,19 +7,19 @@ from typing import List, Dict, Optional, Tuple, Set
 import numpy as np
 from line_profiler import profile
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_matrix_manager import CollisionMatrixManager
 from giskardpy.model.collisions import NullCollisionDetector, Collisions
-from semantic_world.collision_checking.collision_detector import (
+from semantic_digital_twin.collision_checking.collision_detector import (
     Collision,
     CollisionDetector,
     CollisionCheck,
 )
-from semantic_world.robots.abstract_robot import AbstractRobot
-from semantic_world.spatial_types.symbol_manager import symbol_manager
-from semantic_world.world import World
-from semantic_world.world_description.world_entity import Body
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
 np.random.seed(1337)
 

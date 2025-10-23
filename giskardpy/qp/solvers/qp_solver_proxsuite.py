@@ -3,7 +3,7 @@ from typing import Tuple
 import numpy as np
 from proxsuite.proxsuite_pywrap_avx2 import proxqp
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import QPSolverException, HardConstraintsViolatedException, InfeasibleException
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.qp.solvers.qp_solver_ids import SupportedQPSolver

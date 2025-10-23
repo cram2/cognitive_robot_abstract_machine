@@ -5,10 +5,10 @@ import numpy as np
 from giskardpy.motion_statechart.data_types import LifeCycleState, ObservationState
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from line_profiler import profile
 
-from semantic_world.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
 
 T = TypeVar("T", bound=MotionStatechartNode)
 

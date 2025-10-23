@@ -6,10 +6,10 @@ from typing import Tuple, List, TYPE_CHECKING
 import numpy as np
 from line_profiler import profile
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.qp.adapters.qp_adapter import GiskardToQPAdapter
 from giskardpy.qp.qp_data import QPData
-from semantic_world.spatial_types.symbol_manager import SymbolManager
+from semantic_digital_twin.spatial_types.symbol_manager import SymbolManager
 
 if TYPE_CHECKING:
     pass

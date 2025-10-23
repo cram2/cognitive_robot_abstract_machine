@@ -1,11 +1,11 @@
 from typing import List
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.monitors.monitors import Monitor
 from giskardpy.utils.decorators import validated_dataclass
-from semantic_world.world_description.connections import OmniDrive
-from semantic_world.world_description.world_entity import Body
+from semantic_digital_twin.world_description.connections import OmniDrive
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @validated_dataclass

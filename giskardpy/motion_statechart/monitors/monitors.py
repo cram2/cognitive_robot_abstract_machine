@@ -5,13 +5,13 @@ from abc import ABC
 from dataclasses import field
 from functools import cached_property
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import GiskardException
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.data_types import ObservationState
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.utils.decorators import validated_dataclass
-from semantic_world.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
 
 
 @validated_dataclass

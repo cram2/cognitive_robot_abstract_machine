@@ -3,9 +3,9 @@ import numpy as np
 from unittest.mock import Mock
 from typing import Tuple
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
-from semantic_world.spatial_types.symbol_manager import SymbolManager, symbol_manager
+from semantic_digital_twin.spatial_types.symbol_manager import SymbolManager, symbol_manager
 
 
 class TestSymbolManager:

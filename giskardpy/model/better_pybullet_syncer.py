@@ -8,12 +8,12 @@ from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.bpb_wrapper import create_shape_from_link, create_collision
 from giskardpy.model.collisions import GiskardCollision
-from semantic_world.collision_checking.collision_detector import (
+from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionDetector,
     CollisionCheck,
 )
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.world_description.world_entity import Body
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass

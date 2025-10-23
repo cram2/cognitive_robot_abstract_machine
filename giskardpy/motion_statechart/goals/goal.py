@@ -4,16 +4,16 @@ from dataclasses import field
 from functools import cached_property
 from typing import List, Union
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.monitors.monitors import Monitor
 from giskardpy.motion_statechart.tasks.task import Task
 from giskardpy.utils.decorators import validated_dataclass
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.spatial_types.symbol_manager import symbol_manager
-from semantic_world.world_description.connections import (
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
 )
 

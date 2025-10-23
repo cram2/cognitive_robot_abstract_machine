@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import IntEnum, Enum
 from typing import Union
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 
 goal_parameter = Union[str, float, bool, dict, list, IntEnum, None]
 

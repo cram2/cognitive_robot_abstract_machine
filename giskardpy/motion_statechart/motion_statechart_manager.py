@@ -8,7 +8,7 @@ from typing import List, Tuple, Dict, Optional, Union, Iterable, Set
 import numpy as np
 from line_profiler import profile
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.motion_statechart.data_types import LifeCycleState, ObservationState
 from giskardpy.data_types.exceptions import GiskardException, GoalInitalizationException
 from giskardpy.god_map import god_map
@@ -33,7 +33,7 @@ from giskardpy.qp.constraint import (
 )
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.utils.utils import get_all_classes_in_package, ImmutableDict
-from semantic_world.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
 
 
 def monitor_list_to_monitor_name_tuple(

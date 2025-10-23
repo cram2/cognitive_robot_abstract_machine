@@ -2,14 +2,14 @@ from copy import copy
 from typing import List
 
 import numpy as np
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 import giskardpy.utils.math as gm
 from giskardpy.utils.decorators import memoize
 from giskardpy.god_map import god_map
 from line_profiler import profile
 
-from semantic_world.spatial_types.derivatives import DerivativeMap
-from semantic_world.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
 
 
 def shifted_velocity_profile(vel_profile, acc_profile, distance, dt):

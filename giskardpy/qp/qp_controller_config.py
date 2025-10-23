@@ -6,7 +6,7 @@ from typing import Optional, Dict, Type
 
 import numpy as np
 
-from semantic_world.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from giskardpy.data_types.exceptions import QPSolverException
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
@@ -15,8 +15,8 @@ from giskardpy.qp.qp_formulation import QPFormulation
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.qp.solvers.qp_solver_ids import SupportedQPSolver
 from giskardpy.utils.utils import get_all_classes_in_module
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 
 available_solvers: Dict[SupportedQPSolver, Type[QPSolver]] = {}
 

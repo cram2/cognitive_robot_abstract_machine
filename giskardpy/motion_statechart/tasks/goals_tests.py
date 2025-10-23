@@ -1,11 +1,11 @@
 import numpy as np
 
-import semantic_world.spatial_types.spatial_types as cas
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.tasks.task import Task
 from giskardpy.utils.decorators import validated_dataclass
-from semantic_world.spatial_types.symbol_manager import symbol_manager
-from semantic_world.world_description.connections import ActiveConnection1DOF
+from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 
 @validated_dataclass
