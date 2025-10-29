@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import field
+from dataclasses import field, dataclass
 from functools import cached_property
 from typing import Optional, Union
+
+from random_events.utils import SubclassJSONSerializer
+from typing_extensions import Dict, Any, Self
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
@@ -10,8 +13,50 @@ from giskardpy.utils.decorators import validated_dataclass
 from giskardpy.utils.utils import string_shortener, quote_node_names
 
 
+@dataclass
+class StateTransitionCondition:
+    """Encapsulates both string and expression representations of a condition."""
+
+    expression: Optional[cas.Expression] = None
+    _raw_string: Optional[str] = None
+    _parsed_expression: Optional[cas.Expression] = None
+    _default_value: str = "False"
+
+    @classmethod
+    def create_true(cls) -> Self:
+        return cls(expression=cas.TrinaryTrue)
+
+    @classmethod
+    def create_false(cls) -> Self:
+        return cls(expression=cas.TrinaryFalse)
+
+    @classmethod
+    def from_str(cls, value: str) -> Self:
+        return cls(value)
+
+    @property
+    def string_representation(self) -> str:
+        if self._raw_string is None:
+            return self._default_value
+        return quote_node_names(self._raw_string)
+
+    @property
+    def expression(self) -> Optional[cas.Expression]:
+        return self._parsed_expression
+
+    def set_string(self, value: Union[str, "MotionStatechartNode"]) -> None:
+        if hasattr(value, "name"):  # MotionStatechartNode
+            value = value.name
+        if value == "":
+            value = self._default_value
+        self._raw_string = value
+
+    def set_expression(self, expression: cas.Expression) -> None:
+        self._parsed_expression = expression
+
+
 @validated_dataclass
-class MotionStatechartNode:
+class MotionStatechartNode(SubclassJSONSerializer):
     name: str
 
     _plot: bool = field(default=True, kw_only=True)
@@ -19,18 +64,28 @@ class MotionStatechartNode:
         default_factory=lambda: cas.TrinaryUnknown, init=False
     )
 
-    _unparsed_start_condition: Optional[str] = field(default=None, init=False)
-    _unparsed_pause_condition: Optional[str] = field(default=None, init=False)
-    _unparsed_end_condition: Optional[str] = field(default=None, init=False)
-    _unparsed_reset_condition: Optional[str] = field(default=None, init=False)
-
-    logic3_start_condition: Optional[cas.Expression] = field(default=None, init=False)
-    logic3_pause_condition: Optional[cas.Expression] = field(default=None, init=False)
-    logic3_end_condition: Optional[cas.Expression] = field(default=None, init=False)
-    logic3_reset_condition: Optional[cas.Expression] = field(default=None, init=False)
+    start_condition: StateTransitionCondition = field(
+        default_factory=StateTransitionCondition.create_true, init=False
+    )
+    pause_condition: StateTransitionCondition = field(
+        default_factory=StateTransitionCondition.create_false, init=False
+    )
+    end_condition: StateTransitionCondition = field(
+        default_factory=StateTransitionCondition.create_false, init=False
+    )
+    reset_condition: StateTransitionCondition = field(
+        default_factory=StateTransitionCondition.create_false, init=False
+    )
 
     def __str__(self):
         return self.name
+
+    def to_json(self) -> Dict[str, Any]:
+        return {**super().to_json(), "name": self.name, "_plot": self._plot}
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        return cls(name=data["name"], prefix=data["prefix"])
 
     def set_unparsed_conditions(
         self,
