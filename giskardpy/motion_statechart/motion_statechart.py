@@ -8,6 +8,7 @@ import rustworkx as rx
 from typing_extensions import List, MutableMapping, ClassVar, Self, Type
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
+from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
@@ -17,6 +18,8 @@ from giskardpy.motion_statechart.graph_node import (
     GenericMotionStatechartNode,
     PayloadMonitor,
 )
+from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphviz
+from giskardpy.utils.utils import create_path
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
 
@@ -78,13 +81,6 @@ class State(MutableMapping[MotionStatechartNode, float]):
 
     def __repr__(self) -> str:
         return str(self)
-
-
-class LifeCycleValues(IntEnum):
-    NOT_STARTED = 0
-    RUNNING = 1
-    PAUSED = 2
-    DONE = 3
 
 
 @dataclass(repr=False)
@@ -306,3 +302,10 @@ class MotionStatechart:
         for node in self.get_nodes_by_type(CancelMotion):
             if self.observation_state[node] == ObservationState.TrinaryTrue:
                 raise node.exception
+
+    def draw(self):
+        graph = MotionStatechartGraphviz(self).to_dot_graph()
+        file_name = "muh.pdf"
+        # create_path(file_name)
+        graph.write_pdf(file_name)
+        print(f"Saved task graph at {file_name}.")

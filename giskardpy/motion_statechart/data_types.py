@@ -8,12 +8,12 @@ import semantic_digital_twin.spatial_types.spatial_types as cas
 goal_parameter = Union[str, float, bool, dict, list, IntEnum, None]
 
 
-class LifeCycleState(IntEnum):
-    not_started = 0
-    running = 1
-    paused = 2
-    succeeded = 3
-    failed = 4
+class LifeCycleValues(IntEnum):
+    NOT_STARTED = 0
+    RUNNING = 1
+    PAUSED = 2
+    DONE = 3
+    FAILED = 4
 
 
 class FloatEnum(float, Enum):

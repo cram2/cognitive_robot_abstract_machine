@@ -64,6 +64,15 @@ class StateTransitionCondition:
     def apply_to_motion_state_chart(self):
         self.motion_statechart.add_transition(self)
 
+    def __str__(self):
+        """
+        Takes a logical expression, replaces the state symbols with monitor names and formats it nicely.
+        """
+        free_symbols = self.expression.free_symbols()
+        if not free_symbols:
+            return str(cas.is_true_symbol(self.expression))
+        return cas.trinary_logic_to_str(self.expression)
+
 
 @dataclass(repr=False, eq=False)
 class MotionStatechartNode(cas.Symbol, SubclassJSONSerializer):
@@ -84,6 +93,9 @@ class MotionStatechartNode(cas.Symbol, SubclassJSONSerializer):
     )
 
     _plot: bool = field(default=True, kw_only=True)
+    _plot_style: str = field(kw_only=True)
+    _plot_shape: str = field(kw_only=True)
+    _plot_extra_boarder_styles: List[str] = field(default_factory=list, kw_only=True)
 
     _start_condition: StateTransitionCondition = field(init=False)
     _pause_condition: StateTransitionCondition = field(init=False)
@@ -192,7 +204,9 @@ GenericMotionStatechartNode = TypeVar(
 
 
 @dataclass(eq=False, repr=False)
-class Monitor(MotionStatechartNode): ...
+class Monitor(MotionStatechartNode):
+    _plot_style: str = field(default="filled, rounded", kw_only=True)
+    _plot_shape: str = field(default="rectangle", kw_only=True)
 
 
 @dataclass(eq=False, repr=False)
@@ -218,6 +232,11 @@ class EndMotion(MotionStatechartNode):
     observation_expression: cas.Expression = field(
         default_factory=lambda: cas.TrinaryTrue, init=False
     )
+    _plot_boarder_styles: List[str] = field(
+        default_factory=lambda: ["rounded"], kw_only=True
+    )
+    _plot_style: str = field(default="filled, rounded", kw_only=True)
+    _plot_shape: str = field(default="rectangle", kw_only=True)
 
 
 @dataclass(eq=False)
@@ -226,3 +245,8 @@ class CancelMotion(MotionStatechartNode):
     observation_expression: cas.Expression = field(
         default_factory=lambda: cas.TrinaryTrue, init=False
     )
+    _plot_extra_boarder_styles: List[str] = field(
+        default_factory=lambda: ["dashed, rounded"], kw_only=True
+    )
+    _plot_style: str = field(default="filled, rounded", kw_only=True)
+    _plot_shape: str = field(default="rectangle", kw_only=True)

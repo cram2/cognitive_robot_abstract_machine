@@ -9,7 +9,7 @@ from giskardpy.data_types.exceptions import (
     DuplicateNameException,
 )
 from giskardpy.god_map import god_map
-from giskardpy.motion_statechart.data_types import LifeCycleState
+from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.qp.constraint import DerivativeEqualityConstraint
 from giskardpy.qp.constraint import (
@@ -41,6 +41,9 @@ class Task(MotionStatechartNode):
     """
     Tasks are a set of constraints with the same predicates.
     """
+
+    _plot_style: str = field(default="filled, diagonals", kw_only=True)
+    _plot_shape: str = field(default="rectangle", kw_only=True)
 
     eq_constraints: List[EqualityConstraint] = field(default_factory=list, init=False)
     neq_constraints: List[InequalityConstraint] = field(
@@ -82,7 +85,7 @@ class Task(MotionStatechartNode):
         for constraint in constraints:
             is_running = cas.if_eq(
                 self.life_cycle_state_symbol,
-                int(LifeCycleState.running),
+                int(LifeCycleValues.RUNNING),
                 if_result=cas.Expression(1),
                 else_result=cas.Expression(0),
             )

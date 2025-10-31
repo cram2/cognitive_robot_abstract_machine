@@ -11,6 +11,8 @@ from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 @dataclass(eq=False, repr=False)
 class Goal(MotionStatechartNode):
     nodes: List[MotionStatechartNode] = field(default_factory=list)
+    _plot_style: str = field(default="filled", kw_only=True)
+    _plot_shape: str = field(default="none", kw_only=True)
 
     def add_node(self, node: MotionStatechartNode) -> None:
         self.nodes.append(node)

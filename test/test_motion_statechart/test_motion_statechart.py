@@ -1,6 +1,7 @@
 import pytest
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
+from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
@@ -11,7 +12,6 @@ from giskardpy.motion_statechart.monitors.monitors import TrueMonitor
 from giskardpy.motion_statechart.monitors.payload_monitors import Print
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
-    LifeCycleValues,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -20,6 +20,26 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import Body
+
+
+def test_condition_to_str():
+    msg = MotionStatechart(World())
+    node1 = TrueMonitor(name=PrefixedName("muh"), motion_statechart=msg)
+    node2 = TrueMonitor(name=PrefixedName("muh2"), motion_statechart=msg)
+    node3 = TrueMonitor(name=PrefixedName("muh3"), motion_statechart=msg)
+    end = EndMotion(name=PrefixedName("done"), motion_statechart=msg)
+
+    end.start_condition = cas.trinary_logic_and(
+        node1, cas.trinary_logic_or(node2, cas.trinary_logic_not(node3))
+    )
+    a = str(end._start_condition)
+    assert a == '"muh" and ("muh2" or not "muh3")'
+
+
+def test_motion_statechart_to_dot():
+    msg = MotionStatechart(World())
+    node1 = TrueMonitor(name=PrefixedName("muh"), motion_statechart=msg)
+    msg.draw()
 
 
 def test_motion_statechart():
@@ -31,6 +51,7 @@ def test_motion_statechart():
     end = EndMotion(name=PrefixedName("done"), motion_statechart=msg)
 
     node1.start_condition = cas.trinary_logic_or(node3, node2)
+    a = str(node1._start_condition)
     end.start_condition = node1
     assert len(msg.nodes) == 4
     assert len(msg.edges) == 3
@@ -346,6 +367,7 @@ def test_nested_goals():
 
     # compile and check initial states
     msg.compile()
+    msg.draw()
     assert msg.observation_state[node1] == msg.observation_state.TrinaryUnknown
     assert msg.observation_state[sub_node1] == msg.observation_state.TrinaryUnknown
     assert msg.observation_state[sub_node2] == msg.observation_state.TrinaryUnknown
