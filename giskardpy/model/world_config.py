@@ -80,18 +80,20 @@ class WorldWithOmniDriveRobot(WorldConfig):
     def setup_world(self):
         map = Body(name=self.root_name)
         odom = Body(name=self.odom_body_name)
-        localization = Connection6DoF(parent=map, child=odom, _world=self.world)
+        localization = Connection6DoF.create_with_dofs(
+            parent=map, child=odom, world=self.world
+        )
         self.world.add_connection(localization)
 
         urdf_parser = URDFParser(urdf=self.urdf)
         world_with_robot = urdf_parser.parse()
 
-        odom = OmniDrive(
+        odom = OmniDrive.create_with_dofs(
             parent=odom,
             child=world_with_robot.root,
             translation_velocity_limits=0.2,
             rotation_velocity_limits=0.2,
-            _world=self.world,
+            world=self.world,
         )
 
         self.world.merge_world(world_with_robot, odom)
