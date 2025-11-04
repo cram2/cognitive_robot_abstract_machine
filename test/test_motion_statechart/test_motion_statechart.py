@@ -69,6 +69,36 @@ def test_self_start_condition():
     pass
 
 
+@pytest.mark.skip(reason="not implemented yet")
+def test_all_conditions_with_goals():
+    pass
+
+
+@pytest.mark.skip(reason="not implemented yet")
+def test_all_conditions_with_nodes():
+    pass
+
+
+@pytest.mark.skip(reason="not implemented yet")
+def test_arrange_in_sequence():
+    pass
+
+
+@pytest.mark.skip(reason="not implemented yet")
+def test_transition_hooks():
+    pass
+
+
+@pytest.mark.skip(reason="not implemented yet")
+def test_optionality_of_qp_controller_in_compile():
+    pass
+
+
+@pytest.mark.skip(reason="not implemented yet")
+def test_state_deletion():
+    pass
+
+
 def test_motion_statechart():
     msc = MotionStatechart(World())
 
