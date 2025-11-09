@@ -1,6 +1,6 @@
 from __future__ import division
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
@@ -15,8 +15,8 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 @dataclass
 class InsertCylinder(Goal):
-    cylinder_name: Body
-    hole_point: cas.Point3
+    cylinder_name: Body= field(kw_only=True)
+    hole_point: cas.Point3= field(kw_only=True)
     cylinder_height: Optional[float] = None
     up: Optional[cas.Vector3] = None
     pre_grasp_height: float = 0.1

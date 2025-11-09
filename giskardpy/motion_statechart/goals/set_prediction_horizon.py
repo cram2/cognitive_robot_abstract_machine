@@ -3,6 +3,7 @@ from typing import Union
 
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.qp.solvers.qp_solver_ids import SupportedQPSolver
 
 
 @dataclass
