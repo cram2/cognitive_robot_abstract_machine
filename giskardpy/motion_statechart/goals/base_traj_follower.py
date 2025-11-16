@@ -88,21 +88,21 @@ class BaseTrajFollower(Goal):
         odom_T_base_footprint_goal = self.make_odom_T_base_footprint_goal(
             t_in_s, derivative
         )
-        map_T_odom = god_map.world._forward_kinematic_manager.compose_expression(
-            god_map.world.root_link_name, self.odom_link
+        map_T_odom = context.world._forward_kinematic_manager.compose_expression(
+            context.world.root_link_name, self.odom_link
         )
         return map_T_odom @ odom_T_base_footprint_goal
 
     @profile
     def trans_error_at(self, t_in_s: float):
         odom_T_base_footprint_goal = self.make_odom_T_base_footprint_goal(t_in_s)
-        map_T_odom = god_map.world.compute_forward_kinematics(
-            god_map.world.root_link_name, self.odom_link
+        map_T_odom = context.world.compute_forward_kinematics(
+            context.world.root_link_name, self.odom_link
         )
         map_T_base_footprint_goal = map_T_odom @ odom_T_base_footprint_goal
         map_T_base_footprint_current = (
-            god_map.world._forward_kinematic_manager.compose_expression(
-                god_map.world.root_link_name, self.base_footprint_link
+            context.world._forward_kinematic_manager.compose_expression(
+                context.world.root_link_name, self.base_footprint_link
             )
         )
 
@@ -116,8 +116,8 @@ class BaseTrajFollower(Goal):
         errors_x = []
         errors_y = []
         map_T_base_footprint = (
-            god_map.world._forward_kinematic_manager.compose_expression(
-                god_map.world.root_link_name, self.base_footprint_link
+            context.world._forward_kinematic_manager.compose_expression(
+                context.world.root_link_name, self.base_footprint_link
             )
         )
         for t in range(context.qp_controller.prediction_horizon):

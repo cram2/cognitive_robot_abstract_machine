@@ -45,19 +45,19 @@ from semantic_digital_twin.world_description.world_entity import Body
 #             self.pointing_axis.reference_frame = self.tip_link
 #         self.map = self.root_link
 #         self.base_footprint = self.tip_link
-#         self.goal_pose = god_map.world.transform(
+#         self.goal_pose = context.world.transform(
 #             target_frame=self.map, spatial_object=self.goal_pose
 #         )
 #         self.goal_pose.z = 0
 #         diff_drive_joints = [
-#             v for k, v in god_map.world.joints.items() if isinstance(v, DiffDrive)
+#             v for k, v in context.world.joints.items() if isinstance(v, DiffDrive)
 #         ]
 #         assert len(diff_drive_joints) == 1
 #         self.joint: DiffDrive = diff_drive_joints[0]
 #         self.odom = self.joint.parent_link_name
 #
 #         if self.pointing_axis is not None:
-#             self.base_footprint_V_pointing_axis = god_map.world.transform(
+#             self.base_footprint_V_pointing_axis = context.world.transform(
 #                 target_frame=self.base_footprint, spatial_object=self.pointing_axis
 #             )
 #             self.base_footprint_V_pointing_axis.scale(1)
@@ -66,10 +66,10 @@ from semantic_digital_twin.world_description.world_entity import Body
 #             self.base_footprint_V_pointing_axis.reference_frame = self.base_footprint
 #             self.base_footprint_V_pointing_axis.z = 1
 #
-#         map_T_base_current = god_map.world.compute_forward_kinematics(
+#         map_T_base_current = context.world.compute_forward_kinematics(
 #             self.map, self.base_footprint
 #         )
-#         map_T_odom_current = god_map.world.compute_forward_kinematics(
+#         map_T_odom_current = context.world.compute_forward_kinematics(
 #             self.map, self.odom
 #         )
 #         _, map_odom_angle = map_T_odom_current.to_rotation_matrix().to_axis_angle()
@@ -77,7 +77,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 #         axis_start, angle_start = map_R_base_current.to_axis_angle()
 #         angle_start = cas.if_greater_zero(axis_start[2], angle_start, -angle_start)
 #
-#         map_T_base_footprint = god_map.world.compose_forward_kinematics_expression(
+#         map_T_base_footprint = context.world.compose_forward_kinematics_expression(
 #             self.map, self.base_footprint
 #         )
 #         map_P_base_footprint = map_T_base_footprint.to_position()

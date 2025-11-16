@@ -53,8 +53,8 @@ class GraspSequence(Goal):
         )
         self.add_task(grasp)
 
-        lift_pose = god_map.world.transform(
-            target_frame=god_map.world.root_link_name, spatial_object=self.goal_pose
+        lift_pose = context.world.transform(
+            target_frame=context.world.root_link_name, spatial_object=self.goal_pose
         )
         lift_pose.z += 0.1
 
@@ -80,7 +80,7 @@ class Cutting(Goal):
     weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
-        schnibble_down_pose = god_map.world.compute_forward_kinematics(
+        schnibble_down_pose = context.world.compute_forward_kinematics(
             root=self.tip_link, tip=self.tip_link
         )
         schnibble_down_pose.x = -self.depth
@@ -104,7 +104,7 @@ class Cutting(Goal):
         self.add_monitor(cancel)
         cancel.start_condition = f"not {made_contact.name}"
 
-        schnibble_up_pose = god_map.world.compute_forward_kinematics(
+        schnibble_up_pose = context.world.compute_forward_kinematics(
             root=self.tip_link, tip=self.tip_link
         )
         schnibble_up_pose.x = self.depth
@@ -117,7 +117,7 @@ class Cutting(Goal):
         )
         self.add_task(cut_up)
 
-        schnibble_right_pose = god_map.world.compute_forward_kinematics(
+        schnibble_right_pose = context.world.compute_forward_kinematics(
             root=self.tip_link, tip=self.tip_link
         )
         schnibble_right_pose.y = self.right_shift

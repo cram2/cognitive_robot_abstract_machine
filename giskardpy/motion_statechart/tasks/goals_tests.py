@@ -11,21 +11,21 @@ from semantic_digital_twin.world_description.connections import ActiveConnection
 @dataclass
 class DebugGoal(Task):
     def __post_init__(self):
-        q = cas.Quaternion(reference_frame=god_map.world.root)
+        q = cas.Quaternion(reference_frame=context.world.root)
         god_map.debug_expression_manager.add_debug_expression("q", q)
 
-        p = cas.Point3(1, 0, 0, reference_frame=god_map.world.root)
+        p = cas.Point3(1, 0, 0, reference_frame=context.world.root)
         god_map.debug_expression_manager.add_debug_expression("p", p)
 
         pose = cas.TransformationMatrix.from_xyz_rpy(
-            y=1, reference_frame=god_map.world.root
+            y=1, reference_frame=context.world.root
         )
         god_map.debug_expression_manager.add_debug_expression("pose", pose)
 
-        v = cas.Vector3(1, 0, 0, reference_frame=god_map.world.root)
+        v = cas.Vector3(1, 0, 0, reference_frame=context.world.root)
         god_map.debug_expression_manager.add_debug_expression("v", v)
 
-        r = cas.Quaternion(reference_frame=god_map.world.root).to_rotation_matrix()
+        r = cas.Quaternion(reference_frame=context.world.root).to_rotation_matrix()
         god_map.debug_expression_manager.add_debug_expression("r", r)
 
         e1 = cas.Expression(np.eye(3))
@@ -47,7 +47,7 @@ class CannotResolveSymbol(Task):
     def __post_init__(self):
         self.data = {}
         s = symbol_manager.register_symbol_provider("s", provider=lambda: self.data[2])
-        joint: ActiveConnection1DOF = god_map.world.get_connection_by_name(
+        joint: ActiveConnection1DOF = context.world.get_connection_by_name(
             self.joint_name
         )
         joint_position = joint.dof.variables.position

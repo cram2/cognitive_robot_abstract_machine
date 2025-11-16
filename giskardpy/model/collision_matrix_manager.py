@@ -235,11 +235,11 @@ class CollisionMatrixManager:
     #         for robot in god_map.collision_scene.robots:
     #             for body in robot.bodies_with_collisions:
     #                 try:
-    #                     controlled_parent_joint = god_map.world.get_controlled_parent_joint_of_link(body)
+    #                     controlled_parent_joint = context.world.get_controlled_parent_joint_of_link(body)
     #                 except KeyError as e:
     #                     continue  # this happens when the root link of a robot has a collision model
     #                 distance = external_distances[controlled_parent_joint].buffer_zone_distance
-    #                 for child_link_name in god_map.world.get_directly_controlled_child_links_with_collisions(
+    #                 for child_link_name in context.world.get_directly_controlled_child_links_with_collisions(
     #                         controlled_parent_joint):
     #                     max_distances[child_link_name] = distance
     #
@@ -257,7 +257,7 @@ class CollisionMatrixManager:
         Tell Giskard to check this collision, even if it got disabled through other means such as allow_all_collisions.
         """
         check = CollisionCheck.create_and_validate(
-            body_a=body_a, body_b=body_b, distance=distance, world=god_map.world
+            body_a=body_a, body_b=body_b, distance=distance, world=self.world
         )
         if check in self.added_checks:
             raise ValueError(f"Collision check {check} already added")
@@ -324,8 +324,8 @@ class CollisionMatrixManager:
     #                 self.disabled_pairs.add((body_a, body_b))
 
     # def disable_non
-    #     for group in god_map.world.groups.values():
+    #     for group in self.world.groups.values():
     #         if group.name not in self.robot_names:
     #             for link_a, link_b in set(combinations_with_replacement(group.link_names_with_collisions, 2)):
-    #                 key = god_map.world.sort_links(link_a, link_b)
+    #                 key = self.world.sort_links(link_a, link_b)
     #                 self.self_collision_matrix[key] = DisableCollisionReason.Unknown

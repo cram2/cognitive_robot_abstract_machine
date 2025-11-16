@@ -72,8 +72,8 @@ class CollisionWorldSynchronizer:
         self.collision_detector.sync_world_state()
 
     def has_world_model_changed(self) -> bool:
-        if self.world_model_version != god_map.world.get_world_model_manager().version:
-            self.world_model_version = god_map.world.get_world_model_manager().version
+        if self.world_model_version != self.world.get_world_model_manager().version:
+            self.world_model_version = self.world.get_world_model_manager().version
             return True
         return False
 

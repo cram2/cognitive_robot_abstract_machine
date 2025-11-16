@@ -49,7 +49,7 @@ class WiggleInsert(Task):
                                                                          hole_point
         """
         if self.hole_normal is None:
-            self.hole_normal = cas.Vector3(0, 0, 0, reference_frame=god_map.world.root)
+            self.hole_normal = cas.Vector3(0, 0, 0, reference_frame=context.world.root)
 
         # Random-Sample works better with control_dt and Random-Walk with throttling using self.dt in my testing
         if self.random_walk:
@@ -81,10 +81,10 @@ class WiggleInsert(Task):
         self.v1 = cas.Vector3(*v1, reference_frame=self.hole_normal.reference_frame)
         self.v2 = cas.Vector3(*v2, reference_frame=self.hole_normal.reference_frame)
 
-        r_P_c = god_map.world._forward_kinematic_manager.compose_expression(
+        r_P_c = context.world._forward_kinematic_manager.compose_expression(
             self.root_link, self.tip_link
         ).to_position()
-        r_P_g = god_map.world.transform(
+        r_P_g = context.world.transform(
             target_frame=self.root_link, spatial_object=self.hole_point
         )
 
@@ -110,17 +110,17 @@ class WiggleInsert(Task):
             output_type_hint=cas.FloatVariable,
         )
 
-        tip_V_hole_normal = god_map.world.transform(
+        tip_V_hole_normal = context.world.transform(
             target_frame=self.tip_link, spatial_object=self.hole_normal
         )
         tip_R_hole_normal = cas.RotationMatrix.from_axis_angle(
             angle=angle, axis=tip_V_hole_normal
         )
-        root_R_hole_normal = god_map.world.compute_fk(
+        root_R_hole_normal = context.world.compute_fk(
             self.root_link, self.tip_link
         ).dot(tip_R_hole_normal)
 
-        r_T_c = god_map.world._forward_kinematic_manager.compose_expression(
+        r_T_c = context.world._forward_kinematic_manager.compose_expression(
             self.root_link, self.tip_link
         )
         r_R_c = r_T_c.to_rotation_matrix()

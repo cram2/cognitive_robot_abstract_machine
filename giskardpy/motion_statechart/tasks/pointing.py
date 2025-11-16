@@ -100,16 +100,16 @@ class PointingCone(Task):
         :param max_velocity: rad/s
         :param weight:
         """
-        self.root_P_goal_point = god_map.world.transform(
+        self.root_P_goal_point = context.world.transform(
             target_frame=self.root_link, spatial_object=self.goal_point
         ).to_np()
 
-        tip_V_pointing_axis = god_map.world.transform(
+        tip_V_pointing_axis = context.world.transform(
             target_frame=self.tip_link, spatial_object=self.pointing_axis
         )
         tip_V_pointing_axis.scale(1)
 
-        root_T_tip = god_map.world._forward_kinematic_manager.compose_expression(
+        root_T_tip = context.world._forward_kinematic_manager.compose_expression(
             self.root_link, self.tip_link
         )
         root_P_goal_point = symbol_manager.register_point3(

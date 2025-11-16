@@ -27,9 +27,6 @@ if TYPE_CHECKING:
 
 
 class GodMap:
-    # %% important objects
-    world: World
-
     # %% managers
     debug_expression_manager: DebugExpressionManager
 

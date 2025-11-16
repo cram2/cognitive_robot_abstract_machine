@@ -26,7 +26,7 @@ class SpiralMixing(Task):
 
     def __post_init__(self):
 
-        root_T_tip = god_map.world._forward_kinematic_manager.compose_expression(
+        root_T_tip = context.world._forward_kinematic_manager.compose_expression(
             root_link=self.root_link, tip_link=self.tip_link
         )
         t = context.time_symbol
@@ -44,7 +44,7 @@ class SpiralMixing(Task):
         object_T_goal.y = y
         object_T_goal.z = z
 
-        root_T_object = god_map.world._forward_kinematic_manager.compose_expression(
+        root_T_object = context.world._forward_kinematic_manager.compose_expression(
             root_link=self.root_link, tip_link=self.object_name
         )
         root_T_goal = root_T_object.dot(object_T_goal)

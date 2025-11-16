@@ -37,16 +37,16 @@ class GraspBar(Task):
         :param reference_angular_velocity: rad/s
         :param weight:
         """
-        bar_center = god_map.world.transform(
+        bar_center = context.world.transform(
             target_frame=self.root_link, spatial_object=self.bar_center
         )
 
-        tip_grasp_axis = god_map.world.transform(
+        tip_grasp_axis = context.world.transform(
             target_frame=self.tip_link, spatial_object=self.tip_grasp_axis
         )
         tip_grasp_axis.scale(1)
 
-        bar_axis = god_map.world.transform(
+        bar_axis = context.world.transform(
             target_frame=self.root_link, spatial_object=self.bar_axis
         )
         bar_axis.scale(1)
@@ -59,7 +59,7 @@ class GraspBar(Task):
         tip_V_tip_grasp_axis = self.tip_grasp_axis
         root_P_bar_center = self.bar_center
 
-        root_T_tip = god_map.world._forward_kinematic_manager.compose_expression(
+        root_T_tip = context.world._forward_kinematic_manager.compose_expression(
             self.root_link, self.tip_link
         )
         root_V_tip_normal = root_T_tip @ tip_V_tip_grasp_axis
@@ -71,7 +71,7 @@ class GraspBar(Task):
             weight=self.weight,
         )
 
-        root_P_tip = god_map.world._forward_kinematic_manager.compose_expression(
+        root_P_tip = context.world._forward_kinematic_manager.compose_expression(
             self.root_link, self.tip_link
         ).to_position()
 

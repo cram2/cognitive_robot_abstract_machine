@@ -24,14 +24,14 @@ class FeatureFunctionGoal(Task):
     reference_feature: Union[cas.Point3, cas.Vector3] = field(init=False)
 
     def __post_init__(self):
-        root_reference_feature = god_map.world.transform(
+        root_reference_feature = context.world.transform(
             target_frame=self.root_link, spatial_object=self.reference_feature
         )
-        tip_controlled_feature = god_map.world.transform(
+        tip_controlled_feature = context.world.transform(
             target_frame=self.tip_link, spatial_object=self.controlled_feature
         )
 
-        root_T_tip = god_map.world._forward_kinematic_manager.compose_expression(
+        root_T_tip = context.world._forward_kinematic_manager.compose_expression(
             self.root_link, self.tip_link
         )
         if isinstance(self.controlled_feature, cas.Point3):

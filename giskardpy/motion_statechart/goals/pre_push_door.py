@@ -29,16 +29,16 @@ class PrePushDoor(Goal):
             ActiveConnection1DOF
         )
         object_V_object_rotation_axis = cas.Vector3(
-            god_map.world.get_joint(object_joint_name).axis
+            context.world.get_joint(object_joint_name).axis
         )
 
-        root_T_tip = god_map.world._forward_kinematic_manager.compose_expression(
+        root_T_tip = context.world._forward_kinematic_manager.compose_expression(
             self.root_link, self.tip_link
         )
-        root_T_door = god_map.world._forward_kinematic_manager.compose_expression(
+        root_T_door = context.world._forward_kinematic_manager.compose_expression(
             self.root_link, self.door_object
         )
-        door_P_handle = god_map.world.compute_forward_kinematics(
+        door_P_handle = context.world.compute_forward_kinematics(
             self.door_object, self.door_handle
         )
         temp_point = np.asarray(
@@ -52,7 +52,7 @@ class PrePushDoor(Goal):
         door_V_v2 = object_V_object_rotation_axis  # B
         door_V_v1 = cas.Vector3(door_V_v1)  # A
 
-        door_Pose_tip = god_map.world._forward_kinematic_manager.compose_expression(
+        door_Pose_tip = context.world._forward_kinematic_manager.compose_expression(
             self.door_object, self.tip_link
         )
         door_P_tip = door_Pose_tip.to_position()

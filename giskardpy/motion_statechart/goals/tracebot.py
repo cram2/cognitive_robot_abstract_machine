@@ -24,19 +24,19 @@ class InsertCylinder(Goal):
     get_straight_after: float = 0.02
 
     def __post_init__(self):
-        self.root = god_map.world.root
+        self.root = context.world.root
         self.tip = self.cylinder_name
         if self.cylinder_height is None:
-            self.cylinder_height = god_map.world.links[self.tip].collisions[0].height
+            self.cylinder_height = context.world.links[self.tip].collisions[0].height
         else:
             self.cylinder_height = self.cylinder_height
-        self.root_P_hole = god_map.world.transform(
+        self.root_P_hole = context.world.transform(
             target_frame=self.root, spatial_object=self.hole_point
         )
         if self.up is None:
             self.up = cas.Vector3.Z()
             self.up.reference_frame = self.root
-        self.root_V_up = god_map.world.transform(
+        self.root_V_up = context.world.transform(
             target_frame=self.root, spatial_object=self.up
         )
 
@@ -44,7 +44,7 @@ class InsertCylinder(Goal):
 
         root_P_hole = self.root_P_hole
         root_V_up = self.root_V_up
-        root_T_tip = god_map.world._forward_kinematic_manager.compose_expression(
+        root_T_tip = context.world._forward_kinematic_manager.compose_expression(
             self.root, self.tip
         )
         root_P_tip = root_T_tip.to_position()

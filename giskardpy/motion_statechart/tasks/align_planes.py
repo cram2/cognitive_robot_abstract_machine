@@ -28,17 +28,17 @@ class AlignPlanes(Task):
         :param reference_velocity: rad/s
         :param weight:
         """
-        self.tip_V_tip_normal = god_map.world.transform(
+        self.tip_V_tip_normal = context.world.transform(
             target_frame=self.tip_link, spatial_object=self.tip_normal
         )
         self.tip_V_tip_normal.scale(1)
 
-        self.root_V_root_normal = god_map.world.transform(
+        self.root_V_root_normal = context.world.transform(
             target_frame=self.root_link, spatial_object=self.goal_normal
         )
         self.root_V_root_normal.scale(1)
 
-        root_R_tip = god_map.world._forward_kinematic_manager.compose_expression(
+        root_R_tip = context.world._forward_kinematic_manager.compose_expression(
             self.root_link, self.tip_link
         ).to_rotation_matrix()
         root_V_tip_normal = root_R_tip @ self.tip_V_tip_normal

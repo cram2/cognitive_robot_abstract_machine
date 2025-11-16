@@ -20,16 +20,16 @@ class DiffDriveTangentialToPoint(Task):
     drive: bool = False
 
     def __post_init__(self):
-        self.tip = god_map.world.get_kinematic_structure_entity_by_name(
+        self.tip = context.world.get_kinematic_structure_entity_by_name(
             PrefixedName("base_footprint", prefix=self.group_name)
         )
-        self.root = god_map.world.root()
-        self.goal_point = god_map.world.transform(
-            target_frame=god_map.world.root_link_name, spatial_object=self.goal_point
+        self.root = context.world.root()
+        self.goal_point = context.world.transform(
+            target_frame=context.world.root_link_name, spatial_object=self.goal_point
         )
         self.goal_point.z = 0
         if self.forward is not None:
-            self.tip_V_pointing_axis = god_map.world.transform(
+            self.tip_V_pointing_axis = context.world.transform(
                 target_frame=self.tip, spatial_object=self.forward
             )
             self.tip_V_pointing_axis.scale(1)
@@ -38,7 +38,7 @@ class DiffDriveTangentialToPoint(Task):
             self.tip_V_pointing_axis.reference_frame = self.tip
 
         map_P_center = self.goal_point
-        map_T_base = god_map.world._forward_kinematic_manager.compose_expression(
+        map_T_base = context.world._forward_kinematic_manager.compose_expression(
             self.root, self.tip
         )
         map_P_base = map_T_base.to_position()
@@ -90,12 +90,12 @@ class KeepHandInWorkspace(Task):
 
     def __post_init__(self):
         if self.base_footprint is None:
-            self.base_footprint = god_map.world.search_for_link_name("base_footprint")
+            self.base_footprint = context.world.search_for_link_name("base_footprint")
         if self.map_frame is None:
-            self.map_frame = god_map.world.root_link_name
+            self.map_frame = context.world.root_link_name
 
         if self.pointing_axis is not None:
-            self.map_V_pointing_axis = god_map.world.transform(
+            self.map_V_pointing_axis = context.world.transform(
                 target_frame=self.base_footprint, spatial_object=self.pointing_axis
             )
             self.map_V_pointing_axis.scale(1)
@@ -106,12 +106,12 @@ class KeepHandInWorkspace(Task):
         weight = DefaultWeights.WEIGHT_ABOVE_CA
         base_footprint_V_pointing_axis = cas.Vector3(self.map_V_pointing_axis)
         map_T_base_footprint = (
-            god_map.world._forward_kinematic_manager.compose_expression(
+            context.world._forward_kinematic_manager.compose_expression(
                 self.map_frame, self.base_footprint
             )
         )
         map_V_pointing_axis = map_T_base_footprint @ base_footprint_V_pointing_axis
-        map_T_tip = god_map.world._forward_kinematic_manager.compose_expression(
+        map_T_tip = context.world._forward_kinematic_manager.compose_expression(
             self.map_frame, self.tip_link
         )
         map_V_tip = cas.Vector3(map_T_tip.to_position())

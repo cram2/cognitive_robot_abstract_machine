@@ -11,7 +11,7 @@ from giskardpy.god_map import god_map
 from giskardpy.model.collisions import GiskardCollision
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from giskardpy.middleware import get_middleware
-from giskardpy.utils.utils import suppress_stdout
+from giskardpy.utils.utils import suppress_stdout, get_file_hash
 from semantic_digital_twin.world_description.geometry import (
     Shape,
     Box,
@@ -134,12 +134,10 @@ def load_convex_mesh_shape(
 def convert_to_decomposed_obj_and_save_in_tmp(
     file_name: str, log_path="/tmp/giskardpy/vhacd.log"
 ) -> str:
-    first_group_name = list(
-        god_map.world.get_semantic_annotations_by_type(AbstractRobot)
-    )[0].name
+    hopefully_unique_name = "_".join(file_name.split("/")[-4:])
     resolved_old_path = get_middleware().resolve_iri(file_name)
-    short_file_name = file_name.split("/")[-1][:-3]
-    obj_file_name = f"{first_group_name}/{short_file_name}obj"
+    short_file_name = file_name.split("/")[-1].split(".")[0]
+    obj_file_name = f"{hopefully_unique_name}/{short_file_name}.obj"
     new_path_original = god_map.to_tmp_path(obj_file_name)
     if not os.path.exists(new_path_original):
         mesh = trimesh.load(resolved_old_path, force="mesh")

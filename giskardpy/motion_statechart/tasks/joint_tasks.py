@@ -144,9 +144,9 @@ class MirrorJointPosition(Task):
         self.connections = []
         goal_state = {}
         for joint_name, target_joint_name in self.mapping.items():
-            connection = god_map.world.get_connection_by_name(joint_name)
+            connection = context.world.get_connection_by_name(joint_name)
             self.connections.append(connection)
-            target_connection = god_map.world.get_connection_by_name(target_joint_name)
+            target_connection = context.world.get_connection_by_name(target_joint_name)
 
             ll_vel = connection.dof.lower_limits
             ul_vel = connection.dof.upper_limits
@@ -210,7 +210,7 @@ class JointPositionLimitList(Task):
             raise GoalInitalizationException(f"Can't initialize {self} with no joints.")
 
         for joint_name, (lower_limit, upper_limit) in self.lower_upper_limits.items():
-            connection: ActiveConnection1DOF = god_map.world.get_connection_by_name(
+            connection: ActiveConnection1DOF = context.world.get_connection_by_name(
                 joint_name
             )
             self.connections.append(connection)
@@ -412,7 +412,7 @@ class AvoidJointLimits(Task):
 
     def __post_init__(self):
         if self.connection_list is None:
-            self.connection_list = god_map.world.controlled_connections
+            self.connection_list = context.world.controlled_connections
         for connection in self.connection_list:
             if isinstance(connection, (RevoluteConnection, PrismaticConnection)):
                 if not connection.dof.has_position_limits():

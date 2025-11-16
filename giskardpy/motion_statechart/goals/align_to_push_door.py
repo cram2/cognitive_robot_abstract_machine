@@ -32,25 +32,25 @@ class AlignToPushDoor(Goal):
         self.tip = self.tip_link
         self.handle = self.door_handle
 
-        object_joint_name = god_map.world.get_movable_parent_joint(self.door_object)
-        object_joint_angle = god_map.world.state[object_joint_name].position
+        object_joint_name = context.world.get_movable_parent_joint(self.door_object)
+        object_joint_angle = context.world.state[object_joint_name].position
 
         self.tip_gripper_axis.scale(1)
         object_V_object_rotation_axis = cas.Vector3(
-            god_map.world.get_joint(object_joint_name).axis
+            context.world.get_joint(object_joint_name).axis
         )
-        joint_limit = god_map.world.compute_joint_limits(object_joint_name, 0)
+        joint_limit = context.world.compute_joint_limits(object_joint_name, 0)
 
-        root_T_tip = god_map.world._forward_kinematic_manager.compose_expression(
+        root_T_tip = context.world._forward_kinematic_manager.compose_expression(
             self.root, self.tip
         )
-        root_T_door_expr = god_map.world._forward_kinematic_manager.compose_expression(
+        root_T_door_expr = context.world._forward_kinematic_manager.compose_expression(
             self.root, self.door_object
         )
         tip_V_tip_grasp_axis = cas.Vector3.from_iterable(self.tip_gripper_axis)
         root_V_object_rotation_axis = root_T_door_expr @ object_V_object_rotation_axis
         root_V_tip_grasp_axis = root_T_tip @ tip_V_tip_grasp_axis
-        door_P_handle = god_map.world.compute_fk_point(self.door_object, self.handle)
+        door_P_handle = context.world.compute_fk_point(self.door_object, self.handle)
         temp_point = np.asarray(
             [door_P_handle.x.to_np(), door_P_handle.y.to_np(), door_P_handle.z.to_np()]
         )
