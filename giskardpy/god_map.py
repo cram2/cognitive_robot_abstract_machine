@@ -42,7 +42,6 @@ class GodMap:
     trajectory: Trajectory
     qp_solver_solution: np.ndarray
     added_collision_checks: Dict[Tuple[PrefixedName, PrefixedName], float]
-    closest_point: Collisions
     motion_start_time: float
     hack: float
     free_variables: List[DegreeOfFreedom]
