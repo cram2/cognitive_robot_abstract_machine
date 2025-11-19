@@ -426,7 +426,7 @@ class MotionStatechart(SubclassJSONSerializer):
     def _create_edge_for_condition(
         self, owner: MotionStatechartNode, condition: TrinaryCondition
     ):
-        for parent_node in condition.variables:
+        for parent_node in condition.node_dependencies:
             self.rx_graph.add_edge(owner.index, parent_node.index, condition)
 
     def _build_nodes(self, context: BuildContext):
@@ -443,12 +443,16 @@ class MotionStatechart(SubclassJSONSerializer):
         artifacts = node.build(context=context)
         node._constraint_collection = artifacts.constraints
         node._constraint_collection.link_to_motion_statechart_node(node)
-        node._observation_expression = artifacts.observation
+        # if no observation is set, use the symbol for its observation variable to copy the state from last tick,
+        # in case `on_tick` doesn't overwrite it.
+        node._observation_expression = (
+            artifacts.observation or node.observation_variable
+        )
         node._debug_expressions = artifacts.debug_expressions
 
     def _apply_goal_conditions_to_their_children(self):
         for goal in self.get_nodes_by_type(Goal):
-            goal.apply_goal_conditions_to_children()
+            goal._apply_goal_conditions_to_children()
 
     def compile(self, context: BuildContext):
         self._expand_goals(context=context)
@@ -587,7 +591,7 @@ class MotionStatechart(SubclassJSONSerializer):
             transition = TrinaryCondition.from_json(
                 json_data, motion_statechart=motion_statechart, **kwargs
             )
-            transition.owner.set_transition(transition)
+            transition.owner._set_transition(transition)
         for node in motion_statechart.nodes:
             if node.parent_node is not None:
                 node.parent_node.nodes.append(node)

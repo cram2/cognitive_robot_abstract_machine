@@ -40,9 +40,21 @@ if TYPE_CHECKING:
 
 class TransitionKind(Enum):
     START = 1
+    """
+    Transitions nodes from NOT_STARTED to RUNNING.
+    """
     PAUSE = 2
+    """
+    Transitions nodes from RUNNING to PAUSED if True, or back if False.
+    """
     END = 3
+    """
+    Transitions nodes from RUNNING or PAUSED to DONE.
+    """
     RESET = 4
+    """
+    Transitions nodes from any state to NOT_STARTED.
+    """
 
 
 @dataclass(eq=False, repr=False)
@@ -66,6 +78,9 @@ class TrinaryCondition(SubclassJSONSerializer):
     """
 
     owner: Optional[MotionStatechartNode] = field(default=None)
+    """
+    The node this transition belongs to.
+    """
 
     def __hash__(self) -> int:
         return hash((str(self), self.kind))
@@ -102,7 +117,7 @@ class TrinaryCondition(SubclassJSONSerializer):
         self._child = child
 
     @property
-    def variables(self) -> List[MotionStatechartNode]:
+    def node_dependencies(self) -> List[MotionStatechartNode]:
         """
         List of parent nodes involved in the condition, derived from the free symbols in the expression.
         """
@@ -222,6 +237,9 @@ class ObservationVariable(cas.FloatVariable):
 
     name: PrefixedName = field(kw_only=True)
     motion_statechart_node: MotionStatechartNode
+    """
+    The node this variable is the observation state of.
+    """
 
     def resolve(self) -> float:
         return self.motion_statechart_node.observation_state
@@ -235,6 +253,9 @@ class LifeCycleVariable(cas.FloatVariable):
 
     name: PrefixedName = field(kw_only=True)
     motion_statechart_node: MotionStatechartNode
+    """
+    The node this variable is the life cycle state of.
+    """
 
     def resolve(self) -> LifeCycleValues:
         return self.motion_statechart_node.life_cycle_state
@@ -242,7 +263,12 @@ class LifeCycleVariable(cas.FloatVariable):
 
 @dataclass
 class DebugExpression:
+    """
+    Symbolic expressions used for debugging only.
+    """
+
     name: str
+
     expression: (
         cas.Point3
         | cas.Vector3
@@ -250,14 +276,36 @@ class DebugExpression:
         | cas.RotationMatrix
         | cas.TransformationMatrix
     )
+
     color: Color = field(default_factory=lambda: Color(1, 0, 0, 1))
+    """
+    The color used when this expression is rendered in visualization tools.
+    """
 
 
 @dataclass
 class NodeArtifacts:
+    """
+    Represents the artifacts produced by the `build` method of a node.
+    It makes explicit what artifacts are produced by a node.
+    """
+
     constraints: ConstraintCollection = field(default_factory=ConstraintCollection)
-    observation: cas.Expression = field(default_factory=lambda: cas.TrinaryUnknown)
+    """
+    A collection of constraints that describe a motion task. 
+    """
+    observation: Optional[cas.Expression] = field(default=None)
+    """
+    A symbolic expression that describes the observation state of this node.
+    Instead of setting this attribute directly, you may also implement the `on_tick` method of a node.
+    The advantage of using observation is that you can reuse the expressions used in constraints.
+    .. warning:: the result of `on_tick` takes precedence over the observation expression.
+    """
     debug_expressions: List[DebugExpression] = field(default_factory=list)
+    """
+    A list of symbolic expressions used for debugging only.
+    While in debug mode, you can call .evaluate() on them to get their current value.
+    """
 
 
 @dataclass(repr=False, eq=False)
@@ -265,6 +313,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
     name: str = field(default=None, kw_only=True)
     """
     A name for the node within a motion statechart.
+    The name is not unique, use `.unique_name`, if you need a unique identifier.
     """
 
     _motion_statechart: MotionStatechart = field(init=False, default=None)
@@ -273,7 +322,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
     """
     index: Optional[int] = field(default=None, init=False)
     """
-    The index of the entity in `_world.kinematic_structure`.
+    The index of this node in the motion statechart.
     """
 
     parent_node_index: Optional[int] = field(default=None, init=False)
@@ -283,9 +332,12 @@ class MotionStatechartNode(SubclassJSONSerializer):
 
     _life_cycle_variable: LifeCycleVariable = field(init=False, default=None)
     """
-    A symbol referring to the life cycle state of this node.
+    A variable referring to the life cycle state of this node.
     """
     _observation_variable: ObservationVariable = field(init=False, default=None)
+    """
+    A variable referring to the observation state of this node.
+    """
 
     _constraint_collection: ConstraintCollection = field(init=False)
     """The parameter is set after build() using its NodeArtifacts."""
@@ -295,9 +347,21 @@ class MotionStatechartNode(SubclassJSONSerializer):
     """The parameter is set after build() using its NodeArtifacts."""
 
     _start_condition: TrinaryCondition = field(init=False, default=None)
+    """
+    Decides when this node transitions from life cycle state NOT_STARTED to RUNNING.
+    """
     _pause_condition: TrinaryCondition = field(init=False, default=None)
+    """
+    Decides when this node transitions from RUNNING to PAUSED or back.
+    """
     _end_condition: TrinaryCondition = field(init=False, default=None)
+    """
+    Decides when this node transitions from RUNNING or PAUSED to DONE.
+    """
     _reset_condition: TrinaryCondition = field(init=False, default=None)
+    """
+    Decides when this transitions to NOT_STARTED.
+    """
 
     _plot: bool = field(default=True, kw_only=True)
     _plot_style: str = field(default="filled, rounded", init=False)
@@ -309,6 +373,10 @@ class MotionStatechartNode(SubclassJSONSerializer):
             self.name = self.__class__.__name__
 
     def _post_add_to_motion_statechart(self):
+        """
+        Called after this node is added to a motion statechart.
+        Finalizes the initialization parts that require the motion statechart to be set.
+        """
         self._observation_variable = ObservationVariable(
             name=PrefixedName("observation", self.unique_name),
             motion_statechart_node=self,
@@ -332,6 +400,9 @@ class MotionStatechartNode(SubclassJSONSerializer):
 
     @property
     def parent_node(self) -> Optional[MotionStatechartNode]:
+        """
+        :return: Reference to the parent node of this node.
+        """
         if self.parent_node_index is None:
             return None
         return self._motion_statechart.get_node_by_index(self.parent_node_index)
@@ -343,7 +414,11 @@ class MotionStatechartNode(SubclassJSONSerializer):
         else:
             self.parent_node_index = parent_node.index
 
-    def set_transition(self, transition: TrinaryCondition) -> None:
+    def _set_transition(self, transition: TrinaryCondition) -> None:
+        """
+        Sets the transition condition for this node, depending on its kind.
+        Used in json parsing.
+        """
         match transition.kind:
             case TransitionKind.START:
                 self._start_condition = transition
@@ -356,14 +431,12 @@ class MotionStatechartNode(SubclassJSONSerializer):
             case _:
                 raise ValueError(f"Unknown transition kind: {transition.kind}")
 
-    def evaluate_debug_expressions(self) -> Dict[str, float]:
-        return {
-            name: float(expr.evaluate())
-            for name, expr in self._debug_expressions.items()
-        }
-
     @property
     def life_cycle_variable(self) -> LifeCycleVariable:
+        """
+        The variable representing the life cycle state of this node.
+        :return:
+        """
         if self._life_cycle_variable is None:
             raise NotInMotionStatechartError(self.name)
         return self._life_cycle_variable
@@ -392,13 +465,13 @@ class MotionStatechartNode(SubclassJSONSerializer):
         """
         return NodeArtifacts(
             constraints=ConstraintCollection(),
-            observation=cas.Expression(self.observation_variable),
         )
 
     def on_tick(self, context: ExecutionContext) -> Optional[ObservationStateValues]:
         """
         Triggered when the node is ticked.
         .. warning:: Only happens while the node is in state RUNNING.
+        .. warning:: The result of this method takes precedence over the observation expression created in build().
         :return: An optional observation state overwrite
         """
 
@@ -432,10 +505,16 @@ class MotionStatechartNode(SubclassJSONSerializer):
 
     @property
     def life_cycle_state(self) -> LifeCycleValues:
+        """
+        :return: The current life cycle state of this node.
+        """
         return LifeCycleValues(self.motion_statechart.life_cycle_state[self])
 
     @property
     def observation_state(self) -> float:
+        """
+        :return: The current observation state of this node.
+        """
         return self.motion_statechart.observation_state[self]
 
     @property
@@ -565,7 +644,7 @@ GenericMotionStatechartNode = TypeVar(
 @dataclass(eq=False, repr=False)
 class Task(MotionStatechartNode):
     """
-    Tasks are a set of constraints with the same predicates.
+    Tasks are MotionStatechartNodes that add motion constraints.
     """
 
     _plot_style: str = field(default="filled, diagonals", init=False)
@@ -580,34 +659,36 @@ class Goal(MotionStatechartNode):
 
     def expand(self, context: BuildContext) -> None:
         """
-        Instantiate child nodes and wire their life cycle transition conditions.
+        Instantiate child nodes, add them to this goal, and wire their life cycle transition conditions.
         ..warning:: Nodes have not been built yet.
         """
-        pass
 
     def add_node(self, node: MotionStatechartNode) -> None:
+        """
+        Adds a node to this goal and the motion statechart this goal belongs to.
+        Should be used in expand().
+        """
         self.nodes.append(node)
         node.parent_node = self
         self.motion_statechart.add_node(node)
 
-    def arrange_in_sequence(self, nodes: List[MotionStatechartNode]) -> None:
-        first_node = nodes[0]
-        first_node.end_condition = first_node.observation_variable
-        for node in nodes[1:]:
-            node.start_condition = first_node.observation_variable
-            node.end_condition = node.observation_variable
-            first_node = node
-
-    def apply_goal_conditions_to_children(self):
+    def _apply_goal_conditions_to_children(self) -> None:
+        """
+        This method is called after expand() to link the conditions of this goal to its children.
+        """
         for node in self.nodes:
-            self.apply_start_condition_to_node(node)
-            self.apply_pause_condition_to_node(node)
-            self.apply_end_condition_to_node(node)
-            self.apply_reset_condition_to_node(node)
+            self._apply_start_condition_to_node(node)
+            self._apply_pause_condition_to_node(node)
+            self._apply_end_condition_to_node(node)
+            self._apply_reset_condition_to_node(node)
             if isinstance(node, Goal):
-                node.apply_goal_conditions_to_children()
+                node._apply_goal_conditions_to_children()
 
-    def apply_start_condition_to_node(self, node: MotionStatechartNode):
+    def _apply_start_condition_to_node(self, node: MotionStatechartNode) -> None:
+        """
+        Links the start condition of this goal to the start condition of the node.
+        Ensures that the node can only be started when this goal is started.
+        """
         if cas.is_const_trinary_true(node.start_condition):
             node.start_condition = self.start_condition
             return
@@ -615,7 +696,11 @@ class Goal(MotionStatechartNode):
             node.start_condition, self.start_condition
         )
 
-    def apply_pause_condition_to_node(self, node: MotionStatechartNode):
+    def _apply_pause_condition_to_node(self, node: MotionStatechartNode) -> None:
+        """
+        Links the pause condition of this goal to the pause condition of the node.
+        Ensures that the node is always paused when the goal is paused.
+        """
         if cas.is_const_trinary_false(node.pause_condition):
             node.pause_condition = self.pause_condition
         elif not cas.is_const_trinary_false(node.pause_condition):
@@ -623,7 +708,11 @@ class Goal(MotionStatechartNode):
                 node.pause_condition, self.pause_condition
             )
 
-    def apply_end_condition_to_node(self, node: MotionStatechartNode):
+    def _apply_end_condition_to_node(self, node: MotionStatechartNode) -> None:
+        """
+        Links the end condition of this goal to the end condition of the node.
+        Ensures that the node is automatically ended when the goal is ended.
+        """
         if cas.is_const_trinary_false(node.end_condition):
             node.end_condition = self.end_condition
         elif not cas.is_const_trinary_false(self.end_condition):
@@ -631,7 +720,11 @@ class Goal(MotionStatechartNode):
                 node.end_condition, self.end_condition
             )
 
-    def apply_reset_condition_to_node(self, node: MotionStatechartNode):
+    def _apply_reset_condition_to_node(self, node: MotionStatechartNode):
+        """
+        Links the reset condition of this goal to the reset condition of the node.
+        Ensures that the node is reset, when the goal is reset.
+        """
         if cas.is_const_trinary_false(node.reset_condition):
             node.reset_condition = self.reset_condition
         elif not cas.is_const_trinary_false(node.pause_condition):

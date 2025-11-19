@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - giskard_library
+      - semantic_world_integration
   pull_request:
 #    branches:
 #      - giskard_library
