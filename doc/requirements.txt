@@ -1,0 +1,6 @@
+jupyter-book<2.0.0
+matplotlib
+numpy
+sphinx-autoapi
+sphinxcontrib-plantuml
+pylint

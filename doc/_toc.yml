@@ -1,0 +1,33 @@
+# Table of contents
+# Learn more at https://jupyterbook.org/customize/toc.html
+
+format: jb-book
+root: intro
+parts:
+- caption: Entity Query Language
+  chapters:
+    - file: eql/intro
+      sections:
+        - file: eql/writing_queries
+        - file: eql/result_quantifiers
+        - file: eql/logical_operators
+        - file: eql/comparators
+        - file: eql/domain_mapping
+        - file: eql/predicate_and_symbolic_function
+        - file: eql/cache
+        - file: eql/match
+        - file: eql/writing_rule_trees
+        - file: eql/eql_for_sql_experts
+- caption: ORMatic
+  chapters:
+    - file: ormatic/intro
+    - file: ormatic/orm_generation
+    - file: ormatic/alternative_mapping
+    - file: ormatic/interface_usage
+    - file: ormatic/eql_for_ormatic
+    - file: ormatic/tips_and_tricks
+
+- caption: References
+  chapters:
+    - file: autoapi/index
+    - file: bibliography

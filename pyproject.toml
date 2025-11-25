@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "krrood"
+version = "2.0.1"
+description = "A python package for Knowledge Representation and Reasoning systems based on Object Oriented Design."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de"},
+    {name = "Tom Schierenbeck", email = "tom_sch@uni-bremen.de"}
+]
+keywords = ["Knowledge-representation", "reasoning", "ontology", "orm", "query-langauge", "database", "python"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.urls]
+Homepage = "https://code-iai.github.io/krrood/intro.html"
+Repository = "https://github.com/code-iai/krrood"
+Issues = "https://github.com/code-iai/krrood/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["krrood*"]
+exclude = ["test*"]
+
+[tool.setuptools.package-data]
+krrood = [
+  "ormatic/templates/*.j2",
+  "ormatic/templates/*.jinja",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+pythonpath = ["src", "test"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+]
+markers = []
+
+[tool.coverage.run]
+source = ["src/krrood"]
+omit = ["*/tests/*", "*/test_*.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }

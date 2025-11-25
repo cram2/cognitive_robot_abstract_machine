@@ -1,0 +1,214 @@
+import json
+import uuid
+from dataclasses import dataclass
+from typing import Dict, Any, Self
+
+import pytest
+
+
+from krrood.adapters.json_serializer import (
+    MissingTypeError,
+    InvalidTypeFormatError,
+    UnknownModuleError,
+    ClassNotFoundError,
+    SubclassJSONSerializer,
+    SubclassJSONEncoder,
+    SubclassJSONDecoder,
+    to_json,
+    from_json,
+    JSON_TYPE_NAME,
+)
+from krrood.utils import get_full_class_name
+
+
+@dataclass
+class Animal(SubclassJSONSerializer):
+    """
+    Base animal used in tests.
+    """
+
+    name: str
+    age: int
+
+    def to_json(self):
+        data = super().to_json()
+        data.update(
+            {
+                "name": to_json(self.name),
+                "age": to_json(self.age),
+            }
+        )
+        return data
+
+    @classmethod
+    def _from_json(cls, data, **kwargs):
+        return cls(
+            name=from_json(data["name"]),
+            age=from_json(data["age"]),
+        )
+
+
+@dataclass
+class Dog(Animal):
+    """
+    Dog subtype for tests.
+    """
+
+    breed: str = "mixed"
+
+    def to_json(self):
+        data = super().to_json()
+        data.update(
+            {
+                "breed": to_json(self.breed),
+            }
+        )
+        return data
+
+    @classmethod
+    def _from_json(cls, data, **kwargs):
+        return cls(
+            name=from_json(data["name"]),
+            age=from_json(data["age"]),
+            breed=from_json(data["breed"]),
+        )
+
+
+@dataclass
+class Bulldog(Dog):
+    """
+    Deep subtype to ensure deep discovery works.
+    """
+
+    stubborn: bool = True
+
+    def to_json(self):
+        data = super().to_json()
+        data.update(
+            {
+                "stubborn": to_json(self.stubborn),
+            }
+        )
+        return data
+
+    @classmethod
+    def _from_json(cls, data, **kwargs):
+        return cls(
+            name=from_json(data["name"]),
+            age=from_json(data["age"]),
+            breed=from_json(data["breed"]),
+            stubborn=from_json(data["stubborn"]),
+        )
+
+
+@dataclass
+class Cat(Animal):
+    """
+    Cat subtype for tests.
+    """
+
+    lives: int = 9
+
+    def to_json(self):
+        data = super().to_json()
+        data.update(
+            {
+                "lives": to_json(self.lives),
+            }
+        )
+        return data
+
+    @classmethod
+    def _from_json(cls, data, **kwargs):
+        return cls(
+            name=from_json(data["name"]),
+            age=from_json(data["age"]),
+            lives=from_json(data["lives"]),
+        )
+
+
+@dataclass
+class ClassThatNeedsKWARGS(SubclassJSONSerializer):
+    a: int
+    b: float = 0
+
+    def to_json(self) -> Dict[str, Any]:
+        return {**super().to_json(), "a": to_json(self.a)}
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(a=from_json(data["a"]), b=from_json(kwargs["b"]))
+
+
+def test_roundtrip_dog_and_cat():
+    dog = Dog(name="Rex", age=5, breed="Shepherd")
+    cat = Cat(name="Misty", age=3, lives=7)
+
+    dog_json = dog.to_json()
+    cat_json = cat.to_json()
+
+    assert dog_json[JSON_TYPE_NAME] == get_full_class_name(Dog)
+    assert cat_json[JSON_TYPE_NAME] == get_full_class_name(Cat)
+
+    dog2 = SubclassJSONSerializer.from_json(dog_json)
+    cat2 = SubclassJSONSerializer.from_json(cat_json)
+
+    assert isinstance(dog2, Dog)
+    assert isinstance(cat2, Cat)
+    assert dog2 == dog
+    assert cat2 == cat
+
+
+def test_deep_subclass_discovery():
+    b = Bulldog(name="Butch", age=4, breed="Bulldog", stubborn=True)
+    b_json = b.to_json()
+
+    assert b_json[JSON_TYPE_NAME] == get_full_class_name(Bulldog)
+
+    b2 = SubclassJSONSerializer.from_json(b_json)
+    assert isinstance(b2, Bulldog)
+    assert b2 == b
+
+
+def test_unknown_module_raises_unknown_module_error():
+    with pytest.raises(UnknownModuleError):
+        SubclassJSONSerializer.from_json({JSON_TYPE_NAME: "non.existent.Class"})
+
+
+def test_missing_type_raises_missing_type_error():
+    with pytest.raises(MissingTypeError):
+        SubclassJSONSerializer.from_json({})
+
+
+def test_invalid_type_format_raises_invalid_type_format_error():
+    with pytest.raises(InvalidTypeFormatError):
+        SubclassJSONSerializer.from_json({JSON_TYPE_NAME: "NotAQualifiedName"})
+
+
+essential_existing_module = "krrood.utils"
+
+
+def test_class_not_found_raises_class_not_found_error():
+    with pytest.raises(ClassNotFoundError):
+        SubclassJSONSerializer.from_json(
+            {JSON_TYPE_NAME: f"{essential_existing_module}.DoesNotExist"}
+        )
+
+
+def test_uuid_encoding():
+    u = uuid.uuid4()
+    encoded = to_json(u)
+    result = from_json(encoded)
+    assert u == result
+
+    us = [uuid.uuid4(), uuid.uuid4()]
+    encoded = to_json(us)
+    result = from_json(encoded)
+    assert us == result
+
+
+def test_with_kwargs():
+    obj = ClassThatNeedsKWARGS(a=1, b=2.0)
+    data = obj.to_json()
+    result = from_json(data, b=2.0)
+    assert obj == result

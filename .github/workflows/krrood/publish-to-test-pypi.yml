@@ -1,0 +1,70 @@
+name: Publish Python distribution to PyPI and TestPyPI
+on:
+  push:
+    tags:
+      - 'v*'    # Only run when pushing tags like v1.2.3
+#    branches:
+#      - main    # Tag must be on main
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # needed to see tags
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+
+    - name: Install pypa/build
+      run: >-
+        python3 -m
+        pip install
+        build
+        --user
+
+    - name: Set version from tag
+      run: |
+        TAG="${GITHUB_REF#refs/tags/}"   # e.g., v0.2.9
+        VERSION="${TAG#v}"               # remove leading 'v'
+        echo "Detected version: $VERSION"
+        
+        # Update __version__ in your package
+        sed -i "s/^__version__ = .*/__version__ = \"$VERSION\"/" src/krrood/__init__.py
+
+    - name: Clean old builds
+      run: rm -rf dist build *.egg-info
+
+    - name: Build a binary wheel and a source tarball
+      run: python3 -m build
+
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+
+  publish-to-pypi:
+    name: >-
+      Publish Python distribution to PyPI
+#    if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/krrood  # Replace <package-name> with your PyPI project name
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

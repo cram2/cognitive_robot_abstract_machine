@@ -1,0 +1,1794 @@
+"""
+Core symbolic expression system used to build and evaluate entity queries.
+
+This module defines the symbolic types (variables, sources, logical and
+comparison operators) and the evaluation mechanics.
+"""
+
+from __future__ import annotations
+
+import contextvars
+import operator
+import typing
+from abc import abstractmethod, ABC
+from collections import UserDict
+from copy import copy
+from dataclasses import dataclass, field, fields, MISSING, is_dataclass
+from functools import lru_cache, cached_property
+
+from typing_extensions import (
+    Iterable,
+    Any,
+    Optional,
+    Type,
+    Dict,
+    ClassVar,
+    Union as TypingUnion,
+    Generic,
+    TYPE_CHECKING,
+    List,
+    Tuple,
+    Callable,
+    Self,
+)
+
+from .cache_data import (
+    SeenSet,
+)
+from .enums import EQLMode, PredicateType
+from .failures import (
+    MultipleSolutionFound,
+    NoSolutionFound,
+    UnsupportedNegation,
+    GreaterThanExpectedNumberOfSolutions,
+    LessThanExpectedNumberOfSolutions,
+    InvalidEntityType,
+    UnSupportedOperand,
+)
+from .hashed_data import HashedValue, HashedIterable, T
+from .result_quantification_constraint import (
+    ResultQuantificationConstraint,
+    Exactly,
+)
+from .rxnode import RWXNode, ColorLegend
+from .symbol_graph import SymbolGraph
+from .utils import IDGenerator, is_iterable, generate_combinations
+from ..class_diagrams import ClassRelation
+from ..class_diagrams.class_diagram import Association, WrappedClass
+from ..class_diagrams.failures import ClassIsUnMappedInClassDiagram
+from ..class_diagrams.wrapped_field import WrappedField
+
+if TYPE_CHECKING:
+    from .conclusion import Conclusion
+
+_symbolic_mode = contextvars.ContextVar("symbolic_mode", default=None)
+
+
+def _set_symbolic_mode(mode: EQLMode):
+    """
+    Set symbolic construction mode.
+
+    :param mode: Can be Query or Rule.
+    """
+    _symbolic_mode.set(mode)
+
+
+def in_symbolic_mode(mode: Optional[EQLMode] = None) -> bool:
+    """
+    Check whether symbolic construction mode is currently active.
+
+    :returns: True if symbolic mode is enabled, otherwise False.
+    """
+    current_mode = _symbolic_mode.get()
+    return current_mode == mode if mode else current_mode is not None
+
+
+id_generator = IDGenerator()
+
+RWXNode.enclosed_name = "Selected Variable"
+
+
+@dataclass
+class OperationResult:
+    """
+    A data structure that carries information about the result of an operation in EQL.
+    """
+
+    bindings: Dict[int, HashedValue]
+    """
+    The bindings resulting from the operation, mapping variable IDs to their values.
+    """
+    is_false: bool
+    """
+    Whether the operation resulted in a false value (i.e., The operation condition was not satisfied)
+    """
+    operand: SymbolicExpression
+    """
+    The operand that produced the result.
+    """
+
+    @cached_property
+    def is_true(self):
+        return not self.is_false
+
+    def __contains__(self, item):
+        return item in self.bindings
+
+    def __getitem__(self, item):
+        return self.bindings[item]
+
+    def __setitem__(self, key, value):
+        self.bindings[key] = value
+
+    def __hash__(self):
+        return id(self)
+
+    def __eq__(self, other):
+        return (
+            self.bindings == other.bindings
+            and self.is_true == other.is_true
+            and self.operand == other.operand
+        )
+
+
+@dataclass(eq=False)
+class SymbolicExpression(Generic[T], ABC):
+    """
+    Base class for all symbolic expressions.
+
+    Symbolic expressions form a tree and are evaluated lazily to produce
+    bindings for variables, subject to logical constraints.
+
+    :ivar _child_: Optional child expression.
+    :ivar _id_: Unique identifier of this node.
+    :ivar _node_: Backing anytree.Node for visualization and traversal.
+    :ivar _conclusion_: Set of conclusion actions attached to this node.
+    :ivar _is_false_: Internal flag indicating evaluation result for this node.
+    """
+
+    _child_: Optional[SymbolicExpression] = field(init=False)
+    _id_: int = field(init=False, repr=False, default=None)
+    _node_: RWXNode = field(init=False, default=None, repr=False)
+    _id_expression_map_: ClassVar[Dict[int, SymbolicExpression]] = {}
+    _conclusion_: typing.Set[Conclusion] = field(init=False, default_factory=set)
+    _symbolic_expression_stack_: ClassVar[List[SymbolicExpression]] = []
+    _is_false_: bool = field(init=False, repr=False, default=False)
+    _seen_parent_values_by_parent_: Dict[int, Dict[bool, SeenSet]] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    _eval_parent_: Optional[SymbolicExpression] = field(
+        default=None, init=False, repr=False
+    )
+    _plot_color__: Optional[ColorLegend] = field(default=None, init=False, repr=False)
+
+    def __post_init__(self):
+        if not self._id_:
+            self._id_ = id_generator(self)
+            self._create_node_()
+            self._id_expression_map_[self._id_] = self
+        if hasattr(self, "_child_") and self._child_ is not None:
+            self._update_child_()
+
+    def _update_child_(self, child: Optional[SymbolicExpression] = None):
+        child = child or self._child_
+        self._child_ = self._update_children_(child)[0]
+
+    def _update_children_(
+        self, *children: SymbolicExpression
+    ) -> Tuple[SymbolicExpression, ...]:
+        children: Dict[int, SymbolicExpression] = dict(enumerate(children))
+        for k, v in children.items():
+            if not isinstance(v, SymbolicExpression):
+                children[k] = Literal(v)
+        for k, v in children.items():
+            # With graph structure, do not copy nodes; just connect an edge.
+            v._node_.parent = self._node_
+        return tuple(children.values())
+
+    def _create_node_(self):
+        self._node_ = RWXNode(self._name_, data=self, color=self._plot_color_)
+
+    @abstractmethod
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+        """
+        Evaluate the symbolic expression and set the operands indices.
+        This method should be implemented by subclasses.
+        """
+        pass
+
+    def _add_conclusion_(self, conclusion: Conclusion):
+        self._conclusion_.add(conclusion)
+
+    @lru_cache(maxsize=None)
+    def _projection_(self, when_true: Optional[bool] = True) -> HashedIterable[int]:
+        """
+        Return the set of variable ids that uniquely identify an output of this node
+        for its parent, on the given truth branch.
+
+        The default implementation asks the parent for its projection, and augments it
+        with variables referenced by this node's conclusions when the branch can yield.
+        """
+        if self._parent_:
+            projection = self._parent_._projection_(when_true=when_true)
+        else:
+            projection = HashedIterable()
+
+        if when_true or (when_true is None):
+            for child in self._children_:
+                for conclusion in child._conclusion_:
+                    projection.update(conclusion._unique_variables_)
+        return projection
+
+    @property
+    def _parent_(self) -> Optional[SymbolicExpression]:
+        if self._eval_parent_ is not None:
+            return self._eval_parent_
+        elif self._node_.parent is not None:
+            return self._node_.parent.data
+        return None
+
+    @_parent_.setter
+    def _parent_(self, value: Optional[SymbolicExpression]):
+        self._node_.parent = value._node_ if value is not None else None
+        if value is not None and hasattr(value, "_child_"):
+            value._child_ = self
+
+    @cached_property
+    def _conditions_root_(self) -> SymbolicExpression:
+        """
+        Get the root of the symbolic expression tree that contains conditions.
+        """
+        conditions_root = self._root_
+        while conditions_root._child_ is not None:
+            conditions_root = conditions_root._child_
+            if isinstance(conditions_root._parent_, QueryObjectDescriptor):
+                break
+        return conditions_root
+
+    @property
+    def _root_(self) -> SymbolicExpression:
+        """
+        Get the root of the symbolic expression tree.
+        """
+        return self._node_.root.data
+
+    @property
+    @abstractmethod
+    def _name_(self) -> str:
+        pass
+
+    @property
+    def _all_nodes_(self) -> List[SymbolicExpression]:
+        return [self] + self._descendants_
+
+    @property
+    def _descendants_(self) -> List[SymbolicExpression]:
+        return [d.data for d in self._node_.descendants]
+
+    @property
+    def _children_(self) -> List[SymbolicExpression]:
+        return [c.data for c in self._node_.children]
+
+    @classmethod
+    def _current_parent_(cls) -> Optional[SymbolicExpression]:
+        if cls._symbolic_expression_stack_:
+            return cls._symbolic_expression_stack_[-1]
+        return None
+
+    @property
+    def _sources_(self):
+        vars = [v.data for v in self._node_.leaves]
+        while any(isinstance(v, SymbolicExpression) for v in vars):
+            vars = {
+                (
+                    v._domain_source_.domain
+                    if isinstance(v, Variable) and v._domain_source_
+                    else v
+                )
+                for v in vars
+            }
+            for v in copy(vars):
+                if isinstance(v, SymbolicExpression):
+                    vars.remove(v)
+                    vars.update(set(v._all_variable_instances_))
+        sources = set(HashedIterable(vars))
+        return sources
+
+    @cached_property
+    def _unique_variables_(self) -> HashedIterable[Variable]:
+        unique_variables = HashedIterable()
+        for var in self._all_variable_instances_:
+            unique_variables.add(var)
+        return unique_variables
+
+    @cached_property
+    @abstractmethod
+    def _all_variable_instances_(self) -> List[Variable]:
+        """
+        Get the leaf instances of the symbolic expression.
+        This is useful for accessing the leaves of the symbolic expression tree.
+        """
+        ...
+
+    def _is_duplicate_output_(self, output: Dict[int, HashedValue]) -> bool:
+        """
+        Check if the output has been seen before for the current parent and truth branch.
+        """
+        projection = self._projection_(when_true=not self._is_false_)
+        if not projection:
+            return False
+
+        required_output = {k: v for k, v in output.items() if k in projection}
+        if not required_output:
+            return False
+
+        # Use a per-parent seen set to avoid suppressing outputs across different parent contexts
+        parent_id = self._parent_._id_ if self._parent_ else self._id_
+        seen_by_truth = self._seen_parent_values_by_parent_.setdefault(
+            parent_id, {True: SeenSet(), False: SeenSet()}
+        )
+        seen_set = seen_by_truth[not self._is_false_]
+
+        if seen_set.check(required_output):
+            return True
+        seen_set.add(required_output)
+        return False
+
+    @property
+    def _plot_color_(self) -> ColorLegend:
+        return self._plot_color__
+
+    @_plot_color_.setter
+    def _plot_color_(self, value: ColorLegend):
+        self._plot_color__ = value
+        self._node_.color = value
+
+    def __and__(self, other):
+        return AND(self, other)
+
+    def __or__(self, other):
+        return optimize_or(self, other)
+
+    def __invert__(self):
+        return Not(self)
+
+    def __enter__(self) -> Self:
+        node = self
+        if (node is self._root_) or (node._parent_ is self._root_):
+            node = node._conditions_root_
+        SymbolicExpression._symbolic_expression_stack_.append(node)
+        return self
+
+    def __exit__(self, *args):
+        SymbolicExpression._symbolic_expression_stack_.pop()
+
+    def __hash__(self):
+        return hash(id(self))
+
+    def __repr__(self):
+        return self._name_
+
+
+@dataclass(eq=False, repr=False)
+class CanBehaveLikeAVariable(SymbolicExpression[T], ABC):
+    """
+    This class adds the monitoring/tracking behaviour on variables that tracks attribute access, calling,
+    and comparison operations.
+    """
+
+    _var_: CanBehaveLikeAVariable[T] = field(init=False, default=None)
+    """
+    A variable that is used if the child class to this class want to provide a variable to be tracked other than 
+    itself, this is specially useful for child classes that holds a variable instead of being a variable and want
+     to delegate the variable behaviour to the variable it has instead.
+    For example, this is the case for the ResultQuantifiers & QueryDescriptors that operate on a single selected
+    variable.
+    """
+    _path_: List[ClassRelation] = field(init=False, default_factory=list)
+    """
+    The path of the variable in the symbol graph as a sequence of relation instances.
+    """
+
+    _type_: Type = field(init=False, default=None)
+    """
+    The type of the variable.
+    """
+
+    def __getattr__(self, name: str) -> CanBehaveLikeAVariable[T]:
+        # Prevent debugger/private attribute lookups from being interpreted as symbolic attributes
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(
+                f"{self.__class__.__name__} object has no attribute {name}"
+            )
+        return Attribute(self, name, self._type__)
+
+    @cached_property
+    def _type__(self):
+        return self._var_._type_ if self._var_ else None
+
+    def __getitem__(self, key) -> CanBehaveLikeAVariable[T]:
+        return Index(self, key)
+
+    def __call__(self, *args, **kwargs) -> CanBehaveLikeAVariable[T]:
+
+        return Call(self, args, kwargs)
+
+    def __eq__(self, other) -> Comparator:
+        return Comparator(self, other, operator.eq)
+
+    def __contains__(self, item) -> Comparator:
+        return Comparator(item, self, operator.contains)
+
+    def __ne__(self, other) -> Comparator:
+        return Comparator(self, other, operator.ne)
+
+    def __lt__(self, other) -> Comparator:
+        return Comparator(self, other, operator.lt)
+
+    def __le__(self, other) -> Comparator:
+        return Comparator(self, other, operator.le)
+
+    def __gt__(self, other) -> Comparator:
+        return Comparator(self, other, operator.gt)
+
+    def __ge__(self, other) -> Comparator:
+        return Comparator(self, other, operator.ge)
+
+    def __hash__(self):
+        return super().__hash__()
+
+
+@dataclass(eq=False)
+class ResultQuantifier(CanBehaveLikeAVariable[T], ABC):
+    """
+    Base for quantifiers that return concrete results from entity/set queries
+    (e.g., An, The).
+    """
+
+    _child_: QueryObjectDescriptor[T]
+    _quantification_constraint_: Optional[ResultQuantificationConstraint] = None
+
+    def __post_init__(self):
+        if not isinstance(self._child_, QueryObjectDescriptor):
+            raise InvalidEntityType(type(self._child_))
+        super().__post_init__()
+        self._var_ = (
+            self._child_._var_
+            if isinstance(self._child_, CanBehaveLikeAVariable)
+            else None
+        )
+        self._node_.wrap_subtree = True
+
+    @cached_property
+    def _type_(self):
+        if self._var_:
+            return self._var_._type_
+        else:
+            raise ValueError("No type available as _var_ is None")
+
+    @property
+    def _name_(self) -> str:
+        return f"{self.__class__.__name__}()"
+
+    def evaluate(
+        self,
+    ) -> Iterable[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression[T]], T]]]:
+        """
+        Evaluate the query and map the results to the correct output data structure.
+        This is the exposed evaluation method for users.
+        """
+        SymbolGraph().remove_dead_instances()
+        yield from map(self._process_result_, self._evaluate__())
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[T]:
+        sources = sources or {}
+        self._eval_parent_ = parent
+        if self._id_ in sources:
+            yield OperationResult(sources, False, self)
+            return
+        result_count = 0
+        values = self._child_._evaluate__(sources, parent=self)
+        for value in values:
+            result_count += 1
+            self._assert_satisfaction_of_quantification_constraints_(
+                result_count, done=False
+            )
+            if self._var_:
+                value[self._id_] = value[self._var_._id_]
+            yield OperationResult(value.bindings, False, self)
+        self._assert_satisfaction_of_quantification_constraints_(
+            result_count, done=True
+        )
+
+    @lru_cache(maxsize=None)
+    def _projection_(self, when_true: Optional[bool] = True) -> HashedIterable[int]:
+        """
+        Return the projection for result quantifiers.
+
+        Includes selected variables from the child and conclusion variables when applicable.
+        """
+        projection = (
+            self._parent_._projection_(when_true=when_true)
+            if self._parent_
+            else HashedIterable()
+        )
+        child = self._child_
+        for var in child.selected_variables:
+            projection.add(var)
+            projection.update(var._unique_variables_)
+        if when_true or (when_true is None):
+            for conclusion in child._conclusion_:
+                projection.update(conclusion._unique_variables_)
+        return projection
+
+    @cached_property
+    def _all_variable_instances_(self) -> List[Variable]:
+        return self._child_._all_variable_instances_
+
+    def _process_result_(
+        self, result: OperationResult
+    ) -> TypingUnion[T, UnificationDict]:
+        """
+        Map the result to the correct output data structure for user usage. This returns the selected variables only.
+        In case of Entity, it returns the value of the selected variable, and in case of SetOf, it returns a dictionary with the selected variables as keys and the values as values.
+
+        :param result: The result to be mapped.
+        :return: The mapped result.
+        """
+        if isinstance(self._child_, Entity):
+            return result[self._child_.selected_variable._id_].value
+        elif isinstance(self._child_, SetOf):
+            selected_variables_ids = [v._id_ for v in self._child_.selected_variables]
+            return UnificationDict(
+                {
+                    self._id_expression_map_[var_id]: value
+                    for var_id, value in result.bindings.items()
+                    if var_id in selected_variables_ids
+                }
+            )
+        else:
+            raise NotImplementedError(f"Unknown child type {type(self._child_)}")
+
+    def __invert__(self):
+        raise UnsupportedNegation(self.__class__)
+
+    def _assert_satisfaction_of_quantification_constraints_(
+        self, result_count: int, done: bool
+    ):
+        """
+        Assert the satisfaction of quantification constraints.
+
+        :param result_count: The current count of results
+        :param done: Whether all results have been processed
+        :raises QuantificationNotSatisfiedError: If the quantification constraints are not satisfied.
+        """
+        if self._quantification_constraint_:
+            self._quantification_constraint_.assert_satisfaction(
+                result_count, self, done
+            )
+
+    def __repr__(self):
+        name = f"{self.__class__.__name__}"
+        if self._quantification_constraint_:
+            name += f"({self._quantification_constraint_})"
+        return name
+
+    def visualize(
+        self,
+        figsize=(35, 30),
+        node_size=7000,
+        font_size=25,
+        spacing_x: float = 4,
+        spacing_y: float = 4,
+        layout: str = "tidy",
+        edge_style: str = "orthogonal",
+        label_max_chars_per_line: Optional[int] = 13,
+    ):
+        """
+        Visualize the query graph, for arguments' documentation see `rustworkx_utils.RWXNode.visualize`.
+        """
+        self._node_.visualize(
+            figsize=figsize,
+            node_size=node_size,
+            font_size=font_size,
+            spacing_x=spacing_x,
+            spacing_y=spacing_y,
+            layout=layout,
+            edge_style=edge_style,
+            label_max_chars_per_line=label_max_chars_per_line,
+        )
+
+    @property
+    def _plot_color_(self) -> ColorLegend:
+        return ColorLegend("ResultQuantifier", "#9467bd")
+
+    @_plot_color_.setter
+    def _plot_color_(self, value: ColorLegend):
+        self._plot_color__ = value
+        self._node_.color = value
+
+
+class UnificationDict(UserDict):
+    """
+    A dictionary which maps all expressions that are on a single variable to the original variable id.
+    """
+
+    def __getitem__(self, key: CanBehaveLikeAVariable[T]) -> T:
+        key = key._id_expression_map_[key._var_._id_]
+        return super().__getitem__(key).value
+
+
+@dataclass(eq=False, repr=False)
+class An(ResultQuantifier[T]):
+    """Quantifier that yields all matching results one by one."""
+
+    ...
+
+
+@dataclass(eq=False, repr=False)
+class The(ResultQuantifier[T]):
+    """
+    Quantifier that expects exactly one result; raises MultipleSolutionFound if more.
+    """
+
+    _quantification_constraint_: ResultQuantificationConstraint = field(
+        init=False, default_factory=lambda: Exactly(1)
+    )
+
+    def evaluate(
+        self,
+    ) -> TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression[T]], T]]:
+        return list(super().evaluate())[0]
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression[T]], T]]]:
+        try:
+            yield from super()._evaluate__(sources, parent=parent)
+        except LessThanExpectedNumberOfSolutions:
+            raise NoSolutionFound(self)
+        except GreaterThanExpectedNumberOfSolutions:
+            raise MultipleSolutionFound(self)
+
+
+@dataclass(eq=False, repr=False)
+class QueryObjectDescriptor(SymbolicExpression[T], ABC):
+    """
+    Describes the queried object(s), could be a query over a single variable or a set of variables,
+    also describes the condition(s)/properties of the queried object(s).
+    """
+
+    _child_: Optional[SymbolicExpression[T]] = field(default=None)
+    selected_variables: List[CanBehaveLikeAVariable[T]] = field(default_factory=list)
+    warned_vars: typing.Set = field(default_factory=set, init=False)
+
+    def __post_init__(self):
+        super().__post_init__()
+        for variable in self.selected_variables:
+            variable._var_._node_.enclosed = True
+
+    @lru_cache(maxsize=None)
+    def _projection_(self, when_true: Optional[bool] = True) -> HashedIterable[int]:
+        """
+        Return the projection for query object descriptors.
+
+        Includes selected variables and conclusion variables when applicable.
+        """
+        projection = (
+            self._parent_._projection_(when_true=when_true)
+            if self._parent_
+            else HashedIterable()
+        )
+        projection.update(self.selected_variables)
+        for var in self.selected_variables:
+            projection.update(var._unique_variables_)
+        if self._child_ and (when_true or (when_true is None)):
+            for conclusion in self._child_._conclusion_:
+                projection.update(conclusion._unique_variables_)
+        return projection
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+        sources = sources or {}
+        self._eval_parent_ = parent
+        for values in self.get_constrained_values(sources):
+            self.evaluate_conclusions_and_update_bindings(values)
+            if self.any_selected_variable_is_inferred_and_unbound(values):
+                continue
+            yield from self.evaluate_selected_variables(values.bindings)
+
+    @staticmethod
+    def variable_is_inferred(var: CanBehaveLikeAVariable[T]) -> bool:
+        """
+        Whether the variable is inferred or not.
+
+        :param var: The variable.
+        :return: True if the variable is inferred, otherwise False.
+        """
+        return isinstance(var, Variable) and var._is_inferred_
+
+    def any_selected_variable_is_inferred_and_unbound(
+        self, values: OperationResult
+    ) -> bool:
+        """
+        Check if any of the selected variables is inferred and is not bound.
+
+        :param values: The current result with the current bindings.
+        :return: True if any of the selected variables is inferred and is not bound, otherwise False.
+        """
+        return any(
+            not self.variable_is_bound_or_its_children_are_bound(var, values)
+            for var in self.selected_variables
+            if self.variable_is_inferred(var)
+        )
+
+    @lru_cache(maxsize=None)
+    def variable_is_bound_or_its_children_are_bound(
+        self, var: CanBehaveLikeAVariable[T], result: OperationResult
+    ) -> bool:
+        """
+        Whether the variable is directly bound or all its children are bound.
+
+        :param var: The variable.
+        :param result: The current result containing the current bindings.
+        :return: True if the variable is bound, otherwise False.
+        """
+        if var._id_ in result:
+            return True
+        unique_vars = [uv.value for uv in var._unique_variables_ if uv.value is not var]
+        if unique_vars and all(
+            self.variable_is_bound_or_its_children_are_bound(uv, result)
+            for uv in unique_vars
+        ):
+            return True
+        return False
+
+    def evaluate_conclusions_and_update_bindings(self, child_result: OperationResult):
+        """
+        Update the bindings of the results by evaluating the conclusions using the received bindings from the child as
+        sources.
+
+        :param child_result: The result of the child operation.
+        """
+        if not self._child_:
+            return
+        for conclusion in self._child_._conclusion_:
+            child_result.bindings = next(
+                iter(conclusion._evaluate__(child_result.bindings, parent=self))
+            ).bindings
+
+    def get_constrained_values(
+        self, sources: Optional[Dict[int, HashedValue]]
+    ) -> Iterable[OperationResult]:
+        """
+        Evaluate the child (i.e., the conditions that constrain the domain of the selected variables).
+
+        :param sources: The current bindings.
+        :return: The bindings after applying the constraints of the child.
+        """
+        if self._child_:
+            # QueryObjectDescriptor does not yield when it's False
+            yield from filter(
+                lambda v: v.is_true, self._child_._evaluate__(sources, parent=self)
+            )
+        else:
+            yield from [OperationResult(sources, False, self)]
+
+    def evaluate_selected_variables(
+        self, sources: Dict[int, HashedValue]
+    ) -> Iterable[OperationResult]:
+        """
+        Evaluate the selected variables by generating combinations of values from their evaluation generators.
+
+        :param sources: The current bindings.
+        :return: An Iterable of OperationResults for each combination of values.
+        """
+        var_val_gen = {
+            var: var._evaluate__(copy(sources), parent=self)
+            for var in self.selected_variables
+        }
+        for sol in generate_combinations(var_val_gen):
+            var_val = {var._id_: sol[var][var._id_] for var in self.selected_variables}
+            self._is_false_ = self._is_false_ or any(
+                sol[var].is_false for var in self.selected_variables
+            )
+            yield OperationResult({**sources, **var_val}, self._is_false_, self)
+
+    @cached_property
+    def _all_variable_instances_(self) -> List[Variable]:
+        vars = []
+        if self.selected_variables:
+            vars.extend(self.selected_variables)
+        if self._child_:
+            vars.extend(self._child_._all_variable_instances_)
+        return vars
+
+    def __invert__(self):
+        raise UnsupportedNegation(self.__class__)
+
+    @property
+    def _plot_color_(self) -> ColorLegend:
+        return ColorLegend("ObjectDescriptor", "#d62728")
+
+    @property
+    def _name_(self) -> str:
+        return f"({', '.join(var._name_ for var in self.selected_variables)})"
+
+
+@dataclass(eq=False, repr=False)
+class SetOf(QueryObjectDescriptor[T]):
+    """
+    A query over a set of variables.
+    """
+
+    ...
+
+
+@dataclass(eq=False, repr=False)
+class Entity(QueryObjectDescriptor[T], CanBehaveLikeAVariable[T]):
+    """
+    A query over a single variable.
+    """
+
+    def __post_init__(self):
+        self._var_ = self.selected_variable
+        super().__post_init__()
+
+    @property
+    def selected_variable(self):
+        return self.selected_variables[0] if self.selected_variables else None
+
+
+@dataclass
+class From:
+    """
+    A dataclass that holds the domain for a symbolic variable, this will be used instead of the global cache
+    of the variable class type.
+    """
+
+    domain: Any
+    """
+    The domain to use for the symbolic variable.
+    """
+
+
+@dataclass(eq=False, repr=False)
+class Variable(CanBehaveLikeAVariable[T]):
+    """
+    A Variable that queries will assign. The Variable produces results of type `T`.
+    """
+
+    _type_: Type = field(default=MISSING)
+    """
+    The result type of the variable. (The value of `T`)
+    """
+
+    _name__: str
+    """
+    The name of the variable.
+    """
+
+    _kwargs_: Dict[str, Any] = field(default_factory=dict)
+    """
+    The properties of the variable as keyword arguments.
+    """
+
+    _domain_source_: Optional[From] = field(default=None, kw_only=True, repr=False)
+    """
+    An optional source for the variable domain. If not given, the global cache of the variable class type will be used
+    as the domain, or if kwargs are given the type and the kwargs will be used to inference/infer new values for the
+    variable.
+    """
+    _domain_: HashedIterable = field(
+        default_factory=HashedIterable, kw_only=True, repr=False
+    )
+    """
+    The iterable domain of values for this variable.
+    """
+    _predicate_type_: Optional[PredicateType] = field(default=None, repr=False)
+    """
+    If this symbol is an instance of the Predicate class.
+    """
+    _is_inferred_: bool = field(default=False, repr=False)
+    """
+    Whether this variable should be inferred.
+    """
+    _child_vars_: Optional[Dict[str, SymbolicExpression]] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    A dictionary mapping child variable names to variables, these are from the _kwargs_ dictionary. 
+    """
+
+    def __post_init__(self):
+        self._validate_inputs_and_fill_missing_ones_()
+        self._var_ = self
+        super().__post_init__()
+        # has to be after super init because this needs the node of this variable to be initialized first.
+        self._update_child_vars_from_kwargs_()
+
+    def _validate_inputs_and_fill_missing_ones_(self):
+        if self._kwargs_ and not self._type_:
+            raise ValueError(
+                f"Variable {self._name_} has class keyword arguments but no type is specified."
+            )
+        self._child_ = None
+        if self._domain_source_:
+            self._update_domain_(self._domain_source_.domain)
+
+    def _update_domain_(self, domain):
+        if domain:
+            if isinstance(domain, HashedIterable):
+                self._domain_ = domain
+                return
+            elif not is_iterable(domain):
+                domain = [HashedValue(domain)]
+            self._domain_.set_iterable(domain)
+
+    def _update_child_vars_from_kwargs_(self):
+        for k, v in self._kwargs_.items():
+            if isinstance(v, SymbolicExpression):
+                self._child_vars_[k] = v
+            else:
+                self._child_vars_[k] = Literal(v, name=k)
+        self._update_children_(*self._child_vars_.values())
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+        """
+        A variable either is already bound in sources by other constraints (Symbolic Expressions).,
+        or will yield from current domain if exists,
+        or has no domain and will instantiate new values by constructing the type if the type is given.
+        """
+        self._eval_parent_ = parent
+        sources = sources or {}
+        if self._id_ in sources:
+            yield OperationResult(sources, not bool(sources[self._id_]), self)
+        elif self._domain_:
+            for v in self._domain_:
+                yield OperationResult(
+                    {**sources, self._id_: HashedValue(v)}, False, self
+                )
+        elif self._should_be_instantiated_:
+            yield from self._instantiate_using_child_vars_and_yield_results_(sources)
+        else:
+            raise ValueError("Cannot evaluate variable.")
+
+    @cached_property
+    def _should_be_instantiated_(self):
+        return self._is_inferred_ or self._predicate_type_
+
+    def _instantiate_using_child_vars_and_yield_results_(
+        self, sources: Dict[int, HashedValue]
+    ) -> Iterable[OperationResult]:
+        for kwargs in self._generate_combinations_for_child_vars_values_(sources):
+            # Build once: unwrapped hashed kwargs for already provided child vars
+            bound_kwargs = {k: v[self._child_vars_[k]._id_] for k, v in kwargs.items()}
+            instance = self._type_(**{k: hv.value for k, hv in bound_kwargs.items()})
+            if self._predicate_type_ == PredicateType.SubClassOfPredicate:
+                instance = instance()
+            yield self._process_output_and_update_values_(instance, kwargs)
+
+    def _generate_combinations_for_child_vars_values_(
+        self, sources: Optional[Dict[int, HashedValue]] = None
+    ):
+        yield from generate_combinations(
+            {k: var._evaluate__(sources) for k, var in self._child_vars_.items()}
+        )
+
+    def _process_output_and_update_values_(
+        self, instance: Any, kwargs: Dict[str, OperationResult]
+    ) -> OperationResult:
+        """
+        Process the predicate/variable instance and get the results.
+
+        :param instance: The created instance.
+        :param kwargs: The keyword arguments of the predicate/variable.
+        :return: The results' dictionary.
+        """
+        hv = HashedValue(instance)
+        # kwargs is a mapping from name -> {var_id: HashedValue};
+        # we need a single dict {var_id: HashedValue}
+        values = {self._id_: hv}
+        for d in kwargs.values():
+            values.update(d.bindings)
+        return OperationResult(values, not bool(instance), self)
+
+    @property
+    def _name_(self):
+        return self._name__
+
+    @cached_property
+    def _all_variable_instances_(self) -> List[Variable]:
+        variables = [self]
+        for v in self._child_vars_.values():
+            variables.extend(v._all_variable_instances_)
+        return variables
+
+    @property
+    def _plot_color_(self) -> ColorLegend:
+        if self._plot_color__:
+            return self._plot_color__
+        else:
+            return ColorLegend("Variable", "cornflowerblue")
+
+    @_plot_color_.setter
+    def _plot_color_(self, value: ColorLegend):
+        self._plot_color__ = value
+        self._node_.color = value
+
+
+@dataclass(eq=False, init=False, repr=False)
+class Literal(Variable[T]):
+    """
+    Literals are variables that are not constructed by their type but by their given data.
+    """
+
+    def __init__(
+        self, data: Any, name: Optional[str] = None, type_: Optional[Type] = None
+    ):
+        original_data = data
+        data = [data]
+        if not is_iterable(data):
+            data = HashedIterable([data])
+        if not type_:
+            first_value = next(iter(data), None)
+            type_ = type(first_value) if first_value else None
+        if name is None:
+            if type_:
+                name = type_.__name__
+            else:
+                name = type(original_data).__name__
+        super().__init__(_name__=name, _type_=type_, _domain_source_=From(data))
+
+    @property
+    def _plot_color_(self) -> ColorLegend:
+        if self._plot_color__:
+            return self._plot_color__
+        else:
+            return ColorLegend("Literal", "#949292")
+
+
+@dataclass(eq=False, repr=False)
+class DomainMapping(CanBehaveLikeAVariable[T], ABC):
+    """
+    A symbolic expression the maps the domain of symbolic variables.
+    """
+
+    _child_: CanBehaveLikeAVariable[T]
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._var_ = self
+
+    @cached_property
+    def _all_variable_instances_(self) -> List[Variable]:
+        return self._child_._all_variable_instances_
+
+    @cached_property
+    def _type_(self):
+        return self._child_._type_
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+
+        sources = sources or {}
+
+        self._eval_parent_ = parent
+
+        if self._id_ in sources:
+            yield OperationResult(sources, self._is_false_, self)
+            return
+
+        yield from (
+            self._build_operation_result_and_update_truth_value_(
+                child_result, mapped_value
+            )
+            for child_result in self._child_._evaluate__(sources, parent=self)
+            for mapped_value in self._apply_mapping_(child_result[self._child_._id_])
+        )
+
+    def _build_operation_result_and_update_truth_value_(
+        self, child_result: OperationResult, current_value: Any
+    ) -> OperationResult:
+        """
+        Set the current truth value of the operation result, and build the operation result to be yielded.
+
+        :param child_result: The current result from the child operation.
+        :param current_value: The current value of this operation that is derived from the child result.
+        :return: The operation result.
+        """
+        self._is_false_ = not bool(current_value)
+        return OperationResult(
+            {**child_result.bindings, self._id_: current_value},
+            self._is_false_,
+            self,
+        )
+
+    @abstractmethod
+    def _apply_mapping_(self, value: HashedValue) -> Iterable[HashedValue]:
+        """
+        Apply the domain mapping to a symbolic value.
+        """
+        pass
+
+    @property
+    def _plot_color_(self) -> ColorLegend:
+        if self._plot_color__:
+            return self._plot_color__
+        else:
+            return ColorLegend("DomainMapping", "#8FC7B8")
+
+    @_plot_color_.setter
+    def _plot_color_(self, value: ColorLegend):
+        self._plot_color__ = value
+        self._node_.color = value
+
+
+@dataclass(eq=False, repr=False)
+class Attribute(DomainMapping):
+    """
+    A symbolic attribute that can be used to access attributes of symbolic variables.
+
+    For instance, if Body.name is called, then the attribute name is "name" and `_owner_class_` is `Body`
+    """
+
+    _attr_name_: str
+    """
+    The name of the attribute.
+    """
+
+    _owner_class_: Type
+    """
+    The class that owns this attribute.
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self._wrapped_owner_class_:
+            self._update_path_()
+
+    def _update_path_(self):
+        if self._relation_:
+            self._path_ = self._child_._path_ + [self._relation_]
+
+    @cached_property
+    def _relation_(self):
+        if self._wrapped_field_ and self._wrapped_type_:
+            return Association(
+                self._wrapped_owner_class_, self._wrapped_type_, self._wrapped_field_
+            )
+        return None
+
+    @cached_property
+    def _wrapped_type_(self):
+        try:
+            return SymbolGraph().class_diagram.get_wrapped_class(self._type_)
+        except ClassIsUnMappedInClassDiagram:
+            return None
+
+    @cached_property
+    def _type_(self) -> Optional[Type]:
+        """
+        :return: The type of the accessed attribute.
+        """
+
+        if not is_dataclass(self._owner_class_):
+            return None
+
+        if self._wrapped_owner_class_:
+            # try to get the type endpoint from a field
+            try:
+                return self._wrapped_field_.type_endpoint
+            except (KeyError, AttributeError):
+                return None
+        else:
+            wrapped_cls = WrappedClass(self._owner_class_)
+            wrapped_cls._class_diagram = SymbolGraph().class_diagram
+            wrapped_field = WrappedField(
+                wrapped_cls,
+                [f for f in fields(self._owner_class_) if f.name == self._attr_name_][
+                    0
+                ],
+            )
+            try:
+                return wrapped_field.type_endpoint
+            except (AttributeError, RuntimeError):
+                return None
+
+    @cached_property
+    def _wrapped_field_(self) -> Optional[WrappedField]:
+        return self._wrapped_owner_class_._wrapped_field_name_map_.get(
+            self._attr_name_, None
+        )
+
+    @cached_property
+    def _wrapped_owner_class_(self):
+        """
+        :return: The owner class of the attribute from the symbol graph.
+        """
+        try:
+            return SymbolGraph().class_diagram.get_wrapped_class(self._owner_class_)
+        except ClassIsUnMappedInClassDiagram:
+            return None
+
+    def _apply_mapping_(self, value: HashedValue) -> Iterable[HashedValue]:
+        yield HashedValue(id_=value.id_, value=getattr(value.value, self._attr_name_))
+
+    @property
+    def _name_(self):
+        return f"{self._child_._var_._name_}.{self._attr_name_}"
+
+
+@dataclass(eq=False, repr=False)
+class Index(DomainMapping):
+    """
+    A symbolic indexing operation that can be used to access items of symbolic variables via [] operator.
+    """
+
+    _key_: Any
+
+    def _apply_mapping_(self, value: HashedValue) -> Iterable[HashedValue]:
+        yield HashedValue(id_=value.id_, value=value.value[self._key_])
+
+    @property
+    def _name_(self):
+        return f"{self._child_._var_._name_}[{self._key_}]"
+
+
+@dataclass(eq=False, repr=False)
+class Call(DomainMapping):
+    """
+    A symbolic call that can be used to call methods on symbolic variables.
+    """
+
+    _args_: Tuple[Any, ...] = field(default_factory=tuple)
+    _kwargs_: Dict[str, Any] = field(default_factory=dict)
+
+    def _apply_mapping_(self, value: HashedValue) -> Iterable[HashedValue]:
+        if len(self._args_) > 0 or len(self._kwargs_) > 0:
+            yield HashedValue(
+                id_=value.id_, value=value.value(*self._args_, **self._kwargs_)
+            )
+        else:
+            yield HashedValue(id_=value.id_, value=value.value())
+
+    @property
+    def _name_(self):
+        return f"{self._child_._var_._name_}()"
+
+
+@dataclass(eq=False, repr=False)
+class Flatten(DomainMapping):
+    """
+    Domain mapping that flattens an iterable-of-iterables into a single iterable of items.
+
+    Given a child expression that evaluates to an iterable (e.g., Views.bodies), this mapping yields
+    one solution per inner element while preserving the original bindings (e.g., the View instance),
+    similar to UNNEST in SQL.
+    """
+
+    def __post_init__(self):
+        if not isinstance(self._child_, SymbolicExpression):
+            self._child_ = Literal(self._child_)
+        super().__post_init__()
+        self._path_ = self._child_._path_
+
+    def _apply_mapping_(self, value: HashedValue) -> Iterable[HashedValue]:
+        for inner_v in value.value:
+            yield HashedValue(inner_v)
+
+    @cached_property
+    def _name_(self):
+        return f"Flatten({self._child_._name_})"
+
+
+@dataclass(eq=False, repr=False)
+class BinaryOperator(SymbolicExpression, ABC):
+    """
+    A base class for binary operators that can be used to combine symbolic expressions.
+    """
+
+    left: SymbolicExpression
+    right: SymbolicExpression
+    _child_: SymbolicExpression = field(init=False, default=None)
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.left, self.right = self._update_children_(self.left, self.right)
+
+    @cached_property
+    def _all_variable_instances_(self) -> List[Variable]:
+        """
+        Get the leaf instances of the symbolic expression.
+        This is useful for accessing the leaves of the symbolic expression tree.
+        """
+        return self.left._all_variable_instances_ + self.right._all_variable_instances_
+
+    @lru_cache(maxsize=None)
+    def _projection_(self, when_true: Optional[bool] = True) -> HashedIterable[int]:
+        """
+        Return the projection for binary operators.
+
+        Includes variables from both operands symmetrically to ensure non-empty dedup keys.
+        """
+        projection = HashedIterable()
+        # Include variables from both left and right operands symmetrically
+        projection.update(self.left._unique_variables_)
+        projection.update(self.right._unique_variables_)
+        if when_true or (when_true is None):
+            for conclusion in self._conclusion_:
+                projection.update(conclusion._unique_variables_)
+        if self._parent_:
+            projection.update(self._parent_._projection_(when_true))
+        return projection
+
+
+def not_contains(container, item) -> bool:
+    """
+    The inverted contains operation.
+
+    :param container: The container.
+    :param item: The item to test if contained in the container.
+    :return:
+    """
+    return not operator.contains(container, item)
+
+
+@dataclass(eq=False, repr=False)
+class Comparator(BinaryOperator):
+    """
+    A symbolic equality check that can be used to compare symbolic variables using a provided comparison operation.
+    """
+
+    left: CanBehaveLikeAVariable
+    right: CanBehaveLikeAVariable
+    operation: Callable[[Any, Any], bool]
+    operation_name_map: ClassVar[Dict[Any, str]] = {
+        operator.eq: "==",
+        operator.ne: "!=",
+        operator.lt: "<",
+        operator.le: "<=",
+        operator.gt: ">",
+        operator.ge: ">=",
+    }
+
+    @property
+    def _name_(self):
+        if self.operation in self.operation_name_map:
+            return self.operation_name_map[self.operation]
+        return self.operation.__name__
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+        """
+        Compares the left and right symbolic variables using the "operation".
+        """
+        sources = sources or {}
+        self._eval_parent_ = parent
+
+        if self._id_ in sources:
+            yield OperationResult(sources, self._is_false_, self)
+            return
+
+        first_operand, second_operand = self.get_first_second_operands(sources)
+
+        yield from (
+            OperationResult(
+                second_val.bindings, not self.apply_operation(second_val), self
+            )
+            for first_val in filter(
+                lambda v: v.is_true, first_operand._evaluate__(sources, parent=self)
+            )
+            for second_val in filter(
+                lambda v: v.is_true,
+                second_operand._evaluate__(first_val.bindings, parent=self),
+            )
+        )
+
+    def apply_operation(self, operand_values: OperationResult) -> bool:
+        res = self.operation(
+            operand_values[self.left._id_].value, operand_values[self.right._id_].value
+        )
+        self._is_false_ = not res
+        operand_values[self._id_] = HashedValue(res)
+        return res
+
+    def get_first_second_operands(
+        self, sources: Dict[int, HashedValue]
+    ) -> Tuple[SymbolicExpression, SymbolicExpression]:
+        if sources and any(
+            v.value._var_._id_ in sources for v in self.right._unique_variables_
+        ):
+            return self.right, self.left
+        else:
+            return self.left, self.right
+
+    @property
+    def _plot_color_(self) -> ColorLegend:
+        return ColorLegend("Comparator", "#ff7f0e")
+
+
+@dataclass(eq=False, repr=False)
+class LogicalOperator(SymbolicExpression[T], ABC):
+    """
+    A symbolic operation that can be used to combine multiple symbolic expressions using logical constraints on their
+    truth values. Examples are conjunction (AND), disjunction (OR), negation (NOT), and conditional quantification
+    (ForALL, Exists).
+    """
+
+    @property
+    def _name_(self):
+        return self.__class__.__name__
+
+    @property
+    def _plot_color_(self) -> ColorLegend:
+        return ColorLegend("LogicalOperator", "#2ca02c")
+
+
+@dataclass(eq=False, repr=False)
+class Not(LogicalOperator[T]):
+    """
+    The logical negation of a symbolic expression. Its truth value is the opposite of its child's truth value. This is
+    used when you want bindings that satisfy the negated condition (i.e., that doesn't satisfy the original condition).
+    """
+
+    _child_: SymbolicExpression[T]
+
+    def __post_init__(self):
+        if isinstance(self._child_, ResultQuantifier):
+            raise UnSupportedOperand(self.__class__, self._child_)
+        super().__post_init__()
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+        sources = sources or {}
+        self._eval_parent_ = parent
+        for v in self._child_._evaluate__(sources, parent=self):
+            self._is_false_ = v.is_true
+            yield OperationResult(v.bindings, self._is_false_, self)
+
+    @property
+    def _all_variable_instances_(self) -> List[Variable]:
+        return self._child_._all_variable_instances_
+
+
+@dataclass(eq=False, repr=False)
+class LogicalBinaryOperator(LogicalOperator[T], BinaryOperator, ABC):
+    def __post_init__(self):
+        if isinstance(self.left, ResultQuantifier):
+            raise UnSupportedOperand(self.__class__, self.left)
+        if isinstance(self.right, ResultQuantifier):
+            raise UnSupportedOperand(self.__class__, self.right)
+        super().__post_init__()
+
+
+@dataclass(eq=False, repr=False)
+class AND(LogicalBinaryOperator):
+    """
+    A symbolic AND operation that can be used to combine multiple symbolic expressions.
+    """
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+        sources = sources or {}
+        self._eval_parent_ = parent
+        left_values = self.left._evaluate__(sources, parent=self)
+        for left_value in left_values:
+            self._is_false_ = left_value.is_false
+            if self._is_false_:
+                yield OperationResult(left_value.bindings, self._is_false_, self)
+            else:
+                yield from self.evaluate_right(left_value)
+
+    def evaluate_right(self, left_value: OperationResult) -> Iterable[OperationResult]:
+        right_values = self.right._evaluate__(left_value.bindings, parent=self)
+        for right_value in right_values:
+            self._is_false_ = right_value.is_false
+            yield OperationResult(right_value.bindings, self._is_false_, self)
+
+
+@dataclass(eq=False, repr=False)
+class OR(LogicalBinaryOperator, ABC):
+    """
+    A symbolic single choice operation that can be used to choose between multiple symbolic expressions.
+    """
+
+    left_evaluated: bool = field(default=False, init=False)
+    right_evaluated: bool = field(default=False, init=False)
+
+    @lru_cache(maxsize=None)
+    def _projection_(self, when_true: Optional[bool] = True) -> HashedIterable[int]:
+        """
+        Return the projection for OR operators.
+
+        Includes variables from both operands symmetrically to ensure non-empty dedup keys.
+        """
+        projection = HashedIterable()
+        # Include variables from both left and right operands symmetrically
+        projection.update(self.left._unique_variables_)
+        projection.update(self.right._unique_variables_)
+        if when_true or (when_true is None):
+            for conclusion in self.left._conclusion_:
+                projection.update(conclusion._unique_variables_)
+            for conclusion in self.right._conclusion_:
+                projection.update(conclusion._unique_variables_)
+        if self._parent_:
+            projection.update(self._parent_._projection_(when_true))
+        return projection
+
+    def evaluate_left(
+        self,
+        sources: Dict[int, HashedValue],
+    ) -> Iterable[OperationResult]:
+        """
+        Evaluate the left operand, taking into consideration if it should yield when it is False.
+
+        :param sources: The current bindings to use for evaluation.
+        :return: The new bindings after evaluating the left operand (and possibly right operand).
+        """
+        left_values = self.left._evaluate__(sources, parent=self)
+
+        for left_value in left_values:
+            self.left_evaluated = True
+            left_is_false = left_value.is_false
+            if left_is_false:
+                yield from self.evaluate_right(left_value.bindings)
+            else:
+                self._is_false_ = False
+                yield OperationResult(left_value.bindings, self._is_false_, self)
+
+    def evaluate_right(
+        self, sources: Dict[int, HashedValue]
+    ) -> Iterable[OperationResult]:
+        """
+        Evaluate the right operand.
+
+        :param sources: The current bindings to use during evaluation.
+        :return: The new bindings after evaluating the right operand.
+        """
+
+        self.left_evaluated = False
+
+        right_values = self.right._evaluate__(sources, parent=self)
+
+        for right_value in right_values:
+            self._is_false_ = right_value.is_false
+            self.right_evaluated = True
+            yield OperationResult(right_value.bindings, self._is_false_, self)
+
+        self.right_evaluated = False
+
+
+@dataclass(eq=False, repr=False)
+class Union(OR):
+    """
+    This operator is a version of the OR operator that always evaluates both the left and the right operand.
+    """
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+        sources = sources or {}
+        self._eval_parent_ = parent
+
+        yield from self.evaluate_left(sources)
+        yield from self.evaluate_right(sources)
+
+
+@dataclass(eq=False, repr=False)
+class ElseIf(OR):
+    """
+    A version of the OR operator that evaluates the right operand only when the left operand is False.
+    """
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+        """
+        Constrain the symbolic expression based on the indices of the operands.
+        This method overrides the base class method to handle ElseIf logic.
+        """
+        sources = sources or {}
+        self._eval_parent_ = parent
+        yield from self.evaluate_left(sources)
+
+
+@dataclass(eq=False, repr=False)
+class QuantifiedConditional(LogicalBinaryOperator, ABC):
+    """
+    This is the super class of the universal, and existential conditional operators. It is a binary logical operator
+    that has a quantified variable and a condition on the values of that variable.
+    """
+
+    @property
+    def variable(self):
+        return self.left
+
+    @variable.setter
+    def variable(self, value):
+        self.left = value
+
+    @property
+    def condition(self):
+        return self.right
+
+    @condition.setter
+    def condition(self, value):
+        self.right = value
+
+
+@dataclass(eq=False, repr=False)
+class ForAll(QuantifiedConditional):
+    """
+    This operator is the universal conditional operator. It returns bindings that satisfy the condition for all the
+    values of the quantified variable. It short circuits by ignoring the bindings that doesn't satisfy the condition.
+    """
+
+    @cached_property
+    def condition_unique_variable_ids(self) -> List[int]:
+        return [
+            v.id_
+            for v in self.condition._unique_variables_.difference(
+                self.left._unique_variables_
+            )
+        ]
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+        sources = sources or {}
+        self._eval_parent_ = parent
+
+        solution_set = None
+
+        for var_val in self.variable._evaluate__(sources, parent=self):
+            if solution_set is None:
+                solution_set = self.get_all_candidate_solutions(var_val.bindings)
+            else:
+                solution_set = [
+                    sol
+                    for sol in solution_set
+                    if self.evaluate_condition({**sol, **var_val.bindings})
+                ]
+            if not solution_set:
+                solution_set = []
+                break
+
+        # Yield the remaining bindings (non-universal) merged with the incoming sources
+        yield from [
+            OperationResult({**sources, **sol}, False, self) for sol in solution_set
+        ]
+
+    def get_all_candidate_solutions(self, sources: Dict[int, HashedValue]):
+        values_that_satisfy_condition = []
+        # Evaluate the condition under this particular universal value
+        for condition_val in self.condition._evaluate__(sources, parent=self):
+            if condition_val.is_false:
+                continue
+            condition_val_bindings = {
+                k: v
+                for k, v in condition_val.bindings.items()
+                if k in self.condition_unique_variable_ids
+            }
+            values_that_satisfy_condition.append(condition_val_bindings)
+        return values_that_satisfy_condition
+
+    def evaluate_condition(self, sources: Dict[int, HashedValue]) -> bool:
+        for condition_val in self.condition._evaluate__(sources, parent=self):
+            return condition_val.is_true
+        return False
+
+    def __invert__(self):
+        return Exists(self.variable, self.condition.__invert__())
+
+
+@dataclass(eq=False, repr=False)
+class Exists(QuantifiedConditional):
+    """
+    An existential checker that checks if a condition holds for any value of the variable given, the benefit
+    of this is that this short circuits the condition and returns True if the condition holds for any value without
+    getting all the condition values that hold for one specific value of the variable.
+    """
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+        sources = sources or {}
+        self._eval_parent_ = parent
+        for var_val in self.variable._evaluate__(sources, parent=self):
+            yield from self.evaluate_condition(var_val.bindings)
+
+    def evaluate_condition(
+        self, sources: Dict[int, HashedValue]
+    ) -> Iterable[OperationResult]:
+        # Evaluate the condition under this particular universal value
+        for condition_val in self.condition._evaluate__(sources, parent=self):
+            self._is_false_ = condition_val.is_false
+            if not self._is_false_:
+                yield OperationResult(condition_val.bindings, False, self)
+                break
+
+    def __invert__(self):
+        return ForAll(self.variable, self.condition.__invert__())
+
+
+OperatorOptimizer = Callable[[SymbolicExpression, SymbolicExpression], LogicalOperator]
+
+
+def chained_logic(
+    operator: TypingUnion[Type[LogicalOperator], OperatorOptimizer], *conditions
+):
+    """
+    A chian of logic operation over multiple conditions, e.g. cond1 | cond2 | cond3.
+
+    :param operator: The symbolic operator to apply between the conditions.
+    :param conditions: The conditions to be chained.
+    """
+    prev_operation = None
+    for condition in conditions:
+        if prev_operation is None:
+            prev_operation = condition
+            continue
+        prev_operation = operator(prev_operation, condition)
+    return prev_operation
+
+
+def optimize_or(left: SymbolicExpression, right: SymbolicExpression) -> OR:
+
+    left_vars = left._unique_variables_.filter(
+        lambda v: not isinstance(v.value, Literal)
+    )
+    right_vars = right._unique_variables_.filter(
+        lambda v: not isinstance(v.value, Literal)
+    )
+    if set(left_vars.unwrapped_values) == set(right_vars.unwrapped_values):
+        return ElseIf(left, right)
+    else:
+        return Union(left, right)
+
+
+def _any_of_the_kwargs_is_a_variable(bindings: Dict[str, Any]) -> bool:
+    """
+    :param bindings: A kwarg like dict mapping strings to objects
+    :return: Rather any of the objects is a variable or not.
+    """
+    return any(
+        isinstance(binding, CanBehaveLikeAVariable) for binding in bindings.values()
+    )

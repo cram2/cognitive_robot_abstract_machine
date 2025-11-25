@@ -1,4 +1,11 @@
 # Byte-compiled / optimized / DLL files
+.venv
+__pycache__
+.idea
+.hypothesis
+_build
+*.egg-info
+build
 __pycache__/
 *.py[cod]
 
@@ -73,3 +80,6 @@ tmp/
 # Example checkpoints
 examples/.ipynb_checkpoints/
 */tmp/*
+*.pyc
+*.pyo
+*.pdf
