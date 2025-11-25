@@ -1,9 +1,19 @@
-![](doc/source/_static/images/new_pycram_logo_clean.svg#gh-light-mode-only)
-![](doc/source/_static/images/new_pycram_logo_clean_dark.svg#gh-dark-mode-only)
+# PyCRAM — High‑level feature highlights
+
+[![Python Tests](https://github.com/cram2/pycram/actions/workflows/new-pycram-ci.yml/badge.svg)](https://github.com/cram2/pycram/actions/workflows/new-pycram-ci.yml/badge.svg)
+[![Example Tests](https://github.com/cram2/pycram/actions/workflows/notebook-test-ci.yml/badge.svg)](https://github.com/cram2/pycram/actions/workflows/notebook-test-ci.yml/badge.svg)
+
+```{raw} html
+<div style="display: flex; flex-direction: row; align-items: center; gap: 30px;">
+  <div style="flex: 1; max-width: 70%;">
+    <img src="_static/images/new_pycram_logo_clean.svg" alt="Assimilation Icon" class="only-light" style="width: 100%; height: auto; object-fit: contain;">
+    <img src="_static/images/new_pycram_logo_clean_dark.svg" alt="Assimilation Icon" class="only-dark" style="width: 100%; height: auto; object-fit: contain;">
+  </div>
+</div>
+```
 
 
-
-## Key Features
+## Key features
 
 - Intent-based task specification: express “what” to do using designators; the framework decides the concrete “how” at run time.
 - Late binding and adaptability: defer grounding of actions, motions, objects, and locations until execution to match the current world and robot state.
@@ -32,9 +42,6 @@ The recommended installation method is via `pip`:
 pip install pycram-robotics
 ```
 
-While this works out-of-the-box to execute the examples or tests PyCRAM needs a ROS installation to load URDFs or use the 
-visualization with RViz2. Look at the detailed installation instructions for more infos.  
-
 Detailed installation instructions and manual setup guides are available [here](https://pycram.readthedocs.io/en/latest/installation.html).
 
 ## Live Demonstration in the Virtual Research Building
@@ -58,4 +65,19 @@ Source documentation is located in the `doc` directory. Instructions for buildin
 
 Comprehensive examples are provided as Jupyter Notebooks in the `examples` folder and documented in the [Examples section](https://pycram.readthedocs.io/en/latest/notebooks/intro.html). Refer to the examples folder's `README` for instructions on executing these notebooks.
 
+
+
+Citing PyCRAM
+=============
+
+If you want to cite PyCRAM in your work, you can use the following bibtex entry:
+
+.. code-block:: bibtex
+
+        @software{dech2024pycram,
+        author = {Dech, Jonas and Bassiouny, Abdelrhman and  Schierenbeck, Tom and Hassouna, Vanessa and Krohm, Luca and Prüsser, David},
+        title = {PyCRAM: A Python framework for cognition-enbabled robtics},
+        url = {https://github.com/cram2/pycram},
+        version = {2.0.0},
+        }
 

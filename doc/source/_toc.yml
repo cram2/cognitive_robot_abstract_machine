@@ -1,0 +1,51 @@
+# Table of contents
+# Learn more at https://jupyterbook.org/customize/toc.html
+
+format: jb-book
+root: index.md
+parts:
+  - caption: Getting Started
+    chapters:
+    - file: installation.rst
+    - file:  quickstart.rst
+
+  - caption: Concepts
+    chapters:
+    - file: plan.rst
+    - file: designators.rst
+    - file: orm_concept.rst
+    - file: abstract_robot.rst
+    - file: process_modules.rst
+    - file: costmap.rst
+    - file: notebooks.rst
+  - caption: Adding a new Robot
+    chapters:
+    - file: new_robot.rst
+
+  - caption: Trouble Shooting
+    chapters:
+    - file: troubleshooting.rst
+    - file: remarks.rst
+
+
+  - caption: Examples
+    chapters:
+      - file: notebooks/language
+      - file: designator_example.rst
+        sections:
+        - file: notebooks/action_designator
+        - file: notebooks/object_designator
+        - file: notebooks/location_designator
+        - file: notebooks/motion_designator
+      - file: orm.md
+        sections:
+        - file: notebooks/orm_example
+        - file: notebooks/orm_querying_examples
+      - file: datastructures.rst
+        sections:
+        - file: notebooks/pose
+      - file: ros_utils.rst
+
+  - caption: API
+    chapters:
+    - file: autoapi/pycram/index.md

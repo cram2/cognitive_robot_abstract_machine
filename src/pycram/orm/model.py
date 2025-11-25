@@ -1,0 +1,272 @@
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Type, List, Self
+
+import numpy as np
+from krrood.ormatic.dao import AlternativeMapping, T, to_dao
+from sqlalchemy import TypeDecorator, types
+from typing_extensions import Optional
+
+from ..datastructures.dataclasses import ExecutionData
+from ..datastructures.enums import TaskStatus
+from ..datastructures.pose import Quaternion
+from ..designator import DesignatorDescription
+from ..failures import PlanFailure
+from ..language import TryInOrderNode, ParallelNode, TryAllNode, CodeNode, MonitorNode
+from ..plan import (
+    ActionNode,
+    MotionNode,
+    PlanNode,
+    ResolvedActionNode,
+    DesignatorNode,
+    Plan,
+)
+from ..robot_plans import ActionDescription, BaseMotion
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+#            Map all Designators, that are not self-mapping, here.
+#            By default all classes are self-mapping, so you only need to add the ones where not every attribute is
+#            supposed to be mapped or where an attribute is from a type, which is not mapped itself.
+#            Specify the columns(attributes) that are supposed to be tracked in the database.
+#            One attribute equals one column. Please refer to the ORMatic documentation for more information.
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+@dataclass
+class PyCRAMQuaternionMapping(AlternativeMapping[Quaternion]):
+    x: float = 0
+    y: float = 0
+    z: float = 0
+    w: float = 1
+
+    @classmethod
+    def create_instance(cls, obj: T):
+        return Quaternion(obj.x, obj.y, obj.z, obj.w)
+
+    def create_from_dao(self) -> T:
+        return Quaternion(self.x, self.y, self.z, self.w)
+
+
+@dataclass
+class PlanNodeMapping(AlternativeMapping[PlanNode]):
+    status: TaskStatus = TaskStatus.CREATED
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    reason: Optional[PlanFailure] = None
+
+    @classmethod
+    def create_instance(cls, obj: PlanNode):
+        """
+        Convert a PlanNode to a PlanNodeDAO.
+        """
+        return cls(
+            status=obj.status,
+            start_time=obj.start_time,
+            end_time=obj.end_time,
+            reason=obj.reason,
+        )
+
+    def create_from_dao(self) -> T:
+        raise NotImplementedError()
+
+
+@dataclass
+class DesignatorNodeMapping(PlanNodeMapping, AlternativeMapping[DesignatorNode]):
+    designator_ref: DesignatorDescription = None
+    designator_type: Type[DesignatorDescription] = None
+
+    @classmethod
+    def create_instance(cls, obj: DesignatorNode):
+        """
+        Convert a DesignatorNode to a DesignatorNodeDAO.
+        """
+        return cls(
+            status=obj.status,
+            start_time=obj.start_time,
+            designator_type=obj.designator_type,
+            designator_ref=obj.designator_ref,
+            end_time=obj.end_time,
+            reason=obj.reason,
+        )
+
+    def create_from_dao(self) -> T:
+        raise NotImplementedError()
+
+
+@dataclass
+class ActionNodeMapping(DesignatorNodeMapping, AlternativeMapping[ActionNode]):
+
+    @classmethod
+    def create_instance(cls, obj: ActionNode):
+        """
+        Convert an ActionNode to an ActionNodeDAO.
+        """
+        return cls(
+            status=obj.status,
+            designator_type=obj.designator_type,
+            start_time=obj.start_time,
+            end_time=obj.end_time,
+            reason=obj.reason,
+        )
+
+    def create_from_dao(self) -> T:
+        raise NotImplementedError()
+
+
+@dataclass
+class MotionNodeMapping(DesignatorNodeMapping, AlternativeMapping[MotionNode]):
+
+    # @classmethod
+    # def create_instance(cls, obj: MotionNode):
+    #     """
+    #     Convert a MotionNode to a MotionNodeDAO.
+    #     """
+    #     return cls(
+    #         status=obj.status,
+    #         action=obj.action,
+    #         start_time=obj.start_time,
+    #         end_time=obj.end_time,
+    #         reason=obj.reason,
+    #     )
+
+    def create_from_dao(self) -> T:
+        raise NotImplementedError()
+
+
+@dataclass
+class ResolvedActionNodeMapping(
+    DesignatorNodeMapping, AlternativeMapping[ResolvedActionNode]
+):
+    designator_ref: ActionDescription = None
+    execution_data: ExecutionData = None
+
+    @classmethod
+    def create_instance(cls, obj: ResolvedActionNode):
+        """
+        Convert a ResolvedActionNode to a ResolvedActionNodeDAO.
+        """
+        return cls(
+            status=obj.status,
+            start_time=obj.start_time,
+            designator_ref=obj.designator_ref,
+            designator_type=obj.designator_type,
+            end_time=obj.end_time,
+            reason=obj.reason,
+            execution_data=obj.execution_data,
+        )
+
+    def create_from_dao(self) -> T:
+        raise NotImplementedError()
+
+
+@dataclass
+class TryInOrderMapping(AlternativeMapping[TryInOrderNode]):
+
+    @classmethod
+    def create_instance(cls, obj: TryInOrderNode):
+        """
+        Convert a TryInOrderNode to a TryInOrderNodeDAO.
+        """
+        return cls()
+
+    def create_from_dao(self) -> T:
+        raise NotImplementedError()
+
+
+@dataclass
+class ParallelNodeMapping(AlternativeMapping[ParallelNode]):
+
+    @classmethod
+    def create_instance(cls, obj: ParallelNode):
+        """
+        Convert a ParallelNode to a ParallelNodeDAO.
+        """
+        return cls()
+
+    def create_from_dao(self) -> T:
+        raise NotImplementedError()
+
+
+@dataclass
+class TryAllNodeMapping(AlternativeMapping[TryAllNode]):
+
+    @classmethod
+    def create_instance(cls, obj: TryAllNode):
+        """
+        Convert a TryAllNode to a TryAllNodeDAO.
+        """
+        return cls()
+
+    def create_from_dao(self) -> T:
+        raise NotImplementedError()
+
+
+@dataclass
+class CodeNodeMapping(AlternativeMapping[CodeNode]):
+
+    @classmethod
+    def create_instance(cls, obj: CodeNode):
+        """
+        Convert a CodeNode to a CodeNodeDAO.
+        """
+        return cls()
+
+    def create_from_dao(self) -> T:
+        raise NotImplementedError()
+
+
+@dataclass
+class MonitorNodeMapping(AlternativeMapping[MonitorNode]):
+
+    @classmethod
+    def create_instance(cls, obj: MonitorNode):
+        """
+        Convert a MonitorNode to a MonitorNodeDAO.
+        """
+        return cls()
+
+    def create_from_dao(self) -> T:
+        raise NotImplementedError()
+
+
+@dataclass
+class PlanEdge:
+    parent: PlanNode
+    child: PlanNode
+
+@dataclass
+class PlanMapping(AlternativeMapping[Plan]):
+    nodes: List[PlanNode]
+    # edges: List[PlanEdge]
+
+    @classmethod
+    def create_instance(cls, obj: Plan):
+        #return cls(nodes=[to_dao(node) for node in obj.nodes], edges=[PlanEdge(to_dao(edge[0]), to_dao(edge[1])) for edge in obj.edges])
+        return cls(nodes=[to_dao(node) for node in obj.nodes])#, edges=[PlanEdge(parent=parent, child=child) for parent, child in obj.edges])
+
+    def create_from_dao(self) -> T:
+        raise NotImplementedError()
+
+#
+# @dataclass
+# class MonitorNodeDAO(ORMaticExplicitMapping):
+#
+#     @classproperty
+#     def explicit_mapping(cls) -> Type:
+#         return MonitorNode
+
+
+class NumpyType(TypeDecorator):
+    """
+    Type that casts field which are of numpy nd array type
+    """
+
+    impl = types.LargeBinary(4 * 1024 * 1024 * 1024 - 1)  # 4 GB max
+
+    def process_bind_param(self, value: np.ndarray, dialect):
+        array = value.astype(np.float64)
+        return array.tobytes()
+
+    def process_result_value(self, value: impl, dialect) -> Optional[np.ndarray]:
+        return np.frombuffer(value, dtype=np.float64)
