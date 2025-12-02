@@ -5,13 +5,8 @@ defaults:
 on:
   push:
     branches:
-      - giskard_library
-      - semantic_world_integration
+      - main
   pull_request:
-#    branches:
-#      - giskard_library
-#      - master
-#      - devel
   workflow_dispatch:
     inputs:
       logLevel:
