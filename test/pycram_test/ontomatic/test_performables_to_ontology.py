@@ -1,4 +1,4 @@
-from ontomatic.ontomatic_performable_test_dummy import TestOntomaticPerformable
+from ..ontomatic.ontomatic_performable_test_dummy import TestOntomaticPerformable
 from sqlalchemy.testing import skip_test
 
 from pycram.ontomatic.performables_to_ontology import create_ontology_from_performables
