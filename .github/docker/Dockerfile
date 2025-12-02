@@ -10,34 +10,20 @@ WORKDIR /opt/ros
 RUN apt update  \
     && apt install python3.12-venv ros-jazzy-xacro python3-vcstool git ros-dev-tools default-jre graphviz graphviz-dev -y  \
     && apt-get clean  \
-    && rm -rf /var/lib/apt/lists/*
-RUN vcs import --input https://raw.githubusercontent.com/cram2/cognitive_robot_abstract_machine/main/semantic_digital_twin/rosinstall/semantic_digital_twin-https.rosinstall
-RUN mv iai_maps /opt/ros/overlay_ws/src/iai_maps
-RUN mv iai_pr2 /opt/ros/overlay_ws/src/iai_pr2
+    && rm -rf /var/lib/apt/lists/* \
+
+RUN cd $OVERLAY_WS/src \
+    && git clone -b ros-jazzy --single-branch https://github.com/code-iai/iai_maps.git \
+    && git clone -b ros-jazzy-main --single-branch https://github.com/code-iai/iai_pr2.git \
+    && git clone -b ros2-jazzy --single-branch https://github.com/code-iai/hsr_description.git \
+
 RUN source /opt/ros/jazzy/setup.bash  \
     && cd $OVERLAY_WS  \
-    && colcon build --symlink-install
-RUN echo "source $OVERLAY_WS/install/setup.bash" >> ~/.bashrc
+    && colcon build --merge-install
 
 RUN python3 -m venv cram-env --system-site-packages  \
     && source cram-env/bin/activate  \
     && pip install poetry
-#    && cd cognitive_robot_abstract_machine \
-#    && poetry install
-#    && pip install -r krrood/requirements.txt  \
-#    && pip install -r semantic_digital_twin/requirements.txt  \
-#    && pip install -r giskardpy/requirements.txt  \
-#    && pip install -r pycram/requirements.txt  \
-#    && pip install https://nc.uni-bremen.de/public.php/dav/files/nxxi4QSBcYmmxba/?accept=zip  \
-#    && pip install -e krrood \
-#    && pip install -e semantic_digital_twin \
-#    && pip install -e giskardpy \
-#    && pip install -e pycram
-
-# Install the Multiverse Parser outside of the overlay workspace
-
-#RUN git clone https://github.com/Multiverse-Framework/Multiverse-Parser.git
-#RUN source $OVERLAY_WS/src/semantic_digital_twin-venv/bin/activate && pip install -r Multiverse-Parser/requirements.txt && pip install pyside6 pyopengl jinja2 &&  ./Multiverse-Parser/setup.sh --usd && pip install -e Multiverse-Parser
 
 RUN source /opt/ros/jazzy/setup.bash  \
     && cd $OVERLAY_WS  \
