@@ -45,4 +45,4 @@ jobs:
         with:
           context: ./.github/docker
           push: true
-          tags: ghcr.io/${{ github.repository }}/cram:jazzy
+          tags: ghcr.io/${{ github.repository }}:jazzy
