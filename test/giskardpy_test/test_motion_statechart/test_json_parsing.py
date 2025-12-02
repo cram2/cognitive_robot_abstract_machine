@@ -204,7 +204,7 @@ def test_executing_json_parsed_statechart():
 
     kin_sim = Executor(
         world=world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
+        controller_config=QPControllerConfig.create_default_with_20hz(),
     )
     kin_sim.compile(motion_statechart=msc_copy)
 
@@ -265,7 +265,7 @@ def test_cart_goal_simple(pr2_world: World):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
+        controller_config=QPControllerConfig.create_default_with_20hz(),
     )
 
     kin_sim.compile(motion_statechart=msc_copy)
@@ -378,7 +378,7 @@ def test_unreachable_cart_goal(pr2_world):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
+        controller_config=QPControllerConfig.create_default_with_20hz(),
     )
 
     kin_sim.compile(motion_statechart=msc_copy)

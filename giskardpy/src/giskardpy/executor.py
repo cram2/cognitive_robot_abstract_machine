@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field, InitVar
 
-from typing_extensions import Optional
+import time
+from typing_extensions import Optional, Protocol
 
 from giskardpy.data_types.exceptions import (
     NoQPControllerConfigException,
@@ -27,29 +28,64 @@ from semantic_digital_twin.robots.abstract_robot import (
 from semantic_digital_twin.world import World
 
 
+class Pacer(Protocol):
+    control_dt: float
+    def sleep(self):
+        """
+        Sleeps according to the pacer's logic to make a loop run at 'control_dt' frequency.
+        """
+
+@dataclass
+class SimulationPacer:
+    control_dt: float = field(init=False)
+    """
+    How long a cycle should take with real_time_factor=1.0.
+    """
+
+    real_time_factor: Optional[float] = None
+    """
+    Allows you to adjust the simulation speed.
+    If None, the pacer will not sleep at all.
+    If 1.0, the pacer will try to achieve the control_dt frequency, as long as the other code in the loop allows it.
+    """
+
+    _next_target_time: Optional[float] = field(default=None, init=False)
+
+    def sleep(self):
+        """
+        Sleep to maintain a control loop pace defined by `control_dt` and `real_time_factor`.
+        - If `real_time_factor` is None, return immediately (no pacing).
+        - Otherwise, target interval is `control_dt / real_time_factor`.
+        """
+        if self.real_time_factor is None:
+            return
+        if self.real_time_factor <= 0:
+            return
+        dt = self.control_dt / self.real_time_factor
+        now = time.monotonic()
+        if self._next_target_time is None:
+            self._next_target_time = now + dt
+        sleep_time = self._next_target_time - now
+        if sleep_time > 0:
+            time.sleep(sleep_time)
+            now = self._next_target_time
+        else:
+            # if we are behind schedule, catch up without sleeping and reschedule to the next slot after now
+            pass
+        # advance next target time to the next slot strictly after current time
+        while self._next_target_time is not None and self._next_target_time <= now:
+            self._next_target_time += dt
+
 @dataclass
 class Executor:
     """
     Represents the main execution entity that manages motion statecharts, collision
     scenes, and control cycles for the robot's operations.
-
-    :ivar tmp_folder: Temporary folder path used for auxiliary operations during execution.
-    :type tmp_folder: str
-    :ivar motion_statechart: The motion statechart describing the robot's motion logic.
-    :type motion_statechart: MotionStatechart
-    :ivar collision_scene: The collision scene synchronizer for managing robot collision states.
-    :type collision_scene: Optional[CollisionWorldSynchronizer]
-    :ivar auxiliary_variable_manager: Manages auxiliary symbolic variables for execution contexts.
-    :type auxiliary_variable_manager: AuxiliaryVariableManager
-    :ivar qp_controller: Optional quadratic programming controller used for motion control.
-    :type qp_controller: Optional[QPController]
-    :ivar control_cycles: Tracks the number of control cycles elapsed during execution.
-    :type control_cycles: int
     """
 
     world: World
     """The world object containing the state and entities of the robot's environment."""
-    controller_config: Optional[QPControllerConfig] = None
+    controller_config: QPControllerConfig = field(default_factory=QPControllerConfig.create_default_with_20hz)
     """Optional configuration for the QP Controller. Is only needed when constraints are present in the motion statechart."""
     collision_checker: InitVar[CollisionCheckerLib] = field(
         default=CollisionCheckerLib.none
@@ -57,6 +93,8 @@ class Executor:
     """Library used for collision checking. Can be set to Bullet or None."""
     tmp_folder: str = field(default="/tmp/")
     """Path to safe temporary files."""
+
+    pacer: Pacer = field(default_factory=SimulationPacer)
 
     # %% init False
     motion_statechart: MotionStatechart = field(init=False)
@@ -95,6 +133,7 @@ class Executor:
             robots=self.world.get_semantic_annotations_by_type(AbstractRobot),
             collision_detector=collision_detector,
         )
+        self.pacer.control_dt = self.controller_config.control_dt
 
     def _create_control_cycles_variable(self):
         self._control_cycles_variable = (
@@ -147,7 +186,7 @@ class Executor:
         )
         self.world.apply_control_commands(
             next_cmd,
-            self.qp_controller.config.control_dt or self.qp_controller.config.mpc_dt,
+            self.qp_controller.config.control_dt,
             self.qp_controller.config.max_derivative,
         )
 
@@ -159,6 +198,7 @@ class Executor:
         try:
             for i in range(timeout):
                 self.tick()
+                self.pacer.sleep()
                 if self.motion_statechart.is_end_motion():
                     return
             raise TimeoutError("Timeout reached while waiting for end of motion.")

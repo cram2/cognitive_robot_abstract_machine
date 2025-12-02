@@ -15,6 +15,9 @@ from giskardpy.utils.utils import get_all_classes_in_module
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
+import logging
+
+logger = logging.getLogger(__name__)
 
 available_solvers: Dict[SupportedQPSolver, Type[QPSolver]] = {}
 
@@ -42,44 +45,111 @@ detect_solvers()
 class QPControllerConfig:
     control_dt: Optional[float]
     """
-    if control_dt is None, then the controller will run as fast as possible, only recommended for testing.
+    The time step of the control loop.
+    A lower value will result in a smoother control signal, but the QP will have to be solved more often.
+    If the value is too large, the QP might start running into infeasiblity issues.
+
+    On a real robot:
+        Pick a value equal to or below the frequency at which we get feedback.
+        Computing control commands at a higher frequency than the robot can provide feedback can result in instability.
+        If you cannot match the frequency due to hardware limitations, pick one that is as close to it as possible.
+
+    In simulation:
+        Pick 0.05. It is low enough to be stable and high enough for quick simulations.
     """
 
     dof_weights: Dict[PrefixedName, DerivativeMap[float]] = field(
         default_factory=lambda: defaultdict(
-            lambda: DerivativeMap([None, 0.01, np.inf, None])
+            lambda: DerivativeMap([None, 0.01, None, None])
         )
     )
-    max_derivative: Derivatives = field(default=Derivatives.jerk)
-    qp_solver_id: Optional[SupportedQPSolver] = field(default=None)
-    prediction_horizon: int = field(default=7)
-    mpc_dt: float = field(default=0.0125)
-    max_trajectory_length: Optional[float] = field(default=30)
+    """
+    Weights for the derivatives of the DOFs.
+    A lower weight for a dof will make it cheaper for Giskard to use it.
+    If you think Giskard is using a certain DOF too much, you can increase its weight here.
+    .. warning:: If you increase the weights too much, Giskard might prefer violating goals over moving Dofs.
+    """
+
     horizon_weight_gain_scalar: float = 0.1
+    """
+    Decides how much the dof_weights decrease over the prediction horizon.
+    .. warning:: Only change if you really know what you are doing.
+    """
+
+    max_derivative: Derivatives = field(default=Derivatives.jerk)
+    """
+    The highest derivative that will be considered in the QP formulation.
+    ..warning:: Only change if you really know what you are doing.
+    """
+
+    qp_solver_id: SupportedQPSolver = field(default=SupportedQPSolver.qpSWIFT)
+    """
+    The solver used for solving the QP formulation.
+    .. warning:: only qpSWIFT is well tested.
+    """
+
+    prediction_horizon: int = field(default=7)
+    """
+    The prediction horizon used for the QP formulation.
+    Increasing this value will:
+        - make the commands produced by Giskard smoother
+        - increase the computational cost of the controller.
+    You'll want a value that is as high as necessary and as low as possible.
+    .. warning:: Minimum value is 4, otherwise it becomes impossible to integrate jerk into the QP formulation.
+    """
+
     qp_formulation: Optional[QPFormulation] = field(default_factory=QPFormulation)
+    """
+    Changes the formulation of the QP problem.
+    Check QPFormulation for more information.
+    """
+
     retries_with_relaxed_constraints: int = field(default=5)
-    added_slack: float = field(default=100)
-    weight_factor: float = field(default=100)
+    """
+    If the QP insolvable, the constraints will be relaxed with high weight slack variables 
+    up to 'retries_with_relaxed_constraints' many times.
+    """
+
     verbose: bool = field(default=True)
+    """
+    If True, prints config.
+    """
 
     # %% init false
+    mpc_dt: Optional[float] = field(init=False)
+    """
+    The time step of the MPC.
+    control_dt == mpc_dt:
+        default
+    control_dt > mpc_dt:
+        The control commands apply over longer intervals than expected, almost guaranteeing overshoot or in stability.
+    control_dt < mpc_dt:
+        The MPC formulation underestimates real kinematics based on mpc_dt. If the control loop runs faster, 
+        the actual system evolves more frequently, potentially causing overshooting as velocity 
+        integrals exceed the controller’s estimate. In extreme cases, QPs may become infeasible due to excessive 
+        velocity/acceleration demands.
+    .. warning:: Don't change this.  
+    """
+
     qp_solver_class: Type[QPSolver] = field(init=False)
+    """
+    Reference to the resolved QP solver class.
+    """
 
     def __post_init__(self):
+        self.mpc_dt = self.control_dt
         if not self.qp_formulation.is_mpc:
             self.prediction_horizon = 1
             self.max_derivative = Derivatives.velocity
 
         if self.prediction_horizon < 4:
             raise ValueError("prediction horizon must be >= 4.")
-        self.__endless_mode = self.max_trajectory_length is None
         self.set_qp_solver()
 
     @classmethod
-    def create_default_with_50hz(cls):
+    def create_default_with_20hz(cls):
         return cls(
-            control_dt=0.02,
-            mpc_dt=0.02,
+            control_dt=0.05,
             prediction_horizon=7,
         )
 
@@ -99,7 +169,7 @@ class QPControllerConfig:
         )
 
     def set_dof_weight(
-        self, dof_name: PrefixedName, derivative: Derivatives, weight: float
+            self, dof_name: PrefixedName, derivative: Derivatives, weight: float
     ):
         """Set weight for a specific DOF derivative."""
         self.dof_weights[dof_name].data[derivative] = weight

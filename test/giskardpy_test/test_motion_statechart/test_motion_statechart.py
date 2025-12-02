@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.executor import Executor
+from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.model.collision_matrix_manager import CollisionRequest
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
@@ -89,6 +89,8 @@ from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFr
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+
+
 
 
 def test_condition_to_str():
@@ -450,7 +452,6 @@ def test_joint_goal():
 
     kin_sim = Executor(
         world=world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
     kin_sim.compile(motion_statechart=msc)
 
@@ -492,7 +493,6 @@ def test_two_goals(pr2_world: World):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
     kin_sim.compile(motion_statechart=msc)
 
@@ -507,7 +507,6 @@ def test_two_goals(pr2_world: World):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
     kin_sim.compile(motion_statechart=msc)
 
@@ -1034,7 +1033,6 @@ def test_continuous_joint(pr2_world):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
@@ -1058,7 +1056,6 @@ def test_revolute_joint(pr2_world):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
@@ -1082,7 +1079,6 @@ def test_cart_goal_1eef(pr2_world: World):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
@@ -1131,7 +1127,6 @@ def test_long_goal(pr2_world: World):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
     kin_sim.compile(motion_statechart=msc)
     t = time.perf_counter()
@@ -1177,7 +1172,6 @@ def test_cart_goal_sequence_at_build(pr2_world: World):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
 
     kin_sim.compile(motion_statechart=msc)
@@ -1222,7 +1216,6 @@ def test_cart_goal_sequence_on_start(pr2_world: World):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
@@ -1253,7 +1246,6 @@ def test_CartesianOrientation(pr2_world: World):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
@@ -1284,7 +1276,6 @@ def test_pointing(pr2_world: World):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
@@ -1313,7 +1304,6 @@ def test_pointing_cone(pr2_world: World):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
@@ -1364,7 +1354,6 @@ def test_align_planes(pr2_world: World):
 
     kin_sim = Executor(
         world=pr2_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
     )
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
@@ -1646,7 +1635,6 @@ class TestParallel:
 
         kin_sim = Executor(
             world=pr2_world,
-            controller_config=QPControllerConfig.create_default_with_50hz(),
         )
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
@@ -1743,7 +1731,6 @@ class TestOpenClose:
 
         kin_sim = Executor(
             world=pr2_world,
-            controller_config=QPControllerConfig.create_default_with_50hz(),
         )
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
@@ -1785,7 +1772,6 @@ class TestCollisionAvoidance:
 
         kin_sim = Executor(
             world=box_bot_world,
-            controller_config=QPControllerConfig.create_default_with_50hz(),
             collision_checker=CollisionCheckerLib.bpb,
         )
         kin_sim.compile(motion_statechart=msc_copy)
@@ -1892,7 +1878,6 @@ class TestCollisionAvoidance:
 
         kin_sim = Executor(
             world=box_bot_world,
-            controller_config=QPControllerConfig.create_default_with_50hz(),
             collision_checker=CollisionCheckerLib.bpb,
         )
         kin_sim.compile(motion_statechart=msc_copy)
