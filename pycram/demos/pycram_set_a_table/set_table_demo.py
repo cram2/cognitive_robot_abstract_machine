@@ -5,7 +5,7 @@ from pycram.robot_plans import *
 from pycram.datastructures.pose import PoseStamped
 from pycram.datastructures.enums import Arms, TorsoState, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
-from pycram.language import SequentialPlan
+from pycram.language import SequentialPlan, ParallelPlan
 from pycram.process_module import simulated_robot
 import rclpy
 import threading
@@ -32,20 +32,21 @@ rclpy.create_node('demo_node')
 threading.Thread(target=rclpy.spin, args=(rclpy.create_node('demo_node'),), daemon=True).start()
 
 VizMarkerPublisher(world=world, node=rclpy.create_node('demo_node'))
+simulated_robot.speedup = True  # Speeds up actions in simulation
 
 with simulated_robot:
     print("=== Plan started ===")
 
-    print("1. Parking arms")
-    SequentialPlan(context, ParkArmsActionDescription(Arms.BOTH)).perform()
-    print("   Arms parked ✅")
-
-    print("2. Moving torso up")
-    SequentialPlan(context, MoveTorsoActionDescription([torso_pose])).perform()
-    print("   Torso moved ✅")
+    # print("1. Parking arms")
+    # SequentialPlan(context, ParkArmsActionDescription(Arms.BOTH)).perform()
+    # print("   Arms parked ✅")
+    #
+    # print("2. Moving torso up")
+    # SequentialPlan(context, MoveTorsoActionDescription([torso_pose])).perform()
+    # print("   Torso moved ✅")
 
     print("3. Navigating to pickup location")
-    SequentialPlan(context, NavigateActionDescription([pickup_pose])).perform()
+    ParallelPlan(context, NavigateActionDescription([pickup_pose]),SequentialPlan(context, ParkArmsActionDescription(Arms.BOTH), MoveTorsoActionDescription([torso_pose]) ) ).perform()
     print("   Reached pickup location ✅")
 
     print("4. Picking up milk")
