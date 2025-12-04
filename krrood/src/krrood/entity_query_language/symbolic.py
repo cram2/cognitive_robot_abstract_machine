@@ -588,6 +588,16 @@ class Aggregator(ResultProcessor[T], ABC):
         self._node_.color = value
 
 
+@dataclass(eq=False, repr=False)
+class Count(Aggregator[T]):
+    """
+    Count the number of child results.
+    """
+
+    def _apply_aggregation_function_(self, child_results: Iterable[OperationResult]) -> Dict[int, HashedValue]:
+        return {self._id_: HashedValue(len(list(child_results)))}
+
+
 @dataclass
 class EntityAggregator(Aggregator[T], ABC):
 
@@ -634,13 +644,21 @@ class Sum(EntityAggregator[T]):
 
 
 @dataclass(eq=False, repr=False)
-class Count(Aggregator[T]):
+class Avg(EntityAggregator[T]):
     """
-    Count the number of child results.
+    Calculate the average of the child results. If given, make use of the key function to extract the value to be
+     averaged.
     """
 
     def _apply_aggregation_function_(self, child_results: Iterable[OperationResult]) -> Dict[int, HashedValue]:
-        return {self._id_: HashedValue(len(list(child_results)))}
+        sum_val = 0
+        count = 0
+        for val in map(self._get_child_value_from_result_, child_results):
+            sum_val += val
+            count += 1
+        if count:
+            return {self._id_: HashedValue(sum_val/count)}
+        return {}
 
 
 @dataclass(eq=False, repr=False)

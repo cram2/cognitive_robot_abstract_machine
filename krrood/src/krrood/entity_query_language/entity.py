@@ -35,7 +35,7 @@ from .symbolic import (
     Flatten,
     ForAll,
     Exists,
-    Literal, Selectable, Max, Min, Sum, Count, QueryObjectDescriptor,
+    Literal, Selectable, Max, Min, Sum, Count, QueryObjectDescriptor, Avg,
 )
 
 from .predicate import (
@@ -318,6 +318,18 @@ def sum(variable: Selectable[T], key: Optional[Callable] = None, default: Option
     :return: A Sum object that can be evaluated to find the sum of values.
     """
     return Sum(variable, _key_func_=key, _default_value_=default)
+
+
+def avg(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Avg[T]]:
+    """
+        Computes the sum of values produced by the given variable.
+
+        :param variable: The variable for which the sum is calculated.
+        :param key: A function that extracts a comparison key from each variable value.
+        :param default: The value returned when the iterable is empty.
+        :return: A Sum object that can be evaluated to find the sum of values.
+        """
+    return Avg(variable, _key_func_=key, _default_value_=default)
 
 
 def count(variable: Selectable[T]) -> Union[T, Count[T]]:
