@@ -336,7 +336,7 @@ class PrismaticConnection(ActiveConnection1DOF):
         super().add_to_world(world)
 
         translation_axis = self.axis * self.dof.variables.position
-        self.kinematics = cas.TransformationMatrix.from_xyz_rpy(
+        self._kinematics = cas.TransformationMatrix.from_xyz_rpy(
             x=translation_axis[0],
             y=translation_axis[1],
             z=translation_axis[2],
@@ -353,7 +353,7 @@ class RevoluteConnection(ActiveConnection1DOF):
     def add_to_world(self, world: World):
         super().add_to_world(world)
 
-        self.kinematics = cas.TransformationMatrix.from_xyz_axis_angle(
+        self._kinematics = cas.TransformationMatrix.from_xyz_axis_angle(
             axis=self.axis,
             angle=self.dof.variables.position,
             child_frame=self.child,
@@ -461,7 +461,7 @@ class Connection6DoF(Connection):
             z_init=self.qz.variables.position,
             w_init=self.qw.variables.position,
         ).to_rotation_matrix()
-        self.kinematics = cas.TransformationMatrix.from_point_rotation_matrix(
+        self._kinematics = cas.TransformationMatrix.from_point_rotation_matrix(
             point=parent_P_child,
             rotation_matrix=parent_R_child,
             child_frame=self.child,
@@ -690,8 +690,8 @@ class OmniDrive(ActiveConnection, HasUpdateState):
             pitch=self.pitch.variables.position,
             yaw=0,
         )
-        self.kinematics = odom_T_bf @ bf_T_bf_vel @ bf_vel_T_bf
-        self.kinematics.child_frame = self.child
+        self._kinematics = odom_T_bf @ bf_T_bf_vel @ bf_vel_T_bf
+        self._kinematics.child_frame = self.child
 
     @classmethod
     def create_with_dofs(

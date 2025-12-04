@@ -4,14 +4,15 @@ import time
 import unittest
 import uuid
 from typing import Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import numpy as np
 import sqlalchemy
-from krrood.ormatic.utils import drop_database, create_engine
+from pkg_resources import resource_filename
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from krrood.ormatic.utils import drop_database, create_engine
 from semantic_digital_twin.adapters.ros.world_synchronizer import (
     StateSynchronizer,
     ModelReloadSynchronizer,
@@ -23,7 +24,6 @@ from semantic_digital_twin.orm.ormatic_interface import Base, WorldMappingDAO
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Door
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.testing import rclpy_node
-from semantic_digital_twin.utils import get_semantic_digital_twin_directory_root
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -141,7 +141,6 @@ def test_state_synchronization_world_model_change_after_init(rclpy_node):
 
 
 def test_model_reload(rclpy_node):
-
     engine = create_engine(
         "sqlite+pysqlite:///file::memory:?cache=shared",
         connect_args={"check_same_thread": False, "uri": True},
@@ -256,8 +255,7 @@ def test_model_synchronization_merge_full_world(rclpy_node):
 
     pr2_world = URDFParser.from_file(
         os.path.join(
-            get_semantic_digital_twin_directory_root(os.getcwd()),
-            "semantic_digital_twin",
+            resource_filename('semantic_digital_twin', '../../'),
             "resources",
             "urdf",
             "pr2_kinematic_tree.urdf",

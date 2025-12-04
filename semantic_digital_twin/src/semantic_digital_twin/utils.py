@@ -80,7 +80,7 @@ class suppress_stdout_stderr(object):
 
 
 def hacky_urdf_parser_fix(
-    urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
+        urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
 ) -> str:
     # Parse input string
     root = ET.fromstring(urdf)
@@ -166,32 +166,6 @@ def hsrb_installed() -> bool:
         return False
     except (ImportError, PackageNotFoundError, ValueError):
         return False
-
-
-def get_semantic_digital_twin_directory_root(file_path: str) -> str:
-    """
-    Get the root directory of the semantic digital twin given a file path that lays in it.
-
-    :param file_path: Path to the file
-    :return: Root directory of the semantic digital twin
-    """
-    if not os.path.exists(file_path):
-        raise ValueError(f"File {file_path} does not exist")
-
-    current_dir = os.path.abspath(file_path)
-
-    # Loop until we reach the root directory (cross-platform)
-    while True:
-        if os.path.exists(os.path.join(current_dir, "pyproject.toml")):
-            return current_dir
-        parent_dir = os.path.dirname(current_dir)
-        if parent_dir == current_dir:
-            break
-        current_dir = parent_dir
-
-    raise ValueError(
-        f"Could not find pyproject.toml in any parent directory of {file_path}"
-    )
 
 
 def type_string_to_type(type_string: str) -> type:

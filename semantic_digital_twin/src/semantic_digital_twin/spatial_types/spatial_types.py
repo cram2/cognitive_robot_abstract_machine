@@ -33,6 +33,7 @@ from typing_extensions import (
     overload,
 )
 
+from krrood.entity_query_language.predicate import Symbol
 from ..adapters.world_entity_kwargs_tracker import (
     KinematicStructureEntityKwargsTracker,
 )
@@ -368,7 +369,7 @@ def _operation_type_error(arg1: object, operation: str, arg2: object) -> TypeErr
 
 
 @dataclass(eq=False)
-class SymbolicType:
+class SymbolicType(Symbol):
     """
     A wrapper around CasADi's ca.SX, with better usability
     """
@@ -927,6 +928,9 @@ class Expression(
             Expression(self.casadi_sx.dep(i)) for i in range(self.casadi_sx.n_dep())
         ]
         return parts
+
+    def is_scalar(self) -> bool:
+        return self.shape == (1, 1)
 
     def __copy__(self) -> Expression:
         return Expression(copy(self.casadi_sx))

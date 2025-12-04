@@ -863,7 +863,7 @@ class Connection(WorldEntity, SubclassJSONSerializer):
     """
 
     parent_T_connection_expression: TransformationMatrix = field(default=None)
-    kinematics: TransformationMatrix = field(
+    _kinematics: TransformationMatrix = field(
         default_factory=TransformationMatrix, init=False
     )
     connection_T_child_expression: TransformationMatrix = field(default=None)
@@ -946,7 +946,7 @@ class Connection(WorldEntity, SubclassJSONSerializer):
     def origin_expression(self) -> TransformationMatrix:
         return (
             self.parent_T_connection_expression
-            @ self.kinematics
+            @ self._kinematics
             @ self.connection_T_child_expression
         )
 

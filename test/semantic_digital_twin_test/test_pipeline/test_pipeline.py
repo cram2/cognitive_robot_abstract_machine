@@ -4,6 +4,7 @@ import unittest
 from dataclasses import dataclass
 
 import numpy as np
+from pkg_resources import resource_filename
 
 from semantic_digital_twin.adapters.fbx import FBXParser
 from semantic_digital_twin.adapters.procthor.procthor_pipelines import (
@@ -21,7 +22,6 @@ from semantic_digital_twin.pipeline.pipeline import (
     BodyFactoryReplace,
 )
 from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
-from semantic_digital_twin.utils import get_semantic_digital_twin_directory_root
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -42,8 +42,7 @@ class PipelineTestCase(unittest.TestCase):
             cls.dummy_world.add_connection(c1)
 
         cls.fbx_path = os.path.join(
-            get_semantic_digital_twin_directory_root(os.getcwd()),
-            "semantic_digital_twin",
+            resource_filename('semantic_digital_twin', '../../'),
             "resources",
             "fbx",
             "test_dressers.fbx",

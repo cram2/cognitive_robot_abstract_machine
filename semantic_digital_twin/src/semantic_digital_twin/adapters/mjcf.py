@@ -95,10 +95,10 @@ class MJCFParser:
         collisions = []
         for mujoco_geom in mujoco_body.geoms:
             shape = self.parse_geom(mujoco_geom=mujoco_geom)
-            if mujoco_geom.contype == 0 and mujoco_geom.conaffinity == 0:
-                visuals.append(shape)
-            else:
+            if mujoco_geom.contype != 0 or mujoco_geom.conaffinity != 0:
                 collisions.append(shape)
+            if mujoco_geom.group in [0, 1, 2]:
+                visuals.append(shape)
         body.inertial = self.parse_inertial(mujoco_body=mujoco_body)
         body.visual = ShapeCollection(shapes=visuals, reference_frame=body)
         body.collision = ShapeCollection(shapes=collisions, reference_frame=body)
@@ -163,15 +163,18 @@ class MJCFParser:
                 mujoco_joint=mujoco_joint,
             )
         if len(mujoco_body.joints) == 0:
+            body_pos = mujoco_body.pos
+            body_quat = mujoco_body.quat
+            body_quat /= numpy.linalg.norm(body_quat)
             parent_body_to_child_body_transform = (
                 TransformationMatrix.from_xyz_quaternion(
-                    pos_x=mujoco_body.pos[0],
-                    pos_y=mujoco_body.pos[1],
-                    pos_z=mujoco_body.pos[2],
-                    quat_w=mujoco_body.quat[0],
-                    quat_x=mujoco_body.quat[1],
-                    quat_y=mujoco_body.quat[2],
-                    quat_z=mujoco_body.quat[3],
+                    pos_x=body_pos[0],
+                    pos_y=body_pos[1],
+                    pos_z=body_pos[2],
+                    quat_w=body_quat[0],
+                    quat_x=body_quat[1],
+                    quat_y=body_quat[2],
+                    quat_z=body_quat[3],
                 )
             )
             parent_body = self.world.get_kinematic_structure_entity_by_name(
@@ -195,14 +198,17 @@ class MJCFParser:
         :param mujoco_geom: The Mujoco geometry to parse.
         :return: The Shape object representing the geometry.
         """
+        geom_pos = mujoco_geom.pos
+        geom_quat = mujoco_geom.quat
+        geom_quat /= numpy.linalg.norm(geom_quat)
         origin_transform = TransformationMatrix.from_xyz_quaternion(
-            pos_x=mujoco_geom.pos[0],
-            pos_y=mujoco_geom.pos[1],
-            pos_z=mujoco_geom.pos[2],
-            quat_w=mujoco_geom.quat[0],
-            quat_x=mujoco_geom.quat[1],
-            quat_y=mujoco_geom.quat[2],
-            quat_z=mujoco_geom.quat[3],
+            pos_x=geom_pos[0],
+            pos_y=geom_pos[1],
+            pos_z=geom_pos[2],
+            quat_w=geom_quat[0],
+            quat_x=geom_quat[1],
+            quat_y=geom_quat[2],
+            quat_z=geom_quat[3],
         )
         size = mujoco_geom.size * 2
         for i in range(len(size)):
@@ -244,6 +250,14 @@ class MJCFParser:
                 mujoco_material: mujoco.MjsMaterial = self.spec.material(
                     mujoco_geom.material
                 )
+                meshscale = mujoco_mesh.scale
+                if not numpy.allclose(meshscale, 1.0):
+                    scale_mat = numpy.eye(4)
+                    scale_mat[0, 0] = meshscale[0]
+                    scale_mat[1, 1] = meshscale[1]
+                    scale_mat[2, 2] = meshscale[2]
+                    scale_transform = TransformationMatrix(data=scale_mat)
+                    origin_transform = origin_transform @ scale_transform
                 if mujoco_material is None:
                     return FileMesh(
                         filename=filename, origin=origin_transform, color=color
@@ -288,15 +302,18 @@ class MJCFParser:
             connection = FixedConnection(parent=parent_body, child=child_body)
         else:
             mujoco_child_body = self.spec.body(child_name)
+            child_body_pos = mujoco_child_body.pos
+            child_body_quat = mujoco_child_body.quat
+            child_body_quat /= numpy.linalg.norm(child_body_quat)
             parent_body_to_child_body_transform = (
                 TransformationMatrix.from_xyz_quaternion(
-                    pos_x=mujoco_child_body.pos[0],
-                    pos_y=mujoco_child_body.pos[1],
-                    pos_z=mujoco_child_body.pos[2],
-                    quat_w=mujoco_child_body.quat[0],
-                    quat_x=mujoco_child_body.quat[1],
-                    quat_y=mujoco_child_body.quat[2],
-                    quat_z=mujoco_child_body.quat[3],
+                    pos_x=child_body_pos[0],
+                    pos_y=child_body_pos[1],
+                    pos_z=child_body_pos[2],
+                    quat_w=child_body_quat[0],
+                    quat_x=child_body_quat[1],
+                    quat_y=child_body_quat[2],
+                    quat_z=child_body_quat[3],
                 )
             )
             child_body_to_joint_transform = TransformationMatrix.from_xyz_quaternion(

@@ -12,6 +12,7 @@ import uuid
 from dataclasses import is_dataclass
 
 import sqlalchemy
+import trimesh
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.utils import classes_of_module

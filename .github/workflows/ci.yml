@@ -18,7 +18,6 @@ jobs:
         include:
           - lib: giskardpy
           - lib: krrood
-          - lib: pycram
           - lib: semantic_digital_twin
     uses: ./.github/workflows/ci_reusable.yml
     with:

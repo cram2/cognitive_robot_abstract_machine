@@ -10,7 +10,6 @@ project-excludes = ["**/*venv/**/*"]
 name = "giskardpy"
 authors = [
     { name="Simon Stelter", email="stelter@uni-bremen.de" },
-
 ]
 description = "A qp-based motion controller for robotic systems."
 readme = "README.md"

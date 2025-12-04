@@ -329,7 +329,7 @@ class ShapeConverter(EntityConverter, ABC):
         :param entity: The Shape object to convert.
         :return: A dictionary of shape properties, by default containing position, quaternion, and RGBA color.
         """
-        geom_props = EntityConverter._convert(self, entity)
+        geom_props = EntityConverter._convert(self, entity, **kwargs)
         px, py, pz, qw, qx, qy, qz = cas_pose_to_list(entity.origin)
         geom_pos = [px, py, pz]
         geom_quat = [qw, qx, qy, qz]
@@ -716,11 +716,16 @@ class MujocoGeomConverter(MujocoConverter, ShapeConverter, ABC):
                 "type": self.type,
             }
         )
-        if not kwargs.get("visible", True):
-            shape_props[self.rgba_str][3] = 0.0
-        if not kwargs.get("collidable", True):
+        is_visible = kwargs.get("visible", True)
+        is_collidable = kwargs.get("collidable", True)
+        if is_visible and is_collidable:
+            shape_props["group"] = 1
+        elif is_visible and not is_collidable:
             shape_props["contype"] = 0
             shape_props["conaffinity"] = 0
+            shape_props["group"] = 2
+        elif not is_visible and is_collidable:
+            shape_props["group"] = 3
         return shape_props
 
 
@@ -730,7 +735,9 @@ class MujocoBoxConverter(MujocoGeomConverter, BoxConverter):
     def _post_convert(
         self, entity: Box, shape_props: Dict[str, Any], **kwargs
     ) -> Dict[str, Any]:
-        shape_props.update(MujocoGeomConverter._post_convert(self, entity, shape_props))
+        shape_props.update(
+            MujocoGeomConverter._post_convert(self, entity, shape_props, **kwargs)
+        )
         shape_props.update(
             {"size": [entity.scale.x / 2, entity.scale.y / 2, entity.scale.z / 2]}
         )
@@ -743,7 +750,9 @@ class MujocoSphereConverter(MujocoGeomConverter, SphereConverter):
     def _post_convert(
         self, entity: Sphere, shape_props: Dict[str, Any], **kwargs
     ) -> Dict[str, Any]:
-        shape_props.update(MujocoGeomConverter._post_convert(self, entity, shape_props))
+        shape_props.update(
+            MujocoGeomConverter._post_convert(self, entity, shape_props, **kwargs)
+        )
         shape_props.update({"size": [entity.radius, entity.radius, entity.radius]})
         return shape_props
 
@@ -754,7 +763,9 @@ class MujocoCylinderConverter(MujocoGeomConverter, CylinderConverter):
     def _post_convert(
         self, entity: Cylinder, shape_props: Dict[str, Any], **kwargs
     ) -> Dict[str, Any]:
-        shape_props.update(MujocoGeomConverter._post_convert(self, entity, shape_props))
+        shape_props.update(
+            MujocoGeomConverter._post_convert(self, entity, shape_props, **kwargs)
+        )
         shape_props.update({"size": [entity.width / 2, entity.height, 0.0]})
         return shape_props
 
@@ -765,7 +776,9 @@ class MujocoMeshConverter(MujocoGeomConverter, MeshConverter):
     def _post_convert(
         self, entity: Mesh, shape_props: Dict[str, Any], **kwargs
     ) -> Dict[str, Any]:
-        shape_props.update(MujocoGeomConverter._post_convert(self, entity, shape_props))
+        shape_props.update(
+            MujocoGeomConverter._post_convert(self, entity, shape_props, **kwargs)
+        )
         shape_props.update({"mesh": entity})
         if isinstance(entity.mesh.visual, TextureVisuals) and isinstance(
             entity.mesh.visual.material.name, str
@@ -922,8 +935,8 @@ class MultiSimBuilder(ABC):
             self._build_shape(
                 parent=body,
                 shape=shape,
-                visible=shape in body.visual or not body.visual,
-                collidable=shape in body.collision,
+                is_visible=shape in body.visual,
+                is_collidable=shape in body.collision,
             )
 
     def build_region(self, region: Region):
@@ -935,7 +948,7 @@ class MultiSimBuilder(ABC):
         self._build_region(region=region)
         for shape in region.area:
             self._build_shape(
-                parent=region, shape=shape, visible=True, collidable=False
+                parent=region, shape=shape, is_visible=True, is_collidable=False
             )
 
     @abstractmethod
@@ -976,15 +989,19 @@ class MultiSimBuilder(ABC):
 
     @abstractmethod
     def _build_shape(
-        self, parent: Union[Body, Region], shape: Shape, visible: bool, collidable: bool
+        self,
+        parent: Union[Body, Region],
+        shape: Shape,
+        is_visible: bool,
+        is_collidable: bool,
     ):
         """
         Builds a shape in the simulator and attaches it to its parent body or region.
 
         :param parent: The parent body or region to attach the shape to.
         :param shape: The shape to build.
-        :param visible: Whether the shape is visible.
-        :param collidable: Whether the shape is collidable.
+        :param is_visible: Whether the shape is visible.
+        :param is_collidable: Whether the shape is collidable.
         """
         raise NotImplementedError
 
@@ -1025,6 +1042,7 @@ class MujocoBuilder(MultiSimBuilder):
     def _start_build(self, file_path: str):
         self.spec = mujoco.MjSpec()
         self.spec.modelname = "scene"
+        self.spec.compiler.degree = 0
 
     def _end_build(self, file_path: str):
         self.spec.compile()
@@ -1058,10 +1076,14 @@ class MujocoBuilder(MultiSimBuilder):
         self._build_mujoco_body(body=region)
 
     def _build_shape(
-        self, parent: Union[Body, Region], shape: Shape, visible: bool, collidable: bool
+        self,
+        parent: Union[Body, Region],
+        shape: Shape,
+        is_visible: bool,
+        is_collidable: bool,
     ):
         geom_props = MujocoGeomConverter.convert(
-            shape, visible=visible, collidable=collidable
+            shape, visible=is_visible, collidable=is_collidable
         )
         assert geom_props is not None, f"Failed to convert shape {id(shape)}."
         parent_body_name = parent.name.name
@@ -1530,6 +1552,7 @@ class MultiSim(ABC):
         headless: bool = False,
         step_size: float = 1e-3,
         real_time_factor: float = 1.0,
+        **kwargs,
     ):
         """
         Initializes the MultiSim class.
@@ -1547,6 +1570,7 @@ class MultiSim(ABC):
             headless=headless,
             step_size=step_size,
             real_time_factor=real_time_factor,
+            **kwargs,
         )
         self.synchronizer = self.synchronizer_class(
             world=world,

@@ -1,0 +1,15 @@
+# Code owners for framework directories
+
+# krrood framework
+/krrood/ @AbdelrhmanBassiouny @tomsch420
+
+# giskardpy
+/giskardpy/ @ichumuh @maltehue
+
+# pycram framework
+/pycram/ @Tigul @sunava
+
+# semantic_digital_twin framework
+/semantic_digital_twin/ @ichumuh @tomsch420 @LucaKro
+
+

@@ -1,10 +1,14 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.pyrefly]
+project-includes = ["**/*"]
+project-excludes = ["**/*venv/**/*"]
 
 [project]
 name = "krrood"
-version = "2.0.5"
+dynamic = ["version", "dependencies"]
 description = "A python package for Knowledge Representation and Reasoning systems based on Object Oriented Design."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -29,7 +33,6 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering",
 ]
-dependencies = []
 
 [project.optional-dependencies]
 dev = [
@@ -86,4 +89,5 @@ exclude_lines = [
 ]
 
 [tool.setuptools.dynamic]
+version = {attr = "krrood.__version__"}
 dependencies = { file = ["requirements.txt"] }
