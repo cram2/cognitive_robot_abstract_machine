@@ -15,6 +15,7 @@ from ....has_parameters import has_parameters
 from ....language import SequentialPlan
 from ....robot_description import RobotDescription
 from ....robot_descriptions.pr2_states import *
+from ....robot_descriptions.hsrb_states import *
 from ....robot_plans.actions.base import ActionDescription
 from ....robot_plans.motions.gripper import MoveGripperMotion
 from ....robot_plans.motions.robot_body import MoveJointsMotion
@@ -138,6 +139,8 @@ class ParkArmsAction(ActionDescription):
         :return: The joint positions that should be set for the arm to be in the park position.
         """
         jm = JointStateManager()
+        print(jm.joint_states)
+        print(self.arm)
         park_state = jm.get_arm_state(self.arm, StaticJointState.Park, self.robot_view)
         return park_state.joint_names, park_state.joint_positions
 
