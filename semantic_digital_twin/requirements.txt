@@ -32,4 +32,4 @@ pymysql
 pyglet == 1.5.31
 pycollada
 mujoco==3.3.5
-multiverse-simulators>=0.0.7
+multiverse-simulators>=0.0.8

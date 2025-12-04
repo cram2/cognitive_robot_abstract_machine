@@ -36,7 +36,7 @@ from ..world_description.inertial_properties import (
     PrincipalAxes,
 )
 from ..world_description.shape_collection import ShapeCollection
-from .multi_sim import MujocoActuator
+from .multi_sim import MujocoActuator, GeomVisibilityAndCollisionType
 
 
 @dataclass
@@ -97,7 +97,11 @@ class MJCFParser:
             shape = self.parse_geom(mujoco_geom=mujoco_geom)
             if mujoco_geom.contype != 0 or mujoco_geom.conaffinity != 0:
                 collisions.append(shape)
-            if mujoco_geom.group in [0, 1, 2]:
+            if mujoco_geom.group in [
+                GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_1,
+                GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_2,
+                GeomVisibilityAndCollisionType.ONLY_VISIBLE,
+            ]:
                 visuals.append(shape)
         body.inertial = self.parse_inertial(mujoco_body=mujoco_body)
         body.visual = ShapeCollection(shapes=visuals, reference_frame=body)

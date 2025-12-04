@@ -2,6 +2,7 @@ import os
 import time
 import unittest
 
+import mujoco
 import numpy
 
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -22,7 +23,7 @@ try:
     from mujoco_connector import MultiverseMujocoConnector
     from multiverse_simulator import MultiverseSimulatorState, MultiverseViewer
     from semantic_digital_twin.adapters.mjcf import MJCFParser
-    from semantic_digital_twin.adapters.multi_sim import MujocoSim
+    from semantic_digital_twin.adapters.multi_sim import MujocoSim, MujocoActuator
 except ImportError:
     MultiverseMujocoConnector = None
     multi_sim_found = False
@@ -315,7 +316,7 @@ class MujocoSimTestCase(unittest.TestCase):
             new_body.name.name, multi_sim.simulator.get_all_body_names().result
         )
 
-        time.sleep(1)
+        time.sleep(0.5)
 
         current_time = time.time()
         region = Region(name=PrefixedName("test_region"))
@@ -343,6 +344,31 @@ class MujocoSimTestCase(unittest.TestCase):
             )
         print(f"Time to add new region: {time.time() - current_time}s")
         self.assertIn(region.name.name, multi_sim.simulator.get_all_body_names().result)
+
+        time.sleep(0.5)
+
+        T_const = 0.1
+        kp = 100
+        kv = 10
+        actuator = MujocoActuator(
+            name=PrefixedName("test_actuator"),
+            dynamics_type=mujoco.mjtDyn.mjDYN_NONE,
+            dynamics_parameters=[T_const] + [0.0] * 9,
+            gain_type=mujoco.mjtGain.mjGAIN_FIXED,
+            gain_parameters=[kp] + [0.0] * 9,
+            bias_type=mujoco.mjtBias.mjBIAS_AFFINE,
+            bias_parameters=[0, -kp, -kv] + [0.0] * 7,
+        )
+        dof = self.test_urdf_1_world.get_degree_of_freedom_by_name(name="r_joint_1")
+        actuator.add_dof(dof=dof)
+
+        current_time = time.time()
+        with self.test_urdf_1_world.modify_world():
+            self.test_urdf_1_world.add_actuator(actuator=actuator)
+        print(f"Time to add new actuator: {time.time() - current_time}s")
+        self.assertIn(
+            actuator.name.name, multi_sim.simulator.get_all_actuator_names().result
+        )
 
         time.sleep(4.0)
 
