@@ -226,7 +226,7 @@ class URDFParser:
             dof_name = PrefixedName(joint.mimic.joint, prefix)
 
         try:
-            dof = world.get_degree_of_freedom_by_name(dof_name)
+            dof = world.get_degree_of_freedom_by_name(dof_name.name)
         except WorldEntityNotFoundError as e:
             dof = DegreeOfFreedom(
                 name=dof_name,
