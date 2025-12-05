@@ -225,15 +225,15 @@ class URDFParser:
             offset = joint.mimic.offset if joint.mimic.offset is not None else 0
             dof_name = PrefixedName(joint.mimic.joint, prefix)
 
-        try:
-            dof = world.get_degree_of_freedom_by_name(dof_name)
-        except WorldEntityNotFoundError as e:
+        if dof_name not in [d.name for d in world.degrees_of_freedom]:
             dof = DegreeOfFreedom(
                 name=dof_name,
                 lower_limits=lower_limits,
                 upper_limits=upper_limits,
             )
             world.add_degree_of_freedom(dof)
+        else:
+            dof = world.get_degree_of_freedom_by_name(dof_name)
 
         assert joint.axis is not None, f"Joint axis is None for joint {joint.name}"
         result = connection_type(

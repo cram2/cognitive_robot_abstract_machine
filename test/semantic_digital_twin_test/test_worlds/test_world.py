@@ -979,3 +979,16 @@ def test_actuators(world_setup):
 
     assert actuator in world.actuators
     assert world.get_actuator_by_id(actuator.id) == actuator
+
+
+def test_add_body_hash():
+    world = World()
+    body = Body(name=PrefixedName("body"))
+    with world.modify_world():
+        world.add_body(body)
+
+    assert hash(body) in world._world_entity_hash_table
+
+    with world.modify_world():
+        world.remove_kinematic_structure_entity(body)
+    assert hash(body) not in world._world_entity_hash_table

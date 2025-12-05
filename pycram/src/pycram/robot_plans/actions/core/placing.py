@@ -7,9 +7,16 @@ from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
+from .pick_up import ReachActionDescription
 from ....config.action_conf import ActionConfig
-from ...motions.gripper import MoveTCPMotion, MoveGripperMotion
-from ....datastructures.enums import Arms, GripperState
+from ...motions.gripper import MoveTCPMotion, MoveGripperMotion, ReachMotion
+from ....datastructures.enums import (
+    Arms,
+    GripperState,
+    ApproachDirection,
+    VerticalAlignment,
+)
+from ....datastructures.grasp import GraspDescription
 from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import PoseStamped
 from ....failures import ObjectNotPlacedAtTargetLocation, ObjectStillInContact
@@ -49,15 +56,15 @@ class PlaceAction(ActionDescription):
         super().__post_init__()
 
     def execute(self) -> None:
-        pre_place_pose = self.world.transform(
-            self.target_location.to_spatial_type(), self.world.root
-        )
-        pre_place_pose = PoseStamped.from_spatial_type(pre_place_pose)
-        pre_place_pose.position.z += 0.1
         SequentialPlan(
             self.context,
-            MoveTCPMotion(pre_place_pose, self.arm),
-            MoveTCPMotion(self.target_location, self.arm),
+            ReachActionDescription(
+                self.target_location,
+                self.arm,
+                GraspDescription(
+                    ApproachDirection.FRONT, VerticalAlignment.NoAlignment
+                ),
+            ),
             MoveGripperMotion(GripperState.OPEN, self.arm),
         ).perform()
 

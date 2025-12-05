@@ -26,8 +26,6 @@ class MoveMotion(BaseMotion):
 
     def perform(self):
         return
-        pm_manager = ProcessModuleManager().get_manager(self.robot_view)
-        return pm_manager.navigate().execute(self)
 
     @property
     def _motion_chart(self):
