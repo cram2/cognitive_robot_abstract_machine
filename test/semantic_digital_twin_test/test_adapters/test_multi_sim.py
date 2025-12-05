@@ -6,11 +6,12 @@ import unittest
 import mujoco
 import numpy
 
+from semantic_digital_twin import logger
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
-from semantic_digital_twin.world import World, logger
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,

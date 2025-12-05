@@ -86,10 +86,6 @@ from .world_description.world_modification import (
 from .world_description.world_state import WorldState
 
 logger = logging.getLogger(__name__)
-if not logger.handlers:  # Add handler if none exists
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
-    logger.addHandler(handler)
 
 id_generator = IDGenerator()
 
