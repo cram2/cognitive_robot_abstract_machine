@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 """
 Utilities for hashing, rendering, and general helpers used by the
 symbolic query engine.
@@ -18,7 +16,8 @@ try:
 except ImportError:
     Source = None
 
-from typing_extensions import Set, Any, List, Type
+from dataclasses import dataclass, field
+from typing_extensions import Set, Any, TypeVar, Generic, Iterable, List
 
 
 class IDGenerator:
@@ -176,3 +175,32 @@ class ALL:
 
 
 All = ALL()
+T = TypeVar("T")
+
+
+@dataclass
+class ReEnterableLazyIterable(Generic[T]):
+    """
+    A wrapper for an iterable that allows multiple iterations over its elements,
+    materializing values as they are iterated over.
+    """
+
+    iterable: Iterable[T] = field(default_factory=list)
+    materialized_values: List[T] = field(default_factory=list)
+
+    def set_iterable(self, iterable):
+        self.iterable = (v for v in iterable)
+
+    def __iter__(self):
+        """
+        Iterate over the hashed values.
+
+        :return: An iterator over the hashed values.
+        """
+        yield from self.materialized_values
+        for v in self.iterable:
+            self.materialized_values.append(v)
+            yield v
+
+    def __bool__(self):
+        return bool(self.materialized_values) or bool(self.iterable)

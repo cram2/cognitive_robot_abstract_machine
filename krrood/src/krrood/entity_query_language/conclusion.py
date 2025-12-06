@@ -10,11 +10,11 @@ from .enums import RDREdge
 from .rxnode import ColorLegend
 from .symbolic import (
     SymbolicExpression,
-    T,
     Variable,
     OperationResult,
     ResultQuantifier,
 )
+from .utils import T
 
 
 @dataclass(eq=False)

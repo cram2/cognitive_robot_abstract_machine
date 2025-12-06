@@ -2,6 +2,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 from scipy.spatial.transform import Rotation as R
 
+import krrood.entity_query_language.utils
 from semantic_digital_twin.spatial_types import RotationMatrix, Vector3
 from semantic_digital_twin.world_description.inertial_properties import (
     InertiaTensor,
@@ -71,7 +72,7 @@ class TestComponentsAndAssembly:
 
     def test_inertia_tensor_properties(self):
         for moments_values, axes_values in moments_and_axes_values:
-            expected_tensor = axes_values @ np.diag(moments_values) @ axes_values.T
+            expected_tensor = axes_values @ np.diag(moments_values) @ krrood.entity_query_language.utils.T
             ixx = expected_tensor[0, 0]
             iyy = expected_tensor[1, 1]
             izz = expected_tensor[2, 2]

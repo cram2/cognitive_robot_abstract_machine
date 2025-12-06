@@ -18,6 +18,8 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.interval import Interval, reals, closed_open, closed
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Continuous
+
+import krrood.entity_query_language.utils
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world import World
@@ -667,7 +669,7 @@ class VisibilityCostmap(Costmap):
         map = np.zeros((self.width, self.width))
         # This is done to iterate over the depth images one at a time
         for i in range(4):
-            row_masks = mask[res == i].T
+            row_masks = krrood.entity_query_language.utils.T
             # This statement does several things, first it takes the values from
             # the depth image for this quarter of the costmap. The values taken are
             # the complete columns of the depth image (which where computed beforehand)

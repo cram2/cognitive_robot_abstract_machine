@@ -942,8 +942,8 @@ def random_rotation_matrix(rand=None):
         Three independent random variables that are uniformly distributed
         between 0 and 1 for each returned quaternion.
 
-    >>> R = random_rotation_matrix()
-    >>> numpy.allclose(numpy.dot(R.T, R), numpy.identity(4))
+import krrood.entity_query_language.utils    >>> R = random_rotation_matrix()
+    >>> numpy.allclose(numpy.dot(krrood.entity_query_language.utils.T, R), numpy.identity(4))
     True
 
     """
@@ -1254,9 +1254,9 @@ def inverse_matrix(matrix):
     """
     Return inverse of square transformation matrix.
 
-    >>> M0 = random_rotation_matrix()
-    >>> M1 = inverse_matrix(M0.T)
-    >>> numpy.allclose(M1, numpy.linalg.inv(M0.T))
+import krrood.entity_query_language.utils    >>> M0 = random_rotation_matrix()
+    >>> M1 = inverse_matrix(krrood.entity_query_language.utils.T)
+    >>> numpy.allclose(M1, numpy.linalg.inv(krrood.entity_query_language.utils.T))
     True
     >>> for size in range(1, 7):
     ...     M0 = numpy.random.rand(size, size)
@@ -1274,7 +1274,7 @@ def concatenate_matrices(*matrices):
     >>> M = numpy.random.rand(16).reshape((4, 4)) - 0.5
     >>> numpy.allclose(M, concatenate_matrices(M))
     True
-    >>> numpy.allclose(numpy.dot(M, M.T), concatenate_matrices(M, M.T))
+import krrood.entity_query_language.utils    >>> numpy.allclose(numpy.dot(M, krrood.entity_query_language.utils.T), concatenate_matrices(M, krrood.entity_query_language.utils.T))
     True
 
     """

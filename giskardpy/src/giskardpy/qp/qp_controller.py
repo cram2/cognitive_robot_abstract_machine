@@ -10,6 +10,7 @@ import pandas
 import pandas as pd
 from line_profiler import profile
 
+import krrood.entity_query_language.utils
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.middleware import get_middleware
 from giskardpy.qp.adapters.qp_adapter import GiskardToQPAdapter
@@ -110,7 +111,7 @@ class QPControllerDebugger:
                 "display.max_rows", None, "display.max_columns", None
             ):
                 if df.shape[1] > 1:
-                    for column_name, column in df.T.items():
+                    for column_name, column in krrood.entity_query_language.utils.T.items():
                         zero_filtered_column = (
                             column.replace(0, np.nan)
                             .dropna(how="all")

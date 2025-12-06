@@ -17,7 +17,6 @@ from .entity import (
     exists,
 )
 from .failures import NoneWrappedFieldError
-from .hashed_data import T
 from .predicate import HasType
 from .symbolic import (
     CanBehaveLikeAVariable,
@@ -32,7 +31,7 @@ from .symbolic import (
     SetOf,
     Entity,
 )
-from .utils import is_iterable
+from .utils import is_iterable, T
 
 
 @dataclass

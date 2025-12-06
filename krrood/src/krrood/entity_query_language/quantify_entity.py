@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, Union, Type
 
-from .hashed_data import T
+from .utils import T
 from .match import EntityType, Match
 from .result_quantification_constraint import (
     ResultQuantificationConstraint,

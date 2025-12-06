@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import Tuple
 
 import numpy as np
+
+import krrood.entity_query_language.utils
 from semantic_digital_twin.robots.abstract_robot import Manipulator, AbstractRobot
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Optional, Union, List
@@ -149,7 +151,7 @@ class GraspDescription(HasParameters):
         orientation = objectTmap.orientation.to_list()
 
         mapRobject = R.from_quat(orientation).as_matrix()
-        objectRmap = mapRobject.T
+        objectRmap = krrood.entity_query_language.utils.T
 
         object_to_robot_vector_local = objectRmap.dot(
             object_to_robot_vector_world.to_numpy()

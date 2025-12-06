@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from .hashed_data import T
 from .symbol_graph import SymbolGraph
-from .utils import is_iterable
+from .utils import is_iterable, T
 
 """
 User interface (grammar & vocabulary) for entity query language.
