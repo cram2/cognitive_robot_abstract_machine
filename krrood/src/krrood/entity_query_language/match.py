@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Generic, Optional, Type, Dict, Any, List, Union, Self, Iterable
 
-from krrood.entity_query_language.symbolic import Exists
+from krrood.entity_query_language.symbolic import Exists, DomainType
 
 from .entity import (
     ConditionType,
@@ -14,11 +14,9 @@ from .entity import (
     let,
     set_of,
     entity,
-    DomainType,
     exists,
 )
 from .failures import NoneWrappedFieldError
-from .hashed_data import T, HashedValue
 from .predicate import HasType
 from .symbolic import (
     CanBehaveLikeAVariable,
@@ -33,7 +31,7 @@ from .symbolic import (
     SetOf,
     Entity,
 )
-from .utils import is_iterable
+from .utils import is_iterable, T
 
 
 @dataclass
@@ -347,7 +345,7 @@ class Select(Match[T], Selectable[T]):
 
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, HashedValue]] = None,
+        sources: Optional[Dict[int, Any]] = None,
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         yield from self.variable._evaluate__(sources, parent)

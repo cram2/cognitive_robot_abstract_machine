@@ -9,8 +9,8 @@ from .symbolic import (
     chained_logic,
     AND,
     BinaryOperator,
-    T,
 )
+from .utils import T
 
 if TYPE_CHECKING:
     from .entity import ConditionType
