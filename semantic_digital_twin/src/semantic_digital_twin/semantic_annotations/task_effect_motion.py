@@ -94,16 +94,16 @@ class Motion(SemanticAnnotation):
             Case3: causes(motion?, effect?) -> Union of Case2 for all known motions and Case1 for all known effects.
     """
 
-    trajectory: List[Point3]
+    trajectory: Optional[List[Point3]]
     """Planned trajectory points in 3D space."""
 
-    actuator: Body
+    actuator: Optional[Body]
     """The body that must be manipulated (e.g., handle, object)."""
 
-    expected_effect: Effect
+    expected_effect: Optional[Effect]
     """The effect this motion is expected to cause."""
 
-    duration: float
+    duration: Optional[float]
     """Expected duration of motion in seconds."""
 
 

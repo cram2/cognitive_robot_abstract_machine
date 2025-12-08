@@ -12,7 +12,7 @@ their own implementations:
 
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.goals.open_close import Open
@@ -115,9 +115,9 @@ class CausesOpening(Predicate):
 
     effect: Effect
 
-    motion: Optional[Motion]
-
     environment: World
+
+    motion: Optional[Motion] = None
 
     def __call__(self, *args, **kwargs):
         if self.effect.is_achieved():
@@ -149,7 +149,11 @@ class CausesOpening(Predicate):
         # self.environment.state.data = initial_state_data
         # self.environment.notify_state_change()
 
-        return is_achieved
+        self.motion = Motion(
+            trajectory=[], actuator=handle.body, expected_effect=self.effect, duration=2
+        )
+
+        return True
 
     def _extract_container_info(self, annotation: SemanticAnnotation):
         """

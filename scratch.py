@@ -12,8 +12,9 @@ from giskardpy.executor import Executor
 from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from krrood.entity_query_language.entity import entity, let
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.conclusion import Add
+from krrood.entity_query_language.entity import entity, let, set_of, inference
+from krrood.entity_query_language.quantify_entity import an, a
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.procthor.procthor_semantic_annotations import Milk
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -31,6 +32,7 @@ from semantic_digital_twin.semantic_annotations.task_effect_motion import (
     Effect,
     OpenEffect,
     ClosedEffect,
+    Motion,
 )
 from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
 from semantic_digital_twin.world_description.connections import (
@@ -186,14 +188,35 @@ class ContainerDemo:
             self.world.add_semantic_annotations(effects)
 
         effect = let(Effect, domain=self.world.semantic_annotations)
-        query = an(
-            entity(
-                effect,
-                CausesOpening(effect=effect, motion=None, environment=self.world),
-            )
-        )
+        # motion = let(Motion, domain=None)
+        # query = an(
+        #     entity(
+        #         motion,
+        #         CausesOpening(effect=effect_open, motion=motion, environment=self.world),
+        #     )
+        # )
+        # motion = let(Motion, domain=None)
+        # query = an(
+        #     entity(
+        #         motion,
+        #         predicate := CausesOpening(effect=effect_open, motion=motion, environment=self.world),
+        #     )
+        # )
+        #
+        # with query:
+        #     Add(motion, predicate.motion)
+        #
+        # print(list(query.evaluate()))
 
-        print(list(query.evaluate()))
+        motion = let(Motion, domain=None)
+        effect = let(Effect, domain=[effect_open])
+        causes_opening = CausesOpening(effect=effect, environment=self.world)
+        motion = an(entity(causes_opening.motion, causes_opening))
+        print(list(motion.evaluate()))
+
+        # causes_opening = CausesOpening(effect=effect_open, environment=self.world)
+        # assert causes_opening.__call__() is True
+        # print(causes_opening.motion)
 
     def cleanup(self):
         """
