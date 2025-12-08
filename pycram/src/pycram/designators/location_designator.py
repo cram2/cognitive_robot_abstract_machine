@@ -1578,7 +1578,7 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
                         allowed_collision=params_box.ignore_collision_with,
                     )
                     if is_reachable:
-                        print(f"Succeeded costmap with pose {pose_candidate}")
+                        logger.info(f"Succeeded costmap with pose {pose_candidate}")
                         yield GraspPose(
                             pose_candidate.pose,
                             pose_candidate.header,

@@ -239,7 +239,7 @@ class DomainValueExtractor:
                 literal_node.value if hasattr(literal_node, "value") else literal_node
             )
 
-        values = [hashed_value.value for hashed_value in literal_node._domain_]
+        values = [value for value in literal_node._domain_]
 
         if len(values) > 1:
             return values

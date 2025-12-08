@@ -88,7 +88,7 @@ class TransportAction(ActionDescription):
             reachable_for=self.robot_view,
             reachable_arm=self.arm,
         )
-        pl = SequentialPlan(self.context, pickup_loc)
+        pickup_loc.plan_node = self.plan_node
         # Tries to find a pick-up position for the robot that uses the given arm
         pickup_pose = pickup_loc.resolve()
         if not pickup_pose:
@@ -117,16 +117,6 @@ class TransportAction(ActionDescription):
                 True,
             ),
         ).perform()
-
-        # SequentialPlan(self.context,
-        #                NavigateActionDescription(ProbabilisticCostmapLocation(
-        #                    target=self.target_location,
-        #                    reachable_for=self.robot_view,
-        #                    reachable_arm=pickup_pose.arm,
-        #                    grasp_descriptions=[pickup_pose.grasp_description],
-        #                    object_in_hand=self.object_designator,
-        #                    rotation_agnostic=self.place_rotation_agnostic,
-        #                ), True)).perform()
 
         if self.place_rotation_agnostic:
             # Placing rotation agnostic currently means that the robot will position its gripper in the same orientation

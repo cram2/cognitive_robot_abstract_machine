@@ -302,7 +302,6 @@ class TestActionDesignatorGrounding(ApartmentWorldTestCase):
         self.assertTrue(len(location.orientation.to_list()) == 4)
 
     def test_reachability_and_visibility_probabilistic_costmap_location(self):
-        print("enter krrood_test")
         arm_park = {
             "l_shoulder_pan_joint": 1.712,
             "l_shoulder_lift_joint": -0.264,
@@ -332,9 +331,7 @@ class TestActionDesignatorGrounding(ApartmentWorldTestCase):
             reachable_for=self.robot_view,
             visible_for=self.robot_view,
         )
-        print("created location desig")
         plan = SequentialPlan(self.context, NavigateActionDescription(location_desig))
-        print("created plan")
         location = location_desig.resolve()
         self.assertTrue(len(location.position.to_list()) == 3)
         self.assertTrue(len(location.orientation.to_list()) == 4)
@@ -356,7 +353,6 @@ class TestActionDesignatorGrounding(ApartmentWorldTestCase):
         self.assertTrue(len(location.position.to_list()) == 3)
         self.assertTrue(len(location.orientation.to_list()) == 4)
 
-    @unittest.skip("krrood_test is not terminating")
     def test_probabilistic_semantic_location(self):
         location_desig = ProbabilisticSemanticLocation(
             [self.world.get_body_by_name("island_countertop")]

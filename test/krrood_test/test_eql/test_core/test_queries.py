@@ -397,7 +397,7 @@ def test_sources(handles_and_containers_world):
     fixed_connection = let(type_=FixedConnection, domain=world.connections)
     prismatic_connection = let(type_=PrismaticConnection, domain=world.connections)
     drawer_components = (container, handle, fixed_connection, prismatic_connection)
-    query = an(
+    query = a(
         set_of(
             drawer_components,
             container == fixed_connection.parent,
@@ -409,7 +409,7 @@ def test_sources(handles_and_containers_world):
     sources = list(query._sources_)
     assert len(sources) == 1, "Should have 1 source."
     assert (
-        sources[0].value is handles_and_containers_world
+        sources[0] is handles_and_containers_world
     ), "The source should be the world."
 
 
