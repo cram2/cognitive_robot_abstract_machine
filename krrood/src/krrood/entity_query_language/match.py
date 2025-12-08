@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Generic, Optional, Type, Dict, Any, List, Union, Self, Iterable
 
-from krrood.entity_query_language.symbolic import Exists
+from typing_extensions import Generic, Optional, Type, Dict, Any, List, Union, Self, Iterable
 
 from .entity import (
     ConditionType,
@@ -14,17 +13,14 @@ from .entity import (
     let,
     set_of,
     entity,
-    DomainType,
     exists,
 )
 from .failures import NoneWrappedFieldError
-from .hashed_data import T, HashedValue
 from .predicate import HasType
 from .symbolic import (
     CanBehaveLikeAVariable,
     Attribute,
     Comparator,
-    Flatten,
     QueryObjectDescriptor,
     Selectable,
     SymbolicExpression,
@@ -32,8 +28,10 @@ from .symbolic import (
     Literal,
     SetOf,
     Entity,
+    Exists,
+    DomainType
 )
-from .utils import is_iterable
+from .utils import is_iterable, T
 
 
 @dataclass
@@ -104,9 +102,9 @@ class Match(Generic[T]):
         return self
 
     def _resolve(
-        self,
-        variable: Optional[CanBehaveLikeAVariable] = None,
-        parent: Optional[Match] = None,
+            self,
+            variable: Optional[CanBehaveLikeAVariable] = None,
+            parent: Optional[Match] = None,
     ):
         """
         Resolve the match by creating the variable and conditions expressions.
@@ -134,9 +132,9 @@ class Match(Generic[T]):
                 self.conditions.append(condition)
 
     def _update_fields(
-        self,
-        variable: Optional[CanBehaveLikeAVariable] = None,
-        parent: Optional[Match] = None,
+            self,
+            variable: Optional[CanBehaveLikeAVariable] = None,
+            parent: Optional[Match] = None,
     ):
         """
         Update the match variable, parent, is_selected, and type_ fields.
@@ -214,7 +212,7 @@ class AttributeAssignment:
         """
         possibly_flattened_attr = self.attr
         if self.attr._is_iterable_ and (
-            self.assigned_value.kwargs or self.is_type_filter_needed
+                self.assigned_value.kwargs or self.is_type_filter_needed
         ):
             possibly_flattened_attr = flatten(self.attr)
 
@@ -228,7 +226,7 @@ class AttributeAssignment:
         self.conditions.extend(self.assigned_value.conditions)
 
     def infer_condition_between_attribute_and_assigned_value(
-        self,
+            self,
     ) -> Union[Comparator, Exists]:
         """
         Find and return the appropriate condition for the attribute and its assigned value. This can be one of contains,
@@ -243,11 +241,11 @@ class AttributeAssignment:
         elif not self.attr._is_iterable_ and self.is_iterable_value:
             condition = in_(self.attr, self.assigned_variable)
         elif (
-            self.attr._is_iterable_
-            and self.is_iterable_value
-            and not (
+                self.attr._is_iterable_
+                and self.is_iterable_value
+                and not (
                 isinstance(self.assigned_value, Match) and self.assigned_value.universal
-            )
+        )
         ):
             condition = contains(self.assigned_variable, flatten(self.attr))
         else:
@@ -286,7 +284,7 @@ class AttributeAssignment:
         :return: True if the value is an unresolved Match instance, else False.
         """
         return (
-            isinstance(self.assigned_value, Match) and not self.assigned_value.variable
+                isinstance(self.assigned_value, Match) and not self.assigned_value.variable
         )
 
     @cached_property
@@ -297,12 +295,12 @@ class AttributeAssignment:
         if isinstance(self.assigned_value, CanBehaveLikeAVariable):
             return self.assigned_value._is_iterable_
         elif not isinstance(self.assigned_value, Match) and is_iterable(
-            self.assigned_value
+                self.assigned_value
         ):
             return True
         elif (
-            isinstance(self.assigned_value, Match)
-            and self.assigned_value.variable._is_iterable_
+                isinstance(self.assigned_value, Match)
+                and self.assigned_value.variable._is_iterable_
         ):
             return True
         return False
@@ -314,8 +312,8 @@ class AttributeAssignment:
         """
         attr_type = self.attr._type_
         return (not attr_type) or (
-            (self.assigned_value.type_ and self.assigned_value.type_ is not attr_type)
-            and issubclass(self.assigned_value.type_, attr_type)
+                (self.assigned_value.type_ and self.assigned_value.type_ is not attr_type)
+                and issubclass(self.assigned_value.type_, attr_type)
         )
 
 
@@ -336,9 +334,9 @@ class Select(Match[T], Selectable[T]):
         ...
 
     def _resolve(
-        self,
-        variable: Optional[CanBehaveLikeAVariable] = None,
-        parent: Optional[Match] = None,
+            self,
+            variable: Optional[CanBehaveLikeAVariable] = None,
+            parent: Optional[Match] = None,
     ):
         super()._resolve(variable, parent)
         variable = variable or self.variable
@@ -346,9 +344,9 @@ class Select(Match[T], Selectable[T]):
             self._var_ = variable
 
     def _evaluate__(
-        self,
-        sources: Optional[Dict[int, HashedValue]] = None,
-        parent: Optional[SymbolicExpression] = None,
+            self,
+            sources: Optional[Dict[int, Any]] = None,
+            parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         yield from self.variable._evaluate__(sources, parent)
 
@@ -362,7 +360,7 @@ class Select(Match[T], Selectable[T]):
 
 
 def match(
-    type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
+        type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
     """
     Create and return a Match instance that looks for the pattern provided by the type and the
@@ -375,7 +373,7 @@ def match(
 
 
 def match_any(
-    type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
+        type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
     """
     Equivalent to match(type_) but for existential checks.
@@ -386,7 +384,7 @@ def match_any(
 
 
 def match_all(
-    type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
+        type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
     """
     Equivalent to match(type_) but for universal checks.
@@ -397,7 +395,7 @@ def match_all(
 
 
 def select(
-    type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
+        type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Select[T]]:
     """
     Equivalent to match(type_) and selecting the variable to be included in the result.
@@ -406,7 +404,7 @@ def select(
 
 
 def select_any(
-    type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
+        type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Select[T]]:
     """
     Equivalent to select(type_) but for existential checks.
@@ -417,7 +415,7 @@ def select_any(
 
 
 def select_all(
-    type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
+        type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Select[T]]:
     """
     Equivalent to select(type_) but for universal checks.
@@ -428,7 +426,7 @@ def select_all(
 
 
 def entity_matching(
-    type_: Union[Type[T], CanBehaveLikeAVariable[T]], domain: DomainType
+        type_: Union[Type[T], CanBehaveLikeAVariable[T]], domain: DomainType
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
     """
     Same as :py:func:`krrood.entity_query_language.match.match` but with a domain to use for the variable created
@@ -446,7 +444,7 @@ def entity_matching(
 
 
 def entity_selection(
-    type_: Union[Type[T], CanBehaveLikeAVariable[T]], domain: DomainType
+        type_: Union[Type[T], CanBehaveLikeAVariable[T]], domain: DomainType
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Select[T]]:
     """
     Same as :py:func:`krrood.entity_query_language.match.entity_matching` but also selecting the variable to be

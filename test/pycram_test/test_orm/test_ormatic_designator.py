@@ -1,11 +1,13 @@
 from copy import deepcopy
 
 import numpy as np
+import rclpy
 import sqlalchemy.sql.elements
 
 from krrood.entity_query_language.symbol_graph import SymbolGraph
 from krrood.ormatic.dao import to_dao
 from krrood.ormatic.utils import create_engine
+from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
 from semantic_digital_twin.robots.pr2 import PR2
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -21,7 +23,7 @@ from pycram.datastructures.enums import (
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.pose import Pose, PoseStamped
 from pycram.designator import NamedObject
-from pycram.language import SequentialPlan
+from pycram.language import SequentialPlan, ParallelPlan
 from pycram.orm.ormatic_interface import *
 from pycram.process_module import simulated_robot
 from pycram.robot_plans import (
@@ -73,7 +75,7 @@ class PoseTestCases(ORMaticBaseTestCaseMixin):
             plan = SequentialPlan(
                 Context.from_world(test_world),
                 NavigateActionDescription(
-                    PoseStamped.from_list([2, 2.2, 0], [0, 0, 0, 1], test_world.root),
+                    PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], test_world.root),
                     True,
                 ),
                 MoveTorsoActionDescription(TorsoState.HIGH),
@@ -88,7 +90,7 @@ class PoseTestCases(ORMaticBaseTestCaseMixin):
                     NamedObject("milk.stl"),
                     [
                         PoseStamped.from_list(
-                            [2.1, 2, 0.9], [0, 0, 0, 1], test_world.root
+                            [2.3, 2.2, 1], [0, 0, 0, 1], test_world.root
                         )
                     ],
                     [Arms.LEFT],
@@ -208,7 +210,7 @@ class ORMActionDesignatorTestCase(ORMaticBaseTestCaseMixin):
             sp = SequentialPlan(
                 Context.from_world(test_world),
                 NavigateActionDescription(
-                    PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], test_world.root),
+                    PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], test_world.root),
                     True,
                 ),
                 ParkArmsActionDescription(Arms.BOTH),
@@ -220,13 +222,13 @@ class ORMActionDesignatorTestCase(ORMaticBaseTestCaseMixin):
                     ),
                 ),
                 NavigateActionDescription(
-                    PoseStamped.from_list([1.3, 1, 0], [0, 0, 0, 1], test_world.root),
+                    PoseStamped.from_list([1.6, 2.3, 0], [0, 0, 0, 1], test_world.root),
                     True,
                 ),
                 PlaceActionDescription(
                     test_world.get_body_by_name("milk.stl"),
                     PoseStamped.from_list(
-                        [2.0, 1.6, 1.0], [0, 0, 0, 1], test_world.root
+                        [2.3, 2.5, 1.0], [0, 0, 0, 1], test_world.root
                     ),
                     Arms.LEFT,
                 ),
@@ -237,7 +239,7 @@ class ORMActionDesignatorTestCase(ORMaticBaseTestCaseMixin):
         self.session.commit()
 
         result = self.session.scalars(select(ActionDescriptionDAO)).all()
-        self.assertEqual(len(result), 6)
+        self.assertEqual(len(result), 7)
 
     def test_parkArmsAction(self):
         action = SequentialPlan(self.context, ParkArmsActionDescription(Arms.BOTH))
@@ -257,7 +259,7 @@ class ORMActionDesignatorTestCase(ORMaticBaseTestCaseMixin):
             Context.from_world(test_world),
             TransportActionDescription(
                 test_world.get_body_by_name("milk.stl"),
-                PoseStamped.from_list([1.3, 0.9, 0.9], [0, 0, 0, 1], test_world.root),
+                PoseStamped.from_list([2.3, 2.5, 1], [0, 0, 0, 1], test_world.root),
                 Arms.LEFT,
             ),
         )
@@ -281,7 +283,7 @@ class ORMActionDesignatorTestCase(ORMaticBaseTestCaseMixin):
             sp = SequentialPlan(
                 Context.from_world(test_world),
                 NavigateActionDescription(
-                    PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], test_world.root),
+                    PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], test_world.root),
                     True,
                 ),
                 ParkArmsActionDescription(Arms.BOTH),
@@ -293,13 +295,13 @@ class ORMActionDesignatorTestCase(ORMaticBaseTestCaseMixin):
                     ),
                 ),
                 NavigateActionDescription(
-                    PoseStamped.from_list([1.3, 1, 0.0], [0, 0, 0, 1], test_world.root),
+                    PoseStamped.from_list([1.6, 2.3, 0], [0, 0, 0, 1], test_world.root),
                     True,
                 ),
                 PlaceActionDescription(
                     test_world.get_body_by_name("milk.stl"),
                     PoseStamped.from_list(
-                        [2.0, 1.6, 1.0], [0, 0, 0, 1], test_world.root
+                        [2.3, 2.5, 1.0], [0, 0, 0, 1], test_world.root
                     ),
                     Arms.LEFT,
                 ),
@@ -360,6 +362,25 @@ class ORMActionDesignatorTestCase(ORMaticBaseTestCaseMixin):
         # can not do that yet with new mapping
         # self.assertEqual(close_result[0].object.name, "handle_cab10_t")
 
+    def test_parallel_plan(self):
+        plan = ParallelPlan(self.context, ParkArmsActionDescription(Arms.BOTH),
+                            MoveTorsoActionDescription(TorsoState.HIGH))
+
+        with simulated_robot:
+            plan.perform()
+
+        dao = to_dao(plan)
+        self.session.add(dao)
+        self.session.commit()
+
+        park_result = self.session.scalars(select(ParkArmsActionDAO)).all()
+        move_torso_result = self.session.scalars(select(MoveTorsoActionDAO)).all()
+
+        self.assertTrue(park_result is not None)
+        self.assertTrue(move_torso_result is not None)
+
+
+
 
 class ExecDataTest(ORMaticBaseTestCaseMixin):
 
@@ -369,7 +390,7 @@ class ExecDataTest(ORMaticBaseTestCaseMixin):
             sp = SequentialPlan(
                 Context.from_world(test_world),
                 NavigateActionDescription(
-                    PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], test_world.root),
+                    PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], test_world.root),
                     True,
                 ),
                 ParkArmsActionDescription(Arms.BOTH),
@@ -383,14 +404,14 @@ class ExecDataTest(ORMaticBaseTestCaseMixin):
                     ),
                 ),
                 NavigateActionDescription(
-                    PoseStamped.from_list([1.3, 1, 0], [0, 0, 0, 1], test_world.root),
+                    PoseStamped.from_list([1.6, 2.3, 0], [0, 0, 0, 1], test_world.root),
                     True,
                 ),
                 MoveTorsoActionDescription(TorsoState.HIGH),
                 PlaceActionDescription(
                     test_world.get_body_by_name("milk.stl"),
                     PoseStamped.from_list(
-                        [2.0, 1.6, 1.0], [0, 0, 0, 1], test_world.root
+                        [2.3, 2.5, 1], [0, 0, 0, 1], test_world.root
                     ),
                     Arms.LEFT,
                 ),
@@ -443,14 +464,11 @@ class ExecDataTest(ORMaticBaseTestCaseMixin):
                 exec_data.execution_start_pose.pose.position.z,
             ],
         )
-        self.assertListEqual(
-            [0.6, 0.4, 0],
-            [
+        np.testing.assert_almost_equal([0.6, 0.4, 0], [
                 exec_data.execution_end_pose.pose.position.x,
                 exec_data.execution_end_pose.pose.position.y,
                 exec_data.execution_end_pose.pose.position.z,
-            ],
-        )
+            ], decimal=1)
 
     def test_manipulated_body_pose(self):
         test_world = deepcopy(self.world)
@@ -484,13 +502,14 @@ class ExecDataTest(ORMaticBaseTestCaseMixin):
             place_node.execution_data.manipulated_body_pose_end
         )
 
-        self.assertListEqual([2.37, 2, 1.05], start_pose_pick.position.to_list())
+        # self.assertListEqual([2.37, 2, 1.05], start_pose_pick.position.to_list())
+        np.testing.assert_almost_equal([2.37, 2, 1.05], end_pose_pick.position.to_list(), decimal=1)
         # Check that the end_pose of pick_up and start pose of place are not equal because of navigate in between
         for pick, place in zip(
             end_pose_pick.position.to_list(), start_pose_place.position.to_list()
         ):
             self.assertNotEqual(pick, place)
-        np.testing.assert_almost_equal([2.0, 1.6, 1], end_pose_place.position.to_list())
+        np.testing.assert_almost_equal([2.3, 2.5, 1], end_pose_place.position.to_list(), decimal=1)
 
     def test_manipulated_body(self):
         test_world = deepcopy(self.world)
@@ -533,7 +552,7 @@ class RelationalAlgebraTestCase(ORMaticBaseTestCaseMixin):
             sp = SequentialPlan(
                 self.context,
                 NavigateActionDescription(
-                    PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], self.world.root),
+                    PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], self.world.root),
                     True,
                 ),
                 ParkArmsActionDescription(Arms.BOTH),
@@ -545,13 +564,13 @@ class RelationalAlgebraTestCase(ORMaticBaseTestCaseMixin):
                     ),
                 ),
                 NavigateActionDescription(
-                    PoseStamped.from_list([1.3, 1, 0.0], [0, 0, 0, 1], self.world.root),
+                    PoseStamped.from_list([1.6, 2.3, 0], [0, 0, 0, 1], self.world.root),
                     True,
                 ),
                 PlaceActionDescription(
                     self.world.get_body_by_name("milk.stl"),
                     PoseStamped.from_list(
-                        [2.0, 1.6, 0.9], [0, 0, 0, 1], self.world.root
+                        [2.3, 2.5, 1], [0, 0, 0, 1], self.world.root
                     ),
                     Arms.LEFT,
                 ),

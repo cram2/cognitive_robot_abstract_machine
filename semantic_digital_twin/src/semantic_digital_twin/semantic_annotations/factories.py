@@ -11,7 +11,6 @@ from krrood.entity_query_language.entity import (
     entity,
     not_,
     in_,
-    From,
     for_all,
 )
 from krrood.entity_query_language.quantify_entity import an

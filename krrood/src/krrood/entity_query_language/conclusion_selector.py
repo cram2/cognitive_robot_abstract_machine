@@ -3,12 +3,10 @@ from __future__ import annotations
 import typing
 from abc import ABC
 from dataclasses import dataclass, field
-from functools import lru_cache
-from typing_extensions import Dict, Optional, Iterable
+from typing_extensions import Dict, Optional, Iterable, Any
 
 from .cache_data import SeenSet
 from .conclusion import Conclusion
-from .hashed_data import HashedIterable, HashedValue
 from .rxnode import ColorLegend
 from .symbolic import (
     SymbolicExpression,
@@ -43,14 +41,12 @@ class ConclusionSelector(LogicalBinaryOperator, ABC):
         """
         if not conclusions:
             return
-        required_vars = HashedIterable()
+        required_var_ids = set()
         for conclusion in conclusions:
-            vars_ = conclusion._unique_variables_.filter(
-                lambda v: not isinstance(v.value, Literal)
-            )
-            required_vars.update(vars_)
+            vars_ = {v._id_ for v in conclusion._unique_variables_ if not isinstance(v, Literal)}
+            required_var_ids.update(vars_)
         required_output = {
-            k: v for k, v in output.bindings.items() if k in required_vars
+            k: v for k, v in output.bindings.items() if k in required_var_ids
         }
 
         if not self.concluded_before[not self._is_false_].check(required_output):
@@ -71,34 +67,9 @@ class ExceptIf(ConclusionSelector):
     the left branch's conclusions/outputs are excluded; otherwise, left flows through.
     """
 
-    @lru_cache(maxsize=None)
-    def _projection_(self, when_true: Optional[bool] = True) -> HashedIterable[int]:
-        """
-        Return the projection for ExceptIf operators.
-
-        Includes variables from both branches and their conclusions based on truth values.
-        """
-        projection = HashedIterable()
-
-        # When true, we need right's variables to check the exception condition
-        if when_true:
-            projection.update(self.right._unique_variables_)
-
-        # Include conclusions from both branches
-        for conclusion in self.left._conclusion_.union(self.right._conclusion_):
-            projection.update(conclusion._unique_variables_)
-
-        if self._parent_:
-            projection.update(self._parent_._projection_(when_true))
-
-        for conclusion in self._conclusion_:
-            projection.update(conclusion._unique_variables_)
-
-        return projection
-
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, HashedValue]] = None,
+        sources: Optional[Dict[int, Any]] = None,
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         """
@@ -106,7 +77,7 @@ class ExceptIf(ConclusionSelector):
         """
         self._eval_parent_ = parent
         # init an empty source if none is provided
-        sources = sources or HashedIterable()
+        sources = sources or {}
 
         # constrain left values by available sources
         left_values = self.left._evaluate__(sources, parent=self)
@@ -151,7 +122,7 @@ class Alternative(ElseIf, ConclusionSelector):
 
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, HashedValue]] = None,
+        sources: Optional[Dict[int, Any]] = None,
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         outputs = super()._evaluate__(sources, parent=parent)
@@ -173,7 +144,7 @@ class Next(EQLUnion, ConclusionSelector):
 
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, HashedValue]] = None,
+        sources: Optional[Dict[int, Any]] = None,
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         outputs = super()._evaluate__(sources, parent=parent)

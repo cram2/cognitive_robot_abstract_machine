@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from .utils import T
+
 """
 Cache utilities.
 
 This module provides caching datastructures and utilities.
 """
 from dataclasses import dataclass, field
-from typing_extensions import Dict
+from typing_extensions import Dict, Generic, Iterable, List
 
 
 @dataclass
@@ -82,3 +84,47 @@ class SeenSet:
         self.all_seen = False
         self.constraints.clear()
         self.exact.clear()
+
+
+@dataclass
+class ReEnterableLazyIterable(Generic[T]):
+    """
+    A wrapper for an iterable that allows multiple iterations over its elements,
+    materializing values as they are iterated over.
+    """
+
+    iterable: Iterable[T] = field(default_factory=list)
+    """
+    The iterable to wrap.
+    """
+    materialized_values: List[T] = field(default_factory=list)
+    """
+    The materialized values of the iterable.
+    """
+
+    def set_iterable(self, iterable):
+        """
+        Set the iterable and wrap it in a generator.
+
+        This is needed because of the weakref data we get from SymbolGraph. If we do `self.iterable = iterable` and
+        weakref instances die, the iterable would have None values for them. But if we wrap it in a generator,
+        they are actually removed, and the generator doesn't find them, which is the wanted behavior.
+        """
+        self.iterable = (v for v in iterable)
+
+    def __iter__(self):
+        """
+        Iterate over the values, materializing them as they are iterated over.
+
+        :return: An iterator over the values.
+        """
+        yield from self.materialized_values
+        for v in self.iterable:
+            self.materialized_values.append(v)
+            yield v
+
+    def __bool__(self):
+        """
+        Return True if the iterable has values, False otherwise.
+        """
+        return bool(self.materialized_values) or bool(self.iterable)

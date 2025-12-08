@@ -48,8 +48,6 @@ class MoveJointsMotion(BaseMotion):
 
     def perform(self):
         return
-        pm_manager = ProcessModuleManager().get_manager(self.robot_view)
-        return pm_manager.move_joints().execute(self)
 
     @property
     def _motion_chart(self):
@@ -64,11 +62,12 @@ class LookingMotion(BaseMotion):
     """
 
     target: PoseStamped
+    """
+    Target pose to look at
+    """
 
     def perform(self):
         return
-        pm_manager = ProcessModuleManager().get_manager(self.robot_view)
-        return pm_manager.looking().execute(self)
 
     @property
     def _motion_chart(self):

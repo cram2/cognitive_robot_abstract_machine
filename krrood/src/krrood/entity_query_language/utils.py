@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 """
 Utilities for hashing, rendering, and general helpers used by the
 symbolic query engine.
@@ -18,7 +16,7 @@ try:
 except ImportError:
     Source = None
 
-from typing_extensions import Set, Any, List, Type
+from typing_extensions import Set, Any, TypeVar, List
 
 
 class IDGenerator:
@@ -61,7 +59,7 @@ def generate_bindings(child_vars_items, sources):
     backtracking strategy with early pruning.
 
     The input mirrors Variable._child_vars_.items(): a sequence of (name, var)
-    pairs. Each yielded item is a mapping: name -> {var_id: HashedValue}.
+    pairs. Each yielded item is a mapping: name -> {var_id: value}.
 
     The function evaluates each child variable against the current partial
     binding "sources" so constraints can prune the search space early.
@@ -80,9 +78,9 @@ def generate_bindings(child_vars_items, sources):
 
     ordered = sorted(list(child_vars_items), key=score)
 
-    acc = dict(sources)  # var_id -> HashedValue
+    acc = dict(sources)  # var_id -> value
     initially_bound = set(acc.keys())
-    selected = {}  # name -> {var_id: HashedValue}
+    selected = {}  # name -> {var_id: value}
 
     def dfs(i: int):
         if i == len(ordered):
@@ -158,21 +156,4 @@ def make_set(value: Any) -> Set:
     return set(value) if is_iterable(value) else {value}
 
 
-@dataclass(eq=False)
-class ALL:
-    """
-    Sentinel that compares equal to any other value.
-
-    This is used to signal wildcard matches in hashing/containment logic.
-    """
-
-    def __eq__(self, other):
-        """Always return True."""
-        return True
-
-    def __hash__(self):
-        """Hash based on object identity to remain unique as a sentinel."""
-        return hash(id(self))
-
-
-All = ALL()
+T = TypeVar("T")

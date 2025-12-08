@@ -3486,17 +3486,34 @@ class RootedSemanticAnnotationDAO(
     }
 
 
-class AbstractRobotDAO(
+class AgentDAO(
     RootedSemanticAnnotationDAO,
+    DataAccessObject[semantic_digital_twin.world_description.world_entity.Agent],
+):
+
+    __tablename__ = "AgentDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RootedSemanticAnnotationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "AgentDAO",
+        "inherit_condition": database_id == RootedSemanticAnnotationDAO.database_id,
+    }
+
+
+class AbstractRobotDAO(
+    AgentDAO,
     DataAccessObject[semantic_digital_twin.robots.abstract_robot.AbstractRobot],
 ):
 
     __tablename__ = "AbstractRobotDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(RootedSemanticAnnotationDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
+        ForeignKey(AgentDAO.database_id), primary_key=True, use_existing_column=True
     )
 
     torso_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
@@ -3542,7 +3559,24 @@ class AbstractRobotDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "AbstractRobotDAO",
-        "inherit_condition": database_id == RootedSemanticAnnotationDAO.database_id,
+        "inherit_condition": database_id == AgentDAO.database_id,
+    }
+
+
+class HumanDAO(
+    AgentDAO,
+    DataAccessObject[semantic_digital_twin.world_description.world_entity.Human],
+):
+
+    __tablename__ = "HumanDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(AgentDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HumanDAO",
+        "inherit_condition": database_id == AgentDAO.database_id,
     }
 
 

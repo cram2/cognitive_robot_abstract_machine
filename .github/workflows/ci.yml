@@ -19,6 +19,7 @@ jobs:
           - lib: giskardpy
           - lib: krrood
           - lib: semantic_digital_twin
+          - lib: pycram
     uses: ./.github/workflows/ci_reusable.yml
     with:
       lib: ${{ matrix.lib }}

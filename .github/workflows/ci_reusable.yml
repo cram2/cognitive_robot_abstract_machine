@@ -12,10 +12,19 @@ on:
         type: string
 
 jobs:
+  to-lowercase:
+    runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
+    steps:
+      - id: lowercase
+        run: |
+          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
   test:
+    needs: to-lowercase
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository }}:jazzy
+      image: ${{ needs.to-lowercase.outputs.repo_lowercase }}
     steps:
       - uses: actions/checkout@v4
         with:

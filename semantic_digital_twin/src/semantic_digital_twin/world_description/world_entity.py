@@ -93,8 +93,10 @@ class WorldEntity(Symbol):
 
     def add_to_world(self, world: World):
         self._world = world
+        world._world_entity_hash_table[hash(self)] = self
 
     def remove_from_world(self):
+        self._world._world_entity_hash_table.pop(hash(self), None)
         self._world = None
 
 

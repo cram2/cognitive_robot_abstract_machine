@@ -7,15 +7,14 @@ from functools import lru_cache
 from typing_extensions import Any, Optional, List, Dict, Iterable
 
 from .enums import RDREdge
-from .hashed_data import HashedValue
 from .rxnode import ColorLegend
 from .symbolic import (
     SymbolicExpression,
-    T,
     Variable,
     OperationResult,
     ResultQuantifier,
 )
+from .utils import T
 
 
 @dataclass(eq=False)
@@ -73,7 +72,7 @@ class Set(Conclusion[T]):
 
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, HashedValue]] = None,
+        sources: Optional[Dict[int, Any]] = None,
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         self._eval_parent_ = parent
@@ -95,7 +94,7 @@ class Add(Conclusion[T]):
 
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, HashedValue]] = None,
+        sources: Optional[Dict[int, Any]] = None,
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         self._eval_parent_ = parent
@@ -103,17 +102,3 @@ class Add(Conclusion[T]):
         v = next(iter(self.value._evaluate__(sources, parent=self)))[self.value._id_]
         sources[self.var._var_._id_] = v
         yield OperationResult(sources, False, self)
-
-
-@dataclass(eq=False)
-class Infer(ResultQuantifier[T]):
-
-    def __post_init__(self):
-        super().__post_init__()
-        for v in self._child_._selected_variables:
-            v._is_inferred_ = True
-        self._node_.wrap_subtree = False
-
-    @property
-    def _plot_color_(self) -> ColorLegend:
-        return ColorLegend("Infer", "#EAC9FF")
