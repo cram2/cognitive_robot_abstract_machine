@@ -1157,9 +1157,7 @@ class World:
     def get_actuator_by_id(self, id: UUID) -> Actuator:
         return self._get_world_entity_by_hash(hash(id))
 
-    def _get_world_entity_by_hash(
-        self, entity_hash: int
-    ) -> GenericWorldEntity:
+    def _get_world_entity_by_hash(self, entity_hash: int) -> GenericWorldEntity:
         """
         Retrieve a WorldEntity by its hash.
 
@@ -1175,7 +1173,10 @@ class World:
     def is_semantic_annotation_in_world(
         self, semantic_annotation: SemanticAnnotation
     ) -> bool:
-        return semantic_annotation._world == self and semantic_annotation in self.semantic_annotations
+        return (
+            semantic_annotation._world == self
+            and semantic_annotation in self.semantic_annotations
+        )
 
     def is_body_in_world(self, body: Body) -> bool:
         return self._is_world_entity_with_hash_in_world_from_iterable(hash(body))
