@@ -4,7 +4,12 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Optional, Callable
 
 from ..spatial_types import Point3
-from ..world_description.world_entity import SemanticAnnotation, Body, Region
+from ..world_description.world_entity import (
+    SemanticAnnotation,
+    Body,
+    Region,
+    Connection,
+)
 
 
 @dataclass(eq=False)
@@ -29,29 +34,30 @@ class Effect(SemanticAnnotation):
     goal_value: float
     """Target value for the property."""
 
-    tolerance: float = 0.1
+    tolerance: float = 0.05
     """Acceptable deviation from goal value."""
 
     def is_achieved(self) -> bool:
         """Check if the effect is achieved given the current property value."""
-        current_value = self.property_getter(self.target_object)
-        return abs(current_value - self.goal_value) <= self.tolerance
+        return abs(self.current_value - self.goal_value) <= self.tolerance
+
+    @property
+    def current_value(self) -> float:
+        return self.property_getter(self.target_object)
 
 
 class OpenEffect(Effect):
     def is_achieved(self) -> bool:
-        current_value = self.property_getter(self.target_object)
-        return current_value >= self.goal_value - self.tolerance
+        return self.current_value >= self.goal_value - self.tolerance
 
 
 class ClosedEffect(Effect):
     def is_achieved(self) -> bool:
-        current_value = self.property_getter(self.target_object)
-        return current_value <= self.goal_value + self.tolerance
+        return self.current_value <= self.goal_value + self.tolerance
 
 
 @dataclass(eq=False)
-class Task(SemanticAnnotation):
+class TaskRequest(SemanticAnnotation):
     """
     Represents a high-level task request.
 
@@ -94,17 +100,11 @@ class Motion(SemanticAnnotation):
             Case3: causes(motion?, effect?) -> Union of Case2 for all known motions and Case1 for all known effects.
     """
 
-    trajectory: Optional[List[Point3]]
-    """Planned trajectory points in 3D space."""
+    trajectory: List[float]
+    """Planned trajectory points in actuator space."""
 
-    actuator: Optional[Body]
-    """The body that must be manipulated (e.g., handle, object)."""
-
-    expected_effect: Optional[Effect]
-    """The effect this motion is expected to cause."""
-
-    duration: Optional[float]
-    """Expected duration of motion in seconds."""
+    actuator: Connection
+    """The connection that must be manipulated."""
 
 
 """

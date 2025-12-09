@@ -22,6 +22,7 @@ from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
 from semantic_digital_twin.reasoning.predicates_base import (
     CausesOpening,
     SatisfiesRequest,
+    Causes,
 )
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -36,7 +37,7 @@ from semantic_digital_twin.semantic_annotations.task_effect_motion import (
     OpenEffect,
     ClosedEffect,
     Motion,
-    Task,
+    TaskRequest,
 )
 from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
 from semantic_digital_twin.world_description.connections import (
@@ -191,47 +192,48 @@ class ContainerDemo:
         with self.world.modify_world():
             self.world.add_semantic_annotations(effects)
 
-        effect = let(Effect, domain=self.world.semantic_annotations)
-        # motion = let(Motion, domain=None)
-        # query = an(
-        #     entity(
-        #         motion,
-        #         CausesOpening(effect=effect_open, motion=motion, environment=self.world),
-        #     )
-        # )
-        # motion = let(Motion, domain=None)
-        # query = an(
-        #     entity(
-        #         motion,
-        #         predicate := CausesOpening(effect=effect_open, motion=motion, environment=self.world),
-        #     )
-        # )
-        #
-        # with query:
-        #     Add(motion, predicate.motion)
-        #
-        # print(list(query.evaluate()))
-
         # --- Minimal drop-in example combining satisfies_request with causes ---
         # Create one opening and one closing task
-        open_task = Task(task_type="open")
-        close_task = Task(task_type="close")
-
-        # Bind symbols for krrood: choose the opening task for the query
-        task_sym = let(Task, domain=[close_task])
+        open_task = TaskRequest(task_type="open")
+        close_task = TaskRequest(task_type="close")
+        #
+        # # Bind symbols for krrood: choose the opening task for the query
+        task_sym = let(TaskRequest, domain=[open_task, close_task])
         effect_sym = let(Effect, domain=effects)
 
         # Predicates: compatibility and motion generation
         satisfies = SatisfiesRequest(task=task_sym, effect=effect_sym)
         causes_opening = CausesOpening(effect=effect_sym, environment=self.world)
 
-        # Ask for one motion that causes an effect satisfying the opening task
+        # query for one motion that causes an effect satisfying the opening task
         one_motion = an(entity(causes_opening.motion, satisfies, causes_opening))
-        print(list(one_motion.evaluate()))
+        results = list(one_motion.evaluate())
+        print(f"len {len(results)} result: {results[0].trajectory}")
 
-        # causes_opening = CausesOpening(effect=effect_open, environment=self.world)
-        # assert causes_opening.__call__() is True
-        # print(causes_opening.motion)
+        # ----------
+        # motion will be a state trajectory for a specific DoF. Could be extended to WorldState Trajectory?
+        motion = Motion(
+            trajectory=[0.0, 0.1, 0.2],
+            actuator=containers[0].container.body.parent_connection,
+        )
+        motion_sym = let(Motion, domain=[motion])
+        effect_sym = let(Effect, domain=effects)
+
+        # query for the effect of an specific motion
+        # query = an(entity(effect_sym, Causes(effect=effect_sym, motion=motion_sym, environment=self.world)))
+        # results = list(query.evaluate())
+        # print(f"len {len(results)} results: {results}")
+
+        # Query for taskRequest and effect of an specific motion
+        query = a(
+            set_of(
+                [effect_sym, task_sym],
+                Causes(effect=effect_sym, motion=motion_sym, environment=self.world),
+                SatisfiesRequest(task=task_sym, effect=effect_sym),
+            )
+        )
+        results = list(query.evaluate())
+        print(f"len {len(results)} results: {results[0]}")
 
     def cleanup(self):
         """
