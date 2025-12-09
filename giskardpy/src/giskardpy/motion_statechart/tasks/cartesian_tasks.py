@@ -345,26 +345,42 @@ class CartesianPositionVelocityLimit(Task):
 
 @dataclass
 class CartesianRotationVelocityLimit(Task):
-    root_link: Body = field(kw_only=True)
-    tip_link: Body = field(kw_only=True)
-    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
-    max_velocity: Optional[float] = None
+    """
+    This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
+    slowing down the system noticeably.
+    """
 
-    def __post_init__(self):
-        """
-        See CartesianVelocityLimit
-        """
-        r_R_c = context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
-        ).to_rotation()
+    root_link: KinematicStructureEntity = field(kw_only=True)
+    """root link of the kinematic chain"""
+    tip_link: KinematicStructureEntity = field(kw_only=True)
+    """tip link of the kinematic chain"""
+    max_angular_velocity: float = field(default=0.5, kw_only=True)
+    """in m/s"""
+    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
 
-        r_R_c = context.world.compose_forward_kinematics_expression(
+    def build(self, context: BuildContext) -> NodeArtifacts:
+        artifacts = NodeArtifacts()
+
+        root_R_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         ).to_rotation_matrix()
 
-        self.add_rotational_velocity_limit(
-            frame_R_current=r_R_c, max_velocity=self.max_velocity, weight=self.weight
+        artifacts.constraints.add_rotational_velocity_limit(
+            frame_R_current=root_R_tip,
+            max_velocity=self.max_angular_velocity,
+            weight=self.weight,
         )
+
+        _, angle = root_R_tip.to_axis_angle()
+        angle_variables: list[PositionVariable] = angle.free_variables()
+        angle_velocities = [v.dof.variables.velocity for v in angle_variables]
+        angle_dot = cas.Expression(angle).total_derivative(
+            angle_variables, angle_velocities
+        )
+
+        artifacts.observation = cas.abs(angle_dot) <= self.max_angular_velocity
+
+        return artifacts
 
 
 @dataclass(eq=False, repr=False)

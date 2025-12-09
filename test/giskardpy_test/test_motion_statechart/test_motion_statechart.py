@@ -1564,7 +1564,7 @@ class TestVelocityTasks:
             tight_cycles >= 2 * loose_cycles
         ), f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
 
-        low_weight_limit = CartesianVelocityLimit(
+        low_weight_limit = limit_cls(
             root_link=root, tip_link=tip, weight=DefaultWeights.WEIGHT_BELOW_CA
         )
         self._test_observation_variable(
@@ -1604,7 +1604,7 @@ class TestVelocityTasks:
             tight_cycles >= 2 * loose_cycles
         ), f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
 
-        low_weight_limit = CartesianVelocityLimit(
+        low_weight_limit = limit_cls(
             root_link=root, tip_link=tip, weight=DefaultWeights.WEIGHT_BELOW_CA
         )
         self._test_observation_variable(
@@ -1617,6 +1617,9 @@ class TestVelocityTasks:
             pr2_world, CartesianPositionVelocityLimit
         )
         self._test_cartesian_rotation_velocity_limit(pr2_world, CartesianVelocityLimit)
+        self._test_cartesian_rotation_velocity_limit(
+            pr2_world, CartesianRotationVelocityLimit
+        )
 
 
 def test_transition_triggers():
