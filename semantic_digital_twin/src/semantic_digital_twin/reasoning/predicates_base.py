@@ -1,13 +1,8 @@
 """
-Abstract Base Class for Task-Achieving Body Motion Predicates.
+Classes for Task-Achieving Body Motion Predicates.
 
-This module defines the interface for implementing the three predicates from the
-Law of Task-Achieving Body Motion paper. Different problem domains can provide
-their own implementations:
-
-- Motion planning: Execute motion statecharts to observe effects
-- Fluid simulation: Use probabilistic models for pouring tasks
-- Language/AI: Use LLM or learned models to reason about task-effect relationships
+This module defines the three predicates from the
+Body Motion Problem. Different problem domains might need to overwrite an implementation:
 """
 
 from abc import ABC, abstractmethod
@@ -71,6 +66,11 @@ class Causes(Predicate):
 
 @dataclass
 class CausesOpening(Causes):
+    """
+    Overwrites the Causes Predicate for case 1 where a motion needs to be calculated that satisfies a given effect.
+    The calculated motion is written to the motion field.
+    This is a special implementation for the problem domain of opening and closing containers.
+    """
 
     motion: Optional[Motion] = field(default=None, init=False)
 
@@ -149,10 +149,7 @@ class CausesOpening(Causes):
 class SatisfiesRequest(Predicate):
     """
     Check whether an effect satisfies a task request.
-
-    The predicate is a pure compatibility check. The query engine provides
-    the task and effect combinations and this predicate returns True only
-    if the given effect satisfies the given task.
+    For the sake of demonstration a placeholder mapping is used
     """
 
     task: TaskRequest
@@ -161,13 +158,9 @@ class SatisfiesRequest(Predicate):
     def __call__(self, *args, **kwargs) -> bool:
         return self._effect_satisfies_task(self.task, self.effect)
 
-    # --- helpers ---
-    def _effect_satisfies_task(self, task: TaskRequest, effect: Effect) -> bool:
-        # If the task specifies a concrete desired effect, enforce compatibility
-        if task.desired_effect is not None:
-            return self._effects_compatible(task.desired_effect, effect)
-
-        # Fallback: map by task type to effect kind
+    @staticmethod
+    def _effect_satisfies_task(task: TaskRequest, effect: Effect) -> bool:
+        # Placeholder logic
         task_type = (task.task_type or "").lower()
         if task_type == "open":
             return isinstance(effect, OpenedEffect)
@@ -175,32 +168,18 @@ class SatisfiesRequest(Predicate):
             return isinstance(effect, ClosedEffect)
         return False
 
-    @staticmethod
-    def _effects_compatible(desired: Effect, actual: Effect) -> bool:
-        # same intent via class match
-        if type(desired) is not type(actual):
-            return False
 
-        # same target if desired specifies one
-        desired_target = getattr(desired, "target_object", None)
-        if desired_target is not None and desired_target is not getattr(
-            actual, "target_object", None
-        ):
-            return False
+@dataclass
+class CanExecute(Predicate):
+    """
+    Check whether a Robot can execute a motion.
+    TODO: Implementation
+    For the sake of demonstration the simplest way would be to place hte gripper of the robot at the handle
+    and execute the Open motion statechart again. Repeat for all grippers.
+    """
 
-        # directional goal check for known effects
-        if isinstance(desired, OpenedEffect):
-            current = actual.property_getter(actual.target_object)
-            return current >= desired.goal_value - max(
-                getattr(desired, "tolerance", 0.0), getattr(actual, "tolerance", 0.0)
-            )
-        if isinstance(desired, ClosedEffect):
-            current = actual.property_getter(actual.target_object)
-            return current <= desired.goal_value + max(
-                getattr(desired, "tolerance", 0.0), getattr(actual, "tolerance", 0.0)
-            )
+    motion: Motion
+    robot: AbstractRobot
 
-        # generic tolerance check
-        current = actual.property_getter(actual.target_object)
-        tol = max(getattr(desired, "tolerance", 0.0), getattr(actual, "tolerance", 0.0))
-        return abs(current - desired.goal_value) <= tol
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
