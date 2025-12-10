@@ -6,7 +6,7 @@ from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from semantic_digital_twin.reasoning.predicates_base import (
-    CausesOpening,
+    CausesMotion,
     SatisfiesRequest,
     Causes,
 )
@@ -29,7 +29,7 @@ from semantic_digital_twin.reasoning.effect_execution_models import RunMSCModel
 
 class TestBodyMotionProblem:
     @staticmethod
-    def _attach_open_msc_model_in_place(
+    def _get_effect_execution_model_for_open_goal(
         handle_body, actuator, goal_value
     ) -> RunMSCModel:
         msc = MotionStatechart()
@@ -58,7 +58,7 @@ class TestBodyMotionProblem:
                 target_object=drawer,
                 goal_value=0.3,
                 property_getter=property_getter,
-                model=self._attach_open_msc_model_in_place(
+                model=self._get_effect_execution_model_for_open_goal(
                     drawer.handle.body, drawer.container.body.parent_connection, 0.3
                 ),
             )
@@ -66,7 +66,7 @@ class TestBodyMotionProblem:
                 target_object=drawer,
                 goal_value=0.0,
                 property_getter=property_getter,
-                model=self._attach_open_msc_model_in_place(
+                model=self._get_effect_execution_model_for_open_goal(
                     drawer.handle.body, drawer.container.body.parent_connection, 0.0
                 ),
             )
@@ -87,7 +87,7 @@ class TestBodyMotionProblem:
 
         # Define Predicates for the query
         satisfies_request = SatisfiesRequest(task=task_sym, effect=effect_sym)
-        causes_opening = CausesOpening(effect=effect_sym, environment=apartment_world)
+        causes_opening = CausesMotion(effect=effect_sym, environment=apartment_world)
 
         query = an(
             set_of(
@@ -150,7 +150,7 @@ class TestBodyMotionProblem:
 
         # Define Predicates for the query
         satisfies_request = SatisfiesRequest(task=task_sym, effect=effect_sym)
-        causes_opening = CausesOpening(effect=effect_sym, environment=apartment_world)
+        causes_opening = CausesMotion(effect=effect_sym, environment=apartment_world)
 
         # Query for motions that can be causes in the current world based on defined task requests, effects
         # and the world state. Only OpenedEffects should be available, as all drawers are closed
@@ -194,7 +194,7 @@ class TestBodyMotionProblem:
             domain=[TaskRequest(task_type="open"), TaskRequest(task_type="close")],
         )
 
-        causes = CausesOpening(effect=effect_sym, environment=apartment_world)
+        causes = CausesMotion(effect=effect_sym, environment=apartment_world)
 
         query = an(
             set_of(

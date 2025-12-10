@@ -66,11 +66,11 @@ class Causes(Predicate):
 
 
 @dataclass
-class CausesOpening(Causes):
+class CausesMotion(Causes):
     """
     Overwrites the Causes Predicate for case 1 where a motion needs to be calculated that satisfies a given effect.
     The calculated motion is written to the motion field.
-    This is a special implementation for the problem domain of opening and closing containers.
+    This is a special implementation for calculating motions from motion statecharts.
     """
 
     motion: Optional[Motion] = field(default=None, init=False)
@@ -88,30 +88,6 @@ class CausesOpening(Causes):
             return success
 
         return False
-
-    def _extract_container_info(self, annotation: SemanticAnnotation):
-        """
-        Extracts body, handle, and joint info from a semantic annotation.
-        """
-        if isinstance(annotation, Drawer):
-            body = annotation.container.body
-            handle = annotation.handle
-        elif isinstance(annotation, Fridge):
-            body = annotation.door.body
-            handle = annotation.door.handle
-        elif isinstance(annotation, Door):
-            body = annotation.body
-            handle = annotation.handle
-        else:
-            return None
-
-        joint = None
-        if body.parent_connection:
-            connection = body.parent_connection
-            if isinstance(connection, (PrismaticConnection, RevoluteConnection)):
-                joint = connection
-
-        return handle, joint
 
     def _execute_and_record_trajectory(self, executor: Executor, msc: MotionStatechart):
         timeout = 500
