@@ -13,7 +13,7 @@ from .utils import T
 def an(
         entity_: Union[SetOf[T], Entity[T], T, Iterable[T], Type[T], Match[T]],
         quantification: Optional[ResultQuantificationConstraint] = None,
-) -> Union[T]:
+) -> Union[An[T], T]:
     """
     Select a single element satisfying the given entity description.
 
