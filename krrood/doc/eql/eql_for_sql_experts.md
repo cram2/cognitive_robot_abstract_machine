@@ -56,7 +56,7 @@ from dataclasses import dataclass, field
 from typing_extensions import List
 
 from krrood.entity_query_language.entity import let, Symbol, entity, and_, in_, contains, set_of
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity_result_processors import an
 
 
 @dataclass

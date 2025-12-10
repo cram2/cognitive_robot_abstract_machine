@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing_extensions import List
 
 from krrood.entity_query_language.entity import entity, or_, Symbol, let, not_, and_
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity_result_processors import an
 
 
 @dataclass

@@ -29,7 +29,7 @@ You can pass either a variable created with `let(...)` directly, or wrap it with
 from dataclasses import dataclass
 from typing_extensions import List
 
-import krrood.entity_query_language.entity as eql
+import krrood.entity_query_language.entity_result_processors as eql
 from krrood.entity_query_language.entity import entity, let, contains
 
 

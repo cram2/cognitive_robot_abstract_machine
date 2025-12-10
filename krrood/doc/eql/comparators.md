@@ -24,7 +24,7 @@ from krrood.entity_query_language.entity import (
     entity, let, Symbol,
     in_, contains, not_, and_, or_,
 )
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity_result_processors import an
 
 
 @dataclass

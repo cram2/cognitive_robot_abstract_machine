@@ -87,16 +87,21 @@ class SelectableMatchExpression(CanBehaveLikeAVariable[T]):
         """
         return self._match_expression_.evaluate()
 
-    def __getattr__(self, item):
-        if item not in self._match_expression_.attribute_matches:
-            attr = Attribute(_child_=self._var_, _attr_name_=item, _owner_class_=self._match_expression_.type)
-            attribute_expression = AttributeMatch(parent=self._match_expression_, attr_name=item, variable=attr)
-            self._match_expression_.attribute_matches[item] = attribute_expression
-        if item not in self._selectable_attribute_matches_:
-            attribute_expression = self._match_expression_.attribute_matches[item]
+    def __getattr__(self, name):
+        # Prevent debugger/private attribute lookups from being interpreted as symbolic attributes
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(
+                f"{self.__class__.__name__} object has no attribute {name}"
+            )
+        if name not in self._match_expression_.attribute_matches:
+            attr = Attribute(_child_=self._var_, _attr_name_=name, _owner_class_=self._match_expression_.type)
+            attribute_expression = AttributeMatch(parent=self._match_expression_, attr_name=name, variable=attr)
+            self._match_expression_.attribute_matches[name] = attribute_expression
+        if name not in self._selectable_attribute_matches_:
+            attribute_expression = self._match_expression_.attribute_matches[name]
             selectable_attribute_expression = SelectableMatchExpression(_match_expression_=attribute_expression)
-            self._selectable_attribute_matches_[item] = selectable_attribute_expression
-        return self._selectable_attribute_matches_[item]
+            self._selectable_attribute_matches_[name] = selectable_attribute_expression
+        return self._selectable_attribute_matches_[name]
 
     def _evaluate__(self, sources: Optional[Dict[int, Any]] = None, parent: Optional[SymbolicExpression] = None) -> \
             Iterable[OperationResult]:
@@ -105,10 +110,16 @@ class SelectableMatchExpression(CanBehaveLikeAVariable[T]):
 
     @property
     def _name_(self) -> str:
-        return self._match_expression_.name
+        return f"Selectable({self._match_expression_.name})"
 
     def _all_variable_instances_(self) -> List[Variable]:
         return self._var_._all_variable_instances_
+
+    def __str__(self):
+        return self._name_
+
+    def __repr__(self):
+        return self._name_
 
 
 @dataclass
@@ -294,7 +305,7 @@ class Match(AbstractMatchExpression[T]):
         """
         Implemented to raise the appropriate error.
         """
-        if item.startswith("_"):
+        if item.startswith("__"):
             raise AttributeError(item)
         raise UnquantifiedMatchError(self)
 
@@ -377,7 +388,7 @@ class Match(AbstractMatchExpression[T]):
         """
         return self.expression.evaluate()
 
-    @cached_property
+    @property
     def expression(self) -> Union[ResultQuantifier[T], T]:
         """
         Return the entity expression corresponding to the match query.
@@ -399,6 +410,12 @@ class Match(AbstractMatchExpression[T]):
     @property
     def name(self) -> str:
         return f"Match({self.type})"
+
+    def __repr__(self):
+        return self.name
+
+    def __str__(self):
+        return self.name
 
 
 @dataclass(eq=False)
@@ -555,6 +572,12 @@ class AttributeMatch(AbstractMatchExpression[T]):
     @property
     def name(self) -> str:
         return f"{self.parent.name}.{self.attr_name}"
+
+    def __repr__(self):
+        return self.name
+
+    def __str__(self):
+        return self.name
 
 
 def matching(

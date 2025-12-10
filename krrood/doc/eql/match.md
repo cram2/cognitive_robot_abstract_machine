@@ -36,19 +36,19 @@ from krrood.entity_query_language.predicate import HasType
 
 
 # --- Model -------------------------------------------------------------
-@dataclass
+@dataclass(unsafe_hash=True)
 class Body(Symbol):
     name: str
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Handle(Body):
     ...
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Container(Body):
-    ...
+    size: int = 1
 
 
 @dataclass
@@ -65,8 +65,9 @@ class FixedConnection(Connection):
 @dataclass
 class World:
     connections: List[Connection]
+    bodies: List[Body]
     
-@dataclass
+@dataclass(unsafe_hash=True)
 class Drawer(Symbol):
     handle: Handle
     container: Container
@@ -82,14 +83,15 @@ SymbolGraph()
 # Build a small world with a few connections
 c1 = Container("Container1")
 h1 = Handle("Handle1")
-other_c = Container("ContainerX")
+other_c = Container("ContainerX", size=2)
 other_h = Handle("HandleY")
 
 world = World(
     connections=[
         FixedConnection(parent=c1, child=h1),
         FixedConnection(parent=other_c, child=h1),
-    ]
+    ],
+    bodies = [c1, h1, other_c, other_h]
 )
 ```
 
