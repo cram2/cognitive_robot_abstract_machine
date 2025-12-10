@@ -1248,7 +1248,7 @@ class Variable(CanBehaveLikeAVariable[T]):
 
     @property
     def _is_iterable_(self):
-        return bool(self._domain_)
+        return is_iterable(next(iter(self._domain_), None))
 
     @property
     def _plot_color_(self) -> ColorLegend:
