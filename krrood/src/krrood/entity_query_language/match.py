@@ -16,7 +16,7 @@ from .entity import (
     entity,
     exists,
 )
-from .failures import NoneWrappedFieldError
+from .failures import NoneWrappedFieldError, WrongSelectableType
 from .predicate import HasType
 from .rxnode import RWXNode
 from .symbolic import (
@@ -539,8 +539,16 @@ def select(
     if not variables:
         raise ValueError("select() requires at least one variable to be provided.")
     for variable in variables:
-        variable._match_expression_.set_as_selected()
-    return variables[0]._match_expression_.root
+        if isinstance(variable, SelectableMatchExpression):
+            variable._match_expression_.set_as_selected()
+        elif isinstance(variable, AbstractMatchExpression):
+            variable.set_as_selected()
+        else:
+            raise WrongSelectableType(type(variable), [SelectableMatchExpression, AbstractMatchExpression])
+    if isinstance(variables[0], SelectableMatchExpression):
+        return variables[0]._match_expression_.root
+    else:
+        return variables[0].root
 
 
 def entity_matching(

@@ -96,6 +96,19 @@ class UsageError(DataclassException):
 
 
 @dataclass
+class WrongSelectableType(UsageError):
+    """
+    Raised when a wrong variable type is given to the select() statement.
+    """
+    wrong_variable_type: Type
+    expected_types: List[Type]
+
+    def __post_init__(self):
+        self.message = f"Select expects one of {self.expected_types}, instead {self.wrong_variable_type} was given."
+        super().__post_init__()
+
+
+@dataclass
 class LiteralConditionError(UsageError):
     """
     Raised when a literal (i.e. a non-variable) condition is given to the query.
