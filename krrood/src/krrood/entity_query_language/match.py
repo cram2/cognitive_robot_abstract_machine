@@ -287,7 +287,7 @@ class Match(AbstractMatchExpression[T]):
 
     def update_fields(
             self,
-            variable: Optional[CanBehaveLikeAVariable] = None,
+            variable: Optional[Selectable] = None,
             parent: Optional[Match] = None,
     ):
         """
