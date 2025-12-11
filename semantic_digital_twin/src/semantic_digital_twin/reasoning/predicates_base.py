@@ -5,17 +5,13 @@ This module defines the three predicates from the
 Body Motion Problem. Different problem domains might need to overwrite an implementation:
 """
 
-from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Optional
 from dataclasses import dataclass, field
 
 from giskardpy.executor import Executor
-from giskardpy.motion_statechart.goals.open_close import Open
-from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from krrood.entity_query_language.predicate import Predicate
 from ..robots.abstract_robot import AbstractRobot
-from ..semantic_annotations.semantic_annotations import Drawer, Fridge, Door
 from ..semantic_annotations.task_effect_motion import (
     TaskRequest,
     Effect,
@@ -24,9 +20,6 @@ from ..semantic_annotations.task_effect_motion import (
     ClosedEffect,
 )
 from ..world import World
-from ..world_description.connections import PrismaticConnection, RevoluteConnection
-from ..world_description.world_entity import SemanticAnnotation
-from .effect_execution_models import RunMSCModel
 
 
 @dataclass
@@ -80,9 +73,10 @@ class CausesMotion(Causes):
             return False
 
         # If an execution model is provided on the effect, delegate to it.
-        model = getattr(self.effect, "model", None)
-        if model is not None and hasattr(model, "run"):
-            motion, success = model.run(self.effect, self.environment)
+        if self.effect.execution_model:
+            motion, success = self.effect.execution_model.run(
+                self.effect, self.environment
+            )
             if motion is not None:
                 self.motion = motion
             return success

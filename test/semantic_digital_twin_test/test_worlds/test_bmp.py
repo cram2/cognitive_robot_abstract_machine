@@ -21,10 +21,10 @@ from semantic_digital_twin.semantic_annotations.task_effect_motion import (
     TaskRequest,
     Effect,
     Motion,
+    RunMSCModel,
 )
 from semantic_digital_twin.testing import apartment_world
 from semantic_digital_twin.world import World
-from semantic_digital_twin.reasoning.effect_execution_models import RunMSCModel
 
 
 class TestBodyMotionProblem:
@@ -58,7 +58,7 @@ class TestBodyMotionProblem:
                 target_object=drawer,
                 goal_value=0.3,
                 property_getter=property_getter,
-                model=self._get_effect_execution_model_for_open_goal(
+                execution_model=self._get_effect_execution_model_for_open_goal(
                     drawer.handle.body, drawer.container.body.parent_connection, 0.3
                 ),
             )
@@ -66,7 +66,7 @@ class TestBodyMotionProblem:
                 target_object=drawer,
                 goal_value=0.0,
                 property_getter=property_getter,
-                model=self._get_effect_execution_model_for_open_goal(
+                execution_model=self._get_effect_execution_model_for_open_goal(
                     drawer.handle.body, drawer.container.body.parent_connection, 0.0
                 ),
             )
@@ -186,12 +186,12 @@ class TestBodyMotionProblem:
         Attach the MSC as an effect model (RunMSCModel) to that inferred Effect, and
         then use CausesOpening to execute. No pre-defined Effect domain is used.
         """
-        effects, _, _, drawers = self._extend_world(apartment_world)
+        effects, open_task, close_task, drawers = self._extend_world(apartment_world)
 
         effect_sym = let(Effect, domain=effects)
         task_sym = let(
             TaskRequest,
-            domain=[TaskRequest(task_type="open"), TaskRequest(task_type="close")],
+            domain=[open_task, close_task],
         )
 
         causes = CausesMotion(effect=effect_sym, environment=apartment_world)
