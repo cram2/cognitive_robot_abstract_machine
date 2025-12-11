@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Region,
@@ -59,7 +59,9 @@ class DetectAction(ActionDescription):
             ).bounding_box
             if self.region
             else BoundingBox(
-                origin=TransformationMatrix(reference_frame=self.robot_view.root),
+                origin=HomogeneousTransformationMatrix(
+                    reference_frame=self.robot_view.root
+                ),
                 min_x=-1,
                 min_y=-1,
                 min_z=0,

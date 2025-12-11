@@ -12,7 +12,9 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.orm.ormatic_interface import *
@@ -86,7 +88,7 @@ def test_table_world(session, table_world):
 
 
 def test_insert(session):
-    origin = TransformationMatrix.from_xyz_rpy(1, 2, 3, 1, 2, 3)
+    origin = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 1, 2, 3)
     scale = Scale(1.0, 1.0, 1.0)
     color = Color(0.0, 1.0, 1.0)
     shape1 = Box(origin=origin, scale=scale, color=color)

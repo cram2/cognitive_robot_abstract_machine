@@ -1,7 +1,9 @@
 import numpy as np
 
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.testing import world_setup_simple
 
 
@@ -24,7 +26,8 @@ def test_create_segmentation_mask(world_setup_simple):
     )
 
     seg = rt.create_segmentation_mask(
-        TransformationMatrix(camera_pose, reference_frame=world.root), resolution=256
+        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        resolution=256,
     )
     assert seg.shape == (256, 256)  # Assuming a standard resolution
 
@@ -51,7 +54,8 @@ def test_create_depth_map(world_setup_simple):
     )
 
     depth_map = rt.create_depth_map(
-        TransformationMatrix(camera_pose, reference_frame=world.root), resolution=512
+        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        resolution=512,
     )
     assert depth_map is not None
     assert depth_map[0, 0] == -1  # Assuming no objects are hit at the upper left corner

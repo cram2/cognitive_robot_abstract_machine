@@ -58,7 +58,7 @@ class Open(Goal):
                     name="hold handle",
                     root_link=self.environment_link,
                     tip_link=self.tip_link,
-                    goal_pose=cas.TransformationMatrix(
+                    goal_pose=cas.HomogeneousTransformationMatrix(
                         reference_frame=self.tip_link, child_frame=self.tip_link
                     ),
                     weight=self.weight,
@@ -116,7 +116,7 @@ class Close(Open):
                     name="hold handle",
                     root_link=self.environment_link,
                     tip_link=self.tip_link,
-                    goal_pose=cas.TransformationMatrix(
+                    goal_pose=cas.HomogeneousTransformationMatrix(
                         reference_frame=self.tip_link, child_frame=self.tip_link
                     ),
                     weight=self.weight,

@@ -11,7 +11,12 @@ from typing_extensions import List
 from typing_extensions import Optional
 
 from ..datastructures.prefixed_name import PrefixedName
-from ..spatial_types import RotationMatrix, Vector3, Point3, TransformationMatrix
+from ..spatial_types import (
+    RotationMatrix,
+    Vector3,
+    Point3,
+    HomogeneousTransformationMatrix,
+)
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import Quaternion
 from ..world import World
@@ -180,7 +185,7 @@ class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
 
 
 @dataclass
-class TransformationMatrixMapping(AlternativeMapping[TransformationMatrix]):
+class TransformationMatrixMapping(AlternativeMapping[HomogeneousTransformationMatrix]):
     position: Point3
     rotation: Quaternion
     reference_frame: Optional[KinematicStructureEntity] = field(
@@ -189,7 +194,7 @@ class TransformationMatrixMapping(AlternativeMapping[TransformationMatrix]):
     child_frame: Optional[KinematicStructureEntity] = field(init=False, default=None)
 
     @classmethod
-    def create_instance(cls, obj: TransformationMatrix):
+    def create_instance(cls, obj: HomogeneousTransformationMatrix):
         position = obj.to_position()
         rotation = obj.to_quaternion()
         result = cls(position=position, rotation=rotation)
@@ -198,8 +203,8 @@ class TransformationMatrixMapping(AlternativeMapping[TransformationMatrix]):
 
         return result
 
-    def create_from_dao(self) -> TransformationMatrix:
-        return TransformationMatrix.from_point_rotation_matrix(
+    def create_from_dao(self) -> HomogeneousTransformationMatrix:
+        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=self.position,
             rotation_matrix=RotationMatrix.from_quaternion(self.rotation),
             reference_frame=None,

@@ -76,7 +76,7 @@ class ActiveConnection(Connection):
             name=PrefixedName.from_json(data["name"]),
             parent=parent,
             child=child,
-            parent_T_connection_expression=cas.TransformationMatrix.from_json(
+            parent_T_connection_expression=cas.HomogeneousTransformationMatrix.from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),
             frozen_for_collision_avoidance=data["frozen_for_collision_avoidance"],
@@ -162,7 +162,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
             name=PrefixedName.from_json(data["name"]),
             parent=parent,
             child=child,
-            parent_T_connection_expression=cas.TransformationMatrix.from_json(
+            parent_T_connection_expression=cas.HomogeneousTransformationMatrix.from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),
             frozen_for_collision_avoidance=data["frozen_for_collision_avoidance"],
@@ -336,7 +336,7 @@ class PrismaticConnection(ActiveConnection1DOF):
         super().add_to_world(world)
 
         translation_axis = self.axis * self.dof.variables.position
-        self._kinematics = cas.TransformationMatrix.from_xyz_rpy(
+        self._kinematics = cas.HomogeneousTransformationMatrix.from_xyz_rpy(
             x=translation_axis[0],
             y=translation_axis[1],
             z=translation_axis[2],
@@ -353,7 +353,7 @@ class RevoluteConnection(ActiveConnection1DOF):
     def add_to_world(self, world: World):
         super().add_to_world(world)
 
-        self._kinematics = cas.TransformationMatrix.from_xyz_axis_angle(
+        self._kinematics = cas.HomogeneousTransformationMatrix.from_xyz_axis_angle(
             axis=self.axis,
             angle=self.dof.variables.position,
             child_frame=self.child,
@@ -408,7 +408,7 @@ class Connection6DoF(Connection):
             name=PrefixedName.from_json(data["name"]),
             parent=parent,
             child=child,
-            parent_T_connection_expression=cas.TransformationMatrix.from_json(
+            parent_T_connection_expression=cas.HomogeneousTransformationMatrix.from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),
             x_id=from_json(data["x_id"]),
@@ -461,10 +461,12 @@ class Connection6DoF(Connection):
             z_init=self.qz.variables.position,
             w_init=self.qw.variables.position,
         ).to_rotation_matrix()
-        self._kinematics = cas.TransformationMatrix.from_point_rotation_matrix(
-            point=parent_P_child,
-            rotation_matrix=parent_R_child,
-            child_frame=self.child,
+        self._kinematics = (
+            cas.HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                point=parent_P_child,
+                rotation_matrix=parent_R_child,
+                child_frame=self.child,
+            )
         )
 
     @classmethod
@@ -474,7 +476,9 @@ class Connection6DoF(Connection):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         name: Optional[PrefixedName] = None,
-        parent_T_connection_expression: Optional[cas.TransformationMatrix] = None,
+        parent_T_connection_expression: Optional[
+            cas.HomogeneousTransformationMatrix
+        ] = None,
         *args,
         **kwargs,
     ) -> Self:
@@ -535,15 +539,15 @@ class Connection6DoF(Connection):
         return [self.x, self.y, self.z, self.qx, self.qy, self.qz, self.qw]
 
     @property
-    def origin(self) -> cas.TransformationMatrix:
+    def origin(self) -> cas.HomogeneousTransformationMatrix:
         return super().origin
 
     @origin.setter
     def origin(
-        self, transformation: Union[NpMatrix4x4, cas.TransformationMatrix]
+        self, transformation: Union[NpMatrix4x4, cas.HomogeneousTransformationMatrix]
     ) -> None:
-        if not isinstance(transformation, cas.TransformationMatrix):
-            transformation = cas.TransformationMatrix(data=transformation)
+        if not isinstance(transformation, cas.HomogeneousTransformationMatrix):
+            transformation = cas.HomogeneousTransformationMatrix(data=transformation)
         position = transformation.to_position().to_np()
         orientation = transformation.to_rotation_matrix().to_quaternion().to_np()
         self._world.state[self.x.id].position = position[0]
@@ -632,7 +636,7 @@ class OmniDrive(ActiveConnection, HasUpdateState):
             name=PrefixedName.from_json(data["name"], **kwargs),
             parent=parent,
             child=child,
-            parent_T_connection_expression=cas.TransformationMatrix.from_json(
+            parent_T_connection_expression=cas.HomogeneousTransformationMatrix.from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),
             x_id=from_json(data["x_id"]),
@@ -674,15 +678,15 @@ class OmniDrive(ActiveConnection, HasUpdateState):
 
     def add_to_world(self, world: World):
         super().add_to_world(world)
-        odom_T_bf = cas.TransformationMatrix.from_xyz_rpy(
+        odom_T_bf = cas.HomogeneousTransformationMatrix.from_xyz_rpy(
             x=self.x.variables.position,
             y=self.y.variables.position,
             yaw=self.yaw.variables.position,
         )
-        bf_T_bf_vel = cas.TransformationMatrix.from_xyz_rpy(
+        bf_T_bf_vel = cas.HomogeneousTransformationMatrix.from_xyz_rpy(
             x=self.x_velocity.variables.position, y=self.y_velocity.variables.position
         )
-        bf_vel_T_bf = cas.TransformationMatrix.from_xyz_rpy(
+        bf_vel_T_bf = cas.HomogeneousTransformationMatrix.from_xyz_rpy(
             x=0,
             y=0,
             z=0,
@@ -700,7 +704,9 @@ class OmniDrive(ActiveConnection, HasUpdateState):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         name: Optional[PrefixedName] = None,
-        parent_T_connection_expression: Optional[cas.TransformationMatrix] = None,
+        parent_T_connection_expression: Optional[
+            cas.HomogeneousTransformationMatrix
+        ] = None,
         translation_velocity_limits: float = 0.6,
         rotation_velocity_limits: float = 0.5,
         *args,
@@ -809,12 +815,12 @@ class OmniDrive(ActiveConnection, HasUpdateState):
         state[self.y.id].position += y_velocity * dt
 
     @property
-    def origin(self) -> cas.TransformationMatrix:
+    def origin(self) -> cas.HomogeneousTransformationMatrix:
         return super().origin
 
     @origin.setter
     def origin(
-        self, transformation: Union[NpMatrix4x4, cas.TransformationMatrix]
+        self, transformation: Union[NpMatrix4x4, cas.HomogeneousTransformationMatrix]
     ) -> None:
         """
         Overwrites the origin of the connection.
@@ -822,7 +828,7 @@ class OmniDrive(ActiveConnection, HasUpdateState):
         :param parent_T_child:
         """
         if isinstance(transformation, np.ndarray):
-            transformation = cas.TransformationMatrix(data=transformation)
+            transformation = cas.HomogeneousTransformationMatrix(data=transformation)
         position = transformation.to_position()
         roll, pitch, yaw = transformation.to_rotation_matrix().to_rpy()
         self._world.state[self.x.id].position = position.x.to_np()

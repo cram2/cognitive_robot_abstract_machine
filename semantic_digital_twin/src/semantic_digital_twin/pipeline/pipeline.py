@@ -7,7 +7,7 @@ from typing import List, Callable
 import numpy as np
 
 from ..spatial_types import Point3
-from ..spatial_types.spatial_types import TransformationMatrix
+from ..spatial_types.spatial_types import HomogeneousTransformationMatrix
 from ..semantic_annotations.factories import SemanticAnnotationFactory
 from ..world import World
 from ..world_description.geometry import TriangleMesh, FileMesh
@@ -101,8 +101,10 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
                     if m.vertices.shape[0] > 0:
                         m.vertices -= center
 
-            old_origin_T_new_origin = TransformationMatrix.from_point_rotation_matrix(
-                Point3(*center)
+            old_origin_T_new_origin = (
+                HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                    Point3(*center)
+                )
             )
 
             if body.parent_connection:

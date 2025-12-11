@@ -21,7 +21,9 @@ from semantic_digital_twin.pipeline.pipeline import (
     CenterLocalGeometryAndPreserveWorldPose,
     BodyFactoryReplace,
 )
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -35,14 +37,14 @@ class PipelineTestCase(unittest.TestCase):
         cls.dummy_world = World()
         b1 = Body(name=PrefixedName("body1", "krrood_test"))
         b2 = Body(name=PrefixedName("body2", "krrood_test"))
-        c1 = FixedConnection(b1, b2, TransformationMatrix())
+        c1 = FixedConnection(b1, b2, HomogeneousTransformationMatrix())
         with cls.dummy_world.modify_world():
             cls.dummy_world.add_body(b1)
             cls.dummy_world.add_body(b2)
             cls.dummy_world.add_connection(c1)
 
         cls.fbx_path = os.path.join(
-            resource_filename('semantic_digital_twin', '../../'),
+            resource_filename("semantic_digital_twin", "../../"),
             "resources",
             "fbx",
             "test_dressers.fbx",
@@ -59,7 +61,9 @@ class PipelineTestCase(unittest.TestCase):
                 world.add_body(b1)
                 return world
 
-        pipeline = Pipeline(steps=[TestStep(body_name=PrefixedName("body1", "krrood_test"))])
+        pipeline = Pipeline(
+            steps=[TestStep(body_name=PrefixedName("body1", "krrood_test"))]
+        )
 
         dummy_world = World()
 
@@ -83,7 +87,7 @@ class PipelineTestCase(unittest.TestCase):
 
         original_bounding_boxes = [
             body.collision.as_bounding_box_collection_at_origin(
-                TransformationMatrix(reference_frame=world.root)
+                HomogeneousTransformationMatrix(reference_frame=world.root)
             ).bounding_boxes[0]
             for body in world.bodies_with_enabled_collision
         ]
@@ -107,7 +111,7 @@ class PipelineTestCase(unittest.TestCase):
 
         new_bounding_boxes = [
             body.collision.as_bounding_box_collection_at_origin(
-                TransformationMatrix(reference_frame=centered_world.root)
+                HomogeneousTransformationMatrix(reference_frame=centered_world.root)
             ).bounding_boxes[0]
             for body in centered_world.bodies_with_enabled_collision
         ]

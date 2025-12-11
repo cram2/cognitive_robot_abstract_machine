@@ -17,7 +17,7 @@ class GraspSequence(Goal):
     tip_link: Body = field(kw_only=True)
     root_link: Body = field(kw_only=True)
     gripper_joint: PrefixedName = field(kw_only=True)
-    goal_pose: cas.TransformationMatrix = field(kw_only=True)
+    goal_pose: cas.HomogeneousTransformationMatrix = field(kw_only=True)
     max_velocity: float = 100
     weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 

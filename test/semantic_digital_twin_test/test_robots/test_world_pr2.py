@@ -9,7 +9,9 @@ from rustworkx import NoPathFound
 
 from semantic_digital_twin.reasoning.predicates import LeftOf
 from semantic_digital_twin.robots.hsrb import HSRB
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     PrismaticConnection,
@@ -149,7 +151,7 @@ def test_compute_fk_np_pr2_root_left_hand(pr2_world):
     root = pr2_world.get_kinematic_structure_entity_by_name("l_gripper_tool_frame")
 
     connection = pr2_world.get_connections_by_type(OmniDrive)[0]
-    connection.origin = TransformationMatrix.from_xyz_rpy(x=1, yaw=1)
+    connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, yaw=1)
 
     fk = pr2_world.compute_forward_kinematics_np(root, tip)
     np.testing.assert_array_almost_equal(
@@ -192,7 +194,7 @@ def test_compute_ik(pr2_world):
     fk = pr2_world.compute_forward_kinematics_np(bf, eef)
     fk[0, 3] -= 0.2
     joint_state = pr2_world.compute_inverse_kinematics(
-        bf, eef, TransformationMatrix(fk, reference_frame=bf)
+        bf, eef, HomogeneousTransformationMatrix(fk, reference_frame=bf)
     )
     for joint, state in joint_state.items():
         pr2_world.state[joint.id].position = state
@@ -208,7 +210,7 @@ def test_compute_ik_max_iter(pr2_world):
     fk[2, 3] = 10
     with pytest.raises(MaxIterationsException):
         pr2_world.compute_inverse_kinematics(
-            bf, eef, TransformationMatrix(fk, reference_frame=bf)
+            bf, eef, HomogeneousTransformationMatrix(fk, reference_frame=bf)
         )
 
 
@@ -219,7 +221,7 @@ def test_compute_ik_unreachable(pr2_world):
     fk[2, 3] = -1
     with pytest.raises(UnreachableException):
         pr2_world.compute_inverse_kinematics(
-            bf, eef, TransformationMatrix(fk, reference_frame=bf)
+            bf, eef, HomogeneousTransformationMatrix(fk, reference_frame=bf)
         )
 
 

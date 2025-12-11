@@ -24,7 +24,11 @@ from trimesh.visual import TextureVisuals
 
 from ..callbacks.callback import ModelChangeCallback
 from ..datastructures.prefixed_name import PrefixedName
-from ..spatial_types.spatial_types import TransformationMatrix, Point3, Quaternion
+from ..spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+    Quaternion,
+)
 from ..world import World
 from ..world_description.connections import (
     RevoluteConnection,
@@ -57,7 +61,7 @@ from ..world_description.world_modification import (
 )
 
 
-def cas_pose_to_list(pose: TransformationMatrix) -> List[float]:
+def cas_pose_to_list(pose: HomogeneousTransformationMatrix) -> List[float]:
     """
     Converts a CAS TransformationMatrix to a list of 7 floats (position + quaternion).
 

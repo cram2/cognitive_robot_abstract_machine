@@ -10,7 +10,7 @@ from ..datastructures.prefixed_name import PrefixedName
 from ..exceptions import ParsingError, WorldEntityNotFoundError
 from ..spatial_types import spatial_types as cas
 from ..spatial_types.derivatives import Derivatives, DerivativeMap
-from ..spatial_types.spatial_types import TransformationMatrix, Vector3
+from ..spatial_types.spatial_types import HomogeneousTransformationMatrix, Vector3
 from ..utils import (
     suppress_stdout_stderr,
     hacky_urdf_parser_fix,
@@ -199,7 +199,7 @@ class URDFParser:
         translation_offset = getattr(joint.origin, "xyz", [0, 0, 0])
         rotation_offset = getattr(joint.origin, "rpy", [0, 0, 0])
 
-        parent_T_connection = cas.TransformationMatrix.from_xyz_rpy(
+        parent_T_connection = cas.HomogeneousTransformationMatrix.from_xyz_rpy(
             x=translation_offset[0],
             y=translation_offset[1],
             z=translation_offset[2],
@@ -286,7 +286,7 @@ class URDFParser:
         )
         for i, geom in enumerate(geometry):
             params = (*(geom.origin.xyz + geom.origin.rpy),) if geom.origin else ()
-            origin_transform = TransformationMatrix.from_xyz_rpy(
+            origin_transform = HomogeneousTransformationMatrix.from_xyz_rpy(
                 *params, reference_frame=body
             )
             if isinstance(geom.geometry, urdfpy.Box):

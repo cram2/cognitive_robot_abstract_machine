@@ -20,7 +20,7 @@ from ..spatial_computations.ik_solver import (
 )
 from ..spatial_computations.raytracer import RayTracer
 from ..spatial_types import Vector3
-from ..spatial_types.spatial_types import TransformationMatrix
+from ..spatial_types.spatial_types import HomogeneousTransformationMatrix
 from ..world import World
 from ..world_description.connections import FixedConnection
 from ..world_description.geometry import TriangleMesh
@@ -80,7 +80,7 @@ def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
     cam_pose[:3, 3] = camera.root.global_pose.to_np()[:3, 3]
 
     seg = rt.create_segmentation_mask(
-        TransformationMatrix(cam_pose, reference_frame=camera._world.root),
+        HomogeneousTransformationMatrix(cam_pose, reference_frame=camera._world.root),
         resolution=256,
         min_dist=0.2,
     )
@@ -113,7 +113,9 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     # get camera pose
     camera_pose = np.eye(4, dtype=float)
     camera_pose[:3, 3] = camera.root.global_pose.to_np()[:3, 3]
-    camera_pose = TransformationMatrix(camera_pose, reference_frame=camera._world.root)
+    camera_pose = HomogeneousTransformationMatrix(
+        camera_pose, reference_frame=camera._world.root
+    )
 
     # create a world only containing the target body
     world_without_occlusion = World()
@@ -159,7 +161,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     return bodies
 
 
-def reachable(pose: TransformationMatrix, root: Body, tip: Body) -> bool:
+def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> bool:
     """
     Checks if a manipulator can reach a given position.
     This is determined by inverse kinematics.
@@ -196,12 +198,12 @@ def is_supported_by(
         return False
     bounding_box_supported_body = (
         supported_body.collision.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=supported_body)
+            HomogeneousTransformationMatrix(reference_frame=supported_body)
         ).event
     )
     bounding_box_supporting_body = (
         supporting_body.collision.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=supported_body)
+            HomogeneousTransformationMatrix(reference_frame=supported_body)
         ).event
     )
 
@@ -268,7 +270,7 @@ class SpatialRelation(Symbol, ABC):
 @dataclass
 class ViewDependentSpatialRelation(SpatialRelation, ABC):
 
-    point_of_semantic_annotation: TransformationMatrix
+    point_of_semantic_annotation: HomogeneousTransformationMatrix
     """
     The reference spot from where to look at the bodies.
     """

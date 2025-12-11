@@ -16,7 +16,7 @@ class DebugGoal(Task):
         p = cas.Point3(1, 0, 0, reference_frame=context.world.root)
         context.add_debug_expression("p", p)
 
-        pose = cas.TransformationMatrix.from_xyz_rpy(
+        pose = cas.HomogeneousTransformationMatrix.from_xyz_rpy(
             y=1, reference_frame=context.world.root
         )
         context.add_debug_expression("pose", pose)

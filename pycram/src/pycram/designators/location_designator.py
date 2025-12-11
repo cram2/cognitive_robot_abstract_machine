@@ -27,7 +27,9 @@ from scipy.spatial import ConvexHull
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types import Point3
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import BoundingBox
@@ -1292,8 +1294,8 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
 
         robot = world.get_semantic_annotations_by_type(AbstractRobot)[0]
         robot_pose = robot.root.global_pose
-        robot.root.parent_connection.origin = TransformationMatrix.from_xyz_quaternion(
-            100, 100, 0
+        robot.root.parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_quaternion(100, 100, 0)
         )
 
         test = world.ray_tracer.ray_test(rays_start, rays_end)

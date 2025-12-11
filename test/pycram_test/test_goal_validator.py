@@ -1,5 +1,5 @@
 import numpy as np
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 from pycram.tf_transformations import quaternion_from_euler
 from typing_extensions import Optional, List
@@ -34,13 +34,13 @@ class GoalTestCase(ApartmentWorldTestCase):
     def setUp(self):
         super().setUp()
         self.robot_view.root.parent_connection.origin = (
-            TransformationMatrix.from_xyz_quaternion()
+            HomogeneousTransformationMatrix.from_xyz_quaternion()
         )
         self.world.get_body_by_name("milk.stl").parent_connection.origin = (
-            TransformationMatrix.from_xyz_quaternion(2.2, 2, 1)
+            HomogeneousTransformationMatrix.from_xyz_quaternion(2.2, 2, 1)
         )
         self.world.get_body_by_name("breakfast_cereal.stl").parent_connection.origin = (
-            TransformationMatrix.from_xyz_quaternion(2.2, 1.8, 1)
+            HomogeneousTransformationMatrix.from_xyz_quaternion(2.2, 1.8, 1)
         )
 
 
@@ -71,7 +71,7 @@ class TestGoalValidator(GoalTestCase):
         self.assertAlmostEqual(goal_validator.current_error.tolist()[0], 0.5, places=5)
         self.assertAlmostEqual(goal_validator.current_error.tolist()[1], 0, places=5)
         self.world.get_body_by_name("milk.stl").parent_connection.origin = (
-            TransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix.from_xyz_rpy(
                 2.5, 2.4, 1, reference_frame=self.world.root
             )
         )
@@ -110,7 +110,7 @@ class TestGoalValidator(GoalTestCase):
         self.assertEqual(goal_validator.actual_percentage_of_goal_achieved, 0)
         self.assertAlmostEqual(float(goal_validator.current_error), 0.8)
         self.world.get_body_by_name("breakfast_cereal.stl").parent_connection.origin = (
-            TransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix.from_xyz_rpy(
                 3, 1.8, 1, reference_frame=self.world.root
             )
         )
@@ -148,7 +148,7 @@ class TestGoalValidator(GoalTestCase):
         self.assertEqual(goal_validator.actual_percentage_of_goal_achieved, 0)
         self.assertEqual(goal_validator.current_error, [np.pi / 2])
         self.world.get_body_by_name("breakfast_cereal.stl").parent_connection.origin = (
-            TransformationMatrix.from_xyz_quaternion(
+            HomogeneousTransformationMatrix.from_xyz_quaternion(
                 quat_x=cereal_goal_orientation[0],
                 quat_y=cereal_goal_orientation[1],
                 quat_z=cereal_goal_orientation[2],
@@ -512,7 +512,7 @@ class TestGoalValidator(GoalTestCase):
         for percent in [0.5, 1]:
             current_position_goal = [0.0, 1.0 * percent, 0.0]
             self.world.get_body_by_name("base_footprint").parent_connection.origin = (
-                TransformationMatrix.from_xyz_rpy(*current_position_goal)
+                HomogeneousTransformationMatrix.from_xyz_rpy(*current_position_goal)
             )
             self.assertTrue(
                 np.allclose(
@@ -584,7 +584,7 @@ class TestGoalValidator(GoalTestCase):
         for percent in [0.5, 1]:
             current_orientation_goal = orientation_goal * percent
             self.world.get_body_by_name("base_footprint").parent_connection.origin = (
-                TransformationMatrix.from_xyz_rpy(
+                HomogeneousTransformationMatrix.from_xyz_rpy(
                     pitch=current_orientation_goal[0],
                     roll=current_orientation_goal[1],
                     yaw=current_orientation_goal[2],

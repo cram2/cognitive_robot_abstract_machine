@@ -59,7 +59,7 @@ class PrePushDoor(Goal):
             door_P_tip, door_V_v2, door_V_v1
         )
 
-        root_P_nearest_in_rotated_door = cas.TransformationMatrix(
+        root_P_nearest_in_rotated_door = cas.HomogeneousTransformationMatrix(
             root_T_door
         ) @ cas.Point3.from_iterable(door_P_nearest)
 

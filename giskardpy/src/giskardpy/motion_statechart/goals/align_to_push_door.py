@@ -71,12 +71,14 @@ class AlignToPushDoor(Goal):
         door_R_door_rotated = cas.RotationMatrix.from_axis_angle(
             axis=object_V_object_rotation_axis, angle=desired_angle
         )
-        door_T_door_rotated = cas.TransformationMatrix(door_R_door_rotated)
+        door_T_door_rotated = cas.HomogeneousTransformationMatrix(door_R_door_rotated)
         # as the root_T_door is already pointing to a completely rotated door, we invert desired angle to get to the
         # intermediate point
         door_rotated_P_top = door_T_door_rotated.inverse() @ door_P_intermediate_point
 
-        root_P_top = cas.TransformationMatrix(root_T_door_expr) @ door_rotated_P_top
+        root_P_top = (
+            cas.HomogeneousTransformationMatrix(root_T_door_expr) @ door_rotated_P_top
+        )
 
         minimum_angle_to_push_door = joint_limit[1] / 4
 

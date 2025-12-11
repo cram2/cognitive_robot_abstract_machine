@@ -89,7 +89,7 @@ from semantic_digital_twin.semantic_annotations.factories import (
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.spatial_types import (
-    TransformationMatrix,
+    HomogeneousTransformationMatrix,
     Vector3,
     FloatVariable,
 )
@@ -1029,10 +1029,10 @@ def test_set_seed_configuration(pr2_world):
 def test_set_seed_odometry(pr2_world):
     msc = MotionStatechart()
 
-    goal = TransformationMatrix.from_xyz_rpy(
+    goal = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1, y=-1, z=1, roll=1, pitch=1, yaw=1, reference_frame=pr2_world.root
     )
-    expected = TransformationMatrix.from_xyz_rpy(
+    expected = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1, y=-1, yaw=1, reference_frame=pr2_world.root
     )
 
@@ -1111,7 +1111,9 @@ def test_revolute_joint(pr2_world):
 def test_cart_goal_1eef(pr2_world: World):
     tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
     root = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
-    tip_goal = TransformationMatrix.from_xyz_quaternion(pos_x=-0.2, reference_frame=tip)
+    tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=-0.2, reference_frame=tip
+    )
 
     msc = MotionStatechart()
     cart_goal = CartesianPose(
@@ -1140,7 +1142,7 @@ def test_long_goal(pr2_world: World):
                 tip_link=pr2_world.get_kinematic_structure_entity_by_name(
                     "base_footprint"
                 ),
-                goal_pose=TransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=50, reference_frame=pr2_world.root
                 ),
             ),
@@ -1187,10 +1189,12 @@ def test_cart_goal_sequence_at_build(pr2_world: World):
     tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
     root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
 
-    tip_goal1 = TransformationMatrix.from_xyz_quaternion(
+    tip_goal1 = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=-0.2, reference_frame=tip
     )
-    tip_goal2 = TransformationMatrix.from_xyz_quaternion(pos_x=0.2, reference_frame=tip)
+    tip_goal2 = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=0.2, reference_frame=tip
+    )
 
     msc = MotionStatechart()
     cart_goal1 = CartesianPose(
@@ -1232,10 +1236,12 @@ def test_cart_goal_sequence_on_start(pr2_world: World):
     tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
     root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
 
-    tip_goal1 = TransformationMatrix.from_xyz_quaternion(
+    tip_goal1 = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=-0.2, reference_frame=tip
     )
-    tip_goal2 = TransformationMatrix.from_xyz_quaternion(pos_x=0.2, reference_frame=tip)
+    tip_goal2 = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=0.2, reference_frame=tip
+    )
 
     msc = MotionStatechart()
     cart_goal1 = CartesianPose(
@@ -1916,7 +1922,7 @@ class TestOpenClose:
                 parent=pr2_world.root,
                 child=door_world.root,
                 axis=-cas.Vector3.Z(),
-                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world.root
                 ),
             )
@@ -1935,7 +1941,7 @@ class TestOpenClose:
                         CartesianPose(
                             root_link=pr2_world.root,
                             tip_link=r_tip,
-                            goal_pose=TransformationMatrix.from_xyz_rpy(
+                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 yaw=np.pi, reference_frame=handle
                             ),
                         ),
@@ -1994,7 +2000,7 @@ class TestCollisionAvoidance:
                 CartesianPose(
                     root_link=box_bot_world.root,
                     tip_link=tip,
-                    goal_pose=TransformationMatrix.from_xyz_rpy(
+                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=1, reference_frame=box_bot_world.root
                     ),
                 ),
@@ -2040,7 +2046,9 @@ class TestCollisionAvoidance:
             env_connection = FixedConnection(
                 parent=root,
                 child=env2,
-                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(0.75),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    0.75
+                ),
             )
             box_bot_world.add_connection(env_connection)
 
@@ -2051,7 +2059,9 @@ class TestCollisionAvoidance:
             env_connection = FixedConnection(
                 parent=root,
                 child=env3,
-                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(1.25),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    1.25
+                ),
             )
             box_bot_world.add_connection(env_connection)
             env4 = Body(
@@ -2061,7 +2071,7 @@ class TestCollisionAvoidance:
             env_connection = FixedConnection(
                 parent=root,
                 child=env4,
-                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=1, y=-0.25
                 ),
             )
@@ -2073,7 +2083,7 @@ class TestCollisionAvoidance:
             env_connection = FixedConnection(
                 parent=root,
                 child=env5,
-                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=1, y=0.25
                 ),
             )
@@ -2086,7 +2096,7 @@ class TestCollisionAvoidance:
             Sequence(
                 [
                     SetOdometry(
-                        base_pose=TransformationMatrix.from_xyz_rpy(
+                        base_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                             x=1, reference_frame=box_bot_world.root
                         )
                     ),
@@ -2095,7 +2105,7 @@ class TestCollisionAvoidance:
                             CartesianPose(
                                 root_link=box_bot_world.root,
                                 tip_link=tip,
-                                goal_pose=TransformationMatrix.from_xyz_rpy(
+                                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                                     x=1, reference_frame=box_bot_world.root
                                 ),
                             ),

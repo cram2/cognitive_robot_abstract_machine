@@ -8,7 +8,7 @@ from scipy.spatial.transform import Rotation
 
 from ..datastructures.prefixed_name import PrefixedName
 from ..exceptions import WorldEntityNotFoundError
-from ..spatial_types import TransformationMatrix, RotationMatrix, Point3
+from ..spatial_types import HomogeneousTransformationMatrix, RotationMatrix, Point3
 from ..spatial_types import spatial_types as cas
 from ..spatial_types.derivatives import DerivativeMap
 from ..world import World, Body
@@ -174,7 +174,7 @@ class MJCFParser:
             body_quat = mujoco_body.quat
             body_quat /= numpy.linalg.norm(body_quat)
             parent_body_to_child_body_transform = (
-                TransformationMatrix.from_xyz_quaternion(
+                HomogeneousTransformationMatrix.from_xyz_quaternion(
                     pos_x=body_pos[0],
                     pos_y=body_pos[1],
                     pos_z=body_pos[2],
@@ -208,7 +208,7 @@ class MJCFParser:
         geom_pos = mujoco_geom.pos
         geom_quat = mujoco_geom.quat
         geom_quat /= numpy.linalg.norm(geom_quat)
-        origin_transform = TransformationMatrix.from_xyz_quaternion(
+        origin_transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=geom_pos[0],
             pos_y=geom_pos[1],
             pos_z=geom_pos[2],
@@ -263,7 +263,7 @@ class MJCFParser:
                     scale_mat[0, 0] = meshscale[0]
                     scale_mat[1, 1] = meshscale[1]
                     scale_mat[2, 2] = meshscale[2]
-                    scale_transform = TransformationMatrix(data=scale_mat)
+                    scale_transform = HomogeneousTransformationMatrix(data=scale_mat)
                     origin_transform = origin_transform @ scale_transform
                 if mujoco_material is None:
                     return FileMesh(
@@ -313,7 +313,7 @@ class MJCFParser:
             child_body_quat = mujoco_child_body.quat
             child_body_quat /= numpy.linalg.norm(child_body_quat)
             parent_body_to_child_body_transform = (
-                TransformationMatrix.from_xyz_quaternion(
+                HomogeneousTransformationMatrix.from_xyz_quaternion(
                     pos_x=child_body_pos[0],
                     pos_y=child_body_pos[1],
                     pos_z=child_body_pos[2],
@@ -323,10 +323,12 @@ class MJCFParser:
                     quat_z=child_body_quat[3],
                 )
             )
-            child_body_to_joint_transform = TransformationMatrix.from_xyz_quaternion(
-                pos_x=mujoco_joint.pos[0],
-                pos_y=mujoco_joint.pos[1],
-                pos_z=mujoco_joint.pos[2],
+            child_body_to_joint_transform = (
+                HomogeneousTransformationMatrix.from_xyz_quaternion(
+                    pos_x=mujoco_joint.pos[0],
+                    pos_y=mujoco_joint.pos[1],
+                    pos_z=mujoco_joint.pos[2],
+                )
             )
             parent_body_to_joint_transform = (
                 parent_body_to_child_body_transform @ child_body_to_joint_transform

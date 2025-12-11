@@ -6,7 +6,7 @@ from semantic_digital_twin.collision_checking.collision_detector import Collisio
 from semantic_digital_twin.collision_checking.trimesh_collision_detector import (
     TrimeshCollisionDetector,
 )
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.testing import world_setup_simple
 
 
@@ -20,7 +20,9 @@ def test_simple_collision(world_setup_simple):
 
 def test_no_collision(world_setup_simple):
     world, body1, body2, body3, body4 = world_setup_simple
-    body1.parent_connection.origin = TransformationMatrix.from_xyz_rpy(1, 1, 1)
+    body1.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        1, 1, 1
+    )
     tcd = TrimeshCollisionDetector(world)
     collision = tcd.check_collision_between_bodies(body1, body2)
     assert not collision
@@ -45,8 +47,12 @@ def test_collision_matrix(world_setup_simple):
 def test_all_collisions(world_setup_simple):
     world, body1, body2, body3, body4 = world_setup_simple
     tcd = TrimeshCollisionDetector(world)
-    body4.parent_connection.origin = TransformationMatrix.from_xyz_rpy(10, 10, 10)
-    body3.parent_connection.origin = TransformationMatrix.from_xyz_rpy(-10, -10, 10)
+    body4.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        10, 10, 10
+    )
+    body3.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        -10, -10, 10
+    )
 
     collisions = tcd.check_collisions(
         [

@@ -7,7 +7,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import (
     FloatVariable,
     Point3,
-    TransformationMatrix,
+    HomogeneousTransformationMatrix,
     Vector3,
 )
 
@@ -93,8 +93,8 @@ class AuxiliaryVariableManager:
 
     def create_transformation_matrix(
         self, name: PrefixedName, provider: Callable[[], np.ndarray] = None
-    ) -> TransformationMatrix:
-        transformation_matrix = TransformationMatrix()
+    ) -> HomogeneousTransformationMatrix:
+        transformation_matrix = HomogeneousTransformationMatrix()
         for row in range(3):
             for column in range(4):
                 auxiliary_variable = AuxiliaryVariable(

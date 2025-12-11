@@ -304,7 +304,7 @@ class DebugExpression:
         | cas.Vector3
         | cas.Quaternion
         | cas.RotationMatrix
-        | cas.TransformationMatrix
+        | cas.HomogeneousTransformationMatrix
     )
 
     color: Color = field(default_factory=lambda: Color(1, 0, 0, 1))

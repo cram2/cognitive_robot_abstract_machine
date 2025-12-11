@@ -18,7 +18,7 @@ from ..collision_checking.collision_detector import Collision, CollisionCheck
 from ..collision_checking.trimesh_collision_detector import TrimeshCollisionDetector
 from ..robots.abstract_robot import AbstractRobot, ParallelGripper
 from ..spatial_computations.raytracer import RayTracer
-from ..spatial_types import TransformationMatrix
+from ..spatial_types import HomogeneousTransformationMatrix
 from ..world_description.world_entity import Body
 
 
@@ -85,7 +85,7 @@ def robot_holds_body(robot: AbstractRobot, body: Body) -> bool:
 
 
 def blocking(
-    pose: TransformationMatrix,
+    pose: HomogeneousTransformationMatrix,
     root: Body,
     tip: Body,
 ) -> List[Collision]:

@@ -9,7 +9,7 @@ from semantic_digital_twin.adapters.procthor.procthor_semantic_annotations impor
     Bowl,
     Spoon,
 )
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 from pycram.datastructures.dataclasses import Context
@@ -37,7 +37,7 @@ bowl = STLParser(
 with world.modify_world():
     world.merge_world_at_pose(
         bowl,
-        TransformationMatrix.from_xyz_quaternion(
+        HomogeneousTransformationMatrix.from_xyz_quaternion(
             2.4, 2.2, 1, reference_frame=world.root
         ),
     )

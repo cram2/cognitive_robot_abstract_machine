@@ -75,7 +75,7 @@ class BaseTrajFollower(Goal):
         else:
             y = 0
         rot = self.current_traj_point(self.joint.yaw.name, t_in_s, derivative)
-        odom_T_base_footprint_goal = cas.TransformationMatrix.from_xyz_rpy(
+        odom_T_base_footprint_goal = cas.HomogeneousTransformationMatrix.from_xyz_rpy(
             x=x, y=y, yaw=rot
         )
         return odom_T_base_footprint_goal

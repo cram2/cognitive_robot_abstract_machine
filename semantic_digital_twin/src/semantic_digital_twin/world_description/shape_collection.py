@@ -15,7 +15,7 @@ from typing_extensions import TYPE_CHECKING
 
 from .geometry import Shape, BoundingBox
 from ..datastructures.variables import SpatialVariables
-from ..spatial_types import TransformationMatrix, Point3
+from ..spatial_types import HomogeneousTransformationMatrix, Point3
 
 if TYPE_CHECKING:
     from .world_entity import KinematicStructureEntity
@@ -114,7 +114,7 @@ class ShapeCollection(SubclassJSONSerializer):
         return concatenate(transformed_meshes)
 
     def as_bounding_box_collection_at_origin(
-        self, origin: TransformationMatrix
+        self, origin: HomogeneousTransformationMatrix
     ) -> BoundingBoxCollection:
         """
         Provides the bounding box collection for this entity given a transformation matrix as origin.
@@ -144,7 +144,7 @@ class ShapeCollection(SubclassJSONSerializer):
         :returns: A collection of bounding boxes in world-space coordinates.
         """
         return self.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=reference_frame)
+            HomogeneousTransformationMatrix(reference_frame=reference_frame)
         )
 
     def to_json(self) -> Dict[str, Any]:
@@ -264,7 +264,7 @@ class BoundingBoxCollection(ShapeCollection):
                 x.upper,
                 y.upper,
                 z.upper,
-                TransformationMatrix.from_xyz_quaternion(
+                HomogeneousTransformationMatrix.from_xyz_quaternion(
                     x.upper - (x.upper - x.lower) / 2,
                     y.upper - (y.upper - y.lower) / 2,
                     z.upper - (z.upper - z.lower) / 2,
@@ -350,7 +350,7 @@ class BoundingBoxCollection(ShapeCollection):
             max(all_x),
             max(all_y),
             max(all_z),
-            TransformationMatrix.from_xyz_quaternion(
+            HomogeneousTransformationMatrix.from_xyz_quaternion(
                 reference_frame=self.reference_frame
             ),
         )

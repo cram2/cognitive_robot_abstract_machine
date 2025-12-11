@@ -41,7 +41,7 @@ class InWorldSpace(MotionStatechartNode):
 class PoseReached(MotionStatechartNode):
     root_link: Body
     tip_link: Body
-    goal_pose: cas.TransformationMatrix
+    goal_pose: cas.HomogeneousTransformationMatrix
     position_threshold: float = 0.01
     orientation_threshold: float = 0.01
     absolute: bool = False

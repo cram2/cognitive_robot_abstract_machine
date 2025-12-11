@@ -144,7 +144,7 @@ class InverseKinematicsSolver:
         self,
         root: KinematicStructureEntity,
         tip: KinematicStructureEntity,
-        target: cas.TransformationMatrix,
+        target: cas.HomogeneousTransformationMatrix,
         dt: float = 0.05,
         max_iterations: int = 200,
         translation_velocity: float = 0.2,
@@ -292,7 +292,7 @@ class QPProblem:
     Tip body of the kinematic chain.
     """
 
-    target: cas.TransformationMatrix
+    target: cas.HomogeneousTransformationMatrix
     """
     Desired tip pose relative to the root body.
     """
@@ -437,7 +437,7 @@ class ConstraintBuilder:
     Tip body of the kinematic chain.
     """
 
-    target: cas.TransformationMatrix
+    target: cas.HomogeneousTransformationMatrix
     """
     Desired tip pose relative to the root body.
     """
@@ -504,7 +504,7 @@ class ConstraintBuilder:
         return eq_bound_expr, neq_matrix
 
     def _compute_position_error(
-        self, root_T_tip: cas.TransformationMatrix
+        self, root_T_tip: cas.HomogeneousTransformationMatrix
     ) -> Tuple[cas.Expression, cas.Expression]:
         """
         Compute position error with velocity limits.
@@ -512,7 +512,7 @@ class ConstraintBuilder:
         :return: Expression describing the position, and the error vector.
         """
         root_P_tip = root_T_tip.to_position()
-        root_T_tip_goal = cas.TransformationMatrix(self.target)
+        root_T_tip_goal = cas.HomogeneousTransformationMatrix(self.target)
         root_P_tip_goal = root_T_tip_goal.to_position()
 
         translation_cap = self.max_translation_velocity * self.dt
@@ -526,7 +526,7 @@ class ConstraintBuilder:
         return root_P_tip[:3], position_error
 
     def _compute_rotation_error(
-        self, root_T_tip: cas.TransformationMatrix
+        self, root_T_tip: cas.HomogeneousTransformationMatrix
     ) -> Tuple[cas.Expression, cas.Expression]:
         """
         Compute rotation error with velocity limits.
@@ -537,7 +537,7 @@ class ConstraintBuilder:
 
         hack = cas.RotationMatrix.from_axis_angle(cas.Vector3.Z(), -0.0001)
         root_R_tip = root_T_tip.to_rotation_matrix().dot(hack)
-        q_actual = cas.TransformationMatrix(self.target).to_quaternion()
+        q_actual = cas.HomogeneousTransformationMatrix(self.target).to_quaternion()
         q_goal = root_R_tip.to_quaternion()
         q_goal = cas.if_less(q_goal.dot(q_actual), 0, -q_goal, q_goal)
         q_error = q_actual.diff(q_goal)

@@ -321,7 +321,7 @@ class SelfCollisionAvoidanceTask(Task):
         b_P_pb = context.collision_scene.self_new_b_P_pb_symbol(
             self.body_a, self.body_b, self.idx
         )
-        pb_T_b = cas.TransformationMatrix.from_point_rotation_matrix(
+        pb_T_b = cas.HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=b_P_pb
         ).inverse()
         a_P_pa = context.collision_scene.self_new_a_P_pa_symbol(

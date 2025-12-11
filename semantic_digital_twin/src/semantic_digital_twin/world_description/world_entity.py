@@ -46,7 +46,11 @@ from ..adapters.world_entity_kwargs_tracker import (
 from ..datastructures.prefixed_name import PrefixedName
 from ..exceptions import ReferenceFrameMismatchError
 from ..spatial_types import spatial_types as cas
-from ..spatial_types.spatial_types import TransformationMatrix, Expression, Point3
+from ..spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Expression,
+    Point3,
+)
 from ..utils import IDGenerator, type_string_to_type, camel_case_split
 
 if TYPE_CHECKING:
@@ -213,7 +217,7 @@ class KinematicStructureEntity(WorldEntityWithID, SubclassJSONSerializer, ABC):
         return world.transform(com, world.root)
 
     @property
-    def global_pose(self) -> TransformationMatrix:
+    def global_pose(self) -> HomogeneousTransformationMatrix:
         """
         Computes the pose of the KinematicStructureEntity in the world frame.
         :return: TransformationMatrix representing the global pose.
@@ -585,7 +589,8 @@ class Region(KinematicStructureEntity):
         hull.process()
 
         area_mesh = TriangleMesh(
-            mesh=hull, origin=TransformationMatrix(reference_frame=reference_frame)
+            mesh=hull,
+            origin=HomogeneousTransformationMatrix(reference_frame=reference_frame),
         )
         return cls(name=name, area=ShapeCollection([area_mesh]))
 
@@ -765,7 +770,7 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
         return self._kinematic_structure_entities(set(), Region)
 
     def as_bounding_box_collection_at_origin(
-        self, origin: TransformationMatrix
+        self, origin: HomogeneousTransformationMatrix
     ) -> BoundingBoxCollection:
         """
         Returns a bounding box collection that contains the bounding boxes of all bodies in this semantic annotation.
@@ -794,7 +799,7 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
         :returns: A collection of bounding boxes in world-space coordinates.
         """
         return self.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=reference_frame)
+            HomogeneousTransformationMatrix(reference_frame=reference_frame)
         )
 
 
@@ -826,6 +831,7 @@ class RootedSemanticAnnotation(SemanticAnnotation):
             if body.has_collision() and not body.get_collision_config().disabled
         )
 
+
 @dataclass(eq=False)
 class Agent(RootedSemanticAnnotation):
     """
@@ -839,6 +845,7 @@ class Agent(RootedSemanticAnnotation):
 
     ...
 
+
 @dataclass(eq=False)
 class Human(Agent):
     """
@@ -850,7 +857,9 @@ class Human(Agent):
     This class exists primarily for semantic distinction, so that algorithms
     can treat human agents differently from robots if needed.
     """
+
     ...
+
 
 @dataclass(eq=False)
 class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
@@ -866,8 +875,6 @@ class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
         return set(
             self._world.get_kinematic_structure_entities_of_branch(self.root)
         ) | {self.root}
-
-
 
 
 @dataclass(eq=False)
@@ -891,11 +898,13 @@ class Connection(WorldEntity, SubclassJSONSerializer):
     The child KinematicStructureEntity of the connection.
     """
 
-    parent_T_connection_expression: TransformationMatrix = field(default=None)
-    _kinematics: TransformationMatrix = field(
-        default_factory=TransformationMatrix, init=False
+    parent_T_connection_expression: HomogeneousTransformationMatrix = field(
+        default=None
     )
-    connection_T_child_expression: TransformationMatrix = field(default=None)
+    _kinematics: HomogeneousTransformationMatrix = field(
+        default_factory=HomogeneousTransformationMatrix, init=False
+    )
+    connection_T_child_expression: HomogeneousTransformationMatrix = field(default=None)
     """
     The origin expression of a connection is split into 2 transforms:
     1. parent_T_connection describes the pose of the connection relative to its parent and must be constant.
@@ -916,9 +925,9 @@ class Connection(WorldEntity, SubclassJSONSerializer):
 
         # If I use default factories, I'd have to complicate the from_json, because I couldn't blindly pass these args
         if self.parent_T_connection_expression is None:
-            self.parent_T_connection_expression = TransformationMatrix()
+            self.parent_T_connection_expression = HomogeneousTransformationMatrix()
         if self.connection_T_child_expression is None:
-            self.connection_T_child_expression = TransformationMatrix()
+            self.connection_T_child_expression = HomogeneousTransformationMatrix()
 
         if not self.parent_T_connection_expression.is_constant():
             raise RuntimeError(
@@ -966,13 +975,13 @@ class Connection(WorldEntity, SubclassJSONSerializer):
             name=PrefixedName.from_json(data["name"]),
             parent=parent,
             child=child,
-            parent_T_connection_expression=TransformationMatrix.from_json(
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),
         )
 
     @property
-    def origin_expression(self) -> TransformationMatrix:
+    def origin_expression(self) -> HomogeneousTransformationMatrix:
         return (
             self.parent_T_connection_expression
             @ self._kinematics
@@ -1010,7 +1019,7 @@ class Connection(WorldEntity, SubclassJSONSerializer):
         return hash((self.parent, self.child))
 
     @property
-    def origin(self) -> cas.TransformationMatrix:
+    def origin(self) -> cas.HomogeneousTransformationMatrix:
         """
         :return: The relative transform between the parent and child frame.
         """
@@ -1069,8 +1078,8 @@ class Connection(WorldEntity, SubclassJSONSerializer):
     def _find_references_in_world(self, world: World) -> Tuple[
         KinematicStructureEntity,
         KinematicStructureEntity,
-        TransformationMatrix,
-        TransformationMatrix,
+        HomogeneousTransformationMatrix,
+        HomogeneousTransformationMatrix,
     ]:
         """
         Finds the reference frames to this connection in the given world and returns them as usable objects.
@@ -1207,4 +1216,3 @@ class Actuator(WorldEntityWithID, SubclassJSONSerializer):
         :param dof: The degree of freedom to add.
         """
         self._dofs.append(dof)
-

@@ -19,7 +19,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 class DiffDriveBaseGoal(Goal):
     root_link: Body = field(kw_only=True)
     tip_link: Body = field(kw_only=True)
-    goal_pose: cas.TransformationMatrix = field(kw_only=True)
+    goal_pose: cas.HomogeneousTransformationMatrix = field(kw_only=True)
     max_linear_velocity: float = 0.1
     max_angular_velocity: float = 0.5
     weight: float = DefaultWeights.WEIGHT_ABOVE_CA
@@ -34,7 +34,7 @@ class DiffDriveBaseGoal(Goal):
 class CartesianPoseStraight(Goal):
     root_link: Body = field(kw_only=True)
     tip_link: Body = field(kw_only=True)
-    goal_pose: cas.TransformationMatrix = field(kw_only=True)
+    goal_pose: cas.HomogeneousTransformationMatrix = field(kw_only=True)
     reference_linear_velocity: float = CartesianPosition.default_reference_velocity
     reference_angular_velocity: float = CartesianOrientation.default_reference_velocity
     weight: float = DefaultWeights.WEIGHT_ABOVE_CA
@@ -75,8 +75,8 @@ class CartesianPoseStraight(Goal):
 
 @dataclass
 class RelativePositionSequence(Goal):
-    goal1: cas.TransformationMatrix = field(kw_only=True)
-    goal2: cas.TransformationMatrix = field(kw_only=True)
+    goal1: cas.HomogeneousTransformationMatrix = field(kw_only=True)
+    goal2: cas.HomogeneousTransformationMatrix = field(kw_only=True)
     root_link: Body = field(kw_only=True)
     tip_link: Body = field(kw_only=True)
 

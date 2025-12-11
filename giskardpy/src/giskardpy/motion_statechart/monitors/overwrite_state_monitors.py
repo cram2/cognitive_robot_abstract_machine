@@ -39,7 +39,7 @@ class SetSeedConfiguration(MotionStatechartNode):
 
 @dataclass(eq=False, repr=False)
 class SetOdometry(MotionStatechartNode):
-    base_pose: cas.TransformationMatrix = field(kw_only=True)
+    base_pose: cas.HomogeneousTransformationMatrix = field(kw_only=True)
     _odom_joints: Tuple[Type[Connection], ...] = field(default=(OmniDrive,), init=False)
     odom_connection: Optional[OmniDrive] = field(default=None, kw_only=True)
 
@@ -60,7 +60,7 @@ class SetOdometry(MotionStatechartNode):
         return NodeArtifacts(observation=cas.TrinaryTrue)
 
     def on_start(self, context: ExecutionContext):
-        parent_T_pose_ref = cas.TransformationMatrix(
+        parent_T_pose_ref = cas.HomogeneousTransformationMatrix(
             context.world.compute_forward_kinematics_np(
                 self.odom_connection.parent, self.base_pose.reference_frame
             )

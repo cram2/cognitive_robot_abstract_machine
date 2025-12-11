@@ -1210,7 +1210,9 @@ class World:
         return entity_hash in self._world_entity_hash_table
 
     # %% World Merging
-    def merge_world_at_pose(self, other: World, pose: cas.TransformationMatrix) -> None:
+    def merge_world_at_pose(
+        self, other: World, pose: cas.HomogeneousTransformationMatrix
+    ) -> None:
         """
         Merge another world into the existing one, creates a 6DoF connection between the root of this world and the root
         of the other world.
@@ -1739,7 +1741,7 @@ class World:
 
     def compute_forward_kinematics(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
-    ) -> cas.TransformationMatrix:
+    ) -> cas.HomogeneousTransformationMatrix:
         """
         Compute the forward kinematics from the root KinematicStructureEntity to the tip KinematicStructureEntity.
 
@@ -1754,7 +1756,7 @@ class World:
 
     def compose_forward_kinematics_expression(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
-    ) -> cas.TransformationMatrix:
+    ) -> cas.HomogeneousTransformationMatrix:
         """
         :param root: The root KinematicStructureEntity in the kinematic chain.
             It determines the starting point of the forward kinematics calculation.
@@ -1791,7 +1793,7 @@ class World:
         self,
         root: KinematicStructureEntity,
         tip: KinematicStructureEntity,
-        target: cas.TransformationMatrix,
+        target: cas.HomogeneousTransformationMatrix,
         dt: float = 0.05,
         max_iterations: int = 200,
         translation_velocity: float = 0.2,

@@ -56,7 +56,9 @@ class ForwardKinematicsBinding:
 
     _root_T_tip_np: np.ndarray | None = field(init=False)
     """The current state of the TransformationMatrix root_T_tip."""
-    _root_T_tip_expr: cas.TransformationMatrix | None = field(default=None, init=False)
+    _root_T_tip_expr: cas.HomogeneousTransformationMatrix | None = field(
+        default=None, init=False
+    )
     """The TransformationMatrix root_T_tip, represented using auxiliary variables."""
 
     def __post_init__(self, build_context: BuildContext):
@@ -77,7 +79,7 @@ class ForwardKinematicsBinding:
 
     def _create_transformation_matrix(
         self, auxiliary_variable_manager: AuxiliaryVariableManager
-    ) -> cas.TransformationMatrix:
+    ) -> cas.HomogeneousTransformationMatrix:
         """
         Creates the TransformationMatrix root_T_tip, represented using auxiliary variables.
         :param auxiliary_variable_manager: The AuxiliaryVariableManager used for creating the auxiliary variables.

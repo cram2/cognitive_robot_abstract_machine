@@ -46,14 +46,14 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
 
     def __init__(self, world: World):
         self.world = world
-        self.child_body_to_fk_expr: Dict[UUID, cas.TransformationMatrix] = {
-            self.world.root.id: cas.TransformationMatrix()
+        self.child_body_to_fk_expr: Dict[UUID, cas.HomogeneousTransformationMatrix] = {
+            self.world.root.id: cas.HomogeneousTransformationMatrix()
         }
         self.tf: Dict[Tuple[UUID, UUID], cas.Expression] = OrderedDict()
 
     def recompile(self):
-        self.child_body_to_fk_expr: Dict[UUID, cas.TransformationMatrix] = {
-            self.world.root.id: cas.TransformationMatrix()
+        self.child_body_to_fk_expr: Dict[UUID, cas.HomogeneousTransformationMatrix] = {
+            self.world.root.id: cas.HomogeneousTransformationMatrix()
         }
         self.tf: Dict[Tuple[UUID, UUID], cas.Expression] = OrderedDict()
         self.world._travel_branch(self.world.root, self)
@@ -125,7 +125,7 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
     @copy_lru_cache()
     def compose_expression(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
-    ) -> cas.TransformationMatrix:
+    ) -> cas.HomogeneousTransformationMatrix:
         """
         :param root: The root KinematicStructureEntity in the kinematic chain.
             It determines the starting point of the forward kinematics calculation.
@@ -134,7 +134,7 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
         :return: An expression representing the computed forward kinematics of the tip KinematicStructureEntity relative to the root KinematicStructureEntity.
         """
 
-        fk = cas.TransformationMatrix()
+        fk = cas.HomogeneousTransformationMatrix()
         root_chain, tip_chain = self.world.compute_split_chain_of_connections(root, tip)
         connection: Connection
         for connection in root_chain:
@@ -148,7 +148,7 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
 
     def compute(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
-    ) -> cas.TransformationMatrix:
+    ) -> cas.HomogeneousTransformationMatrix:
         """
         Compute the forward kinematics from the root KinematicStructureEntity to the tip KinematicStructureEntity.
 
@@ -159,7 +159,7 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
         :param tip: Tip KinematicStructureEntity to which the kinematics are computed.
         :return: Transformation matrix representing the relative pose of the tip KinematicStructureEntity with respect to the root KinematicStructureEntity.
         """
-        return cas.TransformationMatrix(
+        return cas.HomogeneousTransformationMatrix(
             data=self.compute_np(root, tip), reference_frame=root
         )
 

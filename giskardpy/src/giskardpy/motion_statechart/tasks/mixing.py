@@ -34,7 +34,7 @@ class SpiralMixing(Task):
         a = self.angle_increment * t
         h = self.upward_increment * t
 
-        object_T_goal = cas.TransformationMatrix()
+        object_T_goal = cas.HomogeneousTransformationMatrix()
         x = r * cas.cos(a)
         y = r * cas.sin(a)
         z = h

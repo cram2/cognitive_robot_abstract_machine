@@ -9,7 +9,7 @@ import numpy as np
 from semantic_digital_twin.spatial_types.spatial_types import (
     Vector3 as SpatialVector3,
     Quaternion as SpatialQuaternion,
-    TransformationMatrix as SpatialTransformationMatrix,
+    HomogeneousTransformationMatrix as SpatialTransformationMatrix,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Self, Tuple, Optional, List, TYPE_CHECKING

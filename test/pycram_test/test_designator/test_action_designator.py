@@ -215,7 +215,7 @@ class TestActionDesignatorGrounding(ApartmentWorldTestCase):
     def test_detect(self):
         milk_body = self.world.get_body_by_name("milk.stl")
         self.robot_view.root.parent_connection.origin = (
-            TransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix.from_xyz_rpy(
                 1.5, 2, 0, reference_frame=self.world.root
             )
         )

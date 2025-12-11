@@ -28,7 +28,7 @@ from semantic_digital_twin.spatial_types.derivatives import Derivatives, Derivat
 
 # from semantic_digital_twin.spatial_types.math import rotation_matrix_from_rpy
 from semantic_digital_twin.spatial_types.spatial_types import (
-    TransformationMatrix,
+    HomogeneousTransformationMatrix,
     RotationMatrix,
 )
 from semantic_digital_twin.testing import world_setup, pr2_world
@@ -248,7 +248,7 @@ def test_compute_ik(world_setup):
         ]
     )
     joint_state = world.compute_inverse_kinematics(
-        l2, r2, TransformationMatrix(target, reference_frame=l2)
+        l2, r2, HomogeneousTransformationMatrix(target, reference_frame=l2)
     )
     for joint, state in joint_state.items():
         world.state[joint.id].position = state
@@ -288,9 +288,9 @@ def test_compute_relative_pose(world_setup):
     world.state[connection.dof.id].position = 1.0
     world.notify_state_change()
 
-    pose = TransformationMatrix(reference_frame=l2)
+    pose = HomogeneousTransformationMatrix(reference_frame=l2)
     relative_pose = world.transform(pose, l1)
-    expected_pose = TransformationMatrix(
+    expected_pose = HomogeneousTransformationMatrix(
         [
             [1.0, 0, 0.0, 1.0],
             [0.0, 1.0, 0.0, 0.0],
@@ -314,7 +314,7 @@ def test_compute_relative_pose_both(world_setup):
     )
     world.notify_state_change()
 
-    pose = TransformationMatrix.from_xyz_rpy(x=1.0, reference_frame=bf)
+    pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, reference_frame=bf)
     relative_pose = world.transform(pose, world.root)
     # Rotation is 90 degrees around z-axis, translation is 1 along x-axis
     expected_pose = np.array(
@@ -335,7 +335,7 @@ def test_compute_relative_pose_only_translation(world_setup):
     world.state[connection.dof.id].position = 1.0
     world.notify_state_change()
 
-    pose = TransformationMatrix.from_xyz_rpy(x=2.0, reference_frame=l2)
+    pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=2.0, reference_frame=l2)
     relative_pose = world.transform(pose, l1)
     expected_pose = np.array(
         [
@@ -355,7 +355,7 @@ def test_compute_relative_pose_only_rotation(world_setup):
     world.state[connection.dof.id].position = np.pi / 2  # 90 degrees
     world.notify_state_change()
 
-    pose = TransformationMatrix(reference_frame=r2)
+    pose = HomogeneousTransformationMatrix(reference_frame=r2)
     relative_pose = world.transform(pose, r1)
     expected_pose = np.array(
         [
@@ -449,7 +449,7 @@ def test_merge_with_connection(world_setup, pr2_world):
     pose = np.eye(4)
     pose[0, 3] = 1.0
 
-    origin = TransformationMatrix(pose)
+    origin = HomogeneousTransformationMatrix(pose)
 
     connection = pr2_world.get_connection_by_name("l_gripper_l_finger_joint")
     pr2_world.state[connection.dof.id].position = 0.55
@@ -498,7 +498,7 @@ def test_merge_with_pose(world_setup, pr2_world):
     pose = np.eye(4)
     pose[0, 3] = 1.0  # Translate along x-axis
 
-    world.merge_world_at_pose(pr2_world, TransformationMatrix(pose))
+    world.merge_world_at_pose(pr2_world, HomogeneousTransformationMatrix(pose))
 
     assert base_link in world.kinematic_structure_entities
     assert r_gripper_tool_frame in world.kinematic_structure_entities
@@ -535,7 +535,7 @@ def test_merge_with_pose_rotation(world_setup, pr2_world):
         ]
     )
 
-    world.merge_world_at_pose(pr2_world, TransformationMatrix(pose))
+    world.merge_world_at_pose(pr2_world, HomogeneousTransformationMatrix(pose))
 
     assert base_link in world.kinematic_structure_entities
     assert r_gripper_tool_frame in world.kinematic_structure_entities

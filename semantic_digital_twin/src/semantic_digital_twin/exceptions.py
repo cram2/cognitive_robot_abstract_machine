@@ -150,64 +150,6 @@ class ReferenceFrameMismatchError(SpatialTypesError):
 
 
 @dataclass
-class WrongDimensionsError(SpatialTypesError):
-    expected_dimensions: Union[Tuple[int, int], str]
-    actual_dimensions: Tuple[int, int]
-
-    def __post_init__(self):
-        msg = f"Expected {self.expected_dimensions} dimensions, but got {self.actual_dimensions}."
-        super().__init__(msg)
-
-
-@dataclass
-class NotSquareMatrixError(SpatialTypesError):
-    actual_dimensions: Tuple[int, int]
-
-    def __post_init__(self):
-        msg = f"Expected a square matrix, but got {self.actual_dimensions} dimensions."
-        super().__init__(msg)
-
-
-@dataclass
-class HasFreeVariablesError(SpatialTypesError):
-    """
-    Raised when an operation can't be performed on an expression with free variables.
-    """
-
-    variables: List[FloatVariable]
-
-    def __post_init__(self):
-        msg = f"Operation can't be performed on expression with free variables: {self.variables}."
-        super().__init__(msg)
-
-
-class ExpressionEvaluationError(SpatialTypesError): ...
-
-
-@dataclass
-class WrongNumberOfArgsError(ExpressionEvaluationError):
-    expected_number_of_args: int
-    actual_number_of_args: int
-
-    def __post_init__(self):
-        msg = f"Expected {self.expected_number_of_args} arguments, but got {self.actual_number_of_args}."
-        super().__init__(msg)
-
-
-@dataclass
-class DuplicateVariablesError(SpatialTypesError):
-    """
-    Raised when duplicate variables are found in an operation that requires unique variables.
-    """
-
-    variables: List[FloatVariable]
-
-    def __post_init__(self):
-        msg = f"Operation failed due to duplicate variables: {self.variables}. All variables must be unique."
-        super().__init__(msg)
-
-
-@dataclass
 class ParsingError(Exception):
     """
     An error that happens during parsing of files.

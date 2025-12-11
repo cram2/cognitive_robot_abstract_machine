@@ -206,7 +206,7 @@ class CartesianPose(Task):
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """Name of the tip link of the kin chain"""
 
-    goal_pose: cas.TransformationMatrix = field(kw_only=True)
+    goal_pose: cas.HomogeneousTransformationMatrix = field(kw_only=True)
     """The goal pose"""
 
     reference_linear_velocity: float = field(
@@ -286,7 +286,9 @@ class CartesianPose(Task):
         artifacts.debug_expressions.append(
             DebugExpression(
                 "current_pose",
-                expression=cas.TransformationMatrix(reference_frame=self.tip_link),
+                expression=cas.HomogeneousTransformationMatrix(
+                    reference_frame=self.tip_link
+                ),
             )
         )
         artifacts.debug_expressions.append(

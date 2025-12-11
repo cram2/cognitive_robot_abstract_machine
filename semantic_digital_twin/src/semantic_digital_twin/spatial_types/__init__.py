@@ -4,7 +4,7 @@ from .spatial_types import (
     RotationMatrix,
     Vector3,
     Point3,
-    TransformationMatrix,
-    ReferenceFrameMixin,
+    HomogeneousTransformationMatrix,
+    SpatialType,
     Quaternion,
 )

@@ -7,7 +7,7 @@ from random_events.variable import Continuous
 #  import plotly.graph_objects as go
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.interval import *
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 from pycram.testing import ApartmentWorldTestCase
 from pycram.costmaps import (
@@ -25,12 +25,12 @@ class CostmapTestCase(ApartmentWorldTestCase):
 
     def test_attachment_exclusion(self):
         self.robot_view.root.parent_connection.origin = (
-            TransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix.from_xyz_rpy(
                 -1.5, 1, 0, reference_frame=self.world.root
             )
         )
         self.world.get_body_by_name("milk.stl").parent_connection.origin = (
-            TransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix.from_xyz_rpy(
                 -1.8, 1, 1, reference_frame=self.world.root
             )
         )

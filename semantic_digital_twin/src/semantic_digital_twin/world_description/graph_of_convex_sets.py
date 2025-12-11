@@ -27,7 +27,7 @@ from random_events.product_algebra import SimpleEvent, Event
 from rtree import index
 from sortedcontainers import SortedSet
 
-from ..spatial_types import Point3, TransformationMatrix
+from ..spatial_types import Point3, HomogeneousTransformationMatrix
 
 
 class PoseOccupiedError(Exception):
@@ -123,7 +123,7 @@ class GraphOfConvexSets:
                 min(a_max[0], b_max[0]),
                 min(a_max[1], b_max[1]),
                 min(a_max[2], b_max[2]),
-                TransformationMatrix(reference_frame=self.world.root),
+                HomogeneousTransformationMatrix(reference_frame=self.world.root),
             )
 
         # Build a 3-D R-tree
@@ -264,7 +264,9 @@ class GraphOfConvexSets:
                         max_x=np.inf,
                         max_y=np.inf,
                         max_z=np.inf,
-                        origin=TransformationMatrix(reference_frame=world.root),
+                        origin=HomogeneousTransformationMatrix(
+                            reference_frame=world.root
+                        ),
                     )
                 ],
                 reference_frame=world.root,
@@ -309,7 +311,7 @@ class GraphOfConvexSets:
             [
                 bloat_obstacle(bb)
                 for bb in semantic_obstacle_annotation.as_bounding_box_collection_at_origin(
-                    TransformationMatrix(reference_frame=world_root)
+                    HomogeneousTransformationMatrix(reference_frame=world_root)
                 )
             ],
             world_root,
@@ -320,7 +322,7 @@ class GraphOfConvexSets:
                 [
                     bloat_wall(bb)
                     for bb in semantic_wall_annotation.as_bounding_box_collection_at_origin(
-                        TransformationMatrix(reference_frame=world_root)
+                        HomogeneousTransformationMatrix(reference_frame=world_root)
                     )
                 ],
                 world_root,

@@ -8,7 +8,7 @@ from typing_extensions import Tuple
 
 from .adapters.urdf import URDFParser
 from .datastructures.prefixed_name import PrefixedName
-from .spatial_types import TransformationMatrix
+from .spatial_types import HomogeneousTransformationMatrix
 from .spatial_types.derivatives import DerivativeMap
 from .spatial_types.spatial_types import Vector3
 from .utils import rclpy_installed, tracy_installed, hsrb_installed
@@ -83,7 +83,7 @@ def world_setup_simple():
         collision=ShapeCollection(
             [
                 Box(
-                    origin=TransformationMatrix.from_xyz_rpy(),
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
                     scale=Scale(0.25, 0.25, 0.25),
                 )
             ]
@@ -94,7 +94,7 @@ def world_setup_simple():
         collision=ShapeCollection(
             [
                 Box(
-                    origin=TransformationMatrix.from_xyz_rpy(),
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
                     scale=Scale(0.25, 0.25, 0.25),
                 )
             ]
@@ -103,14 +103,14 @@ def world_setup_simple():
     body3 = Body(
         name=PrefixedName("name3", prefix="test"),
         collision=ShapeCollection(
-            [Sphere(origin=TransformationMatrix.from_xyz_rpy(), radius=0.01)]
+            [Sphere(origin=HomogeneousTransformationMatrix.from_xyz_rpy(), radius=0.01)]
         ),
     )
 
     body4 = Body(
         name=PrefixedName("name4", prefix="test"),
         collision=ShapeCollection(
-            [Sphere(origin=TransformationMatrix.from_xyz_rpy(), radius=0.01)]
+            [Sphere(origin=HomogeneousTransformationMatrix.from_xyz_rpy(), radius=0.01)]
         ),
     )
 
@@ -275,6 +275,7 @@ def rclpy_node():
 
         # Shut down the ROS client library
         rclpy.shutdown()
+
 
 @pytest.fixture()
 def kitchen_world():
