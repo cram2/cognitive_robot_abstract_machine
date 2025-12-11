@@ -25,7 +25,7 @@ from krrood.entity_query_language.entity import (
     inference,
     and_,
 )
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity_result_processors import an
 from krrood.entity_query_language.conclusion import Add
 
 from krrood.entity_query_language.predicate import HasType

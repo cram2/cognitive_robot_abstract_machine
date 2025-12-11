@@ -3,6 +3,7 @@ from math import factorial
 
 import pytest
 
+import krrood.entity_query_language.entity_result_processors as eql
 from krrood.entity_query_language.entity import (
     and_,
     not_,
@@ -14,10 +15,8 @@ from krrood.entity_query_language.entity import (
     or_,
     exists,
     flatten,
-    count,
 )
-import krrood.entity_query_language.entity as eql
-from krrood.entity_query_language.quantify_entity import an, a, the
+from krrood.entity_query_language.entity_result_processors import an, a, the, count
 from krrood.entity_query_language.failures import (
     MultipleSolutionFound,
     UnsupportedNegation,

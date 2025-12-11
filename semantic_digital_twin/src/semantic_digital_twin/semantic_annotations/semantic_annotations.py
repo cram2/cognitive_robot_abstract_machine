@@ -5,7 +5,7 @@ from typing import Set, Iterable, Optional
 
 import numpy as np
 from krrood.entity_query_language.entity import entity, let
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity_result_processors import an
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
 from typing_extensions import List
 

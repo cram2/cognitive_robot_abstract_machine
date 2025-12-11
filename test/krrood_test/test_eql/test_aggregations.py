@@ -7,7 +7,7 @@ from krrood.entity_query_language.entity import (
     let,
     exists,
 )
-from krrood.entity_query_language.quantify_entity import an, the
+from krrood.entity_query_language.entity_result_processors import an, the
 from ..dataset.example_classes import VectorsWithProperty
 from ..dataset.semantic_world_like_classes import View, Drawer, Container, Cabinet
 

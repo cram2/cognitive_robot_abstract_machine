@@ -332,10 +332,15 @@ class Selectable(SymbolicExpression[T], ABC):
     For example, this is the case for the ResultQuantifiers & QueryDescriptors that operate on a single selected
     variable.
     """
+
     _type_: Type[T] = field(init=False, default=None)
     """
     The type of the variable.
     """
+
+    @cached_property
+    def _type__(self):
+        return self._var_._type_ if self._var_ else None
 
     def _process_result_(
             self, result: OperationResult
@@ -358,10 +363,6 @@ class Selectable(SymbolicExpression[T], ABC):
         if self._var_ and self._var_ is not self:
             return self._var_._is_iterable_
         return False
-
-    @cached_property
-    def _type__(self):
-        return self._var_._type_ if self._var_ else None
 
 
 @dataclass(eq=False, repr=False)
@@ -735,7 +736,7 @@ class UnificationDict(UserDict):
     A dictionary which maps all expressions that are on a single variable to the original variable id.
     """
 
-    def __getitem__(self, key: CanBehaveLikeAVariable[T]) -> T:
+    def __getitem__(self, key: Selectable[T]) -> T:
         key = key._id_expression_map_[key._var_._id_]
         return super().__getitem__(key)
 
@@ -1247,7 +1248,7 @@ class Variable(CanBehaveLikeAVariable[T]):
 
     @property
     def _is_iterable_(self):
-        return bool(self._domain_)
+        return is_iterable(next(iter(self._domain_), None))
 
     @property
     def _plot_color_(self) -> ColorLegend:
@@ -1298,7 +1299,7 @@ class DomainMapping(CanBehaveLikeAVariable[T], ABC):
     A symbolic expression the maps the domain of symbolic variables.
     """
 
-    _child_: CanBehaveLikeAVariable[T]
+    _child_: Selectable[T]
 
     def __post_init__(self):
         super().__post_init__()

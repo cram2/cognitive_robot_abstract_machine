@@ -34,8 +34,7 @@ from .symbolic import (
     Flatten,
     ForAll,
     Exists,
-    Literal, Selectable, Max, Min, Sum, Count, Average, DomainType,
-)
+    Literal, Selectable, DomainType, )
 
 from .predicate import (
     Predicate,
@@ -281,61 +280,3 @@ def inference(
     return lambda **kwargs: Variable(
         _type_=type_, _name__=type_.__name__, _kwargs_=kwargs, _is_inferred_=True
     )
-
-
-def max(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Max[T]]:
-    """
-    Maps the variable values to their maximum value.
-
-    :param variable: The variable for which the maximum value is to be found.
-    :param key: A function that extracts a comparison key from each variable value.
-    :param default: The value returned when the iterable is empty.
-    :return: A Max object that can be evaluated to find the maximum value.
-    """
-    return Max(variable, _key_func_=key, _default_value_=default)
-
-
-def min(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Min[T]]:
-    """
-    Maps the variable values to their minimum value.
-
-    :param variable: The variable for which the minimum value is to be found.
-    :param key: A function that extracts a comparison key from each variable value.
-    :param default: The value returned when the iterable is empty.
-    :return: A Min object that can be evaluated to find the minimum value.
-    """
-    return Min(variable, _key_func_=key, _default_value_=default)
-
-
-def sum(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Sum[T]]:
-    """
-    Computes the sum of values produced by the given variable.
-
-    :param variable: The variable for which the sum is calculated.
-    :param key: A function that extracts a comparison key from each variable value.
-    :param default: The value returned when the iterable is empty.
-    :return: A Sum object that can be evaluated to find the sum of values.
-    """
-    return Sum(variable, _key_func_=key, _default_value_=default)
-
-
-def average(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Average[T]]:
-    """
-    Computes the sum of values produced by the given variable.
-
-    :param variable: The variable for which the sum is calculated.
-    :param key: A function that extracts a comparison key from each variable value.
-    :param default: The value returned when the iterable is empty.
-    :return: A Sum object that can be evaluated to find the sum of values.
-    """
-    return Average(variable, _key_func_=key, _default_value_=default)
-
-
-def count(variable: Selectable[T]) -> Union[T, Count[T]]:
-    """
-    Count the number of values produced by the given variable.
-
-    :param variable: The variable for which the count is calculated.
-    :return: A Count object that can be evaluated to count the number of values.
-    """
-    return Count(variable)

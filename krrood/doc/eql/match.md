@@ -11,11 +11,11 @@ kernelspec:
   name: python3
 ---
 
-# Pattern matching with `match` and `entity_matching`
+# Pattern matching with `matching`
 
 EQL provides a concise pattern-matching API for building nested structural queries.
-Use `match(type_)(...)` to describe a nested pattern on attributes, and wrap the outermost match
-with `entity_matching(type_, domain)(...)` when you also need to bind a search domain.
+Use `matching(type_)(...)` to describe a nested pattern on attributes. Bind a search domain with
+`.from_(domain)` on the outermost match expression, and quantify it with `the(...)` or `a(...)`.
 
 The following example shows how nested patterns translate
 into an equivalent manual query built with `entity(...)` and predicates.
@@ -28,28 +28,27 @@ from typing_extensions import List
 from krrood.entity_query_language.entity import (
     let, entity, Symbol,
 )
-from krrood.entity_query_language.quantify_entity import the, an
+from krrood.entity_query_language.entity_result_processors import the, a
 from krrood.entity_query_language.match import (
-    match,
-    entity_matching,
+    matching,
 )
 from krrood.entity_query_language.predicate import HasType
 
 
 # --- Model -------------------------------------------------------------
-@dataclass
+@dataclass(unsafe_hash=True)
 class Body(Symbol):
     name: str
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Handle(Body):
     ...
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Container(Body):
-    ...
+    size: int = 1
 
 
 @dataclass
@@ -66,8 +65,9 @@ class FixedConnection(Connection):
 @dataclass
 class World:
     connections: List[Connection]
+    bodies: List[Body]
     
-@dataclass
+@dataclass(unsafe_hash=True)
 class Drawer(Symbol):
     handle: Handle
     container: Container
@@ -83,28 +83,29 @@ SymbolGraph()
 # Build a small world with a few connections
 c1 = Container("Container1")
 h1 = Handle("Handle1")
-other_c = Container("ContainerX")
+other_c = Container("ContainerX", size=2)
 other_h = Handle("HandleY")
 
 world = World(
     connections=[
         FixedConnection(parent=c1, child=h1),
         FixedConnection(parent=other_c, child=h1),
-    ]
+    ],
+    bodies = [c1, h1, other_c, other_h]
 )
 ```
 
 ## Matching a nested structure
 
-`entity_matching(FixedConnection, world.connections)` selects from `world.connections` items of type
-`FixedConnection`. Inner `match(...)` clauses describe constraints on attributes of that selected item.
+`matching(FixedConnection).from_(world.connections)` selects from `world.connections` items of type
+`FixedConnection`. Inner `matching(...)` clauses describe constraints on attributes of that selected item.
 
 ```{code-cell} ipython3
 fixed_connection_query = the(
-    entity_matching(FixedConnection, world.connections)(
-        parent=match(Container)(name="Container1"),
-        child=match(Handle)(name="Handle1"),
-    )
+    matching(FixedConnection)(
+        parent=matching(Container)(name="Container1"),
+        child=matching(Handle)(name="Handle1"),
+    ).from_(world.connections)
 )
 ```
 
@@ -137,39 +138,56 @@ print(type(fixed_connection).__name__, fixed_connection.parent.name, fixed_conne
 ```
 
 Notes:
-- Use `entity_matching` for the outer pattern when a domain is involved; inner attributes use `match`.
-- Nested `match(...)` can be composed arbitrarily deep following your object graph.
-- `entity_matching` is a syntactic sugar over the explicit `entity` + predicates form, so both are interchangeable.
+- Bind domains with `.from_(domain)` on the outermost `matching(...)`.
+- Nested `matching(...)` can be composed arbitrarily deep following your object graph.
+- `matching(...).from_(...)` is syntactic sugar over the explicit `entity` + predicates form shown above.
 
 ## Selecting inner objects with `select()`
 
-Use `select(Type)` when you want the matched inner objects to appear in the result. The evaluation then
-returns a mapping from the selected variables to the concrete objects (a unification dictionary).
+Use `select(...)` on variables you want returned. The evaluation then returns a unification dictionary
+mapping variables to concrete objects.
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.match import select
 
-container, handle = select(Container), select(Handle)
-fixed_connection_query = the(
-    entity_matching(FixedConnection, world.connections)(
-        parent=container(name="Container1"),
-        child=handle(name="Handle1"),
-    )
+fixed_connection = the(
+    matching(FixedConnection)(
+        parent=matching(Container)(name="Container1"),
+        child=matching(Handle)(name="Handle1"),
+    ).from_(world.connections)
 )
 
-answers = fixed_connection_query.evaluate()
+container_and_handle = select(container := fixed_connection.parent,
+                              handle := fixed_connection.child)
+
+answers = container_and_handle.evaluate()
 print(answers[container].name, answers[handle].name)
 ```
 
-## Existential matches in collections with `match_any()`
-
-When matching a container-like attribute (for example, a list), use `match_any(pattern)` to express that
-at least one element of the collection should satisfy the given pattern.
-
-Below we add two simple view classes and build a small scene of drawers and a cabinet.
+You can additionally filter the selection with `where(...)`:
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.match import match_any
+fixed_connection2 = the(
+    matching(FixedConnection)(
+        parent=matching(Container),
+        child=matching(Handle),
+    ).from_(world.connections)
+)
+
+selected = select(c := fixed_connection2.parent, h := fixed_connection2.child).where(c.size > 1)
+ans = selected.evaluate()
+print(ans[c].name, ans[h].name)
+```
+
+## Matching collections with `match_any()` and `match_all()`
+
+When matching a container-like attribute (for example, a list), use `match_any(values)` to express that
+at least one element equals one of the provided values, or `match_all(values)` to require that all given
+values are present in the collection.
+
+```{code-cell} ipython3
+from krrood.entity_query_language.match import match_any, match_all
+from krrood.entity_query_language.entity_result_processors import a, the
 
 # Build a simple set of views
 drawer1 = Drawer(handle=h1, container=c1)
@@ -178,93 +196,88 @@ cabinet1 = Cabinet(container=c1, drawers=[drawer1, drawer2])
 cabinet2 = Cabinet(container=other_c, drawers=[drawer2])
 views = [drawer1, drawer2, cabinet1, cabinet2]
 
-# Query: find the cabinet that has any drawer from the set {drawer1, drawer2}
-cabinet_query = an(entity_matching(Cabinet, views)(drawers=match_any([drawer1, drawer2])))
+# Existential: any of the given drawers is present
+cabinet_any = a(matching(Cabinet)(drawers=match_any([drawer1, drawer2])).from_(views))
+print(len(list(cabinet_any.evaluate())))  # 2
 
-found_cabinets = list(cabinet_query.evaluate())
-assert len(found_cabinets) == 2
-print(found_cabinets[0].container.name, found_cabinets[0].drawers[0].handle.name)
-print(found_cabinets[1].container.name, found_cabinets[1].drawers[0].handle.name)
+# Universal: all given drawers are present
+cabinet_all = the(matching(Cabinet)(drawers=match_all([drawer2])).from_(views))
+print(cabinet_all.evaluate())
 ```
 
-## Selecting elements from collections with `select_any()`
+## Distinct results
 
-If you want to retrieve a specific element from a collection attribute while matching, use `select_any(Type)`.
-It behaves like `match_any(Type)` but also selects the matched element so you can access it in the result.
-
-```{code-cell} ipython3
-from krrood.entity_query_language.match import select_any
-
-selected_drawers = select_any([drawer1, drawer2])
-# Query: find the cabinet that has any drawer from the set {drawer1, drawer2}
-cabinet_query = an(entity_matching(Cabinet, views)(drawers=selected_drawers))
-
-ans = list(cabinet_query.evaluate())
-assert len(ans) == 2
-print(ans)
-```
-
-## Selecting inner objects with `select()`
-
-Use `select(Type)` when you want the matched inner objects to appear in the result. The evaluation then
-returns a mapping from the selected variables to the concrete objects (a unification dictionary).
+Remove duplicates with `distinct()`. On multi-variable selections you can pass one or more variables
+to deduplicate on a subset of keys.
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.match import select
 
-container, handle = select(Container), select(Handle)
-fixed_connection_query = the(
-    entity_matching(FixedConnection, world.connections)(
-        parent=container(name="Container1"),
-        child=handle(name="Handle1"),
-    )
-)
+# Distinct on a single variable
+names = ["Handle1", "Handle1", "Handle2", "Container1", "Container1", "Container3"]
+name_var = a(matching(str).from_(names))
+q1 = select(name_var).where(name_var.startswith("Handle")).distinct()
+print(list(q1.evaluate()))  # ["Handle1", "Handle2"]
 
-answers = fixed_connection_query.evaluate()
-print(answers[container].name, answers[handle].name)
+# Distinct on a pair
+handle_names = ["Handle1", "Handle1", "Handle2"]
+container_names = ["Container1", "Container1", "Container3"]
+h = a(matching(str).from_(handle_names))
+c = a(matching(str).from_(container_names))
+pairs = select(h, c).distinct()
+print(list(pairs.evaluate()))
+
+# Distinct on a subset (only by handle)
+pairs_by_handle = select(h, c).distinct(h)
+print(list(pairs_by_handle.evaluate()))
 ```
 
-## Existential matches in collections with `match_any()`
+## Ordering results
 
-When having multiple possible matches, and you care only if at least the attribute matches one possibility, use
-`match_any(IterableOfPossibleValues)` to express that
-at least one element of the collection should satisfy the given pattern.
-
-Below we add two simple view classes and build a small scene of drawers and a cabinet.
+Use `order_by(variable=..., key=..., descending=...)` on a selection to order results. It composes with `distinct()`.
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.match import match_any
+values = [5, 1, 1, 2, 1, 4, 3, 3, 5]
+v = a(matching(int).from_(values))
+ordered = select(v).distinct().order_by(variable=v, descending=False)
+print(list(ordered.evaluate()))  # [1, 2, 3, 4, 5]
 
-# Build a simple set of views
-drawer1 = Drawer(handle=h1, container=c1)
-drawer2 = Drawer(handle=Handle("OtherHandle"), container=other_c)
-cabinet1 = Cabinet(container=c1, drawers=[drawer1, drawer2])
-cabinet2 = Cabinet(container=other_c, drawers=[drawer2])
-views = [drawer1, drawer2, cabinet1, cabinet2]
-
-# Query: find the cabinet that has any drawer from the set {drawer1, drawer2}
-cabinet_query = an(entity_matching(Cabinet, views)(drawers=match_any([drawer1, drawer2])))
-
-found_cabinets = list(cabinet_query.evaluate())
-assert len(found_cabinets) == 2
-print(found_cabinets[0].container.name, found_cabinets[0].drawers[0].handle.name)
-print(found_cabinets[1].container.name, found_cabinets[1].drawers[0].handle.name)
+names2 = ["Handle1", "handle2", "Handle3", "container1", "Container2", "container3"]
+n = a(matching(str).from_(names2))
+key = lambda x: int(x[-1])
+ordered2 = select(n).order_by(variable=n, key=key, descending=True)
+print(list(ordered2.evaluate()))
 ```
 
-## Selecting elements from collections with `select_any()`
+## Aggregations and counts
 
-If you want to retrieve a specific element from a collection attribute while matching, use `select_any(Type)`.
-It behaves like `match_any(Type)` but also selects the matched element so you can access it in the result.
+You can use result processors like `count(...)` and `max(...)` together with matches and selections.
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.match import select_any, entity_selection
+import krrood.entity_query_language.entity_result_processors as eql
 
-selected_drawers = select_any([drawer1, drawer2])
-# Query: find the cabinet that has any drawer from the set {drawer1, drawer2}
-cabinet = entity_selection(Cabinet, views)
-cabinet_query = an(cabinet(drawers=selected_drawers))
+world  # from above
 
-ans = list(cabinet_query.evaluate())
-assert len(ans) == 2
-print(ans)
+# Count matching entities
+fixed_connections = a(matching(FixedConnection).from_(world.connections))
+print(eql.count(fixed_connections).evaluate())
+
+# Compute max over an attribute
+container = a(matching(Container).from_(world.bodies))
+max_size = select(eql.max(container.size)).evaluate()
+print(max_size)
+```
+
+## Error on unquantified matches
+
+Accessing attributes on an unquantified match (without `the(...)` or `a(...)`) raises `UnquantifiedMatchError`.
+
+```{code-cell} ipython3
+from krrood.entity_query_language.failures import UnquantifiedMatchError
+
+container_m = matching(Container).from_(world.bodies)
+try:
+    _ = container_m.size
+except UnquantifiedMatchError:
+    print("Caught UnquantifiedMatchError as expected")
 ```

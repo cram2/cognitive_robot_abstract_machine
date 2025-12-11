@@ -12,7 +12,7 @@ from krrood.entity_query_language.entity import (
     not_,
     contains,
 )
-from krrood.entity_query_language.quantify_entity import an, the
+from krrood.entity_query_language.entity_result_processors import an, the
 
 from ..collision_checking.collision_detector import Collision, CollisionCheck
 from ..collision_checking.trimesh_collision_detector import TrimeshCollisionDetector

@@ -33,7 +33,7 @@ from krrood.entity_query_language.entity import (
     flatten,
     Symbol,
 )
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity_result_processors import an
 
 @dataclass
 class Body(Symbol):

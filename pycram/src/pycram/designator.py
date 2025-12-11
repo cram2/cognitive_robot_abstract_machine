@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import get_type_hints
 
 from krrood.entity_query_language.entity import entity, contains, let
-from krrood.entity_query_language.quantify_entity import an, the
+from krrood.entity_query_language.entity_result_processors import an, the
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body

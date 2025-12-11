@@ -13,6 +13,7 @@ from ..utils import DataclassException
 
 if TYPE_CHECKING:
     from .symbolic import SymbolicExpression, ResultQuantifier
+    from .match import Match
 
 
 @dataclass
@@ -91,8 +92,32 @@ class UsageError(DataclassException):
     """
     Raised when there is an incorrect usage of the entity query language API.
     """
-
     ...
+
+
+@dataclass
+class UnquantifiedMatchError(UsageError):
+    """
+    Raised when a Match expression is being used without being quantified first.
+    """
+    match_expression: Match
+
+    def __post_init__(self):
+        self.message = (f"The match expression {self.match_expression} is being used without being quantified first."
+                        f"Please make sure to quantify the match using a/an or the")
+
+
+@dataclass
+class WrongSelectableType(UsageError):
+    """
+    Raised when a wrong variable type is given to the select() statement.
+    """
+    wrong_variable_type: Type
+    expected_types: List[Type]
+
+    def __post_init__(self):
+        self.message = f"Select expects one of {self.expected_types}, instead {self.wrong_variable_type} was given."
+        super().__post_init__()
 
 
 @dataclass
@@ -126,6 +151,7 @@ class CannotProcessResultOfGivenChildType(UsageError):
     """
     The unsupported child type.
     """
+
     def __post_init__(self):
         self.message = (f"The child type {self.unsupported_child_type} cannot have its results processed"
                         f" during evaluation because it doesn't implement the `_process_result_` method.")
@@ -245,6 +271,7 @@ class InvalidChildType(UsageError):
             f"The child type {self.invalid_child_type} is not valid. It must be a subclass of {self.correct_child_types}"
         )
         super().__post_init__()
+
 
 @dataclass
 class InvalidEntityType(InvalidChildType):
