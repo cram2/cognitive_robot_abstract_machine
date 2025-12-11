@@ -2,17 +2,29 @@ from __future__ import annotations
 
 from typing_extensions import Optional, Union, Type, Iterable, Callable
 
-from .match import Match, SelectableMatchExpression, AbstractMatchExpression
+from .entitymatch import EntityMatch, SelectableMatchExpression, AbstractMatchExpression
 from .result_quantification_constraint import (
     ResultQuantificationConstraint,
 )
-from .symbolic import An, The, SetOf, Entity, Selectable, Max, Min, Sum, Average, Count, ResultProcessor
+from .symbolic import (
+    An,
+    The,
+    SetOf,
+    Entity,
+    Selectable,
+    Max,
+    Min,
+    Sum,
+    Average,
+    Count,
+    ResultProcessor,
+)
 from .utils import T
 
 
 def an(
-        entity_: Union[SetOf[T], Entity[T], T, Iterable[T], Type[T], Match[T]],
-        quantification: Optional[ResultQuantificationConstraint] = None,
+    entity_: Union[SetOf[T], Entity[T], T, Iterable[T], Type[T], EntityMatch[T]],
+    quantification: Optional[ResultQuantificationConstraint] = None,
 ) -> Union[An[T], T]:
     """
     Select all values satisfying the given entity description.
@@ -22,7 +34,9 @@ def an(
     :return: A quantifier representing "an" element.
     :rtype: An[T]
     """
-    return _apply_result_processor(An, entity_, _quantification_constraint_=quantification)
+    return _apply_result_processor(
+        An, entity_, _quantification_constraint_=quantification
+    )
 
 
 a = an
@@ -32,7 +46,7 @@ This is an alias to accommodate for words not starting with vowels.
 
 
 def the(
-        entity_: Union[SetOf[T], Entity[T], T, Iterable[T], Type[T], Match[T]],
+    entity_: Union[SetOf[T], Entity[T], T, Iterable[T], Type[T], EntityMatch[T]],
 ) -> Union[The[T], T]:
     """
     Select the unique value satisfying the given entity description.
@@ -44,7 +58,9 @@ def the(
     return _apply_result_processor(The, entity_)
 
 
-def max(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Max[T]]:
+def max(
+    variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None
+) -> Union[T, Max[T]]:
     """
     Maps the variable values to their maximum value.
 
@@ -53,10 +69,14 @@ def max(variable: Selectable[T], key: Optional[Callable] = None, default: Option
     :param default: The value returned when the iterable is empty.
     :return: A Max object that can be evaluated to find the maximum value.
     """
-    return _apply_result_processor(Max, variable, _key_func_=key, _default_value_=default)
+    return _apply_result_processor(
+        Max, variable, _key_func_=key, _default_value_=default
+    )
 
 
-def min(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Min[T]]:
+def min(
+    variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None
+) -> Union[T, Min[T]]:
     """
     Maps the variable values to their minimum value.
 
@@ -65,10 +85,14 @@ def min(variable: Selectable[T], key: Optional[Callable] = None, default: Option
     :param default: The value returned when the iterable is empty.
     :return: A Min object that can be evaluated to find the minimum value.
     """
-    return _apply_result_processor(Min, variable, _key_func_=key, _default_value_=default)
+    return _apply_result_processor(
+        Min, variable, _key_func_=key, _default_value_=default
+    )
 
 
-def sum(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Sum[T]]:
+def sum(
+    variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None
+) -> Union[T, Sum[T]]:
     """
     Computes the sum of values produced by the given variable.
 
@@ -77,10 +101,14 @@ def sum(variable: Selectable[T], key: Optional[Callable] = None, default: Option
     :param default: The value returned when the iterable is empty.
     :return: A Sum object that can be evaluated to find the sum of values.
     """
-    return _apply_result_processor(Sum, variable, _key_func_=key, _default_value_=default)
+    return _apply_result_processor(
+        Sum, variable, _key_func_=key, _default_value_=default
+    )
 
 
-def average(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Average[T]]:
+def average(
+    variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None
+) -> Union[T, Average[T]]:
     """
     Computes the sum of values produced by the given variable.
 
@@ -89,7 +117,9 @@ def average(variable: Selectable[T], key: Optional[Callable] = None, default: Op
     :param default: The value returned when the iterable is empty.
     :return: A Sum object that can be evaluated to find the sum of values.
     """
-    return _apply_result_processor(Average, variable, _key_func_=key, _default_value_=default)
+    return _apply_result_processor(
+        Average, variable, _key_func_=key, _default_value_=default
+    )
 
 
 def count(variable: Selectable[T]) -> Union[T, Count[T]]:
@@ -105,7 +135,7 @@ def count(variable: Selectable[T]) -> Union[T, Count[T]]:
 def _apply_result_processor(
     result_processor: Type[ResultProcessor[T]],
     variable: Selectable[T],
-    **result_processor_kwargs
+    **result_processor_kwargs,
 ) -> Union[T, ResultProcessor[T]]:
     """
     Applies the result processor to the given variable.
@@ -116,7 +146,11 @@ def _apply_result_processor(
     :return: The result processor instance.
     """
     if isinstance(variable, AbstractMatchExpression):
-        return variable.apply_result_processor(result_processor, **result_processor_kwargs)
+        return variable.apply_result_processor(
+            result_processor, **result_processor_kwargs
+        )
     elif isinstance(variable, SelectableMatchExpression):
-        return variable._match_expression_.apply_result_processor(result_processor, **result_processor_kwargs)
+        return variable._match_expression_.apply_result_processor(
+            result_processor, **result_processor_kwargs
+        )
     return result_processor(_child_=variable, **result_processor_kwargs)

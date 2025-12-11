@@ -47,6 +47,7 @@ from .symbolic import (
     DomainType,
     ResultProcessor,
     OrderByParams,
+    Entity,
 )
 from .utils import is_iterable, T
 
@@ -178,7 +179,7 @@ class AbstractMatchExpression(Generic[T], ABC):
     """
     The conditions that define the match.
     """
-    parent: Optional[Match] = field(init=False, default=None)
+    parent: Optional[EntityMatch] = field(init=False, default=None)
     """
     The parent match if this is a nested match.
     """
@@ -301,7 +302,7 @@ class AbstractMatchExpression(Generic[T], ABC):
         return self.variable._type_
 
     @property
-    def root(self) -> Match:
+    def root(self) -> EntityMatch:
         return self.node.root.data
 
     def __eq__(self, other):
@@ -312,7 +313,50 @@ class AbstractMatchExpression(Generic[T], ABC):
 
 
 @dataclass(eq=False)
-class Match(AbstractMatchExpression[T]):
+class AbstractEntityMatch(AbstractMatchExpression[T], ABC):
+
+    def evaluate(self):
+        return self.expression.evaluate()
+
+    @cached_property
+    def expression(self) -> Union[ResultQuantifier[T], T]:
+        query_descriptor = self._query_descriptor
+        if self._distinct:
+            query_descriptor = query_descriptor.distinct(*self._distinct_on)
+        if self._order_by:
+            query_descriptor.order_by(
+                self._order_by.variable, self._order_by.descending, self._order_by.key
+            )
+        return self.result_processor_data.apply(query_descriptor)
+
+    @cached_property
+    @abstractmethod
+    def _query_descriptor(self) -> QueryObjectDescriptor: ...
+
+
+@dataclass(eq=False)
+class SetOfMatch(AbstractEntityMatch[T]):
+    selected_variables: List[Selectable]
+    """
+    A list of selected variables.
+    """
+
+    @cached_property
+    def _query_descriptor(self) -> QueryObjectDescriptor:
+        if len(self.selected_variables) > 1:
+            return _set_of(self.selected_variables, *self.conditions)
+        return _entity(self.selected_variables[0], *self.conditions)
+
+    def resolve(self, *args, **kwargs):
+        pass
+
+    @property
+    def name(self) -> str:
+        return f"SetOf({','.join(map(str, self.selected_variables))})"
+
+
+@dataclass(eq=False)
+class EntityMatch(AbstractEntityMatch[T]):
     """
     Construct a query that looks for the pattern provided by the type and the keyword arguments.
     Example usage where we look for an object of type Drawer with body of type Body that has the name"drawer_1":
@@ -322,7 +366,7 @@ class Match(AbstractMatchExpression[T]):
         >>> @dataclass
         >>> class Drawer:
         >>>     body: Body
-        >>> drawer = a(matching(Drawer)(body=matching(Body)(name="drawer_1")))
+        >>> drawer = an(entity(Drawer)(body=entity(Body)(name="drawer_1")))
     """
 
     domain: DomainType = field(default=None, kw_only=True)
@@ -349,20 +393,13 @@ class Match(AbstractMatchExpression[T]):
         return self
 
     @cached_property
-    def expression(self) -> Union[ResultQuantifier[T], T]:
+    def _query_descriptor(self) -> Entity:
         """
         Return the entity expression corresponding to the match query.
         """
         if not self.variable:
             self.resolve()
-        query_descriptor = _entity(self.variable, *self.conditions)
-        if self._distinct:
-            query_descriptor = query_descriptor.distinct(*self._distinct_on)
-        if self._order_by:
-            query_descriptor.order_by(
-                self._order_by.variable, self._order_by.descending, self._order_by.key
-            )
-        return self.result_processor_data.apply(query_descriptor)
+        return _entity(self.variable, *self.conditions)
 
     def __getattr__(self, item):
         """
@@ -382,7 +419,7 @@ class Match(AbstractMatchExpression[T]):
     def resolve(
         self,
         variable: Optional[Selectable] = None,
-        parent: Optional[Match] = None,
+        parent: Optional[EntityMatch] = None,
     ):
         """
         Resolve the match by creating the variable and conditions expressions.
@@ -416,7 +453,7 @@ class Match(AbstractMatchExpression[T]):
     def update_fields(
         self,
         variable: Optional[Selectable] = None,
-        parent: Optional[Match] = None,
+        parent: Optional[EntityMatch] = None,
     ):
         """
         Update the match variable, and parent.
@@ -464,7 +501,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
     """
     The name of the attribute to assign the value to.
     """
-    assigned_value: Optional[Union[Literal, Match]] = None
+    assigned_value: Optional[Union[Literal, EntityMatch]] = None
     """
     The value to assign to the attribute, which can be a Match instance or a Literal.
     """
@@ -491,7 +528,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
 
     def resolve(
         self,
-        parent_match: Optional[Match] = None,
+        parent_match: Optional[EntityMatch] = None,
     ):
         """
         Resolve the attribute assignment by creating the conditions and applying the necessary mappings
@@ -634,41 +671,9 @@ class AttributeMatch(AbstractMatchExpression[T]):
         return self.name
 
 
-@dataclass(eq=False)
-class Select(AbstractMatchExpression[T]):
-    selected_variables: List[Selectable]
-    """
-    A list of selected variables.
-    """
-
-    def evaluate(self):
-        return self.expression.evaluate()
-
-    @cached_property
-    def expression(self) -> Union[ResultQuantifier[T], T]:
-        if len(self.selected_variables) > 1:
-            query_descriptor = _set_of(self.selected_variables, *self.conditions)
-        else:
-            query_descriptor = _entity(self.selected_variables[0], *self.conditions)
-        if self._distinct:
-            query_descriptor = query_descriptor.distinct(*self._distinct_on)
-        if self._order_by:
-            query_descriptor.order_by(
-                self._order_by.variable, self._order_by.descending, self._order_by.key
-            )
-        return self.result_processor_data.apply(query_descriptor)
-
-    def resolve(self, *args, **kwargs):
-        pass
-
-    @property
-    def name(self) -> str:
-        return f"Select({','.join(map(str, self.selected_variables))})"
-
-
 def entity(
     type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
-) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
+) -> Union[Type[T], CanBehaveLikeAVariable[T], EntityMatch[T]]:
     """
     Create and return a Match instance that looks for the pattern provided by the type and the
     keyword arguments.
@@ -676,12 +681,12 @@ def entity(
     :param type_: The type of the variable (i.e., The class you want to instantiate).
     :return: The Match instance.
     """
-    return entity_matching(type_, None)
+    return _entity_matching(type_, None)
 
 
 def match_any(
     type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
-) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
+) -> Union[Type[T], CanBehaveLikeAVariable[T], EntityMatch[T]]:
     """
     Equivalent to entity(type_) but for existential checks.
     """
@@ -692,7 +697,7 @@ def match_any(
 
 def match_all(
     type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
-) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
+) -> Union[Type[T], CanBehaveLikeAVariable[T], EntityMatch[T]]:
     """
     Equivalent to entity(type_) but for universal checks.
     """
@@ -703,18 +708,18 @@ def match_all(
 
 def set_of(
     *variables: Union[T, Selectable[T]],
-) -> Union[T, Select[T]]:
+) -> Union[T, SetOfMatch[T]]:
     """
-    Select the variables to be included in the result.
+    Select the set of variables to be included in the result.
     """
     if not variables:
-        raise ValueError("select() requires at least one variable to be provided.")
-    return Select(list(variables))
+        raise ValueError("set_of() requires at least one variable to be provided.")
+    return SetOfMatch(list(variables))
 
 
-def entity_matching(
+def _entity_matching(
     type_: Union[Type[T], CanBehaveLikeAVariable[T]], domain: DomainType
-) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
+) -> Union[Type[T], CanBehaveLikeAVariable[T], EntityMatch[T]]:
     """
     Same as :py:func:`krrood.entity_query_language.match.match` but with a domain to use for the variable created
      by the match.
@@ -724,7 +729,7 @@ def entity_matching(
     :return: The MatchEntity instance.
     """
     if isinstance(type_, CanBehaveLikeAVariable):
-        return Match(_type=type_._type_, domain=domain, variable=type_)
+        return EntityMatch(_type=type_._type_, domain=domain, variable=type_)
     elif type_ and not isinstance(type_, type):
-        return Match(_type=type_, domain=domain, variable=Literal(type_))
-    return Match(_type=type_, domain=domain)
+        return EntityMatch(_type=type_, domain=domain, variable=Literal(type_))
+    return EntityMatch(_type=type_, domain=domain)

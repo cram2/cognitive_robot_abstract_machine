@@ -8,7 +8,7 @@ from krrood.entity_query_language.entity import (
     contains,
 )
 from krrood.entity_query_language.failures import UnquantifiedMatchError
-from krrood.entity_query_language.match import (
+from krrood.entity_query_language.entitymatch import (
     entity,
     match_any,
     set_of,
