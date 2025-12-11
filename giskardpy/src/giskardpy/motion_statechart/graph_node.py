@@ -31,6 +31,12 @@ from giskardpy.motion_statechart.data_types import (
 from giskardpy.motion_statechart.exceptions import (
     NotInMotionStatechartError,
     InvalidConditionError,
+    EmptyMotionStatechartError,
+    EndMotionInGoalError,
+    InputNotExpressionError,
+    SelfInStartConditionError,
+    NonObservationVariableError,
+    NodeAlreadyBelongsToDifferentNodeError,
 )
 from giskardpy.motion_statechart.plotters.plot_specs import NodePlotSpec
 from giskardpy.qp.constraint_collection import ConstraintCollection
@@ -100,10 +106,40 @@ class TrinaryCondition(SubclassJSONSerializer):
     def update_expression(
         self, new_expression: cas.Expression, child: MotionStatechartNode
     ) -> None:
-        if not isinstance(new_expression, (cas.FloatVariable, cas.Expression)):
-            raise InvalidConditionError(new_expression)
+        self._sanity_check(new_expression)
         self.expression = new_expression
         self._child = child
+
+    def _sanity_check(self, new_expression: cas.Expression) -> None:
+        self._check_condition_is_variable_or_expression(new_expression)
+        self._check_owner_not_in_start_condition(new_expression)
+        self._check_only_observation_variables(new_expression)
+
+    def _check_condition_is_variable_or_expression(
+        self, new_expression: cas.Expression
+    ):
+        if not isinstance(new_expression, (cas.FloatVariable, cas.Expression)):
+            raise InputNotExpressionError(condition=self, new_expression=new_expression)
+
+    def _check_only_observation_variables(self, new_expression: cas.Expression):
+        free_variables = new_expression.free_variables()
+        for variable in free_variables:
+            if not isinstance(variable, ObservationVariable):
+                raise NonObservationVariableError(
+                    condition=self,
+                    non_observation_variable=variable,
+                    new_expression=new_expression,
+                )
+
+    def _check_owner_not_in_start_condition(self, new_expression: cas.Expression):
+        if (
+            self.kind == TransitionKind.START
+            and self.owner.belongs_to_motion_statechart()
+            and self.owner.observation_variable in new_expression.free_variables()
+        ):
+            raise SelfInStartConditionError(
+                condition=self, new_expression=new_expression
+            )
 
     @property
     def node_dependencies(self) -> List[MotionStatechartNode]:
@@ -434,9 +470,12 @@ class MotionStatechartNode(SubclassJSONSerializer):
             raise NotInMotionStatechartError(self.name)
         return self._life_cycle_variable
 
+    def belongs_to_motion_statechart(self) -> bool:
+        return self._motion_statechart is not None
+
     @property
     def observation_variable(self) -> ObservationVariable:
-        if self._observation_variable is None:
+        if not self.belongs_to_motion_statechart():
             raise NotInMotionStatechartError(self.name)
         return self._observation_variable
 
@@ -518,6 +557,8 @@ class MotionStatechartNode(SubclassJSONSerializer):
     def start_condition(self, expression: cas.Expression) -> None:
         if self._start_condition is None:
             raise NotInMotionStatechartError(self.name)
+        free_variables = expression.free_variables
+
         self._start_condition.update_expression(expression, self)
 
     @property
@@ -644,10 +685,23 @@ class Goal(MotionStatechartNode):
         Adds a node to this goal and the motion statechart this goal belongs to.
         Should be used in expand().
         """
+        self._add_node_sanity_check(node)
         if node not in self.nodes:
             self.nodes.append(node)
         node.parent_node = self
         self.motion_statechart.add_node(node)
+
+    def _add_node_sanity_check(self, node: MotionStatechartNode) -> None:
+        self._check_node_has_no_end_motion(node)
+        self._check_node_doesnt_belong_to_different_parent(node)
+
+    def _check_node_has_no_end_motion(self, node: MotionStatechartNode) -> None:
+        if isinstance(node, EndMotion):
+            raise EndMotionInGoalError(node=self)
+
+    def _check_node_doesnt_belong_to_different_parent(self, node: MotionStatechartNode):
+        if node.belongs_to_motion_statechart() and node.parent_node != self:
+            raise NodeAlreadyBelongsToDifferentNodeError(node=self, new_node=node)
 
     def add_nodes(self, nodes: List[MotionStatechartNode]) -> None:
         for node in nodes:

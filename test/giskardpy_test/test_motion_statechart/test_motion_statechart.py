@@ -2,11 +2,13 @@ import json
 import time
 from dataclasses import dataclass
 from math import radians
+from typing import Optional, Iterable
 
 import numpy as np
 import pytest
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
+from giskardpy.data_types.exceptions import DuplicateNameException
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.model.collision_matrix_manager import CollisionRequest
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
@@ -14,10 +16,17 @@ from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
+    DefaultWeights,
 )
 from giskardpy.motion_statechart.exceptions import (
     NotInMotionStatechartError,
     InvalidConditionError,
+    NodeInitializationError,
+    EndMotionInGoalError,
+    InputNotExpressionError,
+    SelfInStartConditionError,
+    NonObservationVariableError,
+    NodeAlreadyBelongsToDifferentNodeError,
 )
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     CollisionAvoidance,
@@ -48,7 +57,10 @@ from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianOrientation,
+    CartesianPosition,
+    CartesianVelocityLimit,
 )
+from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
 from giskardpy.motion_statechart.test_nodes.test_nodes import (
@@ -58,8 +70,9 @@ from giskardpy.motion_statechart.test_nodes.test_nodes import (
     TestNestedGoal,
     ConstFalseNode,
 )
+from giskardpy.qp.constraint import EqualityConstraint, BaseConstraint
+from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.exceptions import HardConstraintsViolatedException
-from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.utils.math import angle_between_vector
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     KinematicStructureEntityKwargsTracker,
@@ -73,7 +86,11 @@ from semantic_digital_twin.semantic_annotations.factories import (
     VerticalSemanticDirection,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
-from semantic_digital_twin.spatial_types import TransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types import (
+    TransformationMatrix,
+    Vector3,
+    FloatVariable,
+)
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
     trinary_logic_and,
@@ -84,13 +101,12 @@ from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     ActiveConnection1DOF,
     FixedConnection,
+    OmniDrive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
-
-
 
 
 def test_condition_to_str():
@@ -131,11 +147,6 @@ def test_motion_statechart_to_dot():
 
 
 @pytest.mark.skip(reason="not implemented yet")
-def test_self_start_condition():
-    pass
-
-
-@pytest.mark.skip(reason="not implemented yet")
 def test_all_conditions_with_goals():
     pass
 
@@ -147,16 +158,6 @@ def test_all_conditions_with_nodes():
 
 @pytest.mark.skip(reason="not implemented yet")
 def test_transition_hooks():
-    pass
-
-
-@pytest.mark.skip(reason="not implemented yet")
-def test_optionality_of_qp_controller_in_compile():
-    pass
-
-
-@pytest.mark.skip(reason="not implemented yet")
-def test_state_deletion():
     pass
 
 
@@ -477,6 +478,50 @@ def test_joint_goal():
     assert (
         msc.history.get_life_cycle_history_of_node(end)[-1] == LifeCycleValues.RUNNING
     )
+
+
+class TestConditions:
+    def test_InvalidConditionError(self):
+        node = ConstTrueNode()
+        with pytest.raises(InputNotExpressionError):
+            node.end_condition = node
+
+    def test_nodes_cannot_have_themselves_as_start_condition(self):
+        msc = MotionStatechart()
+        node1 = ConstTrueNode()
+        msc.add_node(node1)
+        with pytest.raises(SelfInStartConditionError):
+            node1.start_condition = node1.observation_variable
+
+    def test_non_observation_variable_in_condition(self):
+        msc = MotionStatechart()
+        msc.add_node(node := ConstTrueNode())
+        with pytest.raises(NonObservationVariableError):
+            node.start_condition = cas.FloatVariable(name="muh")
+
+    def test_add_node_to_multiple_goals(self):
+        msc = MotionStatechart()
+        node = ConstTrueNode()
+        msc.add_node(Sequence([node]))
+        msc.add_node(Sequence([node]))
+
+        kin_sim = Executor(
+            world=World(),
+        )
+        with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
+            kin_sim.compile(motion_statechart=msc)
+
+    def test_add_node_to_multiple_goals2(self):
+        msc = MotionStatechart()
+        node = ConstTrueNode()
+        msc.add_node(node)
+        msc.add_node(Sequence([node]))
+
+        kin_sim = Executor(
+            world=World(),
+        )
+        with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
+            kin_sim.compile(motion_statechart=msc)
 
 
 def test_two_goals(pr2_world: World):
@@ -1381,6 +1426,188 @@ def test_align_planes(pr2_world: World):
     ), f"AlignPlanes failed: final angle {angle:.6f} rad > threshold {align_planes.threshold:.6f} rad"
 
 
+def test_angle_goal(pr2_world: World):
+    """
+    Ensure AngleGoal drives the angle between tip_vector and reference_vector
+    into the interval [lower_angle, upper_angle].
+    """
+    tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+
+    msc = MotionStatechart()
+
+    tip_vector = cas.Vector3.Y(reference_frame=tip)
+    reference_vector = cas.Vector3.X(reference_frame=root)
+
+    lower_angle = radians(30)
+    upper_angle = radians(32)
+
+    angle_goal = AngleGoal(
+        root_link=root,
+        tip_link=tip,
+        tip_vector=tip_vector,
+        reference_vector=reference_vector,
+        lower_angle=lower_angle,
+        upper_angle=upper_angle,
+    )
+    msc.add_node(angle_goal)
+
+    msc.add_node(EndMotion.when_true(angle_goal))
+
+    kin_sim = Executor(world=pr2_world)
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick_until_end()
+
+    root_V_tip = pr2_world.transform(target_frame=root, spatial_object=tip_vector)
+    root_V_tip.scale(1)
+    root_V_ref = pr2_world.transform(target_frame=root, spatial_object=reference_vector)
+    root_V_ref.scale(1)
+
+    v_tip = root_V_tip.to_np()[:3]
+    v_ref = root_V_ref.to_np()[:3]
+
+    eps = 1e-9
+    assert np.linalg.norm(v_tip) > eps, "tip_vector became zero-length"
+    assert np.linalg.norm(v_ref) > eps, "reference_vector became zero-length"
+
+    angle = angle_between_vector(v_tip, v_ref)
+
+    assert (
+        lower_angle <= angle <= upper_angle
+    ), f"AngleGoal failed: final angle {angle:.6f} rad not in [{lower_angle:.6f}, {upper_angle:.6f}]"
+
+
+class TestVelocityTasks:
+    def _build_msc(
+        self, goal_node, limit_node, extra_nodes: Optional[Iterable] = None
+    ) -> MotionStatechart:
+        """
+        Convenience Function:
+        Build a small MSC: goal_node -> limit_node -> (extra_nodes...) -> EndMotion(when_true=goal_node)
+        Returns the MotionStatechart but does not compile or run it.
+        """
+        msc = MotionStatechart()
+        msc.add_node(goal_node)
+        msc.add_node(limit_node)
+
+        if extra_nodes:
+            for node in extra_nodes:
+                msc.add_node(node)
+
+        msc.add_node(EndMotion.when_true(goal_node))
+        return msc
+
+    def _compile_msc_and_run_until_end(self, world: "World", goal_node, limit_node):
+        """
+        Convenience Function:
+        Build the MSC (no extra nodes), compile into an Executor,
+        run until end and return (control_cycles, executor)
+        """
+        msc = self._build_msc(goal_node=goal_node, limit_node=limit_node)
+        kin_sim = Executor(world=world)
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        return kin_sim.control_cycles, kin_sim
+
+    def _test_observation_variable(self, goal_node, limit_node, world: "World"):
+        """
+        Tests that velocity limit's observation variable can trigger a CancelMotion
+        when the planner chooses to violate the limit.
+
+        Expects the CancelMotion to raise the provided exception.
+        """
+        msc = self._build_msc(goal_node=goal_node, limit_node=limit_node)
+        cancel_motion = CancelMotion(exception=Exception("test"))
+        cancel_motion.start_condition = cas.trinary_logic_not(
+            limit_node.observation_variable
+        )
+        msc.add_node(cancel_motion)
+
+        kin_sim = Executor(world=world)
+        kin_sim.compile(motion_statechart=msc)
+
+        with pytest.raises(Exception):
+            kin_sim.tick_until_end()
+
+    def test_cartesian_position_velocity_limit(self, pr2_world: "World"):
+        """
+        Test for the linear velocity limits.
+        """
+        tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
+        root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+
+        point = cas.Point3(1, 0, 0, reference_frame=tip)
+        position_goal = CartesianPosition(
+            root_link=root, tip_link=tip, goal_point=point
+        )
+
+        # Halving the velocity should at least double the execution time
+        usual_limit = CartesianVelocityLimit(root_link=root, tip_link=tip)
+        half_velocity_limit = CartesianVelocityLimit(
+            root_link=root,
+            tip_link=tip,
+            max_linear_velocity=(usual_limit.max_linear_velocity / 2.1),
+        )
+
+        loose_cycles, _ = self._compile_msc_and_run_until_end(
+            world=pr2_world, goal_node=position_goal, limit_node=usual_limit
+        )
+        tight_cycles, _ = self._compile_msc_and_run_until_end(
+            world=pr2_world, goal_node=position_goal, limit_node=half_velocity_limit
+        )
+
+        assert (
+            tight_cycles >= 2 * loose_cycles
+        ), f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
+
+        low_weight_limit = CartesianVelocityLimit(
+            root_link=root, tip_link=tip, weight=DefaultWeights.WEIGHT_BELOW_CA
+        )
+        self._test_observation_variable(
+            goal_node=position_goal, limit_node=low_weight_limit, world=pr2_world
+        )
+
+    def test_cartesian_rotation_velocity_limit(self, pr2_world: "World"):
+        """
+        Test for the angular velocity limits.
+        """
+        tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
+        root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+
+        rotation = cas.RotationMatrix.from_rpy(yaw=np.pi / 2, reference_frame=tip)
+        orientation = CartesianOrientation(
+            root_link=root, tip_link=tip, goal_orientation=rotation
+        )
+
+        # Halving the velocity should at least double the execution time
+        usual_limit = CartesianVelocityLimit(
+            root_link=root, tip_link=tip, max_angular_velocity=0.3
+        )
+        half_velocity_limit = CartesianVelocityLimit(
+            root_link=root,
+            tip_link=tip,
+            max_angular_velocity=(usual_limit.max_angular_velocity / 2.1),
+        )
+
+        loose_cycles, _ = self._compile_msc_and_run_until_end(
+            world=pr2_world, goal_node=orientation, limit_node=usual_limit
+        )
+        tight_cycles, _ = self._compile_msc_and_run_until_end(
+            world=pr2_world, goal_node=orientation, limit_node=half_velocity_limit
+        )
+
+        assert (
+            tight_cycles >= 2 * loose_cycles
+        ), f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
+
+        low_weight_limit = CartesianVelocityLimit(
+            root_link=root, tip_link=tip, weight=DefaultWeights.WEIGHT_BELOW_CA
+        )
+        self._test_observation_variable(
+            goal_node=orientation, limit_node=low_weight_limit, world=pr2_world
+        )
+
+
 def test_transition_triggers():
     msc = MotionStatechart()
 
@@ -1503,14 +1730,6 @@ def test_count_ticks():
     assert kin_sim.control_cycles == 3 + 2
 
 
-def test_InvalidConditionError():
-    msc = MotionStatechart()
-    node = ConstTrueNode()
-    msc.add_node(node)
-    with pytest.raises(InvalidConditionError):
-        node.end_condition = node
-
-
 class TestEndMotion:
     def test_end_motion_when_all_done1(self):
         msc = MotionStatechart()
@@ -1589,6 +1808,15 @@ class TestEndMotion:
             kin_sim.tick_until_end()
         msc.draw("muh.pdf")
         assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+
+    def test_goals_cannot_have_end_motion(self):
+        msc = MotionStatechart()
+        msc.add_node(Sequence([ConstTrueNode(), EndMotion()]))
+        with pytest.raises(EndMotionInGoalError):
+            kin_sim = Executor(
+                world=World(),
+            )
+            kin_sim.compile(motion_statechart=msc)
 
 
 class TestParallel:
@@ -1885,3 +2113,93 @@ class TestCollisionAvoidance:
         msc_copy.draw("muh.pdf")
         with pytest.raises(HardConstraintsViolatedException):
             kin_sim.tick_until_end()
+
+
+def test_constraint_collection(pr2_world: World):
+    """
+    Test the constraint collection naming behavior. Expected behavior is:
+    - Not naming constraints should result in automatically generated unique names
+    - Manually naming constraints the same name should result in an Exception
+    - Merging constraint collections should handle duplicates via prefix if they are in different collections
+    - Merge raises an Exception if a collection contains duplicates in itself
+    """
+    col = ConstraintCollection()
+    tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+
+    expr = cas.Vector3.X(tip).angle_between(cas.Vector3.Y(root))
+
+    col.add_point_goal_constraints(
+        frame_P_current=cas.Point3(0, 0, 0, reference_frame=tip),
+        frame_P_goal=cas.Point3(0, 0, 0, reference_frame=tip),
+        reference_velocity=0.1,
+        weight=DefaultWeights.WEIGHT_BELOW_CA,
+    )
+    assert len(col.eq_constraints) >= 3
+
+    for i in range(3):
+        col.add_equality_constraint(
+            reference_velocity=0.1 * i,
+            equality_bound=0.0,
+            weight=DefaultWeights.WEIGHT_BELOW_CA,
+            task_expression=expr,
+        )
+
+    col.add_inequality_constraint(
+        name="same_name",
+        reference_velocity=0.2,
+        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        task_expression=expr,
+        lower_error=0.1,
+        upper_error=0.2,
+    )
+
+    with pytest.raises(DuplicateNameException):
+        col.add_equality_constraint(
+            name="same_name",
+            reference_velocity=0.2,
+            equality_bound=0.0,
+            weight=DefaultWeights.WEIGHT_BELOW_CA,
+            task_expression=expr,
+        )
+
+    col2 = ConstraintCollection()
+    col2.add_equality_constraint(
+        name="same_name",
+        reference_velocity=0.2,
+        equality_bound=0.0,
+        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        task_expression=expr,
+    )
+
+    col.merge("prefix", col2)
+    assert any(c.name.startswith("prefix/") for c in col._constraints)
+
+    with pytest.raises(DuplicateNameException):
+        col.merge("", col2)
+
+    col3 = ConstraintCollection()
+    col3.add_equality_constraint(
+        name="same_name",
+        reference_velocity=0.2,
+        equality_bound=0.0,
+        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        task_expression=expr,
+    )
+    constraint = EqualityConstraint(
+        name="same_name",
+        expression=expr,
+        bound=0.0,
+        normalization_factor=0.1,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
+        lower_slack_limit=-float("inf"),
+        upper_slack_limit=float("inf"),
+        linear_weight=0,
+    )
+    col3._constraints.append(constraint)
+
+    with pytest.raises(DuplicateNameException):
+        col3._are_names_unique()
+
+    with pytest.raises(DuplicateNameException):
+        col2.merge("", col3)

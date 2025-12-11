@@ -96,6 +96,28 @@ class UsageError(DataclassException):
 
 
 @dataclass
+class LiteralConditionError(UsageError):
+    """
+    Raised when a literal (i.e. a non-variable) condition is given to the query.
+    Example:
+        >>> a = True
+        >>> body = let(Body, None)
+        >>> query = an(entity(body, a))
+    This could also happen when you are using a predicate or a symbolic_function and all the given arguments are literals.
+    Example:
+        >>> predicate = HasType(Body("Body1"), Body)
+        >>> query = an(entity(let(Body, None), predicate))
+    So make sure that at least one of the arguments to the predicate or symbolic function are variables.
+    """
+    literal_conditions: List[Any]
+
+    def __post_init__(self):
+        self.message = (f"Literal conditions are not allowed in queries: {self.literal_conditions} as they are always"
+                        f"either True or False, independent on any other values/bindings in the query")
+        super().__post_init__()
+
+
+@dataclass
 class CannotProcessResultOfGivenChildType(UsageError):
     """
     Raised when the entity query language API cannot process the results of a given child type during evaluation.

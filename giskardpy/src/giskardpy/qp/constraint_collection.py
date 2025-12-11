@@ -10,7 +10,10 @@ from giskardpy.data_types.exceptions import (
     DuplicateNameException,
 )
 from giskardpy.motion_statechart.data_types import LifeCycleValues, DefaultWeights
-from giskardpy.motion_statechart.exceptions import GoalInitalizationException
+from giskardpy.motion_statechart.exceptions import (
+    NodeInitializationError,
+    MotionStatechartError,
+)
 from giskardpy.qp.constraint import (
     EqualityConstraint,
     InequalityConstraint,
@@ -29,37 +32,48 @@ Large_Number = 1e4
 
 @dataclass
 class ConstraintCollection:
-    constraints: List[BaseConstraint] = field(default_factory=list, init=False)
+    _constraints: List[BaseConstraint] = field(default_factory=list, init=False)
 
     @property
     def eq_constraints(self) -> List[EqualityConstraint]:
-        return [c for c in self.constraints if isinstance(c, EqualityConstraint)]
+        return [c for c in self._constraints if isinstance(c, EqualityConstraint)]
 
     @property
     def neq_constraints(self) -> List[InequalityConstraint]:
-        return [c for c in self.constraints if isinstance(c, InequalityConstraint)]
+        return [c for c in self._constraints if isinstance(c, InequalityConstraint)]
 
     @property
     def derivative_constraints(self) -> List[DerivativeInequalityConstraint]:
         return [
-            c for c in self.constraints if isinstance(c, DerivativeInequalityConstraint)
+            c
+            for c in self._constraints
+            if isinstance(c, DerivativeInequalityConstraint)
         ]
 
     @property
     def eq_derivative_constraints(self) -> List[DerivativeEqualityConstraint]:
         return [
-            c for c in self.constraints if isinstance(c, DerivativeEqualityConstraint)
+            c for c in self._constraints if isinstance(c, DerivativeEqualityConstraint)
         ]
 
     def merge(self, name_prefix: str, other: ConstraintCollection):
-        for constraint in other.constraints:
+        for constraint in other._constraints:
             constraint.name = f"{name_prefix}/{constraint.name}"
-        self.constraints.extend(other.constraints)
+        self._constraints.extend(other._constraints)
         self._are_names_unique()
+
+    def add_constraint(self, constraint: BaseConstraint):
+        constraint.name = constraint.name or f"{len(self._constraints)}"
+        existing_names = {c.name for c in self._constraints}
+        if constraint.name in existing_names:
+            raise DuplicateNameException(
+                f"Constraint named {constraint.name} already exists."
+            )
+        self._constraints.append(constraint)
 
     def _are_names_unique(self):
         names = set()
-        for c in self.constraints:
+        for c in self._constraints:
             if c.name in names:
                 raise DuplicateNameException(
                     f"Constraint named {c.name} already exists."
@@ -67,10 +81,12 @@ class ConstraintCollection:
             names.add(c.name)
 
     def get_all_float_variable_names(self) -> Set[PrefixedName]:
-        return {v.name for c in self.constraints for v in c.expression.free_variables()}
+        return {
+            v.name for c in self._constraints for v in c.expression.free_variables()
+        }
 
     def link_to_motion_statechart_node(self, node: MotionStatechartNode):
-        for constraint in self.constraints:
+        for constraint in self._constraints:
             is_running = cas.if_eq(
                 node.life_cycle_variable,
                 LifeCycleValues.RUNNING,
@@ -103,10 +119,10 @@ class ConstraintCollection:
         :param upper_slack_limit: how much the upper error can be violated, don't use unless you know what you are doing
         """
         if task_expression.shape != (1, 1):
-            raise GoalInitalizationException(
+            raise MotionStatechartError(
                 f"expression must have shape (1, 1), has {task_expression.shape}"
             )
-        name = name or f"{len(self.constraints)}"
+
         lower_slack_limit = (
             lower_slack_limit if lower_slack_limit is not None else -float("inf")
         )
@@ -123,11 +139,7 @@ class ConstraintCollection:
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,
         )
-        if constraint.name in self.constraints:
-            raise DuplicateNameException(
-                f"Constraint named {constraint.name} already exists."
-            )
-        self.constraints.append(constraint)
+        self.add_constraint(constraint)
 
     def add_inequality_constraint(
         self,
@@ -155,7 +167,7 @@ class ConstraintCollection:
         :param upper_slack_limit: how much the upper error can be violated, don't use unless you know what you are doing
         """
         if task_expression.shape != (1, 1):
-            raise GoalInitalizationException(
+            raise MotionStatechartError(
                 f"expression must have shape (1,1), has {task_expression.shape}"
             )
         name = name or ""
@@ -176,12 +188,7 @@ class ConstraintCollection:
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,
         )
-        if name in self.constraints:
-            raise DuplicateNameException(
-                f"A constraint with name '{name}' already exists. "
-                f"You need to set a name, if you add multiple constraints."
-            )
-        self.constraints.append(constraint)
+        self.add_constraint(constraint)
 
     def add_point_goal_constraints(
         self,
@@ -200,6 +207,7 @@ class ConstraintCollection:
         :param weight:
         :param name:
         """
+
         frame_V_error = frame_P_goal - frame_P_current
         for i in range(3):
             self.add_equality_constraint(
@@ -221,6 +229,7 @@ class ConstraintCollection:
         """
         A wrapper around add_constraint. Will add a constraint that tries to move expr_current to expr_goal.
         """
+
         error = expr_goal - expr_current
         self.add_equality_constraint(
             reference_velocity=reference_velocity,
@@ -242,6 +251,7 @@ class ConstraintCollection:
         """
         A wrapper around add_constraint. Will add a constraint that tries to move expr_current to expr_goal.
         """
+
         error_min = expr_min - expr_current
         error_max = expr_max - expr_current
         self.add_inequality_constraint(
@@ -270,6 +280,7 @@ class ConstraintCollection:
         :param weight:
         :param name:
         """
+
         angle = cas.safe_acos(frame_V_current.dot(frame_V_goal))
         # avoid singularity by staying away from pi
         angle_limited = cas.min(cas.max(angle, -reference_velocity), reference_velocity)
@@ -305,6 +316,7 @@ class ConstraintCollection:
         :param weight:
         :param name:
         """
+
         # avoid singularity
         # the sign determines in which direction the robot moves when in singularity.
         # -0.0001 preserves the old behavior from before this goal was refactored
@@ -348,7 +360,7 @@ class ConstraintCollection:
         :param lower_slack_limit:
         :param upper_slack_limit:
         """
-        name = name or ""
+
         constraint = DerivativeInequalityConstraint(
             name=name,
             derivative=Derivatives.velocity,
@@ -361,9 +373,7 @@ class ConstraintCollection:
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,
         )
-        if constraint.name in self.constraints:
-            raise KeyError(f"a constraint with name '{name}' already exists")
-        self.constraints.append(constraint)
+        self.add_constraint(constraint)
 
     def add_velocity_eq_constraint(
         self,
@@ -386,7 +396,7 @@ class ConstraintCollection:
         :param lower_slack_limit:
         :param upper_slack_limit:
         """
-        name = name or ""
+
         constraint = DerivativeEqualityConstraint(
             name=name,
             derivative=Derivatives.velocity,
@@ -398,9 +408,7 @@ class ConstraintCollection:
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,
         )
-        if constraint.name in self.constraints:
-            raise KeyError(f"a constraint with name '{name}' already exists")
-        self.constraints.append(constraint)
+        self.add_constraint(constraint)
 
     def add_velocity_eq_constraint_vector(
         self,
@@ -445,6 +453,7 @@ class ConstraintCollection:
         :param max_violation: m/s
         :param name:
         """
+
         trans_error = frame_P_current.norm()
         trans_error = cas.if_eq_zero(trans_error, cas.Expression(0.01), trans_error)
         self.add_velocity_constraint(
@@ -475,6 +484,7 @@ class ConstraintCollection:
         :param max_violation:
         :param name:
         """
+
         root_Q_tipCurrent = frame_R_current.to_quaternion()
         angle_error = root_Q_tipCurrent.to_axis_angle()[1]
         self.add_velocity_constraint(

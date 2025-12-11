@@ -108,7 +108,7 @@ def blocking(
     robot = the(
         entity(
             r := let(AbstractRobot, root._world.semantic_annotations),
-            tip in r.bodies,
+            contains(r.bodies, tip),
         )
     )
     return robot_in_collision(robot.evaluate(), [])

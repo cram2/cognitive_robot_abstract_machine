@@ -15,7 +15,6 @@ kernelspec:
 
 EQL can be well-used to answer symbolic questions through querying.
 
-
 Whenever you write a query you have to wrap free variables in `let` statements.
 `let` wraps your classes such that attribute access is intercepted and replaced by a symbolic expression.
 
@@ -65,6 +64,12 @@ query = an(
     )
 )
 print(*query.evaluate(), sep="\n")
+```
+
+```{warning}
+Conditions must be symbolic expressions not constants/literals because they are then always True or False. This
+is not affected by any of the query variables, thus doesn't make sense to put as a condition. An error will be raised
+if you try to do so.
 ```
 
 

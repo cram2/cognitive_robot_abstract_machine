@@ -481,9 +481,10 @@ class MotionStatechart(SubclassJSONSerializer):
         node._constraint_collection.link_to_motion_statechart_node(node)
         # if no observation is set, use the symbol for its observation variable to copy the state from last tick,
         # in case `on_tick` doesn't overwrite it.
-        node._observation_expression = (
-            artifacts.observation or node.observation_variable
-        )
+        if artifacts.observation is None:
+            node._observation_expression = node.observation_variable
+        else:
+            node._observation_expression = artifacts.observation
         node._debug_expressions = artifacts.debug_expressions
 
     def _apply_goal_conditions_to_their_children(self):

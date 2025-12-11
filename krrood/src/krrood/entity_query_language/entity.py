@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .failures import LiteralConditionError
 from .symbol_graph import SymbolGraph
 from .utils import is_iterable, T
 
@@ -105,6 +106,9 @@ def _extract_variables_and_expression(
     selected_variables = list(selected_variables)
     expression = None
     if len(expression_list) > 0:
+        literal_expressions = [exp for exp in expression_list if not isinstance(exp, SymbolicExpression)]
+        if literal_expressions:
+            raise LiteralConditionError(literal_expressions)
         expression = (
             and_(*expression_list) if len(expression_list) > 1 else expression_list[0]
         )

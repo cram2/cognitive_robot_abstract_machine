@@ -76,7 +76,7 @@ class ShapeCollection(SubclassJSONSerializer):
                 f"reference frame than the collection."
             )
             shape.origin = self.reference_frame._world.transform(
-                shape.origin.reference_frame.global_pose,
+                shape.origin,
                 self.reference_frame,
             )
 
