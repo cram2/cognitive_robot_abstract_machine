@@ -4,7 +4,7 @@ from dataclasses import field, dataclass
 from typing import Optional, Type, Tuple
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.motion_statechart.exceptions import GoalInitalizationException
+from giskardpy.motion_statechart.exceptions import NodeInitializationError
 from giskardpy.motion_statechart.context import BuildContext, ExecutionContext
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
@@ -47,12 +47,15 @@ class SetOdometry(MotionStatechartNode):
         if self.odom_connection is None:
             drive_connections = context.world.get_connections_by_type(self._odom_joints)
             if len(drive_connections) == 0:
-                raise GoalInitalizationException("No drive joints in world")
+                raise NodeInitializationError(
+                    node=self, reason="No drive joints in world"
+                )
             elif len(drive_connections) == 1:
                 self.odom_connection = drive_connections[0]
             else:
-                raise GoalInitalizationException(
-                    "Multiple drive joint found in world, please set 'group_name'"
+                raise NodeInitializationError(
+                    node=self,
+                    reason="Multiple drive joint found in world, please set 'group_name'",
                 )
         return NodeArtifacts(observation=cas.TrinaryTrue)
 

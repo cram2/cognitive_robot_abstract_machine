@@ -5,7 +5,7 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer
 from typing_extensions import Self
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.motion_statechart.exceptions import GoalInitalizationException
+from giskardpy.motion_statechart.exceptions import NodeInitializationError
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import NodeArtifacts
@@ -80,7 +80,7 @@ class JointPositionList(Task):
 
     def build(self, context: BuildContext) -> NodeArtifacts:
         if len(self.goal_state) == 0:
-            raise GoalInitalizationException(f"Can't initialize {self} with no joints.")
+            raise NodeInitializationError(node=self, reason="empty goal_state")
 
         artifacts = NodeArtifacts()
 
@@ -205,7 +205,7 @@ class JointPositionLimitList(Task):
         self.connections = []
         self.joint_names = list(sorted(self.lower_upper_limits.keys()))
         if len(self.lower_upper_limits) == 0:
-            raise GoalInitalizationException(f"Can't initialize {self} with no joints.")
+            raise NodeInitializationError(node=self, reason=f"no input joints")
 
         for joint_name, (lower_limit, upper_limit) in self.lower_upper_limits.items():
             connection: ActiveConnection1DOF = context.world.get_connection_by_name(

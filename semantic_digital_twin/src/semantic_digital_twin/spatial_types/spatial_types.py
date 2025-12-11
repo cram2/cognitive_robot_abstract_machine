@@ -400,6 +400,22 @@ class SymbolicType(Symbol):
                 result_list[x_index][y_index] = result
         return result_list
 
+    def is_scalar(self) -> bool:
+        return self.shape == (1, 1)
+
+    def __bool__(self) -> bool:
+        if self.is_scalar():
+            if self.is_constant():
+                return bool(self.to_np())
+            elif self.casadi_sx.op() == ca.OP_EQ:
+                # not evaluating bool would cause all expressions containing == to be evaluated to True, because they are not None
+                # this can cause a lot of unintended bugs, therefore we try to evaluate it
+                left = self.casadi_sx.dep(0)
+                right = self.casadi_sx.dep(1)
+                return ca.is_equal(ca.simplify(left), ca.simplify(right), 5)
+        # it's not evaluatable as a bool, so we revert to the normal behavior, and a not None python thing is true
+        return True
+
     def __repr__(self):
         return repr(self.casadi_sx)
 
@@ -929,9 +945,6 @@ class Expression(
         ]
         return parts
 
-    def is_scalar(self) -> bool:
-        return self.shape == (1, 1)
-
     def __copy__(self) -> Expression:
         return Expression(copy(self.casadi_sx))
 
@@ -1379,7 +1392,8 @@ def is_const_binary_false(expression: Expression) -> bool:
 def logic_and(*args: ScalarData) -> ScalarData:
     assert len(args) >= 2, "and must be called with at least 2 arguments"
     # if there is any False, return False
-    if any(x for x in args if is_const_binary_false(x)):
+    # not x because all x that are found are False
+    if any(not x for x in args if is_const_binary_false(x)):
         return BinaryFalse
     # filter all True
     args = [x for x in args if not is_const_binary_true(x)]
@@ -2152,7 +2166,8 @@ class TransformationMatrix(
         :param child_frame: Child frame entity associated with the object.
         :return: An instance of the class with the specified transformations applied.
         """
-        axis = axis or Vector3(0, 0, 1)
+        if axis is None:
+            axis = Vector3(0, 0, 1)
         rotation_matrix = RotationMatrix.from_axis_angle(axis=axis, angle=angle)
         point = Point3(x_init=x, y_init=y, z_init=z)
         return cls.from_point_rotation_matrix(

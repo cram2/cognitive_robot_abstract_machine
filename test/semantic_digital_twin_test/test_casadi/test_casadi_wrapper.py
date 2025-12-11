@@ -2295,8 +2295,8 @@ class TestTransformationMatrix:
         f = cas.TransformationMatrix.from_xyz_rpy(1, 2, 3)
         r = f.to_rotation_matrix()
         assert f[0, 3] == 1
-        assert f[0, 3] == 2
-        assert f[0, 3] == 3
+        assert f[1, 3] == 2
+        assert f[2, 3] == 3
         assert r[0, 0] == 1
         assert r[1, 1] == 1
         assert r[2, 2] == 1
@@ -2842,6 +2842,34 @@ class TestCASWrapper:
         else:
             assert_allclose(f(), expected)
             assert_allclose(f(np.array([], dtype=float)), expected)
+
+    def test_bool_casting(self):
+        v = cas.FloatVariable(name="v")
+        v2 = cas.FloatVariable(name="v2")
+        v3 = cas.FloatVariable(name="v3")
+
+        # simple casting cases of constants
+        assert cas.BinaryTrue
+        assert not cas.BinaryFalse
+
+        # "and" and "or" are smart and will simply const True/False away.
+        assert not (v and cas.BinaryFalse)
+        assert v or cas.BinaryTrue
+
+        # the == calls __eq__ which returns an expression.
+        assert v == v
+        assert v != v2
+
+        # "in" is calling __eq__ which creates, e.g., v == v, bool casting of eq works and will return False for first eq and True for second
+        assert v2 in [v, v2, v3]
+        assert v not in [v2, v3]
+
+        # const logical expressions can be evaluated
+        assert cas.Expression(10) > cas.Expression(5)
+
+        # here bool is called on v and returns it if it is True, otherwise it would return v2
+        # this is the "normal" behavior for python objects
+        assert (v or v2) == v
 
     def test_create_variables(self):
         result = cas.create_float_variables(["a", "b", "c"])

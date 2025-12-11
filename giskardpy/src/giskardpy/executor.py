@@ -233,7 +233,7 @@ class Executor:
         constraint_collection = (
             self.motion_statechart.combine_constraint_collections_of_nodes()
         )
-        if len(constraint_collection.constraints) == 0:
+        if len(constraint_collection._constraints) == 0:
             self.qp_controller = None
             # to not build controller, if there are no constraints
             return

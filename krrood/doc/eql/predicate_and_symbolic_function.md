@@ -19,6 +19,11 @@ A Predicate class is a dataclass that inherits from EQL `Predicate` class.
 These two become symbolic variables when any of the arguments are variables of a query.
 If all the arguments are ordinary python objects, you can use them normally.
 
+```{warning}
+When using predicates and symbolic functions, at least one of the arguments must be a symbolic expression 
+(like a variable constructed using `let` or another query). Otherwise, the predicate will be considered a 
+constant/literal and cannot be used as a condition as it is either always True or always False.
+```
 
 Lets first define our model and some sample data.
 

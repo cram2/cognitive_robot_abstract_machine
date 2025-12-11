@@ -1208,8 +1208,6 @@ class Variable(CanBehaveLikeAVariable[T]):
             # Build once: unwrapped hashed kwargs for already provided child vars
             bound_kwargs = {k: v[self._child_vars_[k]._id_] for k, v in kwargs.items()}
             instance = self._type_(**bound_kwargs)
-            if self._predicate_type_ == PredicateType.SubClassOfPredicate:
-                instance = instance()
             yield self._process_output_and_update_values_(instance, kwargs)
 
     def _generate_combinations_for_child_vars_values_(
