@@ -232,6 +232,23 @@ class Plan:
         if isinstance(self.root, DesignatorNode):
             return self.root.designator_ref.resolve()
 
+    def get_nodes_by_designator_type(
+        self, designator_type: Type[DesignatorDescription]
+    ) -> List[DesignatorNode]:
+        """
+        Filters the nodes for nodes linked to designators of a given type.
+
+        :param designator_type: The type of the designators to filter for
+        :return: A list of DesignatorNodes of the given type
+        """
+        return list(
+            filter(
+                lambda node: isinstance(node, DesignatorNode)
+                and node.designator_type == designator_type,
+                self.nodes,
+            )
+        )
+
     def flattened_parameters(self):
         """
         The core parameter of this plan, as dict with paths as keys and the core type as value
