@@ -1,20 +1,16 @@
-from pycram.datastructures.dataclasses import Color
-from pycram.datastructures.enums import (
-    ObjectType,
-    Arms,
-    DetectionTechnique,
-    VerticalAlignment,
-    ApproachDirection,
-)
-from pycram.datastructures.pose import PoseStamped
-from pycram.robot_plans import *
-from pycram.designators.location_designator import CostmapLocation, AccessingLocation
-from pycram.designators.object_designator import BelieveObject, ObjectPart
 from pycram.object_descriptors.urdf import ObjectDescription
-from pycram.process_module import simulated_robot
-from pycram.robot_description import RobotDescription
 from pycram.world_concepts.world_object import Object
 from pycram.worlds.multiverse import Multiverse
+
+from pycram.datastructures.dataclasses import Color
+from pycram.designators.location_designator import AccessingLocation
+from pycram.designators.object_designator import ObjectPart
+from pycram.process_module import simulated_robot
+from pycram.robot_plans import *
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Milk,
+    Spoon,
+)
 
 world = Multiverse()
 extension = ObjectDescription.get_file_extension()
@@ -25,7 +21,7 @@ apartment = Object("apartment", pycrap.Apartment, f"apartment{extension}")
 
 milk = Object(
     "milk",
-    pycrap.Milk,
+    Milk,
     f"milk.xml",
     pose=PoseStamped.from_list([2.4, 2, 1.02]),
     color=Color(1, 0, 0, 1),
@@ -33,7 +29,7 @@ milk = Object(
 
 spoon = Object(
     "spoon",
-    pycrap.Spoon,
+    Spoon,
     "spoon.xml",
     pose=PoseStamped.from_list([2.5, 2.2, 0.85]),
     color=Color(0, 0, 1, 1),
@@ -44,7 +40,6 @@ robot_desig = BelieveObject(names=[robot.name])
 apartment_desig = BelieveObject(names=[apartment.name])
 
 with simulated_robot:
-
     # Transport the milk
     ParkArmsAction([Arms.BOTH]).resolve().perform()
 
@@ -59,7 +54,7 @@ with simulated_robot:
     milk_desig = (
         DetectAction(
             DetectionTechnique.TYPES,
-            object_designator_description=BelieveObject(types=[pycrap.Milk]),
+            object_designator_description=BelieveObject(types=[Milk]),
         )
         .resolve()
         .perform()[0]
@@ -97,7 +92,7 @@ with simulated_robot:
     spoon_desig = (
         DetectAction(
             DetectionTechnique.TYPES,
-            object_designator_description=BelieveObject(types=[pycrap.Spoon]),
+            object_designator_description=BelieveObject(types=[Spoon]),
         )
         .resolve()
         .perform()[0]

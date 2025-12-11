@@ -6,15 +6,16 @@ import unittest
 from copy import deepcopy
 
 import pytest
+
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.adapters.procthor.procthor_semantic_annotations import Milk
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Milk,
+)
 from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
 from semantic_digital_twin.utils import rclpy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
-from krrood.entity_query_language.symbol_graph import SymbolGraph
-
 from .datastructures.dataclasses import Context
 from .datastructures.enums import WorldMode
 from .plan import Plan

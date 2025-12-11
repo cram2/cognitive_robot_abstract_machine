@@ -6,25 +6,22 @@ import time
 from typing import List
 
 import tqdm
+from sqlalchemy.orm import Session
+
 from krrood.entity_query_language.symbol_graph import SymbolGraph
 from krrood.ormatic.dao import to_dao
 from krrood.ormatic.utils import drop_database, create_engine
 from krrood.utils import recursive_subclasses
-from sqlalchemy.orm import Session
-from typing_extensions import TYPE_CHECKING
-
-
 from semantic_digital_twin.world import World
 
 sg = SymbolGraph()
-
 
 from semantic_digital_twin.adapters.fbx import FBXParser
 from semantic_digital_twin.adapters.procthor.procthor_pipelines import (
     dresser_factory_from_body,
 )
 from semantic_digital_twin.orm.ormatic_interface import *
-from semantic_digital_twin.adapters.procthor.procthor_semantic_annotations import (
+from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasBody

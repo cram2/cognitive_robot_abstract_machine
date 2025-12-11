@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Dict
 from uuid import UUID
 
-from krrood.adapters.json_serializer import JSONSerializationError
 from typing_extensions import (
     Optional,
     List,
@@ -16,6 +15,7 @@ from typing_extensions import (
     Any,
 )
 
+from krrood.adapters.json_serializer import JSONSerializationError
 from .datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
@@ -270,3 +270,11 @@ class KinematicStructureEntityNotInKwargs(JSONSerializationError):
             f"Kinematic structure entity '{self.kinematic_structure_entity_id}' is not in the kwargs of the "
             f"method that created it."
         )
+
+
+class AmbiguousNameError(ValueError):
+    """Raised when more than one semantic annotation class matches a given name with the same score."""
+
+
+class UnresolvedNameError(ValueError):
+    """Raised when no semantic annotation class matches a given name."""
