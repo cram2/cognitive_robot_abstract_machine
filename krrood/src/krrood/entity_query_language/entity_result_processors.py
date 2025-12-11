@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing_extensions import Optional, Union, Type, Iterable, Callable
 
-from .match import Match, SelectableMatchExpression
+from .match import Match, SelectableMatchExpression, AbstractMatchExpression
 from .result_quantification_constraint import (
     ResultQuantificationConstraint,
 )
@@ -115,7 +115,7 @@ def _apply_result_processor(
     :param **result_processor_kwargs: The keyword arguments for the result processor.
     :return: The result processor instance.
     """
-    if isinstance(variable, Match):
+    if isinstance(variable, AbstractMatchExpression):
         return variable.apply_result_processor(result_processor, **result_processor_kwargs)
     elif isinstance(variable, SelectableMatchExpression):
         return variable._match_expression_.apply_result_processor(result_processor, **result_processor_kwargs)

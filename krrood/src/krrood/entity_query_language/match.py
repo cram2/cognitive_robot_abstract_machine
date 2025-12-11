@@ -4,7 +4,18 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from typing_extensions import Optional, Type, Dict, Any, List, Union, Self, Iterable, Generic, Callable
+from typing_extensions import (
+    Optional,
+    Type,
+    Dict,
+    Any,
+    List,
+    Union,
+    Self,
+    Iterable,
+    Generic,
+    Callable,
+)
 
 from .entity import (
     ConditionType,
@@ -12,8 +23,8 @@ from .entity import (
     in_,
     flatten,
     let,
-    set_of,
-    entity,
+    set_of as _set_of,
+    entity as _entity,
     exists,
 )
 from .failures import NoneWrappedFieldError, WrongSelectableType, UnquantifiedMatchError
@@ -33,7 +44,9 @@ from .symbolic import (
     Variable,
     Flatten,
     Exists,
-    DomainType, ResultProcessor, OrderByParams
+    DomainType,
+    ResultProcessor,
+    OrderByParams,
 )
 from .utils import is_iterable, T
 
@@ -43,6 +56,7 @@ class ResultProcessorData:
     """
     A class representing a result processor in a Match statement. This is used to process the result of the match.
     """
+
     type_: Type[ResultProcessor]
     """
     The type of the result processor.
@@ -63,11 +77,14 @@ class SelectableMatchExpression(CanBehaveLikeAVariable[T]):
 
     Match expressions are structured in a graph that is a higher level representation for the entity query graph.
     """
+
     _match_expression_: AbstractMatchExpression[T]
     """
     The match expression that this class wraps and makes selectable.
     """
-    _selectable_attribute_matches_: Dict[str, SelectableMatchExpression] = field(init=False, default_factory=dict)
+    _selectable_attribute_matches_: Dict[str, SelectableMatchExpression] = field(
+        init=False, default_factory=dict
+    )
     """
     A dictionary mapping attribute names to their corresponding selectable match expressions.
     """
@@ -78,6 +95,8 @@ class SelectableMatchExpression(CanBehaveLikeAVariable[T]):
         _id_ manually from the match_expression.
         """
         self._var_ = self._match_expression_.variable
+        if self._var_ is None:
+            return
         self._node_ = self._var_._node_
         self._id_ = self._var_._id_
 
@@ -93,18 +112,26 @@ class SelectableMatchExpression(CanBehaveLikeAVariable[T]):
             raise AttributeError(
                 f"{self.__class__.__name__} object has no attribute {name}"
             )
-        if name not in self._match_expression_.attribute_matches:
-            attr = getattr(self._match_expression_.expression, name)
-            attribute_expression = AttributeMatch(parent=self._match_expression_, attr_name=name, variable=attr)
-            self._match_expression_.attribute_matches[name] = attribute_expression
+        # if name not in self._match_expression_.attribute_matches:
+        #     attr = getattr(self._match_expression_.expression, name)
+        #     attribute_expression = AttributeMatch(parent=self._match_expression_, attr_name=name, variable=attr)
+        #     self._match_expression_.attribute_matches[name] = attribute_expression
         if name not in self._selectable_attribute_matches_:
-            attribute_expression = self._match_expression_.attribute_matches[name]
-            selectable_attribute_expression = SelectableMatchExpression(_match_expression_=attribute_expression)
+            attr = getattr(self._match_expression_.expression, name)
+            attribute_expression = AttributeMatch(
+                parent=self._match_expression_, attr_name=name, variable=attr
+            )
+            selectable_attribute_expression = SelectableMatchExpression(
+                _match_expression_=attribute_expression
+            )
             self._selectable_attribute_matches_[name] = selectable_attribute_expression
         return self._selectable_attribute_matches_[name]
 
-    def _evaluate__(self, sources: Optional[Dict[int, Any]] = None, parent: Optional[SymbolicExpression] = None) -> \
-            Iterable[OperationResult]:
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, Any]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
         self._eval_parent_ = parent
         yield from self._var_._evaluate__(sources, self)
 
@@ -120,6 +147,9 @@ class SelectableMatchExpression(CanBehaveLikeAVariable[T]):
 
     def __repr__(self):
         return self._name_
+
+    def __hash__(self):
+        return hash(self._match_expression_)
 
 
 @dataclass
@@ -156,7 +186,9 @@ class AbstractMatchExpression(Generic[T], ABC):
     """
     The RWXNode representing the match expression in the match query graph.
     """
-    attribute_matches: Dict[str, AttributeMatch] = field(init=False, default_factory=dict)
+    attribute_matches: Dict[str, AttributeMatch] = field(
+        init=False, default_factory=dict
+    )
     """
     A dictionary mapping attribute names to their corresponding AttributeMatch instances.
     """
@@ -172,11 +204,15 @@ class AbstractMatchExpression(Generic[T], ABC):
     """
     List of variables that need to be distinct together as a combination.
     """
-    result_processor_data: Optional[ResultProcessorData] = field(init=False, default_factory=lambda: ResultProcessorData(An))
+    result_processor_data: Optional[ResultProcessorData] = field(
+        init=False, default_factory=lambda: ResultProcessorData(An)
+    )
     """
     The result processor data to be applied to the match expression.
     """
-    selectable_match: Optional[SelectableMatchExpression] = field(init=False, default=None)
+    selectable_match: Optional[SelectableMatchExpression] = field(
+        init=False, default=None
+    )
     """
     The selectable match expression of this match.
     """
@@ -195,25 +231,25 @@ class AbstractMatchExpression(Generic[T], ABC):
         ...
 
     def apply_result_processor(
-            self, result_processor: Type[ResultProcessor[T]], **result_processor_kwargs
+        self, result_processor: Type[ResultProcessor[T]], **result_processor_kwargs
     ) -> Union[ResultProcessor[T], T]:
         """
         Record the result processor to be applied to the result of the match.
         """
-        self.result_processor_data = ResultProcessorData(result_processor, result_processor_kwargs)
+        self.result_processor_data = ResultProcessorData(
+            result_processor, result_processor_kwargs
+        )
         self.resolve()
         if self.selectable_match is None:
             self.selectable_match = SelectableMatchExpression(_match_expression_=self)
         return self.selectable_match
 
     @abstractmethod
-    def resolve(self, *args, **kwargs):
-        ...
+    def resolve(self, *args, **kwargs): ...
 
     @property
     @abstractmethod
-    def name(self) -> str:
-        ...
+    def name(self) -> str: ...
 
     @property
     def id(self):
@@ -304,9 +340,9 @@ class Match(AbstractMatchExpression[T]):
         return self
 
     def resolve(
-            self,
-            variable: Optional[Selectable] = None,
-            parent: Optional[Match] = None,
+        self,
+        variable: Optional[Selectable] = None,
+        parent: Optional[Match] = None,
     ):
         """
         Resolve the match by creating the variable and conditions expressions.
@@ -338,9 +374,9 @@ class Match(AbstractMatchExpression[T]):
         return self
 
     def update_fields(
-            self,
-            variable: Optional[Selectable] = None,
-            parent: Optional[Match] = None,
+        self,
+        variable: Optional[Selectable] = None,
+        parent: Optional[Match] = None,
     ):
         """
         Update the match variable, and parent.
@@ -410,7 +446,10 @@ class AttributeMatch(AbstractMatchExpression[T]):
             self.resolve()
         return self.result_processor_data.apply(self.variable)
 
-    def resolve(self, parent_match: Optional[Match] = None,):
+    def resolve(
+        self,
+        parent_match: Optional[Match] = None,
+    ):
         """
         Resolve the attribute assignment by creating the conditions and applying the necessary mappings
         to the attribute.
@@ -421,7 +460,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
             return
         possibly_flattened_attr = self.attribute
         if self.attribute._is_iterable_ and (
-                self.assigned_value.kwargs or self.is_type_filter_needed
+            self.assigned_value.kwargs or self.is_type_filter_needed
         ):
             self.flattened_attribute = flatten(self.attribute)
             possibly_flattened_attr = self.flattened_attribute
@@ -442,7 +481,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
             self.variable = self.flattened_attribute
 
     def infer_condition_between_attribute_and_assigned_value(
-            self,
+        self,
     ) -> Union[Comparator, Exists]:
         """
         Find and return the appropriate condition for the attribute and its assigned value. This can be one of contains,
@@ -457,18 +496,22 @@ class AttributeMatch(AbstractMatchExpression[T]):
         elif not self.attribute._is_iterable_ and self.is_iterable_value:
             condition = in_(self.attribute, self.assigned_variable)
         elif (
-                self.attribute._is_iterable_
-                and self.is_iterable_value
-                and not (
-                isinstance(self.assigned_value, AbstractMatchExpression) and self.assigned_value.universal
-        )
+            self.attribute._is_iterable_
+            and self.is_iterable_value
+            and not (
+                isinstance(self.assigned_value, AbstractMatchExpression)
+                and self.assigned_value.universal
+            )
         ):
             self.flattened_attribute = flatten(self.attribute)
             condition = contains(self.assigned_variable, self.flattened_attribute)
         else:
             condition = self.attribute == self.assigned_variable
 
-        if isinstance(self.assigned_value, AbstractMatchExpression) and self.assigned_value.existential:
+        if (
+            isinstance(self.assigned_value, AbstractMatchExpression)
+            and self.assigned_value.existential
+        ):
             condition = exists(self.attribute, condition)
 
         return condition
@@ -504,7 +547,8 @@ class AttributeMatch(AbstractMatchExpression[T]):
         :return: True if the value is an unresolved Match instance, else False.
         """
         return (
-                isinstance(self.assigned_value, AbstractMatchExpression) and not self.assigned_value.variable
+            isinstance(self.assigned_value, AbstractMatchExpression)
+            and not self.assigned_value.variable
         )
 
     @cached_property
@@ -514,13 +558,13 @@ class AttributeMatch(AbstractMatchExpression[T]):
         """
         if isinstance(self.assigned_value, Selectable):
             return self.assigned_value._is_iterable_
-        elif not isinstance(self.assigned_value, AbstractMatchExpression) and is_iterable(
-                self.assigned_value
-        ):
+        elif not isinstance(
+            self.assigned_value, AbstractMatchExpression
+        ) and is_iterable(self.assigned_value):
             return True
         elif (
-                isinstance(self.assigned_value, AbstractMatchExpression)
-                and self.assigned_value.variable._is_iterable_
+            isinstance(self.assigned_value, AbstractMatchExpression)
+            and self.assigned_value.variable._is_iterable_
         ):
             return True
         return False
@@ -532,8 +576,8 @@ class AttributeMatch(AbstractMatchExpression[T]):
         """
         attr_type = self.type
         return (not attr_type) or (
-                (self.assigned_value.type and self.assigned_value.type is not attr_type)
-                and issubclass(self.assigned_value.type, attr_type)
+            (self.assigned_value.type and self.assigned_value.type is not attr_type)
+            and issubclass(self.assigned_value.type, attr_type)
         )
 
     @property
@@ -554,12 +598,15 @@ class Select(AbstractMatchExpression[T]):
     A list of selected variables.
     """
 
+    def evaluate(self):
+        return self.expression.evaluate()
+
     @cached_property
     def expression(self) -> Union[ResultQuantifier[T], T]:
         if len(self.selected_variables) > 1:
-            query_descriptor = set_of(self.selected_variables, *self.conditions)
+            query_descriptor = _set_of(self.selected_variables, *self.conditions)
         else:
-            query_descriptor = entity(self.selected_variables[0], *self.conditions)
+            query_descriptor = _entity(self.selected_variables[0], *self.conditions)
         if self._distinct:
             query_descriptor = query_descriptor.distinct(*self._distinct_on)
         if self._order_by:
@@ -573,7 +620,12 @@ class Select(AbstractMatchExpression[T]):
         self.conditions.extend(conditions)
         return self
 
-    def order_by(self, variable: Selectable, descending: bool = False, key: Optional[Callable] = None) -> Self:
+    def order_by(
+        self,
+        variable: Selectable,
+        descending: bool = False,
+        key: Optional[Callable] = None,
+    ) -> Self:
         """
         Order the results by the given variable, using the given key function in descending or ascending order.
 
@@ -585,8 +637,8 @@ class Select(AbstractMatchExpression[T]):
         return self
 
     def distinct(
-            self,
-            *on: Selectable[T],
+        self,
+        *on: Selectable[T],
     ) -> Self:
         """
         Apply distinctness constraint to the query object descriptor results.
@@ -603,8 +655,8 @@ class Select(AbstractMatchExpression[T]):
         return f"Select({','.join(map(str, self.selected_variables))})"
 
 
-def matching(
-        type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
+def entity(
+    type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
     """
     Create and return a Match instance that looks for the pattern provided by the type and the
@@ -617,7 +669,7 @@ def matching(
 
 
 def match_any(
-        type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
+    type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
     """
     Equivalent to matching(type_) but for existential checks.
@@ -628,7 +680,7 @@ def match_any(
 
 
 def match_all(
-        type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
+    type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
     """
     Equivalent to matching(type_) but for universal checks.
@@ -638,30 +690,19 @@ def match_all(
     return match_
 
 
-def select(
-        *variables: Any,
-) -> Match:
+def set_of(
+    *variables: Union[T, Selectable[T]],
+) -> Union[T, Select[T]]:
     """
     Select the variables to be included in the result.
     """
     if not variables:
         raise ValueError("select() requires at least one variable to be provided.")
-    if isinstance(variables[0], SelectableMatchExpression):
-        root = variables[0]._match_expression_.root
-    else:
-        root = variables[0].root
-    for variable in variables:
-        if isinstance(variable, SelectableMatchExpression):
-            root.update_selected_variables(variable._match_expression_.variable)
-        elif isinstance(variable, AbstractMatchExpression):
-            root.update_selected_variables(variable.variable)
-        else:
-            raise WrongSelectableType(type(variable), [SelectableMatchExpression, AbstractMatchExpression])
-    return root
+    return Select(list(variables))
 
 
 def entity_matching(
-        type_: Union[Type[T], CanBehaveLikeAVariable[T]], domain: DomainType
+    type_: Union[Type[T], CanBehaveLikeAVariable[T]], domain: DomainType
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
     """
     Same as :py:func:`krrood.entity_query_language.match.match` but with a domain to use for the variable created
