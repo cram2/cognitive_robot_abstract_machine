@@ -222,6 +222,40 @@ class AbstractMatchExpression(Generic[T], ABC):
         if self.parent:
             self.node.parent = self.parent.node
 
+    def where(self, *conditions: ConditionType) -> Self:
+        self.conditions.extend(conditions)
+        return self
+
+    def order_by(
+        self,
+        variable: Optional[Selectable] = None,
+        descending: bool = False,
+        key: Optional[Callable] = None,
+    ) -> Self:
+        """
+        Order the results by the given variable, using the given key function in descending or ascending order.
+
+        :param variable: The variable to order by.
+        :param descending: Whether to order the results in descending order.
+        :param key: A function to extract the key from the variable value.
+        """
+        self._order_by = OrderByParams(variable, descending, key)
+        return self
+
+    def distinct(
+        self,
+        *on: Selectable[T],
+    ) -> Self:
+        """
+        Apply distinctness constraint to the query object descriptor results.
+
+        :param on: The variables to be used for distinctness.
+        :return: This query object descriptor.
+        """
+        self._distinct = True
+        self._distinct_on = list(on)
+        return self
+
     @cached_property
     @abstractmethod
     def expression(self) -> Union[ResultQuantifier[T], T]:
@@ -321,7 +355,13 @@ class Match(AbstractMatchExpression[T]):
         """
         if not self.variable:
             self.resolve()
-        query_descriptor = entity(self.variable, *self.conditions)
+        query_descriptor = _entity(self.variable, *self.conditions)
+        if self._distinct:
+            query_descriptor = query_descriptor.distinct(*self._distinct_on)
+        if self._order_by:
+            query_descriptor.order_by(
+                self._order_by.variable, self._order_by.descending, self._order_by.key
+            )
         return self.result_processor_data.apply(query_descriptor)
 
     def __getattr__(self, item):
@@ -444,7 +484,10 @@ class AttributeMatch(AbstractMatchExpression[T]):
         """
         if not self.variable:
             self.resolve()
-        return self.result_processor_data.apply(self.variable)
+        if issubclass(self.result_processor_data.type_, ResultQuantifier):
+            return self.variable
+        else:
+            return self.result_processor_data.apply(self.variable)
 
     def resolve(
         self,
@@ -610,45 +653,13 @@ class Select(AbstractMatchExpression[T]):
         if self._distinct:
             query_descriptor = query_descriptor.distinct(*self._distinct_on)
         if self._order_by:
-            query_descriptor._order_by = self._order_by
+            query_descriptor.order_by(
+                self._order_by.variable, self._order_by.descending, self._order_by.key
+            )
         return self.result_processor_data.apply(query_descriptor)
 
     def resolve(self, *args, **kwargs):
         pass
-
-    def where(self, *conditions: ConditionType) -> Self:
-        self.conditions.extend(conditions)
-        return self
-
-    def order_by(
-        self,
-        variable: Selectable,
-        descending: bool = False,
-        key: Optional[Callable] = None,
-    ) -> Self:
-        """
-        Order the results by the given variable, using the given key function in descending or ascending order.
-
-        :param variable: The variable to order by.
-        :param descending: Whether to order the results in descending order.
-        :param key: A function to extract the key from the variable value.
-        """
-        self._order_by = OrderByParams(variable, descending, key)
-        return self
-
-    def distinct(
-        self,
-        *on: Selectable[T],
-    ) -> Self:
-        """
-        Apply distinctness constraint to the query object descriptor results.
-
-        :param on: The variables to be used for distinctness.
-        :return: This query object descriptor.
-        """
-        self._distinct = True
-        self._distinct_on = list(on)
-        return self
 
     @property
     def name(self) -> str:
@@ -672,9 +683,9 @@ def match_any(
     type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
     """
-    Equivalent to matching(type_) but for existential checks.
+    Equivalent to entity(type_) but for existential checks.
     """
-    match_ = matching(type_)
+    match_ = entity(type_)
     match_.existential = True
     return match_
 
@@ -683,9 +694,9 @@ def match_all(
     type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
     """
-    Equivalent to matching(type_) but for universal checks.
+    Equivalent to entity(type_) but for universal checks.
     """
-    match_ = matching(type_)
+    match_ = entity(type_)
     match_.universal = True
     return match_
 

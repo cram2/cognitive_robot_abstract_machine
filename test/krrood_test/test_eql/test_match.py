@@ -68,7 +68,7 @@ def test_select(handles_and_containers_world):
         ).from_(world.connections)
     )
     container_and_handle = the(
-        set_of((container := fixed_connection.parent, handle := fixed_connection.child))
+        set_of(container := fixed_connection.parent, handle := fixed_connection.child)
     )
 
     # Method 2
@@ -89,7 +89,7 @@ def test_select(handles_and_containers_world):
     assert set(container_and_handle_2.evaluate().values()) == set(
         container_and_handle.evaluate().values()
     )
-    assert isinstance(container_and_handle._child_, SetOf)
+    assert isinstance(container_and_handle._match_expression_.expression._child_, SetOf)
 
     answers = container_and_handle.evaluate()
     assert isinstance(answers, UnificationDict)
@@ -101,7 +101,7 @@ def test_select_where(handles_and_containers_world):
     world = handles_and_containers_world
 
     # Method 1
-    fixed_connection = the(
+    fixed_connection = eql.an(
         entity(FixedConnection)(
             parent=entity(Container),
             child=entity(Handle),
@@ -130,7 +130,7 @@ def test_select_where(handles_and_containers_world):
     assert set(container_and_handle_2.evaluate().values()) == set(
         container_and_handle.evaluate().values()
     )
-    assert isinstance(container_and_handle.expression._child_, SetOf)
+    assert isinstance(container_and_handle._match_expression_.expression._child_, SetOf)
 
     answers = container_and_handle.evaluate()
     assert isinstance(answers, UnificationDict)
