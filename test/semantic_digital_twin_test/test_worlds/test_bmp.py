@@ -58,17 +58,13 @@ class TestBodyMotionProblem:
                 target_object=drawer,
                 goal_value=0.3,
                 property_getter=property_getter,
-                execution_model=self._get_effect_execution_model_for_open_goal(
-                    drawer.handle.body, drawer.container.body.parent_connection, 0.3
-                ),
+                execution_model=None,
             )
             close_effect = ClosedEffect(
                 target_object=drawer,
                 goal_value=0.0,
                 property_getter=property_getter,
-                execution_model=self._get_effect_execution_model_for_open_goal(
-                    drawer.handle.body, drawer.container.body.parent_connection, 0.0
-                ),
+                execution_model=None,
             )
             effects.append(effect_open)
             effects.append(close_effect)
@@ -201,6 +197,49 @@ class TestBodyMotionProblem:
                 [task_sym.task_type, effect_sym.name, causes.motion.trajectory],
                 SatisfiesRequest(task=task_sym, effect=effect_sym),
                 causes,
+            )
+        )
+
+        results = list(query.evaluate())
+        motion: Motion = results[0]
+        print(len(results))
+        print(motion)
+
+    def test_predefined_motion_models(self, apartment_world: World):
+        effects, open_task, close_task, drawers = self._extend_world(apartment_world)
+        motions = []
+        for drawer in drawers:
+            close_motion = Motion(
+                trajectory=[],
+                actuator=drawer.container.body.parent_connection,
+                motion_model=self._get_effect_execution_model_for_open_goal(
+                    drawer.handle.body, drawer.container.body.parent_connection, 0.0
+                ),
+            )
+            open_motion = Motion(
+                trajectory=[],
+                actuator=drawer.container.body.parent_connection,
+                motion_model=self._get_effect_execution_model_for_open_goal(
+                    drawer.handle.body, drawer.container.body.parent_connection, 0.0
+                ),
+            )
+            motions.append(close_motion)
+            motions.append(open_motion)
+
+        effect_sym = let(Effect, domain=effects)
+        task_sym = let(
+            TaskRequest,
+            domain=[open_task, close_task],
+        )
+        motion_sym = let(Motion, domain=motions)
+
+        query = an(
+            set_of(
+                [task_sym.task_type, effect_sym.name, motion_sym.trajectory],
+                SatisfiesRequest(task=task_sym, effect=effect_sym),
+                Causes(
+                    effect=effect_sym, environment=apartment_world, motion=motion_sym
+                ),
             )
         )
 

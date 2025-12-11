@@ -38,6 +38,16 @@ class Causes(Predicate):
     motion: Optional[Motion]
 
     def __call__(self, *args, **kwargs):
+        if self.effect.is_achieved():
+            return False
+
+        if self.motion and self.motion.motion_model:
+            motion, success = self.motion.motion_model.run(
+                self.effect, self.environment
+            )
+            if motion is not None:
+                self.motion = motion
+            return success
         return self._map_motion_to_effect()
 
     def _map_motion_to_effect(self):
@@ -82,19 +92,6 @@ class CausesMotion(Causes):
             return success
 
         return False
-
-    def _execute_and_record_trajectory(self, executor: Executor, msc: MotionStatechart):
-        timeout = 500
-        trajectory = []
-        for _ in range(timeout):
-            executor.tick()
-            trajectory_value = self.effect.current_value
-            trajectory.append(trajectory_value)
-            if msc.is_end_motion():
-                break
-        else:
-            print("Timeout reached.")
-        return trajectory
 
 
 @dataclass

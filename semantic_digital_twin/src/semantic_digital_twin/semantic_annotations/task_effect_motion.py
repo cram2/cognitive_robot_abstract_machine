@@ -92,6 +92,8 @@ class Motion(SemanticAnnotation):
     actuator: Connection
     """The connection that must be manipulated."""
 
+    motion_model: RunMSCModel = field(default=None)
+
 
 class MissingMotionStatechartError(Exception):
     """
