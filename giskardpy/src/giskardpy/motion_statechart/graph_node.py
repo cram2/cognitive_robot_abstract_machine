@@ -491,17 +491,18 @@ class MotionStatechartNode(SubclassJSONSerializer):
 
     def build(self, context: BuildContext) -> NodeArtifacts:
         """
-        Describe this node by returning its constraints and the observation expression.
         Called exactly once during motion statechart compilation.
+        Use this method for any setup steps.
         .. warning:: Don't create other nodes within this function.
+        :param context: The context that contains data that can be used to build this node.
+        :return: A NodeArtifacts instance that describes this node. It is normal for nodes that don't directly affect the motion to return empty NodeArtifacts.
         """
-        return NodeArtifacts(
-            constraints=ConstraintCollection(),
-        )
+        return NodeArtifacts()
 
     def on_tick(self, context: ExecutionContext) -> Optional[ObservationStateValues]:
         """
         Triggered when the node is ticked.
+        .. warning:: This method is called inside a control loop, make sure it is fast.
         .. warning:: Only happens while the node is in state RUNNING.
         .. warning:: The result of this method takes precedence over the observation expression created in build().
         :return: An optional observation state overwrite
@@ -510,26 +511,31 @@ class MotionStatechartNode(SubclassJSONSerializer):
     def on_start(self, context: ExecutionContext):
         """
         Triggered when the node transitions from NOT_STARTED to RUNNING.
+        .. warning:: This method is called inside a control loop, make sure it is fast.
         """
 
     def on_pause(self, context: ExecutionContext):
         """
         Triggered when the node transitions from RUNNING to PAUSED.
+        .. warning:: This method is called inside a control loop, make sure it is fast.
         """
 
     def on_unpause(self, context: ExecutionContext):
         """
         Triggered when the node transitions from PAUSED to RUNNING.
+        .. warning:: This method is called inside a control loop, make sure it is fast.
         """
 
     def on_end(self, context: ExecutionContext):
         """
         Triggered when the node transitions from RUNNING to DONE.
+        .. warning:: This method is called inside a control loop, make sure it is fast.
         """
 
     def on_reset(self, context: ExecutionContext):
         """
         Triggered when the node transitions from any state to NOT_STARTED.
+        .. warning:: This method is called inside a control loop, make sure it is fast.
         """
 
     def __hash__(self):
