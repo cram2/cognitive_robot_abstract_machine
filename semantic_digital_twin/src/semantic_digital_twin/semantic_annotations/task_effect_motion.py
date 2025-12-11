@@ -35,9 +35,6 @@ class Effect(SemanticAnnotation):
     goal_value: float
     """Target value for the property."""
 
-    execution_model: EffectExecutionModel
-    """Model defining an execution function for the effect."""
-
     tolerance: float = 0.05
     """Acceptable deviation from goal value."""
 
@@ -93,6 +90,7 @@ class Motion(SemanticAnnotation):
     """The connection that must be manipulated."""
 
     motion_model: RunMSCModel = field(default=None)
+    """A model that describes how the motion can be executed. Here a Giskard Motion Statechart"""
 
 
 class MissingMotionStatechartError(Exception):
@@ -121,7 +119,7 @@ class RunMSCModel(EffectExecutionModel):
     actuator: Connection
     timeout: int = 500
 
-    def run(self, effect: Effect, world: World) -> Tuple[Optional[Motion], bool]:
+    def run(self, effect: Effect, world: World) -> Tuple[Optional[List[float]], bool]:
         if self.msc is None:
             raise MissingMotionStatechartError(
                 "RunMSCModel requires a MotionStatechart instance to run."
@@ -140,8 +138,7 @@ class RunMSCModel(EffectExecutionModel):
                 if self.msc.is_end_motion():
                     break
 
-            motion = Motion(trajectory=trajectory, actuator=self.actuator)
-            return motion, effect.is_achieved()
+            return trajectory, effect.is_achieved()
         finally:
             world.state.data = initial_state_data
             world.notify_state_change()

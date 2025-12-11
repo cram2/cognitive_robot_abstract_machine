@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from krrood.entity_query_language.conclusion import Add, Set
 from krrood.entity_query_language.entity import let, entity, set_of, inference
 from krrood.entity_query_language.match import match, entity_matching
@@ -6,7 +8,6 @@ from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from semantic_digital_twin.reasoning.predicates_base import (
-    CausesMotion,
     SatisfiesRequest,
     Causes,
 )
@@ -52,38 +53,54 @@ class TestBodyMotionProblem:
 
         # Define effects for the drawers
         effects = []
+        motions = []
         property_getter = lambda obj: obj.container.body.parent_connection.position
         for drawer in drawers:
             effect_open = OpenedEffect(
-                target_object=drawer,
-                goal_value=0.3,
-                property_getter=property_getter,
-                execution_model=None,
+                target_object=drawer, goal_value=0.3, property_getter=property_getter
             )
             close_effect = ClosedEffect(
                 target_object=drawer,
                 goal_value=0.0,
                 property_getter=property_getter,
-                execution_model=None,
             )
             effects.append(effect_open)
             effects.append(close_effect)
+            close_motion = Motion(
+                trajectory=[],
+                actuator=drawer.container.body.parent_connection,
+                motion_model=self._get_effect_execution_model_for_open_goal(
+                    drawer.handle.body, drawer.container.body.parent_connection, 0.0
+                ),
+            )
+            open_motion = Motion(
+                trajectory=[],
+                actuator=drawer.container.body.parent_connection,
+                motion_model=self._get_effect_execution_model_for_open_goal(
+                    drawer.handle.body, drawer.container.body.parent_connection, 0.3
+                ),
+            )
+            motions.append(open_motion)
+            motions.append(close_motion)
 
         # Define simple TaskRequests
         open_task = TaskRequest(task_type="open")
         close_task = TaskRequest(task_type="close")
-        return effects, open_task, close_task, drawers
+        return effects, motions, open_task, close_task, drawers
 
-    def test_query_motion_satisfying_task_request(self, apartment_world: World):
-        effects, open_task, close_task, _ = self._extend_world(apartment_world)
+    def test_query_motion_satisfying_task_request1(self, apartment_world: World):
+        effects, motions, open_task, close_task, _ = self._extend_world(apartment_world)
 
         # Define Krrood symbols
         task_sym = let(TaskRequest, domain=[open_task, close_task])
         effect_sym = let(Effect, domain=effects)
+        motion_sym = let(Motion, domain=motions)
 
         # Define Predicates for the query
         satisfies_request = SatisfiesRequest(task=task_sym, effect=effect_sym)
-        causes_opening = CausesMotion(effect=effect_sym, environment=apartment_world)
+        causes_opening = Causes(
+            effect=effect_sym, motion=motion_sym, environment=apartment_world
+        )
 
         query = an(
             set_of(
@@ -103,7 +120,7 @@ class TestBodyMotionProblem:
         )
 
     def test_query_task_and_effect_satisfying_motion(self, apartment_world: World):
-        effects, open_task, close_task, drawers = self._extend_world(apartment_world)
+        effects, _, open_task, close_task, drawers = self._extend_world(apartment_world)
 
         # Define a motion
         motion = Motion(
@@ -138,15 +155,20 @@ class TestBodyMotionProblem:
         )
 
     def test_query_motion_if_drawers_open(self, apartment_world: World):
-        effects, open_task, close_task, drawers = self._extend_world(apartment_world)
+        effects, motions, open_task, close_task, drawers = self._extend_world(
+            apartment_world
+        )
 
         # Define Krrood symbols
         task_sym = let(TaskRequest, domain=[open_task, close_task])
         effect_sym = let(Effect, domain=effects)
+        motion_sym = let(Motion, domain=motions)
 
         # Define Predicates for the query
         satisfies_request = SatisfiesRequest(task=task_sym, effect=effect_sym)
-        causes_opening = CausesMotion(effect=effect_sym, environment=apartment_world)
+        causes_opening = Causes(
+            effect=effect_sym, motion=motion_sym, environment=apartment_world
+        )
 
         # Query for motions that can be causes in the current world based on defined task requests, effects
         # and the world state. Only OpenedEffects should be available, as all drawers are closed
@@ -174,63 +196,13 @@ class TestBodyMotionProblem:
         assert all([res.data[task_sym].task_type == "close" for res in results])
         print("second query done with task type ", results[0].data[task_sym].task_type)
 
-    def test_query_constructs_msc_and_executes_via_effect_model(
-        self, apartment_world: World
-    ):
-        """
-        Build the MotionStatechart (MSC) and the Effect directly in the EQL query.
-        Attach the MSC as an effect model (RunMSCModel) to that inferred Effect, and
-        then use CausesOpening to execute. No pre-defined Effect domain is used.
-        """
-        effects, open_task, close_task, drawers = self._extend_world(apartment_world)
+    def test_query_motion_satisfying_task_request2(self, apartment_world: World):
+        effects, motions, open_task, close_task, drawers = self._extend_world(
+            apartment_world
+        )
 
         effect_sym = let(Effect, domain=effects)
-        task_sym = let(
-            TaskRequest,
-            domain=[open_task, close_task],
-        )
-
-        causes = CausesMotion(effect=effect_sym, environment=apartment_world)
-
-        query = an(
-            set_of(
-                [task_sym.task_type, effect_sym.name, causes.motion.trajectory],
-                SatisfiesRequest(task=task_sym, effect=effect_sym),
-                causes,
-            )
-        )
-
-        results = list(query.evaluate())
-        motion: Motion = results[0]
-        print(len(results))
-        print(motion)
-
-    def test_predefined_motion_models(self, apartment_world: World):
-        effects, open_task, close_task, drawers = self._extend_world(apartment_world)
-        motions = []
-        for drawer in drawers:
-            close_motion = Motion(
-                trajectory=[],
-                actuator=drawer.container.body.parent_connection,
-                motion_model=self._get_effect_execution_model_for_open_goal(
-                    drawer.handle.body, drawer.container.body.parent_connection, 0.0
-                ),
-            )
-            open_motion = Motion(
-                trajectory=[],
-                actuator=drawer.container.body.parent_connection,
-                motion_model=self._get_effect_execution_model_for_open_goal(
-                    drawer.handle.body, drawer.container.body.parent_connection, 0.0
-                ),
-            )
-            motions.append(close_motion)
-            motions.append(open_motion)
-
-        effect_sym = let(Effect, domain=effects)
-        task_sym = let(
-            TaskRequest,
-            domain=[open_task, close_task],
-        )
+        task_sym = let(TaskRequest, domain=[open_task, close_task])
         motion_sym = let(Motion, domain=motions)
 
         query = an(
@@ -238,7 +210,7 @@ class TestBodyMotionProblem:
                 [task_sym.task_type, effect_sym.name, motion_sym.trajectory],
                 SatisfiesRequest(task=task_sym, effect=effect_sym),
                 Causes(
-                    effect=effect_sym, environment=apartment_world, motion=motion_sym
+                    effect=effect_sym, motion=motion_sym, environment=apartment_world
                 ),
             )
         )

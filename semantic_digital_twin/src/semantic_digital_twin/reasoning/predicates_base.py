@@ -41,13 +41,20 @@ class Causes(Predicate):
         if self.effect.is_achieved():
             return False
 
-        if self.motion and self.motion.motion_model:
-            motion, success = self.motion.motion_model.run(
+        # Generate a trajectory from a motion model and check it fits the effect
+        if (
+            self.motion
+            and self.motion.motion_model
+            and len(self.motion.trajectory) == 0
+        ):
+            trajectory, success = self.motion.motion_model.run(
                 self.effect, self.environment
             )
-            if motion is not None:
-                self.motion = motion
+            if trajectory and len(trajectory) > 0:
+                self.motion.trajectory = trajectory
             return success
+
+        # If trajectory exists check if it fits the effect
         return self._map_motion_to_effect()
 
     def _map_motion_to_effect(self):
@@ -66,32 +73,6 @@ class Causes(Predicate):
         self.environment.notify_state_change()
 
         return not is_achieved_pre and is_achieved_post
-
-
-@dataclass
-class CausesMotion(Causes):
-    """
-    Overwrites the Causes Predicate for case 1 where a motion needs to be calculated that satisfies a given effect.
-    The calculated motion is written to the motion field.
-    This is a special implementation for calculating motions from motion statecharts.
-    """
-
-    motion: Optional[Motion] = field(default=None, init=False)
-
-    def __call__(self, *args, **kwargs):
-        if self.effect.is_achieved():
-            return False
-
-        # If an execution model is provided on the effect, delegate to it.
-        if self.effect.execution_model:
-            motion, success = self.effect.execution_model.run(
-                self.effect, self.environment
-            )
-            if motion is not None:
-                self.motion = motion
-            return success
-
-        return False
 
 
 @dataclass
