@@ -106,10 +106,6 @@ class SelectableMatchExpression(CanBehaveLikeAVariable[T]):
             raise AttributeError(
                 f"{self.__class__.__name__} object has no attribute {name}"
             )
-        # if name not in self._match_expression_.attribute_matches:
-        #     attr = getattr(self._match_expression_.expression, name)
-        #     attribute_expression = AttributeMatch(parent=self._match_expression_, attr_name=name, variable=attr)
-        #     self._match_expression_.attribute_matches[name] = attribute_expression
         if name not in self._selectable_attribute_matches_:
             attr = getattr(self._match_expression_.expression, name)
             attribute_expression = AttributeMatch(
@@ -179,12 +175,6 @@ class AbstractMatchExpression(Generic[T], ABC):
     node: Optional[RWXNode] = field(init=False, default=None)
     """
     The RWXNode representing the match expression in the match query graph.
-    """
-    attribute_matches: Dict[str, AttributeMatch] = field(
-        init=False, default_factory=dict
-    )
-    """
-    A dictionary mapping attribute names to their corresponding AttributeMatch instances.
     """
     _order_by: Optional[OrderByParams] = field(default=None, init=False)
     """
@@ -431,7 +421,6 @@ class EntityMatch(AbstractEntityMatch[T]):
             attr_match = AttributeMatch(
                 parent=self, attr_name=attr_name, assigned_value=attr_assigned_value
             )
-            self.attribute_matches[attr_name] = attr_match
             if attr_match.is_an_unresolved_match:
                 attr_match.resolve(self)
                 self.conditions.extend(attr_match.conditions)
