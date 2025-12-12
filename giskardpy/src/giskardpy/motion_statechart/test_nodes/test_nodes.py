@@ -112,7 +112,7 @@ class TestRunAfterStop(Goal):
 class TestEndBeforeStart(Goal):
     node1: CountTicks = field(init=False)
     node2: ConstTrueNode = field(init=False)
-    end: EndMotion = field(init=False)
+    node3: ConstTrueNode = field(init=False)
 
     def expand(self, context: BuildContext) -> None:
         self.node1 = CountTicks(ticks=1)
@@ -121,13 +121,15 @@ class TestEndBeforeStart(Goal):
         self.node2 = ConstTrueNode()
         self.add_node(self.node2)
 
-        self.end = EndMotion()
-        self.add_node(self.end)
-        self.end.start_condition = self.node1.observation_variable
-        self.end.end_condition = self.node2.observation_variable
+        self.node3 = ConstTrueNode()
+        self.add_node(self.node3)
+        self.node3.start_condition = self.node1.observation_variable
+        self.node3.end_condition = self.node2.observation_variable
 
     def build(self, context: BuildContext) -> NodeArtifacts:
-        return NodeArtifacts(observation=cas.Expression(self.end.observation_variable))
+        return NodeArtifacts(
+            observation=cas.Expression(self.node3.observation_variable)
+        )
 
 
 @dataclass(repr=False, eq=False)
