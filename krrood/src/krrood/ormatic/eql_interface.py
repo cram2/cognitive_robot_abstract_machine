@@ -19,6 +19,7 @@ from ..entity_query_language.symbolic import (
     Variable,
     Literal,
 )
+from ..entity_query_language.entity import SelectableMatchExpression
 
 from .dao import get_dao_class
 
@@ -790,6 +791,8 @@ def eql_to_sql(query: SymbolicExpression, session: Session) -> EQLTranslator:
     :param session: The SQLAlchemy session
     :return: The translator instance
     """
+    if isinstance(query, SelectableMatchExpression):
+        query = query._match_expression_.expression
     result = EQLTranslator(query, session)
     result.translate()
     return result

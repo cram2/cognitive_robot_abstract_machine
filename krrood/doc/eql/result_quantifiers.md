@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from typing_extensions import List
 
 from krrood.entity_query_language.entity import entity, let, Symbol
-from krrood.entity_query_language.quantify_entity import an, the
+from krrood.entity_query_language.entity_result_processors import an, the
 from krrood.entity_query_language.result_quantification_constraint import AtLeast, AtMost, Exactly, Range
 from krrood.entity_query_language.failures import MultipleSolutionFound, LessThanExpectedNumberOfSolutions, GreaterThanExpectedNumberOfSolutions
 
