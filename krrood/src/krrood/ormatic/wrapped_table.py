@@ -477,6 +477,11 @@ class WrappedTable:
             logger.info(f"Parsing as JSON.")
             self.create_json_column(wrapped_field)
 
+        # handle collection of enums
+        elif wrapped_field.is_collection_of_enums:
+            logger.info(f"Parsing as collection of enums.")
+            self.create_enum_list_column(wrapped_field)
+
         # handle one to many relationships
         elif wrapped_field.is_one_to_many_relationship:
             logger.info(f"Parsing as one to many relationship.")
@@ -638,6 +643,26 @@ class WrappedTable:
         container = Set if issubclass(wrapped_field.container_type, set) else List
         column_type = f"Mapped[{module_and_class_name(container)}[{module_and_class_name(wrapped_field.type_endpoint)}]]"
         column_constructor = f"mapped_column(JSON, nullable={wrapped_field.is_optional}, use_existing_column=True)"
+        self.custom_columns.append(
+            ColumnConstructor(column_name, column_type, column_constructor)
+        )
+
+    def create_enum_list_column(self, wrapped_field: WrappedField):
+        """
+        Create a column for a list of enum values stored as JSON.
+
+        :param wrapped_field: The field to extract the information from.
+        """
+        self.ormatic.imported_modules.add("typing_extensions")
+        self.ormatic.imported_modules.add(wrapped_field.type_endpoint.__module__)
+        self.ormatic.imported_modules.add("krrood.ormatic.custom_types")
+
+        column_name = wrapped_field.field.name
+        container = Set if issubclass(wrapped_field.container_type, set) else List
+        enum_type_name = module_and_class_name(wrapped_field.type_endpoint)
+        column_type = f"Mapped[{module_and_class_name(container)}[{enum_type_name}]]"
+        column_constructor = f"mapped_column(krrood.ormatic.custom_types.EnumListType({enum_type_name}), nullable={wrapped_field.is_optional}, use_existing_column=True)"
+
         self.custom_columns.append(
             ColumnConstructor(column_name, column_type, column_constructor)
         )

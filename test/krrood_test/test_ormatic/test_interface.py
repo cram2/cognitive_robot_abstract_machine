@@ -611,3 +611,15 @@ def test_multiple_inheritance(session, database):
     queried = session.scalars(select(MultipleInheritanceDAO)).one()
     reconstructed = queried.from_dao()
     assert reconstructed == obj
+
+
+def test_list_of_enum(session, database):
+    obj = ListOfEnum([TestEnum.OPTION_A, TestEnum.OPTION_B, TestEnum.OPTION_C])
+    dao = to_dao(obj)
+    session.add(dao)
+    session.commit()
+
+    queried = session.scalars(select(ListOfEnumDAO)).one()
+    reconstructed = queried.from_dao()
+    assert reconstructed == obj
+    assert reconstructed.list_of_enum == [TestEnum.OPTION_A, TestEnum.OPTION_B, TestEnum.OPTION_C]

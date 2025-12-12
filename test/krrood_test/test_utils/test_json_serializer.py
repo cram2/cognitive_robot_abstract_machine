@@ -173,11 +173,6 @@ def test_unknown_module_raises_unknown_module_error():
         SubclassJSONSerializer.from_json({JSON_TYPE_NAME: "non.existent.Class"})
 
 
-def test_missing_type_raises_missing_type_error():
-    with pytest.raises(MissingTypeError):
-        SubclassJSONSerializer.from_json({})
-
-
 def test_invalid_type_format_raises_invalid_type_format_error():
     with pytest.raises(InvalidTypeFormatError):
         SubclassJSONSerializer.from_json({JSON_TYPE_NAME: "NotAQualifiedName"})

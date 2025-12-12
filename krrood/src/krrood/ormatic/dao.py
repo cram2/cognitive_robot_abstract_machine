@@ -73,7 +73,9 @@ class NoDAOFoundError(TypeError):
     """
 
     def __post_init__(self):
-        super().__init__(f"Class {type(self.obj)} does not have a DAO.")
+        super().__init__(
+            f"Class {type(self.obj)} does not have a DAO. Did you forget to import your ORM Interface?"
+        )
 
 
 @dataclass

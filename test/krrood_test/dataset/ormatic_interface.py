@@ -724,6 +724,44 @@ class EntityAssociationDAO(
     }
 
 
+class ForwardRefTypeADAO(
+    SymbolDAO,
+    DataAccessObject[test.krrood_test.dataset.example_classes.ForwardRefTypeA],
+):
+
+    __tablename__ = "ForwardRefTypeADAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    value: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ForwardRefTypeADAO",
+        "inherit_condition": database_id == SymbolDAO.database_id,
+    }
+
+
+class ForwardRefTypeBDAO(
+    SymbolDAO,
+    DataAccessObject[test.krrood_test.dataset.example_classes.ForwardRefTypeB],
+):
+
+    __tablename__ = "ForwardRefTypeBDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    count: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ForwardRefTypeBDAO",
+        "inherit_condition": database_id == SymbolDAO.database_id,
+    }
+
+
 class FruitBoxDAO(
     SymbolDAO,
     DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.FruitBox],
@@ -799,6 +837,32 @@ class KinematicChainDAO(
     }
 
 
+class ListOfEnumDAO(
+    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.ListOfEnum]
+):
+
+    __tablename__ = "ListOfEnumDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    list_of_enum: Mapped[
+        typing.List[test.krrood_test.dataset.example_classes.TestEnum]
+    ] = mapped_column(
+        krrood.ormatic.custom_types.EnumListType(
+            test.krrood_test.dataset.example_classes.TestEnum
+        ),
+        nullable=False,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ListOfEnumDAO",
+        "inherit_condition": database_id == SymbolDAO.database_id,
+    }
+
+
 class MoreShapesDAO(
     SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.MoreShapes]
 ):
@@ -817,6 +881,43 @@ class MoreShapesDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "MoreShapesDAO",
+        "inherit_condition": database_id == SymbolDAO.database_id,
+    }
+
+
+class MultipleForwardRefContainerDAO(
+    SymbolDAO,
+    DataAccessObject[
+        test.krrood_test.dataset.example_classes.MultipleForwardRefContainer
+    ],
+):
+
+    __tablename__ = "MultipleForwardRefContainerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    ref_a_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("ForwardRefTypeADAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    ref_b_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("ForwardRefTypeBDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    ref_a: Mapped[ForwardRefTypeADAO] = relationship(
+        "ForwardRefTypeADAO", uselist=False, foreign_keys=[ref_a_id], post_update=True
+    )
+    ref_b: Mapped[ForwardRefTypeBDAO] = relationship(
+        "ForwardRefTypeBDAO", uselist=False, foreign_keys=[ref_b_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MultipleForwardRefContainerDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
     }
 

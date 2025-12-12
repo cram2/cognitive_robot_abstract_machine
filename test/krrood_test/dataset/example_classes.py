@@ -604,3 +604,45 @@ class PrimaryBase:
 @dataclass
 class MultipleInheritance(PrimaryBase, Mixin):
     extra_attribute: str
+
+
+# %% Test List of Enum
+
+
+class TestEnum(Enum):
+    OPTION_A = "option_a"
+    OPTION_B = "option_b"
+    OPTION_C = "option_c"
+
+
+@dataclass
+class ListOfEnum(Symbol):
+    list_of_enum: List[TestEnum]
+
+
+# %% Test forward reference resolution with multiple unresolved types
+# This reproduces the issue where get_type_hints fails because multiple
+# forward references need to be resolved iteratively
+
+
+@dataclass
+class ForwardRefTypeA(Symbol):
+    """A simple class used as a forward reference target."""
+    value: str = ""
+
+
+@dataclass
+class ForwardRefTypeB(Symbol):
+    """Another class used as a forward reference target."""
+    count: int = 0
+
+
+@dataclass
+class MultipleForwardRefContainer(Symbol):
+    """
+    A class that has multiple fields with forward reference types.
+    This tests that the forward reference resolution can handle
+    multiple unresolved types that need to be resolved iteratively.
+    """
+    ref_a: Optional[ForwardRefTypeA] = None
+    ref_b: Optional[ForwardRefTypeB] = None

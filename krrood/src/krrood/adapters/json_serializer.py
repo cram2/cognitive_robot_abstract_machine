@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import importlib
 import uuid
 from dataclasses import dataclass, field
@@ -21,10 +22,11 @@ leaf_types = (
     str,
     bool,
     NoneType,
-)  # containers that can be serialized by the built-in JSON module
+)  # types that can be serialized by the built-in JSON module
 
 
 JSON_TYPE_NAME = "__json_type__"  # the key used in JSON dicts to identify the class
+ENUM_TYPE_NAME = "__enum_type__"
 
 JSON_DICT_TYPE = Dict[str, Any]  # Commonly referred JSON dict
 JSON_RETURN_TYPE = Union[
@@ -200,6 +202,10 @@ class SubclassJSONSerializer:
         if isinstance(data, list_like_classes):
             return [from_json(d) for d in data]
 
+        fully_qualified_enum_name = data.get(ENUM_TYPE_NAME)
+        if fully_qualified_enum_name:
+            return data
+
         fully_qualified_class_name = data.get(JSON_TYPE_NAME)
         if not fully_qualified_class_name:
             raise MissingTypeError()
@@ -254,6 +260,9 @@ def to_json(obj: Union[SubclassJSONSerializer, Any]) -> JSON_RETURN_TYPE:
 
     if isinstance(obj, list_like_classes):
         return [to_json(item) for item in obj]
+
+    if isinstance(obj, dict):
+        return {to_json(key): to_json(value) for key, value in obj.items()}
 
     if isinstance(obj, SubclassJSONSerializer):
         return obj.to_json()
