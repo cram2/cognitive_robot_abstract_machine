@@ -2256,6 +2256,11 @@ class TestLifeCycleTransitions:
         kin_sim.tick_until_end()
         msc.draw("muh.pdf")
 
+        assert runafterstop.cancel.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert runafterstop.ticking1.life_cycle_state == LifeCycleValues.DONE
+        assert runafterstop.ticking2.life_cycle_state == LifeCycleValues.DONE
+        assert runafterstop.life_cycle_state == LifeCycleValues.DONE
+
     def test_run_after_stop_from_pause(self):
         """
         Test for node to run from paused while the parent node already stopped.
@@ -2282,6 +2287,15 @@ class TestLifeCycleTransitions:
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
         msc.draw("muh.pdf")
+
+        assert (
+            runafterstopfrompause.cancel.life_cycle_state == LifeCycleValues.NOT_STARTED
+        )
+        assert runafterstopfrompause.ticking1.life_cycle_state == LifeCycleValues.DONE
+        assert runafterstopfrompause.ticking2.life_cycle_state == LifeCycleValues.DONE
+        assert runafterstopfrompause.ticking3.life_cycle_state == LifeCycleValues.DONE
+        assert runafterstopfrompause.pulse.life_cycle_state == LifeCycleValues.DONE
+        assert runafterstopfrompause.life_cycle_state == LifeCycleValues.DONE
 
     def test_end_before_start(self):
         """
