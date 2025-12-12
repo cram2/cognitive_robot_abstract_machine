@@ -1,14 +1,14 @@
 import pytest
 
 import krrood.entity_query_language.entity_result_processors as eql
-from krrood.entity_query_language.entity import (
+from krrood.entity_query_language.core_entity import (
     _entity,
     let,
     _set_of,
     contains,
 )
 from krrood.entity_query_language.failures import UnquantifiedMatchError
-from krrood.entity_query_language.entitymatch import (
+from krrood.entity_query_language.entity import (
     entity,
     match_any,
     set_of,

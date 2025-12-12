@@ -19,7 +19,7 @@ from ..dataset.semantic_world_like_classes import (
     Door,
     Wardrobe,
 )
-from krrood.entity_query_language.entity import (
+from krrood.entity_query_language.core_entity import (
     _entity,
     let,
     inference,

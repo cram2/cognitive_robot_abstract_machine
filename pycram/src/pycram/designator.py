@@ -5,7 +5,7 @@ import inspect
 from dataclasses import dataclass, field
 from typing import get_type_hints
 
-from krrood.entity_query_language.entitymatch import entity, contains, let
+from krrood.entity_query_language.entity import entity, contains, let
 from krrood.entity_query_language.entity_result_processors import an, the
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot

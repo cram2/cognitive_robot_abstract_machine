@@ -4,7 +4,7 @@ from math import factorial
 import pytest
 
 import krrood.entity_query_language.entity_result_processors as eql
-from krrood.entity_query_language.entity import (
+from krrood.entity_query_language.core_entity import (
     and_,
     not_,
     contains,

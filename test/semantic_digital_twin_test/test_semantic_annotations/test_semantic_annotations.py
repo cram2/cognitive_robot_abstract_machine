@@ -1,7 +1,7 @@
 import logging
 
 from krrood.entity_query_language.entity_result_processors import an
-from krrood.entity_query_language.entitymatch import (
+from krrood.entity_query_language.entity import (
     entity,
     let,
     in_,

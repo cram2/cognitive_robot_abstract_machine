@@ -5,7 +5,7 @@ from copy import deepcopy
 from typing import Optional, List
 
 import trimesh.sample
-from krrood.entity_query_language.entitymatch import (
+from krrood.entity_query_language.entity import (
     let,
     entity,
     and_,

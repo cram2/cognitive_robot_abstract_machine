@@ -1,352 +1,749 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from functools import cached_property
 
-from .failures import LiteralConditionError
-from .symbol_graph import SymbolGraph
+from krrood.entity_query_language.core_entity import Item, Container
+from typing_extensions import (
+    Optional,
+    Type,
+    Dict,
+    Any,
+    List,
+    Union,
+    Self,
+    Iterable,
+    Generic,
+    Callable,
+)
+
+from .core_entity import *
+from .core_entity import _entity, _set_of
+from .failures import NoneWrappedFieldError, WrongSelectableType, UnquantifiedMatchError
+from .predicate import HasType
+from .rxnode import RWXNode
+from .symbolic import (
+    CanBehaveLikeAVariable,
+    Attribute,
+    Comparator,
+    QueryObjectDescriptor,
+    Selectable,
+    SymbolicExpression,
+    OperationResult,
+    Literal,
+    ResultQuantifier,
+    An,
+    Variable,
+    Flatten,
+    Exists,
+    DomainType,
+    ResultProcessor,
+    OrderByParams,
+    Entity,
+)
 from .utils import is_iterable, T
 
-"""
-User interface (grammar & vocabulary) for entity query language.
-"""
-import operator
 
-from typing_extensions import (
-    Any,
-    Optional,
-    Union,
-    Iterable,
-    Type,
-    Tuple,
-    List,
-    Callable,
-    TYPE_CHECKING,
-    overload,
-)
-
-from .symbolic import (
-    SymbolicExpression,
-    Entity,
-    SetOf,
-    AND,
-    Comparator,
-    chained_logic,
-    CanBehaveLikeAVariable,
-    Variable,
-    optimize_or,
-    Flatten,
-    ForAll,
-    Exists,
-    Literal,
-    Selectable,
-    DomainType,
-)
-
-from .predicate import (
-    Predicate,
-    # type: ignore
-    Symbol,  # type: ignore
-)
-
-if TYPE_CHECKING:
-    pass
-
-ConditionType = Union[SymbolicExpression, bool, Predicate]
-"""
-The possible types for conditions.
-"""
-
-
-def _entity(
-    selected_variable: T,
-    *properties: ConditionType,
-) -> Entity[T]:
+@dataclass
+class ResultProcessorData:
     """
-    Create an entity descriptor from a selected variable and its properties.
-
-    :param selected_variable: The variable to select in the result.
-    :type selected_variable: T
-    :param properties: Conditions that define the entity.
-    :type properties: Union[SymbolicExpression, bool]
-    :return: Entity descriptor.
-    :rtype: Entity[T]
+    A class representing a result processor in a Match statement. This is used to process the result of the match.
     """
-    selected_variables, expression = _extract_variables_and_expression(
-        [selected_variable], *properties
+
+    type_: Type[ResultProcessor]
+    """
+    The type of the result processor.
+    """
+    kwargs: Dict[str, Any] = field(default_factory=dict)
+    """
+    The keyword arguments to pass to the result processor.
+    """
+
+    def apply(self, expr: Selectable[T]) -> Union[ResultProcessor[T], T]:
+        return self.type_(_child_=expr, **self.kwargs)
+
+
+@dataclass
+class SelectableMatchExpression(CanBehaveLikeAVariable[T]):
+    """
+    Base class for all match expressions.
+
+    Match expressions are structured in a graph that is a higher level representation for the entity query graph.
+    """
+
+    _match_expression_: AbstractMatchExpression[T]
+    """
+    The match expression that this class wraps and makes selectable.
+    """
+    _selectable_attribute_matches_: Dict[str, SelectableMatchExpression] = field(
+        init=False, default_factory=dict
     )
-    return Entity(_selected_variables=selected_variables, _child_=expression)
-
-
-def _set_of(
-    selected_variables: Iterable[T],
-    *properties: ConditionType,
-) -> SetOf[T]:
     """
-    Create a set descriptor from selected variables and their properties.
-
-    :param selected_variables: Iterable of variables to select in the result set.
-    :type selected_variables: Iterable[T]
-    :param properties: Conditions that define the set.
-    :type properties: Union[SymbolicExpression, bool]
-    :return: Set descriptor.
-    :rtype: SetOf[T]
+    A dictionary mapping attribute names to their corresponding selectable match expressions.
     """
-    selected_variables, expression = _extract_variables_and_expression(
-        selected_variables, *properties
+
+    def __post_init__(self):
+        """
+        This is to avoid running __post_init__ of the BaseClass CanBehaveLikeAVariable and to set _var_, _node_, and
+        _id_ manually from the match_expression.
+        """
+        self._var_ = self._match_expression_.variable
+        if self._var_ is None:
+            return
+        self._node_ = self._var_._node_
+        self._id_ = self._var_._id_
+
+    def evaluate(self):
+        """
+        Evaluate the match expression and return the result.
+        """
+        return self._match_expression_.expression.evaluate()
+
+    def __getattr__(self, name):
+        # Prevent debugger/private attribute lookups from being interpreted as symbolic attributes
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(
+                f"{self.__class__.__name__} object has no attribute {name}"
+            )
+        # if name not in self._match_expression_.attribute_matches:
+        #     attr = getattr(self._match_expression_.expression, name)
+        #     attribute_expression = AttributeMatch(parent=self._match_expression_, attr_name=name, variable=attr)
+        #     self._match_expression_.attribute_matches[name] = attribute_expression
+        if name not in self._selectable_attribute_matches_:
+            attr = getattr(self._match_expression_.expression, name)
+            attribute_expression = AttributeMatch(
+                parent=self._match_expression_, attr_name=name, variable=attr
+            )
+            selectable_attribute_expression = SelectableMatchExpression(
+                _match_expression_=attribute_expression
+            )
+            self._selectable_attribute_matches_[name] = selectable_attribute_expression
+        return self._selectable_attribute_matches_[name]
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, Any]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+        self._eval_parent_ = parent
+        yield from self._var_._evaluate__(sources, self)
+
+    @property
+    def _name_(self) -> str:
+        return f"Selectable({self._match_expression_.name})"
+
+    def _all_variable_instances_(self) -> List[Variable]:
+        return self._var_._all_variable_instances_
+
+    def __str__(self):
+        return self._name_
+
+    def __repr__(self):
+        return self._name_
+
+    def __hash__(self):
+        return hash(self._match_expression_)
+
+
+@dataclass
+class AbstractMatchExpression(Generic[T], ABC):
+    _type: Optional[Type[T]] = field(default=None, kw_only=True)
+    """
+    The type of the variable.
+    """
+    variable: Optional[Selectable[T]] = field(default=None, kw_only=True)
+    """
+    The created variable from the type and kwargs.
+    """
+    is_selected: bool = field(default=False, kw_only=True)
+    """
+    Whether the variable should be selected in the result.
+    """
+    existential: bool = field(default=False, kw_only=True)
+    """
+    Whether the match is an existential match check or not.
+    """
+    universal: bool = field(default=False, kw_only=True)
+    """
+    Whether the match is a universal match (i.e., must match for all values of the variable/attribute) check or not.
+    """
+    conditions: List[ConditionType] = field(init=False, default_factory=list)
+    """
+    The conditions that define the match.
+    """
+    parent: Optional[EntityMatch] = field(init=False, default=None)
+    """
+    The parent match if this is a nested match.
+    """
+    node: Optional[RWXNode] = field(init=False, default=None)
+    """
+    The RWXNode representing the match expression in the match query graph.
+    """
+    attribute_matches: Dict[str, AttributeMatch] = field(
+        init=False, default_factory=dict
     )
-    return SetOf(_selected_variables=selected_variables, _child_=expression)
-
-
-def _extract_variables_and_expression(
-    selected_variables: Iterable[T], *properties: ConditionType
-) -> Tuple[List[T], SymbolicExpression]:
     """
-    Extracts the variables and expressions from the selected variables.
-
-    :param selected_variables: Iterable of variables to select in the result set.
-    :param properties: Conditions on the selected variables.
-    :return: Tuple of selected variables and expressions.
+    A dictionary mapping attribute names to their corresponding AttributeMatch instances.
     """
-    expression_list = list(properties)
-    selected_variables = list(selected_variables)
-    expression = None
-    if len(expression_list) > 0:
-        literal_expressions = [
-            exp for exp in expression_list if not isinstance(exp, SymbolicExpression)
-        ]
-        if literal_expressions:
-            raise LiteralConditionError(literal_expressions)
-        expression = (
-            and_(*expression_list) if len(expression_list) > 1 else expression_list[0]
+    _order_by: Optional[OrderByParams] = field(default=None, init=False)
+    """
+    Parameters for ordering the results of the query object descriptor.
+    """
+    _distinct: bool = field(init=False, default=False)
+    """
+    Whether to get distinct results or not.
+    """
+    _distinct_on: List[Selectable] = field(init=False, default_factory=list)
+    """
+    List of variables that need to be distinct together as a combination.
+    """
+    result_processor_data: Optional[ResultProcessorData] = field(
+        init=False, default_factory=lambda: ResultProcessorData(An)
+    )
+    """
+    The result processor data to be applied to the match expression.
+    """
+    selectable_match: Optional[SelectableMatchExpression] = field(
+        init=False, default=None
+    )
+    """
+    The selectable match expression of this match.
+    """
+
+    def __post_init__(self):
+        self.node = RWXNode(self.name, data=self)
+        if self.parent:
+            self.node.parent = self.parent.node
+
+    def where(self, *conditions: ConditionType) -> Self:
+        self.conditions.extend(conditions)
+        return self
+
+    def order_by(
+        self,
+        variable: Optional[Selectable] = None,
+        descending: bool = False,
+        key: Optional[Callable] = None,
+    ) -> Self:
+        """
+        Order the results by the given variable, using the given key function in descending or ascending order.
+
+        :param variable: The variable to order by.
+        :param descending: Whether to order the results in descending order.
+        :param key: A function to extract the key from the variable value.
+        """
+        self._order_by = OrderByParams(variable, descending, key)
+        return self
+
+    def distinct(
+        self,
+        *on: Selectable[T],
+    ) -> Self:
+        """
+        Apply distinctness constraint to the query object descriptor results.
+
+        :param on: The variables to be used for distinctness.
+        :return: This query object descriptor.
+        """
+        self._distinct = True
+        self._distinct_on = list(on)
+        return self
+
+    @cached_property
+    @abstractmethod
+    def expression(self) -> Union[ResultQuantifier[T], T]:
+        """
+        Return the entity expression corresponding to the match query.
+        """
+        ...
+
+    def apply_result_processor(
+        self, result_processor: Type[ResultProcessor[T]], **result_processor_kwargs
+    ) -> Union[ResultProcessor[T], T]:
+        """
+        Record the result processor to be applied to the result of the match.
+        """
+        self.result_processor_data = ResultProcessorData(
+            result_processor, result_processor_kwargs
         )
-    return selected_variables, expression
+        self.resolve()
+        if self.selectable_match is None:
+            self.selectable_match = SelectableMatchExpression(_match_expression_=self)
+        return self.selectable_match
+
+    @abstractmethod
+    def resolve(self, *args, **kwargs): ...
+
+    @property
+    @abstractmethod
+    def name(self) -> str: ...
+
+    @property
+    def id(self):
+        return self.node.id
+
+    @cached_property
+    def type(self) -> Optional[Type[T]]:
+        """
+        If type is predefined return it, else if the variable is available return its type, else return None.
+        """
+        if self._type is not None:
+            return self._type
+        if self.variable is None:
+            return None
+        return self.variable._type_
+
+    @property
+    def root(self) -> EntityMatch:
+        return self.node.root.data
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+    def __hash__(self):
+        return id(self)
 
 
-def let(
-    type_: Type[T],
-    domain: DomainType,
-    name: Optional[str] = None,
-) -> Union[T, Selectable[T]]:
+@dataclass(eq=False)
+class AbstractEntityMatch(AbstractMatchExpression[T], ABC):
+
+    def evaluate(self):
+        return self.expression.evaluate()
+
+    @cached_property
+    def expression(self) -> Union[ResultQuantifier[T], T]:
+        query_descriptor = self._query_descriptor
+        if self._distinct:
+            query_descriptor = query_descriptor.distinct(*self._distinct_on)
+        if self._order_by:
+            query_descriptor.order_by(
+                self._order_by.variable, self._order_by.descending, self._order_by.key
+            )
+        return self.result_processor_data.apply(query_descriptor)
+
+    @cached_property
+    @abstractmethod
+    def _query_descriptor(self) -> QueryObjectDescriptor: ...
+
+
+@dataclass(eq=False)
+class SetOfMatch(AbstractEntityMatch[T]):
+    selected_variables: List[Selectable]
     """
-    Declare a symbolic variable that can be used inside queries.
-
-    Filters the domain to elements that are instances of T.
-
-    .. warning::
-
-        If no domain is provided, and the type_ is a Symbol type, then the domain will be inferred from the SymbolGraph,
-         which may contain unnecessarily many elements.
-
-    :param type_: The type of variable.
-    :param domain: Iterable of potential values for the variable or None.
-     If None, the domain will be inferred from the SymbolGraph for Symbol types, else should not be evaluated by EQL
-      but by another evaluator (e.g., EQL To SQL converter in Ormatic).
-    :param name: The variable name, only required for pretty printing.
-    :return: A Variable that can be queried for.
-    """
-    domain_source = _get_domain_source_from_domain_and_type_values(domain, type_)
-
-    if name is None:
-        name = type_.__name__
-
-    result = Variable(
-        _type_=type_,
-        _domain_source_=domain_source,
-        _name__=name,
-    )
-
-    return result
-
-
-def _get_domain_source_from_domain_and_type_values(
-    domain: DomainType, type_: Type
-) -> Optional[DomainType]:
-    """
-    Get the domain source from the domain and the type values.
-
-    :param domain: The domain value.
-    :param type_: The type of the variable.
-    :return: The domain source as a From object.
-    """
-    if is_iterable(domain):
-        domain = filter(lambda x: isinstance(x, type_), domain)
-    elif domain is None and issubclass(type_, Symbol):
-        domain = SymbolGraph().get_instances_of_type(type_)
-    return domain
-
-
-def and_(*conditions: ConditionType):
-    """
-    Logical conjunction of conditions.
-
-    :param conditions: One or more conditions to combine.
-    :type conditions: SymbolicExpression | bool
-    :return: An AND operator joining the conditions.
-    :rtype: SymbolicExpression
-    """
-    return chained_logic(AND, *conditions)
-
-
-def or_(*conditions):
-    """
-    Logical disjunction of conditions.
-
-    :param conditions: One or more conditions to combine.
-    :type conditions: SymbolicExpression | bool
-    :return: An OR operator joining the conditions.
-    :rtype: SymbolicExpression
-    """
-    return chained_logic(optimize_or, *conditions)
-
-
-def not_(operand: SymbolicExpression):
-    """
-    A symbolic NOT operation that can be used to negate symbolic expressions.
-    """
-    if not isinstance(operand, SymbolicExpression):
-        operand = Literal(operand)
-    return operand._invert_()
-
-
-@dataclass
-class Item:
-    """
-    Represents a container item.
+    A list of selected variables.
     """
 
-    item: Any
+    @cached_property
+    def _query_descriptor(self) -> QueryObjectDescriptor:
+        if len(self.selected_variables) > 1:
+            return _set_of(self.selected_variables, *self.conditions)
+        return _entity(self.selected_variables[0], *self.conditions)
+
+    def resolve(self, *args, **kwargs):
+        pass
+
+    @property
+    def name(self) -> str:
+        return f"SetOf({','.join(map(str, self.selected_variables))})"
 
 
-@overload
-def contains(item: Any):
+@dataclass(eq=False)
+class EntityMatch(AbstractEntityMatch[T]):
     """
-    A version of contains where the container is not defined yet
-    """
-    ...
-
-
-@overload
-def contains(
-    container: Union[Iterable, CanBehaveLikeAVariable[T]], item: Any
-) -> Comparator:
-    """
-    Check whether a container contains an item.
-
-    :param container: The container expression.
-    :param item: The item to look for.
-    :return: A comparator expression equivalent to ``item in container``.
-    :rtype: SymbolicExpression
-    """
-    ...
-
-
-def contains(*args):
-    """
-    Check whether a container contains an item. Can take just the item or both container and item.
-    """
-    if len(args) == 1:
-        item = args[0]
-        return Item(None, item)
-    container, item = args[0], args[1]
-    return in_(item, container)
-
-
-@overload
-def in_(container: Union[Iterable, CanBehaveLikeAVariable[T]]):
-    """
-    Build a comparator for membership: ``item in container``.
-
-    :param container: The container expression.
-    :return: Comparator expression for membership.
-    """
-    ...
-
-
-@overload
-def in_(item: Any, container: Union[Iterable, CanBehaveLikeAVariable[T]]):
-    """
-    Build a comparator for membership: ``item in container``.
-
-    :param item: The candidate item.
-    :param container: The container expression.
-    :return: Comparator expression for membership.
-    :rtype: Comparator
-    """
-    ...
-
-
-@dataclass
-class Container:
-    """
-    Represents a container of items.
+    Construct a query that looks for the pattern provided by the type and the keyword arguments.
+    Example usage where we look for an object of type Drawer with body of type Body that has the name"drawer_1":
+        >>> @dataclass
+        >>> class Body:
+        >>>     name: str
+        >>> @dataclass
+        >>> class Drawer:
+        >>>     body: Body
+        >>> drawer = an(entity(Drawer)(body=entity(Body)(name="drawer_1")))
     """
 
-    container: Union[Iterable, CanBehaveLikeAVariable[T]]
-
-
-def in_(*args):
+    domain: DomainType = field(default=None, kw_only=True)
     """
-    If two arguments are give, build a comparator for membership: ``item in container``,
-    else if one argument, then it is considered as the container and Container instance is returned.
+    The domain to use for the variable created by the match.
     """
-    if len(args) == 1:
-        container = args[0]
-        return Container(container)
-    item, container = args[0], args[1]
-    return Comparator(container, item, operator.contains)
-
-
-def flatten(
-    var: Union[CanBehaveLikeAVariable[T], Iterable[T]],
-) -> Union[CanBehaveLikeAVariable[T], T]:
+    kwargs: Dict[str, Any] = field(init=False, default_factory=dict)
     """
-    Flatten a nested iterable domain into individual items while preserving the parent bindings.
-    This returns a DomainMapping that, when evaluated, yields one solution per inner element
-    (similar to SQL UNNEST), keeping existing variable bindings intact.
+    The keyword arguments to match against.
     """
-    return Flatten(var)
-
-
-def for_all(
-    universal_variable: Union[CanBehaveLikeAVariable[T], T],
-    condition: ConditionType,
-):
+    resolved: bool = field(init=False, default=False)
     """
-    A universal on variable that finds all sets of variable bindings (values) that satisfy the condition for **every**
-     value of the universal_variable.
-
-    :param universal_variable: The universal on variable that the condition must satisfy for all its values.
-    :param condition: A SymbolicExpression or bool representing a condition that must be satisfied.
-    :return: A SymbolicExpression that can be evaluated producing every set that satisfies the condition.
+    Whether the match is resolved or not.
     """
-    return ForAll(universal_variable, condition)
+
+    def __call__(self, **kwargs) -> Union[Self, T, CanBehaveLikeAVariable[T]]:
+        """
+        Update the match with new keyword arguments to constrain the type we are matching with.
+
+        :param kwargs: The keyword arguments to match against.
+        :return: The current match instance after updating it with the new keyword arguments.
+        """
+        self.kwargs = kwargs
+        return self
+
+    @cached_property
+    def _query_descriptor(self) -> Entity:
+        """
+        Return the entity expression corresponding to the match query.
+        """
+        if not self.variable:
+            self.resolve()
+        return _entity(self.variable, *self.conditions)
+
+    def __getattr__(self, item):
+        """
+        Implemented to raise the appropriate error.
+        """
+        if item.startswith("__"):
+            raise AttributeError(item)
+        raise UnquantifiedMatchError(self)
+
+    def from_(self, domain: DomainType):
+        """
+        Record the domain to use for the variable created by the match.
+        """
+        self.domain = domain
+        return self
+
+    def resolve(
+        self,
+        variable: Optional[Selectable] = None,
+        parent: Optional[EntityMatch] = None,
+    ):
+        """
+        Resolve the match by creating the variable and conditions expressions.
+
+        :param variable: An optional pre-existing variable to use for the match; if not provided, a new variable will
+         be created.
+        :param parent: The parent match if this is a nested match.
+        :return:
+        """
+        if self.resolved:
+            return
+        self.update_fields(variable, parent)
+        for attr_name, attr_assigned_value in self.kwargs.items():
+            if isinstance(attr_assigned_value, SelectableMatchExpression):
+                attr_assigned_value = attr_assigned_value._match_expression_
+            attr_match = AttributeMatch(
+                parent=self, attr_name=attr_name, assigned_value=attr_assigned_value
+            )
+            self.attribute_matches[attr_name] = attr_match
+            if attr_match.is_an_unresolved_match:
+                attr_match.resolve(self)
+                self.conditions.extend(attr_match.conditions)
+            else:
+                condition = (
+                    attr_match.infer_condition_between_attribute_and_assigned_value()
+                )
+                self.conditions.append(condition)
+        self.resolved = True
+        return self
+
+    def update_fields(
+        self,
+        variable: Optional[Selectable] = None,
+        parent: Optional[EntityMatch] = None,
+    ):
+        """
+        Update the match variable, and parent.
+
+        :param variable: The variable to use for the match.
+         If None, a new variable will be created.
+        :param parent: The parent match if this is a nested match.
+        """
+
+        if variable is not None:
+            self.variable = variable
+        elif self.variable is None:
+            self.variable = let(self.type, self.domain)
+
+        self.parent = parent
+
+    def evaluate(self):
+        """
+        Evaluate the match expression and return the result.
+        """
+        return self.expression.evaluate()
+
+    @property
+    def name(self) -> str:
+        return f"Match({self.type})"
+
+    def __repr__(self):
+        return self.name
+
+    def __str__(self):
+        return self.name
 
 
-def exists(
-    universal_variable: Union[CanBehaveLikeAVariable[T], T],
-    condition: ConditionType,
-):
+@dataclass(eq=False)
+class AttributeMatch(AbstractMatchExpression[T]):
     """
-    A universal on variable that finds all sets of variable bindings (values) that satisfy the condition for **any**
-     value of the universal_variable.
-
-    :param universal_variable: The universal on variable that the condition must satisfy for any of its values.
-    :param condition: A SymbolicExpression or bool representing a condition that must be satisfied.
-    :return: A SymbolicExpression that can be evaluated producing every set that satisfies the condition.
+    A class representing an attribute assignment in a Match statement.
     """
-    return Exists(universal_variable, condition)
 
-
-def inference(
-    type_: Type[T],
-) -> Union[Type[T], Callable[[Any], Variable[T]]]:
+    parent: AbstractMatchExpression = field(kw_only=True)
     """
-    This returns a factory function that creates a new variable of the given type and takes keyword arguments for the
-    type constructor.
+    The parent match expression.
+    """
+    attr_name: str = field(kw_only=True)
+    """
+    The name of the attribute to assign the value to.
+    """
+    assigned_value: Optional[Union[Literal, EntityMatch]] = None
+    """
+    The value to assign to the attribute, which can be a Match instance or a Literal.
+    """
+    variable: Union[Attribute, Flatten] = field(default=None, kw_only=True)
+    """
+    The symbolic variable representing the attribute.
+    """
+    flattened_attribute: Flatten = field(init=False, default=None)
+    """
+    The flattened attribute if the attribute is an iterable and has been flattened.
+    """
+
+    @cached_property
+    def expression(self) -> Union[ResultQuantifier[T], T]:
+        """
+        Return the entity expression corresponding to the match query.
+        """
+        if not self.variable:
+            self.resolve()
+        if issubclass(self.result_processor_data.type_, ResultQuantifier):
+            return self.variable
+        else:
+            return self.result_processor_data.apply(self.variable)
+
+    def resolve(
+        self,
+        parent_match: Optional[EntityMatch] = None,
+    ):
+        """
+        Resolve the attribute assignment by creating the conditions and applying the necessary mappings
+        to the attribute.
+
+        :param parent_match: The parent match of the attribute assignment.
+        """
+        if self.variable is not None:
+            return
+        possibly_flattened_attr = self.attribute
+        if (
+            self.attribute._wrapped_field_
+            and self.attribute._is_iterable_
+            and (self.assigned_value.kwargs or self.is_type_filter_needed)
+        ):
+            self.flattened_attribute = flatten(self.attribute)
+            possibly_flattened_attr = self.flattened_attribute
+
+        self.assigned_value.resolve(possibly_flattened_attr, parent_match)
+
+        if self.is_type_filter_needed:
+            self.conditions.append(
+                HasType(possibly_flattened_attr, self.assigned_value.type)
+            )
+
+        self.conditions.extend(self.assigned_value.conditions)
+
+        # Update _var_, _id_, and _node_, these are needed for the query graph, and for selection mechanics that use _var_.
+        if self.flattened_attribute is None:
+            self.variable = self.attribute
+        else:
+            self.variable = self.flattened_attribute
+
+    def infer_condition_between_attribute_and_assigned_value(
+        self,
+    ) -> Union[Comparator, Exists]:
+        """
+        Find and return the appropriate condition for the attribute and its assigned value. This can be one of contains,
+        in_, or == depending on the type of the assigned value and the type of the attribute. In addition, if the
+        assigned value is a Match instance with an existential flag set, an Exists expression is created over the
+         comparator condition.
+
+        :return: A Comparator or an Exists expression representing the condition.
+        """
+        if isinstance(self.assigned_value, Item):
+            condition = contains(self.attribute, self.assigned_value.item)
+        elif isinstance(self.assigned_value, Container):
+            condition = in_(self.attribute, self.assigned_value.container)
+        elif (
+            self.attribute._wrapped_field_
+            and self.attribute._is_iterable_
+            and not self.is_iterable_value
+        ):
+            condition = contains(self.attribute, self.assigned_variable)
+        elif (
+            self.attribute._wrapped_field_
+            and not self.attribute._is_iterable_
+            and self.is_iterable_value
+        ):
+            condition = in_(self.attribute, self.assigned_variable)
+        elif (
+            self.attribute._wrapped_field_
+            and self.attribute._is_iterable_
+            and self.is_iterable_value
+            and not (
+                isinstance(self.assigned_value, AbstractMatchExpression)
+                and self.assigned_value.universal
+            )
+        ):
+            self.flattened_attribute = flatten(self.attribute)
+            condition = contains(self.assigned_variable, self.flattened_attribute)
+        else:
+            condition = self.attribute == self.assigned_variable
+
+        if (
+            isinstance(self.assigned_value, AbstractMatchExpression)
+            and self.assigned_value.existential
+        ):
+            condition = exists(self.attribute, condition)
+
+        return condition
+
+    @cached_property
+    def assigned_variable(self) -> CanBehaveLikeAVariable:
+        """
+        :return: The symbolic variable representing the assigned value.
+        """
+        return (
+            self.assigned_value.variable
+            if isinstance(self.assigned_value, AbstractMatchExpression)
+            else self.assigned_value
+        )
+
+    @cached_property
+    def attribute(self) -> Attribute:
+        """
+        :return: the attribute of the variable.
+        :raises NoneWrappedFieldError: If the attribute does not have a WrappedField.
+        """
+        if self.variable is not None:
+            return self.variable
+        attr: Attribute = getattr(self.parent.variable, self.attr_name)
+        # if attr._wrapped_field_ is None:
+        #     raise NoneWrappedFieldError(self.parent.type, self.attr_name)
+        self.variable = attr
+        return attr
+
+    @property
+    def is_an_unresolved_match(self) -> bool:
+        """
+        :return: True if the value is an unresolved Match instance, else False.
+        """
+        return (
+            isinstance(self.assigned_value, AbstractMatchExpression)
+            and not self.assigned_value.variable
+        )
+
+    @cached_property
+    def is_iterable_value(self) -> bool:
+        """
+        :return: True if the value is an iterable or a Match instance with an iterable type, else False.
+        """
+        if isinstance(self.assigned_value, Item):
+            return False
+        elif isinstance(self.assigned_value, Container):
+            return True
+        elif isinstance(self.assigned_value, Selectable):
+            return self.assigned_value._is_iterable_
+        elif not isinstance(
+            self.assigned_value, AbstractMatchExpression
+        ) and is_iterable(self.assigned_value):
+            return True
+        elif (
+            isinstance(self.assigned_value, AbstractMatchExpression)
+            and self.assigned_value.variable._is_iterable_
+        ):
+            return True
+        return False
+
+    @cached_property
+    def is_type_filter_needed(self):
+        """
+        :return: True if a type filter condition is needed for the attribute assignment, else False.
+        """
+        if not self.attribute._wrapped_field_:
+            return False
+        attr_type = self.type
+        return (not attr_type) or (
+            (self.assigned_value.type and self.assigned_value.type is not attr_type)
+            and issubclass(self.assigned_value.type, attr_type)
+        )
+
+    @property
+    def name(self) -> str:
+        return f"{self.parent.name}.{self.attr_name}"
+
+    def __repr__(self):
+        return self.name
+
+    def __str__(self):
+        return self.name
+
+
+def entity(
+    type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
+) -> Union[Type[T], CanBehaveLikeAVariable[T], EntityMatch[T]]:
+    """
+    Create and return a Match instance that looks for the pattern provided by the type and the
+    keyword arguments.
 
     :param type_: The type of the variable (i.e., The class you want to instantiate).
-    :return: The factory function for creating a new variable.
+    :return: The Match instance.
     """
-    return lambda **kwargs: Variable(
-        _type_=type_, _name__=type_.__name__, _kwargs_=kwargs, _is_inferred_=True
-    )
+    return _entity_matching(type_, None)
+
+
+def match_any(
+    type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
+) -> Union[Type[T], CanBehaveLikeAVariable[T], EntityMatch[T]]:
+    """
+    Equivalent to entity(type_) but for existential checks.
+    """
+    match_ = entity(type_)
+    match_.existential = True
+    return match_
+
+
+def match_all(
+    type_: Union[Type[T], CanBehaveLikeAVariable[T], Any, None] = None,
+) -> Union[Type[T], CanBehaveLikeAVariable[T], EntityMatch[T]]:
+    """
+    Equivalent to entity(type_) but for universal checks.
+    """
+    match_ = entity(type_)
+    match_.universal = True
+    return match_
+
+
+def set_of(
+    *variables: Union[T, Selectable[T]],
+) -> Union[T, SetOfMatch[T]]:
+    """
+    Select the set of variables to be included in the result.
+    """
+    if not variables:
+        raise ValueError("set_of() requires at least one variable to be provided.")
+    return SetOfMatch(list(variables))
+
+
+def _entity_matching(
+    type_: Union[Type[T], CanBehaveLikeAVariable[T]], domain: DomainType
+) -> Union[Type[T], CanBehaveLikeAVariable[T], EntityMatch[T]]:
+    """
+    Same as :py:func:`krrood.entity_query_language.match.match` but with a domain to use for the variable created
+     by the match.
+
+    :param type_: The type of the variable (i.e., The class you want to instantiate).
+    :param domain: The domain used for the variable created by the match.
+    :return: The MatchEntity instance.
+    """
+    if isinstance(type_, CanBehaveLikeAVariable):
+        return EntityMatch(_type=type_._type_, domain=domain, variable=type_)
+    elif type_ and not isinstance(type_, type):
+        return EntityMatch(_type=type_, domain=domain, variable=Literal(type_))
+    return EntityMatch(_type=type_, domain=domain)

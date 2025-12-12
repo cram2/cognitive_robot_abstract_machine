@@ -1,4 +1,4 @@
-from krrood.entity_query_language.entitymatch import entity, set_of, let, contains
+from krrood.entity_query_language.entity import entity, set_of, let, contains
 from krrood.entity_query_language.entity_result_processors import the, a, an
 from semantic_digital_twin.spatial_types import Expression
 

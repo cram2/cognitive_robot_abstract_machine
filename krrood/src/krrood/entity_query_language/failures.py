@@ -13,7 +13,7 @@ from ..utils import DataclassException
 
 if TYPE_CHECKING:
     from .symbolic import SymbolicExpression, ResultQuantifier
-    from .entitymatch import EntityMatch
+    from .entity import EntityMatch
 
 
 @dataclass

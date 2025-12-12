@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing_extensions import Optional, Union, Type, Iterable, Callable
 
-from .entitymatch import EntityMatch, SelectableMatchExpression, AbstractMatchExpression
+from .entity import EntityMatch, SelectableMatchExpression, AbstractMatchExpression
 from .result_quantification_constraint import (
     ResultQuantificationConstraint,
 )

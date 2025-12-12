@@ -41,10 +41,10 @@ world = setup_world()
 To query the belief state for certain objects we use the Entity Query Language (EQL) which is part of the KRROOD project. 
 For a more detailed documentation check out their website (https://github.com/code-iai/krrood/tree/main).
 
-To query for a body for example the milk bottle we need to create a query. 
+To query for a body for example the milk bottle we need to create a query.
 
 ```python
-from krrood.entity_query_language.entitymatch import entity, contains, let
+from krrood.entity_query_language.entity import entity, contains, let
 from krrood.entity_query_language.entity_result_processors import an
 from semantic_digital_twin.world_description.world_entity import Body, PrefixedName
 
@@ -66,10 +66,10 @@ print(query.evaluate())
 Depending on the query there could be more than one solution. For example a query searching for all bodies whose name 
 contains the sub-string "cabinet" would yield multiple results. 
 
-We first need a query with multiple results. 
+We first need a query with multiple results.
 
 ```python
-from krrood.entity_query_language.entitymatch import entity, contains, let
+from krrood.entity_query_language.entity import entity, contains, let
 from krrood.entity_query_language.entity_result_processors import an
 from semantic_digital_twin.world_description.world_entity import Body, PrefixedName
 

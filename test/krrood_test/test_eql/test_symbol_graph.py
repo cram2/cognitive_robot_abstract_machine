@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from krrood.entity_query_language.entity import _entity, let
+from krrood.entity_query_language.core_entity import _entity, let
 from krrood.entity_query_language.entity_result_processors import an
 from krrood.entity_query_language.symbol_graph import SymbolGraph
 from ..dataset.example_classes import Position

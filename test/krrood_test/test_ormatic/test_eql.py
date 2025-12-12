@@ -20,7 +20,7 @@ from ..dataset.ormatic_interface import (
     PrismaticConnectionDAO,
     BodyDAO,
 )
-from krrood.entity_query_language.entitymatch import (
+from krrood.entity_query_language.entity import (
     let,
     entity,
     contains,

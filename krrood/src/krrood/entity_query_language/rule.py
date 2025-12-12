@@ -13,7 +13,7 @@ from .symbolic import (
 from .utils import T
 
 if TYPE_CHECKING:
-    from .entity import ConditionType
+    from .core_entity import ConditionType
 
 
 def refinement(*conditions: ConditionType) -> SymbolicExpression[T]:

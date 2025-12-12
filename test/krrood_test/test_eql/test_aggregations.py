@@ -1,4 +1,4 @@
-from krrood.entity_query_language.entity import (
+from krrood.entity_query_language.core_entity import (
     flatten,
     _entity,
     not_,
