@@ -106,6 +106,55 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
         return str(self) == str(other)
 
 
+def _create_condition(
+    start_from: MotionStatechartNode,
+    condition_getter: Callable[[MotionStatechartNode], cas.Expression],
+    expected_value: cas.Expression,
+    combine_func: Callable[[cas.Expression, cas.Expression], cas.Expression],
+) -> cas.Expression:
+    """
+    Create a combined condition by traversing up the parent nodes starting from `start_from`.
+    The combined condition is created by applying `combine_func` on the conditions of each parent node.
+    :param start_from: The node to start traversing from.
+    :param condition_getter: A function that takes a node and returns the condition to combine.
+    :param expected_value: The expected value of the condition to consider it as True.
+    :param combine_func: A function that takes two conditions and combines them.
+    :return: The combined condition.
+    """
+    current_node = start_from
+    condition = condition_getter(current_node) == expected_value
+    while current_node.parent_node is not None:
+        parent_cond = condition_getter(current_node.parent_node)
+        cond_expr = parent_cond == expected_value
+        condition = (
+            cond_expr if condition is None else combine_func(condition, cond_expr)
+        )
+        current_node = current_node.parent_node
+    return condition
+
+
+def _create_not_started_condition(
+    node: MotionStatechartNode,
+) -> cas.Expression:
+    """
+    Create a condition that checks if node should transition into RUNNING state from NOT_STARTED.
+    Iterates over potential parent nodes to ensure they are not ended and have started.
+    :param node: The node to create the condition for.
+    :return: The combined condition.
+    """
+    not_started_condition = node.start_condition == cas.TrinaryTrue
+    current = node
+    while current.parent_node is not None:
+        parent = current.parent_node
+        not_started_condition = cas.trinary_logic_and(
+            not_started_condition,
+            cas.trinary_logic_not(parent.end_condition),
+            parent.start_condition == cas.TrinaryTrue,
+        )
+        current = parent
+    return not_started_condition
+
+
 @dataclass(repr=False, eq=False)
 class LifeCycleState(State):
 
@@ -113,67 +162,28 @@ class LifeCycleState(State):
     _compiled_updater: cas.CompiledFunction = field(init=False)
 
     def compile(self):
-        def create_condition(
-            start_from: MotionStatechartNode,
-            condition_getter: Callable[[MotionStatechartNode], cas.Expression],
-            expected_value: cas.Expression,
-            combine_func: Callable[[cas.Expression, cas.Expression], cas.Expression],
-        ) -> cas.Expression:
-            """
-            Create a combined condition by traversing up the parent nodes starting from `start_from`.
-            The combined condition is created by applying `combine_func` on the conditions of each parent node.
-            :param start_from: The node to start traversing from.
-            :param condition_getter: A function that takes a node and returns the condition to combine.
-            :param expected_value: The expected value of the condition to consider it as True.
-            :param combine_func: A function that takes two conditions and combines them.
-            :return: The combined condition.
-            """
-            current_node = start_from
-            condition = condition_getter(current_node) == expected_value
-            while current_node.parent_node is not None:
-                parent_cond = condition_getter(current_node.parent_node)
-                cond_expr = parent_cond == expected_value
-                condition = (
-                    cond_expr
-                    if condition is None
-                    else combine_func(condition, cond_expr)
-                )
-                current_node = current_node.parent_node
-            return condition
-
         state_updater = []
         for node in self.motion_statechart.nodes:
             state_symbol = node.life_cycle_variable
 
-            reset_or_chain = create_condition(
+            reset_or_chain = _create_condition(
                 node, lambda p: p.reset_condition, cas.TrinaryTrue, cas.trinary_logic_or
             )
-            end_or_chain = create_condition(
+            end_or_chain = _create_condition(
                 node, lambda p: p.end_condition, cas.TrinaryTrue, cas.trinary_logic_or
             )
-            pause_or_chain = create_condition(
+            pause_or_chain = _create_condition(
                 node, lambda p: p.pause_condition, cas.TrinaryTrue, cas.trinary_logic_or
             )
-            pause_and_chain_false = create_condition(
+            pause_and_chain_false = _create_condition(
                 node,
                 lambda p: p.pause_condition,
                 cas.TrinaryFalse,
                 cas.trinary_logic_and,
             )
 
-            not_started_condition = node.start_condition == cas.TrinaryTrue
-            current = node
-            while current.parent_node is not None:
-                parent = current.parent_node
-                not_started_condition = cas.trinary_logic_and(
-                    not_started_condition,
-                    cas.trinary_logic_not(parent.end_condition),
-                    parent.start_condition == cas.TrinaryTrue,
-                )
-                current = parent
-
             not_started_transitions = cas.if_else(
-                condition=not_started_condition,
+                condition=_create_not_started_condition(node),
                 if_result=cas.Expression(LifeCycleValues.RUNNING),
                 else_result=cas.Expression(LifeCycleValues.NOT_STARTED),
             )
