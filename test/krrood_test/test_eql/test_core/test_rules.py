@@ -1,5 +1,5 @@
 from krrood.entity_query_language.conclusion import Add
-from krrood.entity_query_language.entity import let, entity, and_, inference
+from krrood.entity_query_language.entity import let, _entity, and_, inference
 from krrood.entity_query_language.entity_result_processors import an
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.rule import refinement, alternative, next_rule
@@ -25,7 +25,7 @@ def test_generate_drawers(handles_and_containers_world):
     prismatic_connection = let(type_=PrismaticConnection, domain=world.connections)
 
     query = an(
-        entity(
+        _entity(
             drawers := let(type_=Drawer, domain=None),
             and_(
                 container == fixed_connection.parent,
@@ -60,7 +60,7 @@ def test_add_conclusion(handles_and_containers_world):
     prismatic_connection = let(type_=PrismaticConnection, domain=world.connections)
 
     query = an(
-        entity(
+        _entity(
             drawers := let(type_=Drawer, domain=None),
             container == fixed_connection.parent,
             handle == fixed_connection.child,
@@ -91,7 +91,7 @@ def test_rule_tree_with_a_refinement(doors_and_drawers_world):
     fixed_connection = let(type_=FixedConnection, domain=world.connections)
 
     query = an(
-        entity(
+        _entity(
             drawers_and_doors := let(type_=View, domain=None),
             body == fixed_connection.parent,
             handle == fixed_connection.child,
@@ -127,7 +127,7 @@ def test_rule_tree_with_multiple_refinements(doors_and_drawers_world):
     revolute_connection = let(type_=RevoluteConnection, domain=world.connections)
 
     query = an(
-        entity(
+        _entity(
             views := inference(View)(),
             body == fixed_connection.parent,
             handle == fixed_connection.child,
@@ -171,7 +171,7 @@ def test_rule_tree_with_an_alternative(doors_and_drawers_world):
     revolute_connection = let(type_=RevoluteConnection, domain=world.connections)
 
     query = an(
-        entity(
+        _entity(
             views := inference(View)(),
             body == fixed_connection.parent,
             handle == fixed_connection.child,
@@ -213,7 +213,7 @@ def test_rule_tree_with_multiple_alternatives(doors_and_drawers_world):
     revolute_connection = let(type_=RevoluteConnection, domain=world.connections)
 
     query = an(
-        entity(
+        _entity(
             views := inference(View)(),
             body == fixed_connection.parent,
             handle == fixed_connection.child,
@@ -265,7 +265,7 @@ def test_rule_tree_with_multiple_alternatives_optimized(doors_and_drawers_world)
     revolute_connection = let(type_=RevoluteConnection, domain=world.connections)
 
     query = an(
-        entity(
+        _entity(
             views := inference(View)(),
             HasType(fixed_connection.child, Handle),
             fixed_connection.parent == prismatic_connection.child,
@@ -330,7 +330,7 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree(doors_and_drawers
     revolute_connection = let(type_=RevoluteConnection, domain=world.connections)
 
     query = an(
-        entity(
+        _entity(
             views := inference(View)(),
             body == fixed_connection.parent,
             handle == fixed_connection.child,
@@ -382,7 +382,7 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree_optimized(
     revolute_connection = let(type_=RevoluteConnection, domain=world.connections)
 
     query = an(
-        entity(
+        _entity(
             views := inference(View)(),
             HasType(fixed_connection.child, Handle),
         )

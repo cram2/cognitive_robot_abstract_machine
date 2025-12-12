@@ -20,7 +20,7 @@ from ..dataset.ormatic_interface import (
     PrismaticConnectionDAO,
     BodyDAO,
 )
-from krrood.entity_query_language.entity import (
+from krrood.entity_query_language.entitymatch import (
     let,
     entity,
     contains,
@@ -38,7 +38,7 @@ def test_translate_simple_greater(session, database):
     session.add(PositionDAO(x=1, y=2, z=4))
     session.commit()
 
-    query = an(entity(position := let(type_=Position, domain=[]), position.z > 3))
+    query = an(entity(position := let(type_=Position, domain=[])).where(position.z > 3))
 
     translator = eql_to_sql(query, session)
     query_by_hand = select(PositionDAO).where(PositionDAO.z > 3)
@@ -59,8 +59,7 @@ def test_translate_or_condition(session, database):
     session.commit()
 
     query = an(
-        entity(
-            position := let(type_=Position, domain=[]),
+        entity(position := let(type_=Position, domain=[])).where(
             or_(position.z == 4, position.x == 2),
         )
     )
@@ -97,7 +96,7 @@ def test_translate_join_one_to_one(session, database):
     )
     session.commit()
 
-    query = an(entity(pose := let(type_=Pose, domain=[]), pose.position.z > 3))
+    query = an(entity(pose := let(type_=Pose, domain=[])).where(pose.position.z > 3))
     translator = eql_to_sql(query, session)
     query_by_hand = select(PoseDAO).join(PoseDAO.position).where(PositionDAO.z > 3)
 
@@ -119,8 +118,7 @@ def test_translate_in_operator(session, database):
     session.commit()
 
     query = an(
-        entity(
-            position := let(Position, domain=[]),
+        entity(position := let(Position, domain=[])).where(
             in_(position.x, [1, 7]),
         )
     )
@@ -146,15 +144,7 @@ def test_the_quantifier(session, database):
 
     def get_query(domain=None):
 
-        query = the(
-            entity(
-                position := let(
-                    type_=Position,
-                    domain=domain,
-                ),
-                position.y == 2,
-            )
-        )
+        query = the(entity(Position)(y=2).from_(domain))
         return query
 
     with pytest.raises(MultipleSolutionFound):
@@ -193,16 +183,12 @@ def test_equal(session, database):
         domain=world.connections,
         name="prismatic_connection",
     )
-    fixed_connection = let(
-        type_=FixedConnection, domain=world.connections, name="fixed_connection"
-    )
 
     # Write the query body
     query = an(
-        entity(
-            fixed_connection,
-            fixed_connection.parent == prismatic_connection.child,
-        )
+        entity(FixedConnection)(
+            parent=prismatic_connection.child,
+        ).from_(world.connections)
     )
     translator = eql_to_sql(query, session)
 
@@ -259,14 +245,11 @@ def test_complicated_equal(session, database):
 
     # Write the query body - this was previously failing with "Attribute chain ended on a relationship"
     query = the(
-        entity(
-            drawer_body,
-            and_(
-                parent_container == prismatic_connection.parent,
-                drawer_body == prismatic_connection.child,
-                drawer_body == fixed_connection.parent,
-                handle == fixed_connection.child,
-            ),
+        entity(drawer_body).where(
+            parent_container == prismatic_connection.parent,
+            drawer_body == prismatic_connection.child,
+            drawer_body == fixed_connection.parent,
+            handle == fixed_connection.child,
         )
     )
 
@@ -282,12 +265,7 @@ def test_contains(session, database):
     session.add(BodyDAO(name="Body3", size=1))
     session.commit()
 
-    query = an(
-        entity(
-            b := let(type_=Body, domain=[], name="b"),
-            contains("Body1TestName", b.name),
-        )
-    )
+    query = an(entity(Body)(name=in_("Body1TestName")))
     translator = eql_to_sql(query, session)
 
     result = translator.evaluate()

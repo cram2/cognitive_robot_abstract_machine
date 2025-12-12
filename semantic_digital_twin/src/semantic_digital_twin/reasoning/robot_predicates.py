@@ -5,7 +5,7 @@ from copy import deepcopy
 from typing import Optional, List
 
 import trimesh.sample
-from krrood.entity_query_language.entity import (
+from krrood.entity_query_language.entitymatch import (
     let,
     entity,
     and_,
@@ -41,12 +41,9 @@ def robot_in_collision(
 
     body = let(type_=Body, domain=robot._world.bodies_with_enabled_collision)
     possible_collisions_bodies = an(
-        entity(
-            body,
-            and_(
-                not_(contains(robot.bodies, body)),
-                not_(contains(ignore_collision_with, body)),
-            ),
+        entity(body).where(
+            not_(contains(robot.bodies, body)),
+            not_(contains(ignore_collision_with, body)),
         ),
     )
     possible_collisions_bodies = possible_collisions_bodies.evaluate()
@@ -73,10 +70,7 @@ def robot_holds_body(robot: AbstractRobot, body: Body) -> bool:
     :return: True if the robot is holding the object, False otherwise
     """
     grippers = an(
-        entity(
-            g := let(ParallelGripper, robot._world.semantic_annotations),
-            g._robot == robot,
-        )
+        entity(ParallelGripper)(_robot=robot).from_(robot._world.semantic_annotations)
     )
 
     return any(
@@ -106,10 +100,9 @@ def blocking(
             root._world.state[dof.id].position = state
 
     robot = the(
-        entity(
-            r := let(AbstractRobot, root._world.semantic_annotations),
-            contains(r.bodies, tip),
-        )
+        entity(AbstractRobot)(bodies=contains(tip)).from_(
+            root._world.semantic_annotations
+        ),
     )
     return robot_in_collision(robot.evaluate(), [])
 

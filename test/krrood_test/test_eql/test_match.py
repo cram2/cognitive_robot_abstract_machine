@@ -2,9 +2,9 @@ import pytest
 
 import krrood.entity_query_language.entity_result_processors as eql
 from krrood.entity_query_language.entity import (
-    entity as _entity,
+    _entity,
     let,
-    set_of as _set_of,
+    _set_of,
     contains,
 )
 from krrood.entity_query_language.failures import UnquantifiedMatchError

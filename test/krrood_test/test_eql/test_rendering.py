@@ -20,7 +20,7 @@ from ..dataset.semantic_world_like_classes import (
     Wardrobe,
 )
 from krrood.entity_query_language.entity import (
-    entity,
+    _entity,
     let,
     inference,
     and_,
@@ -40,7 +40,7 @@ def test_render_rx_graph_as_igraph_simple(handles_and_containers_world):
     container = fixed_connection.parent
     handle = fixed_connection.child
     rule = an(
-        entity(
+        _entity(
             inference(Drawer)(handle=handle, container=container, world=world),
             HasType(handle, Handle),
         )
@@ -68,7 +68,7 @@ def test_render_rx_graph_as_igraph_complex(doors_and_drawers_world):
     prismatic_connection = let(PrismaticConnection, domain=world.connections)
     revolute_connection = let(RevoluteConnection, domain=world.connections)
     rule = an(
-        entity(
+        _entity(
             views := let(View, domain=None),
             fixed_connection_condition,
             prismatic_connection.child == body,

@@ -5,8 +5,9 @@ import inspect
 from dataclasses import dataclass, field
 from typing import get_type_hints
 
-from krrood.entity_query_language.entity import entity, contains, let
+from krrood.entity_query_language.entitymatch import entity, contains, let
 from krrood.entity_query_language.entity_result_processors import an, the
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -255,10 +256,9 @@ class NamedObject(ObjectDesignatorDescription, PartialDesignator):
         """
         for params in self.generate_permutations():
             query = an(
-                entity(
-                    body := let(type_=Body, domain=self.world.bodies),
-                    contains(body.name.name, params["names"]),
-                )
+                entity(Body)(
+                    name=entity(PrefixedName)(name=contains(params["names"]))
+                ).from_(self.world.bodies)
             )
 
             for obj in query.evaluate():

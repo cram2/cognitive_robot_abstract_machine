@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
 
+from krrood.entity_query_language.entity import Item, Container
 from typing_extensions import (
     Optional,
     Type,
@@ -23,9 +24,13 @@ from .entity import (
     in_,
     flatten,
     let,
-    set_of as _set_of,
-    entity as _entity,
+    _set_of as _set_of,
+    _entity as _entity,
     exists,
+    and_,
+    or_,
+    for_all,
+    inference,
 )
 from .failures import NoneWrappedFieldError, WrongSelectableType, UnquantifiedMatchError
 from .predicate import HasType
@@ -539,8 +544,10 @@ class AttributeMatch(AbstractMatchExpression[T]):
         if self.variable is not None:
             return
         possibly_flattened_attr = self.attribute
-        if self.attribute._is_iterable_ and (
-            self.assigned_value.kwargs or self.is_type_filter_needed
+        if (
+            self.attribute._wrapped_field_
+            and self.attribute._is_iterable_
+            and (self.assigned_value.kwargs or self.is_type_filter_needed)
         ):
             self.flattened_attribute = flatten(self.attribute)
             possibly_flattened_attr = self.flattened_attribute
@@ -571,12 +578,25 @@ class AttributeMatch(AbstractMatchExpression[T]):
 
         :return: A Comparator or an Exists expression representing the condition.
         """
-        if self.attribute._is_iterable_ and not self.is_iterable_value:
+        if isinstance(self.assigned_value, Item):
+            condition = contains(self.attribute, self.assigned_value.item)
+        elif isinstance(self.assigned_value, Container):
+            condition = in_(self.attribute, self.assigned_value.container)
+        elif (
+            self.attribute._wrapped_field_
+            and self.attribute._is_iterable_
+            and not self.is_iterable_value
+        ):
             condition = contains(self.attribute, self.assigned_variable)
-        elif not self.attribute._is_iterable_ and self.is_iterable_value:
+        elif (
+            self.attribute._wrapped_field_
+            and not self.attribute._is_iterable_
+            and self.is_iterable_value
+        ):
             condition = in_(self.attribute, self.assigned_variable)
         elif (
-            self.attribute._is_iterable_
+            self.attribute._wrapped_field_
+            and self.attribute._is_iterable_
             and self.is_iterable_value
             and not (
                 isinstance(self.assigned_value, AbstractMatchExpression)
@@ -616,8 +636,8 @@ class AttributeMatch(AbstractMatchExpression[T]):
         if self.variable is not None:
             return self.variable
         attr: Attribute = getattr(self.parent.variable, self.attr_name)
-        if attr._wrapped_field_ is None:
-            raise NoneWrappedFieldError(self.parent.type, self.attr_name)
+        # if attr._wrapped_field_ is None:
+        #     raise NoneWrappedFieldError(self.parent.type, self.attr_name)
         self.variable = attr
         return attr
 
@@ -636,7 +656,11 @@ class AttributeMatch(AbstractMatchExpression[T]):
         """
         :return: True if the value is an iterable or a Match instance with an iterable type, else False.
         """
-        if isinstance(self.assigned_value, Selectable):
+        if isinstance(self.assigned_value, Item):
+            return False
+        elif isinstance(self.assigned_value, Container):
+            return True
+        elif isinstance(self.assigned_value, Selectable):
             return self.assigned_value._is_iterable_
         elif not isinstance(
             self.assigned_value, AbstractMatchExpression
@@ -654,6 +678,8 @@ class AttributeMatch(AbstractMatchExpression[T]):
         """
         :return: True if a type filter condition is needed for the attribute assignment, else False.
         """
+        if not self.attribute._wrapped_field_:
+            return False
         attr_type = self.type
         return (not attr_type) or (
             (self.assigned_value.type and self.assigned_value.type is not attr_type)

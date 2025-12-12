@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from .failures import LiteralConditionError
 from .symbol_graph import SymbolGraph
 from .utils import is_iterable, T
@@ -19,6 +21,7 @@ from typing_extensions import (
     List,
     Callable,
     TYPE_CHECKING,
+    overload,
 )
 
 from .symbolic import (
@@ -34,7 +37,10 @@ from .symbolic import (
     Flatten,
     ForAll,
     Exists,
-    Literal, Selectable, DomainType, )
+    Literal,
+    Selectable,
+    DomainType,
+)
 
 from .predicate import (
     Predicate,
@@ -51,7 +57,7 @@ The possible types for conditions.
 """
 
 
-def entity(
+def _entity(
     selected_variable: T,
     *properties: ConditionType,
 ) -> Entity[T]:
@@ -71,7 +77,7 @@ def entity(
     return Entity(_selected_variables=selected_variables, _child_=expression)
 
 
-def set_of(
+def _set_of(
     selected_variables: Iterable[T],
     *properties: ConditionType,
 ) -> SetOf[T]:
@@ -105,7 +111,9 @@ def _extract_variables_and_expression(
     selected_variables = list(selected_variables)
     expression = None
     if len(expression_list) > 0:
-        literal_expressions = [exp for exp in expression_list if not isinstance(exp, SymbolicExpression)]
+        literal_expressions = [
+            exp for exp in expression_list if not isinstance(exp, SymbolicExpression)
+        ]
         if literal_expressions:
             raise LiteralConditionError(literal_expressions)
         expression = (
@@ -200,6 +208,24 @@ def not_(operand: SymbolicExpression):
     return operand._invert_()
 
 
+@dataclass
+class Item:
+    """
+    Represents a container item.
+    """
+
+    item: Any
+
+
+@overload
+def contains(item: Any):
+    """
+    A version of contains where the container is not defined yet
+    """
+    ...
+
+
+@overload
 def contains(
     container: Union[Iterable, CanBehaveLikeAVariable[T]], item: Any
 ) -> Comparator:
@@ -211,9 +237,32 @@ def contains(
     :return: A comparator expression equivalent to ``item in container``.
     :rtype: SymbolicExpression
     """
+    ...
+
+
+def contains(*args):
+    """
+    Check whether a container contains an item. Can take just the item or both container and item.
+    """
+    if len(args) == 1:
+        item = args[0]
+        return Item(None, item)
+    container, item = args[0], args[1]
     return in_(item, container)
 
 
+@overload
+def in_(container: Union[Iterable, CanBehaveLikeAVariable[T]]):
+    """
+    Build a comparator for membership: ``item in container``.
+
+    :param container: The container expression.
+    :return: Comparator expression for membership.
+    """
+    ...
+
+
+@overload
 def in_(item: Any, container: Union[Iterable, CanBehaveLikeAVariable[T]]):
     """
     Build a comparator for membership: ``item in container``.
@@ -223,6 +272,27 @@ def in_(item: Any, container: Union[Iterable, CanBehaveLikeAVariable[T]]):
     :return: Comparator expression for membership.
     :rtype: Comparator
     """
+    ...
+
+
+@dataclass
+class Container:
+    """
+    Represents a container of items.
+    """
+
+    container: Union[Iterable, CanBehaveLikeAVariable[T]]
+
+
+def in_(*args):
+    """
+    If two arguments are give, build a comparator for membership: ``item in container``,
+    else if one argument, then it is considered as the container and Container instance is returned.
+    """
+    if len(args) == 1:
+        container = args[0]
+        return Container(container)
+    item, container = args[0], args[1]
     return Comparator(container, item, operator.contains)
 
 
