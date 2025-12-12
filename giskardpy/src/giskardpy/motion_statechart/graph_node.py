@@ -707,66 +707,6 @@ class Goal(MotionStatechartNode):
         for node in nodes:
             self.add_node(node)
 
-    def _apply_goal_conditions_to_children(self) -> None:
-        """
-        This method is called after expand() to link the conditions of this goal to its children.
-        """
-        for node in self.nodes:
-            self._apply_start_condition_to_node(node)
-            self._apply_pause_condition_to_node(node)
-            self._apply_end_condition_to_node(node)
-            self._apply_reset_condition_to_node(node)
-            if isinstance(node, Goal):
-                node._apply_goal_conditions_to_children()
-
-    def _apply_start_condition_to_node(self, node: MotionStatechartNode) -> None:
-        """
-        Links the start condition of this goal to the start condition of the node.
-        Ensures that the node can only be started when this goal is started.
-        """
-        if cas.is_const_trinary_true(node.start_condition):
-            node.start_condition = self.start_condition
-            return
-        node.start_condition = cas.trinary_logic_and(
-            node.start_condition, self.start_condition
-        )
-
-    def _apply_pause_condition_to_node(self, node: MotionStatechartNode) -> None:
-        """
-        Links the pause condition of this goal to the pause condition of the node.
-        Ensures that the node is always paused when the goal is paused.
-        """
-        if cas.is_const_trinary_false(node.pause_condition):
-            node.pause_condition = self.pause_condition
-        elif not cas.is_const_trinary_false(node.pause_condition):
-            node.pause_condition = cas.trinary_logic_or(
-                node.pause_condition, self.pause_condition
-            )
-
-    def _apply_end_condition_to_node(self, node: MotionStatechartNode) -> None:
-        """
-        Links the end condition of this goal to the end condition of the node.
-        Ensures that the node is automatically ended when the goal is ended.
-        """
-        if cas.is_const_trinary_false(node.end_condition):
-            node.end_condition = self.end_condition
-        elif not cas.is_const_trinary_false(self.end_condition):
-            node.end_condition = cas.trinary_logic_or(
-                node.end_condition, self.end_condition
-            )
-
-    def _apply_reset_condition_to_node(self, node: MotionStatechartNode):
-        """
-        Links the reset condition of this goal to the reset condition of the node.
-        Ensures that the node is reset, when the goal is reset.
-        """
-        if cas.is_const_trinary_false(node.reset_condition):
-            node.reset_condition = self.reset_condition
-        elif not cas.is_const_trinary_false(node.pause_condition):
-            node.reset_condition = cas.trinary_logic_or(
-                node.reset_condition, self.reset_condition
-            )
-
 
 @dataclass(eq=False, repr=False)
 class ThreadPayloadMonitor(MotionStatechartNode, ABC):
