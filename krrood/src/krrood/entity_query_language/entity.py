@@ -613,8 +613,6 @@ class AttributeMatch(AbstractMatchExpression[T]):
         if self.variable is not None:
             return self.variable
         attr: Attribute = getattr(self.parent.variable, self.attr_name)
-        # if attr._wrapped_field_ is None:
-        #     raise NoneWrappedFieldError(self.parent.type, self.attr_name)
         self.variable = attr
         return attr
 
