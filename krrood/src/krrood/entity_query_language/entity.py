@@ -556,9 +556,15 @@ class AttributeMatch(AbstractMatchExpression[T]):
         :return: A Comparator or an Exists expression representing the condition.
         """
         if isinstance(self.assigned_value, Item):
-            condition = contains(self.attribute, self.assigned_value.item)
+            value = self.assigned_value.item
+            if isinstance(value, AbstractMatchExpression):
+                value = value.variable
+            condition = contains(self.attribute, value)
         elif isinstance(self.assigned_value, Container):
-            condition = in_(self.attribute, self.assigned_value.container)
+            value = self.assigned_value.container
+            if isinstance(value, AbstractMatchExpression):
+                value = value.variable
+            condition = in_(self.attribute, value)
         elif (
             self.attribute._wrapped_field_
             and self.attribute._is_iterable_
