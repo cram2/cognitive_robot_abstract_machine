@@ -1,0 +1,38 @@
+<mujoco>
+    <option>
+        <flag energy="enable"/>
+    </option>
+    <asset>
+        <mesh name="jeroen_cup_mesh" file="../stl/jeroen_cup.stl" scale="1 1 1"/>
+        <mesh name="jeroen_cup_mesh_small" file="../stl/jeroen_cup.stl" scale="0.5 0.5 0.2"/>
+        <mesh name="jeroen_cup_mesh_big" file="../stl/jeroen_cup.stl" scale="5 5 2"/>
+    </asset>
+    <worldbody>
+        <body name="jeroen_cup" pos="0 0 0">
+            <freejoint/>
+            <geom type="mesh" mesh="jeroen_cup_mesh" />
+        </body>
+        <body name="jeroen_cup_small" pos="0.1 0 0">
+            <freejoint/>
+            <geom type="mesh" mesh="jeroen_cup_mesh_small" />
+        </body>
+        <body name="jeroen_cup_big" pos="-0.3 0 0">
+            <freejoint/>
+            <geom type="mesh" mesh="jeroen_cup_mesh_big" />
+        </body>
+        <body name="jeroen_cup_mocap" pos="0 0 0" mocap="true">
+            <geom type="mesh" mesh="jeroen_cup_mesh" contype="0" conaffinity="0" rgba="0 0 1 1"/>
+        </body>
+        <body name="jeroen_cup_small_mocap" pos="0.1 0 0" mocap="true">
+            <geom type="mesh" mesh="jeroen_cup_mesh_small" contype="0" conaffinity="0" rgba="0 0 1 1"/>
+        </body>
+        <body name="jeroen_cup_big_mocap" pos="-0.3 0 0" mocap="true">
+            <geom type="mesh" mesh="jeroen_cup_mesh_big" contype="0" conaffinity="0" rgba="0 0 1 1"/>
+        </body>
+    </worldbody>
+    <equality>
+        <weld body1="jeroen_cup_mocap" body2="jeroen_cup" />
+        <weld body1="jeroen_cup_small_mocap" body2="jeroen_cup_small" />
+        <weld body1="jeroen_cup_big_mocap" body2="jeroen_cup_big" />
+    </equality>
+</mujoco>
