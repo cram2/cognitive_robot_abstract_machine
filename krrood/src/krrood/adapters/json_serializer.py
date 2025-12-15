@@ -5,6 +5,7 @@ import importlib
 import uuid
 from dataclasses import dataclass, field
 from types import NoneType
+from typing import List
 
 from typing_extensions import Dict, Any, Self, Union, Callable, Type
 
@@ -221,7 +222,7 @@ class SubclassJSONSerializer:
             raise ClassNotFoundError(class_name, module_name) from exc
 
         if issubclass(target_cls, enum.Enum):
-            return deserialize_enum(data, target_cls)
+            return deserialize_enum(data)
 
         if issubclass(target_cls, SubclassJSONSerializer):
             return target_cls._from_json(data, **kwargs)
@@ -313,44 +314,14 @@ def serialize_enum(obj: enum.Enum) -> Dict[str, Any]:
     return {JSON_TYPE_NAME: get_full_class_name(type(obj)), "value": obj.value}
 
 
-def deserialize_enum(
-    data: Dict[str, Any], target_cls: Type[enum.Enum] | None = None
-) -> enum.Enum:
+def deserialize_enum(data: Dict[str, Any]) -> List[enum.Enum]:
     """
     Deserialize an enum from a JSON dictionary.
+
+    :param data: Dictionary containing the enum value or values
+    :return: The deserialized enum or list of enums
     """
-
-    enum_class = target_cls
-    if enum_class is None:
-        fully_qualified_class_name = data.get(JSON_TYPE_NAME)
-        if not fully_qualified_class_name:
-            raise MissingTypeError()
-
-        try:
-            module_name, class_name = fully_qualified_class_name.rsplit(".", 1)
-        except ValueError as exc:
-            raise InvalidTypeFormatError(fully_qualified_class_name) from exc
-
-        try:
-            module = importlib.import_module(module_name)
-        except ModuleNotFoundError as exc:
-            raise UnknownModuleError(module_name) from exc
-
-        try:
-            enum_class = getattr(module, class_name)
-        except AttributeError as exc:
-            raise ClassNotFoundError(class_name, module_name) from exc
-
-    if "value" in data:
-        try:
-            return enum_class(data["value"])
-        except ValueError as exc:
-            raise ClassNotDeserializableError(enum_class) from exc
-
-    if "values" in data:
-        try:
-            return [enum_class(item) for item in data["values"]]
-        except ValueError as exc:
-            raise ClassNotDeserializableError(enum_class) from exc
-
-    raise ClassNotDeserializableError(enum_class)
+    module_name, class_name = data.get(JSON_TYPE_NAME).rsplit(".", 1)
+    module = importlib.import_module(module_name)
+    enum_class = getattr(module, class_name)
+    return [enum_class(item) for item in data["values"]]
