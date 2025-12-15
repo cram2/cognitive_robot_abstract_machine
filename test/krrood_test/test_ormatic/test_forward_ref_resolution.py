@@ -42,7 +42,7 @@ class TestForwardReferenceResolution:
         # Now import the isolated classes - the types they reference
         # (IsolatedTypeAlpha, IsolatedTypeBeta) are under TYPE_CHECKING
         # so they won't be imported at runtime
-        from test.krrood_test.dataset.isolated_forward_ref_types import (
+        from test.krrood_test.dataset.isolated_forward_ref_classes import (
             IsolatedClassWithMultipleMixins,
             IsolatedMixinAlpha,
             IsolatedMixinBeta,

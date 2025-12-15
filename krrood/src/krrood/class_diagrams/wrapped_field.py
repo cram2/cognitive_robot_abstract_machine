@@ -96,33 +96,43 @@ class WrappedField:
 
     @cached_property
     def resolved_type(self):
-        try:
-            result = get_type_hints(self.clazz.clazz)[self.field.name]
-            return result
-        except NameError as e:
-            # First try to find the class in the class diagram
-            potential_matching_classes = [
-                cls.clazz
-                for cls in self.clazz._class_diagram.wrapped_classes
-                if cls.clazz.__name__ == e.name
-            ]
-            if len(potential_matching_classes) > 0:
-                found_clazz = potential_matching_classes[0]
-            else:
-                # second try to find it in the modules
-                found_clazz = manually_search_for_class_name(e.name)
+        """
+        Resolve the type hint for this field.
 
-            # Build a complete namespace with ALL classes from the class diagram
-            local_namespace = {
-                cls.clazz.__name__: cls.clazz
-                for cls in self.clazz._class_diagram.wrapped_classes
-            }
-            # Also add the manually found class (in case it's not in the diagram)
-            local_namespace[e.name] = found_clazz
-            result = get_type_hints(self.clazz.clazz, localns=local_namespace)[
-                self.field.name
-            ]
-            return result
+        Handles forward references by iteratively building a namespace with
+        classes from the class diagram and sys.modules until all references
+        are resolved.
+        """
+        local_namespace = self._build_initial_namespace()
+
+        while True:
+            try:
+                return get_type_hints(self.clazz.clazz, localns=local_namespace)[
+                    self.field.name
+                ]
+            except NameError as e:
+                found_class = self._find_class_by_name(e.name)
+                local_namespace[e.name] = found_class
+
+    def _build_initial_namespace(self) -> dict:
+        """
+        Build the initial namespace for type resolution from the class diagram.
+        """
+        class_diagram = self.clazz._class_diagram
+        if class_diagram is None:
+            return {}
+        return {cls.clazz.__name__: cls.clazz for cls in class_diagram.wrapped_classes}
+
+    def _find_class_by_name(self, class_name: str) -> Type:
+        """
+        Find a class by name in the class diagram or sys.modules.
+        """
+        class_diagram = self.clazz._class_diagram
+        if class_diagram is not None:
+            for wrapped_class in class_diagram.wrapped_classes:
+                if wrapped_class.clazz.__name__ == class_name:
+                    return wrapped_class.clazz
+        return manually_search_for_class_name(class_name)
 
     @cached_property
     def is_builtin_type(self) -> bool:
