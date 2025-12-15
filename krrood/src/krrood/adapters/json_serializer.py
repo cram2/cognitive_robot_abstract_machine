@@ -221,7 +221,7 @@ class SubclassJSONSerializer:
             raise ClassNotFoundError(class_name, module_name) from exc
 
         if issubclass(target_cls, enum.Enum):
-            return data
+            return target_cls._from_json(data, **kwargs)
 
         if issubclass(target_cls, SubclassJSONSerializer):
             return target_cls._from_json(data, **kwargs)
