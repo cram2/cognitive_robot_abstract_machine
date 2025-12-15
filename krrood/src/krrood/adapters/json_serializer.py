@@ -26,7 +26,6 @@ leaf_types = (
 
 
 JSON_TYPE_NAME = "__json_type__"  # the key used in JSON dicts to identify the class
-ENUM_TYPE_NAME = "__enum_type__"
 
 JSON_DICT_TYPE = Dict[str, Any]  # Commonly referred JSON dict
 JSON_RETURN_TYPE = Union[
@@ -202,10 +201,6 @@ class SubclassJSONSerializer:
         if isinstance(data, list_like_classes):
             return [from_json(d) for d in data]
 
-        fully_qualified_enum_name = data.get(ENUM_TYPE_NAME)
-        if fully_qualified_enum_name:
-            return data
-
         fully_qualified_class_name = data.get(JSON_TYPE_NAME)
         if not fully_qualified_class_name:
             raise MissingTypeError()
@@ -224,6 +219,9 @@ class SubclassJSONSerializer:
             target_cls = getattr(module, class_name)
         except AttributeError as exc:
             raise ClassNotFoundError(class_name, module_name) from exc
+
+        if issubclass(target_cls, enum.Enum):
+            return data
 
         if issubclass(target_cls, SubclassJSONSerializer):
             return target_cls._from_json(data, **kwargs)

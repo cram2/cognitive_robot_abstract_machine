@@ -5,6 +5,7 @@ from typing_extensions import Type, Optional, List
 from sqlalchemy import TypeDecorator
 from sqlalchemy import types
 
+from ..adapters.json_serializer import JSON_TYPE_NAME
 from ..ormatic.utils import module_and_class_name
 
 
@@ -49,7 +50,7 @@ class EnumListType(TypeDecorator):
         if value is None:
             return None
         return {
-            "__enum_type__": module_and_class_name(self.enum_class),
+            JSON_TYPE_NAME: module_and_class_name(self.enum_class),
             "values": [item.value for item in value],
         }
 
@@ -59,7 +60,7 @@ class EnumListType(TypeDecorator):
         if value is None:
             return None
 
-        enum_class_name = value["__enum_type__"]
+        enum_class_name = value[JSON_TYPE_NAME]
         module_name, class_name = enum_class_name.rsplit(".", 1)
         module = importlib.import_module(module_name)
         enum_class = getattr(module, class_name)
