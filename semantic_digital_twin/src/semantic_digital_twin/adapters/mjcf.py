@@ -1,7 +1,8 @@
+import logging
 import os
-from typing import Optional
+from typing_extensions import Optional, Dict
 import numpy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import mujoco
 from scipy.spatial.transform import Rotation
@@ -36,7 +37,15 @@ from ..world_description.inertial_properties import (
     PrincipalAxes,
 )
 from ..world_description.shape_collection import ShapeCollection
-from .multi_sim import MujocoActuator, GeomVisibilityAndCollisionType, MujocoCamera
+from .multi_sim import (
+    MujocoActuator,
+    GeomVisibilityAndCollisionType,
+    MujocoCamera,
+    MujocoEquality,
+    MujocoMocapBody,
+)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -48,6 +57,11 @@ class MJCFParser:
     file_path: str
     """
     The file path of the scene.
+    """
+
+    mimic_joints: Dict[str, str] = field(default_factory=dict)
+    """
+    A dictionary mapping joint names to the names of the joints they mimic.
     """
 
     prefix: Optional[str] = None
@@ -70,6 +84,8 @@ class MJCFParser:
 
         worldbody: mujoco.MjsBody = self.spec.worldbody
         with self.world.modify_world():
+            self.parse_equalities()
+
             root = Body(name=PrefixedName(worldbody.name))
             self.world.add_body(root)
 
@@ -110,6 +126,8 @@ class MJCFParser:
         body.visual = ShapeCollection(shapes=visuals, reference_frame=body)
         body.collision = ShapeCollection(shapes=collisions, reference_frame=body)
         self.world.add_kinematic_structure_entity(body)
+        if mujoco_body.mocap:
+            self.world.add_semantic_annotation(MujocoMocapBody(body=body))
         for mujoco_child_body in mujoco_body.bodies:
             self.parse_body(mujoco_body=mujoco_child_body)
 
@@ -257,21 +275,25 @@ class MJCFParser:
                 mujoco_material: mujoco.MjsMaterial = self.spec.material(
                     mujoco_geom.material
                 )
-                meshscale = mujoco_mesh.scale
-                if not numpy.allclose(meshscale, 1.0):
-                    scale_mat = numpy.eye(4)
-                    scale_mat[0, 0] = meshscale[0]
-                    scale_mat[1, 1] = meshscale[1]
-                    scale_mat[2, 2] = meshscale[2]
-                    scale_transform = TransformationMatrix(data=scale_mat)
-                    origin_transform = origin_transform @ scale_transform
+                meshscale = Scale(*mujoco_mesh.scale)
                 if mujoco_material is None:
                     return FileMesh(
-                        filename=filename, origin=origin_transform, color=color
+                        filename=filename,
+                        origin=origin_transform,
+                        color=color,
+                        scale=meshscale,
                     )
                 else:
                     texture_name = mujoco_material.textures[1]
                     mujoco_texture: mujoco.MjsTexture = self.spec.texture(texture_name)
+                    if mujoco_texture is None:
+                        color = Color(*mujoco_material.rgba)
+                        return FileMesh(
+                            filename=filename,
+                            origin=origin_transform,
+                            color=color,
+                            scale=meshscale,
+                        )
                     texturedir = os.path.join(
                         os.path.dirname(self.file_path), self.spec.texturedir
                     )
@@ -282,10 +304,14 @@ class MJCFParser:
                             origin=origin_transform,
                             color=color,
                             texture_file_path=texture_file_path,
+                            scale=meshscale,
                         )
                     else:
                         return FileMesh(
-                            filename=filename, origin=origin_transform, color=color
+                            filename=filename,
+                            origin=origin_transform,
+                            color=color,
+                            scale=meshscale,
                         )
 
         raise NotImplementedError(f"Geometry type {mujoco_geom.type} not implemented.")
@@ -391,6 +417,8 @@ class MJCFParser:
         try:
             return self.world.get_degree_of_freedom_by_name(dof_name)
         except WorldEntityNotFoundError:
+            if dof_name in self.mimic_joints:
+                dof_name = self.mimic_joints[dof_name]
             if (
                 mujoco_joint.range is None
                 or mujoco_joint.range[0] == 0
@@ -511,3 +539,25 @@ class MJCFParser:
             quat=quat,
         )
         self.world.add_semantic_annotation(camera)
+
+    def parse_equalities(self):
+        self.mimic_joints = {}
+        equality: mujoco.MjsEquality
+        for equality in self.spec.equalities:
+            match equality.type:
+                case mujoco.mjtEq.mjEQ_JOINT:
+                    self.mimic_joints[equality.name2] = equality.name1
+                case mujoco.mjtEq.mjEQ_WELD:
+                    self.world.add_semantic_annotation(
+                        MujocoEquality(
+                            type=mujoco.mjtEq.mjEQ_WELD,
+                            obj_type=mujoco.mjtObj.mjOBJ_BODY,
+                            name_1=equality.name1,
+                            name_2=equality.name2,
+                            data=equality.data,
+                        )
+                    )
+                case _:
+                    logger.warning(
+                        f"Equality of type {equality.type} not supported yet. Skipping."
+                    )

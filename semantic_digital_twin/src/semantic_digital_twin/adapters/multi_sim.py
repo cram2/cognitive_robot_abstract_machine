@@ -1,3 +1,4 @@
+import logging
 import inspect
 import os
 import shutil
@@ -56,6 +57,8 @@ from ..world_description.world_modification import (
     AddActuatorModification,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def cas_pose_to_list(pose: TransformationMatrix) -> List[float]:
     """
@@ -64,11 +67,11 @@ def cas_pose_to_list(pose: TransformationMatrix) -> List[float]:
     :param pose: The CAS TransformationMatrix to convert.
     :return: A list of 7 floats ([px, py, pz, qw, qx, qy, qz]) representing the position and quaternion.
     """
-    pos = pose.to_position()
-    quat = pose.to_quaternion()
-    px, py, pz, _ = pos.evaluate().tolist()
-    qx, qy, qz, qw = quat.evaluate().tolist()
-    return [px, py, pz, qw, qx, qy, qz]
+    pose = pose.evaluate()
+    pos = pose[:3, 3]
+    rotation_matrix = pose[:3, :3]
+    quat = Rotation.from_matrix(rotation_matrix).as_quat(scalar_first=True)
+    return [pos[0], pos[1], pos[2], quat[0], quat[1], quat[2], quat[3]]
 
 
 class GeomVisibilityAndCollisionType(IntEnum):
@@ -542,6 +545,11 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
                 self.damping_str: entity.dynamics.damping,
             }
         )
+        if dof.name.name != joint_props["name"]:
+            joint_props["equality_joint"] = {
+                "joint": dof.name.name,
+                "data": [entity.offset, entity.multiplier, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            }
         return joint_props
 
 
@@ -788,6 +796,50 @@ class MujocoCamera(MultiSimCamera):
     quat: list = field(default_factory=lambda: [1, 0, 0, 0])
 
 
+@dataclass(eq=False)
+class MujocoEquality(SemanticAnnotation):
+    """
+    Semantic annotation declaring that two MuJoCo entities are constrained.
+    """
+
+    type: mujoco.mjtEq
+    """
+    The type of the equality constraint.
+    """
+
+    obj_type: mujoco.mjtObj
+    """
+    The type of the objects being constrained.
+    """
+
+    name_1: str
+    """
+    The name of the first entity being constrained.
+    """
+
+    name_2: str
+    """
+    The name of the second entity being constrained.
+    """
+
+    data: List[float]
+    """
+    The data associated with the equality constraint.
+    """
+
+
+@dataclass(eq=False)
+class MujocoMocapBody(SemanticAnnotation):
+    """
+    Semantic annotation declaring that a Body is a MujocoMocapBody.
+    """
+
+    body: Body
+    """
+    The body which is a MujocoMocapBody.
+    """
+
+
 class MujocoConverter(EntityConverter, ABC): ...
 
 
@@ -1020,30 +1072,36 @@ class MultiSimBuilder(ABC):
     A builder to build a world in the Multiverse simulator.
     """
 
+    _world: Optional[World] = None
+    """
+    The world to be built.
+    """
+
     def build_world(self, world: World, file_path: str):
         """
         Builds the world in the simulator and saves it to a file.
 
-        :param world: The world to build.
+        :param world: The world to be built.
         :param file_path: The file path to save the world to.
         """
+        self._world = world
         self._asset_folder_path = os.path.join(os.path.dirname(file_path), "assets")
         if not os.path.exists(self.asset_folder_path):
             os.makedirs(self.asset_folder_path)
-        if len(world.bodies) == 0:
-            with world.modify_world():
+        if len(self.world.bodies) == 0:
+            with self.world.modify_world():
                 root = Body(name=PrefixedName("world"))
-                world.add_body(root)
-        elif world.bodies[0].name.name != "world":
+                self.world.add_body(root)
+        elif self.world.bodies[0].name.name != "world":
             with world.modify_world():
                 root_bodies = [
-                    body for body in world.bodies if body.parent_connection is None
+                    body for body in self.world.bodies if body.parent_connection is None
                 ]
                 root = Body(name=PrefixedName("world"))
-                world.add_body(root)
+                self.world.add_body(root)
                 for root_body in root_bodies:
                     connection = FixedConnection(parent=root, child=root_body)
-                    world.add_connection(connection)
+                    self.world.add_connection(connection)
 
         self._start_build(file_path=file_path)
 
@@ -1180,6 +1238,10 @@ class MultiSimBuilder(ABC):
         """
         return self._asset_folder_path
 
+    @property
+    def world(self) -> World:
+        return self._world
+
 
 @dataclass
 class MujocoBuilder(MultiSimBuilder):
@@ -1195,6 +1257,7 @@ class MujocoBuilder(MultiSimBuilder):
         self.spec.compiler.degree = 0
 
     def _end_build(self, file_path: str):
+        self._build_equalities()
         self.spec.compile()
         self.spec.to_file(file_path)
         import xml.etree.ElementTree as ET
@@ -1246,6 +1309,9 @@ class MujocoBuilder(MultiSimBuilder):
         if geom_props["type"] == mujoco.mjtGeom.mjGEOM_MESH and not self._parse_geom(
             geom_props=geom_props
         ):
+            logger.warning(
+                f"Mesh {shape.mesh} could not be parsed. Skipping geom {geom_props['name']}."
+            )
             return
         geom_spec = parent_body_spec.add_geom(**geom_props)
         if geom_spec.type == mujoco.mjtGeom.mjGEOM_BOX and geom_spec.size[2] == 0:
@@ -1278,17 +1344,18 @@ class MujocoBuilder(MultiSimBuilder):
             )
         mesh_ext = os.path.splitext(mesh_file_path)[1].lower()
         if mesh_ext == ".dae":
-            print(f"Cannot use .dae files in Mujoco. Skipping mesh {mesh_file_path}.")
+            logger.warning(
+                f"Cannot use .dae files in Mujoco. Skipping mesh {mesh_file_path}."
+            )
             return False
         mesh_name = os.path.splitext(os.path.basename(mesh_file_path))[0]
+        mesh_scale = [mesh_entity.scale.x, mesh_entity.scale.y, mesh_entity.scale.z]
+        if not numpy.allclose(mesh_scale, [1.0, 1.0, 1.0]):
+            mesh_name += f"_{'_'.join(map(str, mesh_scale))}"
         if mesh_name not in [mesh.name for mesh in self.spec.meshes]:
             mesh = self.spec.add_mesh(name=mesh_name)
             mesh.file = mesh_file_path
-            mesh.scale[:] = (
-                mesh_entity.scale.x,
-                mesh_entity.scale.y,
-                mesh_entity.scale.z,
-            )
+            mesh.scale = mesh_scale
         geom_props["meshname"] = mesh_name
         texture_file_path = geom_props.pop("texture_file_path", None)
         if isinstance(texture_file_path, str):
@@ -1321,6 +1388,15 @@ class MujocoBuilder(MultiSimBuilder):
         if isinstance(connection, FixedConnection):
             return
         joint_props = MujocoJointConverter.convert(connection)
+        if "equality_joint" in joint_props:
+            equality_joint = joint_props.pop("equality_joint")
+            equality = self.spec.add_equality()
+            equality.type = mujoco.mjtEq.mjEQ_JOINT
+            equality.objtype = mujoco.mjtObj.mjOBJ_JOINT
+            equality.name1 = joint_props["name"]
+            equality.name2 = equality_joint["joint"]
+            equality.data = equality_joint["data"]
+
         child_body_name = connection.child.name.name
         child_body_spec = self._find_entity(
             entity_type=mujoco.mjtObj.mjOBJ_BODY, entity_name=child_body_name
@@ -1413,6 +1489,15 @@ class MujocoBuilder(MultiSimBuilder):
                 entity_name=parent_body_name,
                 entity_type=mujoco.mjtObj.mjOBJ_BODY,
             )
+        if any(
+            [
+                semantic_annotation.body == body
+                for semantic_annotation in self.world.get_semantic_annotations_by_type(
+                    MujocoMocapBody
+                )
+            ]
+        ):
+            body_props["mocap"] = 1
         body_spec = parent_body_spec.add_body(**body_props)
         if body_spec is None:
             raise MujocoEntityNotFoundError(
@@ -1420,6 +1505,20 @@ class MujocoBuilder(MultiSimBuilder):
                 entity_type=mujoco.mjtObj.mjOBJ_BODY,
                 action="add",
             )
+
+    def _build_equalities(self):
+        """
+        Builds all equalities in the Mujoco spec.
+        """
+        for equality_semantic_annotation in self.world.get_semantic_annotations_by_type(
+            MujocoEquality
+        ):
+            equality = self.spec.add_equality()
+            equality.type = equality_semantic_annotation.type
+            equality.objtype = equality_semantic_annotation.obj_type
+            equality.name1 = equality_semantic_annotation.name_1
+            equality.name2 = equality_semantic_annotation.name_2
+            equality.data = equality_semantic_annotation.data
 
     def _find_entity(
         self,
@@ -1431,7 +1530,7 @@ class MujocoBuilder(MultiSimBuilder):
         """
         Finds an entity in the Mujoco spec by its type and name.
 
-        :param entity_type: The type of the entity
+        :param entity_type: The type of the entity.
         :param entity_name: The name of the entity.
         :return: The entity if found, None otherwise.
         """
