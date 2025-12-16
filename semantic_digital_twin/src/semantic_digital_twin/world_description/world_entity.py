@@ -651,6 +651,18 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
             )
         for entity in self.kinematic_structure_entities:
             entity._semantic_annotations.add(self)
+            # add the subentity to my world if they don't have one yet
+            if self._world is not None and entity._world is None:
+                entity.add_to_world(self._world)
+            # if my subentity already has a world, but I don't, add myself to that world
+            elif entity._world is not None and self._world is None:
+                self.add_to_world(entity._world)
+
+    def add_to_world(self, world: World) -> None:
+        super().add_to_world(world)
+        for entity in self.kinematic_structure_entities:
+            if entity._world is None:
+                entity.add_to_world(world)
 
     def __hash__(self):
         return hash(

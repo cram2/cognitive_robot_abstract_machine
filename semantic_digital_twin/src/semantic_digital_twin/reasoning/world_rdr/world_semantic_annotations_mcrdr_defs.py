@@ -239,7 +239,7 @@ def conclusion_10840634078579061471470540436169882059(case) -> List[Fridge]:
         ]
         return [
             Fridge(
-                container=c.parent,
+                container=Container(c.parent),
                 door=fridge_doors[fridge_doors_bodies.index(c.child)],
             )
             for c in fridge_door_connections
