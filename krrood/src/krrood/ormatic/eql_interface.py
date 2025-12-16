@@ -563,8 +563,8 @@ class EQLTranslator:
             return None
 
         rel_resolver = RelationshipResolver()
-        left_attribute_name = query.left._attr_name_
-        right_attribute_name = query.right._attr_name_
+        left_attribute_name = query.left._attribute_name_
+        right_attribute_name = query.right._attribute_name_
 
         left_rel, left_fk = rel_resolver.resolve_relationship_and_foreign_key(
             left_dao, left_attribute_name
@@ -679,7 +679,7 @@ class EQLTranslator:
         names = []
         node = query
         while isinstance(node, Attribute):
-            names.append(node._attr_name_)
+            names.append(node._attribute_name_)
             node = node._child_
         return list(reversed(names))
 

@@ -2,8 +2,8 @@ import os
 
 import pytest
 
-from krrood.entity_query_language.entity import entity, let
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity import entity, variable
+from krrood.entity_query_language.entity_result_processors import an
 from krrood.entity_query_language.symbol_graph import SymbolGraph
 from ..dataset.example_classes import Position
 
@@ -38,7 +38,7 @@ def test_memory_leak():
 
     create_data()
 
-    q = an(entity(let(Position, domain=None)))
+    q = an(entity(variable(Position, domain=None)))
     result = list(q.evaluate())
 
     assert result == []

@@ -21,7 +21,7 @@ If all the arguments are ordinary python objects, you can use them normally.
 
 ```{warning}
 When using predicates and symbolic functions, at least one of the arguments must be a symbolic expression 
-(like a variable constructed using `let` or another query). Otherwise, the predicate will be considered a 
+(like a variable constructed using `variable` or another query). Otherwise, the predicate will be considered a 
 constant/literal and cannot be used as a condition as it is either always True or always False.
 ```
 
@@ -31,9 +31,9 @@ Lets first define our model and some sample data.
 from dataclasses import dataclass
 from typing_extensions import List
 
-from krrood.entity_query_language.entity import entity, let, Symbol
+from krrood.entity_query_language.entity import entity, variable, Symbol
 from krrood.entity_query_language.predicate import Predicate, symbolic_function
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity_result_processors import an
 
 
 @dataclass
@@ -86,9 +86,10 @@ class HasThreeInItsName(Predicate):
         return '3' in self.body.name
 
 # Build the query using the predicate inside symbolic mode
+body = variable(type_=Body, domain=world.bodies)
 query = an(
     entity(
-        body := let(type_=Body, domain=world.bodies),
+        body).where(
         is_handle(body_=body),  # use the predicate just like any other condition
         HasThreeInItsName(body)
     )

@@ -13,6 +13,7 @@ from .symbolic import (
     Variable,
     OperationResult,
     ResultQuantifier,
+    Selectable,
 )
 from .utils import T
 
@@ -26,7 +27,7 @@ class Conclusion(SymbolicExpression[T], ABC):
     :ivar value: The value or expression used by the conclusion.
     """
 
-    var: Variable[T]
+    var: Selectable[T]
     value: Any
     _child_: Optional[SymbolicExpression[T]] = field(init=False, default=None)
 

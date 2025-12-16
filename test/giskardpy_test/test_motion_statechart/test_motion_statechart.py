@@ -1703,36 +1703,53 @@ def test_not_not_in_motion_statechart():
 
 
 def test_counting():
+    class FakeClock:
+        def __init__(self):
+            self.t = 0.0
+
+        def time(self):
+            return self.t
+
+        def advance(self, dt):
+            self.t += dt
+
+    clock = FakeClock()
+
     msc = MotionStatechart()
-    seconds = 3
-    counter = CountSeconds(seconds=seconds)
-    msc.add_node(counter)
+    seconds = 1
+    msc.add_nodes(
+        [counter := CountSeconds(seconds=seconds, now=clock.time), pulse := Pulse()]
+    )
 
-    node1 = Pulse()
-    msc.add_node(node1)
-    node1.start_condition = counter.observation_variable
+    pulse.start_condition = counter.observation_variable
+    counter.reset_condition = pulse.observation_variable
 
-    end = EndMotion()
-    msc.add_node(end)
-
-    counter.reset_condition = node1.observation_variable
+    msc.add_node(end := EndMotion())
 
     end.start_condition = trinary_logic_and(
-        counter.observation_variable, trinary_logic_not(node1.observation_variable)
+        counter.observation_variable, trinary_logic_not(pulse.observation_variable)
     )
 
     kin_sim = Executor(
         world=World(),
+        pacer=SimulationPacer(real_time_factor=None),
     )
     kin_sim.compile(motion_statechart=msc)
 
-    current_time = time.time()
+    # Advance fake time deterministically without wall-clock sleeps
+    step = 0.1
+    while not msc.is_end_motion():
+        kin_sim.tick()
+        clock.advance(step)
+        if kin_sim.control_cycles > 1000:
+            raise TimeoutError("test stuck")
 
-    kin_sim.tick_until_end(1_000_000)
-    msc.draw("muh.pdf")
-
-    actual = time.time() - current_time
-    assert np.isclose(actual, seconds * 2, rtol=0.01)
+    # it takes 2 * seconds to finish the counters
+    # + 1 for pulse to trigger
+    # + 1 for reset
+    # + 1 for EndMotion to transition to RUNNING
+    # + 1 for EndMotion to observe True
+    assert np.allclose(seconds * 2 + 0.4, clock.time())
 
 
 def test_count_ticks():

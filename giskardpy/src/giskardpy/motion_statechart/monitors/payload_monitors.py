@@ -1,6 +1,6 @@
 import time
 from dataclasses import field, dataclass
-from typing import Optional
+from typing import Optional, Callable
 
 from giskardpy.motion_statechart.context import ExecutionContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
@@ -46,16 +46,17 @@ class CountSeconds(MotionStatechartNode):
     """
 
     seconds: float = field(kw_only=True)
+    now: Callable[[], float] = field(default=time.monotonic, kw_only=True, repr=False)
     _start_time: float = field(init=False)
 
     def on_tick(self, context: ExecutionContext) -> Optional[ObservationStateValues]:
-        difference = time.time() - self._start_time
-        if difference >= self.seconds:
+        difference = self.now() - self._start_time
+        if difference >= self.seconds - 1e-5:
             return ObservationStateValues.TRUE
         return None
 
     def on_start(self, context: ExecutionContext):
-        self._start_time = time.time()
+        self._start_time = self.now()
 
 
 @dataclass(repr=False, eq=False)

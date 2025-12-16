@@ -27,8 +27,8 @@ from dataclasses import dataclass
 
 from typing_extensions import List
 
-from krrood.entity_query_language.entity import entity, let, Symbol
-from krrood.entity_query_language.quantify_entity import an, the
+from krrood.entity_query_language.entity import entity, variable, Symbol
+from krrood.entity_query_language.entity_result_processors import an, the
 from krrood.entity_query_language.result_quantification_constraint import AtLeast, AtMost, Exactly, Range
 from krrood.entity_query_language.failures import MultipleSolutionFound, LessThanExpectedNumberOfSolutions, GreaterThanExpectedNumberOfSolutions
 
@@ -46,8 +46,8 @@ class World(Symbol):
 
 world = World(1, [Body("Body1"), Body("Body2")])
 
-
-query = the(entity(body := let(Body, domain=world.bodies),
+body = variable(Body, domain=world.bodies)
+query = the(entity(body).where(
                    body.name.endswith("1")))
 print(query.evaluate())
 ```
@@ -55,8 +55,8 @@ print(query.evaluate())
 If there are multiple results, we get an informative exception.
 
 ```{code-cell} ipython3
-
-query = the(entity(body := let(Body, domain=world.bodies)))
+body = variable(Body, domain=world.bodies)
+query = the(entity(body))
 
 try:
     query.evaluate()
@@ -67,8 +67,8 @@ except MultipleSolutionFound as e:
 We can also get all results using `an`.
 
 ```{code-cell} ipython3
-
-query = an(entity(body := let(Body, domain=None)))
+body = variable(Body, domain=None)
+query = an(entity(body))
 
 print(*query.evaluate(), sep="\n")
 ```
@@ -83,8 +83,9 @@ The world contains exactly two bodies, so all the following examples will evalua
 
 ```{code-cell} ipython3
 # Require at least one result
+body = variable(Body, domain=world.bodies)
 query = an(
-    entity(body := let(Body, domain=world.bodies)),
+    entity(body),
     quantification=AtLeast(1),
 )
 
@@ -94,9 +95,9 @@ print(len(list(query.evaluate())))  # -> 2
 You can also bound the number of results within a range using both `at_least` and `at_most`:
 
 ```{code-cell} ipython3
-
+body = variable(Body, domain=world.bodies)
 query = an(
-    entity(body := let(Body, domain=world.bodies)),
+    entity(body),
     quantification=Range(AtLeast(1), AtMost(3))
 )
 
@@ -106,9 +107,9 @@ print(len(list(query.evaluate())))  # -> 2
 If you want an exact number of results, use `exactly`:
 
 ```{code-cell} ipython3
-
+body = variable(Body, domain=world.bodies)
 query = an(
-    entity(body := let(Body, domain=world.bodies)),
+    entity(body),
     quantification=Exactly(2),
 )
 
@@ -125,9 +126,9 @@ The result count constraints will raise informative exceptions when the number o
 # The world from above has exactly two bodies: Body1 and Body2
 
 # at_least too high -> LessThanExpectedNumberOfSolutions
-
+body = variable(Body, domain=world.bodies)
 query = an(
-    entity(body := let(Body, domain=world.bodies)),
+    entity(body),
     quantification=AtLeast(3),
 )
 try:
@@ -136,9 +137,9 @@ except LessThanExpectedNumberOfSolutions as e:
     print(e)
 
 # at_most too low -> GreaterThanExpectedNumberOfSolutions
-
+body = variable(Body, domain=world.bodies)
 query = an(
-    entity(body := let(Body, domain=world.bodies)),
+    entity(body),
     quantification=AtMost(1),
 )
 try:
@@ -147,9 +148,9 @@ except GreaterThanExpectedNumberOfSolutions as e:
     print(e)
 
 # exactly mismatch -> can raise either LessThan... or GreaterThan...
-
+body = variable(Body, domain=world.bodies)
 query = an(
-    entity(body := let(Body, domain=world.bodies)),
+    entity(body),
     quantification=Exactly(1),
 )
 try:

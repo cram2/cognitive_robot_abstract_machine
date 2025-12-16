@@ -17,7 +17,6 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 
 import builtins
 import krrood.ormatic.custom_types
-import semantic_digital_twin.adapters.procthor.procthor_semantic_annotations
 import semantic_digital_twin.callbacks.callback
 import semantic_digital_twin.datastructures.prefixed_name
 import semantic_digital_twin.orm.model
@@ -1730,7 +1729,7 @@ class HasBodyDAO(
 class BaseballDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Baseball
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Baseball
     ],
 ):
 
@@ -1749,7 +1748,7 @@ class BaseballDAO(
 class BedDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Bed
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bed
     ],
 ):
 
@@ -1768,7 +1767,7 @@ class BedDAO(
 class BookDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Book
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Book
     ],
 ):
 
@@ -1797,7 +1796,7 @@ class BookDAO(
 class BookFrontDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.BookFront
+        semantic_digital_twin.semantic_annotations.semantic_annotations.BookFront
     ],
 ):
 
@@ -1816,7 +1815,7 @@ class BookFrontDAO(
 class ChairDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Chair
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Chair
     ],
 ):
 
@@ -1835,7 +1834,7 @@ class ChairDAO(
 class ArmchairDAO(
     ChairDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Armchair
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Armchair
     ],
 ):
 
@@ -1854,7 +1853,7 @@ class ArmchairDAO(
 class OfficeChairDAO(
     ChairDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.OfficeChair
+        semantic_digital_twin.semantic_annotations.semantic_annotations.OfficeChair
     ],
 ):
 
@@ -1873,7 +1872,7 @@ class OfficeChairDAO(
 class ClothDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Cloth
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Cloth
     ],
 ):
 
@@ -1911,7 +1910,7 @@ class ContainerDAO(
 class BottleDAO(
     ContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Bottle
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bottle
     ],
 ):
 
@@ -1930,7 +1929,7 @@ class BottleDAO(
 class MustardBottleDAO(
     BottleDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.MustardBottle
+        semantic_digital_twin.semantic_annotations.semantic_annotations.MustardBottle
     ],
 ):
 
@@ -1949,7 +1948,7 @@ class MustardBottleDAO(
 class SoapBottleDAO(
     BottleDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.SoapBottle
+        semantic_digital_twin.semantic_annotations.semantic_annotations.SoapBottle
     ],
 ):
 
@@ -1968,7 +1967,7 @@ class SoapBottleDAO(
 class WineBottleDAO(
     BottleDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.WineBottle
+        semantic_digital_twin.semantic_annotations.semantic_annotations.WineBottle
     ],
 ):
 
@@ -1987,7 +1986,7 @@ class WineBottleDAO(
 class GarbageBinDAO(
     ContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.GarbageBin
+        semantic_digital_twin.semantic_annotations.semantic_annotations.GarbageBin
     ],
 ):
 
@@ -2006,7 +2005,7 @@ class GarbageBinDAO(
 class ProcthorBoxDAO(
     ContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.ProcthorBox
+        semantic_digital_twin.semantic_annotations.semantic_annotations.ProcthorBox
     ],
 ):
 
@@ -2022,10 +2021,33 @@ class ProcthorBoxDAO(
     }
 
 
+class SaltContainerDAO(
+    ContainerDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.SaltContainer
+    ],
+):
+
+    __tablename__ = "SaltContainerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ContainerDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SaltContainerDAO",
+        "inherit_condition": database_id == ContainerDAO.database_id,
+    }
+
+
 class CookingContainerDAO(
     ContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.CookingContainer
+        semantic_digital_twin.semantic_annotations.semantic_annotations.CookingContainer
     ],
 ):
 
@@ -2044,7 +2066,7 @@ class CookingContainerDAO(
 class KettleDAO(
     CookingContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Kettle
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Kettle
     ],
 ):
 
@@ -2065,7 +2087,7 @@ class KettleDAO(
 class PanDAO(
     CookingContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Pan
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Pan
     ],
 ):
 
@@ -2086,7 +2108,7 @@ class PanDAO(
 class PotDAO(
     CookingContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Pot
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Pot
     ],
 ):
 
@@ -2107,7 +2129,7 @@ class PotDAO(
 class CuttleryDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Cuttlery
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Cuttlery
     ],
 ):
 
@@ -2126,7 +2148,7 @@ class CuttleryDAO(
 class ForkDAO(
     CuttleryDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Fork
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Fork
     ],
 ):
 
@@ -2145,7 +2167,7 @@ class ForkDAO(
 class KnifeDAO(
     CuttleryDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Knife
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Knife
     ],
 ):
 
@@ -2161,33 +2183,10 @@ class KnifeDAO(
     }
 
 
-class MilkDAO(
-    CuttleryDAO,
-    DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Milk
-    ],
-):
-
-    __tablename__ = "MilkDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(CuttleryDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
-        String(255), use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "MilkDAO",
-        "inherit_condition": database_id == CuttleryDAO.database_id,
-    }
-
-
 class SpoonDAO(
     CuttleryDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Spoon
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Spoon
     ],
 ):
 
@@ -2210,7 +2209,7 @@ class SpoonDAO(
 class DecorDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Decor
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Decor
     ],
 ):
 
@@ -2229,7 +2228,7 @@ class DecorDAO(
 class WallDecorDAO(
     DecorDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.WallDecor
+        semantic_digital_twin.semantic_annotations.semantic_annotations.WallDecor
     ],
 ):
 
@@ -2248,7 +2247,7 @@ class WallDecorDAO(
 class PosterDAO(
     WallDecorDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Poster
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Poster
     ],
 ):
 
@@ -2296,7 +2295,7 @@ class DoorDAO(
 class DrinkingContainerDAO(
     ContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.DrinkingContainer
+        semantic_digital_twin.semantic_annotations.semantic_annotations.DrinkingContainer
     ],
 ):
 
@@ -2315,7 +2314,7 @@ class DrinkingContainerDAO(
 class CupDAO(
     DrinkingContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Cup
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Cup
     ],
 ):
 
@@ -2340,7 +2339,7 @@ class CupDAO(
 class MugDAO(
     DrinkingContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Mug
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Mug
     ],
 ):
 
@@ -2361,7 +2360,7 @@ class MugDAO(
 class DroneDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Drone
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Drone
     ],
 ):
 
@@ -2380,7 +2379,7 @@ class DroneDAO(
 class FoodDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Food
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Food
     ],
 ):
 
@@ -2399,7 +2398,7 @@ class FoodDAO(
 class BreadDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Bread
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bread
     ],
 ):
 
@@ -2415,10 +2414,56 @@ class BreadDAO(
     }
 
 
+class CandyDAO(
+    FoodDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Candy
+    ],
+):
+
+    __tablename__ = "CandyDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CandyDAO",
+        "inherit_condition": database_id == FoodDAO.database_id,
+    }
+
+
+class CerealDAO(
+    FoodDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Cereal
+    ],
+):
+
+    __tablename__ = "CerealDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CerealDAO",
+        "inherit_condition": database_id == FoodDAO.database_id,
+    }
+
+
 class CheezeItDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.CheezeIt
+        semantic_digital_twin.semantic_annotations.semantic_annotations.CheezeIt
     ],
 ):
 
@@ -2437,7 +2482,7 @@ class CheezeItDAO(
 class GelatinBoxDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.GelatinBox
+        semantic_digital_twin.semantic_annotations.semantic_annotations.GelatinBox
     ],
 ):
 
@@ -2453,10 +2498,56 @@ class GelatinBoxDAO(
     }
 
 
+class MilkDAO(
+    ContainerDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Milk
+    ],
+):
+
+    __tablename__ = "MilkDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ContainerDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MilkDAO",
+        "inherit_condition": database_id == ContainerDAO.database_id,
+    }
+
+
+class NoodlesDAO(
+    FoodDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Noodles
+    ],
+):
+
+    __tablename__ = "NoodlesDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NoodlesDAO",
+        "inherit_condition": database_id == FoodDAO.database_id,
+    }
+
+
 class PringlesDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Pringles
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Pringles
     ],
 ):
 
@@ -2475,7 +2566,7 @@ class PringlesDAO(
 class ProduceDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Produce
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Produce
     ],
 ):
 
@@ -2494,7 +2585,7 @@ class ProduceDAO(
 class AppleDAO(
     ProduceDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Apple
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Apple
     ],
 ):
 
@@ -2513,7 +2604,7 @@ class AppleDAO(
 class BananaDAO(
     ProduceDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Banana
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Banana
     ],
 ):
 
@@ -2532,7 +2623,7 @@ class BananaDAO(
 class LettuceDAO(
     ProduceDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Lettuce
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Lettuce
     ],
 ):
 
@@ -2551,7 +2642,7 @@ class LettuceDAO(
 class OrangeDAO(
     ProduceDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Orange
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Orange
     ],
 ):
 
@@ -2570,7 +2661,7 @@ class OrangeDAO(
 class PotatoDAO(
     ProduceDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Potato
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Potato
     ],
 ):
 
@@ -2589,7 +2680,7 @@ class PotatoDAO(
 class TomatoDAO(
     ProduceDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Tomato
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Tomato
     ],
 ):
 
@@ -2608,7 +2699,7 @@ class TomatoDAO(
 class TomatoSoupDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.TomatoSoup
+        semantic_digital_twin.semantic_annotations.semantic_annotations.TomatoSoup
     ],
 ):
 
@@ -2627,7 +2718,7 @@ class TomatoSoupDAO(
 class TunaCanDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.TunaCan
+        semantic_digital_twin.semantic_annotations.semantic_annotations.TunaCan
     ],
 ):
 
@@ -2665,7 +2756,7 @@ class HandleDAO(
 class HouseplantDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Houseplant
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Houseplant
     ],
 ):
 
@@ -2684,7 +2775,7 @@ class HouseplantDAO(
 class LidDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Lid
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Lid
     ],
 ):
 
@@ -2703,7 +2794,7 @@ class LidDAO(
 class PanLidDAO(
     LidDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.PanLid
+        semantic_digital_twin.semantic_annotations.semantic_annotations.PanLid
     ],
 ):
 
@@ -2722,7 +2813,7 @@ class PanLidDAO(
 class PotLidDAO(
     LidDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.PotLid
+        semantic_digital_twin.semantic_annotations.semantic_annotations.PotLid
     ],
 ):
 
@@ -2741,7 +2832,7 @@ class PotLidDAO(
 class LiquidCapDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.LiquidCap
+        semantic_digital_twin.semantic_annotations.semantic_annotations.LiquidCap
     ],
 ):
 
@@ -2760,7 +2851,7 @@ class LiquidCapDAO(
 class PenDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Pen
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Pen
     ],
 ):
 
@@ -2779,7 +2870,7 @@ class PenDAO(
 class PencilDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Pencil
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Pencil
     ],
 ):
 
@@ -2798,7 +2889,7 @@ class PencilDAO(
 class SaltPepperShakerDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.SaltPepperShaker
+        semantic_digital_twin.semantic_annotations.semantic_annotations.SaltPepperShaker
     ],
 ):
 
@@ -2817,7 +2908,7 @@ class SaltPepperShakerDAO(
 class ShelvingUnitDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.ShelvingUnit
+        semantic_digital_twin.semantic_annotations.semantic_annotations.ShelvingUnit
     ],
 ):
 
@@ -2836,7 +2927,7 @@ class ShelvingUnitDAO(
 class SinkDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Sink
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Sink
     ],
 ):
 
@@ -2855,7 +2946,7 @@ class SinkDAO(
 class SofaDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Sofa
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Sofa
     ],
 ):
 
@@ -2874,7 +2965,7 @@ class SofaDAO(
 class SprayBottleDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.SprayBottle
+        semantic_digital_twin.semantic_annotations.semantic_annotations.SprayBottle
     ],
 ):
 
@@ -2893,7 +2984,7 @@ class SprayBottleDAO(
 class StatueDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Statue
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Statue
     ],
 ):
 
@@ -2941,7 +3032,7 @@ class TableDAO(
 class CoffeeTableDAO(
     TableDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.CoffeeTable
+        semantic_digital_twin.semantic_annotations.semantic_annotations.CoffeeTable
     ],
 ):
 
@@ -2960,7 +3051,7 @@ class CoffeeTableDAO(
 class DeskDAO(
     TableDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Desk
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Desk
     ],
 ):
 
@@ -2979,7 +3070,7 @@ class DeskDAO(
 class DiningTableDAO(
     TableDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.DiningTable
+        semantic_digital_twin.semantic_annotations.semantic_annotations.DiningTable
     ],
 ):
 
@@ -2998,7 +3089,7 @@ class DiningTableDAO(
 class SideTableDAO(
     TableDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.SideTable
+        semantic_digital_twin.semantic_annotations.semantic_annotations.SideTable
     ],
 ):
 
@@ -3017,7 +3108,7 @@ class SideTableDAO(
 class VaseDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Vase
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Vase
     ],
 ):
 
@@ -3036,7 +3127,7 @@ class VaseDAO(
 class WallPanelDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.WallPanel
+        semantic_digital_twin.semantic_annotations.semantic_annotations.WallPanel
     ],
 ):
 
@@ -3338,7 +3429,7 @@ class HasSupportingSurfaceDAO(
 class BowlDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Bowl
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bowl
     ],
 ):
 
@@ -3395,7 +3486,7 @@ class FloorDAO(
 class PlateDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Plate
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Plate
     ],
 ):
 

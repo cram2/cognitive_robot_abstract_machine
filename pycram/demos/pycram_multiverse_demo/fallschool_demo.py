@@ -1,24 +1,19 @@
-import logging
-from datetime import timedelta
-
-import rospy
-from ..tf_transformations import quaternion_from_euler
-from typing_extensions import Type
-
 import pycrap
-from pycram.datastructures.dataclasses import Color
-from pycram.datastructures.enums import Arms
-from pycram.datastructures.pose import PoseStamped
+import rospy
+import rospy
 from pycram.datastructures.world import UseProspectionWorld, World
-from pycram.robot_plans import *
-from pycram.designators.object_designator import BelieveObject
-from pycram.process_module import simulated_robot, with_simulated_robot, real_robot
 from pycram.ros_utils.robot_state_updater import WorldStateUpdater
+from pycram.ros_utils.viz_marker_publisher import VizMarkerPublisher
 from pycram.world_concepts.world_object import Object
 from pycram.worlds.bullet_world import BulletWorld
 from pycram.worlds.multiverse import Multiverse
-from pycram.ros_utils.viz_marker_publisher import VizMarkerPublisher
 from pycrap.ontologies import PhysicalObject
+
+from pycram.datastructures.dataclasses import Color
+from pycram.process_module import with_simulated_robot, real_robot
+from pycram.robot_plans import *
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from ..tf_transformations import quaternion_from_euler
 
 
 @with_simulated_robot
@@ -57,7 +52,7 @@ WorldStateUpdater(
 apartment = Object("apartment", pycrap.Apartment, f"apartment.urdf")
 milk = Object(
     "milk",
-    pycrap.Milk,
+    Milk,
     milk_path,
     pose=PoseStamped.from_list([0.4, 2.6, 1.34], [1, 0, 0, 0]),
     color=Color(1, 0, 0, 1),
@@ -71,13 +66,10 @@ fridge_base_pose.position.x += 0.16
 fridge_base_pose.position.y += -0.1
 milk.set_pose(fridge_base_pose, base=True)
 
-
 robot_desig = BelieveObject(names=[robot.name])
 apartment_desig = BelieveObject(names=[apartment.name])
 
-
 with real_robot:
-
     # Transport the milkMoveGripperMotion
     ParkArmsAction([Arms.BOTH]).resolve().perform()
 
