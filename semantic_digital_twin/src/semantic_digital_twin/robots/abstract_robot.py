@@ -29,6 +29,7 @@ from ..world_description.world_entity import (
     Agent,
     Connection,
     CollisionCheckingConfig,
+    Agent
 )
 from ..world_description.world_entity import (
     KinematicStructureEntity,
@@ -40,7 +41,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class SemanticRobotAnnotation(RootedSemanticAnnotation, ABC):
+class SemanticRobotAnnotation(Agent, ABC):
     """
     Represents a collection of connected robot bodies, starting from a root body, and ending in a unspecified collection
     of tip bodies.

@@ -26,6 +26,7 @@ if TYPE_CHECKING:
         KinematicStructureEntity,
     )
     from .spatial_types.spatial_types import FloatVariable, SymbolicType
+    from .world_description.shape_collection import ShapeCollection
 
 
 @dataclass
@@ -270,3 +271,12 @@ class KinematicStructureEntityNotInKwargs(JSONSerializationError):
             f"Kinematic structure entity '{self.kinematic_structure_entity_id}' is not in the kwargs of the "
             f"method that created it."
         )
+
+
+@dataclass
+class NoShapeError(UsageError):
+    shape_collection: ShapeCollection
+
+    def __post_init__(self):
+        msg = f"Shape collection '{self.shape_collection}' has no shapes."
+        super().__init__(msg)

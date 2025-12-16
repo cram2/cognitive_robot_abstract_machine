@@ -658,11 +658,24 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
             elif entity._world is not None and self._world is None:
                 self.add_to_world(entity._world)
 
+        for f in fields(self):
+            value = getattr(self, f.name)
+            if (
+                isinstance(value, SemanticAnnotation)
+                and value._world is not None
+                and self._world is None
+            ):
+                self.add_to_world(value._world)
+
     def add_to_world(self, world: World) -> None:
         super().add_to_world(world)
         for entity in self.kinematic_structure_entities:
             if entity._world is None:
                 entity.add_to_world(world)
+        for f in fields(self):
+            value = getattr(self, f.name)
+            if isinstance(value, SemanticAnnotation) and value._world is None:
+                value.add_to_world(world)
 
     def __hash__(self):
         return hash(
@@ -838,6 +851,7 @@ class RootedSemanticAnnotation(SemanticAnnotation):
             if body.has_collision() and not body.get_collision_config().disabled
         )
 
+
 @dataclass(eq=False)
 class Agent(RootedSemanticAnnotation):
     """
@@ -851,6 +865,7 @@ class Agent(RootedSemanticAnnotation):
 
     ...
 
+
 @dataclass(eq=False)
 class Human(Agent):
     """
@@ -862,7 +877,18 @@ class Human(Agent):
     This class exists primarily for semantic distinction, so that algorithms
     can treat human agents differently from robots if needed.
     """
+
     ...
+
+
+@dataclass(eq=False)
+class Agent(RootedSemanticAnnotation):
+    """
+    Represents an agent (dynamic/controlled body) in the world.
+    """
+
+    ...
+
 
 @dataclass(eq=False)
 class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
@@ -878,8 +904,6 @@ class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
         return set(
             self._world.get_kinematic_structure_entities_of_branch(self.root)
         ) | {self.root}
-
-
 
 
 @dataclass(eq=False)
@@ -1219,4 +1243,3 @@ class Actuator(WorldEntityWithID, SubclassJSONSerializer):
         :param dof: The degree of freedom to add.
         """
         self._dofs.append(dof)
-

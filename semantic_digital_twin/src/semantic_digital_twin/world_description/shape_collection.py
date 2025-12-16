@@ -15,6 +15,7 @@ from typing_extensions import TYPE_CHECKING
 
 from .geometry import Shape, BoundingBox
 from ..datastructures.variables import SpatialVariables
+from ..exceptions import NoShapeError
 from ..spatial_types import TransformationMatrix, Point3
 
 if TYPE_CHECKING:
@@ -35,6 +36,7 @@ class ShapeCollection(SubclassJSONSerializer):
     The shapes contained in this collection.
     """
 
+    # Why is this called "reference_frame" when it is a KinematicStructureEntity?
     reference_frame: Optional[KinematicStructureEntity] = None
     """
     Backreference to the kinematic structure entity this collection belongs to.
@@ -81,7 +83,13 @@ class ShapeCollection(SubclassJSONSerializer):
             )
 
     def __getitem__(self, index: int) -> Shape:
-        return self.shapes[index]
+        try:
+            return self.shapes[index]
+        except IndexError:
+            if len(self.shapes) == 0:
+                raise NoShapeError(self)
+            else:
+                raise
 
     def __len__(self) -> int:
         return len(self.shapes)
