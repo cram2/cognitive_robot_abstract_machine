@@ -20,7 +20,7 @@ Result quantifiers like `the` and `an` are also a kind of result processor. See 
 All result processors are evaluatable: they return a query object that exposes `.evaluate(...)`.
 
 ```{note}
-You can pass either a variable created with `let(...)` directly, or wrap it with `entity(...)`. Both forms are supported by the processors demonstrated below.
+You can pass either a variable created with `variable(...)` directly, or wrap it with `entity(...)`. Both forms are supported by the processors demonstrated below.
 ```
 
 ## Setup
@@ -29,8 +29,8 @@ You can pass either a variable created with `let(...)` directly, or wrap it with
 from dataclasses import dataclass
 from typing_extensions import List
 
-import krrood.entity_query_language.entity as eql
-from krrood.entity_query_language.entity import entity, let, contains
+import krrood.entity_query_language.entity_result_processors as eql
+from krrood.entity_query_language.entity import entity, variable, contains
 
 
 @dataclass
@@ -58,11 +58,11 @@ world = World([
 Count the number of results matching a predicate.
 
 ```{code-cell} ipython3
-body = let(Body, domain=world.bodies)
+body = variable(Body, domain=world.bodies)
 
 query = eql.count(
     entity(
-        body,
+        body).where(
         contains(body.name, "Handle"),
     )
 )
@@ -73,7 +73,7 @@ print(query.evaluate())  # -> 2
 You can also count over a variable directly (without `entity(...)`).
 
 ```{code-cell} ipython3
-query = eql.count(let(Body, domain=world.bodies))
+query = eql.count(variable(Body, domain=world.bodies))
 print(query.evaluate())  # -> 5
 ```
 
@@ -83,7 +83,7 @@ Sum numeric values from the results.
 
 ```{code-cell} ipython3
 heights = [1, 2, 3, 4, 5]
-value = let(int, domain=heights)
+value = variable(int, domain=heights)
 
 query = eql.sum(entity(value))
 print(query.evaluate())  # -> 15
@@ -92,7 +92,7 @@ print(query.evaluate())  # -> 15
 If there are no results, `sum` returns `None`.
 
 ```{code-cell} ipython3
-empty = let(int, domain=[])
+empty = variable(int, domain=[])
 query = eql.sum(entity(empty))
 print(query.evaluate())  # -> None
 ```
@@ -109,7 +109,7 @@ print(query.evaluate())  # -> 15
 Compute the arithmetic mean of numeric values.
 
 ```{code-cell} ipython3
-value = let(int, domain=[1, 2, 3, 4, 5])
+value = variable(int, domain=[1, 2, 3, 4, 5])
 query = eql.average(entity(value))
 print(query.evaluate())  # -> 3.0
 ```
@@ -120,7 +120,7 @@ Find the maximum or minimum value.
 
 ```{code-cell} ipython3
 values = [10, 7, 12, 3]
-value = let(int, domain=values)
+value = variable(int, domain=values)
 
 max_query = eql.max(entity(value))
 min_query = eql.min(entity(value))

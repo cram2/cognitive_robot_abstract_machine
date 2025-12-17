@@ -15,8 +15,8 @@ kernelspec:
 
 EQL can be well-used to answer symbolic questions through querying.
 
-Whenever you write a query you have to wrap free variables in `let` statements.
-`let` wraps your classes such that attribute access is intercepted and replaced by a symbolic expression.
+Whenever you write a query you have to wrap free variables in `variable` statements.
+`variable` wraps your classes such that attribute access is intercepted and replaced by a symbolic expression.
 
 This is different from plain python in the sense that it doesn't evaluate what you write directly but
 treats your statements as something that will be evaluated later (lazily).
@@ -41,8 +41,8 @@ from dataclasses import dataclass
 
 from typing_extensions import List
 
-from krrood.entity_query_language.entity import entity, let, Symbol
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity import entity, variable, Symbol
+from krrood.entity_query_language.entity_result_processors import an
 
 
 @dataclass
@@ -58,9 +58,10 @@ class World:
 
 world = World(1, [Body("Body1"), Body("Body2")])
 
+body = variable(Body, domain=world.bodies)
 query = an(
     entity(
-        body := let(Body, domain=world.bodies), body.name.startswith("B"),
+        body).where(body.name.startswith("B"),
     )
 )
 print(*query.evaluate(), sep="\n")

@@ -68,7 +68,7 @@ questions = [
       "question": "Which query returns all Handle views using EQL?",
       "type": "multiple_choice",
       "answers": [
-        {"answer": "an(entity(let(Handle, world.views)))", "correct": True},
+        {"answer": "an(entity(variable(Handle, world.views)))", "correct": True},
         {"answer": "world.get_views_by_type(Handle)", "correct": False},
         {"answer": "select * from views where type='Handle'", "correct": False},
         {"answer": "handles = world.views['Handle']", "correct": False}

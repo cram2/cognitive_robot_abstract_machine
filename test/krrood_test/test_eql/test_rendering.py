@@ -21,11 +21,11 @@ from ..dataset.semantic_world_like_classes import (
 )
 from krrood.entity_query_language.entity import (
     entity,
-    let,
+    variable,
     inference,
     and_,
 )
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity_result_processors import an
 from krrood.entity_query_language.conclusion import Add
 
 from krrood.entity_query_language.predicate import HasType
@@ -36,12 +36,13 @@ from krrood.entity_query_language.rule import alternative
 def test_render_rx_graph_as_igraph_simple(handles_and_containers_world):
     world = handles_and_containers_world
 
-    fixed_connection = let(FixedConnection, world.connections)
+    fixed_connection = variable(FixedConnection, world.connections)
     container = fixed_connection.parent
     handle = fixed_connection.child
     rule = an(
         entity(
-            inference(Drawer)(handle=handle, container=container, world=world),
+            inference(Drawer)(handle=handle, container=container, world=world)
+        ).where(
             HasType(handle, Handle),
         )
     )
@@ -57,19 +58,19 @@ def test_render_rx_graph_as_igraph_simple(handles_and_containers_world):
 def test_render_rx_graph_as_igraph_complex(doors_and_drawers_world):
     world = doors_and_drawers_world
 
-    body = let(Body, domain=world.bodies)
-    handle = let(Handle, domain=world.bodies)
-    container = let(Container, domain=world.bodies)
+    body = variable(Body, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    container = variable(Container, domain=world.bodies)
 
-    fixed_connection = let(FixedConnection, domain=world.connections)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
     fixed_connection_condition = and_(
         fixed_connection.parent == body, fixed_connection.child == handle
     )
-    prismatic_connection = let(PrismaticConnection, domain=world.connections)
-    revolute_connection = let(RevoluteConnection, domain=world.connections)
+    prismatic_connection = variable(PrismaticConnection, domain=world.connections)
+    revolute_connection = variable(RevoluteConnection, domain=world.connections)
+    views = variable(View, domain=None, inferred=True)
     rule = an(
-        entity(
-            views := let(View, domain=None),
+        entity(views).where(
             fixed_connection_condition,
             prismatic_connection.child == body,
         )

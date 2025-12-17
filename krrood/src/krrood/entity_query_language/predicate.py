@@ -14,6 +14,7 @@ from typing_extensions import (
     ClassVar,
     Dict,
     List,
+    Iterable,
 )
 
 from .enums import PredicateType

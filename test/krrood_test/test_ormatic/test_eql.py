@@ -21,14 +21,14 @@ from ..dataset.ormatic_interface import (
     BodyDAO,
 )
 from krrood.entity_query_language.entity import (
-    let,
+    variable,
     entity,
     contains,
     and_,
     or_,
     in_,
 )
-from krrood.entity_query_language.quantify_entity import an, the
+from krrood.entity_query_language.entity_result_processors import an, the
 from krrood.ormatic.dao import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
 
@@ -38,7 +38,8 @@ def test_translate_simple_greater(session, database):
     session.add(PositionDAO(x=1, y=2, z=4))
     session.commit()
 
-    query = an(entity(position := let(type_=Position, domain=[]), position.z > 3))
+    position = variable(type_=Position, domain=[])
+    query = an(entity(position).where(position.z > 3))
 
     translator = eql_to_sql(query, session)
     query_by_hand = select(PositionDAO).where(PositionDAO.z > 3)
@@ -58,9 +59,9 @@ def test_translate_or_condition(session, database):
     session.add(PositionDAO(x=2, y=9, z=10))
     session.commit()
 
+    position = variable(type_=Position, domain=[])
     query = an(
-        entity(
-            position := let(type_=Position, domain=[]),
+        entity(position).where(
             or_(position.z == 4, position.x == 2),
         )
     )
@@ -97,7 +98,8 @@ def test_translate_join_one_to_one(session, database):
     )
     session.commit()
 
-    query = an(entity(pose := let(type_=Pose, domain=[]), pose.position.z > 3))
+    pose = variable(type_=Pose, domain=[])
+    query = an(entity(pose).where(pose.position.z > 3))
     translator = eql_to_sql(query, session)
     query_by_hand = select(PoseDAO).join(PoseDAO.position).where(PositionDAO.z > 3)
 
@@ -118,9 +120,9 @@ def test_translate_in_operator(session, database):
     session.add(PositionDAO(x=7, y=8, z=9))
     session.commit()
 
+    position = variable(Position, domain=[])
     query = an(
-        entity(
-            position := let(Position, domain=[]),
+        entity(position).where(
             in_(position.x, [1, 7]),
         )
     )
@@ -145,13 +147,12 @@ def test_the_quantifier(session, database):
     session.commit()
 
     def get_query(domain=None):
-
+        position = variable(
+            type_=Position,
+            domain=domain,
+        )
         query = the(
-            entity(
-                position := let(
-                    type_=Position,
-                    domain=domain,
-                ),
+            entity(position).where(
                 position.y == 2,
             )
         )
@@ -188,19 +189,18 @@ def test_equal(session, database):
     # Query for the kinematic tree of the drawer which has more than one component.
     # Declare the placeholders
 
-    prismatic_connection = let(
-        type_=PrismaticConnection,
+    prismatic_connection = variable(
+        PrismaticConnection,
         domain=world.connections,
         name="prismatic_connection",
     )
-    fixed_connection = let(
-        type_=FixedConnection, domain=world.connections, name="fixed_connection"
+    fixed_connection = variable(
+        FixedConnection, domain=world.connections, name="fixed_connection"
     )
 
     # Write the query body
     query = an(
-        entity(
-            fixed_connection,
+        entity(fixed_connection).where(
             fixed_connection.parent == prismatic_connection.child,
         )
     )
@@ -243,24 +243,23 @@ def test_complicated_equal(session, database):
 
     # Query for the kinematic tree of the drawer which has more than one component.
     # Declare the placeholders
-    parent_container = let(
+    parent_container = variable(
         type_=Container, domain=world.bodies, name="parent_connection"
     )
-    prismatic_connection = let(
+    prismatic_connection = variable(
         type_=PrismaticConnection,
         domain=world.connections,
         name="prismatic_connection",
     )
-    drawer_body = let(type_=Container, domain=world.bodies, name="drawer_body")
-    fixed_connection = let(
+    drawer_body = variable(type_=Container, domain=world.bodies, name="drawer_body")
+    fixed_connection = variable(
         type_=FixedConnection, domain=world.connections, name="fixed_connection"
     )
-    handle = let(type_=Handle, domain=world.bodies, name="handle")
+    handle = variable(type_=Handle, domain=world.bodies, name="handle")
 
     # Write the query body - this was previously failing with "Attribute chain ended on a relationship"
     query = the(
-        entity(
-            drawer_body,
+        entity(drawer_body).where(
             and_(
                 parent_container == prismatic_connection.parent,
                 drawer_body == prismatic_connection.child,
@@ -282,9 +281,9 @@ def test_contains(session, database):
     session.add(BodyDAO(name="Body3", size=1))
     session.commit()
 
+    b = variable(type_=Body, domain=[], name="b")
     query = an(
-        entity(
-            b := let(type_=Body, domain=[], name="b"),
+        entity(b).where(
             contains("Body1TestName", b.name),
         )
     )

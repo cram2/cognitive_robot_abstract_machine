@@ -7,13 +7,13 @@ from functools import reduce
 from operator import or_
 
 from krrood.entity_query_language.entity import (
-    let,
+    variable,
     entity,
     not_,
     in_,
     for_all,
 )
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity_result_processors import an
 from numpy import ndarray
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     uniform_measure_of_simple_event,
@@ -352,11 +352,13 @@ class HasDoorLikeFactories(ABC):
         :param world: The world from which to get the bodies.
         :return: A list of bodies that are not part of any door semantic annotation.
         """
-        all_doors = let(Door, domain=world.semantic_annotations)
-        other_body = let(type_=Body, domain=world.bodies)
+        all_doors = variable(Door, domain=world.semantic_annotations)
+        other_body = variable(type_=Body, domain=world.bodies)
         door_bodies = all_doors.bodies
         bodies_without_excluded_bodies_query = an(
-            entity(other_body, for_all(door_bodies, not_(in_(other_body, door_bodies))))
+            entity(other_body).where(
+                for_all(door_bodies, not_(in_(other_body, door_bodies)))
+            )
         )
 
         filtered_bodies = list(bodies_without_excluded_bodies_query.evaluate())

@@ -47,6 +47,7 @@ class Container2(ContainerConf):
 @dataclass
 class Container3(ContainerConf):
     name: str = "Container3"
+    size: int = 2
 
 
 @dataclass
