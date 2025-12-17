@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from inspect import signature
 from typing import Optional
 
-from typing_extensions import TypeVar, ClassVar
+from typing_extensions import TypeVar, ClassVar, Type
 
 from giskardpy.motion_statechart.graph_node import Task
 from krrood.ormatic.dao import HasGeneric
@@ -22,12 +22,8 @@ T = TypeVar("T", bound=AbstractRobot)
 
 
 @dataclass
-class AlternativeMotionMapping(HasGeneric[T], ABC):
+class AlternativeMotion(HasGeneric[T], ABC):
     execution_type: ClassVar[ExecutionType]
-
-    @property
-    def motion_chart(self) -> Task:
-        return None
 
     def perform(self):
         pass
@@ -35,8 +31,13 @@ class AlternativeMotionMapping(HasGeneric[T], ABC):
     @staticmethod
     def check_for_alternative(
         robot_view: AbstractRobot, motion: BaseMotion
-    ) -> Optional[BaseMotion]:
-        for alternative in AlternativeMotionMapping.__subclasses__():
+    ) -> Optional[Type[BaseMotion]]:
+        """
+        Checks if there is an alternative motion for the given robot view, motion and execution type.
+
+        :return: The alternative motion class if found, None otherwise
+        """
+        for alternative in AlternativeMotion.__subclasses__():
             if (
                 issubclass(alternative, motion.__class__)
                 and alternative.original_class() == robot_view.__class__
@@ -58,6 +59,11 @@ class BaseMotion(DesignatorDescription):
 
     @property
     def motion_chart(self) -> Task:
+        """
+        Returns the mapped motion chart for this motion or the alternative motion if there is one.
+
+        :return: The motion chart for this motion in this context
+        """
         alternative = self.get_alternative_motion()
         if alternative:
             parameter = signature(self.__init__).parameters
@@ -74,5 +80,5 @@ class BaseMotion(DesignatorDescription):
     def _motion_chart(self) -> Task:
         pass
 
-    def get_alternative_motion(self) -> Optional[AlternativeMotionMapping]:
-        return AlternativeMotionMapping.check_for_alternative(self.robot_view, self)
+    def get_alternative_motion(self) -> Optional[Type[AlternativeMotion]]:
+        return AlternativeMotion.check_for_alternative(self.robot_view, self)

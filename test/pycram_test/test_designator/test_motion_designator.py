@@ -114,7 +114,7 @@ class TestAlternativeMotionMapping(EmptyWorldTestCase):
         with real_robot:
             self.assertTrue(move_motion.get_alternative_motion())
             msc = move_motion.motion_chart
-            self.assertEqual(ActionServerTask, type(msc))
+            self.assertEqual(NavigateActionServerTask, type(msc))
 
     def test_alternative_mapping_move_gripper(self):
 
