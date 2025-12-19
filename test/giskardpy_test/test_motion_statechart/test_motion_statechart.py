@@ -62,7 +62,10 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPositionVelocityLimit,
     CartesianRotationVelocityLimit,
 )
-from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal
+from giskardpy.motion_statechart.tasks.feature_functions import (
+    AngleGoal,
+    AlignPerpendicular,
+)
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
 from giskardpy.motion_statechart.test_nodes.test_nodes import (
@@ -1426,6 +1429,57 @@ def test_align_planes(pr2_world: World):
     assert (
         angle <= align_planes.threshold
     ), f"AlignPlanes failed: final angle {angle:.6f} rad > threshold {align_planes.threshold:.6f} rad"
+
+
+def test_align_perpendicular(pr2_world: World):
+    tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+
+    msc = MotionStatechart()
+
+    goal_normal = cas.Vector3.X(reference_frame=root)
+    tip_normal = cas.Vector3.X(reference_frame=tip)
+
+    align_perp = AlignPerpendicular(
+        root_link=root,
+        tip_link=tip,
+        reference_normal=goal_normal,
+        tip_normal=tip_normal,
+    )
+    msc.add_node(align_perp)
+
+    end = EndMotion()
+    msc.add_node(end)
+    end.start_condition = align_perp.observation_variable
+
+    kin_sim = Executor(world=pr2_world)
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick_until_end()
+
+    # Check if the angle between normals is (approximately) 90 degrees
+    root_V_goal_normal = pr2_world.transform(
+        target_frame=root, spatial_object=goal_normal
+    )
+    root_V_goal_normal.scale(1)
+    root_V_tip_normal = pr2_world.transform(
+        target_frame=root, spatial_object=tip_normal
+    )
+    root_V_tip_normal.scale(1)
+
+    v_tip = root_V_tip_normal.to_np()[:3]
+    v_goal = root_V_goal_normal.to_np()[:3]
+
+    eps = 1e-9
+    assert np.linalg.norm(v_goal) > eps, "goal normal became zero-length"
+    assert np.linalg.norm(v_tip) > eps, "tip normal became zero-length"
+
+    angle = angle_between_vector(v_tip, v_goal)
+    target = np.pi / 2
+
+    assert abs(angle - target) <= align_perp.threshold, (
+        f"AlignPerpendicular failed: final angle {angle:.6f} rad, "
+        f"target {target:.6f} rad, threshold {align_perp.threshold:.6f} rad"
+    )
 
 
 def test_angle_goal(pr2_world: World):
