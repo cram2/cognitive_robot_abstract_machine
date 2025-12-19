@@ -21,20 +21,12 @@ from ..spatial_types import Quaternion, Vector3
 from ..world import World
 
 
-@dataclass
+@dataclass(eq=False)
 class PR2(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
     """
     Represents the Personal Robot 2 (PR2), which was originally created by Willow Garage.
     The PR2 robot consists of two arms, each with a parallel gripper, a head with a camera, and a prismatic torso
     """
-
-    def __hash__(self):
-        return hash(
-            tuple(
-                [self.__class__]
-                + sorted([kse.name for kse in self.kinematic_structure_entities])
-            )
-        )
 
     def load_srdf(self):
         """

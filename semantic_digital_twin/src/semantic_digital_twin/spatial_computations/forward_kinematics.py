@@ -177,9 +177,9 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
         :param tip: Tip body to which the kinematics are computed.
         :return: Transformation matrix representing the relative pose of the tip body with respect to the root body.
         """
-        root = root.id
+        root_hash = root.id
         tip = tip.id
-        root_is_world = root == self.world.root.id
+        root_is_world = root_hash == self.world.root.id
         tip_is_world = tip == self.world.root.id
 
         if not tip_is_world:
@@ -189,7 +189,7 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
                 return map_T_tip
 
         if not root_is_world:
-            i = self.idx_start[root]
+            i = self.idx_start[root_hash]
             map_T_root = self.forward_kinematics_for_all_bodies[i : i + 4]
             root_T_map = inverse_frame(map_T_root)
             if tip_is_world:

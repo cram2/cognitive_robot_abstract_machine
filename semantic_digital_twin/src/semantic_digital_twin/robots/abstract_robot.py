@@ -358,7 +358,7 @@ class Torso(KinematicChain):
         return hash((self.name, self.root, self.tip))
 
 
-@dataclass
+@dataclass(eq=False)
 class AbstractRobot(Agent, ABC):
     """
     Specification of an abstract robot. A robot consists of:
