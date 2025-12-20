@@ -390,7 +390,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
 
 
 def match(
-    type_: Union[Type[T], Selectable[T]],
+    type_: Optional[Union[Type[T], Selectable[T]]] = None,
 ) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
     """
     Create a symbolic variable matching the type and the provided keyword arguments. This is used for easy variable
@@ -404,7 +404,7 @@ def match(
 
 def match_variable(
     type_: Union[Type[T], Selectable[T]], domain: DomainType
-) -> Union[An[T], CanBehaveLikeAVariable[T], MatchVariable[T]]:
+) -> Union[Type[T], An[T], CanBehaveLikeAVariable[T], MatchVariable[T]]:
     """
     Same as :py:func:`krrood.entity_query_language.match.match` but with a domain to use for the variable created
      by the match.

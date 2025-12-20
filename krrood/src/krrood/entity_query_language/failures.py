@@ -88,6 +88,27 @@ class NoSolutionFound(LessThanExpectedNumberOfSolutions):
 
 
 @dataclass
+class LogicalError(DataclassException):
+    """
+    Raised when there is an error in the logical structure/evaluation of the query.
+    """
+
+
+@dataclass
+class VariableCannotBeEvaluated(DataclassException):
+    """
+    Raised when a variable cannot be evaluated due to missing or invalid information in the variable.
+    """
+    variable: Variable
+    
+    def __post_init__(self):
+        self.message = (f"Variable {self.variable} cannot be evaluated because of missing or invalid information."
+                        f"The variable couldn't be identified as one of (already bound, has a domain, or is inferred,"
+                        f"Check that the variable is correctly defined and that all required information is provided.")
+        super().__post_init__()
+
+
+@dataclass
 class UsageError(DataclassException):
     """
     Raised when there is an incorrect usage of the entity query language API.

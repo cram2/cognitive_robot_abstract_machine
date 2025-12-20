@@ -1747,19 +1747,6 @@ class InequalityModel(ProblemDataPart):
         n_vel = self.number_of_free_variables * (self.config.prediction_horizon - 2)
         n_jerk = self.number_of_free_variables * (self.config.prediction_horizon)
         if max_derivative >= Derivatives.acceleration:
-            # previous = cas.Matrix.eye(self.number_of_free_variables * (self.config.prediction_horizon)) / self.config.mpc_dt
-            # same = -cas.Matrix.eye(self.number_of_free_variables * (self.config.prediction_horizon - 1)) / self.config.mpc_dt
-            # A_acc = previous
-            # A_acc[self.number_of_free_variables:, :-self.number_of_free_variables] += same
-            # rows_to_delete = []
-            # for i in range(self.config.prediction_horizon):
-            #     for v_i, v in enumerate(self.free_variables):
-            #         idx = i * len(self.free_variables) + v_i
-            #         a_min = v.get_lower_limit(Derivatives.acceleration)
-            #         a_max = v.get_upper_limit(Derivatives.acceleration)
-            #         if (np.isinf(a_min) or cas.is_inf(a_min)) and (np.isinf(a_max) or cas.is_inf(a_max)):
-            #             rows_to_delete.append(idx)
-            # A_acc.remove(rows_to_delete, [])
             model = cas.Matrix.zeros(rows=n_jerk, columns=n_vel)
             pre_previous = cas.Matrix.eye(n_vel) / self.config.mpc_dt**2
             previous = -2 * cas.Matrix.eye(n_vel) / self.config.mpc_dt**2

@@ -61,9 +61,7 @@ def entity(selected_variable: T) -> Entity[T]:
     return Entity(_selected_variables=[selected_variable])
 
 
-def set_of(
-    *selected_variables: Selectable,
-) -> SetOf:
+def set_of(*selected_variables: Union[Selectable[T], Any]) -> SetOf:
     """
     Create a set descriptor for the selected variables.
 
@@ -110,6 +108,16 @@ def variable(
     )
 
     return result
+
+
+def variable_from(
+    domain: DomainType,
+    name: Optional[str] = None,
+) -> Union[T, Selectable[T]]:
+    """
+    Similar to `variable` but constructed from a domain directly wihout specifying its type.
+    """
+    return Literal(data=domain, name=name)
 
 
 def _get_domain_source_from_domain_and_type_values(

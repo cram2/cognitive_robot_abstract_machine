@@ -103,11 +103,15 @@ class PropertyDescriptor(Symbol):
     """
     A mapping from descriptor class to the mapping from domain types to range types for that descriptor class.
     """
-    all_domains: ClassVar[Set[SymbolType]] = set()
+    all_domains: ClassVar[Dict[Type[PropertyDescriptor], Set[SymbolType]]] = (
+        defaultdict(set)
+    )
     """
     A set of all domain types for this descriptor class.
     """
-    all_ranges: ClassVar[Set[SymbolType]] = set()
+    all_ranges: ClassVar[Dict[Type[PropertyDescriptor], Set[SymbolType]]] = defaultdict(
+        set
+    )
     """
     A set of all range types for this descriptor class.
     """
@@ -155,8 +159,13 @@ class PropertyDescriptor(Symbol):
         range_type = self.wrapped_field.type_endpoint
         assert issubclass(range_type, Symbol)
         self.domain_range_map[self.__class__][self.domain] = range_type
-        self.all_domains.add(self.domain)
-        self.all_ranges.add(range_type)
+        for super_class in self.__class__.__mro__:
+            if (super_class is PropertyDescriptor) or not issubclass(
+                super_class, PropertyDescriptor
+            ):
+                continue
+            self.all_domains[super_class].add(self.domain)
+            self.all_ranges[super_class].add(range_type)
 
     @cached_property
     def range(self) -> SymbolType:
