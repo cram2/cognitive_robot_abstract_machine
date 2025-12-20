@@ -389,7 +389,7 @@ class TestFloatVariable:
         v1 = sm.FloatVariable(name="asdf")
         v2 = sm.FloatVariable(name="asdf")
         e = v1 + v2
-        e.compile([[v1, v2]])
+        e.compile(VariableParameters.from_lists([v1, v2]))
 
     def test_from_name(self):
         s = sm.FloatVariable(name="muh")
@@ -626,7 +626,7 @@ class TestCompiledFunction:
         s2_value = 69.0
         s1, s2 = sm.create_float_variables(["s1", "s2"])
         e = sm.sqrt(sm.cos(s1) + sm.sin(s2))
-        e_f = e.compile(parameters=[[s1], [s2]])
+        e_f = e.compile(parameters=VariableParameters.from_lists([s1], [s2]))
         actual = e_f(np.array([s1_value]), np.array([s2_value]))
         expected = np.sqrt(np.cos(s1_value) + np.sin(s2_value))
         assert np.allclose(actual, expected)
@@ -684,7 +684,7 @@ class TestCompiledFunction:
         variables = sm.create_float_variables([str(i) for i in range(size)])
         expr = sm.sum(*variables)
         args = [variables[i * element_size : (i + 1) * element_size] for i in range(n)]
-        f = expr.compile(parameters=args)
+        f = expr.compile(parameters=VariableParameters.from_lists(*args))
         for i in range(100):
             args_values = [np.ones(element_size)] * n
             assert f(*args_values) == size
@@ -696,7 +696,7 @@ class TestCompiledFunction:
         variables = sm.create_float_variables([str(i) for i in range(size)])
         expr = sm.sum(*variables)
         args = [variables[i * element_size : (i + 1) * element_size] for i in range(n)]
-        f = expr.compile(parameters=args)
+        f = expr.compile(parameters=VariableParameters.from_lists(*args))
 
         datas = []
         for i in range(n):
@@ -711,7 +711,7 @@ class TestCompiledFunction:
         s1, s2 = sm.create_float_variables(["s1", "s2"])
         e = sm.sqrt(sm.cos(s1) + sm.sin(s2))
         with pytest.raises(HasFreeVariablesError):
-            e.compile(parameters=[[s1]])
+            e.compile(parameters=VariableParameters.from_lists([s1]))
 
 
 class TestScalar:
