@@ -4,6 +4,7 @@ import importlib
 import os
 import weakref
 from copy import deepcopy
+from enum import IntEnum
 from functools import lru_cache, wraps
 from typing import List
 
@@ -80,7 +81,7 @@ class suppress_stdout_stderr(object):
 
 
 def hacky_urdf_parser_fix(
-        urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
+    urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
 ) -> str:
     # Parse input string
     root = ET.fromstring(urdf)
@@ -193,3 +194,12 @@ def camel_case_split(word: str) -> List[str]:
             start = i
     result.append(word[start:])
     return result
+
+
+class Direction(IntEnum):
+    X = 0
+    Y = 1
+    Z = 2
+    NEGATIVE_X = 3
+    NEGATIVE_Y = 4
+    NEGATIVE_Z = 5

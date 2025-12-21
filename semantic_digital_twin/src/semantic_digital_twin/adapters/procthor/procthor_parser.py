@@ -196,7 +196,7 @@ class ProcthorDoor:
             name=name,
             scale=scale,
             handle_factory=HandleFactory(name=handle_name),
-            semantic_position=semantic_position,
+            semantic_handle_position=semantic_position,
         )
         return door_factory
 

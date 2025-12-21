@@ -8,8 +8,8 @@ from krrood.entity_query_language.entity import (
     exists,
 )
 from krrood.entity_query_language.entity_result_processors import an, the
-from ..dataset.example_classes import VectorsWithProperty
-from ..dataset.semantic_world_like_classes import View, Drawer, Container, Cabinet
+from .._dataset.example_classes import VectorsWithProperty
+from .._dataset.semantic_world_like_classes import View, Drawer, Container, Cabinet
 
 
 # Make a simple View-like container with an iterable attribute `drawers` to be flattened

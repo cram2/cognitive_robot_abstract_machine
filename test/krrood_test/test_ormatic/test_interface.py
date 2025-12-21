@@ -8,8 +8,8 @@ from krrood.ormatic.dao import (
     ToDAOState,
 )
 from krrood.ormatic.exceptions import NoDAOFoundError
-from ..dataset.example_classes import *
-from ..dataset.ormatic_interface import *
+from .._dataset.example_classes import *
+from .._dataset.ormatic_interface import *
 
 
 def test_position(session, database):

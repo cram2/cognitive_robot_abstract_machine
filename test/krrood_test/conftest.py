@@ -22,15 +22,15 @@ from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.utils import classes_of_module, create_engine
 from krrood.ormatic.utils import drop_database
 from krrood.utils import recursive_subclasses
-from .dataset import example_classes
-from .dataset.example_classes import (
+from ._dataset import example_classes
+from ._dataset.example_classes import (
     PhysicalObject,
     NotMappedParent,
     ChildNotMapped,
     ConceptType,
     JSONSerializableClass,
 )
-from .dataset.semantic_world_like_classes import *
+from ._dataset.semantic_world_like_classes import *
 from .test_eql.conf.world.doors_and_drawers import DoorsAndDrawersWorld
 from .test_eql.conf.world.handles_and_containers import (
     HandlesAndContainersWorld,
@@ -88,7 +88,7 @@ def generate_sqlalchemy_interface():
     instance.make_all_tables()
 
     file_path = os.path.join(
-        os.path.dirname(__file__), "dataset", "ormatic_interface.py"
+        os.path.dirname(__file__), "_dataset", "ormatic_interface.py"
     )
 
     with open(file_path, "w") as f:
@@ -123,7 +123,7 @@ def pytest_sessionstart(session):
         )
 
 
-from .dataset.ormatic_interface import *
+from ._dataset.ormatic_interface import *
 
 
 @pytest.fixture

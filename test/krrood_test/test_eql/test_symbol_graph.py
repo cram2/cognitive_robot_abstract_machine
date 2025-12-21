@@ -5,7 +5,7 @@ import pytest
 from krrood.entity_query_language.entity import entity, variable
 from krrood.entity_query_language.entity_result_processors import an
 from krrood.entity_query_language.symbol_graph import SymbolGraph
-from ..dataset.example_classes import Position
+from .._dataset.example_classes import Position
 
 try:
     import pydot

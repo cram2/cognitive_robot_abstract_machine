@@ -10,7 +10,7 @@ from krrood.entity_query_language.failures import NoKwargsInMatchVar
 from krrood.entity_query_language.match import match_variable, match
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.symbolic import UnificationDict
-from ..dataset.semantic_world_like_classes import (
+from .._dataset.semantic_world_like_classes import (
     FixedConnection,
     Container,
     Handle,

@@ -690,6 +690,12 @@ class World:
     ):
         return self.add_kinematic_structure_entity(body)
 
+    def add_region(
+        self,
+        region: KinematicStructureEntity,
+    ):
+        return self.add_kinematic_structure_entity(region)
+
     def add_kinematic_structure_entity(
         self,
         kinematic_structure_entity: KinematicStructureEntity,

@@ -156,6 +156,16 @@ class WrappedField:
         )
 
     @cached_property
+    def is_collection_of_enums(self) -> bool:
+        """Check if the field is a collection of enum values."""
+        if not self.is_container:
+            return False
+        args = get_args(self.resolved_type)
+        return len(args) > 0 and all(
+            inspect.isclass(arg) and issubclass(arg, enum.Enum) for arg in args
+        )
+
+    @cached_property
     def is_optional(self):
         origin = get_origin(self.resolved_type)
         if origin not in [Union, Optional]:

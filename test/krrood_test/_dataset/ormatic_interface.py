@@ -23,8 +23,8 @@ import krrood.entity_query_language.symbol_graph
 import krrood.ormatic.alternative_mappings
 import krrood.ormatic.custom_types
 import sqlalchemy.sql.sqltypes
-import test.krrood_test.dataset.example_classes
-import test.krrood_test.dataset.semantic_world_like_classes
+import test.krrood_test._dataset.example_classes
+import test.krrood_test._dataset.semantic_world_like_classes
 import typing
 import typing_extensions
 import uuid
@@ -36,9 +36,9 @@ from krrood.ormatic.custom_types import TypeType
 
 class Base(DeclarativeBase):
     type_mappings = {
-        test.krrood_test.dataset.example_classes.PhysicalObject: test.krrood_test.dataset.example_classes.ConceptType,
+        test.krrood_test._dataset.example_classes.PhysicalObject: test.krrood_test._dataset.example_classes.ConceptType,
         uuid.UUID: sqlalchemy.sql.sqltypes.UUID,
-        test.krrood_test.dataset.example_classes.JSONSerializableClass: sqlalchemy.sql.sqltypes.JSON,
+        test.krrood_test._dataset.example_classes.JSONSerializableClass: sqlalchemy.sql.sqltypes.JSON,
         typing.Type: krrood.ormatic.custom_types.TypeType,
     }
 
@@ -197,7 +197,7 @@ cabinetdao_drawers_association = Table(
 
 
 class CallableWrapperDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.CallableWrapper]
+    Base, DataAccessObject[test.krrood_test._dataset.example_classes.CallableWrapper]
 ):
 
     __tablename__ = "CallableWrapperDAO"
@@ -220,7 +220,7 @@ class CallableWrapperDAO(
 class InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO(
     Base,
     DataAccessObject[
-        test.krrood_test.dataset.example_classes.InheritanceBaseWithoutSymbolButAlternativelyMappedMapping
+        test.krrood_test._dataset.example_classes.InheritanceBaseWithoutSymbolButAlternativelyMappedMapping
     ],
 ):
 
@@ -245,7 +245,7 @@ class InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO(
 class InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO(
     InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO,
     DataAccessObject[
-        test.krrood_test.dataset.example_classes.InheritanceLevel1WithoutSymbolButAlternativelyMappedMapping
+        test.krrood_test._dataset.example_classes.InheritanceLevel1WithoutSymbolButAlternativelyMappedMapping
     ],
 ):
 
@@ -273,7 +273,7 @@ class InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO(
 class InheritanceLevel2WithoutSymbolButAlternativelyMappedMappingDAO(
     InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO,
     DataAccessObject[
-        test.krrood_test.dataset.example_classes.InheritanceLevel2WithoutSymbolButAlternativelyMappedMapping
+        test.krrood_test._dataset.example_classes.InheritanceLevel2WithoutSymbolButAlternativelyMappedMapping
     ],
 ):
 
@@ -299,7 +299,7 @@ class InheritanceLevel2WithoutSymbolButAlternativelyMappedMappingDAO(
 
 
 class JSONWrapperDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.JSONWrapper]
+    Base, DataAccessObject[test.krrood_test._dataset.example_classes.JSONWrapper]
 ):
 
     __tablename__ = "JSONWrapperDAO"
@@ -312,11 +312,11 @@ class JSONWrapperDAO(
         sqlalchemy.sql.sqltypes.JSON, nullable=False, use_existing_column=True
     )
     more_objects: Mapped[
-        typing.List[test.krrood_test.dataset.example_classes.JSONSerializableClass]
+        typing.List[test.krrood_test._dataset.example_classes.JSONSerializableClass]
     ] = mapped_column(JSON, nullable=False, use_existing_column=True)
 
 
-class MixinDAO(Base, DataAccessObject[test.krrood_test.dataset.example_classes.Mixin]):
+class MixinDAO(Base, DataAccessObject[test.krrood_test._dataset.example_classes.Mixin]):
 
     __tablename__ = "MixinDAO"
 
@@ -341,7 +341,7 @@ class MixinDAO(Base, DataAccessObject[test.krrood_test.dataset.example_classes.M
 class ParentAlternativelyMappedMappingDAO(
     Base,
     DataAccessObject[
-        test.krrood_test.dataset.example_classes.ParentAlternativelyMappedMapping
+        test.krrood_test._dataset.example_classes.ParentAlternativelyMappedMapping
     ],
 ):
 
@@ -376,7 +376,7 @@ class ParentAlternativelyMappedMappingDAO(
 class ChildLevel1NormallyMappedDAO(
     ParentAlternativelyMappedMappingDAO,
     DataAccessObject[
-        test.krrood_test.dataset.example_classes.ChildLevel1NormallyMapped
+        test.krrood_test._dataset.example_classes.ChildLevel1NormallyMapped
     ],
 ):
 
@@ -402,7 +402,7 @@ class ChildLevel1NormallyMappedDAO(
 class ChildLevel2NormallyMappedDAO(
     ChildLevel1NormallyMappedDAO,
     DataAccessObject[
-        test.krrood_test.dataset.example_classes.ChildLevel2NormallyMapped
+        test.krrood_test._dataset.example_classes.ChildLevel2NormallyMapped
     ],
 ):
 
@@ -425,7 +425,7 @@ class ChildLevel2NormallyMappedDAO(
 
 
 class PersonDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.Person]
+    Base, DataAccessObject[test.krrood_test._dataset.example_classes.Person]
 ):
 
     __tablename__ = "PersonDAO"
@@ -484,7 +484,7 @@ class PredicateClassRelationDAO(
 
 
 class PrimaryBaseDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.PrimaryBase]
+    Base, DataAccessObject[test.krrood_test._dataset.example_classes.PrimaryBase]
 ):
 
     __tablename__ = "PrimaryBaseDAO"
@@ -509,7 +509,7 @@ class PrimaryBaseDAO(
 
 class MultipleInheritanceDAO(
     PrimaryBaseDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.MultipleInheritance],
+    DataAccessObject[test.krrood_test._dataset.example_classes.MultipleInheritance],
 ):
 
     __tablename__ = "MultipleInheritanceDAO"
@@ -554,7 +554,7 @@ class SymbolDAO(Base, DataAccessObject[krrood.entity_query_language.predicate.Sy
 class AlternativeMappingAggregatorDAO(
     SymbolDAO,
     DataAccessObject[
-        test.krrood_test.dataset.example_classes.AlternativeMappingAggregator
+        test.krrood_test._dataset.example_classes.AlternativeMappingAggregator
     ],
 ):
 
@@ -586,7 +586,7 @@ class AlternativeMappingAggregatorDAO(
 
 
 class AtomDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Atom]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.Atom]
 ):
 
     __tablename__ = "AtomDAO"
@@ -595,7 +595,7 @@ class AtomDAO(
         ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
     )
 
-    element: Mapped[test.krrood_test.dataset.example_classes.Element] = mapped_column(
+    element: Mapped[test.krrood_test._dataset.example_classes.Element] = mapped_column(
         use_existing_column=True
     )
     type: Mapped[builtins.int] = mapped_column(use_existing_column=True)
@@ -610,7 +610,7 @@ class AtomDAO(
 
 class BackreferenceMappingDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.BackreferenceMapping],
+    DataAccessObject[test.krrood_test._dataset.example_classes.BackreferenceMapping],
 ):
 
     __tablename__ = "BackreferenceMappingDAO"
@@ -641,7 +641,7 @@ class BackreferenceMappingDAO(
 
 class ContainerGenerationDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.ContainerGeneration],
+    DataAccessObject[test.krrood_test._dataset.example_classes.ContainerGeneration],
 ):
 
     __tablename__ = "ContainerGenerationDAO"
@@ -666,7 +666,9 @@ class ContainerGenerationDAO(
 
 class DoublePositionAggregatorDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.DoublePositionAggregator],
+    DataAccessObject[
+        test.krrood_test._dataset.example_classes.DoublePositionAggregator
+    ],
 ):
 
     __tablename__ = "DoublePositionAggregatorDAO"
@@ -697,7 +699,7 @@ class DoublePositionAggregatorDAO(
 
 
 class CustomEntityDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.CustomEntity]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.CustomEntity]
 ):
 
     __tablename__ = "CustomEntityDAO"
@@ -718,7 +720,7 @@ class CustomEntityDAO(
 
 class DerivedEntityDAO(
     CustomEntityDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.DerivedEntity],
+    DataAccessObject[test.krrood_test._dataset.example_classes.DerivedEntity],
 ):
 
     __tablename__ = "DerivedEntityDAO"
@@ -741,7 +743,7 @@ class DerivedEntityDAO(
 
 class EntityAssociationDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.EntityAssociation],
+    DataAccessObject[test.krrood_test._dataset.example_classes.EntityAssociation],
 ):
 
     __tablename__ = "EntityAssociationDAO"
@@ -772,7 +774,7 @@ class EntityAssociationDAO(
 
 class ForwardRefTypeADAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.ForwardRefTypeA],
+    DataAccessObject[test.krrood_test._dataset.example_classes.ForwardRefTypeA],
 ):
 
     __tablename__ = "ForwardRefTypeADAO"
@@ -791,7 +793,7 @@ class ForwardRefTypeADAO(
 
 class ForwardRefTypeBDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.ForwardRefTypeB],
+    DataAccessObject[test.krrood_test._dataset.example_classes.ForwardRefTypeB],
 ):
 
     __tablename__ = "ForwardRefTypeBDAO"
@@ -810,7 +812,7 @@ class ForwardRefTypeBDAO(
 
 class FruitBoxDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.FruitBox],
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.FruitBox],
 ):
 
     __tablename__ = "FruitBoxDAO"
@@ -837,7 +839,7 @@ class FruitBoxDAO(
 
 class ItemWithBackreferenceDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.ItemWithBackreference],
+    DataAccessObject[test.krrood_test._dataset.example_classes.ItemWithBackreference],
 ):
 
     __tablename__ = "ItemWithBackreferenceDAO"
@@ -868,7 +870,8 @@ class ItemWithBackreferenceDAO(
 
 
 class KinematicChainDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.KinematicChain]
+    SymbolDAO,
+    DataAccessObject[test.krrood_test._dataset.example_classes.KinematicChain],
 ):
 
     __tablename__ = "KinematicChainDAO"
@@ -886,7 +889,7 @@ class KinematicChainDAO(
 
 
 class ListOfEnumDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.ListOfEnum]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.ListOfEnum]
 ):
 
     __tablename__ = "ListOfEnumDAO"
@@ -896,7 +899,7 @@ class ListOfEnumDAO(
     )
 
     list_of_enum: Mapped[
-        typing.List[test.krrood_test.dataset.example_classes.TestEnum]
+        typing.List[test.krrood_test._dataset.example_classes.TestEnum]
     ] = mapped_column(JSON, nullable=False, use_existing_column=True)
 
     __mapper_args__ = {
@@ -906,7 +909,7 @@ class ListOfEnumDAO(
 
 
 class MoreShapesDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.MoreShapes]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.MoreShapes]
 ):
 
     __tablename__ = "MoreShapesDAO"
@@ -932,7 +935,7 @@ class MoreShapesDAO(
 class MultipleForwardRefContainerDAO(
     SymbolDAO,
     DataAccessObject[
-        test.krrood_test.dataset.example_classes.MultipleForwardRefContainer
+        test.krrood_test._dataset.example_classes.MultipleForwardRefContainer
     ],
 ):
 
@@ -967,7 +970,7 @@ class MultipleForwardRefContainerDAO(
 
 
 class NodeDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Node]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.Node]
 ):
 
     __tablename__ = "NodeDAO"
@@ -994,7 +997,7 @@ class NodeDAO(
 
 class ObjectAnnotationDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.ObjectAnnotation],
+    DataAccessObject[test.krrood_test._dataset.example_classes.ObjectAnnotation],
 ):
 
     __tablename__ = "ObjectAnnotationDAO"
@@ -1023,7 +1026,7 @@ class ObjectAnnotationDAO(
 
 
 class OrientationDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Orientation]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.Orientation]
 ):
 
     __tablename__ = "OrientationDAO"
@@ -1045,7 +1048,7 @@ class OrientationDAO(
 
 class OriginalSimulatedObjectDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.OriginalSimulatedObject],
+    DataAccessObject[test.krrood_test._dataset.example_classes.OriginalSimulatedObject],
 ):
 
     __tablename__ = "OriginalSimulatedObjectDAO"
@@ -1057,9 +1060,9 @@ class OriginalSimulatedObjectDAO(
     placeholder: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
     concept: Mapped[
-        typing.Optional[test.krrood_test.dataset.example_classes.ConceptType]
+        typing.Optional[test.krrood_test._dataset.example_classes.ConceptType]
     ] = mapped_column(
-        test.krrood_test.dataset.example_classes.ConceptType,
+        test.krrood_test._dataset.example_classes.ConceptType,
         nullable=True,
         use_existing_column=True,
     )
@@ -1071,7 +1074,7 @@ class OriginalSimulatedObjectDAO(
 
 
 class ParentDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Parent]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.Parent]
 ):
 
     __tablename__ = "ParentDAO"
@@ -1089,7 +1092,7 @@ class ParentDAO(
 
 
 class ChildMappedDAO(
-    ParentDAO, DataAccessObject[test.krrood_test.dataset.example_classes.ChildMapped]
+    ParentDAO, DataAccessObject[test.krrood_test._dataset.example_classes.ChildMapped]
 ):
 
     __tablename__ = "ChildMappedDAO"
@@ -1108,7 +1111,7 @@ class ChildMappedDAO(
 
 class ParentBaseMappingDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.ParentBaseMapping],
+    DataAccessObject[test.krrood_test._dataset.example_classes.ParentBaseMapping],
 ):
 
     __tablename__ = "ParentBaseMappingDAO"
@@ -1127,7 +1130,7 @@ class ParentBaseMappingDAO(
 
 class ChildBaseMappingDAO(
     ParentBaseMappingDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.ChildBaseMapping],
+    DataAccessObject[test.krrood_test._dataset.example_classes.ChildBaseMapping],
 ):
 
     __tablename__ = "ChildBaseMappingDAO"
@@ -1145,7 +1148,7 @@ class ChildBaseMappingDAO(
 
 
 class PoseDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Pose]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.Pose]
 ):
 
     __tablename__ = "PoseDAO"
@@ -1179,7 +1182,7 @@ class PoseDAO(
 
 
 class PositionDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Position]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.Position]
 ):
 
     __tablename__ = "PositionDAO"
@@ -1199,7 +1202,7 @@ class PositionDAO(
 
 
 class Position4DDAO(
-    PositionDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Position4D]
+    PositionDAO, DataAccessObject[test.krrood_test._dataset.example_classes.Position4D]
 ):
 
     __tablename__ = "Position4DDAO"
@@ -1217,7 +1220,8 @@ class Position4DDAO(
 
 
 class Position5DDAO(
-    Position4DDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Position5D]
+    Position4DDAO,
+    DataAccessObject[test.krrood_test._dataset.example_classes.Position5D],
 ):
 
     __tablename__ = "Position5DDAO"
@@ -1238,7 +1242,7 @@ class Position5DDAO(
 
 class PositionTypeWrapperDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.PositionTypeWrapper],
+    DataAccessObject[test.krrood_test._dataset.example_classes.PositionTypeWrapper],
 ):
 
     __tablename__ = "PositionTypeWrapperDAO"
@@ -1258,7 +1262,7 @@ class PositionTypeWrapperDAO(
 
 
 class PositionsDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Positions]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.Positions]
 ):
 
     __tablename__ = "PositionsDAO"
@@ -1288,7 +1292,7 @@ class PositionsDAO(
 class PositionsSubclassWithAnotherPositionDAO(
     PositionsDAO,
     DataAccessObject[
-        test.krrood_test.dataset.example_classes.PositionsSubclassWithAnotherPosition
+        test.krrood_test._dataset.example_classes.PositionsSubclassWithAnotherPosition
     ],
 ):
 
@@ -1332,7 +1336,7 @@ class PredicateDAO(
 
 class PrivateDefaultFactoryDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.PrivateDefaultFactory],
+    DataAccessObject[test.krrood_test._dataset.example_classes.PrivateDefaultFactory],
 ):
 
     __tablename__ = "PrivateDefaultFactoryDAO"
@@ -1350,7 +1354,7 @@ class PrivateDefaultFactoryDAO(
 
 
 class ReferenceDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Reference]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.Reference]
 ):
 
     __tablename__ = "ReferenceDAO"
@@ -1382,7 +1386,7 @@ class ReferenceDAO(
 
 class RelationshipParentDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.RelationshipParent],
+    DataAccessObject[test.krrood_test._dataset.example_classes.RelationshipParent],
 ):
 
     __tablename__ = "RelationshipParentDAO"
@@ -1409,7 +1413,7 @@ class RelationshipParentDAO(
 
 class RelationshipChildDAO(
     RelationshipParentDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.RelationshipChild],
+    DataAccessObject[test.krrood_test._dataset.example_classes.RelationshipChild],
 ):
 
     __tablename__ = "RelationshipChildDAO"
@@ -1427,7 +1431,8 @@ class RelationshipChildDAO(
 
 
 class RotationMappedDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.RotationMapped]
+    SymbolDAO,
+    DataAccessObject[test.krrood_test._dataset.example_classes.RotationMapped],
 ):
 
     __tablename__ = "RotationMappedDAO"
@@ -1445,7 +1450,7 @@ class RotationMappedDAO(
 
 
 class ShapeDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Shape]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.Shape]
 ):
 
     __tablename__ = "ShapeDAO"
@@ -1476,7 +1481,7 @@ class ShapeDAO(
 
 
 class ShapesDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Shapes]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.Shapes]
 ):
 
     __tablename__ = "ShapesDAO"
@@ -1526,7 +1531,7 @@ class SymbolGraphMappingDAO(
 
 
 class TorsoDAO(
-    KinematicChainDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Torso]
+    KinematicChainDAO, DataAccessObject[test.krrood_test._dataset.example_classes.Torso]
 ):
 
     __tablename__ = "TorsoDAO"
@@ -1553,7 +1558,7 @@ class TorsoDAO(
 
 class TransformationMappedDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.TransformationMapped],
+    DataAccessObject[test.krrood_test._dataset.example_classes.TransformationMapped],
 ):
 
     __tablename__ = "TransformationMappedDAO"
@@ -1587,7 +1592,7 @@ class TransformationMappedDAO(
 
 
 class UUIDWrapperDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.UUIDWrapper]
+    Base, DataAccessObject[test.krrood_test._dataset.example_classes.UUIDWrapper]
 ):
 
     __tablename__ = "UUIDWrapperDAO"
@@ -1605,7 +1610,7 @@ class UUIDWrapperDAO(
 
 
 class VectorMappedDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.VectorMapped]
+    SymbolDAO, DataAccessObject[test.krrood_test._dataset.example_classes.VectorMapped]
 ):
 
     __tablename__ = "VectorMappedDAO"
@@ -1625,7 +1630,7 @@ class VectorMappedDAO(
 class VectorsWithPropertyMappedDAO(
     SymbolDAO,
     DataAccessObject[
-        test.krrood_test.dataset.example_classes.VectorsWithPropertyMapped
+        test.krrood_test._dataset.example_classes.VectorsWithPropertyMapped
     ],
 ):
 
@@ -1651,7 +1656,7 @@ class VectorsWithPropertyMappedDAO(
 
 class WorldDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.World],
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.World],
 ):
 
     __tablename__ = "WorldDAO"
@@ -1692,7 +1697,7 @@ class WorldDAO(
 
 class WorldEntityDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.WorldEntity],
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.WorldEntity],
 ):
 
     __tablename__ = "WorldEntityDAO"
@@ -1719,7 +1724,7 @@ class WorldEntityDAO(
 
 class BodyDAO(
     WorldEntityDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.Body],
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.Body],
 ):
 
     __tablename__ = "BodyDAO"
@@ -1741,7 +1746,7 @@ class BodyDAO(
 
 class AppleDAO(
     BodyDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.Apple],
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.Apple],
 ):
 
     __tablename__ = "AppleDAO"
@@ -1758,7 +1763,7 @@ class AppleDAO(
 
 class ContainerDAO(
     BodyDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.Container],
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.Container],
 ):
 
     __tablename__ = "ContainerDAO"
@@ -1775,7 +1780,7 @@ class ContainerDAO(
 
 class HandleDAO(
     BodyDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.Handle],
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.Handle],
 ):
 
     __tablename__ = "HandleDAO"
@@ -1792,7 +1797,7 @@ class HandleDAO(
 
 class ConnectionDAO(
     WorldEntityDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.Connection],
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.Connection],
 ):
 
     __tablename__ = "ConnectionDAO"
@@ -1830,7 +1835,7 @@ class ConnectionDAO(
 class FixedConnectionDAO(
     ConnectionDAO,
     DataAccessObject[
-        test.krrood_test.dataset.semantic_world_like_classes.FixedConnection
+        test.krrood_test._dataset.semantic_world_like_classes.FixedConnection
     ],
 ):
 
@@ -1851,7 +1856,7 @@ class FixedConnectionDAO(
 class PrismaticConnectionDAO(
     ConnectionDAO,
     DataAccessObject[
-        test.krrood_test.dataset.semantic_world_like_classes.PrismaticConnection
+        test.krrood_test._dataset.semantic_world_like_classes.PrismaticConnection
     ],
 ):
 
@@ -1872,7 +1877,7 @@ class PrismaticConnectionDAO(
 class RevoluteConnectionDAO(
     ConnectionDAO,
     DataAccessObject[
-        test.krrood_test.dataset.semantic_world_like_classes.RevoluteConnection
+        test.krrood_test._dataset.semantic_world_like_classes.RevoluteConnection
     ],
 ):
 
@@ -1892,7 +1897,7 @@ class RevoluteConnectionDAO(
 
 class ViewDAO(
     WorldEntityDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.View],
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.View],
 ):
 
     __tablename__ = "ViewDAO"
@@ -1911,7 +1916,7 @@ class ViewDAO(
 
 class CabinetDAO(
     ViewDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.Cabinet],
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.Cabinet],
 ):
 
     __tablename__ = "CabinetDAO"
@@ -1944,7 +1949,8 @@ class CabinetDAO(
 
 
 class DoorDAO(
-    ViewDAO, DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.Door]
+    ViewDAO,
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.Door],
 ):
 
     __tablename__ = "DoorDAO"
@@ -1979,7 +1985,7 @@ class DoorDAO(
 
 class DrawerDAO(
     ViewDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.Drawer],
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.Drawer],
 ):
 
     __tablename__ = "DrawerDAO"
@@ -2018,7 +2024,7 @@ class DrawerDAO(
 
 class WardrobeDAO(
     ViewDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.Wardrobe],
+    DataAccessObject[test.krrood_test._dataset.semantic_world_like_classes.Wardrobe],
 ):
 
     __tablename__ = "WardrobeDAO"

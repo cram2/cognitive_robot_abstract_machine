@@ -65,7 +65,7 @@ def door_factory_from_body(door: Body) -> DoorFactory:
         .bounding_boxes[0]
         .scale,
         handle_factory=handle_factory,
-        semantic_position=SemanticPositionDescription(
+        semantic_handle_position=SemanticPositionDescription(
             horizontal_direction_chain=[
                 HorizontalSemanticDirection.RIGHT,
                 HorizontalSemanticDirection.FULLY_CENTER,

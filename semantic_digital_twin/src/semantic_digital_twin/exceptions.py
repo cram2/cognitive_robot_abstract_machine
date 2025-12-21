@@ -21,12 +21,14 @@ from .datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
     from .world import World
+    from .world_description.geometry import Scale
     from .world_description.world_entity import (
         SemanticAnnotation,
         WorldEntity,
         KinematicStructureEntity,
     )
     from .spatial_types.spatial_types import FloatVariable, SymbolicType
+    from .spatial_types import Vector3
 
 
 @dataclass
@@ -97,6 +99,32 @@ class UsageError(LogicalError):
     """
     An exception raised when an incorrect usage of the API is encountered.
     """
+
+
+@dataclass
+class InvalidPlaneDimensions(UsageError):
+
+    scale: Scale
+
+    def __post_init__(self):
+        self.message = f"The depth of a plane must be less than its width or height. This doesnt hold for your door with dimensions {self.scale}"
+
+
+@dataclass
+class MissingSemanticPositionError(UsageError):
+
+    def __post_init__(self):
+        msg = f"Semantic position is missing."
+        super().__init__(msg)
+
+
+@dataclass
+class InvalidAxisError(UsageError):
+    axis: Vector3
+
+    def __post_init__(self):
+        msg = f"Invalid axis {self.axis}."
+        super().__init__(msg)
 
 
 @dataclass

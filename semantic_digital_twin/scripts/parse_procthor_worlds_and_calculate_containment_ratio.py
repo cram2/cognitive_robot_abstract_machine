@@ -14,6 +14,8 @@ from semantic_digital_twin.adapters.procthor.procthor_parser import ProcTHORPars
 from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
 )
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.orm.ormatic_interface import *
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation

@@ -6,7 +6,7 @@ from typing_extensions import Type
 
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
-from ..dataset.example_classes import (
+from .._dataset.example_classes import (
     Position,
     Orientation,
     Pose,

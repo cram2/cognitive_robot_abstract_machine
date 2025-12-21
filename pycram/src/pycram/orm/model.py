@@ -9,7 +9,7 @@ from typing_extensions import Optional
 
 from ..datastructures.dataclasses import ExecutionData
 from ..datastructures.enums import TaskStatus
-from ..datastructures.pose import Quaternion
+from ..datastructures.pose import PyCramQuaternion
 from ..designator import DesignatorDescription
 from ..failures import PlanFailure
 from ..language import TryInOrderNode, ParallelNode, TryAllNode, CodeNode, MonitorNode
@@ -34,7 +34,7 @@ from ..robot_plans import ActionDescription, BaseMotion
 
 
 @dataclass
-class PyCRAMQuaternionMapping(AlternativeMapping[Quaternion]):
+class PyCRAMQuaternionMapping(AlternativeMapping[PyCramQuaternion]):
     x: float = 0
     y: float = 0
     z: float = 0
@@ -42,10 +42,10 @@ class PyCRAMQuaternionMapping(AlternativeMapping[Quaternion]):
 
     @classmethod
     def create_instance(cls, obj: T):
-        return Quaternion(obj.x, obj.y, obj.z, obj.w)
+        return PyCramQuaternion(obj.x, obj.y, obj.z, obj.w)
 
     def create_from_dao(self) -> T:
-        return Quaternion(self.x, self.y, self.z, self.w)
+        return PyCramQuaternion(self.x, self.y, self.z, self.w)
 
 
 @dataclass
