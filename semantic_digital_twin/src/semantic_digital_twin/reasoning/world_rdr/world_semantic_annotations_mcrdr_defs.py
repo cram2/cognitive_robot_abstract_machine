@@ -133,12 +133,12 @@ def conclusion_35528769484583703815352905256802298589(case) -> List[Cabinet]:
             c
             for c in case.connections
             if isinstance(c, PrismaticConnection)
-            and c.child in [drawer.container.body for drawer in drawers]
+            and c.child in [drawer.container.body_a for drawer in drawers]
         ]
         cabinet_container_bodies = [pc.parent for pc in prismatic_connections]
         cabinets = []
         for ccb in cabinet_container_bodies:
-            if ccb in [cabinet.container.body for cabinet in cabinets]:
+            if ccb in [cabinet.container.body_a for cabinet in cabinets]:
                 continue
             cc_prismatic_connections = [
                 pc for pc in prismatic_connections if pc.parent is ccb
@@ -149,7 +149,7 @@ def conclusion_35528769484583703815352905256802298589(case) -> List[Cabinet]:
             cabinet_drawers = [
                 d
                 for d in drawers
-                if d.container.body in cabinet_drawer_container_bodies
+                if d.container.body_a in cabinet_drawer_container_bodies
             ]
             cabinets.append(Cabinet(Container(body=ccb), drawers=cabinet_drawers))
 
