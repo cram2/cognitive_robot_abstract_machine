@@ -1,8 +1,9 @@
-import dataclasses
 import logging
 from copy import deepcopy
+from dataclasses import dataclass, field
 
 import numpy as np
+import rclpy
 import rustworkx as rx
 from box import Box
 from probabilistic_model.distributions import (
@@ -24,6 +25,18 @@ from random_events.polytope import Polytope, NoOptimalSolutionError
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Continuous
 from scipy.spatial import ConvexHull
+
+from giskardpy.executor import Executor
+from giskardpy.model.collision_matrix_manager import CollisionRequest
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    CollisionAvoidance,
+)
+from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types import Point3
@@ -70,7 +83,7 @@ from ..pose_generator_and_validator import (
 from ..robot_description import ViewManager
 from ..utils import translate_pose_along_local_axis, link_pose_for_joint_config
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pycram")
 
 
 class Location(LocationDesignatorDescription):
@@ -184,7 +197,7 @@ def _create_target_sequence(
     return target_sequence
 
 
-@dataclasses.dataclass
+@dataclass
 class CostmapLocation(LocationDesignatorDescription):
     """
     Uses Costmaps to create locations for complex constrains
@@ -1170,7 +1183,7 @@ class ProbabilisticSemanticLocation(LocationDesignatorDescription):
                 yield target_pose
 
 
-@dataclasses.dataclass
+@dataclass
 class ProbabilisticCostmapLocation(LocationDesignatorDescription):
     """
     Uses Costmaps to create locations for complex constrains.
@@ -1528,7 +1541,6 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
                 test_robot.root.parent_connection.origin = (
                     pose_candidate.to_spatial_type()
                 )
-                # test_robot.set_pose(pose_candidate)
 
                 try:
                     collision_check(
@@ -1571,11 +1583,14 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
                     )
                     ee = ViewManager.get_arm_view(params_box.reachable_arm, test_robot)
                     is_reachable = pose_sequence_reachability_validator(
-                        self.test_world.root,
+                        test_robot.root,
                         ee.manipulator.tool_frame,
                         target_sequence,
                         self.test_world,
                         allowed_collision=params_box.ignore_collision_with,
+                    )
+                    logger.debug(
+                        f"Pose Candidate: {pose_candidate }is_reachable: {is_reachable}"
                     )
                     if is_reachable:
                         logger.info(f"Succeeded costmap with pose {pose_candidate}")
@@ -1585,3 +1600,154 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
                             arm=params_box.reachable_arm,
                             grasp_description=grasp_desc,
                         )
+
+
+@dataclass
+class GiskardLocation(LocationDesignatorDescription):
+    """
+    Finds a standing pose for a robot such that the TCP of the given arm can reach the target_pose. This Location
+    Designator uses Giskard and full body control to find a pose for the robot base.
+    """
+
+    target_pose: PoseStamped
+    """
+    Target pose for which a standing pose should be found. 
+    """
+
+    arm: Arms
+    """
+    Arm which should read the target pose
+    """
+
+    grasp_description: Optional[GraspDescription] = None
+
+    threshold: float = field(default=0.02)
+    """
+    Threshold between the TCP of the arm and the target pose at which a stand pose if deemed successfull
+    """
+
+    def __post_init__(self):
+        PartialDesignator.__init__(
+            self,
+            GiskardLocation,
+            target_pose=self.target_pose,
+            arm=self.arm,
+            grasp_description=self.grasp_description,
+        )
+
+    def ground(self) -> PoseStamped:
+        """
+        Default specialized_designators which returns the first element of the iterator of this instance.
+
+        :return: A resolved location
+        """
+        return next(iter(self))
+
+    def __iter__(self) -> Iterator[GraspPose]:
+
+        for params in self.generate_permutations():
+
+            occupancy_map = OccupancyCostmap(
+                resolution=0.02,
+                height=200,
+                width=200,
+                world=self.world,
+                robot_view=self.robot_view,
+                origin=params["target_pose"],
+                distance_to_obstacle=0.03,
+            )
+            gaussian_map = GaussianCostmap(
+                resolution=0.02,
+                origin=params["target_pose"],
+                mean=200,
+                sigma=15,
+                world=self.world,
+            )
+
+            reachability_map = occupancy_map + gaussian_map
+
+            ee = ViewManager.get_arm_view(self.arm, self.robot_view)
+
+            test_world = deepcopy(self.world)
+            test_world.name = "Test World"
+            test_robot = self.robot_view.__class__.from_world(test_world)
+            test_ee = test_world._get_world_entity_by_hash(
+                hash(ee.manipulator.tool_frame)
+            )
+            test_robot.setup_collision_config()
+
+            # Temp workaround until we fix multiple formats
+            giskard_coll_request = CollisionRequest(
+                body_group1=test_robot.bodies_with_collisions,
+                body_group2=list(
+                    set(test_world.bodies_with_enabled_collision)
+                    - set(test_robot.bodies_with_collisions)
+                ),
+                distance=0.1,
+            )
+
+            for candidate in PoseGenerator(reachability_map, number_of_samples=10):
+
+                grasp_descriptions = (
+                    [params["grasp_description"]]
+                    if params["grasp_description"]
+                    else GraspDescription.calculate_grasp_descriptions(
+                        test_robot, params["target_pose"]
+                    )
+                )
+
+                for grasp_desc in grasp_descriptions:
+
+                    target_sequence = _create_target_sequence(
+                        grasp_desc,
+                        params["target_pose"],
+                        test_robot,
+                        None,
+                        params["arm"],
+                        test_world,
+                        False,
+                    )
+
+                    test_robot.root.parent_connection.origin = (
+                        candidate.to_spatial_type()
+                    )
+                    pose_seq = Sequence(
+                        nodes=[
+                            CartesianPose(
+                                root_link=test_world.root,
+                                tip_link=test_ee,
+                                goal_pose=pose.to_spatial_type(),
+                            )
+                            for pose in target_sequence
+                        ]
+                    )
+
+                    collision_avoidance = CollisionAvoidance(
+                        collision_entries=[giskard_coll_request]
+                    )
+                    msc = MotionStatechart()
+                    msc.add_nodes([pose_seq, collision_avoidance])
+
+                    executor = Executor(
+                        test_world,
+                        controller_config=QPControllerConfig(
+                            target_frequency=50, prediction_horizon=4, verbose=False
+                        ),
+                    )
+                    executor.compile(msc)
+                    try:
+                        executor.tick_until_end()
+                    except TimeoutError as e:
+                        pass
+
+                    dist = test_ee.global_pose.to_position().euclidean_distance(
+                        target_sequence[-1].to_spatial_type().to_position()
+                    )
+
+                    if dist > 0.02:
+                        continue
+
+                    ret = GraspPose.from_spatial_type(test_robot.root.global_pose)
+                    ret.grasp_description = grasp_desc
+                    ret.arm = params["arm"]
+                    yield ret

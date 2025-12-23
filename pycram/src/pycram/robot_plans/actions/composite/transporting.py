@@ -23,7 +23,11 @@ from ....datastructures.enums import Arms, Grasp, VerticalAlignment
 from ....datastructures.grasp import GraspDescription
 from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import PoseStamped
-from ....designators.location_designator import ProbabilisticCostmapLocation
+from ....designators.location_designator import (
+    ProbabilisticCostmapLocation,
+    CostmapLocation,
+    GiskardLocation,
+)
 from ....designators.object_designator import BelieveObject
 from ....failures import ObjectUnfetchable, ConfigurationNotReached
 from ....has_parameters import has_parameters
@@ -83,10 +87,16 @@ class TransportAction(ActionDescription):
                         OpenActionDescription(sem_anno[0].handle.body, self.arm),
                     ).perform()
         SequentialPlan(self.context, ParkArmsActionDescription(Arms.BOTH)).perform()
-        pickup_loc = ProbabilisticCostmapLocation(
-            target=self.object_designator,
-            reachable_for=self.robot_view,
-            reachable_arm=self.arm,
+        # pickup_loc = CostmapLocation(
+        #    target=self.object_designator,
+        #    reachable_for=self.robot_view,
+        #    reachable_arm=self.arm,
+        # )
+        pickup_loc = GiskardLocation(
+            target_pose=PoseStamped.from_spatial_type(
+                self.object_designator.global_pose
+            ),
+            arm=self.arm,
         )
         pickup_loc.plan_node = self.plan_node
         # Tries to find a pick-up position for the robot that uses the given arm
@@ -106,14 +116,18 @@ class TransportAction(ActionDescription):
             ),
             ParkArmsActionDescription(Arms.BOTH),
             NavigateActionDescription(
-                ProbabilisticCostmapLocation(
-                    target=self.target_location,
-                    reachable_for=self.robot_view,
-                    reachable_arm=pickup_pose.arm,
-                    grasp_descriptions=[pickup_pose.grasp_description],
-                    object_in_hand=self.object_designator,
-                    rotation_agnostic=self.place_rotation_agnostic,
+                GiskardLocation(
+                    target_pose=self.target_location,
+                    arm=self.arm,
+                    grasp_description=pickup_loc.grasp_description,
                 ),
+                # CostmapLocation(
+                #    target=self.target_location,
+                #    reachable_for=self.robot_view,
+                #    reachable_arm=pickup_pose.arm,
+                #    grasp_descriptions=[pickup_pose.grasp_description],
+                #   rotation_agnostic=self.place_rotation_agnostic,
+                # ),
                 True,
             ),
         ).perform()

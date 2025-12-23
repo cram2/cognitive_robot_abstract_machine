@@ -13,8 +13,8 @@ from pycram.robot_plans import NavigateActionDescription
 from pycram.testing import ApartmentWorldTestCase
 
 
-def test_reachability_costmap_location(simple_pr2_world):
-    world, robot, context = simple_pr2_world
+def test_reachability_costmap_location(immutable_simple_pr2_world):
+    world, robot, context = immutable_simple_pr2_world
     arm_park = {
         "l_shoulder_pan_joint": 1.712,
         "l_shoulder_lift_joint": -0.264,
@@ -48,8 +48,8 @@ def test_reachability_costmap_location(simple_pr2_world):
     # assertTrue(Arms.LEFT == location.reachable_arm or Arms.RIGHT == location.reachable_arm)
 
 
-def test_reachability_pose_costmap_location(simple_pr2_world):
-    world, robot_view, context = simple_pr2_world
+def test_reachability_pose_costmap_location(immutable_simple_pr2_world):
+    world, robot_view, context = immutable_simple_pr2_world
     arm_park = {
         "l_shoulder_pan_joint": 1.712,
         "l_shoulder_lift_joint": -0.264,
@@ -79,8 +79,8 @@ def test_reachability_pose_costmap_location(simple_pr2_world):
     assert len(location.orientation.to_list()) == 4
 
 
-def test_visibility_costmap_location(simple_pr2_world):
-    world, robot_view, context = simple_pr2_world
+def test_visibility_costmap_location(immutable_simple_pr2_world):
+    world, robot_view, context = immutable_simple_pr2_world
     arm_park = {
         "l_shoulder_pan_joint": 1.712,
         "l_shoulder_lift_joint": -0.264,
@@ -109,8 +109,8 @@ def test_visibility_costmap_location(simple_pr2_world):
     assert len(location.orientation.to_list()) == 4
 
 
-def test_visibility_pose_costmap_location(simple_pr2_world):
-    world, robot_view, context = simple_pr2_world
+def test_visibility_pose_costmap_location(immutable_simple_pr2_world):
+    world, robot_view, context = immutable_simple_pr2_world
     arm_park = {
         "l_shoulder_pan_joint": 1.712,
         "l_shoulder_lift_joint": -0.264,
@@ -131,7 +131,7 @@ def test_visibility_pose_costmap_location(simple_pr2_world):
         world.state[world.get_degree_of_freedom_by_name(name).id].position = state
     world.notify_state_change()
     location_desig = CostmapLocation(
-        PoseStamped.from_list([2.2, 3, 1], frame=world.root),
+        PoseStamped.from_list([-1, 0, 1.2], frame=world.root),
         visible_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
@@ -140,8 +140,8 @@ def test_visibility_pose_costmap_location(simple_pr2_world):
     assert len(location.orientation.to_list()) == 4
 
 
-def test_reachability_and_visibility_costmap_location(simple_pr2_world):
-    world, robot_view, context = simple_pr2_world
+def test_reachability_and_visibility_costmap_location(immutable_simple_pr2_world):
+    world, robot_view, context = immutable_simple_pr2_world
     arm_park = {
         "l_shoulder_pan_joint": 1.712,
         "l_shoulder_lift_joint": -0.264,
@@ -175,8 +175,8 @@ def test_reachability_and_visibility_costmap_location(simple_pr2_world):
     assert len(location.orientation.to_list()) == 4
 
 
-def test_reachability_probabilistic_costmap_location(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_reachability_probabilistic_costmap_location(immutable_simple_pr2_world):
+    world, robot_view, context = immutable_simple_pr2_world
     arm_park = {
         "l_shoulder_pan_joint": 1.712,
         "l_shoulder_lift_joint": -0.264,
@@ -209,8 +209,8 @@ def test_reachability_probabilistic_costmap_location(immutable_model_world):
     # assertTrue(Arms.LEFT == location.reachable_arm or Arms.RIGHT == location.reachable_arm)
 
 
-def test_reachability_pose_probabilistic_costmap_location(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_reachability_pose_probabilistic_costmap_location(immutable_simple_pr2_world):
+    world, robot_view, context = immutable_simple_pr2_world
     arm_park = {
         "l_shoulder_pan_joint": 1.712,
         "l_shoulder_lift_joint": -0.264,
@@ -240,8 +240,8 @@ def test_reachability_pose_probabilistic_costmap_location(immutable_model_world)
     # assertTrue(Arms.LEFT == location.reachable_arm or Arms.RIGHT == location.reachable_arm)
 
 
-def test_visibility_probabilistic_costmap_location(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_visibility_probabilistic_costmap_location(immutable_simple_pr2_world):
+    world, robot_view, context = immutable_simple_pr2_world
     arm_park = {
         "l_shoulder_pan_joint": 1.712,
         "l_shoulder_lift_joint": -0.264,
@@ -269,8 +269,8 @@ def test_visibility_probabilistic_costmap_location(immutable_model_world):
     assert len(location.orientation.to_list()) == 4
 
 
-def test_visibility_pose_probabilistic_costmap_location(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_visibility_pose_probabilistic_costmap_location(immutable_simple_pr2_world):
+    world, robot_view, context = immutable_simple_pr2_world
     arm_park = {
         "l_shoulder_pan_joint": 1.712,
         "l_shoulder_lift_joint": -0.264,
@@ -290,7 +290,7 @@ def test_visibility_pose_probabilistic_costmap_location(immutable_model_world):
     for name, state in arm_park.items():
         world.state[world.get_degree_of_freedom_by_name(name).id].position = state
     location_desig = ProbabilisticCostmapLocation(
-        PoseStamped.from_list([2, 2, 1], frame=world.root),
+        PoseStamped.from_list([-1, 0, 1.2], frame=world.root),
         visible_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
@@ -300,9 +300,9 @@ def test_visibility_pose_probabilistic_costmap_location(immutable_model_world):
 
 
 def test_reachability_and_visibility_probabilistic_costmap_location(
-    immutable_model_world,
+    immutable_simple_pr2_world,
 ):
-    world, robot_view, context = immutable_model_world
+    world, robot_view, context = immutable_simple_pr2_world
     arm_park = {
         "l_shoulder_pan_joint": 1.712,
         "l_shoulder_lift_joint": -0.264,
@@ -354,10 +354,10 @@ def test_semantic_location(immutable_model_world):
     assert len(location.orientation.to_list()) == 4
 
 
-def test_probabilistic_semantic_location(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def test_probabilistic_semantic_location(immutable_simple_pr2_world):
+    world, robot_view, context = immutable_simple_pr2_world
     location_desig = ProbabilisticSemanticLocation(
-        [world.get_body_by_name("island_countertop")]
+        [world.get_body_by_name("box_2")], link_is_center_link=True
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
@@ -365,8 +365,9 @@ def test_probabilistic_semantic_location(immutable_model_world):
     assert len(location.orientation.to_list()) == 4
 
     location_desig = ProbabilisticSemanticLocation(
-        [world.get_body_by_name("island_countertop")],
+        [world.get_body_by_name("box")],
         for_object=world.get_body_by_name("milk.stl"),
+        link_is_center_link=True,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
@@ -386,3 +387,15 @@ def test_accessing_location(immutable_model_world):
 
     assert len(access_pose.position.to_list()) == 3
     assert len(access_pose.orientation.to_list()) == 4
+
+
+def test_giskard_location_pose(immutable_model_world):
+    world, robot_view, context = immutable_model_world
+    location_desig = GiskardLocation(
+        PoseStamped.from_list([2.1, 2, 1], frame=world.root), Arms.RIGHT
+    )
+    plan = SequentialPlan(context, NavigateActionDescription(location_desig))
+
+    location = location_desig.resolve()
+    assert len(location.position.to_list()) == 3
+    assert len(location.orientation.to_list()) == 4
