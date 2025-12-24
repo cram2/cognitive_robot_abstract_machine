@@ -54,7 +54,7 @@ class Role(Generic[T], ABC):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_role_taker_type(cls) -> Type:
+    def get_role_taker_type(cls) -> Type[T]:
         """
         :return: The type of the role taker.
         """
