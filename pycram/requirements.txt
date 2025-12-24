@@ -16,3 +16,4 @@ polytope # needed for random events
 krrood
 semantic_digital_twin
 rustworkx_utils
+scikit-image

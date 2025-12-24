@@ -33,53 +33,6 @@ except ImportError:
     )
 
 
-@pytest.fixture(autouse=True, scope="session")
-def cleanup_ros():
-    """
-    Fixture to ensure that ROS is properly cleaned up after all tests.
-    """
-    if os.environ.get("ROS_VERSION") == "2":
-        import rclpy
-
-        if not rclpy.ok():
-            rclpy.init()
-    yield
-    if os.environ.get("ROS_VERSION") == "2":
-        if rclpy.ok():
-            rclpy.shutdown()
-
-
-@pytest.fixture(scope="function")
-def rclpy_node():
-    if not rclpy_installed():
-        pytest.skip("ROS not installed")
-    import rclpy
-    from rclpy.executors import SingleThreadedExecutor
-
-    rclpy.init()
-    node = rclpy.create_node("test_node")
-
-    executor = SingleThreadedExecutor()
-    executor.add_node(node)
-
-    thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
-    thread.start()
-    time.sleep(0.1)
-    try:
-        yield node
-    finally:
-        # Stop executor cleanly and wait for the thread to exit
-        executor.shutdown()
-        thread.join(timeout=2.0)
-
-        # Remove the node from the executor and destroy it
-        # (executor.shutdown() takes care of spinning; add_node is safe to keep as-is)
-        node.destroy_node()
-
-        # Shut down the ROS client library
-        rclpy.shutdown()
-
-
 def setup_world() -> World:
     logger.setLevel(logging.DEBUG)
 

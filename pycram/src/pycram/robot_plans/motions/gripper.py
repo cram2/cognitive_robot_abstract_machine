@@ -4,6 +4,7 @@ from typing import Optional, List
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
+    CartesianPosition,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from semantic_digital_twin.world_description.world_entity import Body
@@ -157,12 +158,21 @@ class MoveTCPMotion(BaseMotion):
     @property
     def _motion_chart(self):
         tip = ViewManager().get_end_effector_view(self.arm, self.robot_view).tool_frame
-        return CartesianPose(
-            root_link=self.robot_view.root,
-            tip_link=tip,
-            goal_pose=self.target.to_spatial_type(),
-            threshold=0.005,
-        )
+        task = None
+        if self.movement_type == MovementType.TRANSLATION:
+            task = CartesianPosition(
+                root_link=self.robot_view.root,
+                tip_link=tip,
+                goal_point=self.target.to_spatial_type().to_position(),
+            )
+        else:
+            task = CartesianPose(
+                root_link=self.robot_view.root,
+                tip_link=tip,
+                goal_pose=self.target.to_spatial_type(),
+                threshold=0.005,
+            )
+        return task
 
 
 @dataclass

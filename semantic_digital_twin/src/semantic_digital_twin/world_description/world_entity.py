@@ -8,7 +8,7 @@ from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from dataclasses import fields
-from functools import lru_cache
+from functools import lru_cache, cached_property
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -116,8 +116,12 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
     A unique identifier for this world entity.
     """
 
-    def __hash__(self):
+    @cached_property
+    def _hash(self):
         return hash(self.id)
+
+    def __hash__(self):
+        return self._hash
 
     def add_to_world(self, world: World):
         super().add_to_world(world)

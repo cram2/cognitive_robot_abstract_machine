@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import copy
 import itertools
 import os
 import tempfile
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from functools import cached_property
 
@@ -14,13 +16,16 @@ from PIL import Image
 from random_events.interval import SimpleInterval, Bound, closed
 from random_events.product_algebra import SimpleEvent
 from trimesh.visual.texture import TextureVisuals, SimpleMaterial
-from typing_extensions import Optional, List, Dict, Any, Self, Tuple
+from typing_extensions import Optional, List, Dict, Any, Self, Tuple, TYPE_CHECKING
 
 from krrood.adapters.exceptions import JSON_TYPE_NAME
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from ..datastructures.variables import SpatialVariables
 from ..spatial_types import HomogeneousTransformationMatrix, Point3
 from ..utils import IDGenerator
+
+if TYPE_CHECKING:
+    from ..world import World
 
 id_generator = IDGenerator()
 
@@ -173,6 +178,26 @@ class Shape(ABC, SubclassJSONSerializer):
             return False
 
         return True
+
+    def copy_for_world(self, world: World) -> Self:
+        """
+        Copies this shape with references to the given world.
+        :param world: The world to copy to.
+        :return: A copy of this shape with references to the given world.
+        """
+        new_origin = HomogeneousTransformationMatrix(
+            self.origin.to_np(),
+            reference_frame=world.get_kinematic_structure_entity_by_name(
+                self.origin.reference_frame.name
+            ),
+        )
+        shape_props = fields(self)
+        new_props = {
+            f.name: deepcopy(getattr(self, f.name))
+            for f in shape_props
+            if f.name not in ["origin"]
+        }
+        return self.__class__(origin=new_origin, **new_props)
 
 
 @dataclass(eq=False)

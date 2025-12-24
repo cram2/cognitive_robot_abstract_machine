@@ -463,55 +463,6 @@ class VisibilityCostmap(Costmap):
         )
         self._generate_map()
 
-    # def __init__(
-    #     self,
-    #     min_height: float,
-    #     max_height: float,
-    #     world: Optional[World],
-    #     size: Optional[int] = 100,
-    #     resolution: Optional[float] = 0.02,
-    #     origin: Optional[PoseStamped] = None,
-    #     target_object: Optional[Body] = None,
-    # ):
-    #     """
-    #     Visibility Costmaps show for every position around the origin pose if the origin can be seen from this pose.
-    #     The costmap is able to deal with height differences of the camera while in a single position, for example, if
-    #     the robot has a movable torso.
-    #
-    #     :param min_height: This is the minimal height the camera can be. This parameter
-    #         is mostly relevant if the vertical position of the camera can change.
-    #     :param max_height: This is the maximal height the camera can be. This is
-    #         mostly relevant if the vertical position of the camera can change.
-    #     :param size: The length of the side of the costmap, the costmap is created
-    #         as a square.
-    #     :param resolution: This parameter specifies how much meter a pixel in the
-    #         costmap represents.
-    #     :param origin: The pose in world coordinate frame around which the
-    #         costmap should be created.
-    #     :param world: The World for which the costmap should be created.
-    #     :param target_object: The object that should be visible.
-    #     """
-    #     if (11 * size**2 + size**3) * 2 > psutil.virtual_memory().available:
-    #         raise OSError("Not enough free RAM to calculate a costmap of this size")
-    #
-    #     self.world = world
-    #     self.map = np.zeros((size, size))
-    #     self.size = size
-    #     self.resolution = resolution
-    #     # for pr2 = 1.27
-    #     self.max_height: float = max_height
-    #     # for pr2 = 1.6
-    #     self.min_height: float = min_height
-    #     self.origin: PoseStamped = (
-    #         PoseStamped.from_list(self.world.root) if not origin else origin
-    #     )
-    #     self.target_object: Optional[Body] = target_object
-    #
-    #     self._generate_map()
-    #     # Costmap.__init__(
-    #     #     self, resolution, size, size, self.origin, self.map, self.world
-    #     # )
-
     def _create_images(self) -> List[np.ndarray]:
         """
         Creates four depth images in every direction around the point

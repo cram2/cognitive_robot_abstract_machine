@@ -137,7 +137,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     ray_tracer_without_occlusion.update_scene()
     segmentation_mask_without_occlusion = (
         ray_tracer_without_occlusion.create_segmentation_mask(
-            camera_pose, resolution=256
+            camera_pose, resolution=256, min_dist=0.1
         )
     )
 
@@ -145,7 +145,9 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     ray_tracer_with_occlusion = RayTracer(camera._world)
     ray_tracer_with_occlusion.update_scene()
     segmentation_mask_with_occlusion = (
-        ray_tracer_with_occlusion.create_segmentation_mask(camera_pose, resolution=256)
+        ray_tracer_with_occlusion.create_segmentation_mask(
+            camera_pose, resolution=256, min_dist=0.1
+        )
     )
 
     mask_without_occluders = segmentation_mask_without_occlusion[

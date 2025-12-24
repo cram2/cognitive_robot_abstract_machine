@@ -69,7 +69,7 @@ class CartesianPosition(Task):
     )
     """Describes when the goal is computed. See GoalBindingPolicy for more information."""
 
-    _fk_binding: ForwardKinematicsBinding = field(kw_only=True, init=False)
+    _fk_binding: ForwardKinematicsBinding = field(kw_only=True, init=False, repr=False)
 
     def build(self, context: BuildContext) -> NodeArtifacts:
         """

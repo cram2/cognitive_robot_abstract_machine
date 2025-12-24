@@ -139,14 +139,6 @@ def doors_and_drawers_world() -> World:
     return world
 
 
-@pytest.fixture(autouse=True)
-def cleanup_after_test():
-    # Setup: runs before each krrood_test
-    SymbolGraph()
-    yield
-    SymbolGraph().clear()
-
-
 @pytest.fixture(scope="session")
 def engine():
     configure_mappers()

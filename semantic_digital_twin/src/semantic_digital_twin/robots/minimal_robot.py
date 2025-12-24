@@ -27,7 +27,7 @@ class MinimalRobot(AbstractRobot):
             )
         )
 
-    def load_srdf(self):
+    def setup_collision_config(self):
         pass
 
     @classmethod

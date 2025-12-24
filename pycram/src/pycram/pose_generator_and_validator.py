@@ -3,6 +3,8 @@ import random
 from copy import deepcopy
 
 import numpy as np
+from numpy.ma import masked_array
+from skimage.measure import label
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionCheck,
     Collision,
@@ -29,7 +31,7 @@ from .datastructures.pose import PoseStamped, TransformStamped
 from .failures import IKError, RobotInCollision
 from .tf_transformations import quaternion_from_euler
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pycram")
 
 
 class OrientationGenerator:
@@ -134,42 +136,69 @@ class PoseGenerator(Iterable[PoseStamped]):
             or self.number_of_samples > self.costmap.map.flatten().shape[0]
         ):
             self.number_of_samples = self.costmap.map.flatten().shape[0]
-        if self.randomize:
-            indices = np.random.choice(
-                self.costmap.map.size, self.number_of_samples, replace=False
-            )
-        else:
-            indices = np.argpartition(
-                self.costmap.map.flatten(), -self.number_of_samples
-            )[-self.number_of_samples :]
 
-        indices = np.dstack(np.unravel_index(indices, self.costmap.map.shape)).reshape(
-            self.number_of_samples, 2
-        )
+        segmented_maps = self.segment_map()
+        samples_per_map = self.number_of_samples // len(segmented_maps)
+        for seg_map in segmented_maps:
 
-        height = self.costmap.map.shape[0]
-        width = self.costmap.map.shape[1]
-        center = np.array([height // 2, width // 2])
-        for ind in indices:
-            if self.costmap.map[ind[0]][ind[1]] == 0:
-                continue
-            # The position is calculated by creating a vector from the 2D position in the costmap (given by x and y)
-            # and the center of the costmap (since this is the origin). This vector is then turned into a transformation
-            # and multiplied with the transformation of the origin.
-            vector_to_origin = (center - ind) * self.costmap.resolution
-            point_to_origin = TransformStamped.from_list(
-                [*vector_to_origin, 0],
-            )
-            origin_to_map = ~self.costmap.origin.to_transform_stamped(None)
-            point_to_map = point_to_origin * origin_to_map
-            map_to_point = ~point_to_map
+            if self.randomize:
+                indices = np.random.choice(seg_map.size, samples_per_map, replace=False)
+            else:
+                indices = np.argpartition(seg_map.flatten(), -samples_per_map)[
+                    -samples_per_map:
+                ]
 
-            orientation = self.orientation_generator(
-                map_to_point.translation.to_list(), self.costmap.origin
-            )
-            yield PoseStamped.from_list(
-                map_to_point.translation.to_list(), orientation, self.costmap.world.root
-            )
+            indices = np.dstack(
+                np.unravel_index(indices, self.costmap.map.shape)
+            ).reshape(samples_per_map, 2)
+
+            height = seg_map.shape[0]
+            width = seg_map.shape[1]
+            center = np.array([height // 2, width // 2])
+            for ind in indices:
+                if seg_map[ind[0]][ind[1]] == 0:
+                    continue
+                # The position is calculated by creating a vector from the 2D position in the costmap (given by x and y)
+                # and the center of the costmap (since this is the origin). This vector is then turned into a transformation
+                # and multiplied with the transformation of the origin.
+                vector_to_origin = (center - ind) * self.costmap.resolution
+                point_to_origin = TransformStamped.from_list(
+                    [*vector_to_origin, 0],
+                )
+                origin_to_map = ~self.costmap.origin.to_transform_stamped(None)
+                point_to_map = point_to_origin * origin_to_map
+                map_to_point = ~point_to_map
+
+                orientation = self.orientation_generator(
+                    map_to_point.translation.to_list(), self.costmap.origin
+                )
+                yield PoseStamped.from_list(
+                    map_to_point.translation.to_list(),
+                    orientation,
+                    self.costmap.world.root,
+                )
+
+    def segment_map(self) -> List[np.ndarray]:
+        """
+        Finds partitions in the costmap and isolates them, a partition is a number of entries in the costmap which are
+        neighbours. Returns a list of numpy arrays with one partition per array.
+
+        :return: A list of numpy arrays with one partition per array
+        """
+        discrete_map = np.copy(self.costmap.map)
+        # Label only works on integer arrays
+        discrete_map[discrete_map != 0] = 1
+
+        labeled_map, num_labels = label(discrete_map, return_num=True, connectivity=2)
+        result_maps = []
+        # We don't want the maps for value 0
+        for i in range(1, num_labels + 1):
+            copy_map = deepcopy(self.costmap.map)
+            copy_map[labeled_map != i] = 0
+            result_maps.append(copy_map)
+        # Maps with the highest values go first
+        result_maps.reverse()
+        return result_maps
 
     @staticmethod
     def height_generator() -> float:

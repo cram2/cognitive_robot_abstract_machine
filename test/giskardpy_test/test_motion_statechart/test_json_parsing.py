@@ -64,8 +64,8 @@ def test_TrueMonitor():
     assert node_copy.name == node.name
 
 
-def test_CollisionRequest(pr2_world: World):
-    robot = pr2_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+def test_CollisionRequest(pr2_world_setup: World):
+    robot = pr2_world_setup.get_semantic_annotations_by_type(AbstractRobot)[0]
     collision_request = CollisionRequest(
         type_=CollisionAvoidanceTypes.AVOID_COLLISION,
         distance=0.2,
@@ -75,7 +75,7 @@ def test_CollisionRequest(pr2_world: World):
     json_data = collision_request.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
-    tracker = KinematicStructureEntityKwargsTracker.from_world(pr2_world)
+    tracker = KinematicStructureEntityKwargsTracker.from_world(pr2_world_setup)
     kwargs = tracker.create_kwargs()
     collision_request_copy = CollisionRequest.from_json(new_json_data, **kwargs)
     assert collision_request_copy.type_ == collision_request.type_
@@ -240,9 +240,9 @@ def test_executing_json_parsed_statechart():
     assert observation_copy == msc_copy.observation_state
 
 
-def test_cart_goal_simple(pr2_world: World):
-    tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+def test_cart_goal_simple(pr2_world_setup: World):
+    tip = pr2_world_setup.get_kinematic_structure_entity_by_name("base_footprint")
+    root = pr2_world_setup.get_kinematic_structure_entity_by_name("odom_combined")
     tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=-0.2, reference_frame=tip
     )
@@ -262,25 +262,25 @@ def test_cart_goal_simple(pr2_world: World):
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
-    tracker = KinematicStructureEntityKwargsTracker.from_world(pr2_world)
+    tracker = KinematicStructureEntityKwargsTracker.from_world(pr2_world_setup)
     kwargs = tracker.create_kwargs()
     msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
 
     kin_sim = Executor(
-        world=pr2_world,
+        world=pr2_world_setup,
         controller_config=QPControllerConfig.create_with_simulation_defaults(),
     )
 
     kin_sim.compile(motion_statechart=msc_copy)
     kin_sim.tick_until_end()
 
-    fk = pr2_world.compute_forward_kinematics_np(root, tip)
+    fk = pr2_world_setup.compute_forward_kinematics_np(root, tip)
     assert np.allclose(fk, tip_goal, atol=cart_goal.threshold)
 
 
-def test_compressed_copy_can_be_plotted(pr2_world: World):
-    tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+def test_compressed_copy_can_be_plotted(pr2_world_setup: World):
+    tip = pr2_world_setup.get_kinematic_structure_entity_by_name("base_footprint")
+    root = pr2_world_setup.get_kinematic_structure_entity_by_name("odom_combined")
     tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=-0.2, reference_frame=tip
     )
@@ -355,9 +355,9 @@ def test_cancel_motion():
         kin_sim.tick_until_end()
 
 
-def test_unreachable_cart_goal(pr2_world):
-    root = pr2_world.root
-    tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
+def test_unreachable_cart_goal(pr2_world_setup):
+    root = pr2_world_setup.root
+    tip = pr2_world_setup.get_kinematic_structure_entity_by_name("base_footprint")
     msc = MotionStatechart()
     msc.add_node(
         cart_goal := CartesianPose(
@@ -377,12 +377,12 @@ def test_unreachable_cart_goal(pr2_world):
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
-    tracker = KinematicStructureEntityKwargsTracker.from_world(pr2_world)
+    tracker = KinematicStructureEntityKwargsTracker.from_world(pr2_world_setup)
     kwargs = tracker.create_kwargs()
     msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
 
     kin_sim = Executor(
-        world=pr2_world,
+        world=pr2_world_setup,
         controller_config=QPControllerConfig.create_with_simulation_defaults(),
     )
 
