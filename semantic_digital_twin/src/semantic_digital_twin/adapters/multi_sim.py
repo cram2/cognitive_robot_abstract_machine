@@ -3,6 +3,7 @@ import inspect
 import os
 import shutil
 import time
+import trimesh
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import IntEnum
@@ -1096,7 +1097,14 @@ class MultiSimBuilder(ABC):
             with self.world.modify_world():
                 root = Body(name=PrefixedName("world"))
                 self.world.add_body(root)
-        elif self.world.bodies[0].name.name != "world":
+        elif self.world.root.name.name != "world":
+            free_joint_bodies = [
+                body
+                for body in self.world.bodies
+                if isinstance(body.parent_connection, Connection6DoF)
+                and body.parent_connection.parent == self.world.root
+            ]
+
             with world.modify_world():
                 root_bodies = [
                     body for body in self.world.bodies if body.parent_connection is None
@@ -1106,6 +1114,10 @@ class MultiSimBuilder(ABC):
                 for root_body in root_bodies:
                     connection = FixedConnection(parent=root, child=root_body)
                     self.world.add_connection(connection)
+
+            with world.modify_world():
+                for free_joint_body in free_joint_bodies:
+                    self.world.move_branch(free_joint_body, root)
 
         self._start_build(file_path=file_path)
 
@@ -1348,10 +1360,38 @@ class MujocoBuilder(MultiSimBuilder):
             )
         mesh_ext = os.path.splitext(mesh_file_path)[1].lower()
         if mesh_ext == ".dae":
-            logger.warning(
-                f"Cannot use .dae files in Mujoco. Skipping mesh {mesh_file_path}."
-            )
-            return False
+            try:
+                # Build output .stl path
+                base_name = os.path.splitext(os.path.basename(mesh_file_path))[0]
+                stl_file_path = os.path.join(self.asset_folder_path, base_name + ".stl")
+
+                if os.path.exists(stl_file_path):
+                    logger.info(
+                        f"Using existing STL for MuJoCo: {stl_file_path} (from {mesh_file_path})"
+                    )
+                else:
+                    logger.info(
+                        f"Converting Collada mesh to STL for MuJoCo: {mesh_file_path}"
+                    )
+                    tm = trimesh.load(mesh_file_path, force="mesh")
+                    if tm.is_empty:
+                        logger.warning(
+                            f"Failed to load .dae mesh (empty): {mesh_file_path}. Skipping."
+                        )
+                        return False
+
+                    # Export as STL
+                    tm.export(stl_file_path)
+
+                mesh_file_path = stl_file_path
+                mesh_ext = ".stl"
+
+            except Exception as e:
+                logger.warning(
+                    f"Cannot convert .dae to STL for MuJoCo. Skipping mesh {mesh_file_path}. "
+                    f"Error: {e}"
+                )
+                return False
         mesh_name = os.path.splitext(os.path.basename(mesh_file_path))[0]
         mesh_scale = [mesh_entity.scale.x, mesh_entity.scale.y, mesh_entity.scale.z]
         if not numpy.allclose(mesh_scale, [1.0, 1.0, 1.0]):
