@@ -23,6 +23,7 @@ from typing_extensions import (
     Iterable,
     Type,
     TYPE_CHECKING,
+    Set,
 )
 
 
@@ -545,57 +546,10 @@ class ClassDiagram:
         clazz._class_diagram = self
         self._cls_wrapped_cls_map[clazz.clazz] = clazz
 
-    def add_relation(self, relation: ClassRelation):
-        """
-        Adds a relation to the internal dependency graph.
-
-        The method establishes a directed edge in the graph between the source and
-        target indices of the provided relation. This function is used to model
-        dependencies among entities represented within the graph.
-
-        :relation: The relation object that contains the source and target entities and
-        encapsulates the relationship between them.
-        """
-        self._dependency_graph.add_edge(
-            relation.source.index, relation.target.index, relation
-        )
-        if not isinstance(relation, Association):
-            return
-        if isinstance(relation, HasRoleTaker):
-            relation.target.roles.add(relation)
-            relation.source.role_taker_association = relation
-            for rel in self.get_outgoing_relations(relation.target):
-                if not isinstance(rel, Association):
-                    continue
-                prev_association_path = (
-                    rel.association_path
-                    if isinstance(rel, AssociationThroughRoleTaker)
-                    else [rel]
-                )
-                self.add_relation(
-                    AssociationThroughRoleTaker(
-                        association_path=[relation, *prev_association_path],
-                        source=relation.source,
-                        target=rel.target,
-                    )
-                )
-        else:
-            for has_role_taker_relation in relation.source.roles:
-                prev_association_path = (
-                    relation.association_path
-                    if isinstance(relation, AssociationThroughRoleTaker)
-                    else [relation]
-                )
-                self.add_relation(
-                    AssociationThroughRoleTaker(
-                        association_path=[
-                            has_role_taker_relation,
-                            *prev_association_path,
-                        ],
-                        source=has_role_taker_relation.source,
-                        target=relation.target,
-                    )
-                )
+    def _create_all_relations(self):
+        self._create_inheritance_relations()
+        self._create_association_relations()
+        self._create_association_relations_inferred_from_role_takers()
 
     def _create_inheritance_relations(self):
         """
@@ -620,10 +574,6 @@ class ClassDiagram:
                     )
                     self.add_relation(relation)
 
-    def _create_all_relations(self):
-        self._create_inheritance_relations()
-        self._create_association_relations()
-
     def _create_association_relations(self):
         """
         Creates association relations between wrapped classes and their fields.
@@ -646,7 +596,11 @@ class ClassDiagram:
                     continue
 
                 association_type = Association
-                if wrapped_field.is_role_taker and issubclass(clazz.clazz, Role):
+                if (
+                    wrapped_field.is_role_taker
+                    and issubclass(clazz.clazz, Role)
+                    and target_type is clazz.clazz.get_role_taker_type()
+                ):
                     role_taker_type = get_generic_type_param(clazz.clazz, Role)[0]
                     if role_taker_type is target_type:
                         association_type = HasRoleTaker
@@ -657,6 +611,163 @@ class ClassDiagram:
                     target=wrapped_target_class,
                 )
                 self.add_relation(relation)
+
+    def _create_association_relations_inferred_from_role_takers(self):
+        """
+        Create association relations in the roles for associations inferred from role takers.
+        """
+        wrapped_classes = (
+            self.wrapped_classes_of_role_associations_subgraph_in_topological_order
+        )
+        for role_taker_clazz in reversed(wrapped_classes):
+            role_taker_associations = self.get_associations_with_condition(
+                role_taker_clazz, lambda rel: not isinstance(rel, HasRoleTaker)
+            )
+            for association in role_taker_associations:
+                self._infer_role_associations_for_role_taker_association(association)
+
+    def _infer_role_associations_for_role_taker_association(
+        self, role_taker_assoc: Association
+    ):
+        """
+        Infer role associations through their role taker association.
+
+        :param role_taker_assoc: Association of the role taker.
+        """
+        wrapped_classes = (
+            self.wrapped_classes_of_role_associations_subgraph_in_topological_order
+        )
+        role_taker_clazz = role_taker_assoc.source
+        for role_clazz in wrapped_classes:
+            if role_clazz is role_taker_clazz:
+                break
+            self._add_association_through_role_taker(role_clazz, role_taker_assoc)
+
+    def _add_association_through_role_taker(
+        self, role_clazz: WrappedClass, role_taker_assoc: Association
+    ):
+        """
+        Adds an association through a role taker to the class diagram. It connects the role class with the role taker
+         association target class through an AssociationThroughRoleTaker relation.
+
+        :param role_clazz: Wrapped class of the role.
+        :param role_taker_assoc: Association of the role taker.
+        """
+        role_taker_clazz = role_taker_assoc.source
+        association_path = self.get_role_association_path(role_clazz, role_taker_clazz)
+        association_path.append(role_taker_assoc)
+        self.add_relation(
+            AssociationThroughRoleTaker(
+                association_path=association_path,
+                source=role_clazz,
+                target=role_taker_assoc.target,
+            )
+        )
+
+    @lru_cache(maxsize=None)
+    def get_role_association_path(
+        self, role_clazz: WrappedClass, role_taker_clazz: WrappedClass
+    ) -> List[Association]:
+        """
+        :param role_clazz: Wrapped class of the role.
+        :param role_taker_clazz: Wrapped class of the role taker.
+        :return: List of all associations between the role and role taker classes in topological order.
+        """
+        association_path = []
+        wrapped_classes = (
+            self.wrapped_classes_of_role_associations_subgraph_in_topological_order
+        )
+        i = wrapped_classes.index(role_clazz)
+        for next_role_clazz in wrapped_classes[i:]:
+            if next_role_clazz is role_taker_clazz:
+                break
+            association = self.role_association_subgraph.out_edges(
+                next_role_clazz.index
+            )[0][-1]
+            association_path.append(association)
+        return association_path
+
+    @cached_property
+    def wrapped_classes_of_role_associations_subgraph_in_topological_order(
+        self,
+    ) -> List[WrappedClass]:
+        """
+        :return: List of all classes in the association subgraph in topological order.
+        """
+        return [
+            self._dependency_graph[index]
+            for index in rx.topological_sort(self.role_association_subgraph)
+        ]
+
+    @cached_property
+    def wrapped_classes_of_inheritance_subgraph_in_topological_order(
+        self,
+    ) -> List[WrappedClass]:
+        """
+        :return: List of all classes in the inheritance subgraph in topological order.
+        """
+        return [
+            self._dependency_graph[index]
+            for index in rx.topological_sort(self.inheritance_subgraph)
+        ]
+
+    @cached_property
+    def wrapped_classes_of_association_subgraph_in_topological_order(
+        self,
+    ) -> List[WrappedClass]:
+        """
+        :return: List of all classes in the association subgraph in topological order.
+        """
+        return [
+            self._dependency_graph[index]
+            for index in rx.topological_sort(self.association_subgraph)
+        ]
+
+    @cached_property
+    def inheritance_subgraph(self):
+        """
+        :return: The subgraph containing only inheritance relations and their incident nodes.
+        """
+        return self._dependency_graph.edge_subgraph(
+            [(r.source.index, r.target.index) for r in self.inheritance_relations]
+        )
+
+    @cached_property
+    def role_association_subgraph(self):
+        """
+        :return: The subgraph containing only association relations and their incident nodes.
+        """
+        return self._dependency_graph.edge_subgraph(
+            [
+                (r.source.index, r.target.index)
+                for r in self.associations
+                if isinstance(r, HasRoleTaker)
+            ]
+        )
+
+    @cached_property
+    def association_subgraph(self):
+        """
+        :return: The subgraph containing only association relations and their incident nodes.
+        """
+        return self._dependency_graph.edge_subgraph(
+            [(r.source.index, r.target.index) for r in self.associations]
+        )
+
+    def add_relation(self, relation: ClassRelation):
+        """
+        Adds a relation to the internal dependency graph.
+
+        The method establishes a directed edge in the graph between the source and
+        target indices of the provided relation. This function is used to model
+        dependencies among entities represented within the graph.
+
+        :relation: The relation object that contains the source and target entities and
+        encapsulates the relationship between them.
+        """
+        self._dependency_graph.add_edge(
+            relation.source.index, relation.target.index, relation
+        )
 
     def _build_rxnode_tree(self, add_association_relations: bool = False) -> RWXNode:
         """
