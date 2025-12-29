@@ -55,6 +55,11 @@ class ClassRelation(ABC):
     target: WrappedClass
     """The target class in the relation."""
 
+    inferred: bool = dataclass_field(default=False, init=False)
+    """
+    Whether this relation was inferred (e.g. associations from role takers) or explicitly defined.
+    """
+
     def __str__(self):
         """Return the relation name for display purposes."""
         return f"{self.__class__.__name__}"
@@ -62,6 +67,8 @@ class ClassRelation(ABC):
     @property
     def color(self) -> str:
         """Default edge color used when visualizing the relation."""
+        if self.inferred:
+            return "red"
         return "black"
 
 
@@ -139,6 +146,7 @@ class AssociationThroughRoleTaker(Association):
     """
 
     def __post_init__(self):
+        self.inferred = True
         self.field_path = [a.field for a in self.association_path]
         self.field = self.field_path[-1]
 
