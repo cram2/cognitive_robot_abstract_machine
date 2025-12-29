@@ -12,25 +12,15 @@ from typing_extensions import (
     List,
     Union,
     Self,
-    Iterable,
     Generic,
-    Callable,
 )
 
 from .entity import (
     ConditionType,
-    contains,
-    in_,
-    flatten,
     variable,
-    set_of,
     entity,
-    exists,
 )
 from .failures import (
-    NoneWrappedFieldError,
-    WrongSelectableType,
-    UsageError,
     NoKwargsInMatchVar,
 )
 from .predicate import HasType
@@ -38,22 +28,13 @@ from .rxnode import RWXNode
 from .symbolic import (
     CanBehaveLikeAVariable,
     Attribute,
-    Comparator,
-    QueryObjectDescriptor,
     Selectable,
-    SymbolicExpression,
-    OperationResult,
     Literal,
-    ResultQuantifier,
     An,
-    Variable,
     Flatten,
-    Exists,
     DomainType,
-    ResultProcessor,
-    OrderByParams,
 )
-from .utils import is_iterable, T
+from .utils import T
 
 
 @dataclass
