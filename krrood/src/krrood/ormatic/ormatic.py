@@ -173,6 +173,13 @@ class ORMatic:
         )
 
     @property
+    def inheritance_graph(self) -> rx.PyDiGraph:
+        """
+        A graph that represents the inheritance structure of the classes. Extracted from the class dependency graph.
+        """
+        return self.class_dependency_graph.inheritance_subgraph
+
+    @property
     def mapped_classes(self) -> List[Type]:
         return [key.clazz for key in self.wrapped_tables.keys()]
 
