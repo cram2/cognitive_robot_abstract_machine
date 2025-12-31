@@ -87,7 +87,7 @@ class Inheritance(ClassRelation):
         return f"isSuperClassOf"
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Association(ClassRelation):
     """
     Represents a general association relationship between two classes.
@@ -126,6 +126,12 @@ class Association(ClassRelation):
 
     def __str__(self):
         return f"has-{self.field.public_name}"
+
+    def __hash__(self):
+        return hash((self.__class__, self.source.index, self.target.index))
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
 
 
 @dataclass(eq=False)
@@ -184,6 +190,19 @@ class AssociationThroughRoleTaker(Association):
             source_instance = getattr(source_instance, wrapped_field.public_name)
         return source_instance
 
+    def __hash__(self):
+        return hash(
+            (
+                self.__class__,
+                self.source.index,
+                tuple(self.association_path),
+                self.target.index,
+            )
+        )
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
 
 class ParseError(TypeError):
     """
@@ -230,7 +249,6 @@ class WrappedClass:
         Public names from the introspector are used to index `_wrapped_field_name_map_`.
         """
         try:
-            wrapped_fields: list[WrappedField] = []
             if self._class_diagram is None:
                 introspector = DataclassOnlyIntrospector()
             else:
@@ -245,8 +263,7 @@ class WrappedClass:
                 )
                 # Map under the public attribute name
                 self._wrapped_field_name_map_[item.public_name] = wf
-                wrapped_fields.append(wf)
-            return wrapped_fields
+            return list(self._wrapped_field_name_map_.values())
         except TypeError as e:
             logging.error(f"Error parsing class {self.clazz}: {e}")
             raise ParseError(e) from e
@@ -697,9 +714,12 @@ class ClassDiagram:
         :param role_taker_assoc: Association of the role taker.
         """
         role_taker_clazz = role_taker_assoc.source
-        association_path = list(
-            self.get_role_association_path(role_clazz, role_taker_clazz)
-        )
+        association_path = []
+        role_association_chain = list(self.role_chain_starting_from_node(role_clazz))
+        for a in role_association_chain:
+            association_path.append(a)
+            if a.target is role_taker_clazz:
+                break
         association_path.append(role_taker_assoc)
         self.add_relation(
             AssociationThroughRoleTaker(
@@ -708,29 +728,6 @@ class ClassDiagram:
                 target=role_taker_assoc.target,
             )
         )
-
-    @lru_cache(maxsize=None)
-    def get_role_association_path(
-        self, role_clazz: WrappedClass, role_taker_clazz: WrappedClass
-    ) -> Tuple[Association]:
-        """
-        :param role_clazz: Wrapped class of the role.
-        :param role_taker_clazz: Wrapped class of the role taker.
-        :return: List of all associations between the role and role taker classes in topological order.
-        """
-        association_path = []
-        wrapped_classes = (
-            self.wrapped_classes_of_role_associations_subgraph_in_topological_order
-        )
-        i = wrapped_classes.index(role_clazz)
-        for next_role_clazz in wrapped_classes[i:]:
-            if next_role_clazz is role_taker_clazz:
-                break
-            association = self.role_association_subgraph.out_edges(
-                next_role_clazz.index
-            )[0][-1]
-            association_path.append(association)
-        return tuple(association_path)
 
     @cached_property
     def wrapped_classes_of_role_associations_subgraph_in_topological_order(
@@ -776,6 +773,22 @@ class ClassDiagram:
         return self._dependency_graph.edge_subgraph(
             [(r.source.index, r.target.index) for r in self.inheritance_relations]
         )
+
+    @lru_cache(maxsize=None)
+    def role_chain_starting_from_node(self, node: WrappedClass) -> Tuple[HasRoleTaker]:
+        """
+        :return: The role chain starting from the given node following HasRoleTaker edges.
+        """
+        chain = []
+        current_node_idx = node.index
+        while True:
+            out_edges = self.role_association_subgraph.out_edges(current_node_idx)
+            if not out_edges:
+                break
+            edge_data = out_edges[0]
+            chain.append(edge_data[2])
+            current_node_idx = edge_data[1]
+        return tuple(chain)
 
     @cached_property
     def role_association_subgraph(self):
@@ -952,6 +965,7 @@ class ClassDiagram:
     def clear(self):
         self._dependency_graph.clear()
         AssociationThroughRoleTaker.get_original_source_instance_given_this_relation_source_instance.cache_clear()
+        self.__class__.role_chain_starting_from_node.cache_clear()
 
     def __hash__(self):
         return hash(id(self))
