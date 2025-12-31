@@ -61,7 +61,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         Update the source wrapped-field value, add this relation to the graph, and apply all implications of adding this
          relation.
         """
-        source_updated = not self.inferred and self.update_source_wrapped_field_value()
+        source_updated = not self.inferred or self.update_source_wrapped_field_value()
         if not source_updated:
             # Means that the value was already set, so we don't need to infer anything.
             return
@@ -147,7 +147,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
                 f"cannot find a field for the inverse {self.inverse_of} defined for the relation {self}"
             )
         original_source_instance = self.inverse_association.get_original_source_instance_given_this_relation_source_instance(
-            self.target
+            self.target.instance
         )
         source = SymbolGraph().get_wrapped_instance(original_source_instance)
         return source, self.inverse_association.field
