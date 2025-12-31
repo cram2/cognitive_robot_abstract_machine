@@ -11,6 +11,7 @@ from typing_extensions import (
     List,
     TYPE_CHECKING,
     Union,
+    Iterator,
 )
 
 from .mixins import TransitiveProperty, HasInverseProperty
@@ -55,17 +56,31 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         else:
             return None
 
-    def add_to_graph(self):
+    def update_source_and_add_to_graph_and_apply_implications(self):
         """
-        Add the relation to the graph and infer additional relations if possible. In addition, update the value of
-         the wrapped field in the source instance if this relation is an inferred relation.
+        Update the source wrapped-field value, add this relation to the graph, and apply all implications of adding this
+         relation.
         """
-        if super().add_to_graph():
-            if self.inferred:
-                self.update_source_wrapped_field_value()
-            self.infer_super_relations()
-            self.infer_inverse_relation()
-            self.infer_transitive_relations()
+        source_updated = not self.inferred and self.update_source_wrapped_field_value()
+        if not source_updated:
+            # Means that the value was already set, so we don't need to infer anything.
+            return
+        self.add_to_graph_and_apply_implications()
+
+    def add_to_graph_and_apply_implications(self):
+        """
+        Add this relation to the graph and apply all implications of this relation.
+        """
+        if self.add_to_graph():
+            self.infer_and_apply_implications()
+
+    def infer_and_apply_implications(self):
+        """
+        Infer all implications of adding this relation and apply them to the corresponding objects.
+        """
+        self.infer_super_relations()
+        self.infer_inverse_relation()
+        self.infer_transitive_relations()
 
     def update_source_wrapped_field_value(self) -> bool:
         """
@@ -85,7 +100,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         for super_domain, super_field in self.super_relations:
             self.__class__(
                 super_domain, self.target, super_field, inferred=True
-            ).add_to_graph()
+            ).update_source_and_add_to_graph_and_apply_implications()
 
     def infer_inverse_relation(self):
         """
@@ -95,7 +110,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             inverse_domain, inverse_field = self.inverse_domain_and_field
             self.__class__(
                 inverse_domain, self.source, inverse_field, inferred=True
-            ).add_to_graph()
+            ).update_source_and_add_to_graph_and_apply_implications()
 
     @cached_property
     def super_relations(self) -> Iterable[Tuple[WrappedInstance, WrappedField]]:
@@ -164,7 +179,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
                 nxt_relation.target,
                 nxt_relation.wrapped_field,
                 inferred=True,
-            ).add_to_graph()
+            ).update_source_and_add_to_graph_and_apply_implications()
 
     def infer_transitive_relations_incoming_to_target(self):
         """
@@ -176,18 +191,17 @@ class PropertyDescriptorRelation(PredicateClassRelation):
                 self.target,
                 nxt_relation.wrapped_field,
                 inferred=True,
-            ).add_to_graph()
+            ).update_source_and_add_to_graph_and_apply_implications()
 
     @property
     def target_outgoing_relations_with_same_descriptor_type(
         self,
-    ) -> Iterable[PredicateClassRelation]:
+    ) -> Iterator[PredicateClassRelation]:
         """
         Get the outgoing relations from the target that have the same property descriptor type as this relation.
         """
-        relation_condition = (
-            lambda relation: relation.property_descriptor_cls
-            is self.property_descriptor_cls
+        relation_condition = lambda relation: issubclass(
+            relation.property_descriptor_cls, self.property_descriptor_cls
         )
         yield from SymbolGraph().get_outgoing_relations_with_condition(
             self.target, relation_condition
@@ -196,13 +210,12 @@ class PropertyDescriptorRelation(PredicateClassRelation):
     @property
     def source_incoming_relations_with_same_descriptor_type(
         self,
-    ) -> Iterable[PredicateClassRelation]:
+    ) -> Iterator[PredicateClassRelation]:
         """
         Get the incoming relations from the source that have the same property descriptor type as this relation.
         """
-        relation_condition = (
-            lambda relation: relation.property_descriptor_cls
-            is self.property_descriptor_cls
+        relation_condition = lambda relation: issubclass(
+            relation.property_descriptor_cls, self.property_descriptor_cls
         )
         yield from SymbolGraph().get_incoming_relations_with_condition(
             self.source, relation_condition
@@ -213,4 +226,4 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         Return the property descriptor class of the relation.
         """
-        return self.wrapped_field.property_descriptor.__class__
+        return type(self.wrapped_field.property_descriptor)

@@ -107,7 +107,9 @@ class MonitoredContainer(Generic[T], ABC):
             value = weakref.ref(value, self._remove_item)
         owner = self._owner
         if owner is not None and add_relation_to_the_graph:
-            self._descriptor.add_relation_to_the_graph(owner, value, inferred=inferred)
+            self._descriptor.add_relation_to_the_graph_and_apply_implications(
+                owner, value, inferred=inferred
+            )
         return value
 
     def _update(

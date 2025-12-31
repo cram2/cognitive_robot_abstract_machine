@@ -178,11 +178,12 @@ class PropertyDescriptor(Symbol):
         """
         return self.domain_range_map[self.__class__][self.domain]
 
-    def add_relation_to_the_graph(
+    def add_relation_to_the_graph_and_apply_implications(
         self, domain_value: Symbol, range_value: Symbol, inferred: bool = False
     ) -> None:
         """
-        Add the relation between the domain_value and the range_value to the symbol graph.
+        Add the relation between the domain_value and the range_value to the symbol graph and apply all implications of
+        the relation.
 
         :param domain_value: The domain value (i.e., the instance that this descriptor is attached to).
         :param range_value: The range value (i.e., the value to set on the managed attribute, and is the target of the
@@ -193,7 +194,7 @@ class PropertyDescriptor(Symbol):
             for v in make_set(range_value):
                 PropertyDescriptorRelation(
                     domain_value, v, self.wrapped_field, inferred=inferred
-                ).add_to_graph()
+                ).add_to_graph_and_apply_implications()
 
     def __get__(self, obj, objtype=None):
         """
@@ -268,7 +269,7 @@ class PropertyDescriptor(Symbol):
                 attr._add_item(v, inferred=False)
         else:
             setattr(obj, self.private_attr_name, value)
-            self.add_relation_to_the_graph(obj, value)
+            self.add_relation_to_the_graph_and_apply_implications(obj, value)
 
     def update_value(
         self,
