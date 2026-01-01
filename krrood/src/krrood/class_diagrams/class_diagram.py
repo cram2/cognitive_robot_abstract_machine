@@ -736,7 +736,7 @@ class ClassDiagram:
         :return: List of all classes in the inheritance subgraph in topological order.
         """
         return [
-            self._dependency_graph[index]
+            self.inheritance_subgraph[index]
             for index in rx.topological_sort(self.inheritance_subgraph)
         ]
 
