@@ -19,13 +19,13 @@ class SymbolGraphMapping(AlternativeMapping[SymbolGraph]):
     predicate_relations: List[PredicateClassRelation]
 
     @classmethod
-    def create_instance(cls, obj: SymbolGraph):
+    def from_domain_object(cls, obj: SymbolGraph):
         return cls(
             instances=obj.wrapped_instances,
             predicate_relations=list(obj.relations()),
         )
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         result = SymbolGraph()
         for instance in self.instances:
             result.add_instance(instance)
@@ -39,8 +39,8 @@ class WrappedInstanceMapping(AlternativeMapping[WrappedInstance]):
     instance: Optional[Symbol]
 
     @classmethod
-    def create_instance(cls, obj: WrappedInstance):
+    def from_domain_object(cls, obj: WrappedInstance):
         return cls(obj.instance)
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         return WrappedInstance(self.instance)

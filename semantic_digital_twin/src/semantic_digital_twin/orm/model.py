@@ -39,7 +39,7 @@ class WorldMapping(AlternativeMapping[World]):
     name: Optional[str] = field(default=None)
 
     @classmethod
-    def create_instance(cls, obj: World):
+    def from_domain_object(cls, obj: World):
         return cls(
             kinematic_structure_entities=obj.kinematic_structure_entities,
             connections=obj.connections,
@@ -49,7 +49,7 @@ class WorldMapping(AlternativeMapping[World]):
             name=obj.name,
         )
 
-    def create_from_dao(self) -> World:
+    def to_domain_object(self) -> World:
         result = World(name=self.name)
 
         with result.modify_world():
@@ -79,13 +79,13 @@ class WorldStateMapping(AlternativeMapping[WorldState]):
     ids: List[UUID]
 
     @classmethod
-    def create_instance(cls, obj: WorldState):
+    def from_domain_object(cls, obj: WorldState):
         return cls(
             data=obj.data.ravel().tolist(),
             ids=obj._ids,
         )
 
-    def create_from_dao(self) -> WorldState:
+    def to_domain_object(self) -> WorldState:
         return WorldState(
             data=np.array(self.data, dtype=np.float64).reshape((4, len(self.ids))),
             _ids=self.ids,
@@ -104,13 +104,13 @@ class Vector3Mapping(AlternativeMapping[Vector3]):
     )
 
     @classmethod
-    def create_instance(cls, obj: Vector3):
+    def from_domain_object(cls, obj: Vector3):
         x, y, z, _ = obj.to_np().tolist()
         result = cls(x=x, y=y, z=z)
         result.reference_frame = obj.reference_frame
         return result
 
-    def create_from_dao(self) -> Vector3:
+    def to_domain_object(self) -> Vector3:
         return Vector3(x=self.x, y=self.y, z=self.z, reference_frame=None)
 
 
@@ -125,13 +125,13 @@ class Point3Mapping(AlternativeMapping[Point3]):
     )
 
     @classmethod
-    def create_instance(cls, obj: Point3):
+    def from_domain_object(cls, obj: Point3):
         x, y, z, _ = obj.to_np().tolist()
         result = cls(x=x, y=y, z=z)
         result.reference_frame = obj.reference_frame
         return result
 
-    def create_from_dao(self) -> Point3:
+    def to_domain_object(self) -> Point3:
         return Point3(x=self.x, y=self.y, z=self.z, reference_frame=None)
 
 
@@ -147,13 +147,13 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
     )
 
     @classmethod
-    def create_instance(cls, obj: Quaternion):
+    def from_domain_object(cls, obj: Quaternion):
         x, y, z, w = obj.to_np().tolist()
         result = cls(x=x, y=y, z=z, w=w)
         result.reference_frame = obj.reference_frame
         return result
 
-    def create_from_dao(self) -> Quaternion:
+    def to_domain_object(self) -> Quaternion:
         return Quaternion(
             x=self.x,
             y=self.y,
@@ -171,12 +171,12 @@ class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
     )
 
     @classmethod
-    def create_instance(cls, obj: RotationMatrix):
+    def from_domain_object(cls, obj: RotationMatrix):
         result = cls(rotation=obj.to_quaternion())
         result.reference_frame = obj.reference_frame
         return result
 
-    def create_from_dao(self) -> RotationMatrix:
+    def to_domain_object(self) -> RotationMatrix:
         result = RotationMatrix.from_quaternion(self.rotation)
         result.reference_frame = None
         return result
@@ -194,7 +194,7 @@ class HomogeneousTransformationMatrixMapping(
     child_frame: Optional[KinematicStructureEntity] = field(init=False, default=None)
 
     @classmethod
-    def create_instance(cls, obj: HomogeneousTransformationMatrix):
+    def from_domain_object(cls, obj: HomogeneousTransformationMatrix):
         position = obj.to_position()
         rotation = obj.to_quaternion()
         result = cls(position=position, rotation=rotation)
@@ -203,7 +203,7 @@ class HomogeneousTransformationMatrixMapping(
 
         return result
 
-    def create_from_dao(self) -> HomogeneousTransformationMatrix:
+    def to_domain_object(self) -> HomogeneousTransformationMatrix:
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=self.position,
             rotation_matrix=RotationMatrix.from_quaternion(self.rotation),
@@ -221,14 +221,14 @@ class PoseMapping(AlternativeMapping[Pose]):
     )
 
     @classmethod
-    def create_instance(cls, obj: Pose):
+    def from_domain_object(cls, obj: Pose):
         position = obj.to_position()
         rotation = obj.to_quaternion()
         result = cls(position=position, rotation=rotation)
         result.reference_frame = obj.reference_frame
         return result
 
-    def create_from_dao(self) -> Pose:
+    def to_domain_object(self) -> Pose:
         return Pose(
             position=self.position,
             orientation=self.rotation,
@@ -244,7 +244,7 @@ class DegreeOfFreedomMapping(AlternativeMapping[DegreeOfFreedom]):
     id: UUID
 
     @classmethod
-    def create_instance(cls, obj: DegreeOfFreedom):
+    def from_domain_object(cls, obj: DegreeOfFreedom):
         return cls(
             name=obj.name,
             lower_limits=obj.lower_limits.data,
@@ -252,7 +252,7 @@ class DegreeOfFreedomMapping(AlternativeMapping[DegreeOfFreedom]):
             id=obj.id,
         )
 
-    def create_from_dao(self) -> DegreeOfFreedom:
+    def to_domain_object(self) -> DegreeOfFreedom:
         lower_limits = DerivativeMap(data=self.lower_limits)
         upper_limits = DerivativeMap(data=self.upper_limits)
         return DegreeOfFreedom(
