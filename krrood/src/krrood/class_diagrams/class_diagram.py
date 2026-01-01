@@ -728,7 +728,7 @@ class ClassDiagram:
             for index in rx.topological_sort(self.role_association_subgraph)
         ]
 
-    @cached_property
+    @property
     def wrapped_classes_of_inheritance_subgraph_in_topological_order(
         self,
     ) -> List[WrappedClass]:
