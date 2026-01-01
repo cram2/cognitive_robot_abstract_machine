@@ -45,6 +45,8 @@ from ..adapters.world_entity_kwargs_tracker import (
 )
 from ..datastructures.prefixed_name import PrefixedName
 from ..exceptions import ReferenceFrameMismatchError
+if TYPE_CHECKING:
+    from ..semantic_annotations.semantic_annotations import Drink
 from ..spatial_types import spatial_types as cas
 from ..spatial_types.spatial_types import TransformationMatrix, Expression, Point3
 from ..utils import IDGenerator, type_string_to_type, camel_case_split
@@ -826,6 +828,15 @@ class RootedSemanticAnnotation(SemanticAnnotation):
             if body.has_collision() and not body.get_collision_config().disabled
         )
 
+# @dataclass(eq=False)
+# class Favorit_Drink(SemanticAnnotation):
+#     """
+#     Represents a semantic annotation that is rooted in a specific KinematicStructureEntity.
+#     """
+#
+#     fav_drink: Body = field(default=None)
+
+
 @dataclass(eq=False)
 class Agent(RootedSemanticAnnotation):
     """
@@ -850,6 +861,7 @@ class Human(Agent):
     This class exists primarily for semantic distinction, so that algorithms
     can treat human agents differently from robots if needed.
     """
+    favourite_drink: Optional[Type["Drink"]] = field(default=None)
     ...
 
 @dataclass(eq=False)

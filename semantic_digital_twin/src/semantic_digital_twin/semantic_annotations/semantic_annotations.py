@@ -175,3 +175,11 @@ class Cola(Drink):
 @dataclass(eq=False)
 class Fanta(Drink):
     ...
+
+@dataclass(eq=False)
+class Water(Drink):
+    ...
+
+@dataclass(eq=False)
+class Beer(Drink):
+    ...
