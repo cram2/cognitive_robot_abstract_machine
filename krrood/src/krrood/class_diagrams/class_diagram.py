@@ -248,6 +248,8 @@ class WrappedClass:
 
         Public names from the introspector are used to index `_wrapped_field_name_map_`.
         """
+        if self.clazz is object:
+            return []
         try:
             if self._class_diagram is None:
                 introspector = DataclassOnlyIntrospector()
@@ -297,6 +299,8 @@ class ClassDiagram:
     def __post_init__(self, classes: List[Type]):
         """Initialize the diagram with the provided classes and build relations."""
         self._dependency_graph = rx.PyDiGraph()
+        object_class = WrappedClass(object)
+        self.add_node(object_class)
         for clazz in classes:
             self.add_node(WrappedClass(clazz=clazz))
         self._create_all_relations()
@@ -314,23 +318,6 @@ class ClassDiagram:
         """
         for relation in self.get_outgoing_relations(clazz):
             if isinstance(relation, Association) and condition(relation):
-                yield relation
-
-    def get_associations_through_role_taker_with_condition(
-        self,
-        clazz: Union[Type, WrappedClass],
-        condition: Callable[[AssociationThroughRoleTaker], bool],
-    ) -> Iterable[AssociationThroughRoleTaker]:
-        """
-        Get all associations through role takers that match the condition.
-
-        :param clazz: The source class or wrapped class for which outgoing edges are to be retrieved.
-        :param condition: The condition to filter relations by.
-        """
-        for relation in self.get_outgoing_relations(clazz):
-            if isinstance(relation, AssociationThroughRoleTaker) and condition(
-                relation
-            ):
                 yield relation
 
     def get_outgoing_relations(
@@ -754,13 +741,29 @@ class ClassDiagram:
         ]
 
     @cached_property
+    def inheritance_subgraph_without_unreachable_nodes(self):
+        """
+        :return: The subgraph containing only inheritance relations and their incident nodes.
+        """
+        object_idx = self.get_wrapped_class(object).index
+        return self._dependency_graph.edge_subgraph(
+            [
+                (r.source.index, r.target.index)
+                for r in self.inheritance_relations
+                if r.source.index != object_idx
+            ]
+        )
+
+    @cached_property
     def inheritance_subgraph(self):
         """
         :return: The subgraph containing only inheritance relations and their incident nodes.
         """
-        return self._dependency_graph.edge_subgraph(
+        inheritance_graph = self._dependency_graph.edge_subgraph(
             [(r.source.index, r.target.index) for r in self.inheritance_relations]
         )
+        inheritance_graph.remove_node(self.get_wrapped_class(object).index)
+        return inheritance_graph
 
     @lru_cache(maxsize=None)
     def role_chain_starting_from_node(self, node: WrappedClass) -> Tuple[HasRoleTaker]:
