@@ -75,6 +75,11 @@ class ORMatic:
     The string version of type mappings that is used in jinja.
     """
 
+    inheritance_graph: rx.PyDiGraph[int] = field(default=None, init=False)
+    """
+    A graph that represents the inheritance structure of the classes. Extracted from the class dependency graph.
+    """
+
     wrapped_tables: Dict[WrappedClass, WrappedTable] = field(
         default_factory=dict, init=False
     )
@@ -90,6 +95,7 @@ class ORMatic:
     def __post_init__(self):
         self.type_mappings[Type] = TypeType
         self.imported_modules.add(Type.__module__)
+        self._create_inheritance_graph()
         self._add_alternative_mappings_to_class_diagram()
         self._create_wrapped_tables()
         self.create_type_annotations_map()
@@ -111,6 +117,14 @@ class ORMatic:
                 self.wrapped_tables[wrapped_clazz] = WrappedTable(
                     wrapped_clazz=wrapped_clazz, ormatic=self
                 )
+
+    def _create_inheritance_graph(self):
+        self.inheritance_graph = rx.PyDiGraph()
+        self.inheritance_graph.add_nodes_from(
+            [w.index for w in self.class_dependency_graph.wrapped_classes]
+        )
+        for edge in self.class_dependency_graph.inheritance_relations:
+            self.inheritance_graph.add_edge(edge.source.index, edge.target.index, None)
 
     def _add_alternative_mappings_to_class_diagram(self):
         """
@@ -168,16 +182,10 @@ class ORMatic:
         """
         :return: List of all tables in topological order.
         """
-        return (
-            self.class_dependency_graph.wrapped_classes_of_inheritance_subgraph_in_topological_order
-        )
-
-    @property
-    def inheritance_graph(self) -> rx.PyDiGraph:
-        """
-        A graph that represents the inheritance structure of the classes. Extracted from the class dependency graph.
-        """
-        return self.class_dependency_graph.inheritance_subgraph
+        return [
+            self.class_dependency_graph._dependency_graph[index]
+            for index in rx.topological_sort(self.inheritance_graph)
+        ]
 
     @property
     def mapped_classes(self) -> List[Type]:

@@ -172,7 +172,12 @@ class WrappedTable:
 
     @property
     def child_tables(self) -> List[WrappedTable]:
-        return self.ormatic.inheritance_graph.successors(self.wrapped_clazz.index)
+        return [
+            self.ormatic.class_dependency_graph._dependency_graph[index]
+            for index in self.ormatic.inheritance_graph.successors(
+                self.wrapped_clazz.index
+            )
+        ]
 
     @property
     def has_children(self) -> bool:
@@ -332,7 +337,9 @@ class WrappedTable:
         )
         if len(original_parents) == 0:
             return None
-        return original_parents[0]
+        return self.ormatic.class_dependency_graph._dependency_graph[
+            original_parents[0]
+        ]
 
     def _resolve_alternative_parent_wrapped(
         self, original_parent_wrapped: WrappedClass

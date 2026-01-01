@@ -82,7 +82,7 @@ def test_role_taker_associations():
         )
         == 2
     )
-    assert len(diagram._dependency_graph.nodes()) == 11
+    assert len(diagram._dependency_graph.nodes()) == 10
     assert (
         len(
             [

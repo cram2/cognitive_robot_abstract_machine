@@ -57,6 +57,11 @@ class ClassRelation(ABC):
     target: WrappedClass
     """The target class in the relation."""
 
+    index: Optional[int] = dataclass_field(init=False, default=None)
+    """
+    The index of the relation in the dependency graph. This is used to uniquely identify the relation.
+    """
+
     inferred: bool = dataclass_field(default=False, init=False)
     """
     Whether this relation was inferred (e.g. associations from role takers) or explicitly defined.
@@ -299,8 +304,6 @@ class ClassDiagram:
     def __post_init__(self, classes: List[Type]):
         """Initialize the diagram with the provided classes and build relations."""
         self._dependency_graph = rx.PyDiGraph()
-        object_class = WrappedClass(object)
-        self.add_node(object_class)
         for clazz in classes:
             self.add_node(WrappedClass(clazz=clazz))
         self._create_all_relations()
@@ -728,7 +731,7 @@ class ClassDiagram:
             for index in rx.topological_sort(self.role_association_subgraph)
         ]
 
-    @property
+    @cached_property
     def wrapped_classes_of_inheritance_subgraph_in_topological_order(
         self,
     ) -> List[WrappedClass]:
@@ -740,29 +743,30 @@ class ClassDiagram:
             for index in rx.topological_sort(self.inheritance_subgraph)
         ]
 
-    @property
+    @cached_property
     def inheritance_subgraph_without_unreachable_nodes(self):
         """
         :return: The subgraph containing only inheritance relations and their incident nodes.
         """
-        object_idx = self.get_wrapped_class(object).index
         return self._dependency_graph.edge_subgraph(
-            [
-                (r.source.index, r.target.index)
-                for r in self.inheritance_relations
-                if r.source.index != object_idx
-            ]
+            [(r.source.index, r.target.index) for r in self.inheritance_relations]
         )
 
-    @property
+    @cached_property
     def inheritance_subgraph(self):
         """
         :return: The subgraph containing only inheritance relations and their incident nodes.
         """
-        inheritance_graph = self._dependency_graph.edge_subgraph(
-            [(r.source.index, r.target.index) for r in self.inheritance_relations]
+        inheritance_graph = self._dependency_graph.subgraph(
+            self._dependency_graph.node_indices()
         )
-        inheritance_graph.remove_node(self.get_wrapped_class(object).index)
+        inheritance_graph.remove_edges_from(
+            [
+                (e.source.index, e.target.index)
+                for e in inheritance_graph.edges()
+                if not isinstance(e, Inheritance)
+            ]
+        )
         return inheritance_graph
 
     @lru_cache(maxsize=None)
@@ -805,7 +809,7 @@ class ClassDiagram:
         :relation: The relation object that contains the source and target entities and
         encapsulates the relationship between them.
         """
-        self._dependency_graph.add_edge(
+        relation.index = self._dependency_graph.add_edge(
             relation.source.index, relation.target.index, relation
         )
 
