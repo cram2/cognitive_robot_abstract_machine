@@ -123,7 +123,10 @@ def pytest_sessionstart(session):
         )
 
 
-from .dataset.ormatic_interface import *
+try:
+    from .dataset.ormatic_interface import *
+except ImportError:
+    pass
 
 
 @pytest.fixture

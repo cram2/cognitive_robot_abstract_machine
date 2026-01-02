@@ -99,7 +99,7 @@ class WrappedInstance:
     Index in the instance graph of the symbol graph that manages this object.
     """
 
-    _symbol_graph_: Optional[SymbolGraph] = field(
+    symbol_graph: Optional[SymbolGraph] = field(
         init=False, hash=False, default=None, repr=False
     )
     """
@@ -215,7 +215,7 @@ class SymbolGraph(metaclass=SingletonMeta):
         :param wrapped_instance: The instance to add.
         """
         wrapped_instance.index = self._instance_graph.add_node(wrapped_instance)
-        wrapped_instance._symbol_graph_ = self
+        wrapped_instance.symbol_graph = self
         self._instance_index[id(wrapped_instance.instance)] = wrapped_instance
         self._class_to_wrapped_instances[wrapped_instance.instance_type].append(
             wrapped_instance
@@ -273,6 +273,7 @@ class SymbolGraph(metaclass=SingletonMeta):
 
     def clear(self) -> None:
         SingletonMeta.clear_instance(type(self))
+        self._class_diagram.clear()
 
     # Adapters to align with ORM alternative mapping expectations
     def add_instance(self, wrapped_instance: WrappedInstance) -> None:

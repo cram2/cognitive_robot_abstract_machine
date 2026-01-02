@@ -24,7 +24,11 @@ from .monitored_container import (
 )
 from .property_descriptor_relation import PropertyDescriptorRelation
 from ..failures import UnMonitoredContainerTypeForDescriptor
-from ...class_diagrams.class_diagram import WrappedClass, Association
+from ...class_diagrams.class_diagram import (
+    WrappedClass,
+    Association,
+    AssociationThroughRoleTaker,
+)
 from ...class_diagrams.wrapped_field import WrappedField
 from ...entity_query_language.predicate import Symbol
 from ...entity_query_language.symbol_graph import (
@@ -174,11 +178,12 @@ class PropertyDescriptor(Symbol):
         """
         return self.domain_range_map[self.__class__][self.domain]
 
-    def add_relation_to_the_graph(
+    def add_relation_to_the_graph_and_apply_implications(
         self, domain_value: Symbol, range_value: Symbol, inferred: bool = False
     ) -> None:
         """
-        Add the relation between the domain_value and the range_value to the symbol graph.
+        Add the relation between the domain_value and the range_value to the symbol graph and apply all implications of
+        the relation.
 
         :param domain_value: The domain value (i.e., the instance that this descriptor is attached to).
         :param range_value: The range value (i.e., the value to set on the managed attribute, and is the target of the
@@ -189,7 +194,7 @@ class PropertyDescriptor(Symbol):
             for v in make_set(range_value):
                 PropertyDescriptorRelation(
                     domain_value, v, self.wrapped_field, inferred=inferred
-                ).add_to_graph()
+                ).add_to_graph_and_apply_implications()
 
     def __get__(self, obj, objtype=None):
         """
@@ -264,7 +269,7 @@ class PropertyDescriptor(Symbol):
                 attr._add_item(v, inferred=False)
         else:
             setattr(obj, self.private_attr_name, value)
-            self.add_relation_to_the_graph(obj, value)
+            self.add_relation_to_the_graph_and_apply_implications(obj, value)
 
     def update_value(
         self,
@@ -287,12 +292,12 @@ class PropertyDescriptor(Symbol):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_associated_field_of_domain_type(
+    def get_association_of_source_type(
         cls,
         domain_type: Union[Type[Symbol], WrappedClass],
-    ) -> Optional[WrappedField]:
+    ) -> Optional[Union[Association, AssociationThroughRoleTaker]]:
         """
-        Get the field of the domain type that is associated with this descriptor class.
+        Get the association that has as a source the given domain type and as a field type this descriptor class.
 
         :param domain_type: The domain type that has an associated field with this descriptor class.
         """
@@ -301,46 +306,23 @@ class PropertyDescriptor(Symbol):
             lambda association: type(association.field.property_descriptor) is cls
         )
         result = next(
-            iter(
-                class_diagram.get_associations_with_condition(
-                    domain_type, association_condition
-                )
+            class_diagram.get_associations_with_condition(
+                domain_type, association_condition
             ),
             None,
         )
-        return result.field if result else None
+        return result
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_fields_of_superproperties_in_role_taker_of_class(
+    def get_superproperties_associations(
         cls,
         domain_type: Union[SymbolType, WrappedClass],
-    ) -> Tuple[Optional[WrappedField], List[WrappedField]]:
+    ) -> Tuple[Association, ...]:
         """
-        Return the role-taker field and all associated fields that are superproperties of this descriptor class.
-
-        :param domain_type: The domain type that has a role-taker, where the role-taker has associated fields with the
-         super properties of this descriptor class.
-        """
-        class_diagram = SymbolGraph().class_diagram
-        role_taker_assoc = class_diagram.get_role_taker_associations_of_cls(domain_type)
-        if role_taker_assoc:
-            role_taker_fields = cls.get_fields_of_superproperties(
-                role_taker_assoc.target
-            )
-            return role_taker_assoc.field, list(role_taker_fields)
-        return None, []
-
-    @classmethod
-    @lru_cache(maxsize=None)
-    def get_fields_of_superproperties(
-        cls,
-        domain_type: Union[SymbolType, WrappedClass],
-    ) -> Tuple[WrappedField, ...]:
-        """
-        Get the fields of the domain type that are associated with the super classes of this descriptor class.
-
-        :param domain_type: The domain type that has an associated field with the super classes of this descriptor class.
+        :param domain_type: The domain type that has the required association(s).
+        :return: The associations that have the given domain type as a source and have a descriptor type that
+         is a super class of this descriptor class.
         """
 
         def association_condition(association: Association) -> bool:
@@ -351,10 +333,7 @@ class PropertyDescriptor(Symbol):
 
         class_diagram = SymbolGraph().class_diagram
 
-        association_fields = [
-            assoc.field
-            for assoc in class_diagram.get_associations_with_condition(
-                domain_type, association_condition
-            )
-        ]
-        return tuple(association_fields)
+        associations_generator = class_diagram.get_associations_with_condition(
+            domain_type, association_condition
+        )
+        return tuple(associations_generator)

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import logging
+import os
 from abc import ABC
 from copy import copy
 from dataclasses import dataclass
-from dataclasses import field, InitVar
+from dataclasses import field as dataclass_field, InitVar
 from functools import cached_property, lru_cache
 
 import rustworkx as rx
+
+from .. import logger
 
 try:
     from rustworkx_utils import RWXNode
@@ -23,6 +26,9 @@ from typing_extensions import (
     Iterable,
     Type,
     TYPE_CHECKING,
+    Set,
+    Iterator,
+    Any,
 )
 
 
@@ -51,6 +57,16 @@ class ClassRelation(ABC):
     target: WrappedClass
     """The target class in the relation."""
 
+    index: Optional[int] = dataclass_field(init=False, default=None)
+    """
+    The index of the relation in the dependency graph. This is used to uniquely identify the relation.
+    """
+
+    inferred: bool = dataclass_field(default=False, init=False)
+    """
+    Whether this relation was inferred (e.g. associations from role takers) or explicitly defined.
+    """
+
     def __str__(self):
         """Return the relation name for display purposes."""
         return f"{self.__class__.__name__}"
@@ -58,6 +74,8 @@ class ClassRelation(ABC):
     @property
     def color(self) -> str:
         """Default edge color used when visualizing the relation."""
+        if self.inferred:
+            return "red"
         return "black"
 
 
@@ -74,7 +92,7 @@ class Inheritance(ClassRelation):
         return f"isSuperClassOf"
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Association(ClassRelation):
     """
     Represents a general association relationship between two classes.
@@ -85,6 +103,18 @@ class Association(ClassRelation):
 
     field: WrappedField
     """The field in the source class that creates this association with the target class."""
+
+    def get_original_source_instance_given_this_relation_source_instance(
+        self, source_instance: Any
+    ):
+        """
+        Given a source instance, returns the original source instance that has the wrapped field of this association.
+        """
+        if not isinstance(source_instance, self.source.clazz):
+            raise ValueError(
+                f"The source instance is not of type {self.source.clazz}, got {source_instance}."
+            )
+        return source_instance
 
     @cached_property
     def one_to_many(self) -> bool:
@@ -102,6 +132,12 @@ class Association(ClassRelation):
     def __str__(self):
         return f"has-{self.field.public_name}"
 
+    def __hash__(self):
+        return hash((self.__class__, self.source.index, self.target.index))
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
 
 @dataclass(eq=False)
 class HasRoleTaker(Association):
@@ -111,6 +147,66 @@ class HasRoleTaker(Association):
 
     def __str__(self):
         return f"role-taker({self.field.public_name})"
+
+
+@dataclass(eq=False)
+class AssociationThroughRoleTaker(Association):
+    """
+    This is an association between a role and a role taker where the role taker class contains an association. This
+    applies transitively to the role taker's role takers and so on. The path is a list of fields that are traversed to
+    get to the target class.
+    """
+
+    field: WrappedField = dataclass_field(init=False)
+    """
+    The last field in the path that is the association to the target class.
+    """
+    association_path: List[Association]
+    """
+    The path of associations that are traversed to get to the target class.
+    """
+    field_path: List[WrappedField] = dataclass_field(init=False)
+    """
+    The path of fields that are traversed to get to the target class.
+    """
+
+    def __post_init__(self):
+        self.inferred = True
+        flat_association_path = []
+        for assoc in self.association_path:
+            if isinstance(assoc, AssociationThroughRoleTaker):
+                flat_association_path.extend(assoc.association_path)
+            else:
+                flat_association_path.append(assoc)
+        self.association_path = flat_association_path
+        self.field_path = [assoc.field for assoc in self.association_path]
+        self.field = self.field_path[-1]
+
+    @lru_cache(maxsize=None)
+    def get_original_source_instance_given_this_relation_source_instance(
+        self, source_instance: Any
+    ):
+        source_instance = (
+            super().get_original_source_instance_given_this_relation_source_instance(
+                source_instance
+            )
+        )
+        for wrapped_field in self.field_path[:-1]:
+            source_instance = getattr(source_instance, wrapped_field.public_name)
+        return source_instance
+
+    def __hash__(self):
+        return hash(
+            (
+                self.__class__,
+                self.source.index,
+                tuple(self.association_path),
+                self.target.index,
+            )
+        )
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
 
 
 class ParseError(TypeError):
@@ -127,14 +223,29 @@ class ParseError(TypeError):
 class WrappedClass:
     """A node wrapper around a Python class used in the class diagram graph."""
 
-    index: Optional[int] = field(init=False, default=None)
+    index: Optional[int] = dataclass_field(init=False, default=None)
     clazz: Type
-    _class_diagram: Optional[ClassDiagram] = field(
+    _class_diagram: Optional[ClassDiagram] = dataclass_field(
         init=False, hash=False, default=None, repr=False
     )
-    _wrapped_field_name_map_: Dict[str, WrappedField] = field(
+    _wrapped_field_name_map_: Dict[str, WrappedField] = dataclass_field(
         init=False, hash=False, default_factory=dict, repr=False
     )
+
+    @cached_property
+    def roles(self) -> Tuple[WrappedClass, ...]:
+        """
+        A tuple of roles that this class plays, represented by the HasRoleTaker instances.
+         There are HasRoleTaker edges connecting the roles to this class.
+        """
+        return tuple(
+            [
+                self._class_diagram.role_association_subgraph[n]
+                for n, _, _ in self._class_diagram.role_association_subgraph.in_edges(
+                    self.index
+                )
+            ]
+        )
 
     @cached_property
     def fields(self) -> List[WrappedField]:
@@ -142,8 +253,9 @@ class WrappedClass:
 
         Public names from the introspector are used to index `_wrapped_field_name_map_`.
         """
+        if self.clazz is object:
+            return []
         try:
-            wrapped_fields: list[WrappedField] = []
             if self._class_diagram is None:
                 introspector = DataclassOnlyIntrospector()
             else:
@@ -158,8 +270,7 @@ class WrappedClass:
                 )
                 # Map under the public attribute name
                 self._wrapped_field_name_map_[item.public_name] = wf
-                wrapped_fields.append(wf)
-            return wrapped_fields
+            return list(self._wrapped_field_name_map_.values())
         except TypeError as e:
             logging.error(f"Error parsing class {self.clazz}: {e}")
             raise ParseError(e) from e
@@ -179,14 +290,14 @@ class ClassDiagram:
 
     classes: InitVar[List[Type]]
 
-    introspector: AttributeIntrospector = field(
+    introspector: AttributeIntrospector = dataclass_field(
         default_factory=DataclassOnlyIntrospector, init=True, repr=False
     )
 
-    _dependency_graph: rx.PyDiGraph[WrappedClass, ClassRelation] = field(
+    _dependency_graph: rx.PyDiGraph[WrappedClass, ClassRelation] = dataclass_field(
         default_factory=rx.PyDiGraph, init=False
     )
-    _cls_wrapped_cls_map: Dict[Type, WrappedClass] = field(
+    _cls_wrapped_cls_map: Dict[Type, WrappedClass] = dataclass_field(
         default_factory=dict, init=False, repr=False
     )
 
@@ -201,7 +312,7 @@ class ClassDiagram:
         self,
         clazz: Union[Type, WrappedClass],
         condition: Callable[[Association], bool],
-    ) -> Iterable[Association]:
+    ) -> Iterator[Association]:
         """
         Get all associations that match the condition.
 
@@ -314,7 +425,6 @@ class ClassDiagram:
         find_predecessors_by_edge = self._dependency_graph.find_predecessors_by_edge
         return tuple(find_predecessors_by_edge(wrapped_cls.index, edge_filter_func))
 
-    @lru_cache(maxsize=None)
     def get_out_edges(
         self, cls: Union[Type, WrappedClass]
     ) -> Tuple[ClassRelation, ...]:
@@ -491,20 +601,10 @@ class ClassDiagram:
         clazz._class_diagram = self
         self._cls_wrapped_cls_map[clazz.clazz] = clazz
 
-    def add_relation(self, relation: ClassRelation):
-        """
-        Adds a relation to the internal dependency graph.
-
-        The method establishes a directed edge in the graph between the source and
-        target indices of the provided relation. This function is used to model
-        dependencies among entities represented within the graph.
-
-        :relation: The relation object that contains the source and target entities and
-        encapsulates the relationship between them.
-        """
-        self._dependency_graph.add_edge(
-            relation.source.index, relation.target.index, relation
-        )
+    def _create_all_relations(self):
+        self._create_inheritance_relations()
+        self._create_association_relations()
+        self._create_association_relations_inferred_from_role_takers()
 
     def _create_inheritance_relations(self):
         """
@@ -529,10 +629,6 @@ class ClassDiagram:
                     )
                     self.add_relation(relation)
 
-    def _create_all_relations(self):
-        self._create_inheritance_relations()
-        self._create_association_relations()
-
     def _create_association_relations(self):
         """
         Creates association relations between wrapped classes and their fields.
@@ -555,7 +651,11 @@ class ClassDiagram:
                     continue
 
                 association_type = Association
-                if wrapped_field.is_role_taker and issubclass(clazz.clazz, Role):
+                if (
+                    wrapped_field.is_role_taker
+                    and issubclass(clazz.clazz, Role)
+                    and target_type is clazz.clazz.get_role_taker_type()
+                ):
                     role_taker_type = get_generic_type_param(clazz.clazz, Role)[0]
                     if role_taker_type is target_type:
                         association_type = HasRoleTaker
@@ -567,98 +667,197 @@ class ClassDiagram:
                 )
                 self.add_relation(relation)
 
-    def _build_rxnode_tree(self, add_association_relations: bool = False) -> RWXNode:
+    def _create_association_relations_inferred_from_role_takers(self):
         """
-        Convert the class diagram graph to RWXNode tree structure for visualization.
-
-        Creates a tree where inheritance relationships are represented as parent-child connections.
-        If there are multiple root classes, they are grouped under a virtual root node.
-
-        :param add_association_relations: If True, include association relations as parent-child connections.
-        :return: Root RWXNode representing the class diagram
+        Create association relations in the roles for associations inferred from role takers.
         """
-        if not RWXNode:
-            raise ImportError(
-                "The rustworkx_utils package is required to visualize the class diagram."
-                "Please install it with `pip install rustworkx_utils`."
+        wrapped_classes = (
+            self.wrapped_classes_of_role_associations_subgraph_in_topological_order
+        )
+        for role_taker_clazz in reversed(wrapped_classes):
+            role_taker_associations = self.get_associations_with_condition(
+                role_taker_clazz, lambda rel: not isinstance(rel, HasRoleTaker)
             )
-        # Create RWXNode for each class
-        node_map = {}
-        for wrapped_class in self.wrapped_classes:
-            class_name = wrapped_class.clazz.__name__
-            node = RWXNode(name=class_name, data=wrapped_class)
-            node_map[wrapped_class.index] = node
+            for association in role_taker_associations:
+                self._infer_role_associations_for_role_taker_association(association)
 
-        # Build parent-child relationships from edges
-        for edge in self._dependency_graph.edge_list():
-            source_idx, target_idx = edge
-            relation = self._dependency_graph.get_edge_data(source_idx, target_idx)
-
-            # For inheritance: source is parent class, target is child class
-            # In RWXNode: parent class should have child class as its child
-            if isinstance(relation, Inheritance):
-                parent_node = node_map[source_idx]
-                child_node = node_map[target_idx]
-                child_node.add_parent(parent_node)
-            elif isinstance(relation, Association) and add_association_relations:
-                # For associations, add as parent relationship with label
-                source_node = node_map[source_idx]
-                target_node = node_map[target_idx]
-                # Association goes from source to target
-                target_node.add_parent(source_node)
-
-        # Find root nodes (nodes without parents)
-        root_nodes = [node for node in node_map.values() if not node.parents]
-
-        # If there's only one root, return it
-        if len(root_nodes) == 1:
-            return root_nodes[0]
-
-        # If there are multiple roots, create a virtual root
-        virtual_root = RWXNode(name="Class Diagram")
-        for root_node in root_nodes:
-            root_node.add_parent(virtual_root)
-
-        return virtual_root
-
-    def visualize(
-        self,
-        filename: str = "class_diagram.pdf",
-        title: str = "Class Diagram",
-        figsize: tuple = (35, 30),
-        node_size: int = 7000,
-        font_size: int = 25,
-        layout: str = "layered",
-        edge_style: str = "straight",
-        **kwargs,
+    def _infer_role_associations_for_role_taker_association(
+        self, role_taker_assoc: Association
     ):
         """
-        Visualize the class diagram using rustworkx_utils.
+        Infer role associations through their role taker association.
 
-        Creates a visual representation of the class diagram showing classes and their relationships.
-        The diagram is saved as a PDF file.
-
-        :param filename: Output filename for the visualization
-        :param title: Title for the diagram
-        :param figsize: Figure size as (width, height) tuple
-        :param node_size: Size of the nodes in the visualization
-        :param font_size: Font size for labels
-        :param kwargs: Additional keyword arguments passed to RWXNode.visualize()
+        :param role_taker_assoc: Association of the role taker.
         """
-        root_node = self._build_rxnode_tree()
-        root_node.visualize(
-            filename=filename,
-            title=title,
-            figsize=figsize,
-            node_size=node_size,
-            font_size=font_size,
-            layout=layout,
-            edge_style=edge_style,
-            **kwargs,
+        role_taker_clazz = role_taker_assoc.source
+        for role_clazz in role_taker_clazz.roles:
+            self._add_association_through_role_taker(role_clazz, role_taker_assoc)
+
+    def _add_association_through_role_taker(
+        self, role_clazz: WrappedClass, role_taker_assoc: Association
+    ):
+        """
+        Adds an association through a role taker to the class diagram. It connects the role class with the role taker
+         association target class through an AssociationThroughRoleTaker relation.
+
+        :param role_clazz: Wrapped class of the role.
+        :param role_taker_assoc: Association of the role taker.
+        """
+        role_taker_clazz = role_taker_assoc.source
+        association_path = []
+        role_association_chain = list(self.role_chain_starting_from_node(role_clazz))
+        for a in role_association_chain:
+            association_path.append(a)
+            if a.target is role_taker_clazz:
+                break
+        association_path.append(role_taker_assoc)
+        self.add_relation(
+            AssociationThroughRoleTaker(
+                association_path=association_path,
+                source=role_clazz,
+                target=role_taker_assoc.target,
+            )
         )
+
+    @cached_property
+    def wrapped_classes_of_role_associations_subgraph_in_topological_order(
+        self,
+    ) -> List[WrappedClass]:
+        """
+        :return: List of all classes in the association subgraph in topological order.
+        """
+        return [
+            self._dependency_graph[index]
+            for index in rx.topological_sort(self.role_association_subgraph)
+        ]
+
+    @cached_property
+    def wrapped_classes_of_inheritance_subgraph_in_topological_order(
+        self,
+    ) -> List[WrappedClass]:
+        """
+        :return: List of all classes in the inheritance subgraph in topological order.
+        """
+        return [
+            self.inheritance_subgraph[index]
+            for index in rx.topological_sort(self.inheritance_subgraph)
+        ]
+
+    @cached_property
+    def inheritance_subgraph_without_unreachable_nodes(self):
+        """
+        :return: The subgraph containing only inheritance relations and their incident nodes.
+        """
+        return self._dependency_graph.edge_subgraph(
+            [(r.source.index, r.target.index) for r in self.inheritance_relations]
+        )
+
+    @cached_property
+    def inheritance_subgraph(self):
+        """
+        :return: The subgraph containing only inheritance relations and their incident nodes.
+        """
+        inheritance_graph = self._dependency_graph.subgraph(
+            self._dependency_graph.node_indices()
+        )
+        inheritance_graph.remove_edges_from(
+            [
+                (e.source.index, e.target.index)
+                for e in inheritance_graph.edges()
+                if not isinstance(e, Inheritance)
+            ]
+        )
+        return inheritance_graph
+
+    @lru_cache(maxsize=None)
+    def role_chain_starting_from_node(self, node: WrappedClass) -> Tuple[HasRoleTaker]:
+        """
+        :return: The role chain starting from the given node following HasRoleTaker edges.
+        """
+        chain = []
+        current_node_idx = node.index
+        while True:
+            out_edges = self.role_association_subgraph.out_edges(current_node_idx)
+            if not out_edges:
+                break
+            edge_data = out_edges[0]
+            chain.append(edge_data[2])
+            current_node_idx = edge_data[1]
+        return tuple(chain)
+
+    @cached_property
+    def role_association_subgraph(self):
+        """
+        :return: The subgraph containing only association relations and their incident nodes.
+        """
+        return self._dependency_graph.edge_subgraph(
+            [
+                (r.source.index, r.target.index)
+                for r in self.associations
+                if isinstance(r, HasRoleTaker)
+            ]
+        )
+
+    def add_relation(self, relation: ClassRelation):
+        """
+        Adds a relation to the internal dependency graph.
+
+        The method establishes a directed edge in the graph between the source and
+        target indices of the provided relation. This function is used to model
+        dependencies among entities represented within the graph.
+
+        :relation: The relation object that contains the source and target entities and
+        encapsulates the relationship between them.
+        """
+        relation.index = self._dependency_graph.add_edge(
+            relation.source.index, relation.target.index, relation
+        )
+
+    def to_dot(
+        self,
+        filepath: str,
+        format_: str = "svg",
+        graph: Optional[rx.PyDiGraph] = None,
+        without_inherited_associations: bool = True,
+    ):
+        import pydot
+
+        if graph is None:
+            if without_inherited_associations:
+                graph = (
+                    self.to_subdiagram_without_inherited_associations()._dependency_graph
+                )
+            else:
+                graph = self._dependency_graph
+
+        if not filepath.endswith(f".{format_}"):
+            filepath += f".{format_}"
+        dot_str = graph.to_dot(
+            lambda node: dict(
+                color="black",
+                fillcolor="lightblue",
+                style="filled",
+                label=node.name,
+            ),
+            lambda edge: dict(color=edge.color, style="solid", label=str(edge)),
+            dict(rankdir="LR"),
+        )
+        dot = pydot.graph_from_dot_data(dot_str)[0]
+        try:
+            dot.write(filepath, format=format_)
+        except FileNotFoundError:
+            tmp_filepath = filepath.replace(f".{format_}", ".dot")
+            dot.write(tmp_filepath, format="raw")
+            try:
+                os.system(f"/usr/bin/dot -T{format_} {tmp_filepath} -o {filepath}")
+                os.remove(tmp_filepath)
+            except Exception as e:
+                logger.error(e)
 
     def clear(self):
         self._dependency_graph.clear()
+        AssociationThroughRoleTaker.get_original_source_instance_given_this_relation_source_instance.cache_clear()
+        self.__class__.role_chain_starting_from_node.cache_clear()
 
     def __hash__(self):
         return hash(id(self))

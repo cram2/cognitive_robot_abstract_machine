@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .failures import UsageError
+
 from .symbol_graph import SymbolGraph
 from .utils import is_iterable, T
 
@@ -34,12 +36,14 @@ from .symbolic import (
     Literal,
     Selectable,
     DomainType,
+    An,
 )
 
 from .predicate import (
     Predicate,
     # type: ignore
-    Symbol,  # type: ignore
+    Symbol,
+    HasType,
 )
 
 if TYPE_CHECKING:
@@ -95,10 +99,15 @@ def variable(
     :param inferred: Whether the variable is inferred or not.
     :return: A Variable that can be queried for.
     """
-    domain_source = _get_domain_source_from_domain_and_type_values(domain, type_)
 
     if name is None:
         name = type_.__name__
+
+    if isinstance(domain, Selectable):
+        var = variable_from(domain, name=name)
+        return An(Entity(_selected_variables=[var], _child_=HasType(var, type_)))
+
+    domain_source = _get_domain_source_from_domain_and_type_values(domain, type_)
 
     result = Variable(
         _type_=type_,
@@ -111,13 +120,13 @@ def variable(
 
 
 def variable_from(
-    domain: DomainType,
+    domain: Union[Iterable[T], Selectable[T]],
     name: Optional[str] = None,
 ) -> Union[T, Selectable[T]]:
     """
     Similar to `variable` but constructed from a domain directly wihout specifying its type.
     """
-    return Literal(data=domain, name=name)
+    return Literal(data=domain, name=name, wrap_in_iterator=False)
 
 
 def _get_domain_source_from_domain_and_type_values(

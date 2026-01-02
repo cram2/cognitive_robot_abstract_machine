@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from ..dataset.university_ontology_like_classes import Company, Person, CEO
+from ..dataset.university_ontology_like_classes import (
+    Company,
+    Person,
+    CEO,
+    Representative,
+)
 from krrood.entity_query_language.symbol_graph import SymbolGraph
 
 SymbolGraph().clear()
@@ -50,6 +55,20 @@ def test_setting_a_role_affects_role_taker():
     ceo1 = CEO(person1)
 
     ceo1.head_of = company
+    assert ceo1.head_of == company
+    assert ceo1.person.works_for == company
+    assert ceo1 in company.members
+    assert company in ceo1.person.member_of
+
+
+def test_setting_a_role_affects_role_taker_chain():
+    company = Company(name="BassCo")
+    person1 = Person(name="Bass1")
+    ceo1 = CEO(person1)
+    representative1 = Representative(ceo1)
+
+    representative1.head_of = company
+    assert representative1.head_of == company
     assert ceo1.head_of == company
     assert ceo1.person.works_for == company
     assert ceo1 in company.members

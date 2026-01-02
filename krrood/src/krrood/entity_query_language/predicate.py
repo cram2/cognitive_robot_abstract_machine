@@ -28,6 +28,7 @@ from .symbolic import (
     _any_of_the_kwargs_is_a_variable,
 )
 from .utils import T
+from ..class_diagrams.utils import Role
 
 
 def symbolic_function(
@@ -114,13 +115,16 @@ class HasType(Predicate):
     """
     The variable whose type is being checked.
     """
-    types_: Type
+    type_: Type
     """
     The type or tuple of types against which the `variable` is validated.
     """
 
     def __call__(self) -> bool:
-        return isinstance(self.variable, self.types_)
+        return isinstance(self.variable, self.type_) or (
+            isinstance(self.variable, Role)
+            and issubclass(self.variable.get_role_taker_type(), self.type_)
+        )
 
 
 @dataclass(eq=False)
@@ -135,7 +139,7 @@ class HasTypes(HasType):
     information with equality comparison explicitly disabled.
     """
 
-    types_: Tuple[Type, ...]
+    type_: Tuple[Type, ...]
     """
     A tuple containing Type objects that are associated with this instance.
     """

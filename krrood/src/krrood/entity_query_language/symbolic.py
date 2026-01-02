@@ -263,24 +263,6 @@ class SymbolicExpression(Generic[T], ABC):
             return cls._symbolic_expression_stack_[-1]
         return None
 
-    @property
-    def _sources_(self):
-        vars = [v.data for v in self._node_.leaves]
-        while any(isinstance(v, SymbolicExpression) for v in vars):
-            vars = {
-                (
-                    v._domain_source_
-                    if isinstance(v, Variable) and v._domain_source_ is not None
-                    else v
-                )
-                for v in vars
-            }
-            for v in copy(vars):
-                if isinstance(v, SymbolicExpression):
-                    vars.remove(v)
-                    vars.update(set(v._all_variable_instances_))
-        return set(vars)
-
     @cached_property
     def _unique_variables_(self) -> Set[Variable]:
         return make_set(self._all_variable_instances_)
@@ -953,7 +935,11 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         :param on: The variables to be used for distinctness.
         :return: This query object descriptor.
         """
-        on_ids = tuple([v._var_._id_ for v in on]) if on else tuple([v._var_._id_ for v in self._selected_variables])
+        on_ids = (
+            tuple([v._var_._id_ for v in on])
+            if on
+            else tuple([v._var_._id_ for v in self._selected_variables])
+        )
         seen_results = SeenSet(keys=on_ids)
 
         def get_distinct_results(
@@ -1261,7 +1247,9 @@ class Variable(CanBehaveLikeAVariable[T]):
         else:
             raise VariableCannotBeEvaluated(self)
 
-    def _iterator_over_domain_values_(self, sources: Dict[int, Any]) -> Iterable[OperationResult]:
+    def _iterator_over_domain_values_(
+        self, sources: Dict[int, Any]
+    ) -> Iterable[OperationResult]:
         """
         Iterate over the values in the variable's domain, yielding OperationResult instances.
 
@@ -1332,14 +1320,18 @@ class Variable(CanBehaveLikeAVariable[T]):
             values.update(d.bindings)
         return self._build_operation_result_and_update_truth_value_(values)
 
-    def _build_operation_result_and_update_truth_value_(self, bindings: Dict[int, Any]) -> OperationResult:
+    def _build_operation_result_and_update_truth_value_(
+        self, bindings: Dict[int, Any]
+    ) -> OperationResult:
         """
         Build an OperationResult instance and update the truth value based on the bindings.
 
         :param bindings: The bindings of the result.
         :return: The OperationResult instance with updated truth value.
         """
-        if isinstance(self._parent_, LogicalOperator) or (self is self._conditions_root_):
+        if isinstance(self._parent_, LogicalOperator) or (
+            self is self._conditions_root_
+        ):
             self._is_false_ = not bool(bindings[self._id_])
         else:
             self._is_false_ = False
@@ -1380,10 +1372,14 @@ class Literal(Variable[T]):
     """
 
     def __init__(
-        self, data: Any, name: Optional[str] = None, type_: Optional[Type] = None
+        self,
+        data: Any,
+        name: Optional[str] = None,
+        type_: Optional[Type] = None,
+        wrap_in_iterator: bool = True,
     ):
         original_data = data
-        if not isinstance(data, CanBehaveLikeAVariable):
+        if wrap_in_iterator:
             data = [data]
         if not type_:
             original_data_lst = make_list(original_data)

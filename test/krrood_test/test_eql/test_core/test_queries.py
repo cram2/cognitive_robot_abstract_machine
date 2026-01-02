@@ -14,7 +14,8 @@ from krrood.entity_query_language.entity import (
     variable,
     or_,
     exists,
-    flatten, variable_from,
+    flatten,
+    variable_from,
 )
 from krrood.entity_query_language.entity_result_processors import an, a, the, count
 from krrood.entity_query_language.failures import (
@@ -388,26 +389,6 @@ def test_generate_with_more_than_one_source_optimized(handles_and_containers_wor
         assert isinstance(sol[FC].parent, Container)
         assert isinstance(sol[FC].child, Handle)
         assert sol[PC].child == sol[FC].parent
-
-
-def test_sources(handles_and_containers_world):
-
-    W = variable(World, domain=handles_and_containers_world)
-    C = variable(Container, domain=W.bodies)
-    H = variable(Handle, domain=W.bodies)
-    FC = variable(FixedConnection, domain=W.connections)
-    PC = variable(PrismaticConnection, domain=W.connections)
-    query = a(
-        set_of(C, H, FC, PC).where(
-            C == FC.parent,
-            H == FC.child,
-            C == PC.child,
-        )
-    )
-    # render_tree(H._sources_[0]._node_.root, use_dot_exporter=True, view=True)
-    sources = list(query._sources_)
-    assert len(sources) == 1, "Should have 1 source."
-    assert sources[0] is handles_and_containers_world, "The source should be the world."
 
 
 def test_the(handles_and_containers_world):

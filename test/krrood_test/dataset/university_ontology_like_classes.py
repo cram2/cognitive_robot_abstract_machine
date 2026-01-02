@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, Field, fields
 
 from typing_extensions import Set, List, Type
 
@@ -15,7 +15,7 @@ from krrood.ontomatic.property_descriptor.property_descriptor import (
 )
 
 
-@dataclass
+@dataclass(eq=False)
 class Company(Symbol):
     name: str
     members: Set[Person] = field(default_factory=set)
@@ -25,7 +25,7 @@ class Company(Symbol):
         return hash(self.name)
 
 
-@dataclass
+@dataclass(eq=False)
 class Person(Symbol):
     name: str
     works_for: Company = None
@@ -35,13 +35,24 @@ class Person(Symbol):
         return hash(self.name)
 
 
-@dataclass
+@dataclass(eq=False)
 class CEO(Role[Person], Symbol):
     person: Person
     head_of: Company = None
 
-    def __hash__(self):
-        return hash(self.person)
+    @classmethod
+    def role_taker_field(cls) -> Field:
+        return [f for f in fields(cls) if f.name == "person"][0]
+
+
+@dataclass(eq=False)
+class Representative(Role[CEO], Symbol):
+    ceo: CEO
+    representative_of: Company = None
+
+    @classmethod
+    def role_taker_field(cls) -> Field:
+        return [f for f in fields(cls) if f.name == "ceo"][0]
 
 
 @dataclass
@@ -70,6 +81,11 @@ class HeadOf(WorksFor):
 
 
 @dataclass
+class RepresentativeOf(WorksFor):
+    pass
+
+
+@dataclass
 class SubOrganizationOf(PropertyDescriptor, TransitiveProperty): ...
 
 
@@ -79,6 +95,9 @@ Person.member_of = MemberOf(Person, "member_of")
 
 # CEO fields' descriptors
 CEO.head_of = HeadOf(CEO, "head_of")
+
+# Representative fields' descriptors
+Representative.representative_of = RepresentativeOf(Representative, "representative_of")
 
 # Company fields' descriptors
 Company.members = Member(Company, "members")
