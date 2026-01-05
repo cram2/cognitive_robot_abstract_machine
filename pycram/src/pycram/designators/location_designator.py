@@ -80,6 +80,7 @@ from ..pose_generator_and_validator import (
     visibility_validator,
     pose_sequence_reachability_validator,
     collision_check,
+    pose_sequence_reachability_validator_new,
 )
 from ..robot_description import ViewManager
 from ..utils import translate_pose_along_local_axis, link_pose_for_joint_config
@@ -410,12 +411,18 @@ class CostmapLocation(LocationDesignatorDescription):
                         params_box.rotation_agnostic,
                     )
                     ee = ViewManager.get_arm_view(params_box.reachable_arm, test_robot)
-                    is_reachable = pose_sequence_reachability_validator(
-                        test_world.root,
-                        ee.manipulator.tool_frame,
+                    # is_reachable = pose_sequence_reachability_validator(
+                    #     test_world.root,
+                    #     ee.manipulator.tool_frame,
+                    #     target_sequence,
+                    #     allowed_collision=params_box.ignore_collision_with,
+                    #     world=test_world,
+                    # )
+                    is_reachable = pose_sequence_reachability_validator_new(
                         target_sequence,
-                        allowed_collision=params_box.ignore_collision_with,
-                        world=test_world,
+                        ee.manipulator.tool_frame,
+                        test_robot,
+                        test_world,
                     )
                     if is_reachable:
                         yield GraspPose(
@@ -644,11 +651,17 @@ class AccessingLocation(LocationDesignatorDescription):
                     for pose in current_target_sequence:
                         pose.rotate_by_quaternion(grasp)
 
-                    is_reachable = pose_sequence_reachability_validator(
-                        test_world.root,
-                        arm_chain.manipulator.tool_frame,
+                    # is_reachable = pose_sequence_reachability_validator(
+                    #     test_world.root,
+                    #     arm_chain.manipulator.tool_frame,
+                    #     current_target_sequence,
+                    #     world=test_world,
+                    # )
+                    is_reachable = pose_sequence_reachability_validator_new(
                         current_target_sequence,
-                        world=test_world,
+                        arm_chain.manipulator.tool_frame,
+                        test_robot,
+                        test_world,
                     )
                     if is_reachable:
                         yield pose_candidate
@@ -1590,13 +1603,20 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
                         rotation_agnostic=params_box.rotation_agnostic,
                     )
                     ee = ViewManager.get_arm_view(params_box.reachable_arm, test_robot)
-                    is_reachable = pose_sequence_reachability_validator(
-                        test_robot.root,
-                        ee.manipulator.tool_frame,
+                    is_reachable = pose_sequence_reachability_validator_new(
                         target_sequence,
+                        ee.manipulator.tool_frame,
+                        test_robot,
                         self.test_world,
-                        allowed_collision=params_box.ignore_collision_with,
                     )
+
+                    # is_reachable = pose_sequence_reachability_validator(
+                    #     test_robot.root,
+                    #     ee.manipulator.tool_frame,
+                    #     target_sequence,
+                    #     self.test_world,
+                    #     allowed_collision=params_box.ignore_collision_with,
+                    # )
                     logger.debug(
                         f"Pose Candidate: {pose_candidate }is_reachable: {is_reachable}"
                     )

@@ -5,6 +5,12 @@ from copy import deepcopy
 import numpy as np
 from numpy.ma import masked_array
 from skimage.measure import label
+
+from giskardpy.executor import Executor
+from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionCheck,
     Collision,
@@ -122,6 +128,61 @@ def reachability_validator(
     finally:
         world.state.data = old_state
         world.notify_state_change()
+
+
+def reachability_validator_new(
+    target_pose: PoseStamped,
+    tip_link: KinematicStructureEntity,
+    robot_view: AbstractRobot,
+    world: World,
+    use_fullbody_ik: bool = False,
+) -> bool:
+    return pose_sequence_reachability_validator_new(
+        [target_pose], tip_link, robot_view, world, use_fullbody_ik
+    )
+
+
+def pose_sequence_reachability_validator_new(
+    target_sequence: List[PoseStamped],
+    tip_link: KinematicStructureEntity,
+    robot_view: AbstractRobot,
+    world: World,
+    use_fullbody_ik: bool = False,
+) -> bool:
+    """
+    Evaluates the pose sequence by executing the pose sequence with giskard.
+    """
+    old_state = deepcopy(world.state.data)
+    root = robot_view.root if not use_fullbody_ik else world.root
+    cart_sequence = Sequence(
+        [
+            CartesianPose(
+                root_link=root, tip_link=tip_link, goal_pose=pose.to_spatial_type()
+            )
+            for pose in target_sequence
+        ]
+    )
+    msc = MotionStatechart()
+    msc.add_node(cart_sequence)
+    msc.
+
+    executor = Executor(
+        world,
+        controller_config=QPControllerConfig(
+            target_frequency=50, prediction_horizon=4, verbose=False
+        ),
+    )
+    executor.compile(msc)
+
+    try:
+        executor.tick_until_end()
+    except TimeoutError:
+        print("Timeout reached")
+        return False
+    finally:
+        world.state.data = old_state
+        world.notify_state_change()
+    return True
 
 
 def pose_sequence_reachability_validator(

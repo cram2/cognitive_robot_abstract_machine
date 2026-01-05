@@ -29,6 +29,9 @@ arm_park = {
     "r_wrist_roll_joint": 0.051,
 }
 
+logger = logging.getLogger("pycram")
+logger.setLevel(logging.DEBUG)
+
 
 def test_reachability_costmap_location(immutable_simple_pr2_world):
     world, robot, context = immutable_simple_pr2_world
