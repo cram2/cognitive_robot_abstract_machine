@@ -24,7 +24,7 @@ from semantic_digital_twin.orm.ormatic_interface import *
 from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
 )
-from semantic_digital_twin.semantic_annotations.mixins import HasBody
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.pipeline.pipeline import (
     Pipeline,
     BodyFilter,
@@ -109,7 +109,7 @@ def parse_fbx_file_to_world_mapping_daos(fbx_file_path: str) -> List[WorldMappin
     worlds = remove_root_and_move_children_into_new_worlds(world)
 
     worlds = replace_dresser_meshes_with_factories(worlds, dresser_pattern)
-    resolver = ProcthorResolver(*[recursive_subclasses(HasBody)])
+    resolver = ProcthorResolver(*[recursive_subclasses(HasRootBody)])
     for world in worlds:
         resolved = resolver.resolve(world.name)
         if resolved:

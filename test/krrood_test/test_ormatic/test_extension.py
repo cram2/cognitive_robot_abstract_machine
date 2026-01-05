@@ -4,8 +4,8 @@ import sys
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.utils import get_classes_of_ormatic_interface
-from ..dataset.dataset_extension import AggregatorOfExternalInstances, CustomPosition
-from ..dataset import ormatic_interface
+from .._dataset.dataset_extension import AggregatorOfExternalInstances, CustomPosition
+from .._dataset import ormatic_interface
 
 
 def test_extension(tmp_path):

@@ -23,7 +23,8 @@ from typing_extensions import (
     Union,
     Callable,
     Any,
-    Iterable, TYPE_CHECKING,
+    Iterable,
+    TYPE_CHECKING,
 )
 from typing_extensions import List
 from typing_extensions import Type, Set
@@ -692,6 +693,12 @@ class World:
         body: KinematicStructureEntity,
     ):
         return self.add_kinematic_structure_entity(body)
+
+    def add_region(
+        self,
+        region: KinematicStructureEntity,
+    ):
+        return self.add_kinematic_structure_entity(region)
 
     def add_kinematic_structure_entity(
         self,

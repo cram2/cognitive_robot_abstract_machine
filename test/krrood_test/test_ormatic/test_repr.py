@@ -1,7 +1,7 @@
-from ..dataset.example_classes import ContainerGeneration, ItemWithBackreference
+from .._dataset.example_classes import ContainerGeneration, ItemWithBackreference
 from krrood.ormatic.dao import to_dao
 from .test_interface import Position, Position4D, Pose, Orientation
-from ..dataset.ormatic_interface import PositionDAO, PoseDAO, Position4DDAO
+from .._dataset.ormatic_interface import PositionDAO, PoseDAO, Position4DDAO
 
 
 def test_repr_includes_scalar_columns_only():

@@ -90,14 +90,16 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     KinematicStructureEntityKwargsTracker,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.semantic_annotations.factories import (
-    DoorFactory,
-    SemanticPositionDescription,
-    HandleFactory,
+from semantic_digital_twin.semantic_annotations.position_descriptions import (
     HorizontalSemanticDirection,
     VerticalSemanticDirection,
+    SemanticPositionDescription,
 )
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+    Door,
+    Hinge,
+)
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -111,7 +113,10 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     FixedConnection,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -2065,41 +2070,50 @@ class TestParallel:
 
 class TestOpenClose:
     def test_open(self, pr2_world):
-        factory = DoorFactory(
+
+        door = Door.create_with_new_body_in_world(
             name=PrefixedName("door"),
-            handle_factory=HandleFactory(name=PrefixedName("handle")),
-            semantic_position=SemanticPositionDescription(
-                horizontal_direction_chain=[
-                    HorizontalSemanticDirection.RIGHT,
-                    HorizontalSemanticDirection.FULLY_CENTER,
-                ],
-                vertical_direction_chain=[VerticalSemanticDirection.FULLY_CENTER],
+            world=pr2_world,
+            parent=pr2_world.root,
+            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world.root
             ),
         )
-        door_world = factory.create()
-        with pr2_world.modify_world():
-            lower_limits = DerivativeMap()
-            lower_limits.position = -np.pi / 2
-            lower_limits.velocity = -1
-            upper_limits = DerivativeMap()
-            upper_limits.position = np.pi / 2
-            upper_limits.velocity = 1
-            dof = DegreeOfFreedom(
-                lower_limits=lower_limits,
-                upper_limits=upper_limits,
-                name=PrefixedName("hinge"),
-            )
-            pr2_world.add_degree_of_freedom(dof)
-            root_T_door = RevoluteConnection(
-                dof_id=dof.id,
-                parent=pr2_world.root,
-                child=door_world.root,
-                axis=-Vector3.Z(),
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world.root
-                ),
-            )
-            pr2_world.merge_world(door_world, root_connection=root_T_door)
+
+        handle = Handle.create_with_new_body_in_world(
+            name=PrefixedName("handle"),
+            world=pr2_world,
+            parent=pr2_world.root,
+            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=1.5, y=0.45, z=1, yaw=np.pi, reference_frame=pr2_world.root
+            ),
+        )
+
+        hinge = Hinge.create_with_new_body_in_world(
+            name=PrefixedName("hinge"),
+            world=pr2_world,
+            parent=pr2_world.root,
+            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=1.5, y=-0.5, z=1, yaw=np.pi, reference_frame=pr2_world.root
+            ),
+        )
+
+        lower_limits = DerivativeMap()
+        lower_limits.position = -np.pi / 2
+        lower_limits.velocity = -1
+        upper_limits = DerivativeMap()
+        upper_limits.position = np.pi / 2
+        upper_limits.velocity = 1
+
+        door.add_handle(handle)
+        door.add_hinge(
+            hinge=hinge,
+            connection_limits=DegreeOfFreedomLimits(
+                lower_limit=lower_limits, upper_limit=upper_limits
+            ),
+        )
+
+        root_C_hinge = door.hinge.body.parent_connection
 
         r_tip = pr2_world.get_body_by_name("r_gripper_tool_frame")
         handle = pr2_world.get_semantic_annotations_by_type(Handle)[0].body
@@ -2126,7 +2140,7 @@ class TestOpenClose:
                                     goal_joint_state=open_goal,
                                 ),
                                 opened := JointPositionReached(
-                                    connection=root_T_door,
+                                    connection=root_C_hinge,
                                     position=open_goal,
                                     name="opened",
                                 ),
@@ -2140,7 +2154,7 @@ class TestOpenClose:
                                     goal_joint_state=close_goal,
                                 ),
                                 closed := JointPositionReached(
-                                    connection=root_T_door,
+                                    connection=root_C_hinge,
                                     position=close_goal,
                                     name="closed",
                                 ),

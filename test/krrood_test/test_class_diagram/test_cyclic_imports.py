@@ -1,7 +1,7 @@
 from krrood.class_diagrams import ClassDiagram
-from ..dataset.cyclic_imports import PoseAnnotation
+from .._dataset.cyclic_imports import PoseAnnotation
 
-from ..dataset.example_classes import Pose
+from .._dataset.example_classes import Pose
 
 
 def test_unfinished_type_field_info():

@@ -82,6 +82,12 @@ class JerkVariable(sm.FloatVariable):
 
 
 @dataclass(eq=False)
+class DegreeOfFreedomLimits:
+    lower_limit: DerivativeMap[float]
+    upper_limit: DerivativeMap[float]
+
+
+@dataclass(eq=False)
 class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     """
     A class representing a degree of freedom in a world model with associated derivatives and limits.

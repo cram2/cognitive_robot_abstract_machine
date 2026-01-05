@@ -11,7 +11,7 @@ def test_generation_process():
     """
     # Verify that the file was created
     file_path = os.path.join(
-        os.path.dirname(__file__), "..", "dataset", "ormatic_interface.py"
+        os.path.dirname(__file__), "..", "_dataset", "ormatic_interface.py"
     )
     assert os.path.exists(file_path)
 
@@ -23,7 +23,7 @@ def test_generation_process():
         assert "class Base(DeclarativeBase):" in content
 
     # Verify we can import from the generated file
-    from ..dataset import ormatic_interface
+    from .._dataset import ormatic_interface
 
     assert hasattr(ormatic_interface, "Base")
 

@@ -1,7 +1,7 @@
 import sys
 
 from krrood.ormatic.dao import to_dao
-from ..dataset.example_classes import Person
+from .._dataset.example_classes import Person
 
 
 def test_deep_person_chain_to_dao():

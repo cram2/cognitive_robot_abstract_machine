@@ -412,7 +412,9 @@ class PyCramPose(HasParameters):
         """
         return cls(
             PyCramVector3(position[0], position[1], position[2]),
-            PyCramQuaternion(orientation[0], orientation[1], orientation[2], orientation[3]),
+            PyCramQuaternion(
+                orientation[0], orientation[1], orientation[2], orientation[3]
+            ),
         )
 
 
@@ -574,7 +576,9 @@ class PoseStamped(HasParameters):
             z=message.pose.orientation.z,
             w=message.pose.orientation.w,
         )
-        return cls(pose=PyCramPose(position=position, orientation=orientation), header=header)
+        return cls(
+            pose=PyCramPose(position=position, orientation=orientation), header=header
+        )
 
     @classmethod
     def from_list(

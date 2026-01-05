@@ -2,6 +2,7 @@ import pytest
 
 from krrood.entity_query_language.symbol_graph import SymbolGraph
 
+
 @pytest.fixture(autouse=True, scope="function")
 def cleanup_after_test():
     # runs BEFORE each test

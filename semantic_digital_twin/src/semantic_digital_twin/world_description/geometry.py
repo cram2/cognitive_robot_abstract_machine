@@ -5,7 +5,7 @@ import os
 import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
-from functools import cached_property
+from functools import cached_property, lru_cache
 
 import numpy as np
 import trimesh
@@ -14,13 +14,16 @@ from PIL import Image
 from random_events.interval import SimpleInterval, Bound, closed
 from random_events.product_algebra import SimpleEvent
 from trimesh.visual.texture import TextureVisuals, SimpleMaterial
-from typing_extensions import Optional, List, Dict, Any, Self, Tuple
+from typing_extensions import Optional, List, Dict, Any, Self, Tuple, TYPE_CHECKING
 
 from krrood.adapters.exceptions import JSON_TYPE_NAME
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from ..datastructures.variables import SpatialVariables
 from ..spatial_types import HomogeneousTransformationMatrix, Point3
-from ..utils import IDGenerator
+from ..utils import IDGenerator, Direction
+
+if TYPE_CHECKING:
+    from .world_entity import KinematicStructureEntity
 
 id_generator = IDGenerator()
 
@@ -94,6 +97,9 @@ class Scale(SubclassJSONSerializer):
     The scale in the z direction.
     """
 
+    def __hash__(self):
+        return hash((self.x, self.y, self.z))
+
     def to_json(self) -> Dict[str, Any]:
         return {**super().to_json(), "x": self.x, "y": self.y, "z": self.z}
 
@@ -109,15 +115,68 @@ class Scale(SubclassJSONSerializer):
         self.y = float(self.y)
         self.z = float(self.z)
 
-    @property
-    def simple_event(self) -> SimpleEvent:
-        return SimpleEvent(
+    @lru_cache
+    def to_simple_event(
+        self,
+        extend_result_in_direction: Optional[Direction] = None,
+        amount: float = 0.0,
+    ) -> SimpleEvent:
+        simple_event = SimpleEvent(
             {
                 SpatialVariables.x.value: closed(-self.x / 2, self.x / 2),
                 SpatialVariables.y.value: closed(-self.y / 2, self.y / 2),
                 SpatialVariables.z.value: closed(-self.z / 2, self.z / 2),
             }
         )
+
+        if extend_result_in_direction is not None:
+            self._extend_simple_event_in_direction(
+                simple_event, extend_result_in_direction, amount
+            )
+
+        return simple_event
+
+    def _extend_simple_event_in_direction(
+        self, simple_event: SimpleEvent, direction: Direction, amount: float
+    ) -> SimpleEvent:
+        """
+        Extend the inner event in the specified direction to create the container opening in that direction.
+
+
+        :return: The modified inner event with the specified direction extended.
+        """
+        match direction:
+            case Direction.X:
+                simple_event[SpatialVariables.x.value] = closed(
+                    -self.x / 2, self.x / 2 + amount
+                )
+            case Direction.Y:
+                simple_event[SpatialVariables.y.value] = closed(
+                    -self.y / 2, self.y / 2 + amount
+                )
+            case Direction.Z:
+                simple_event[SpatialVariables.z.value] = closed(
+                    -self.z / 2, self.z / 2 + amount
+                )
+            case Direction.NEGATIVE_X:
+                simple_event[SpatialVariables.x.value] = closed(
+                    -(self.x / 2 + amount), self.x / 2
+                )
+            case Direction.NEGATIVE_Y:
+                simple_event[SpatialVariables.y.value] = closed(
+                    -(self.y / 2 + amount), self.y / 2
+                )
+            case Direction.NEGATIVE_Z:
+                simple_event[SpatialVariables.z.value] = closed(
+                    -(self.z / 2 + amount), self.z / 2
+                )
+
+        return simple_event
+
+    def to_bounding_box(self) -> BoundingBox:
+        min_point = Point3(-self.x / 2, -self.y / 2, -self.z / 2)
+        max_point = Point3(self.x / 2, self.y / 2, self.z / 2)
+        return BoundingBox.from_min_max(min_point, max_point)
 
 
 @dataclass
@@ -366,6 +425,80 @@ class TriangleMesh(Mesh):
         origin = HomogeneousTransformationMatrix.from_json(data["origin"], **kwargs)
         scale = Scale.from_json(data["scale"], **kwargs)
         return cls(mesh=mesh, origin=origin, scale=scale)
+
+    @classmethod
+    def from_3d_points(
+        cls,
+        points_3d: List[Point3],
+        reference_frame: Optional[KinematicStructureEntity] = None,
+        minimum_thickness: float = 0.005,
+        sv_ratio_tol: float = 1e-7,
+    ) -> Self:
+        """
+        Constructs a Region from a list of 3D points by creating a convex hull around them.
+        The points are analyzed to determine if they are approximately planar. If they are,
+        a minimum thickness is added to ensure the region has a non-zero volume.
+
+        :param name: Prefixed name for the region.
+        :param points_3d: List of 3D points.
+        :param reference_frame: Optional reference frame.
+        :param minimum_thickness: Minimum thickness to add if points are near-planar.
+        :param sv_ratio_tol: Tolerance for determining planarity based on singular value ratio.
+
+        :return: Region object.
+        """
+        points = np.asarray([point.to_np()[:3] for point in points_3d], dtype=float)
+        points = np.unique(points, axis=0)
+        assert (
+            len(points) >= 3
+        ), "At least 4 unique points are required to define a 3D region."
+
+        centered_points = points - points.mean(axis=0, keepdims=True)
+        assert np.any(centered_points), "Points must not be all identical."
+
+        # We compute the principal axes of the point cloud using SVD.
+        # This allows us to reason about the geometric thickness of our point cloud.
+        # The axis with the smallest variance, located at the last index if our `principal_axis` is our `normal`
+        # indicating the direction of the region's thickness.
+        _, variance, principal_axis = np.linalg.svd(
+            centered_points, full_matrices=False
+        )
+        smallest_variance_axis = principal_axis[-1]  # this is our normal
+        unit_vector_normal = smallest_variance_axis / np.linalg.norm(
+            smallest_variance_axis
+        )
+
+        # We compute the thickness, peak-to-peak (max - min), along the normal direction, to get the thickness of
+        # the region.
+        thickness_in_normal_direction = np.ptp(centered_points @ unit_vector_normal)
+        is_near_planar = variance[0] > 0 and variance[-1] / variance[0] < sv_ratio_tol
+        thickness_padding = (
+            minimum_thickness / 2
+            if thickness_in_normal_direction < minimum_thickness or is_near_planar
+            else 0.0
+        )
+
+        # We do not provide any 2d shapes, since they would be very weird to handle with raytracing etc.
+        # Thus we decided that in near-planar cases we add a minimum thickness to ensure we get a 3d shape.
+        if thickness_padding > 0:
+            P_aug = np.vstack(
+                [
+                    points + thickness_padding * unit_vector_normal,
+                    points - thickness_padding * unit_vector_normal,
+                ]
+            )
+        else:
+            P_aug = points
+
+        hull = trimesh.points.PointCloud(P_aug).convex_hull
+        hull.remove_unreferenced_vertices()
+        hull.update_faces(hull.nondegenerate_faces())
+        hull.process()
+
+        return cls(
+            mesh=hull,
+            origin=HomogeneousTransformationMatrix(reference_frame=reference_frame),
+        )
 
 
 @dataclass(eq=False)
@@ -750,7 +883,6 @@ class BoundingBox:
         :param min_point: The minimum point
         :param max_point: The maximum point
         """
-        assert min_point.reference_frame is not None
         assert (
             min_point.reference_frame == max_point.reference_frame
         ), "The reference frames of the minimum and maximum points must be the same."

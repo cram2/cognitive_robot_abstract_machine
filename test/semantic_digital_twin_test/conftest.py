@@ -32,7 +32,6 @@ def pytest_configure(config):
 def cleanup_after_test():
     # We need to pass the class diagram, since otherwise some names are not found anymore after clearing the symbol graph
     # for the first time, since World is not a symbol
-    SymbolGraph().clear()
     class_diagram = ClassDiagram(
         recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),

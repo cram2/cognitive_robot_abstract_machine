@@ -99,12 +99,15 @@ class VariableCannotBeEvaluated(DataclassException):
     """
     Raised when a variable cannot be evaluated due to missing or invalid information in the variable.
     """
+
     variable: Variable
-    
+
     def __post_init__(self):
-        self.message = (f"Variable {self.variable} cannot be evaluated because of missing or invalid information."
-                        f"The variable couldn't be identified as one of (already bound, has a domain, or is inferred,"
-                        f"Check that the variable is correctly defined and that all required information is provided.")
+        self.message = (
+            f"Variable {self.variable} cannot be evaluated because of missing or invalid information."
+            f"The variable couldn't be identified as one of (already bound, has a domain, or is inferred,"
+            f"Check that the variable is correctly defined and that all required information is provided."
+        )
         super().__post_init__()
 
 

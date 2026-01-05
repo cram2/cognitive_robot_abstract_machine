@@ -35,14 +35,14 @@ class TestForwardReferenceResolution:
         # Import IsolatedTypeAlpha so it's in sys.modules and can be found
         # But IsolatedTypeBeta is NOT imported into the local namespace, so
         # it won't be found there
-        from test.krrood_test.dataset.isolated_forward_ref_types import (
+        from test.krrood_test._dataset.isolated_forward_ref_types import (
             IsolatedTypeAlpha,
         )
 
         # Now import the isolated classes - the types they reference
         # (IsolatedTypeAlpha, IsolatedTypeBeta) are under TYPE_CHECKING
         # so they won't be imported at runtime
-        from test.krrood_test.dataset.isolated_forward_ref_classes import (
+        from test.krrood_test._dataset.isolated_forward_ref_classes import (
             IsolatedClassWithMultipleMixins,
             IsolatedMixinAlpha,
             IsolatedMixinBeta,

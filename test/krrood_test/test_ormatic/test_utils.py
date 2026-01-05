@@ -1,5 +1,5 @@
 from krrood.utils import inheritance_path_length
-from ..dataset.example_classes import *
+from .._dataset.example_classes import *
 
 
 class A: ...

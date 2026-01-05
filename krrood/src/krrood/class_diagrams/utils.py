@@ -26,7 +26,11 @@ def classes_of_module(module) -> List[Type]:
 def behaves_like_a_built_in_class(
     clazz: Type,
 ) -> bool:
-    return is_builtin_class(clazz) or clazz == UUID or (inspect.isclass(clazz) and issubclass(clazz, Enum))
+    return (
+        is_builtin_class(clazz)
+        or clazz == UUID
+        or (inspect.isclass(clazz) and issubclass(clazz, Enum))
+    )
 
 
 def is_builtin_class(clazz: Type) -> bool:

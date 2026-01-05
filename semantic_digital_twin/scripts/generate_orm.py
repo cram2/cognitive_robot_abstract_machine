@@ -30,7 +30,12 @@ from krrood.utils import recursive_subclasses
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.orm.model import *  # type: ignore
 from semantic_digital_twin.reasoning.predicates import ContainsType
-from semantic_digital_twin.semantic_annotations.mixins import HasBody
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasRootBody,
+)
+from semantic_digital_twin.semantic_annotations.position_descriptions import (
+    SemanticDirection,
+)
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
     ForwardKinematicsManager,
 )
@@ -67,7 +72,7 @@ all_classes |= set(
 )
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.abstract_robot))
 # classes |= set(recursive_subclasses(ViewFactory))
-all_classes |= set([HasBody] + recursive_subclasses(HasBody))
+all_classes |= set([HasRootBody] + recursive_subclasses(HasRootBody))
 all_classes |= set(classes_of_module(semantic_digital_twin.reasoning.predicates))
 all_classes |= set(classes_of_module(semantic_digital_twin.semantic_annotations.mixins))
 all_classes |= set(
@@ -87,6 +92,7 @@ all_classes -= {
     WorldModelManager,
     semantic_digital_twin.adapters.procthor.procthor_resolver.ProcthorResolver,
     ContainsType,
+    SemanticDirection,
 }
 # keep only dataclasses that are NOT AlternativeMapping subclasses
 all_classes = {

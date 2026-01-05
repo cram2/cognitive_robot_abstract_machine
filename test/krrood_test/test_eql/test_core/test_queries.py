@@ -14,7 +14,8 @@ from krrood.entity_query_language.entity import (
     variable,
     or_,
     exists,
-    flatten, variable_from,
+    flatten,
+    variable_from,
 )
 from krrood.entity_query_language.entity_result_processors import an, a, the, count
 from krrood.entity_query_language.failures import (
@@ -37,7 +38,7 @@ from krrood.entity_query_language.result_quantification_constraint import (
     AtMost,
     Range,
 )
-from ...dataset.semantic_world_like_classes import (
+from ..._dataset.semantic_world_like_classes import (
     Handle,
     Body,
     Container,

@@ -15,7 +15,7 @@ left_arm = ArmState(
         "arm_flex_joint",
         "arm_roll_joint",
         "wrist_flex_joint",
-        "wrist_roll_joint"
+        "wrist_roll_joint",
     ],
     joint_positions=[0.0, 1.5, -1.85, 0.0],
     state_type=StaticJointState.Park,

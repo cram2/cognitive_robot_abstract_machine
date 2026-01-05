@@ -3,7 +3,7 @@ from krrood.entity_query_language.entity import variable, entity, and_, inferenc
 from krrood.entity_query_language.entity_result_processors import an
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.rule import refinement, alternative, next_rule
-from ...dataset.semantic_world_like_classes import (
+from ..._dataset.semantic_world_like_classes import (
     Container,
     Handle,
     FixedConnection,
