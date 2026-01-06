@@ -14,7 +14,8 @@ from krrood.entity_query_language.entity import (
     variable,
     or_,
     exists,
-    flatten, variable_from,
+    flatten,
+    variable_from,
 )
 from krrood.entity_query_language.entity_result_processors import an, a, the, count
 from krrood.entity_query_language.failures import (
@@ -49,6 +50,7 @@ from ...dataset.semantic_world_like_classes import (
     ContainsType,
     Apple,
     Drawer,
+    Cabinet,
 )
 
 
@@ -970,3 +972,24 @@ def test_variable_from(handles_and_containers_world):
     body = variable_from(world.bodies)
     query = an(entity(body).where(contains(body.name, "Handle")))
     assert len(list(query.evaluate())) == 3
+
+
+def test_multiple_dependent_selectables(handles_and_containers_world):
+    world = handles_and_containers_world
+    cabinet = variable(Cabinet, domain=world.views)
+    cabinet_drawers = variable_from(cabinet.drawers)
+    old_evaluate = cabinet_drawers._evaluate__
+
+    def _cabinet_drawers_evaluate__(bindings, parent):
+        assert cabinet._id_ in bindings
+        yield from old_evaluate(bindings, parent)
+
+    cabinet_drawers._evaluate__ = _cabinet_drawers_evaluate__
+
+    cabinet_drawer_pairs_query = a(set_of(cabinet, cabinet_drawers))
+    world_cabinets = [c for c in world.views if isinstance(c, Cabinet)]
+    cabinet_drawer_pairs_expected = [(c, d) for c in world_cabinets for d in c.drawers]
+    assert {
+        (res[cabinet], res[cabinet_drawers])
+        for res in cabinet_drawer_pairs_query.evaluate()
+    } == set(cabinet_drawer_pairs_expected)
