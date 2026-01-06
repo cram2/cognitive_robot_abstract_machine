@@ -13,6 +13,7 @@ from ..robots.abstract_robot import (
     FieldOfView,
     Neck,
     AbstractRobot,
+    JointState,
 )
 from .robot_mixins import HasNeck, SpecifiesLeftRightArm
 from ..spatial_types import Quaternion, Vector3
@@ -71,8 +72,8 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                 name=PrefixedName("left_gripper", prefix=robot.name.name),
                 root=world.get_body_by_name("left_robotiq_85_base_link"),
                 tool_frame=world.get_body_by_name("l_gripper_tool_frame"),
-                front_facing_orientation=Quaternion(0.5, 0.5, 0.5, 0.5),
-                front_facing_axis=Vector3(0, 0, 1),
+                front_facing_orientation=Quaternion(0, 0, 0, 1),
+                front_facing_axis=Vector3(1, 0, 0),
                 thumb=left_gripper_thumb,
                 finger=left_gripper_finger,
                 _world=world,
@@ -103,8 +104,8 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                 name=PrefixedName("right_gripper", prefix=robot.name.name),
                 root=world.get_body_by_name("right_robotiq_85_base_link"),
                 tool_frame=world.get_body_by_name("r_gripper_tool_frame"),
-                front_facing_orientation=Quaternion(0.5, 0.5, 0.5, 0.5),
-                front_facing_axis=Vector3(0, 0, 1),
+                front_facing_orientation=Quaternion(0, 0, 0, 1),
+                front_facing_axis=Vector3(1, 0, 0),
                 thumb=right_gripper_thumb,
                 finger=right_gripper_finger,
                 _world=world,
@@ -138,6 +139,89 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             )
 
             robot.add_kinematic_chain(neck)
+
+            # Create states
+            left_arm_park = JointState(
+                name=PrefixedName("left_arm_park", prefix=robot.name.name),
+                joint_names=[world.get_body_by_name("left_shoulder_pan_joint"),
+                             world.get_body_by_name("left_shoulder_lift_joint"),
+                             world.get_body_by_name("left_elbow_joint"),
+                             world.get_body_by_name("left_wrist_1_joint"),
+                             world.get_body_by_name("left_wrist_2_joint"),
+                             world.get_body_by_name("left_wrist_3_joint")],
+                joint_positions=[3.0, -1.0, 1.2, -0.5, 1.57, 0.0],
+                state_type="Park",
+                kinematic_chains=[left_arm],
+                _world=world,
+            )
+
+            right_arm_park = JointState(
+                name=PrefixedName("right_arm_park", prefix=robot.name.name),
+                joint_names=[world.get_body_by_name("right_shoulder_pan_joint"),
+                             world.get_body_by_name("right_shoulder_lift_joint"),
+                             world.get_body_by_name("right_elbow_joint"),
+                             world.get_body_by_name("right_wrist_1_joint"),
+                             world.get_body_by_name("right_wrist_2_joint"),
+                             world.get_body_by_name("right_wrist_3_joint")],
+                joint_positions=[3.0, -2.1, -1.57, 0.5, 1.57, 0.0],
+                state_type="Park",
+                kinematic_chains=[right_arm],
+                _world=world,
+            )
+
+            left_gripper_joints = [world.get_body_by_name("left_robotiq_85_left_knuckle_joint"),
+                                   world.get_body_by_name("left_robotiq_85_right_knuckle_joint"),
+                                   world.get_body_by_name("left_robotiq_85_left_inner_knuckle_joint"),
+                                   world.get_body_by_name("left_robotiq_85_right_inner_knuckle_joint"),
+                                   world.get_body_by_name("left_robotiq_85_left_finger_tip_joint"),
+                                   world.get_body_by_name("left_robotiq_85_right_finger_tip_joint")]
+
+            left_gripper_open = JointState(
+                name=PrefixedName("left_gripper_open", prefix=robot.name.name),
+                joint_names=left_gripper_joints,
+                joint_positions=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                state_type="Open",
+                kinematic_chains=[left_gripper],
+                _world=world,
+            )
+
+            left_gripper_close = JointState(
+                name=PrefixedName("left_gripper_close", prefix=robot.name.name),
+                joint_names=left_gripper_joints,
+                joint_positions=[0.8, -0.8, -0.8, 0.8, -0.8, 0.8],
+                state_type="Close",
+                kinematic_chains=[left_gripper],
+                _world=world,
+            )
+
+            right_gripper_joints = [world.get_body_by_name("right_robotiq_85_left_knuckle_joint"),
+                                    world.get_body_by_name("right_robotiq_85_right_knuckle_joint"),
+                                    world.get_body_by_name("right_robotiq_85_left_inner_knuckle_joint"),
+                                    world.get_body_by_name("right_robotiq_85_right_inner_knuckle_joint"),
+                                    world.get_body_by_name("right_robotiq_85_left_finger_tip_joint"),
+                                    world.get_body_by_name("right_robotiq_85_right_finger_tip_joint")]
+
+            right_gripper_open = JointState(
+                name=PrefixedName("right_gripper_open", prefix=robot.name.name),
+                joint_names=right_gripper_joints,
+                joint_positions=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                state_type="Open",
+                kinematic_chains=[right_gripper],
+                _world=world,
+            )
+
+            right_gripper_close = JointState(
+                name=PrefixedName("right_gripper_close", prefix=robot.name.name),
+                joint_names=right_gripper_joints,
+                joint_positions=[0.8, -0.8, -0.8, 0.8, -0.8, 0.8],
+                state_type="Close",
+                kinematic_chains=[right_gripper],
+                _world=world,
+            )
+
+            robot.add_joint_states([left_arm_park, right_arm_park, left_gripper_close, left_gripper_open,
+                                    right_gripper_close, right_gripper_open])
+
             world.add_semantic_annotation(robot)
 
             vel_limits = defaultdict(lambda: 0.2)

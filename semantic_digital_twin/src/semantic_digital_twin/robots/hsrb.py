@@ -1,5 +1,5 @@
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Self
 
 from .abstract_robot import (
@@ -11,6 +11,7 @@ from .abstract_robot import (
     Camera,
     Torso,
     FieldOfView,
+    JointState,
 )
 from .robot_mixins import HasNeck, HasArms
 from ..datastructures.prefixed_name import PrefixedName
@@ -171,6 +172,70 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
                 _world=world,
             )
             hsrb.add_torso(torso)
+
+            #Create states
+            arm_park = JointState(
+                name=PrefixedName("arm_park", prefix=hsrb.name.name),
+                joint_names=[world.get_body_by_name("arm_flex_joint"), world.get_body_by_name("arm_roll_joint"),
+                             world.get_body_by_name("wrist_flex_joint"), world.get_body_by_name("wrist_roll_joint")],
+                joint_positions=[0.0, 1.5, -1.85, 0.0],
+                state_type="Park",
+                kinematic_chains=[arm],
+                _world=world,
+            )
+
+            gripper_joints = [world.get_body_by_name("hand_l_proximal_joint"),
+                             world.get_body_by_name("hand_r_proximal_joint"),
+                             world.get_body_by_name("hand_motor_joint")]
+
+            gripper_open = JointState(
+                name=PrefixedName("gripper_open", prefix=hsrb.name.name),
+                joint_names=gripper_joints,
+                joint_positions=[0.3, 0.3, 0.3],
+                state_type="Open",
+                kinematic_chains=[gripper],
+                _world=world,
+            )
+
+            gripper_close = JointState(
+                name=PrefixedName("gripper_close", prefix=hsrb.name.name),
+                joint_names=gripper_joints,
+                joint_positions=[0.0, 0.0, 0.0],
+                state_type="Close",
+                kinematic_chains=[gripper],
+                _world=world,
+            )
+
+            torso_joint = [world.get_body_by_name("torso_lift_joint")]
+
+            torso_low = JointState(
+                name=PrefixedName("torso_low", prefix=hsrb.name.name),
+                joint_names=torso_joint,
+                joint_positions=[0.0],
+                state_type="Low",
+                kinematic_chains=[torso],
+                _world=world,
+            )
+
+            torso_mid = JointState(
+                name=PrefixedName("torso_mid", prefix=hsrb.name.name),
+                joint_names=torso_joint,
+                joint_positions=[0.17],
+                state_type="Mid",
+                kinematic_chains=[torso],
+                _world=world,
+            )
+
+            torso_high = JointState(
+                name=PrefixedName("torso_high", prefix=hsrb.name.name),
+                joint_names=torso_joint,
+                joint_positions=[0.34],
+                state_type="High",
+                kinematic_chains=[torso],
+                _world=world,
+            )
+
+            hsrb.add_joint_states([arm_park, gripper_open, gripper_close, torso_low, torso_mid, torso_high])
 
             world.add_semantic_annotation(hsrb)
 

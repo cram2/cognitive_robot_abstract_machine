@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
+from typing import List
 
 from typing_extensions import (
     Iterable,
@@ -13,6 +14,7 @@ from typing_extensions import (
     DefaultDict,
 )
 
+from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import (
     Vector3,
@@ -26,7 +28,6 @@ from ..world_description.connections import (
 from ..world_description.world_entity import (
     Body,
     RootedSemanticAnnotation,
-    Agent,
     Connection,
     CollisionCheckingConfig,
 )
@@ -53,7 +54,7 @@ class SemanticRobotAnnotation(RootedSemanticAnnotation, ABC):
 
     def __post_init__(self):
         if self._world is not None:
-            self._world.add_semantic_annotation(self)
+            self._world.add_semantic_annotation(self, skip_duplicates=True)
 
     @abstractmethod
     def assign_to_robot(self, robot: AbstractRobot):
@@ -357,9 +358,79 @@ class Torso(KinematicChain):
         """
         return hash((self.name, self.root, self.tip))
 
+@dataclass
+class JointState(ABC):
+    """
+    Represents a named joint state of a robot. For example, the park position of the arms.
+    """
+
+    name: PrefixedName
+    """
+    The identifier for this joint state.
+    """
+
+    joint_names: List[Body]
+    """
+    Names of the joints in this state
+    """
+
+    joint_positions: List[float]
+    """
+    Position of the joints in this state, must correspond to the joint_names
+    """
+
+    state_type: str
+    """
+    Type of the joint state (e.g., "Park", "Open")
+    """
+
+    kinematic_chains: List[KinematicChain]
+    """
+    Kinematic chains that are involved in the state of the joints
+    """
+
+    _world: World = field(default=None)
+    """
+    The backreference to the world this joint state belongs to.
+    """
+
+    _robot: AbstractRobot = field(init=False)
+    """
+    The robot this joint state belongs to
+    """
+
+    def apply_to_world(self, world: World):
+        """
+        Applies the joint state to the robot in the given world.
+        :param world: The world in which the robot is located.
+        """
+        for joint_name, joint_position in zip(self.joint_names, self.joint_positions):
+            dof = list(world.get_connection_by_name(joint_name).dofs)[0]
+            world.state[dof.name].position = joint_position
+        world.notify_state_change()
+
+    def assign_to_robot(self, robot: AbstractRobot):
+        """
+        Assigns the joint state to the given robot. This method ensures that the joint state is only assigned
+        to one robot at a time, and raises an error if it is already assigned to another robot.
+        """
+        if self._robot is not None and self._robot != robot:
+            raise ValueError(
+                f"Joint State {self.name} is already assigned to another robot: {self._robot.name}."
+            )
+        if self._robot is not None:
+            return
+        self._robot = robot
+
+    def __hash__(self):
+        """
+        Returns the hash of the joint state, which is based on the joint names and positions.
+        This allows for proper comparison and storage in sets or dictionaries.
+        """
+        return hash((self.name, self.joint_names, self.joint_positions))
 
 @dataclass
-class AbstractRobot(Agent, ABC):
+class AbstractRobot(RootedSemanticAnnotation, ABC):
     """
     Specification of an abstract robot. A robot consists of:
     - a root body, which is the base of the robot
@@ -393,6 +464,11 @@ class AbstractRobot(Agent, ABC):
     sensor_chains: Set[KinematicChain] = field(default_factory=set)
     """
     A collection of all kinematic chains containing a sensor, such as a camera.
+    """
+
+    joint_states: Set[JointState] = field(default_factory=set)
+    """
+    A collection of all joint states of the robot such as ("Park" of arms).
     """
 
     default_collision_config: CollisionCheckingConfig = field(
@@ -510,3 +586,13 @@ class AbstractRobot(Agent, ABC):
             self.sensor_chains.add(kinematic_chain)
         self._semantic_annotations.add(kinematic_chain)
         kinematic_chain.assign_to_robot(self)
+
+    def add_joint_states(self, joint_states: List[JointState]):
+        """
+        Adds joint states for a specific robot.
+
+        :param joint_states: A list of joint states to be added.
+        """
+        for joint_state in joint_states:
+            self.joint_states.add(joint_state)
+            joint_state.assign_to_robot(self)
