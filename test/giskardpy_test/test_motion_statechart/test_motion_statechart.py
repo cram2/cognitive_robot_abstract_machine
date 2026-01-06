@@ -62,6 +62,8 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 )
 from giskardpy.motion_statechart.tasks.feature_functions import (
     AngleGoal,
+    DistanceGoal,
+    HeightGoal,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
@@ -115,6 +117,8 @@ from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFr
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+
+import semantic_digital_twin.spatial_types.spatial_types as cas
 
 
 def test_condition_to_str():
@@ -1461,6 +1465,309 @@ class TestCartesianTasks:
 
         # Verify task detected completion
         assert cart_straight.observation_state == ObservationStateValues.TRUE
+
+
+class TestFeatureFunctions:
+    """Test suite for feature function tasks (HeightGoal, DistanceGoal, etc.)."""
+
+    def test_height_goal_within_bounds(self, pr2_world: World):
+        """
+        Test that HeightGoal successfully constrains the vertical distance
+        between tip and reference points within specified bounds.
+        """
+        tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+        root = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
+
+        tip_point = cas.Point3(0, 0, 0, reference_frame=tip)
+        reference_point = cas.Point3(0, 0, 0, reference_frame=root)
+
+        # Set height bounds: move tip to be 0.3 to 0.5 meters above reference
+        lower_limit = 0.3
+        upper_limit = 0.5
+
+        msc = MotionStatechart()
+        height_goal = HeightGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=lower_limit,
+            upper_limit=upper_limit,
+        )
+        msc.add_node(height_goal)
+        msc.add_node(EndMotion.when_true(height_goal))
+
+        kin_sim = Executor(world=pr2_world)
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        # Verify the goal was achieved
+        assert height_goal.observation_state == ObservationStateValues.TRUE
+
+        # Compute actual height difference
+        root_P_tip = pr2_world.transform(target_frame=root, spatial_object=tip_point)
+        root_P_ref = pr2_world.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        height_diff = (root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3])[2]
+
+        # Verify height is within bounds
+        assert (
+            lower_limit <= height_diff <= upper_limit
+        ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+
+    def test_height_goal_negative_bounds(self, pr2_world: World):
+        """
+        Test HeightGoal with negative height bounds (tip below reference).
+        """
+        tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+        root = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
+
+        tip_point = cas.Point3(0, 0, 0, reference_frame=tip)
+        reference_point = cas.Point3(0, 0, 1.0, reference_frame=root)
+
+        # Negative bounds: tip should be below reference
+        lower_limit = -0.5
+        upper_limit = -0.2
+
+        msc = MotionStatechart()
+        height_goal = HeightGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=lower_limit,
+            upper_limit=upper_limit,
+        )
+        msc.add_node(height_goal)
+        msc.add_node(EndMotion.when_true(height_goal))
+
+        kin_sim = Executor(world=pr2_world)
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert height_goal.observation_state == ObservationStateValues.TRUE
+
+        # Verify actual height difference
+        root_P_tip = pr2_world.transform(target_frame=root, spatial_object=tip_point)
+        root_P_ref = pr2_world.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        height_diff = (root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3])[2]
+
+        assert (
+            lower_limit <= height_diff <= upper_limit
+        ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+
+    def test_distance_goal_within_bounds(self, pr2_world: World):
+        """
+        Test that DistanceGoal successfully constrains the horizontal distance
+        (in x-y plane) between tip and reference points within specified bounds.
+        """
+        tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+        root = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
+
+        tip_point = cas.Point3(0, 0, 0, reference_frame=tip)
+        reference_point = cas.Point3(0, 0, 0, reference_frame=root)
+
+        # Set distance bounds in x-y plane: 0.5 to 0.7 meters
+        lower_limit = 0.5
+        upper_limit = 0.7
+
+        msc = MotionStatechart()
+        distance_goal = DistanceGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=lower_limit,
+            upper_limit=upper_limit,
+        )
+        msc.add_node(distance_goal)
+        msc.add_node(EndMotion.when_true(distance_goal))
+
+        kin_sim = Executor(world=pr2_world)
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        # Verify the goal was achieved
+        assert distance_goal.observation_state == ObservationStateValues.TRUE
+
+        # Compute actual horizontal distance
+        root_P_tip = pr2_world.transform(target_frame=root, spatial_object=tip_point)
+        root_P_ref = pr2_world.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
+        # Distance in x-y plane only (ignore z)
+        horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
+
+        # Verify distance is within bounds
+        assert (
+            lower_limit <= horizontal_distance <= upper_limit
+        ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+
+    def test_distance_goal_zero_distance(self, pr2_world: World):
+        """
+        Test DistanceGoal with bounds that include zero (tip and reference at same x-y position).
+        """
+        tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+        root = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
+
+        tip_point = cas.Point3(0, 0, 0, reference_frame=tip)
+        # Reference point at same x-y but different z
+        reference_point = cas.Point3(0, 0, 0.5, reference_frame=root)
+
+        # Allow zero distance in x-y plane
+        lower_limit = 0.0
+        upper_limit = 0.1
+
+        msc = MotionStatechart()
+        distance_goal = DistanceGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=lower_limit,
+            upper_limit=upper_limit,
+        )
+        msc.add_node(distance_goal)
+        msc.add_node(EndMotion.when_true(distance_goal))
+
+        kin_sim = Executor(world=pr2_world)
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert distance_goal.observation_state == ObservationStateValues.TRUE
+
+        # Verify horizontal distance is near zero
+        root_P_tip = pr2_world.transform(target_frame=root, spatial_object=tip_point)
+        root_P_ref = pr2_world.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
+        horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
+
+        assert (
+            lower_limit <= horizontal_distance <= upper_limit
+        ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+
+    def test_distance_goal_ignores_z_axis(self, pr2_world: World):
+        """
+        Test that DistanceGoal only considers x-y plane distance and ignores z-axis.
+        Even with large z difference, if x-y distance is within bounds, goal succeeds.
+        """
+        tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+        root = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
+
+        tip_point = cas.Point3(0, 0, 0, reference_frame=tip)
+        # Reference point at specific x-y position but very different z
+        reference_point = cas.Point3(0.3, 0.4, 2.0, reference_frame=root)
+
+        # Distance bounds that match the x-y distance (0.5 meters)
+        # sqrt(0.3^2 + 0.4^2) = 0.5
+        lower_limit = 0.45
+        upper_limit = 0.55
+
+        msc = MotionStatechart()
+        distance_goal = DistanceGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=lower_limit,
+            upper_limit=upper_limit,
+        )
+        msc.add_node(distance_goal)
+        msc.add_node(EndMotion.when_true(distance_goal))
+
+        kin_sim = Executor(world=pr2_world)
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert distance_goal.observation_state == ObservationStateValues.TRUE
+
+        # Verify z difference is large but goal still succeeded
+        root_P_tip = pr2_world.transform(target_frame=root, spatial_object=tip_point)
+        root_P_ref = pr2_world.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
+
+        z_diff = abs(diff[2])
+        horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
+
+        # Z difference should be significant
+        assert z_diff > 0.5, f"Z difference {z_diff:.4f} should be > 0.5"
+
+        # But horizontal distance should be within bounds
+        assert (
+            lower_limit <= horizontal_distance <= upper_limit
+        ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+
+    def test_height_and_distance_combined(self, pr2_world: World):
+        """
+        Test combining HeightGoal and DistanceGoal in parallel to constrain
+        both vertical and horizontal distances simultaneously.
+        """
+        tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+        root = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
+
+        tip_point = cas.Point3(0, 0, 0, reference_frame=tip)
+        reference_point = cas.Point3(0, 0, 0, reference_frame=root)
+
+        height_lower = 0.3
+        height_upper = 0.5
+
+        distance_lower = 0.4
+        distance_upper = 0.6
+
+        msc = MotionStatechart()
+        combined_goal = Parallel(
+            [
+                HeightGoal(
+                    root_link=root,
+                    tip_link=tip,
+                    tip_point=tip_point,
+                    reference_point=reference_point,
+                    lower_limit=height_lower,
+                    upper_limit=height_upper,
+                ),
+                DistanceGoal(
+                    root_link=root,
+                    tip_link=tip,
+                    tip_point=tip_point,
+                    reference_point=reference_point,
+                    lower_limit=distance_lower,
+                    upper_limit=distance_upper,
+                ),
+            ]
+        )
+        msc.add_node(combined_goal)
+        msc.add_node(EndMotion.when_true(combined_goal))
+
+        kin_sim = Executor(world=pr2_world)
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert combined_goal.observation_state == ObservationStateValues.TRUE
+
+        # Verify both constraints are satisfied
+        root_P_tip = pr2_world.transform(target_frame=root, spatial_object=tip_point)
+        root_P_ref = pr2_world.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
+
+        height_diff = diff[2]
+        horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
+
+        assert (
+            height_lower <= height_diff <= height_upper
+        ), f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
+        assert (
+            distance_lower <= horizontal_distance <= distance_upper
+        ), f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
 
 
 def test_pointing(pr2_world: World):
