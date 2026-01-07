@@ -2,6 +2,7 @@ from __future__ import division
 
 from dataclasses import field, dataclass
 from typing import Union
+from abc import ABC, abstractmethod
 
 import numpy as np
 
@@ -18,7 +19,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 @dataclass(eq=False, repr=False)
-class FeatureFunctionGoal(Task):
+class FeatureFunctionGoal(Task, ABC):
     """
     Base class for all feature function tasks that operate on geometric features.
 
@@ -29,11 +30,6 @@ class FeatureFunctionGoal(Task):
     The class automatically transforms the controlled feature from the tip frame and
     the reference feature from the root frame into a common coordinate system for
     comparison and control.
-
-    .. note::
-       This is an abstract base class and should not be instantiated directly.
-       Concrete implementations should inherit from this class and specify their
-       controlled and reference features.
     """
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
@@ -99,12 +95,10 @@ class FeatureFunctionGoal(Task):
 @dataclass(eq=False, repr=False)
 class AlignPerpendicular(FeatureFunctionGoal):
     """
-    Creates a motion that aligns two normal vectors to be perpendicular (90 degrees) to each other.
+    Align two normal vectors to be perpendicular.
 
-    This goal generates constraints that drive the angle between the tip_normal and
-    reference_normal towards 90 degrees (π/2 radians), while respecting the maximum velocity limit.
-    The motion is considered complete when the absolute difference between the current angle
-    and 90 degrees is less than the specified threshold.
+    The goal drives the angle between `tip_normal` and `reference_normal` to π/2.
+    Completion occurs when |current_angle - π/2| < `threshold`.
     """
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
@@ -156,10 +150,6 @@ class HeightGoal(FeatureFunctionGoal):
     lower_limit and upper_limit bounds.
     """
 
-    tip_link: KinematicStructureEntity = field(kw_only=True)
-    """The link where the controlled point is attached."""
-    root_link: KinematicStructureEntity = field(kw_only=True)
-    """The reference link defining the fixed coordinate frame."""
     tip_point: cas.Point3 = field(kw_only=True)
     """The point to be controlled, defined in the tip link frame."""
     reference_point: cas.Point3 = field(kw_only=True)
@@ -169,7 +159,7 @@ class HeightGoal(FeatureFunctionGoal):
     upper_limit: float = field(kw_only=True)
     """Upper bound for the vertical distance along the z-axis."""
     weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
-    """Priority weight for the height constraint in the optimization problem."""
+    """Priority weight for the height constraint."""
     max_vel: float = field(default=0.2, kw_only=True)
     """Maximum allowed velocity for the vertical motion."""
 
