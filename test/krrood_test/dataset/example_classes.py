@@ -12,6 +12,7 @@ from typing_extensions import Dict, Any, Sequence, Self
 from typing_extensions import List, Optional, Type
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
+from krrood.class_diagrams.parameterizer import Parameterizer
 from krrood.entity_query_language.predicate import Symbol
 from krrood.ormatic.dao import AlternativeMapping, T
 
@@ -121,6 +122,16 @@ class Atom(NotMappedParent, Symbol):
     charge: float
     timestamp: datetime = field(default_factory=datetime.now)
 
+parameterizer = Parameterizer()
+
+# Call after classes exist
+position_vars = parameterizer(Position)
+pose_vars = parameterizer(Pose)
+atom_vars = parameterizer(Atom)
+
+print("Position variables:", position_vars)
+print("Pose variables:", pose_vars)
+print("Atom variables:", atom_vars)
 
 # check that custom type checks work
 class PhysicalObject:
@@ -604,6 +615,12 @@ class PrimaryBase:
 @dataclass
 class MultipleInheritance(PrimaryBase, Mixin):
     extra_attribute: str
+
+def return_Position():
+    position = Position(x=1, y=2, z=3)
+    orientation = Orientation(w=1.0, x=0.0, y=0.0, z=0.0)
+    pose = Pose(position=position, orientation=orientation)
+    return pose.position.x
 
 
 # %% Test enum list
