@@ -117,7 +117,7 @@ def variable_from(
     """
     Similar to `variable` but constructed from a domain directly wihout specifying its type.
     """
-    return Literal(data=domain, name=name)
+    return Literal(data=domain, name=name, wrap_in_iterator=False)
 
 
 def _get_domain_source_from_domain_and_type_values(
