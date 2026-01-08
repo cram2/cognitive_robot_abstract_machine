@@ -1,89 +1,23 @@
-import os
-import threading
-import time
 from dataclasses import dataclass
 
 import pytest
-from semantic_digital_twin.utils import rclpy_installed
 from typing_extensions import Self
 
-from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types import Vector3, TransformationMatrix
+from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     RevoluteConnection,
     FixedConnection,
 )
-from semantic_digital_twin.world_description.geometry import Box, Scale, Cylinder
+from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     CollisionCheckingConfig,
 )
-
-
-@pytest.fixture(scope="function")
-def rclpy_node():
-    """
-    You can use this fixture if you want to use the marker visualizer of semDT and need a ros node.
-    """
-    if not rclpy_installed():
-        pytest.skip("ROS not installed")
-    import rclpy
-    from rclpy.executors import SingleThreadedExecutor
-
-    rclpy.init()
-    node = rclpy.create_node("test_node")
-
-    executor = SingleThreadedExecutor()
-    executor.add_node(node)
-
-    thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
-    thread.start()
-    time.sleep(0.1)
-    try:
-        yield node
-    finally:
-        # Stop executor cleanly and wait for the thread to exit
-        executor.shutdown()
-        thread.join(timeout=2.0)
-
-        # Remove the node from the executor and destroy it
-        # (executor.shutdown() takes care of spinning; add_node is safe to keep as-is)
-        node.destroy_node()
-
-        # Shut down the ROS client library
-        rclpy.shutdown()
-
-
-@pytest.fixture
-def pr2_world():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "giskardpy",
-        "resources",
-        "urdf",
-    )
-    pr2 = os.path.join(urdf_dir, "pr2_kinematic_tree.urdf")
-    pr2_parser = URDFParser.from_file(file_path=pr2)
-    world_with_pr2 = pr2_parser.parse()
-    with world_with_pr2.modify_world():
-        pr2_root = world_with_pr2.root
-        localization_body = Body(name=PrefixedName("odom_combined"))
-        world_with_pr2.add_kinematic_structure_entity(localization_body)
-        c_root_bf = OmniDrive.create_with_dofs(
-            parent=localization_body, child=pr2_root, world=world_with_pr2
-        )
-        world_with_pr2.add_connection(c_root_bf)
-        PR2.from_world(world_with_pr2)
-
-    return world_with_pr2
 
 
 @pytest.fixture()
@@ -113,7 +47,7 @@ class BoxBot(AbstractRobot):
             )
         )
 
-    def load_srdf(self):
+    def setup_collision_config(self):
         """
         Loads the SRDF file for the PR2 robot, if it exists.
         """
@@ -155,7 +89,9 @@ def box_bot_world():
         env_connection = FixedConnection(
             parent=body,
             child=environment,
-            parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(1),
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                1
+            ),
         )
         world.add_connection(env_connection)
         BoxBot.from_world(world)

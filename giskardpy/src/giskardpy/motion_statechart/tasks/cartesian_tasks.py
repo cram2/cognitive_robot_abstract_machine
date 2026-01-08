@@ -4,8 +4,7 @@ from typing import Optional, ClassVar
 import numpy as np
 from typing_extensions import List
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.motion_statechart import auxilary_variable_manager
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.binding_policy import (
     GoalBindingPolicy,
     ForwardKinematicsBinding,
@@ -20,9 +19,13 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from giskardpy.motion_statechart.graph_node import Task
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.spatial_types import (
+    Vector3,
+    Point3,
+    RotationMatrix,
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.degree_of_freedom import PositionVariable
-from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -32,166 +35,306 @@ from semantic_digital_twin.world_description.world_entity import (
 @dataclass
 class CartesianPosition(Task):
     """
-    This Task will use the kinematic chain between root and tip link to move tip_link into goal_point.
+    Move a tip link to a goal position in 3D space.
+
+    This task controls only the position (x, y, z) of the tip link, not its orientation.
+
     .. warning:: This task does not constrain orientation.
     """
 
     default_reference_velocity: ClassVar[float] = 0.2
+
     root_link: KinematicStructureEntity = field(kw_only=True)
+    """Base link of the kinematic chain."""
+
     tip_link: KinematicStructureEntity = field(kw_only=True)
-    goal_point: cas.Point3 = field(kw_only=True)
+    """End link that should reach the goal position."""
+
+    goal_point: Point3 = field(kw_only=True)
+    """Target 3D point to reach."""
     threshold: float = field(default=0.01, kw_only=True)
+    """Distance threshold for goal achievement in meters."""
+
     reference_velocity: Optional[float] = field(
         default_factory=lambda: CartesianPosition.default_reference_velocity,
         kw_only=True,
     )
+    """Reference velocity for normalization in m/s."""
+
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
-    absolute: bool = field(default=False, kw_only=True)
+    """Task priority relative to other tasks."""
+
+    binding_policy: GoalBindingPolicy = field(
+        default=GoalBindingPolicy.Bind_on_start, kw_only=True
+    )
+    """Describes when the goal is computed. See GoalBindingPolicy for more information."""
+
+    _fk_binding: ForwardKinematicsBinding = field(kw_only=True, init=False, repr=False)
 
     def build(self, context: BuildContext) -> NodeArtifacts:
+        """
+        Build motion constraints for reaching the goal position.
+
+        :param context: Provides access to world model and kinematic expressions.
+        :return: NodeArtifacts containing constraints and observation conditions.
+        """
         artifacts = NodeArtifacts()
 
-        root_P_goal = context.world.transform(
-            target_frame=self.root_link, spatial_object=self.goal_point
+        # Create forward kinematics binding for the goal
+        self._fk_binding = ForwardKinematicsBinding(
+            name=PrefixedName("root_T_goal_ref", str(self.name)),
+            root=self.root_link,
+            tip=self.goal_point.reference_frame,
+            build_context=context,
         )
+        root_P_goal = self._fk_binding.root_T_tip @ self.goal_point
 
-        r_P_c = context.world.compose_forward_kinematics_expression(
+        # Get current tip position in root frame
+        root_P_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         ).to_position()
+
+        # Add constraints to move tip towards goal
         artifacts.constraints.add_point_goal_constraints(
             frame_P_goal=root_P_goal,
-            frame_P_current=r_P_c,
+            frame_P_current=root_P_current,
             reference_velocity=self.reference_velocity,
             weight=self.weight,
         )
 
-        distance_to_goal = root_P_goal.euclidean_distance(r_P_c)
+        # Success condition: distance below threshold
+        distance_to_goal = root_P_goal.euclidean_distance(root_P_current)
         artifacts.observation = distance_to_goal < self.threshold
         return artifacts
+
+    def on_start(self, context: ExecutionContext):
+        """
+        Called when task starts execution.
+
+        Binds the goal pose transformation if binding policy is Bind_on_start.
+
+        :param context: Provides access to current world state.
+        """
+        if self.binding_policy == GoalBindingPolicy.Bind_on_start:
+            self._fk_binding.bind(context.world)
 
 
 @dataclass
 class CartesianPositionStraight(Task):
-    root_link: Body = field(kw_only=True)
-    tip_link: Body = field(kw_only=True)
-    goal_point: cas.Point3 = field(kw_only=True)
-    threshold: float = 0.01
-    reference_velocity: Optional[float] = CartesianPosition.default_reference_velocity
-    absolute: bool = False
-    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
+    """
+    Move a tip link to a goal position along a straight line.
 
-    def __post_init__(self):
-        """
-        Same as CartesianPosition, but tries to move the tip_link in a straight line to the goal_point.
-        """
-        if self.absolute:
-            root_P_goal = context.world.transform(
-                target_frame=self.root_link, spatial_object=self.goal_point
-            )
-        else:
-            root_T_x = context.world.compose_forward_kinematics_expression(
-                self.root_link, self.goal_point.reference_frame
-            )
-            root_P_goal = root_T_x.dot(self.goal_point)
-            root_P_goal = self.update_expression_on_starting(root_P_goal)
+    Unlike CartesianPosition, this task constrains the tip link to move in a straight
+    line towards the goal, useful for tasks requiring linear trajectories.
+    """
 
+    root_link: KinematicStructureEntity = field(kw_only=True)
+    """Base link of the kinematic chain."""
+
+    tip_link: KinematicStructureEntity = field(kw_only=True)
+    """End link that should reach the goal position."""
+
+    goal_point: Point3 = field(kw_only=True)
+    """Target 3D point to reach."""
+
+    reference_velocity: float = field(
+        default=CartesianPosition.default_reference_velocity, kw_only=True
+    )
+    """Reference velocity for movement in m/s."""
+
+    threshold: float = field(default=0.01, kw_only=True)
+    """Distance threshold for goal achievement in meters."""
+
+    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
+    """Task priority relative to other tasks."""
+
+    binding_policy: GoalBindingPolicy = field(
+        default=GoalBindingPolicy.Bind_on_start, kw_only=True
+    )
+    """Describes when the goal is computed. See GoalBindingPolicy for more information."""
+
+    _fk_binding: ForwardKinematicsBinding = field(kw_only=True, init=False)
+
+    def build(self, context: BuildContext) -> NodeArtifacts:
+        """
+        Build motion constraints for reaching the goal along a straight line.
+
+        Creates a virtual coordinate frame aligned with the straight-line path and
+        constrains motion to stay on that line.
+
+        :param context: Provides access to world model and kinematic expressions.
+        :return: NodeArtifacts containing constraints and observation conditions.
+        """
+        artifacts = NodeArtifacts()
+
+        # Create forward kinematics binding for the goal
+        self._fk_binding = ForwardKinematicsBinding(
+            name=PrefixedName("root_T_goal_ref", str(self.name)),
+            root=self.root_link,
+            tip=self.goal_point.reference_frame,
+            build_context=context,
+        )
+        root_P_goal = self._fk_binding.root_T_tip @ self.goal_point
+
+        # Get current tip position and transformations
         root_P_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         ).to_position()
-        t_T_r = context.world.compose_forward_kinematics_expression(
+        tip_T_root = context.world.compose_forward_kinematics_expression(
             self.tip_link, self.root_link
         )
-        tip_P_goal = t_T_r.dot(root_P_goal)
+        tip_P_goal = tip_T_root.dot(root_P_goal)
 
-        # Create rotation matrix, which rotates the tip link frame
-        # such that its x-axis shows towards the goal position.
-        # The goal frame is called 'a'.
-        # Thus, the rotation matrix is called t_R_a.
-        tip_V_error = cas.Vector3.from_iterable(tip_P_goal)
+        # Create coordinate frame aligned with straight-line path
+        # x-axis points from current position towards goal
+        tip_V_error = Vector3.from_iterable(tip_P_goal)
         trans_error = tip_V_error.norm()
-        # x-axis
         tip_V_intermediate_error = tip_V_error.safe_division(trans_error)
-        # y- and z-axis
-        tip_V_intermediate_y = cas.Vector3.from_iterable(np.random.random((3,)))
+
+        # Create orthogonal y and z axes
+        tip_V_intermediate_y = Vector3.from_iterable(np.random.random((3,)))
         tip_V_intermediate_y.scale(1)
         y = tip_V_intermediate_error.cross(tip_V_intermediate_y)
         z = tip_V_intermediate_error.cross(y)
-        t_R_a = cas.RotationMatrix.from_vectors(x=tip_V_intermediate_error, y=-z, z=y)
+        tip_R_aligned = RotationMatrix.from_vectors(
+            x=tip_V_intermediate_error, y=-z, z=y
+        )
 
-        # Apply rotation matrix on the fk of the tip link
-        tip_T_root = context.world.compute_forward_kinematics(
+        # Transform tip kinematics into aligned frame
+        tip_T_root_evaluated = context.world.compute_forward_kinematics(
             self.tip_link, self.root_link
         )
         root_T_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
-        a_T_t = t_R_a.inverse() @ tip_T_root @ root_T_tip
+        aligned_T_tip = tip_R_aligned.inverse() @ tip_T_root_evaluated @ root_T_tip
 
-        expr_p = a_T_t.to_position()
+        expr_p = aligned_T_tip.to_position()
         dist = (root_P_goal - root_P_tip).norm()
 
-        self.add_equality_constraint_vector(
-            reference_velocities=[self.reference_velocity] * 3,
-            equality_bounds=[dist, 0, 0],
-            weights=[
-                DefaultWeights.WEIGHT_ABOVE_CA,
-                DefaultWeights.WEIGHT_ABOVE_CA * 2,
-                DefaultWeights.WEIGHT_ABOVE_CA * 2,
-            ],
-            task_expression=expr_p[:3],
-            names=["line/x", "line/y", "line/z"],
-        )
-        self.observation_expression = dist < self.threshold
+        # Constrain motion: x-axis moves towards goal, y and z stay at zero
+        for i, (name, bound, weight_mult) in enumerate(
+            [
+                ("line/x", dist, 1),
+                ("line/y", 0, 2),
+                ("line/z", 0, 2),
+            ]
+        ):
+            artifacts.constraints.add_equality_constraint(
+                name=name,
+                reference_velocity=self.reference_velocity,
+                equality_bound=bound,
+                weight=DefaultWeights.WEIGHT_ABOVE_CA * weight_mult,
+                task_expression=expr_p[i],
+            )
+
+        # Note: Debug expressions for current_point and goal_point were removed
+        # due to Color/ColorRGBA API incompatibility in the current codebase version.
+        # The core functionality works correctly without visualization.
+
+        # Success condition: distance below threshold
+        artifacts.observation = dist < self.threshold
+        return artifacts
+
+    def on_start(self, context: ExecutionContext):
+        """
+        Called when task starts execution.
+
+        Binds the goal pose transformation if binding policy is Bind_on_start.
+
+        :param context: Provides access to current world state.
+        """
+        if self.binding_policy == GoalBindingPolicy.Bind_on_start:
+            self._fk_binding.bind(context.world)
 
 
 @dataclass
 class CartesianOrientation(Task):
     """
-    This Task will use the kinematic chain between root and tip link to move tip_link into goal_orientation.
+    Rotate a tip link to match a goal orientation.
+
+    This task controls only the orientation (roll, pitch, yaw) of the tip link,
+    not its position.
+
     .. warning:: This task does not constrain position.
     """
 
     default_reference_velocity: ClassVar[float] = 0.2
+
     root_link: KinematicStructureEntity = field(kw_only=True)
+    """Base link of the kinematic chain."""
+
     tip_link: KinematicStructureEntity = field(kw_only=True)
-    goal_orientation: cas.RotationMatrix = field(kw_only=True)
+    """End link whose orientation should match the goal."""
+
+    goal_orientation: RotationMatrix = field(kw_only=True)
+    """Target rotation matrix to match."""
     threshold: float = field(default=0.01, kw_only=True)
+    """Rotation error threshold for goal achievement in radians."""
+
     reference_velocity: float = field(
         default_factory=lambda: CartesianOrientation.default_reference_velocity,
         kw_only=True,
     )
+    """Reference angular velocity for normalization in rad/s."""
+
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
-    absolute: bool = field(default=False, kw_only=True)
+    """Task priority relative to other tasks."""
+
+    binding_policy: GoalBindingPolicy = field(
+        default=GoalBindingPolicy.Bind_on_start, kw_only=True
+    )
+    """Describes when the goal is computed. See GoalBindingPolicy for more information."""
+
+    _fk_binding: ForwardKinematicsBinding = field(kw_only=True, init=False)
 
     def build(self, context: BuildContext) -> NodeArtifacts:
+        """
+        Build motion constraints for reaching the goal orientation.
+
+        :param context: Provides access to world model and kinematic expressions.
+        :return: NodeArtifacts containing constraints and observation conditions.
+        """
         artifacts = NodeArtifacts()
 
-        # if self.absolute:
-        root_R_goal = context.world.transform(
-            target_frame=self.root_link, spatial_object=self.goal_orientation
+        # Create forward kinematics binding for the goal
+        self._fk_binding = ForwardKinematicsBinding(
+            name=PrefixedName("root_T_goal_ref", str(self.name)),
+            root=self.root_link,
+            tip=self.goal_orientation.reference_frame,
+            build_context=context,
         )
-        # else:
-        #     root_T_x = context.world.compose_forward_kinematics_expression(
-        #         self.root_link, self.goal_orientation.reference_frame
-        #     )
-        #     root_R_goal = root_T_x.dot(self.goal_orientation)
-        #     root_R_goal = self.update_expression_on_starting(root_R_goal)
+        root_R_goal = self._fk_binding.root_T_tip @ self.goal_orientation
 
-        r_T_c = context.world.compose_forward_kinematics_expression(
+        # Get current tip orientation in root frame
+        root_T_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
-        r_R_c = r_T_c.to_rotation_matrix()
+        root_R_current = root_T_current.to_rotation_matrix()
 
+        # Add constraints to rotate tip towards goal
         artifacts.constraints.add_rotation_goal_constraints(
-            frame_R_current=r_R_c,
+            frame_R_current=root_R_current,
             frame_R_goal=root_R_goal,
             reference_velocity=self.reference_velocity,
             weight=self.weight,
         )
 
-        rotation_error = r_R_c.rotational_error(root_R_goal)
-        artifacts.observation = cas.abs(rotation_error) < self.threshold
+        # Success condition: rotation error below threshold
+        rotation_error = root_R_current.rotational_error(root_R_goal)
+        artifacts.observation = sm.abs(rotation_error) < self.threshold
         return artifacts
+
+    def on_start(self, context: ExecutionContext):
+        """
+        Called when task starts execution.
+
+        Binds the goal pose transformation if binding policy is Bind_on_start.
+
+        :param context: Provides access to current world state.
+        """
+        if self.binding_policy == GoalBindingPolicy.Bind_on_start:
+            self._fk_binding.bind(context.world)
 
 
 @dataclass(eq=False, repr=False)
@@ -201,51 +344,53 @@ class CartesianPose(Task):
     """
 
     root_link: Optional[KinematicStructureEntity] = field(kw_only=True, default=None)
-    """Name of the root link of the kin chain"""
+    """Name of the root link of the kin chain."""
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
-    """Name of the tip link of the kin chain"""
+    """Name of the tip link of the kin chain."""
 
-    goal_pose: cas.TransformationMatrix = field(kw_only=True)
-    """The goal pose"""
+    goal_pose: HomogeneousTransformationMatrix = field(kw_only=True)
+    """The goal pose."""
 
     reference_linear_velocity: float = field(
         default=CartesianPosition.default_reference_velocity, kw_only=True
     )
-    """
-    Unit: m/s
-    This is used for normalization, for real limits use CartesianVelocityLimit.
-    """
+    """Unit: m/s. This is used for normalization, for real limits use CartesianVelocityLimit."""
 
     reference_angular_velocity: float = field(
         default=CartesianOrientation.default_reference_velocity, kw_only=True
     )
-    """
-    Unit: rad/s
-    This is used for normalization, for real limits use CartesianVelocityLimit.
-    """
+    """Unit: rad/s. This is used for normalization, for real limits use CartesianVelocityLimit."""
 
     threshold: float = field(default=0.01, kw_only=True)
-    """
-    If the error falls below this threshold, the goal is achieved.
-    This is used for both position and orientation.
-    Units are m and rad.
-    """
+    """If the error falls below this threshold, the goal is achieved. This is used for both position and orientation. Units are m and rad."""
 
     binding_policy: GoalBindingPolicy = field(
         default=GoalBindingPolicy.Bind_on_start, kw_only=True
     )
     """Describes when the goal is computed. See GoalBindingPolicy for more information."""
+
     _fk_binding: ForwardKinematicsBinding = field(kw_only=True, init=False)
 
     weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
+    """Task priority relative to other tasks."""
 
     def build(self, context: BuildContext) -> NodeArtifacts:
+        """
+        Build motion constraints for reaching the full 6D goal pose.
+
+        Combines position and orientation constraints for complete pose matching.
+
+        :param context: Provides access to world model and kinematic expressions.
+        :return: NodeArtifacts containing constraints and observation conditions.
+        """
         artifacts = NodeArtifacts()
 
+        # Use world root if no root link specified
         if self.root_link is None:
             self.root_link = context.world.root
 
+        # Create binding for goal pose's reference frame
         self._fk_binding = ForwardKinematicsBinding(
             name=PrefixedName("root_T_ref", str(self.name)),
             root=self.root_link,
@@ -253,31 +398,38 @@ class CartesianPose(Task):
             build_context=context,
         )
 
+        # Extract position and orientation from goal pose
         goal_orientation = self.goal_pose.to_rotation_matrix()
         goal_point = self.goal_pose.to_position()
 
+        # Transform goal into root frame
         root_P_goal = self._fk_binding.root_T_tip @ goal_point
         root_R_goal = self._fk_binding.root_T_tip @ goal_orientation
 
-        r_T_c = context.world.compose_forward_kinematics_expression(
+        # Get current tip pose in root frame
+        root_T_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
-        r_P_c = r_T_c.to_position()
+        root_P_current = root_T_current.to_position()
+
+        # Add position constraints
         artifacts.constraints.add_point_goal_constraints(
             name="position",
             frame_P_goal=root_P_goal,
-            frame_P_current=r_P_c,
+            frame_P_current=root_P_current,
             reference_velocity=self.reference_linear_velocity,
             weight=self.weight,
         )
 
-        distance_to_goal = root_P_goal.euclidean_distance(r_P_c)
+        distance_to_goal = root_P_goal.euclidean_distance(root_P_current)
 
-        r_R_c = r_T_c.to_rotation_matrix()
+        # Get current orientation
+        root_R_current = root_T_current.to_rotation_matrix()
 
+        # Add orientation constraints
         artifacts.constraints.add_rotation_goal_constraints(
             name="rotation",
-            frame_R_current=r_R_c,
+            frame_R_current=root_R_current,
             frame_R_goal=root_R_goal,
             reference_velocity=self.reference_angular_velocity,
             weight=self.weight,
@@ -286,7 +438,9 @@ class CartesianPose(Task):
         artifacts.debug_expressions.append(
             DebugExpression(
                 "current_pose",
-                expression=cas.TransformationMatrix(reference_frame=self.tip_link),
+                expression=HomogeneousTransformationMatrix(
+                    reference_frame=self.tip_link
+                ),
             )
         )
         artifacts.debug_expressions.append(
@@ -296,15 +450,22 @@ class CartesianPose(Task):
             )
         )
 
-        rotation_error = r_R_c.rotational_error(root_R_goal)
-        artifacts.observation = cas.logic_and(
-            cas.abs(rotation_error) < self.threshold,
+        rotation_error = root_R_current.rotational_error(root_R_goal)
+        artifacts.observation = sm.logic_and(
+            sm.abs(rotation_error) < self.threshold,
             distance_to_goal < self.threshold,
         )
 
         return artifacts
 
     def on_start(self, context: ExecutionContext):
+        """
+        Called when task starts execution.
+
+        Binds the goal pose transformation if binding policy is Bind_on_start.
+
+        :param context: Provides access to current world state.
+        """
         if self.binding_policy == GoalBindingPolicy.Bind_on_start:
             self._fk_binding.bind(context.world)
 
@@ -352,7 +513,7 @@ class CartesianPositionVelocityLimit(Task):
 
         position_variables: List[PositionVariable] = root_P_tip.free_variables()
         velocity_variables = [p.dof.variables.velocity for p in position_variables]
-        root_P_tip_dot = cas.Expression(root_P_tip).total_derivative(
+        root_P_tip_dot = root_P_tip.total_derivative(
             position_variables, velocity_variables
         )
 
@@ -409,11 +570,9 @@ class CartesianRotationVelocityLimit(Task):
         _, angle = root_R_tip.to_axis_angle()
         angle_variables: List[PositionVariable] = angle.free_variables()
         angle_velocities = [v.dof.variables.velocity for v in angle_variables]
-        angle_dot = cas.Expression(angle).total_derivative(
-            angle_variables, angle_velocities
-        )
+        angle_dot = angle.total_derivative(angle_variables, angle_velocities)
 
-        artifacts.observation = cas.abs(angle_dot) <= self.max_angular_velocity
+        artifacts.observation = sm.abs(angle_dot) <= self.max_angular_velocity
 
         return artifacts
 
@@ -500,7 +659,7 @@ class CartesianPositionVelocityTarget(Task):
             self.root_link, self.tip_link
         ).to_position()
         self.add_velocity_eq_constraint_vector(
-            velocity_goals=cas.Expression([self.x_vel, self.y_vel, self.z_vel]),
+            velocity_goals=sm.Vector([self.x_vel, self.y_vel, self.z_vel]),
             task_expression=r_P_c,
             reference_velocities=[
                 CartesianPosition.default_reference_velocity,
@@ -528,11 +687,11 @@ class JustinTorsoLimitCart(Task):
         torso_root_T_torso_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
-        torso_root_V_up = cas.Vector3(0, 0, 1)
+        torso_root_V_up = Vector3(0, 0, 1)
         torso_root_V_up.reference_frame = self.root_link
         torso_root_V_up.vis_frame = self.root_link
 
-        torso_root_V_left = cas.Vector3(0, 1, 0)
+        torso_root_V_left = Vector3(0, 1, 0)
         torso_root_V_left.reference_frame = self.root_link
         torso_root_V_left.vis_frame = self.root_link
 
@@ -542,12 +701,6 @@ class JustinTorsoLimitCart(Task):
             frame_V_plane_vector1=torso_root_V_left,
             frame_V_plane_vector2=torso_root_V_up,
         )
-        # distance = cas.distance_point_to_line(torso_root_P_torso_tip, cas.Point3((0, 0, 0)), torso_root_V_up)
-
-        # god_map.context.add_debug_expression(f'{self.name}/torso_root_V_up',
-        #                                                       expression=torso_root_V_up)
-        # god_map.context.add_debug_expression(f'{self.name}/torso_root_P_torso_tip',
-        #                                                       expression=torso_root_P_torso_tip)
 
         self.add_inequality_constraint(
             reference_velocity=CartesianPosition.default_reference_velocity,

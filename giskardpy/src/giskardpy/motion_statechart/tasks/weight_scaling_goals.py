@@ -2,8 +2,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import List
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.graph_node import Task
+from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -19,7 +20,7 @@ class BaseArmWeightScaling(Task):
 
     root_link: Body
     tip_link: Body
-    tip_goal: cas.Point3
+    tip_goal: Point3
     arm_joints: List[str]
     base_joints: List[str]
     gain: float = 100000
@@ -52,7 +53,7 @@ class BaseArmWeightScaling(Task):
                     v_gain = (
                         self.gain
                         / 100
-                        * cas.Expression(1).safe_division(
+                        * sm.Scalar(1).safe_division(
                             (scaling_exp / v.upper_limits.velocity).norm()
                         )
                     )
@@ -65,7 +66,7 @@ class BaseArmWeightScaling(Task):
         context.add_debug_expression(
             "base_scaling",
             self.gain
-            * cas.Expression(1).safe_division(
+            * sm.Scalar(1).safe_division(
                 (scaling_exp / base_v.upper_limits.velocity).norm()
             ),
         )
@@ -96,10 +97,10 @@ class MaxManipulability(Task):
         ).to_position()[:3]
 
         symbols = context.free_variables()
-        e = cas.vstack([root_P_tip])
+        e = sm.vstack([root_P_tip])
         J = e.jacobian(symbols)
         JJT = J.dot(J.T)
-        m = cas.sqrt(JJT.det())
+        m = sm.sqrt(JJT.det())
 
         self.add_position_constraint(
             reference_velocity=1,
@@ -117,4 +118,4 @@ class MaxManipulability(Task):
             self.m_threshold,
             derivatives_to_plot=[0, 1],
         )
-        self.observation_expression = cas.abs(self.m_threshold - m) <= 0.01
+        self.observation_expression = sm.abs(self.m_threshold - m) <= 0.01

@@ -16,7 +16,9 @@ from semantic_digital_twin.world_description.graph_of_convex_sets import (
     PoseOccupiedError,
 )
 from semantic_digital_twin.spatial_types import Point3
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -103,7 +105,9 @@ class GCSFromWorldTestCase(unittest.TestCase):
                     max_y=2,
                     min_z=0,
                     max_z=2,
-                    origin=TransformationMatrix(reference_frame=self.world.root),
+                    origin=HomogeneousTransformationMatrix(
+                        reference_frame=self.world.root
+                    ),
                 )
             ],
             self.world.root,
@@ -138,7 +142,9 @@ class GCSFromWorldTestCase(unittest.TestCase):
                     max_y=2,
                     min_z=0,
                     max_z=2,
-                    origin=TransformationMatrix(reference_frame=self.world.root),
+                    origin=HomogeneousTransformationMatrix(
+                        reference_frame=self.world.root
+                    ),
                 )
             ],
             self.world.root,

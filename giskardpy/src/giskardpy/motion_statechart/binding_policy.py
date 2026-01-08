@@ -1,17 +1,14 @@
 from dataclasses import dataclass, field, InitVar
-from enum import Enum
-from typing import Dict, Any, Self
 
 import numpy as np
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.motion_statechart.auxilary_variable_manager import (
     AuxiliaryVariableManager,
 )
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.utils.utils import JsonSerializableEnum
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -56,7 +53,9 @@ class ForwardKinematicsBinding:
 
     _root_T_tip_np: np.ndarray | None = field(init=False)
     """The current state of the TransformationMatrix root_T_tip."""
-    _root_T_tip_expr: cas.TransformationMatrix | None = field(default=None, init=False)
+    _root_T_tip_expr: HomogeneousTransformationMatrix | None = field(
+        default=None, init=False
+    )
     """The TransformationMatrix root_T_tip, represented using auxiliary variables."""
 
     def __post_init__(self, build_context: BuildContext):
@@ -77,7 +76,7 @@ class ForwardKinematicsBinding:
 
     def _create_transformation_matrix(
         self, auxiliary_variable_manager: AuxiliaryVariableManager
-    ) -> cas.TransformationMatrix:
+    ) -> HomogeneousTransformationMatrix:
         """
         Creates the TransformationMatrix root_T_tip, represented using auxiliary variables.
         :param auxiliary_variable_manager: The AuxiliaryVariableManager used for creating the auxiliary variables.

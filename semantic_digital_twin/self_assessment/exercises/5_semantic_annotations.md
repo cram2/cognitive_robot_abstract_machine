@@ -27,7 +27,8 @@ Your goals:
 :tags: [remove-input]
 from dataclasses import dataclass, field
 from typing import Optional
-from krrood.entity_query_language.entity import entity, an, let
+from krrood.entity_query_language.entity import entity, variable
+from krrood.entity_query_language.entity_result_processors import an, the
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
@@ -222,10 +223,10 @@ Your goals:
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-bottle = let(Bottle, domain=world.semantic_annotations)
+bottle = variable(Bottle, domain=world.semantic_annotations)
 bottles_with_cap_query = an(
     entity(
-        bottle, bottle.cap != None
+        bottle).where(bottle.cap != None
     )
 )
 query_result = list(bottles_with_cap_query.evaluate())

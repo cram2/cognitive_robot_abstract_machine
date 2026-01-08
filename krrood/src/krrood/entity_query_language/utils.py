@@ -16,7 +16,16 @@ try:
 except ImportError:
     Source = None
 
-from typing_extensions import Set, Any, TypeVar, List
+from typing_extensions import (
+    Set,
+    Any,
+    TypeVar,
+    List,
+    Dict,
+    Iterable,
+    Callable,
+    Iterator,
+)
 
 
 class IDGenerator:
@@ -157,3 +166,44 @@ def make_set(value: Any) -> Set:
 
 
 T = TypeVar("T")
+
+Binding = Dict[int, Any]
+"""
+A dictionary mapping variable IDs to values.
+"""
+Stage = Callable[[Binding], Iterator[Binding]]
+"""
+A function that accepts a binding and returns an iterator of bindings.
+"""
+
+
+def chain_stages(stages: List[Stage], initial: Binding) -> Iterator[Binding]:
+    """
+    Chains a sequence of stages into a single pipeline.
+
+    This function takes a list of computational stages and an initial binding, passing the
+    result of each computation stage to the next one. It produces an iterator of bindings
+    by applying each stage in sequence to the current binding.
+
+    :param stages: List[Stage]: A list of stages where each stage is a callable that accepts
+        a Binding and produces an iterator of bindings.
+    :param initial: Binding: The initial binding to start the computation with.
+
+    :return: Iterator[Binding]: An iterator over the bindings resulting from applying all
+        stages in sequence.
+    """
+
+    def evaluate_next_stage_or_yield(i: int, b: Binding) -> Iterator[Binding]:
+        """
+        Recursively evaluates the next stage or yields the current binding if all stages are done.
+
+        :param i: int: The index of the current stage.
+        :param b: Binding: The current binding to be processed.
+        """
+        if i == len(stages):
+            yield b
+            return
+        for b2 in stages[i](b):
+            yield from evaluate_next_stage_or_yield(i + 1, b2)
+
+    yield from evaluate_next_stage_or_yield(0, initial)

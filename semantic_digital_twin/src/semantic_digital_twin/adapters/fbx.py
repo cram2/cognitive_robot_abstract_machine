@@ -11,7 +11,7 @@ from fbxloader import Object3D, Mesh as FBXMesh, Scene
 from ..adapters.mesh import MeshParser
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import (
-    TransformationMatrix,
+    HomogeneousTransformationMatrix,
 )
 from ..world import World
 from ..world_description.connections import FixedConnection
@@ -173,7 +173,7 @@ class FBXParser(MeshParser):
                             )
 
                             t_mesh = TriangleMesh(
-                                origin=TransformationMatrix(),
+                                origin=HomogeneousTransformationMatrix(),
                                 mesh=trimesh.Trimesh(
                                     vertices=transformed_vertices, faces=o.faces
                                 ),
@@ -205,7 +205,7 @@ class FBXParser(MeshParser):
                     obj_body = world.get_body_by_name(name)
                     parent_body = world.get_body_by_name(parent_name)
 
-                    parent_T_child = TransformationMatrix(obj.matrix)
+                    parent_T_child = HomogeneousTransformationMatrix(obj.matrix)
 
                     connection = FixedConnection(
                         parent=parent_body,

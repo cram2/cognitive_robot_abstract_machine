@@ -9,7 +9,7 @@ import numpy as np
 from semantic_digital_twin.spatial_types.spatial_types import (
     Vector3 as SpatialVector3,
     Quaternion as SpatialQuaternion,
-    TransformationMatrix as SpatialTransformationMatrix,
+    HomogeneousTransformationMatrix as SpatialTransformationMatrix,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Self, Tuple, Optional, List, TYPE_CHECKING
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 @has_parameters
 @dataclass
-class Vector3(HasParameters):
+class PyCramVector3(HasParameters):
     """
     A 3D vector with x, y and z coordinates.
     """
@@ -72,9 +72,9 @@ class Vector3(HasParameters):
 
     def to_spatial_type(self, reference_frame: Body = None) -> SpatialVector3:
         return SpatialVector3(
-            x_init=float(self.x),
-            y_init=float(self.y),
-            z_init=self.z,
+            x=float(self.x),
+            y=float(self.y),
+            z=self.z,
             reference_frame=reference_frame,
         )
 
@@ -102,7 +102,7 @@ class Vector3(HasParameters):
             ).all()
         )
 
-    def vector_to_position(self, other: Self) -> Vector3:
+    def vector_to_position(self, other: Self) -> PyCramVector3:
         """
         Calculates a vector from this vector to another vector.
 
@@ -119,41 +119,41 @@ class Vector3(HasParameters):
         """
         return np.array(self.to_list())
 
-    def __add__(self, other: Self) -> Vector3:
+    def __add__(self, other: Self) -> PyCramVector3:
         """
         Adds two vectors together.
 
         :param other: The other vector to add.
         :return: A new vector that is the sum of this vector and the other vector.
         """
-        return Vector3(self.x + other.x, self.y + other.y, self.z + other.z)
+        return PyCramVector3(self.x + other.x, self.y + other.y, self.z + other.z)
 
-    def __sub__(self, other: Self) -> Vector3:
+    def __sub__(self, other: Self) -> PyCramVector3:
         """
         Subtracts two vectors.
 
         :param other: The other vector to subtract.
         :return: A new vector that is the difference of this vector and the other vector.
         """
-        return Vector3(self.x - other.x, self.y - other.y, self.z - other.z)
+        return PyCramVector3(self.x - other.x, self.y - other.y, self.z - other.z)
 
-    def __mul__(self, other: float) -> Vector3:
+    def __mul__(self, other: float) -> PyCramVector3:
         """
         Multiplies the vector by a scalar.
 
         :param other: The scalar to multiply by.
         :return: A new vector that is the product of this vector and the scalar.
         """
-        return Vector3(self.x * other, self.y * other, self.z * other)
+        return PyCramVector3(self.x * other, self.y * other, self.z * other)
 
-    def __rmul__(self, other: float) -> Vector3:
+    def __rmul__(self, other: float) -> PyCramVector3:
         """
         Multiplies the vector by a scalar (right multiplication).
 
         :param other: The scalar to multiply by.
         :return: A new vector that is the product of this vector and the scalar.
         """
-        return Vector3(self.x * other, self.y * other, self.z * other)
+        return PyCramVector3(self.x * other, self.y * other, self.z * other)
 
     @classmethod
     def from_list(cls, vector: List[float]) -> Self:
@@ -168,7 +168,7 @@ class Vector3(HasParameters):
 
 @has_parameters
 @dataclass
-class Quaternion(HasParameters):
+class PyCramQuaternion(HasParameters):
     """
     A quaternion with x, y, z and w components.
     """
@@ -231,10 +231,10 @@ class Quaternion(HasParameters):
         :return: A SpatialQuaternion object containing the x, y, z and w components.
         """
         return SpatialQuaternion(
-            x_init=float(self.x),
-            y_init=float(self.y),
-            z_init=float(self.z),
-            w_init=float(self.w),
+            x=float(self.x),
+            y=float(self.y),
+            z=float(self.z),
+            w=float(self.w),
         )
 
     def round(self, decimals: int = 4):
@@ -262,14 +262,14 @@ class Quaternion(HasParameters):
             ).all()
         )
 
-    def __mul__(self, other: Self) -> Quaternion:
+    def __mul__(self, other: Self) -> PyCramQuaternion:
         """
         Multiplies two quaternions together.
 
         :param other: The other quaternion to multiply with.
         :return: A new quaternion that is the product of this quaternion and the other quaternion.
         """
-        return Quaternion.from_list(
+        return PyCramQuaternion.from_list(
             quaternion_multiply(self.to_list(), other.to_list())
         )
 
@@ -304,13 +304,13 @@ class Quaternion(HasParameters):
 
 @has_parameters
 @dataclass
-class Pose(HasParameters):
+class PyCramPose(HasParameters):
     """
     A pose in 3D space.
     """
 
-    position: Vector3 = field(default_factory=Vector3)
-    orientation: Quaternion = field(default_factory=Quaternion)
+    position: PyCramVector3 = field(default_factory=PyCramVector3)
+    orientation: PyCramQuaternion = field(default_factory=PyCramQuaternion)
 
     def __repr__(self):
         return (
@@ -362,7 +362,7 @@ class Pose(HasParameters):
 
     def almost_equal(
         self,
-        other: Pose,
+        other: PyCramPose,
         position_tolerance: float = 1e-6,
         orientation_tolerance: float = 1e-5,
     ) -> bool:
@@ -411,8 +411,8 @@ class Pose(HasParameters):
         :return: A new Pose object.
         """
         return cls(
-            Vector3(position[0], position[1], position[2]),
-            Quaternion(orientation[0], orientation[1], orientation[2], orientation[3]),
+            PyCramVector3(position[0], position[1], position[2]),
+            PyCramQuaternion(orientation[0], orientation[1], orientation[2], orientation[3]),
         )
 
 
@@ -446,7 +446,7 @@ class Header:
 
 @has_parameters
 @dataclass
-class Vector3Stamped(Vector3):
+class Vector3Stamped(PyCramVector3):
     """
     A Vector3 with an attached ROS Header (timestamp and frame).
     Inherits all vector operations and adds frame/time metadata.
@@ -494,9 +494,9 @@ class Vector3Stamped(Vector3):
 
     def to_spatial_type(self) -> SpatialVector3:
         return SpatialVector3(
-            x_init=float(self.x),
-            y_init=float(self.y),
-            z_init=self.z,
+            x=float(self.x),
+            y=float(self.y),
+            z=self.z,
             reference_frame=self.header.frame_id,
         )
 
@@ -508,7 +508,7 @@ class PoseStamped(HasParameters):
     A pose in 3D space with a timestamp.
     """
 
-    pose: Pose = field(default_factory=Pose)
+    pose: PyCramPose = field(default_factory=PyCramPose)
     header: Header = field(default_factory=Header)
 
     @property
@@ -516,7 +516,7 @@ class PoseStamped(HasParameters):
         return self.pose.position
 
     @position.setter
-    def position(self, value: Vector3):
+    def position(self, value: PyCramVector3):
         self.pose.position = value
 
     @property
@@ -524,7 +524,7 @@ class PoseStamped(HasParameters):
         return self.pose.orientation
 
     @orientation.setter
-    def orientation(self, value: Quaternion):
+    def orientation(self, value: PyCramQuaternion):
         self.pose.orientation = value
 
     @property
@@ -563,18 +563,18 @@ class PoseStamped(HasParameters):
         :return: A new PoseStamped object created from the ROS message.
         """
         header = Header(frame_id=message.header.frame_id, stamp=message.header.stamp)
-        position = Vector3(
+        position = PyCramVector3(
             x=message.pose.position.x,
             y=message.pose.position.y,
             z=message.pose.position.z,
         )
-        orientation = Quaternion(
+        orientation = PyCramQuaternion(
             x=message.pose.orientation.x,
             y=message.pose.orientation.y,
             z=message.pose.orientation.z,
             w=message.pose.orientation.w,
         )
-        return cls(pose=Pose(position=position, orientation=orientation), header=header)
+        return cls(pose=PyCramPose(position=position, orientation=orientation), header=header)
 
     @classmethod
     def from_list(
@@ -600,7 +600,7 @@ class PoseStamped(HasParameters):
         position = position or [0.0, 0.0, 0.0]
         orientation = orientation or [0.0, 0.0, 0.0, 1.0]
         return cls(
-            pose=Pose.from_list(position, orientation),
+            pose=PyCramPose.from_list(position, orientation),
             header=Header(frame_id=frame, stamp=datetime.datetime.now()),
         )
 
@@ -613,7 +613,7 @@ class PoseStamped(HasParameters):
         :param frame: The frame in which the pose is defined.
         :return: A PoseStamped object created from the matrix and frame.
         """
-        pose = Pose.from_matrix(matrix)
+        pose = PyCramPose.from_matrix(matrix)
         return cls(
             pose=pose, header=Header(frame_id=frame, stamp=datetime.datetime.now())
         )
@@ -706,7 +706,7 @@ class PoseStamped(HasParameters):
 
         :param quaternion: A list representing the quaternion [x, y, z, w].
         """
-        self.orientation = self.orientation * Quaternion.from_list(quaternion)
+        self.orientation = self.orientation * PyCramQuaternion.from_list(quaternion)
 
     def is_facing_2d_axis(
         self,
@@ -750,7 +750,7 @@ class PoseStamped(HasParameters):
 
 
 @dataclass
-class Transform(Pose):
+class Transform(PyCramPose):
     @property
     def translation(self):
         return self.position
@@ -793,7 +793,7 @@ class Transform(Pose):
         return Transform.from_matrix(multiplication)
 
     @classmethod
-    def from_pose(cls, pose: Pose) -> Self:
+    def from_pose(cls, pose: PyCramPose) -> Self:
         """
         Create a Transform from a Pose object.
 
@@ -823,7 +823,7 @@ class TransformStamped(PoseStamped):
     """
     Target frame id of the transform.
     """
-    pose: Transform = field(default_factory=Pose)
+    pose: Transform = field(default_factory=PyCramPose)
     """
     The transform of the transform.
     """
@@ -841,7 +841,7 @@ class TransformStamped(PoseStamped):
         return self.pose.position
 
     @translation.setter
-    def translation(self, value: Vector3):
+    def translation(self, value: PyCramVector3):
         self.pose.position = value
 
     @property
@@ -849,7 +849,7 @@ class TransformStamped(PoseStamped):
         return self.pose.orientation
 
     @rotation.setter
-    def rotation(self, value: Quaternion):
+    def rotation(self, value: PyCramQuaternion):
         self.pose.orientation = value
 
     def __invert__(self) -> Self:
@@ -926,7 +926,7 @@ class TransformStamped(PoseStamped):
 
         :return: A PoseStamped object created from the TransformStamped.
         """
-        p = Pose(self.pose.position, self.pose.orientation)
+        p = PyCramPose(self.pose.position, self.pose.orientation)
         return PoseStamped(p, self.header)
 
     def to_spatial_type(self) -> SpatialTransformationMatrix:
@@ -975,4 +975,4 @@ class GraspPose(PoseStamped):
     """
 
 
-Point = Vector3
+Point = PyCramVector3

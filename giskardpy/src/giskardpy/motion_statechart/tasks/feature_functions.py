@@ -3,10 +3,11 @@ from __future__ import division
 from dataclasses import field, dataclass
 from typing import Union
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Task, NodeArtifacts, DebugExpression
+from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -25,8 +26,8 @@ class FeatureFunctionGoal(Task):
     """tip link of the kinematic chain."""
     root_link: KinematicStructureEntity = field(kw_only=True)
     """root link of the kinematic chain."""
-    controlled_feature: Union[cas.Point3, cas.Vector3] = field(init=False)
-    reference_feature: Union[cas.Point3, cas.Vector3] = field(init=False)
+    controlled_feature: Union[Point3, Vector3] = field(init=False)
+    reference_feature: Union[Point3, Vector3] = field(init=False)
 
     def build(self, context: BuildContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
@@ -40,7 +41,7 @@ class FeatureFunctionGoal(Task):
         root_T_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
-        if isinstance(self.controlled_feature, cas.Point3):
+        if isinstance(self.controlled_feature, Point3):
             self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature
             dbg = DebugExpression(
                 name="root_P_controlled_feature",
@@ -48,9 +49,11 @@ class FeatureFunctionGoal(Task):
                 color=Color(1, 0, 0, 1),
             )
             artifacts.debug_expressions.append(dbg)
-        elif isinstance(self.controlled_feature, cas.Vector3):
+        elif isinstance(self.controlled_feature, Vector3):
             self.root_V_controlled_feature = root_T_tip @ tip_controlled_feature
-            self.root_V_controlled_feature.vis_frame = self.controlled_feature.vis_frame
+            self.root_V_controlled_feature.vis_frame = (
+                self.controlled_feature.visualisation_frame
+            )
             dbg = DebugExpression(
                 name="root_V_controlled_feature",
                 expression=self.root_V_controlled_feature,
@@ -58,7 +61,7 @@ class FeatureFunctionGoal(Task):
             )
             artifacts.debug_expressions.append(dbg)
 
-        if isinstance(self.reference_feature, cas.Point3):
+        if isinstance(self.reference_feature, Point3):
             self.root_P_reference_feature = root_reference_feature
             dbg = DebugExpression(
                 name="root_P_reference_feature",
@@ -66,9 +69,11 @@ class FeatureFunctionGoal(Task):
                 color=Color(0, 1, 0, 1),
             )
             artifacts.debug_expressions.append(dbg)
-        elif isinstance(self.reference_feature, cas.Vector3):
+        elif isinstance(self.reference_feature, Vector3):
             self.root_V_reference_feature = root_reference_feature
-            self.root_V_reference_feature.vis_frame = self.reference_feature.vis_frame
+            self.root_V_reference_feature.vis_frame = (
+                self.reference_feature.visualisation_frame
+            )
             dbg = DebugExpression(
                 name="root_V_reference_feature",
                 expression=self.root_V_reference_feature,
@@ -89,8 +94,8 @@ class AlignPerpendicular(FeatureFunctionGoal):
 
     tip_link: Body
     root_link: Body
-    tip_normal: cas.Vector3
-    reference_normal: cas.Vector3
+    tip_normal: Vector3
+    reference_normal: Vector3
     weight: float = DefaultWeights.WEIGHT_BELOW_CA
     max_vel: float = 0.2
     threshold: float = 0.01
@@ -111,7 +116,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
             task_expression=expr,
             name=f"{self.name}_constraint",
         )
-        self.observation_expression = cas.abs(0 - expr) < self.threshold
+        self.observation_expression = sm.abs(0 - expr) < self.threshold
 
 
 @dataclass
@@ -126,8 +131,8 @@ class HeightGoal(FeatureFunctionGoal):
 
     tip_link: Body
     root_link: Body
-    tip_point: cas.Point3
-    reference_point: cas.Point3
+    tip_point: Point3
+    reference_point: Point3
     lower_limit: float
     upper_limit: float
     weight: float = DefaultWeights.WEIGHT_BELOW_CA
@@ -140,7 +145,7 @@ class HeightGoal(FeatureFunctionGoal):
 
         expr = (
             self.root_P_controlled_feature - self.root_P_reference_feature
-        ) @ cas.Vector3.Z()
+        ) @ Vector3.Z()
 
         self.add_inequality_constraint(
             reference_velocity=self.max_vel,
@@ -150,9 +155,9 @@ class HeightGoal(FeatureFunctionGoal):
             task_expression=expr,
             name=f"{self.name}_constraint",
         )
-        self.observation_expression = cas.logic_and(
-            cas.if_less_eq(expr, self.upper_limit, 1, 0),
-            cas.if_greater_eq(expr, self.lower_limit, 1, 0),
+        self.observation_expression = sm.logic_and(
+            sm.if_less_eq(expr, self.upper_limit, 1, 0),
+            sm.if_greater_eq(expr, self.lower_limit, 1, 0),
         )
 
 
@@ -168,8 +173,8 @@ class DistanceGoal(FeatureFunctionGoal):
 
     tip_link: Body
     root_link: Body
-    tip_point: cas.Point3
-    reference_point: cas.Point3
+    tip_point: Point3
+    reference_point: Point3
     lower_limit: float
     upper_limit: float
     weight: float = DefaultWeights.WEIGHT_BELOW_CA
@@ -201,13 +206,9 @@ class DistanceGoal(FeatureFunctionGoal):
             task_expression=root_V_diff[:3],
             names=[f"{self.name}_extra1", f"{self.name}_extra2", f"{self.name}_extra3"],
         )
-        self.observation_expression = cas.logic_and(
-            cas.if_less_eq(
-                expr, self.upper_limit, cas.Expression(1), cas.Expression(0)
-            ),
-            cas.if_greater_eq(
-                expr, self.lower_limit, cas.Expression(1), cas.Expression(0)
-            ),
+        self.observation_expression = sm.logic_and(
+            sm.if_less_eq(expr, self.upper_limit, sm.Scalar(1), sm.Scalar(0)),
+            sm.if_greater_eq(expr, self.lower_limit, sm.Scalar(1), sm.Scalar(0)),
         )
 
 
@@ -221,9 +222,9 @@ class AngleGoal(FeatureFunctionGoal):
     """root link of the kinematic chain."""
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """tip link of the kinematic chain."""
-    tip_vector: cas.Vector3 = field(kw_only=True)
+    tip_vector: Vector3 = field(kw_only=True)
     """Tip vector to be controlled."""
-    reference_vector: cas.Vector3 = field(kw_only=True)
+    reference_vector: Vector3 = field(kw_only=True)
     """Reference vector to measure the angle against."""
     lower_angle: float = field(kw_only=True)
     """Lower limit to control the angle between the tip_vector and the reference_vector."""
@@ -250,9 +251,9 @@ class AngleGoal(FeatureFunctionGoal):
             name=f"{self.name}_constraint",
         )
 
-        artifacts.observation = cas.logic_and(
-            cas.if_less_eq(expr, self.upper_angle, 1, 0),
-            cas.if_greater_eq(expr, self.lower_angle, 1, 0),
+        artifacts.observation = sm.logic_and(
+            sm.if_less_eq(expr, self.upper_angle, 1, 0),
+            sm.if_greater_eq(expr, self.lower_angle, 1, 0),
         )
 
         return artifacts

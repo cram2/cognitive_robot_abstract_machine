@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import itertools
 from typing import Tuple, List, TYPE_CHECKING
 
 import numpy as np
 from line_profiler import profile
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.adapters.qp_adapter import GiskardToQPAdapter
 from giskardpy.qp.qp_data import QPData
+from krrood.symbolic_math.symbolic_math import VariableParameters
 
 if TYPE_CHECKING:
     pass
@@ -28,37 +28,33 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
 
     bE_filter: np.ndarray
     bA_filter: np.ndarray
-    aux_symbols: List[cas.FloatVariable]
+    aux_symbols: List[sm.FloatVariable]
 
     def general_qp_to_specific_qp(
         self,
-        quadratic_weights: cas.Expression,
-        linear_weights: cas.Expression,
-        box_lower_constraints: cas.Expression,
-        box_upper_constraints: cas.Expression,
-        eq_matrix_dofs: cas.Expression,
-        eq_matrix_slack: cas.Expression,
-        eq_bounds: cas.Expression,
-        neq_matrix_dofs: cas.Expression,
-        neq_matrix_slack: cas.Expression,
-        neq_lower_bounds: cas.Expression,
-        neq_upper_bounds: cas.Expression,
+        quadratic_weights: sm.Vector,
+        linear_weights: sm.Vector,
+        box_lower_constraints: sm.Vector,
+        box_upper_constraints: sm.Vector,
+        eq_matrix_dofs: sm.Matrix,
+        eq_matrix_slack: sm.Matrix,
+        eq_bounds: sm.Vector,
+        neq_matrix_dofs: sm.Matrix,
+        neq_matrix_slack: sm.Matrix,
+        neq_lower_bounds: sm.Vector,
+        neq_upper_bounds: sm.Vector,
     ):
-        eq_matrix = cas.hstack(
+        eq_matrix = sm.hstack(
             [
                 eq_matrix_dofs,
                 eq_matrix_slack,
-                cas.Expression.zeros(
-                    eq_matrix_slack.shape[0], self.num_neq_slack_variables
-                ),
+                sm.Matrix.zeros(eq_matrix_slack.shape[0], self.num_neq_slack_variables),
             ]
         )
-        neq_matrix = cas.hstack(
+        neq_matrix = sm.hstack(
             [
                 neq_matrix_dofs,
-                cas.Expression.zeros(
-                    neq_matrix_slack.shape[0], self.num_eq_slack_variables
-                ),
+                sm.Matrix.zeros(neq_matrix_slack.shape[0], self.num_eq_slack_variables),
                 neq_matrix_slack,
             ]
         )
@@ -72,13 +68,15 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         ]
 
         self.eq_matrix_compiled = eq_matrix.compile(
-            parameters=self.free_symbols, sparse=self.sparse
+            parameters=VariableParameters.from_lists(*self.free_symbols),
+            sparse=self.sparse,
         )
         self.neq_matrix_compiled = neq_matrix.compile(
-            parameters=self.free_symbols, sparse=self.sparse
+            parameters=VariableParameters.from_lists(*self.free_symbols),
+            sparse=self.sparse,
         )
 
-        self.combined_vector_f = cas.CompiledFunctionWithViews(
+        self.combined_vector_f = sm.CompiledFunctionWithViews(
             expressions=[
                 quadratic_weights,
                 linear_weights,
@@ -88,7 +86,7 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
                 neq_lower_bounds,
                 neq_upper_bounds,
             ],
-            variable_parameters=self.free_symbols,
+            parameters=VariableParameters.from_lists(*self.free_symbols),
         )
 
         self.bE_filter = np.ones(eq_matrix.shape[0], dtype=bool)

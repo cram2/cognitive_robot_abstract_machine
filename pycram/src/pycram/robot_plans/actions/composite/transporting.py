@@ -5,6 +5,7 @@ from datetime import timedelta
 from typing import List
 
 import numpy as np
+
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
 from semantic_digital_twin.world_description.world_entity import Body
@@ -23,7 +24,11 @@ from ....datastructures.enums import Arms, Grasp, VerticalAlignment
 from ....datastructures.grasp import GraspDescription
 from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import PoseStamped
-from ....designators.location_designator import ProbabilisticCostmapLocation
+from ....designators.location_designator import (
+    ProbabilisticCostmapLocation,
+    CostmapLocation,
+    GiskardLocation,
+)
 from ....designators.object_designator import BelieveObject
 from ....failures import ObjectUnfetchable, ConfigurationNotReached
 from ....has_parameters import has_parameters
@@ -83,10 +88,10 @@ class TransportAction(ActionDescription):
                         OpenActionDescription(sem_anno[0].handle.body, self.arm),
                     ).perform()
         SequentialPlan(self.context, ParkArmsActionDescription(Arms.BOTH)).perform()
-        pickup_loc = ProbabilisticCostmapLocation(
-            target=self.object_designator,
-            reachable_for=self.robot_view,
+        pickup_loc = CostmapLocation(
+            target=PoseStamped.from_spatial_type(self.object_designator.global_pose),
             reachable_arm=self.arm,
+            reachable_for=self.robot_view,
         )
         pickup_loc.plan_node = self.plan_node
         # Tries to find a pick-up position for the robot that uses the given arm
@@ -106,13 +111,10 @@ class TransportAction(ActionDescription):
             ),
             ParkArmsActionDescription(Arms.BOTH),
             NavigateActionDescription(
-                ProbabilisticCostmapLocation(
+                CostmapLocation(
                     target=self.target_location,
+                    reachable_arm=self.arm,
                     reachable_for=self.robot_view,
-                    reachable_arm=pickup_pose.arm,
-                    grasp_descriptions=[pickup_pose.grasp_description],
-                    object_in_hand=self.object_designator,
-                    rotation_agnostic=self.place_rotation_agnostic,
                 ),
                 True,
             ),

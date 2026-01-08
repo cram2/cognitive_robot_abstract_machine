@@ -51,7 +51,7 @@ class FunctionMapping(AlternativeMapping[FunctionType]):
     """
 
     @classmethod
-    def create_instance(cls, obj: Callable) -> Self:
+    def from_domain_object(cls, obj: Callable) -> Self:
 
         if "." in obj.__qualname__:
             class_name = obj.__qualname__.split(".")[0]
@@ -64,7 +64,7 @@ class FunctionMapping(AlternativeMapping[FunctionType]):
         )
         return dao
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
 
         if self.function_name == "<lambda>":
             return lambda *args, **kwargs: raise_uncallable_function(self)

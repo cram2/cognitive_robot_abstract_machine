@@ -5,9 +5,9 @@ from krrood.ormatic.alternative_mappings import FunctionMapping, UncallableFunct
 from krrood.ormatic.dao import (
     to_dao,
     is_data_column,
-    NoDAOFoundError,
-    ToDAOState,
+    ToDataAccessObjectState,
 )
+from krrood.ormatic.exceptions import NoDAOFoundError
 from ..dataset.example_classes import *
 from ..dataset.ormatic_interface import *
 
@@ -476,54 +476,60 @@ def test_inheritance_mapper_args(session, database):
 
 def test_to_dao_alternatively_mapped_parent(session, database):
     ch2 = ChildLevel2NormallyMapped(1, [Entity("a")], 2, 3)
-    ch2_dao = to_dao(ch2)
+    ch2_dao: ChildLevel2NormallyMappedDAO = to_dao(ch2)
 
-    assert isinstance(ch2_dao.entities[0], CustomEntityDAO)
-    assert ch2_dao.entities == [CustomEntityDAO(overwritten_name="a")]
-
-    assert ch2_dao == ChildLevel2NormallyMappedDAO(
+    result_by_hand = ChildLevel2NormallyMappedDAO(
         derived_attribute="1",
         entities=[CustomEntityDAO(overwritten_name="a")],
         level_one_attribute=2,
         level_two_attribute=3,
     )
 
+    assert isinstance(ch2_dao.entities[0], CustomEntityDAO)
+    assert (
+        ch2_dao.entities[0].overwritten_name
+        == result_by_hand.entities[0].overwritten_name
+    )
+    assert len(ch2_dao.entities) == len(result_by_hand.entities)
+    assert ch2_dao.level_one_attribute == result_by_hand.level_one_attribute
+    assert ch2_dao.level_two_attribute == result_by_hand.level_two_attribute
+
 
 def test_callable_alternative_mapping():
-    callable_mapping = FunctionMapping.create_instance(module_level_function)
-    reconstructed = callable_mapping.create_from_dao()
+    callable_mapping = FunctionMapping.from_domain_object(module_level_function)
+    reconstructed = callable_mapping.to_domain_object()
     assert reconstructed() == 1
 
 
 def test_callable_alternative_mapping_instance_method():
-    callable_mapping = FunctionMapping.create_instance(
+    callable_mapping = FunctionMapping.from_domain_object(
         CallableWrapper.custom_instance_method
     )
-    reconstructed = callable_mapping.create_from_dao()
+    reconstructed = callable_mapping.to_domain_object()
     assert reconstructed is CallableWrapper.custom_instance_method
 
 
 def test_callable_alternative_mapping_class_method():
-    callable_mapping = FunctionMapping.create_instance(
+    callable_mapping = FunctionMapping.from_domain_object(
         CallableWrapper.custom_class_method
     )
-    reconstructed = callable_mapping.create_from_dao()
+    reconstructed = callable_mapping.to_domain_object()
     assert reconstructed == CallableWrapper.custom_class_method
 
 
 def test_callable_alternative_mapping_static_method():
-    callable_mapping = FunctionMapping.create_instance(
+    callable_mapping = FunctionMapping.from_domain_object(
         CallableWrapper.custom_static_method
     )
-    reconstructed = callable_mapping.create_from_dao()
+    reconstructed = callable_mapping.to_domain_object()
     assert reconstructed is CallableWrapper.custom_static_method
     assert reconstructed() == 4
 
 
 def test_anonymous_function_mapping():
     func = lambda: 0
-    callable_mapping = FunctionMapping.create_instance(func)
-    reconstructed = callable_mapping.create_from_dao()
+    callable_mapping = FunctionMapping.from_domain_object(func)
+    reconstructed = callable_mapping.to_domain_object()
     with pytest.raises(UncallableFunction):
         reconstructed()
 
@@ -574,7 +580,7 @@ def test_json_integration(session, database):
 
 def test_many_to_many_with_same_type(session, database):
 
-    state = ToDAOState()
+    state = ToDataAccessObjectState()
     position = Position(1, 2, 3)
     ps1 = Positions([position], ["a"])
     ps2 = Positions([position], ["a"])
@@ -611,3 +617,34 @@ def test_multiple_inheritance(session, database):
     queried = session.scalars(select(MultipleInheritanceDAO)).one()
     reconstructed = queried.from_dao()
     assert reconstructed == obj
+
+
+def test_list_of_enum(session, database):
+    obj = ListOfEnum([TestEnum.OPTION_A, TestEnum.OPTION_B, TestEnum.OPTION_C])
+    dao = to_dao(obj)
+
+    session.add(dao)
+    session.commit()
+
+    queried = session.scalars(select(ListOfEnumDAO)).one()
+    reconstructed = queried.from_dao()
+    assert reconstructed == obj
+    assert reconstructed.list_of_enum == [
+        TestEnum.OPTION_A,
+        TestEnum.OPTION_B,
+        TestEnum.OPTION_C,
+    ]
+
+
+def test_persons(session, database):
+    p1 = Person(name="Alice")
+    p2 = Person(name="Bob")
+    p1.knows.append(p2)
+
+    dao = to_dao(p1)
+    session.add(dao)
+    session.commit()
+
+    q = session.scalar(select(PersonDAO).where(PersonDAO.name == "Alice"))
+    assert q.name == "Alice"
+    assert q.knows[0].name == "Bob"

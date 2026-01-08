@@ -2,12 +2,12 @@ from __future__ import division
 
 from dataclasses import dataclass, field
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import NodeArtifacts, DebugExpression
 from giskardpy.motion_statechart.graph_node import Task
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -25,9 +25,9 @@ class Pointing(Task):
     root_link: KinematicStructureEntity = field(kw_only=True)
     """root link of the kinematic chain."""
 
-    goal_point: cas.Point3 = field(kw_only=True)
+    goal_point: Point3 = field(kw_only=True)
     """where to point pointing_axis at."""
-    pointing_axis: cas.Vector3 = field(kw_only=True)
+    pointing_axis: Vector3 = field(kw_only=True)
     """the axis of tip_link that will be used for pointing"""
 
     max_velocity: float = field(default=0.3, kw_only=True)
@@ -88,9 +88,9 @@ class PointingCone(Task):
     root_link: KinematicStructureEntity = field(kw_only=True)
     """root link of the kinematic chain."""
 
-    goal_point: cas.Point3 = field(kw_only=True)
+    goal_point: Point3 = field(kw_only=True)
     """where to point pointing_axis at."""
-    pointing_axis: cas.Vector3 = field(kw_only=True)
+    pointing_axis: Vector3 = field(kw_only=True)
     """the axis of tip_link that will be used for pointing"""
 
     cone_theta: float = field(default=0.0, kw_only=True)

@@ -4,9 +4,10 @@ from typing import Optional
 
 import numpy as np
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Task
+from semantic_digital_twin.spatial_types import Point3, Vector3, RotationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -14,11 +15,11 @@ from semantic_digital_twin.world_description.world_entity import Body
 class WiggleInsert(Task):
     root_link: Body
     tip_link: Body
-    hole_point: cas.Point3
+    hole_point: Point3
     noise_translation: float
     noise_angle: float
     down_velocity: float
-    hole_normal: Optional[cas.Vector3] = None
+    hole_normal: Optional[Vector3] = None
     threshold: float = 0.01
     random_walk: bool = True
     vector_momentum_factor: float = 0.9
@@ -48,7 +49,7 @@ class WiggleInsert(Task):
                                                                          hole_point
         """
         if self.hole_normal is None:
-            self.hole_normal = cas.Vector3(0, 0, 0, reference_frame=context.world.root)
+            self.hole_normal = Vector3(0, 0, 0, reference_frame=context.world.root)
 
         # Random-Sample works better with control_dt and Random-Walk with throttling using self.dt in my testing
         if self.random_walk:
@@ -77,8 +78,8 @@ class WiggleInsert(Task):
         self.last_vector_change = 0
 
         v1, v2 = self.calculate_vectors(self.hole_normal.to_np()[:3])
-        self.v1 = cas.Vector3(*v1, reference_frame=self.hole_normal.reference_frame)
-        self.v2 = cas.Vector3(*v2, reference_frame=self.hole_normal.reference_frame)
+        self.v1 = Vector3(*v1, reference_frame=self.hole_normal.reference_frame)
+        self.v2 = Vector3(*v2, reference_frame=self.hole_normal.reference_frame)
 
         r_P_c = context.world._forward_kinematic_manager.compose_expression(
             self.root_link, self.tip_link
@@ -90,7 +91,7 @@ class WiggleInsert(Task):
         rand_v = symbol_manager.get_expr(
             self.ref_str + vector_function,
             input_type_hint=np.ndarray,
-            output_type_hint=cas.Vector3,
+            output_type_hint=Vector3,
         )
 
         r_P_g_rand = r_P_g + rand_v
@@ -106,13 +107,13 @@ class WiggleInsert(Task):
         angle = symbol_manager.get_expr(
             self.ref_str + angle_function,
             input_type_hint=float,
-            output_type_hint=cas.FloatVariable,
+            output_type_hint=sm.FloatVariable,
         )
 
         tip_V_hole_normal = context.world.transform(
             target_frame=self.tip_link, spatial_object=self.hole_normal
         )
-        tip_R_hole_normal = cas.RotationMatrix.from_axis_angle(
+        tip_R_hole_normal = RotationMatrix.from_axis_angle(
             angle=angle, axis=tip_V_hole_normal
         )
         root_R_hole_normal = context.world.compute_fk(
@@ -179,7 +180,7 @@ class WiggleInsert(Task):
 
         return self.current_angle
 
-    def get_rand_vector(self) -> cas.Vector3:
+    def get_rand_vector(self) -> Vector3:
         now = context.time
         if now - self.last_vector_change >= self.dt:
             self.last_vector_change = now
@@ -190,7 +191,7 @@ class WiggleInsert(Task):
             ) / self.hz
         return self.current_vector
 
-    def get_rand_walk_vector(self) -> cas.Vector3:
+    def get_rand_walk_vector(self) -> Vector3:
         now = context.time
         if now - self.last_vector_change >= self.dt:
             self.last_vector_change = now

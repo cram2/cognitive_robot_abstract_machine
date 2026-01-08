@@ -43,7 +43,6 @@ import pycram.robot_plans.motions.gripper
 import pycram.robot_plans.motions.misc
 import pycram.robot_plans.motions.navigation
 import pycram.robot_plans.motions.robot_body
-import semantic_digital_twin.adapters.procthor.procthor_semantic_annotations
 import semantic_digital_twin.callbacks.callback
 import semantic_digital_twin.datastructures.prefixed_name
 import semantic_digital_twin.orm.model
@@ -82,9 +81,9 @@ class Base(DeclarativeBase):
 executiondatadao_added_world_modifications_association = Table(
     "executiondatadao_added_world_modifications_association",
     Base.metadata,
-    Column("executiondatadao_id", ForeignKey("ExecutionDataDAO.database_id")),
+    Column("source_executiondatadao_id", ForeignKey("ExecutionDataDAO.database_id")),
     Column(
-        "worldmodelmodificationblockdao_id",
+        "target_worldmodelmodificationblockdao_id",
         ForeignKey("WorldModelModificationBlockDAO.database_id"),
     ),
 )
@@ -92,152 +91,159 @@ movetcpwaypointsmotiondao_waypoints_association = Table(
     "movetcpwaypointsmotiondao_waypoints_association",
     Base.metadata,
     Column(
-        "movetcpwaypointsmotiondao_id",
+        "source_movetcpwaypointsmotiondao_id",
         ForeignKey("MoveTCPWaypointsMotionDAO.database_id"),
     ),
-    Column("posestampeddao_id", ForeignKey("PoseStampedDAO.database_id")),
+    Column("target_posestampeddao_id", ForeignKey("PoseStampedDAO.database_id")),
 )
 planmappingdao_nodes_association = Table(
     "planmappingdao_nodes_association",
     Base.metadata,
-    Column("planmappingdao_id", ForeignKey("PlanMappingDAO.database_id")),
-    Column("plannodemappingdao_id", ForeignKey("PlanNodeMappingDAO.database_id")),
+    Column("source_planmappingdao_id", ForeignKey("PlanMappingDAO.database_id")),
+    Column(
+        "target_plannodemappingdao_id", ForeignKey("PlanNodeMappingDAO.database_id")
+    ),
 )
 planmappingdao_edges_association = Table(
     "planmappingdao_edges_association",
     Base.metadata,
-    Column("planmappingdao_id", ForeignKey("PlanMappingDAO.database_id")),
-    Column("planedgedao_id", ForeignKey("PlanEdgeDAO.database_id")),
+    Column("source_planmappingdao_id", ForeignKey("PlanMappingDAO.database_id")),
+    Column("target_planedgedao_id", ForeignKey("PlanEdgeDAO.database_id")),
 )
 shapecollectiondao_shapes_association = Table(
     "shapecollectiondao_shapes_association",
     Base.metadata,
-    Column("shapecollectiondao_id", ForeignKey("ShapeCollectionDAO.database_id")),
-    Column("shapedao_id", ForeignKey("ShapeDAO.database_id")),
+    Column(
+        "source_shapecollectiondao_id", ForeignKey("ShapeCollectionDAO.database_id")
+    ),
+    Column("target_shapedao_id", ForeignKey("ShapeDAO.database_id")),
 )
 worldmappingdao_kinematic_structure_entities_association = Table(
     "worldmappingdao_kinematic_structure_entities_association",
     Base.metadata,
-    Column("worldmappingdao_id", ForeignKey("WorldMappingDAO.database_id")),
+    Column("source_worldmappingdao_id", ForeignKey("WorldMappingDAO.database_id")),
     Column(
-        "kinematicstructureentitydao_id",
+        "target_kinematicstructureentitydao_id",
         ForeignKey("KinematicStructureEntityDAO.database_id"),
     ),
 )
 worldmappingdao_connections_association = Table(
     "worldmappingdao_connections_association",
     Base.metadata,
-    Column("worldmappingdao_id", ForeignKey("WorldMappingDAO.database_id")),
-    Column("connectiondao_id", ForeignKey("ConnectionDAO.database_id")),
+    Column("source_worldmappingdao_id", ForeignKey("WorldMappingDAO.database_id")),
+    Column("target_connectiondao_id", ForeignKey("ConnectionDAO.database_id")),
 )
 worldmappingdao_semantic_annotations_association = Table(
     "worldmappingdao_semantic_annotations_association",
     Base.metadata,
-    Column("worldmappingdao_id", ForeignKey("WorldMappingDAO.database_id")),
-    Column("semanticannotationdao_id", ForeignKey("SemanticAnnotationDAO.database_id")),
+    Column("source_worldmappingdao_id", ForeignKey("WorldMappingDAO.database_id")),
+    Column(
+        "target_semanticannotationdao_id",
+        ForeignKey("SemanticAnnotationDAO.database_id"),
+    ),
 )
 worldmappingdao_degrees_of_freedom_association = Table(
     "worldmappingdao_degrees_of_freedom_association",
     Base.metadata,
-    Column("worldmappingdao_id", ForeignKey("WorldMappingDAO.database_id")),
+    Column("source_worldmappingdao_id", ForeignKey("WorldMappingDAO.database_id")),
     Column(
-        "degreeoffreedommappingdao_id",
+        "target_degreeoffreedommappingdao_id",
         ForeignKey("DegreeOfFreedomMappingDAO.database_id"),
     ),
 )
 hasdoorsdao_doors_association = Table(
     "hasdoorsdao_doors_association",
     Base.metadata,
-    Column("hasdoorsdao_id", ForeignKey("HasDoorsDAO.database_id")),
-    Column("doordao_id", ForeignKey("DoorDAO.database_id")),
+    Column("source_hasdoorsdao_id", ForeignKey("HasDoorsDAO.database_id")),
+    Column("target_doordao_id", ForeignKey("DoorDAO.database_id")),
 )
 cupboarddao_doors_association = Table(
     "cupboarddao_doors_association",
     Base.metadata,
-    Column("cupboarddao_id", ForeignKey("CupboardDAO.database_id")),
-    Column("doordao_id", ForeignKey("DoorDAO.database_id")),
+    Column("source_cupboarddao_id", ForeignKey("CupboardDAO.database_id")),
+    Column("target_doordao_id", ForeignKey("DoorDAO.database_id")),
 )
 hasdrawersdao_drawers_association = Table(
     "hasdrawersdao_drawers_association",
     Base.metadata,
-    Column("hasdrawersdao_id", ForeignKey("HasDrawersDAO.database_id")),
-    Column("drawerdao_id", ForeignKey("DrawerDAO.database_id")),
+    Column("source_hasdrawersdao_id", ForeignKey("HasDrawersDAO.database_id")),
+    Column("target_drawerdao_id", ForeignKey("DrawerDAO.database_id")),
 )
 cabinetdao_doors_association = Table(
     "cabinetdao_doors_association",
     Base.metadata,
-    Column("cabinetdao_id", ForeignKey("CabinetDAO.database_id")),
-    Column("doordao_id", ForeignKey("DoorDAO.database_id")),
+    Column("source_cabinetdao_id", ForeignKey("CabinetDAO.database_id")),
+    Column("target_doordao_id", ForeignKey("DoorDAO.database_id")),
 )
 cabinetdao_drawers_association = Table(
     "cabinetdao_drawers_association",
     Base.metadata,
-    Column("cabinetdao_id", ForeignKey("CabinetDAO.database_id")),
-    Column("drawerdao_id", ForeignKey("DrawerDAO.database_id")),
+    Column("source_cabinetdao_id", ForeignKey("CabinetDAO.database_id")),
+    Column("target_drawerdao_id", ForeignKey("DrawerDAO.database_id")),
 )
 dresserdao_doors_association = Table(
     "dresserdao_doors_association",
     Base.metadata,
-    Column("dresserdao_id", ForeignKey("DresserDAO.database_id")),
-    Column("doordao_id", ForeignKey("DoorDAO.database_id")),
+    Column("source_dresserdao_id", ForeignKey("DresserDAO.database_id")),
+    Column("target_doordao_id", ForeignKey("DoorDAO.database_id")),
 )
 dresserdao_drawers_association = Table(
     "dresserdao_drawers_association",
     Base.metadata,
-    Column("dresserdao_id", ForeignKey("DresserDAO.database_id")),
-    Column("drawerdao_id", ForeignKey("DrawerDAO.database_id")),
+    Column("source_dresserdao_id", ForeignKey("DresserDAO.database_id")),
+    Column("target_drawerdao_id", ForeignKey("DrawerDAO.database_id")),
 )
 wardrobedao_doors_association = Table(
     "wardrobedao_doors_association",
     Base.metadata,
-    Column("wardrobedao_id", ForeignKey("WardrobeDAO.database_id")),
-    Column("doordao_id", ForeignKey("DoorDAO.database_id")),
+    Column("source_wardrobedao_id", ForeignKey("WardrobeDAO.database_id")),
+    Column("target_doordao_id", ForeignKey("DoorDAO.database_id")),
 )
 wardrobedao_drawers_association = Table(
     "wardrobedao_drawers_association",
     Base.metadata,
-    Column("wardrobedao_id", ForeignKey("WardrobeDAO.database_id")),
-    Column("drawerdao_id", ForeignKey("DrawerDAO.database_id")),
+    Column("source_wardrobedao_id", ForeignKey("WardrobeDAO.database_id")),
+    Column("target_drawerdao_id", ForeignKey("DrawerDAO.database_id")),
 )
 abstractrobotdao_manipulators_association = Table(
     "abstractrobotdao_manipulators_association",
     Base.metadata,
-    Column("abstractrobotdao_id", ForeignKey("AbstractRobotDAO.database_id")),
-    Column("manipulatordao_id", ForeignKey("ManipulatorDAO.database_id")),
+    Column("source_abstractrobotdao_id", ForeignKey("AbstractRobotDAO.database_id")),
+    Column("target_manipulatordao_id", ForeignKey("ManipulatorDAO.database_id")),
 )
 abstractrobotdao_sensors_association = Table(
     "abstractrobotdao_sensors_association",
     Base.metadata,
-    Column("abstractrobotdao_id", ForeignKey("AbstractRobotDAO.database_id")),
-    Column("sensordao_id", ForeignKey("SensorDAO.database_id")),
+    Column("source_abstractrobotdao_id", ForeignKey("AbstractRobotDAO.database_id")),
+    Column("target_sensordao_id", ForeignKey("SensorDAO.database_id")),
 )
 abstractrobotdao_manipulator_chains_association = Table(
     "abstractrobotdao_manipulator_chains_association",
     Base.metadata,
-    Column("abstractrobotdao_id", ForeignKey("AbstractRobotDAO.database_id")),
-    Column("kinematicchaindao_id", ForeignKey("KinematicChainDAO.database_id")),
+    Column("source_abstractrobotdao_id", ForeignKey("AbstractRobotDAO.database_id")),
+    Column("target_kinematicchaindao_id", ForeignKey("KinematicChainDAO.database_id")),
 )
 abstractrobotdao_sensor_chains_association = Table(
     "abstractrobotdao_sensor_chains_association",
     Base.metadata,
-    Column("abstractrobotdao_id", ForeignKey("AbstractRobotDAO.database_id")),
-    Column("kinematicchaindao_id", ForeignKey("KinematicChainDAO.database_id")),
+    Column("source_abstractrobotdao_id", ForeignKey("AbstractRobotDAO.database_id")),
+    Column("target_kinematicchaindao_id", ForeignKey("KinematicChainDAO.database_id")),
 )
 kinematicchaindao_sensors_association = Table(
     "kinematicchaindao_sensors_association",
     Base.metadata,
-    Column("kinematicchaindao_id", ForeignKey("KinematicChainDAO.database_id")),
-    Column("sensordao_id", ForeignKey("SensorDAO.database_id")),
+    Column("source_kinematicchaindao_id", ForeignKey("KinematicChainDAO.database_id")),
+    Column("target_sensordao_id", ForeignKey("SensorDAO.database_id")),
 )
 worldmodelmodificationblockdao_modifications_association = Table(
     "worldmodelmodificationblockdao_modifications_association",
     Base.metadata,
     Column(
-        "worldmodelmodificationblockdao_id",
+        "source_worldmodelmodificationblockdao_id",
         ForeignKey("WorldModelModificationBlockDAO.database_id"),
     ),
     Column(
-        "worldmodelmodificationdao_id",
+        "target_worldmodelmodificationdao_id",
         ForeignKey("WorldModelModificationDAO.database_id"),
     ),
 )
@@ -256,20 +262,14 @@ class AccelerationVariableDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    name_id: Mapped[int] = mapped_column(
-        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
+    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+
     dof_id: Mapped[int] = mapped_column(
         ForeignKey("DegreeOfFreedomMappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
-    )
     dof: Mapped[DegreeOfFreedomMappingDAO] = relationship(
         "DegreeOfFreedomMappingDAO",
         uselist=False,
@@ -296,13 +296,15 @@ class BoundingBoxDAO(
     max_z: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
     origin_id: Mapped[int] = mapped_column(
-        ForeignKey("TransformationMatrixMappingDAO.database_id", use_alter=True),
+        ForeignKey(
+            "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
+        ),
         nullable=True,
         use_existing_column=True,
     )
 
-    origin: Mapped[TransformationMatrixMappingDAO] = relationship(
-        "TransformationMatrixMappingDAO",
+    origin: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
+        "HomogeneousTransformationMatrixMappingDAO",
         uselist=False,
         foreign_keys=[origin_id],
         post_update=True,
@@ -473,14 +475,8 @@ class CarryActionDAO(
     tip_link: Mapped[typing.Optional[builtins.str]] = mapped_column(
         String(255), use_existing_column=True
     )
-    tip_axis: Mapped[typing.Optional[pycram.datastructures.enums.AxisIdentifier]] = (
-        mapped_column(use_existing_column=True)
-    )
     root_link: Mapped[typing.Optional[builtins.str]] = mapped_column(
         String(255), use_existing_column=True
-    )
-    root_axis: Mapped[typing.Optional[pycram.datastructures.enums.AxisIdentifier]] = (
-        mapped_column(use_existing_column=True)
     )
 
     __mapper_args__ = {
@@ -639,9 +635,6 @@ class DetectActionDAO(
     technique: Mapped[pycram.datastructures.enums.DetectionTechnique] = mapped_column(
         use_existing_column=True
     )
-    state: Mapped[typing.Optional[pycram.datastructures.enums.DetectionState]] = (
-        mapped_column(use_existing_column=True)
-    )
 
     object_sem_annotation: Mapped[TypeType] = mapped_column(
         TypeType, nullable=False, use_existing_column=True
@@ -790,6 +783,8 @@ class ExecutionDataDAO(
         relationship(
             "WorldModelModificationBlockDAO",
             secondary="executiondatadao_added_world_modifications_association",
+            primaryjoin="ExecutionDataDAO.database_id == executiondatadao_added_world_modifications_association.c.source_executiondatadao_id",
+            secondaryjoin="WorldModelModificationBlockDAO.database_id == executiondatadao_added_world_modifications_association.c.target_worldmodelmodificationblockdao_id",
             cascade="save-update, merge",
         )
     )
@@ -930,6 +925,63 @@ class HeaderDAO(Base, DataAccessObject[pycram.datastructures.pose.Header]):
     )
 
 
+class HomogeneousTransformationMatrixMappingDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.orm.model.HomogeneousTransformationMatrixMapping
+    ],
+):
+
+    __tablename__ = "HomogeneousTransformationMatrixMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    position_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    rotation_id: Mapped[int] = mapped_column(
+        ForeignKey("QuaternionMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    reference_frame_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    child_frame_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    position: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO", uselist=False, foreign_keys=[position_id], post_update=True
+    )
+    rotation: Mapped[QuaternionMappingDAO] = relationship(
+        "QuaternionMappingDAO",
+        uselist=False,
+        foreign_keys=[rotation_id],
+        post_update=True,
+    )
+    reference_frame: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[reference_frame_id],
+        post_update=True,
+    )
+    child_frame: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[child_frame_id],
+        post_update=True,
+    )
+
+
 class IsPerceivableDAO(
     Base,
     DataAccessObject[
@@ -970,20 +1022,14 @@ class JerkVariableDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    name_id: Mapped[int] = mapped_column(
-        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
+    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+
     dof_id: Mapped[int] = mapped_column(
         ForeignKey("DegreeOfFreedomMappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
-    )
     dof: Mapped[DegreeOfFreedomMappingDAO] = relationship(
         "DegreeOfFreedomMappingDAO",
         uselist=False,
@@ -1356,9 +1402,6 @@ class MoveTCPMotionDAO(
     allow_gripper_collision: Mapped[typing.Optional[builtins.bool]] = mapped_column(
         use_existing_column=True
     )
-    movement_type: Mapped[typing.Optional[pycram.datastructures.enums.MovementType]] = (
-        mapped_column(use_existing_column=True)
-    )
 
     target_id: Mapped[int] = mapped_column(
         ForeignKey("PoseStampedDAO.database_id", use_alter=True),
@@ -1402,6 +1445,8 @@ class MoveTCPWaypointsMotionDAO(
     waypoints: Mapped[typing.List[PoseStampedDAO]] = relationship(
         "PoseStampedDAO",
         secondary="movetcpwaypointsmotiondao_waypoints_association",
+        primaryjoin="MoveTCPWaypointsMotionDAO.database_id == movetcpwaypointsmotiondao_waypoints_association.c.source_movetcpwaypointsmotiondao_id",
+        secondaryjoin="PoseStampedDAO.database_id == movetcpwaypointsmotiondao_waypoints_association.c.target_posestampeddao_id",
         cascade="save-update, merge",
     )
 
@@ -1719,11 +1764,15 @@ class PlanMappingDAO(Base, DataAccessObject[pycram.orm.model.PlanMapping]):
     nodes: Mapped[typing.List[PlanNodeMappingDAO]] = relationship(
         "PlanNodeMappingDAO",
         secondary="planmappingdao_nodes_association",
+        primaryjoin="PlanMappingDAO.database_id == planmappingdao_nodes_association.c.source_planmappingdao_id",
+        secondaryjoin="PlanNodeMappingDAO.database_id == planmappingdao_nodes_association.c.target_plannodemappingdao_id",
         cascade="save-update, merge",
     )
     edges: Mapped[typing.List[PlanEdgeDAO]] = relationship(
         "PlanEdgeDAO",
         secondary="planmappingdao_edges_association",
+        primaryjoin="PlanMappingDAO.database_id == planmappingdao_edges_association.c.source_planmappingdao_id",
+        secondaryjoin="PlanEdgeDAO.database_id == planmappingdao_edges_association.c.target_planedgedao_id",
         cascade="save-update, merge",
     )
 
@@ -2005,43 +2054,47 @@ class Point3MappingDAO(
     )
 
 
-class PoseDAO(Base, DataAccessObject[pycram.datastructures.pose.Pose]):
+class PoseMappingDAO(
+    Base, DataAccessObject[semantic_digital_twin.orm.model.PoseMapping]
+):
 
-    __tablename__ = "PoseDAO"
+    __tablename__ = "PoseMappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    polymorphic_type: Mapped[str] = mapped_column(
-        String(255), nullable=False, use_existing_column=True
-    )
-
     position_id: Mapped[int] = mapped_column(
-        ForeignKey("Vector3DAO.database_id", use_alter=True),
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
-    orientation_id: Mapped[int] = mapped_column(
-        ForeignKey("PyCRAMQuaternionMappingDAO.database_id", use_alter=True),
+    rotation_id: Mapped[int] = mapped_column(
+        ForeignKey("QuaternionMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    reference_frame_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    position: Mapped[Vector3DAO] = relationship(
-        "Vector3DAO", uselist=False, foreign_keys=[position_id], post_update=True
+    position: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO", uselist=False, foreign_keys=[position_id], post_update=True
     )
-    orientation: Mapped[PyCRAMQuaternionMappingDAO] = relationship(
-        "PyCRAMQuaternionMappingDAO",
+    rotation: Mapped[QuaternionMappingDAO] = relationship(
+        "QuaternionMappingDAO",
         uselist=False,
-        foreign_keys=[orientation_id],
+        foreign_keys=[rotation_id],
         post_update=True,
     )
-
-    __mapper_args__ = {
-        "polymorphic_on": "polymorphic_type",
-        "polymorphic_identity": "PoseDAO",
-    }
+    reference_frame: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[reference_frame_id],
+        post_update=True,
+    )
 
 
 class PoseStampedDAO(Base, DataAccessObject[pycram.datastructures.pose.PoseStamped]):
@@ -2057,7 +2110,7 @@ class PoseStampedDAO(Base, DataAccessObject[pycram.datastructures.pose.PoseStamp
     )
 
     pose_id: Mapped[int] = mapped_column(
-        ForeignKey("PoseDAO.database_id", use_alter=True),
+        ForeignKey("PyCramPoseDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
@@ -2067,8 +2120,8 @@ class PoseStampedDAO(Base, DataAccessObject[pycram.datastructures.pose.PoseStamp
         use_existing_column=True,
     )
 
-    pose: Mapped[PoseDAO] = relationship(
-        "PoseDAO", uselist=False, foreign_keys=[pose_id], post_update=True
+    pose: Mapped[PyCramPoseDAO] = relationship(
+        "PyCramPoseDAO", uselist=False, foreign_keys=[pose_id], post_update=True
     )
     header: Mapped[HeaderDAO] = relationship(
         "HeaderDAO", uselist=False, foreign_keys=[header_id], post_update=True
@@ -2128,20 +2181,14 @@ class PositionVariableDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    name_id: Mapped[int] = mapped_column(
-        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
+    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+
     dof_id: Mapped[int] = mapped_column(
         ForeignKey("DegreeOfFreedomMappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
-    )
     dof: Mapped[DegreeOfFreedomMappingDAO] = relationship(
         "DegreeOfFreedomMappingDAO",
         uselist=False,
@@ -2207,9 +2254,6 @@ class PreferredGraspAlignmentDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    preferred_axis: Mapped[
-        typing.Optional[pycram.datastructures.enums.AxisIdentifier]
-    ] = mapped_column(use_existing_column=True)
     with_vertical_alignment: Mapped[builtins.bool] = mapped_column(
         use_existing_column=True
     )
@@ -2235,6 +2279,45 @@ class PrefixedNameDAO(
     )
 
 
+class PyCramPoseDAO(Base, DataAccessObject[pycram.datastructures.pose.PyCramPose]):
+
+    __tablename__ = "PyCramPoseDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    position_id: Mapped[int] = mapped_column(
+        ForeignKey("PyCramVector3DAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    orientation_id: Mapped[int] = mapped_column(
+        ForeignKey("PyCRAMQuaternionMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    position: Mapped[PyCramVector3DAO] = relationship(
+        "PyCramVector3DAO", uselist=False, foreign_keys=[position_id], post_update=True
+    )
+    orientation: Mapped[PyCRAMQuaternionMappingDAO] = relationship(
+        "PyCRAMQuaternionMappingDAO",
+        uselist=False,
+        foreign_keys=[orientation_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "PyCramPoseDAO",
+    }
+
+
 class PyCRAMQuaternionMappingDAO(
     Base, DataAccessObject[pycram.orm.model.PyCRAMQuaternionMapping]
 ):
@@ -2249,6 +2332,30 @@ class PyCRAMQuaternionMappingDAO(
     y: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     z: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     w: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+
+class PyCramVector3DAO(
+    Base, DataAccessObject[pycram.datastructures.pose.PyCramVector3]
+):
+
+    __tablename__ = "PyCramVector3DAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    x: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    y: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    z: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "PyCramVector3DAO",
+    }
 
 
 class QuaternionMappingDAO(
@@ -2626,7 +2733,9 @@ class ShapeDAO(
     )
 
     origin_id: Mapped[int] = mapped_column(
-        ForeignKey("TransformationMatrixMappingDAO.database_id", use_alter=True),
+        ForeignKey(
+            "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
+        ),
         nullable=True,
         use_existing_column=True,
     )
@@ -2636,8 +2745,8 @@ class ShapeDAO(
         use_existing_column=True,
     )
 
-    origin: Mapped[TransformationMatrixMappingDAO] = relationship(
-        "TransformationMatrixMappingDAO",
+    origin: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
+        "HomogeneousTransformationMatrixMappingDAO",
         uselist=False,
         foreign_keys=[origin_id],
         post_update=True,
@@ -2770,6 +2879,8 @@ class ShapeCollectionDAO(
     shapes: Mapped[typing.List[ShapeDAO]] = relationship(
         "ShapeDAO",
         secondary="shapecollectiondao_shapes_association",
+        primaryjoin="ShapeCollectionDAO.database_id == shapecollectiondao_shapes_association.c.source_shapecollectiondao_id",
+        secondaryjoin="ShapeDAO.database_id == shapecollectiondao_shapes_association.c.target_shapedao_id",
         cascade="save-update, merge",
     )
     reference_frame: Mapped[KinematicStructureEntityDAO] = relationship(
@@ -2910,17 +3021,21 @@ class StateChangeCallbackDAO(
     }
 
 
-class TransformDAO(PoseDAO, DataAccessObject[pycram.datastructures.pose.Transform]):
+class TransformDAO(
+    PyCramPoseDAO, DataAccessObject[pycram.datastructures.pose.Transform]
+):
 
     __tablename__ = "TransformDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(PoseDAO.database_id), primary_key=True, use_existing_column=True
+        ForeignKey(PyCramPoseDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "TransformDAO",
-        "inherit_condition": database_id == PoseDAO.database_id,
+        "inherit_condition": database_id == PyCramPoseDAO.database_id,
     }
 
 
@@ -2952,60 +3067,6 @@ class TransformStampedDAO(
     }
 
 
-class TransformationMatrixMappingDAO(
-    Base, DataAccessObject[semantic_digital_twin.orm.model.TransformationMatrixMapping]
-):
-
-    __tablename__ = "TransformationMatrixMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    position_id: Mapped[int] = mapped_column(
-        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    rotation_id: Mapped[int] = mapped_column(
-        ForeignKey("QuaternionMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    reference_frame_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    child_frame_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    position: Mapped[Point3MappingDAO] = relationship(
-        "Point3MappingDAO", uselist=False, foreign_keys=[position_id], post_update=True
-    )
-    rotation: Mapped[QuaternionMappingDAO] = relationship(
-        "QuaternionMappingDAO",
-        uselist=False,
-        foreign_keys=[rotation_id],
-        post_update=True,
-    )
-    reference_frame: Mapped[KinematicStructureEntityDAO] = relationship(
-        "KinematicStructureEntityDAO",
-        uselist=False,
-        foreign_keys=[reference_frame_id],
-        post_update=True,
-    )
-    child_frame: Mapped[KinematicStructureEntityDAO] = relationship(
-        "KinematicStructureEntityDAO",
-        uselist=False,
-        foreign_keys=[child_frame_id],
-        post_update=True,
-    )
-
-
 class TransportActionDAO(
     ActionDescriptionDAO,
     DataAccessObject[pycram.robot_plans.actions.composite.transporting.TransportAction],
@@ -3019,9 +3080,6 @@ class TransportActionDAO(
         use_existing_column=True,
     )
 
-    arm: Mapped[typing.Optional[pycram.datastructures.enums.Arms]] = mapped_column(
-        use_existing_column=True
-    )
     place_rotation_agnostic: Mapped[typing.Optional[builtins.bool]] = mapped_column(
         use_existing_column=True
     )
@@ -3174,36 +3232,16 @@ class Vector3MappingDAO(
     )
 
 
-class Vector3DAO(Base, DataAccessObject[pycram.datastructures.pose.Vector3]):
-
-    __tablename__ = "Vector3DAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    x: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    y: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    z: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    polymorphic_type: Mapped[str] = mapped_column(
-        String(255), nullable=False, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_on": "polymorphic_type",
-        "polymorphic_identity": "Vector3DAO",
-    }
-
-
 class Vector3StampedDAO(
-    Vector3DAO, DataAccessObject[pycram.datastructures.pose.Vector3Stamped]
+    PyCramVector3DAO, DataAccessObject[pycram.datastructures.pose.Vector3Stamped]
 ):
 
     __tablename__ = "Vector3StampedDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(Vector3DAO.database_id), primary_key=True, use_existing_column=True
+        ForeignKey(PyCramVector3DAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
     )
 
     header_id: Mapped[int] = mapped_column(
@@ -3218,7 +3256,7 @@ class Vector3StampedDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "Vector3StampedDAO",
-        "inherit_condition": database_id == Vector3DAO.database_id,
+        "inherit_condition": database_id == PyCramVector3DAO.database_id,
     }
 
 
@@ -3235,20 +3273,14 @@ class VelocityVariableDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    name_id: Mapped[int] = mapped_column(
-        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
+    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+
     dof_id: Mapped[int] = mapped_column(
         ForeignKey("DegreeOfFreedomMappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
-    )
     dof: Mapped[DegreeOfFreedomMappingDAO] = relationship(
         "DegreeOfFreedomMappingDAO",
         uselist=False,
@@ -3278,16 +3310,20 @@ class ViewDependentSpatialRelationDAO(
     )
 
     point_of_semantic_annotation_id: Mapped[int] = mapped_column(
-        ForeignKey("TransformationMatrixMappingDAO.database_id", use_alter=True),
+        ForeignKey(
+            "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
+        ),
         nullable=True,
         use_existing_column=True,
     )
 
-    point_of_semantic_annotation: Mapped[TransformationMatrixMappingDAO] = relationship(
-        "TransformationMatrixMappingDAO",
-        uselist=False,
-        foreign_keys=[point_of_semantic_annotation_id],
-        post_update=True,
+    point_of_semantic_annotation: Mapped[HomogeneousTransformationMatrixMappingDAO] = (
+        relationship(
+            "HomogeneousTransformationMatrixMappingDAO",
+            uselist=False,
+            foreign_keys=[point_of_semantic_annotation_id],
+            post_update=True,
+        )
     )
 
     __mapper_args__ = {
@@ -3434,22 +3470,30 @@ class WorldMappingDAO(
         relationship(
             "KinematicStructureEntityDAO",
             secondary="worldmappingdao_kinematic_structure_entities_association",
+            primaryjoin="WorldMappingDAO.database_id == worldmappingdao_kinematic_structure_entities_association.c.source_worldmappingdao_id",
+            secondaryjoin="KinematicStructureEntityDAO.database_id == worldmappingdao_kinematic_structure_entities_association.c.target_kinematicstructureentitydao_id",
             cascade="save-update, merge",
         )
     )
     connections: Mapped[typing.List[ConnectionDAO]] = relationship(
         "ConnectionDAO",
         secondary="worldmappingdao_connections_association",
+        primaryjoin="WorldMappingDAO.database_id == worldmappingdao_connections_association.c.source_worldmappingdao_id",
+        secondaryjoin="ConnectionDAO.database_id == worldmappingdao_connections_association.c.target_connectiondao_id",
         cascade="save-update, merge",
     )
     semantic_annotations: Mapped[typing.List[SemanticAnnotationDAO]] = relationship(
         "SemanticAnnotationDAO",
         secondary="worldmappingdao_semantic_annotations_association",
+        primaryjoin="WorldMappingDAO.database_id == worldmappingdao_semantic_annotations_association.c.source_worldmappingdao_id",
+        secondaryjoin="SemanticAnnotationDAO.database_id == worldmappingdao_semantic_annotations_association.c.target_semanticannotationdao_id",
         cascade="save-update, merge",
     )
     degrees_of_freedom: Mapped[typing.List[DegreeOfFreedomMappingDAO]] = relationship(
         "DegreeOfFreedomMappingDAO",
         secondary="worldmappingdao_degrees_of_freedom_association",
+        primaryjoin="WorldMappingDAO.database_id == worldmappingdao_degrees_of_freedom_association.c.source_worldmappingdao_id",
+        secondaryjoin="DegreeOfFreedomMappingDAO.database_id == worldmappingdao_degrees_of_freedom_association.c.target_degreeoffreedommappingdao_id",
         cascade="save-update, merge",
     )
     state: Mapped[WorldStateMappingDAO] = relationship(
@@ -3512,17 +3556,16 @@ class ConnectionDAO(
         use_existing_column=True,
     )
     parent_T_connection_expression_id: Mapped[int] = mapped_column(
-        ForeignKey("TransformationMatrixMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    kinematics_id: Mapped[int] = mapped_column(
-        ForeignKey("TransformationMatrixMappingDAO.database_id", use_alter=True),
+        ForeignKey(
+            "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
+        ),
         nullable=True,
         use_existing_column=True,
     )
     connection_T_child_expression_id: Mapped[int] = mapped_column(
-        ForeignKey("TransformationMatrixMappingDAO.database_id", use_alter=True),
+        ForeignKey(
+            "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
+        ),
         nullable=True,
         use_existing_column=True,
     )
@@ -3539,23 +3582,17 @@ class ConnectionDAO(
         foreign_keys=[child_id],
         post_update=True,
     )
-    parent_T_connection_expression: Mapped[TransformationMatrixMappingDAO] = (
-        relationship(
-            "TransformationMatrixMappingDAO",
-            uselist=False,
-            foreign_keys=[parent_T_connection_expression_id],
-            post_update=True,
-        )
-    )
-    kinematics: Mapped[TransformationMatrixMappingDAO] = relationship(
-        "TransformationMatrixMappingDAO",
+    parent_T_connection_expression: Mapped[
+        HomogeneousTransformationMatrixMappingDAO
+    ] = relationship(
+        "HomogeneousTransformationMatrixMappingDAO",
         uselist=False,
-        foreign_keys=[kinematics_id],
+        foreign_keys=[parent_T_connection_expression_id],
         post_update=True,
     )
-    connection_T_child_expression: Mapped[TransformationMatrixMappingDAO] = (
+    connection_T_child_expression: Mapped[HomogeneousTransformationMatrixMappingDAO] = (
         relationship(
-            "TransformationMatrixMappingDAO",
+            "HomogeneousTransformationMatrixMappingDAO",
             uselist=False,
             foreign_keys=[connection_T_child_expression_id],
             post_update=True,
@@ -3967,7 +4004,7 @@ class HasBodyDAO(
 class BaseballDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Baseball
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Baseball
     ],
 ):
 
@@ -3986,7 +4023,7 @@ class BaseballDAO(
 class BedDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Bed
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bed
     ],
 ):
 
@@ -4005,7 +4042,7 @@ class BedDAO(
 class BookDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Book
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Book
     ],
 ):
 
@@ -4034,7 +4071,7 @@ class BookDAO(
 class BookFrontDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.BookFront
+        semantic_digital_twin.semantic_annotations.semantic_annotations.BookFront
     ],
 ):
 
@@ -4053,7 +4090,7 @@ class BookFrontDAO(
 class ChairDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Chair
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Chair
     ],
 ):
 
@@ -4072,7 +4109,7 @@ class ChairDAO(
 class ArmchairDAO(
     ChairDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Armchair
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Armchair
     ],
 ):
 
@@ -4091,7 +4128,7 @@ class ArmchairDAO(
 class OfficeChairDAO(
     ChairDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.OfficeChair
+        semantic_digital_twin.semantic_annotations.semantic_annotations.OfficeChair
     ],
 ):
 
@@ -4110,7 +4147,7 @@ class OfficeChairDAO(
 class ClothDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Cloth
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Cloth
     ],
 ):
 
@@ -4148,7 +4185,7 @@ class ContainerDAO(
 class BottleDAO(
     ContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Bottle
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bottle
     ],
 ):
 
@@ -4167,7 +4204,7 @@ class BottleDAO(
 class MustardBottleDAO(
     BottleDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.MustardBottle
+        semantic_digital_twin.semantic_annotations.semantic_annotations.MustardBottle
     ],
 ):
 
@@ -4186,7 +4223,7 @@ class MustardBottleDAO(
 class SoapBottleDAO(
     BottleDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.SoapBottle
+        semantic_digital_twin.semantic_annotations.semantic_annotations.SoapBottle
     ],
 ):
 
@@ -4205,7 +4242,7 @@ class SoapBottleDAO(
 class WineBottleDAO(
     BottleDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.WineBottle
+        semantic_digital_twin.semantic_annotations.semantic_annotations.WineBottle
     ],
 ):
 
@@ -4224,7 +4261,7 @@ class WineBottleDAO(
 class GarbageBinDAO(
     ContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.GarbageBin
+        semantic_digital_twin.semantic_annotations.semantic_annotations.GarbageBin
     ],
 ):
 
@@ -4243,7 +4280,7 @@ class GarbageBinDAO(
 class ProcthorBoxDAO(
     ContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.ProcthorBox
+        semantic_digital_twin.semantic_annotations.semantic_annotations.ProcthorBox
     ],
 ):
 
@@ -4259,10 +4296,33 @@ class ProcthorBoxDAO(
     }
 
 
+class SaltContainerDAO(
+    ContainerDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.SaltContainer
+    ],
+):
+
+    __tablename__ = "SaltContainerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ContainerDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SaltContainerDAO",
+        "inherit_condition": database_id == ContainerDAO.database_id,
+    }
+
+
 class CookingContainerDAO(
     ContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.CookingContainer
+        semantic_digital_twin.semantic_annotations.semantic_annotations.CookingContainer
     ],
 ):
 
@@ -4281,7 +4341,7 @@ class CookingContainerDAO(
 class KettleDAO(
     CookingContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Kettle
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Kettle
     ],
 ):
 
@@ -4302,7 +4362,7 @@ class KettleDAO(
 class PanDAO(
     CookingContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Pan
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Pan
     ],
 ):
 
@@ -4323,7 +4383,7 @@ class PanDAO(
 class PotDAO(
     CookingContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Pot
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Pot
     ],
 ):
 
@@ -4344,7 +4404,7 @@ class PotDAO(
 class CuttleryDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Cuttlery
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Cuttlery
     ],
 ):
 
@@ -4363,7 +4423,7 @@ class CuttleryDAO(
 class ForkDAO(
     CuttleryDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Fork
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Fork
     ],
 ):
 
@@ -4382,7 +4442,7 @@ class ForkDAO(
 class KnifeDAO(
     CuttleryDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Knife
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Knife
     ],
 ):
 
@@ -4398,33 +4458,10 @@ class KnifeDAO(
     }
 
 
-class MilkDAO(
-    CuttleryDAO,
-    DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Milk
-    ],
-):
-
-    __tablename__ = "MilkDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(CuttleryDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
-        String(255), use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "MilkDAO",
-        "inherit_condition": database_id == CuttleryDAO.database_id,
-    }
-
-
 class SpoonDAO(
     CuttleryDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Spoon
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Spoon
     ],
 ):
 
@@ -4447,7 +4484,7 @@ class SpoonDAO(
 class DecorDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Decor
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Decor
     ],
 ):
 
@@ -4466,7 +4503,7 @@ class DecorDAO(
 class WallDecorDAO(
     DecorDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.WallDecor
+        semantic_digital_twin.semantic_annotations.semantic_annotations.WallDecor
     ],
 ):
 
@@ -4485,7 +4522,7 @@ class WallDecorDAO(
 class PosterDAO(
     WallDecorDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Poster
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Poster
     ],
 ):
 
@@ -4533,7 +4570,7 @@ class DoorDAO(
 class DrinkingContainerDAO(
     ContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.DrinkingContainer
+        semantic_digital_twin.semantic_annotations.semantic_annotations.DrinkingContainer
     ],
 ):
 
@@ -4552,7 +4589,7 @@ class DrinkingContainerDAO(
 class CupDAO(
     DrinkingContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Cup
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Cup
     ],
 ):
 
@@ -4577,7 +4614,7 @@ class CupDAO(
 class MugDAO(
     DrinkingContainerDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Mug
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Mug
     ],
 ):
 
@@ -4598,7 +4635,7 @@ class MugDAO(
 class DroneDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Drone
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Drone
     ],
 ):
 
@@ -4617,7 +4654,7 @@ class DroneDAO(
 class FoodDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Food
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Food
     ],
 ):
 
@@ -4636,7 +4673,7 @@ class FoodDAO(
 class BreadDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Bread
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bread
     ],
 ):
 
@@ -4652,10 +4689,56 @@ class BreadDAO(
     }
 
 
+class CandyDAO(
+    FoodDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Candy
+    ],
+):
+
+    __tablename__ = "CandyDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CandyDAO",
+        "inherit_condition": database_id == FoodDAO.database_id,
+    }
+
+
+class CerealDAO(
+    FoodDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Cereal
+    ],
+):
+
+    __tablename__ = "CerealDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CerealDAO",
+        "inherit_condition": database_id == FoodDAO.database_id,
+    }
+
+
 class CheezeItDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.CheezeIt
+        semantic_digital_twin.semantic_annotations.semantic_annotations.CheezeIt
     ],
 ):
 
@@ -4674,7 +4757,7 @@ class CheezeItDAO(
 class GelatinBoxDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.GelatinBox
+        semantic_digital_twin.semantic_annotations.semantic_annotations.GelatinBox
     ],
 ):
 
@@ -4690,10 +4773,56 @@ class GelatinBoxDAO(
     }
 
 
+class MilkDAO(
+    ContainerDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Milk
+    ],
+):
+
+    __tablename__ = "MilkDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ContainerDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MilkDAO",
+        "inherit_condition": database_id == ContainerDAO.database_id,
+    }
+
+
+class NoodlesDAO(
+    FoodDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Noodles
+    ],
+):
+
+    __tablename__ = "NoodlesDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NoodlesDAO",
+        "inherit_condition": database_id == FoodDAO.database_id,
+    }
+
+
 class PringlesDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Pringles
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Pringles
     ],
 ):
 
@@ -4712,7 +4841,7 @@ class PringlesDAO(
 class ProduceDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Produce
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Produce
     ],
 ):
 
@@ -4731,7 +4860,7 @@ class ProduceDAO(
 class AppleDAO(
     ProduceDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Apple
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Apple
     ],
 ):
 
@@ -4750,7 +4879,7 @@ class AppleDAO(
 class BananaDAO(
     ProduceDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Banana
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Banana
     ],
 ):
 
@@ -4769,7 +4898,7 @@ class BananaDAO(
 class LettuceDAO(
     ProduceDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Lettuce
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Lettuce
     ],
 ):
 
@@ -4788,7 +4917,7 @@ class LettuceDAO(
 class OrangeDAO(
     ProduceDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Orange
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Orange
     ],
 ):
 
@@ -4807,7 +4936,7 @@ class OrangeDAO(
 class PotatoDAO(
     ProduceDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Potato
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Potato
     ],
 ):
 
@@ -4826,7 +4955,7 @@ class PotatoDAO(
 class TomatoDAO(
     ProduceDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Tomato
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Tomato
     ],
 ):
 
@@ -4845,7 +4974,7 @@ class TomatoDAO(
 class TomatoSoupDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.TomatoSoup
+        semantic_digital_twin.semantic_annotations.semantic_annotations.TomatoSoup
     ],
 ):
 
@@ -4864,7 +4993,7 @@ class TomatoSoupDAO(
 class TunaCanDAO(
     FoodDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.TunaCan
+        semantic_digital_twin.semantic_annotations.semantic_annotations.TunaCan
     ],
 ):
 
@@ -4902,7 +5031,7 @@ class HandleDAO(
 class HouseplantDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Houseplant
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Houseplant
     ],
 ):
 
@@ -4921,7 +5050,7 @@ class HouseplantDAO(
 class LidDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Lid
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Lid
     ],
 ):
 
@@ -4940,7 +5069,7 @@ class LidDAO(
 class PanLidDAO(
     LidDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.PanLid
+        semantic_digital_twin.semantic_annotations.semantic_annotations.PanLid
     ],
 ):
 
@@ -4959,7 +5088,7 @@ class PanLidDAO(
 class PotLidDAO(
     LidDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.PotLid
+        semantic_digital_twin.semantic_annotations.semantic_annotations.PotLid
     ],
 ):
 
@@ -4978,7 +5107,7 @@ class PotLidDAO(
 class LiquidCapDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.LiquidCap
+        semantic_digital_twin.semantic_annotations.semantic_annotations.LiquidCap
     ],
 ):
 
@@ -4997,7 +5126,7 @@ class LiquidCapDAO(
 class PenDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Pen
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Pen
     ],
 ):
 
@@ -5016,7 +5145,7 @@ class PenDAO(
 class PencilDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Pencil
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Pencil
     ],
 ):
 
@@ -5035,7 +5164,7 @@ class PencilDAO(
 class SaltPepperShakerDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.SaltPepperShaker
+        semantic_digital_twin.semantic_annotations.semantic_annotations.SaltPepperShaker
     ],
 ):
 
@@ -5054,7 +5183,7 @@ class SaltPepperShakerDAO(
 class ShelvingUnitDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.ShelvingUnit
+        semantic_digital_twin.semantic_annotations.semantic_annotations.ShelvingUnit
     ],
 ):
 
@@ -5073,7 +5202,7 @@ class ShelvingUnitDAO(
 class SinkDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Sink
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Sink
     ],
 ):
 
@@ -5092,7 +5221,7 @@ class SinkDAO(
 class SofaDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Sofa
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Sofa
     ],
 ):
 
@@ -5111,7 +5240,7 @@ class SofaDAO(
 class SprayBottleDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.SprayBottle
+        semantic_digital_twin.semantic_annotations.semantic_annotations.SprayBottle
     ],
 ):
 
@@ -5130,7 +5259,7 @@ class SprayBottleDAO(
 class StatueDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Statue
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Statue
     ],
 ):
 
@@ -5178,7 +5307,7 @@ class TableDAO(
 class CoffeeTableDAO(
     TableDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.CoffeeTable
+        semantic_digital_twin.semantic_annotations.semantic_annotations.CoffeeTable
     ],
 ):
 
@@ -5197,7 +5326,7 @@ class CoffeeTableDAO(
 class DeskDAO(
     TableDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Desk
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Desk
     ],
 ):
 
@@ -5216,7 +5345,7 @@ class DeskDAO(
 class DiningTableDAO(
     TableDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.DiningTable
+        semantic_digital_twin.semantic_annotations.semantic_annotations.DiningTable
     ],
 ):
 
@@ -5235,7 +5364,7 @@ class DiningTableDAO(
 class SideTableDAO(
     TableDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.SideTable
+        semantic_digital_twin.semantic_annotations.semantic_annotations.SideTable
     ],
 ):
 
@@ -5254,7 +5383,7 @@ class SideTableDAO(
 class VaseDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Vase
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Vase
     ],
 ):
 
@@ -5273,7 +5402,7 @@ class VaseDAO(
 class WallPanelDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.WallPanel
+        semantic_digital_twin.semantic_annotations.semantic_annotations.WallPanel
     ],
 ):
 
@@ -5305,6 +5434,8 @@ class HasDoorsDAO(
     doors: Mapped[typing.List[DoorDAO]] = relationship(
         "DoorDAO",
         secondary="hasdoorsdao_doors_association",
+        primaryjoin="HasDoorsDAO.database_id == hasdoorsdao_doors_association.c.source_hasdoorsdao_id",
+        secondaryjoin="DoorDAO.database_id == hasdoorsdao_doors_association.c.target_doordao_id",
         cascade="save-update, merge",
     )
 
@@ -5336,6 +5467,8 @@ class CupboardDAO(
     doors: Mapped[typing.List[DoorDAO]] = relationship(
         "DoorDAO",
         secondary="cupboarddao_doors_association",
+        primaryjoin="CupboardDAO.database_id == cupboarddao_doors_association.c.source_cupboarddao_id",
+        secondaryjoin="DoorDAO.database_id == cupboarddao_doors_association.c.target_doordao_id",
         cascade="save-update, merge",
     )
     container: Mapped[ContainerDAO] = relationship(
@@ -5364,6 +5497,8 @@ class HasDrawersDAO(
     drawers: Mapped[typing.List[DrawerDAO]] = relationship(
         "DrawerDAO",
         secondary="hasdrawersdao_drawers_association",
+        primaryjoin="HasDrawersDAO.database_id == hasdrawersdao_drawers_association.c.source_hasdrawersdao_id",
+        secondaryjoin="DrawerDAO.database_id == hasdrawersdao_drawers_association.c.target_drawerdao_id",
         cascade="save-update, merge",
     )
 
@@ -5395,11 +5530,15 @@ class CabinetDAO(
     doors: Mapped[typing.List[DoorDAO]] = relationship(
         "DoorDAO",
         secondary="cabinetdao_doors_association",
+        primaryjoin="CabinetDAO.database_id == cabinetdao_doors_association.c.source_cabinetdao_id",
+        secondaryjoin="DoorDAO.database_id == cabinetdao_doors_association.c.target_doordao_id",
         cascade="save-update, merge",
     )
     drawers: Mapped[typing.List[DrawerDAO]] = relationship(
         "DrawerDAO",
         secondary="cabinetdao_drawers_association",
+        primaryjoin="CabinetDAO.database_id == cabinetdao_drawers_association.c.source_cabinetdao_id",
+        secondaryjoin="DrawerDAO.database_id == cabinetdao_drawers_association.c.target_drawerdao_id",
         cascade="save-update, merge",
     )
     container: Mapped[ContainerDAO] = relationship(
@@ -5434,11 +5573,15 @@ class DresserDAO(
     doors: Mapped[typing.List[DoorDAO]] = relationship(
         "DoorDAO",
         secondary="dresserdao_doors_association",
+        primaryjoin="DresserDAO.database_id == dresserdao_doors_association.c.source_dresserdao_id",
+        secondaryjoin="DoorDAO.database_id == dresserdao_doors_association.c.target_doordao_id",
         cascade="save-update, merge",
     )
     drawers: Mapped[typing.List[DrawerDAO]] = relationship(
         "DrawerDAO",
         secondary="dresserdao_drawers_association",
+        primaryjoin="DresserDAO.database_id == dresserdao_drawers_association.c.source_dresserdao_id",
+        secondaryjoin="DrawerDAO.database_id == dresserdao_drawers_association.c.target_drawerdao_id",
         cascade="save-update, merge",
     )
     container: Mapped[ContainerDAO] = relationship(
@@ -5473,11 +5616,15 @@ class WardrobeDAO(
     doors: Mapped[typing.List[DoorDAO]] = relationship(
         "DoorDAO",
         secondary="wardrobedao_doors_association",
+        primaryjoin="WardrobeDAO.database_id == wardrobedao_doors_association.c.source_wardrobedao_id",
+        secondaryjoin="DoorDAO.database_id == wardrobedao_doors_association.c.target_doordao_id",
         cascade="save-update, merge",
     )
     drawers: Mapped[typing.List[DrawerDAO]] = relationship(
         "DrawerDAO",
         secondary="wardrobedao_drawers_association",
+        primaryjoin="WardrobeDAO.database_id == wardrobedao_drawers_association.c.source_wardrobedao_id",
+        secondaryjoin="DrawerDAO.database_id == wardrobedao_drawers_association.c.target_drawerdao_id",
         cascade="save-update, merge",
     )
     container: Mapped[ContainerDAO] = relationship(
@@ -5575,7 +5722,7 @@ class HasSupportingSurfaceDAO(
 class BowlDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Bowl
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bowl
     ],
 ):
 
@@ -5632,7 +5779,7 @@ class FloorDAO(
 class PlateDAO(
     HasBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.Plate
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Plate
     ],
 ):
 
@@ -5723,17 +5870,34 @@ class RootedSemanticAnnotationDAO(
     }
 
 
-class AbstractRobotDAO(
+class AgentDAO(
     RootedSemanticAnnotationDAO,
+    DataAccessObject[semantic_digital_twin.world_description.world_entity.Agent],
+):
+
+    __tablename__ = "AgentDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RootedSemanticAnnotationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "AgentDAO",
+        "inherit_condition": database_id == RootedSemanticAnnotationDAO.database_id,
+    }
+
+
+class AbstractRobotDAO(
+    AgentDAO,
     DataAccessObject[semantic_digital_twin.robots.abstract_robot.AbstractRobot],
 ):
 
     __tablename__ = "AbstractRobotDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(RootedSemanticAnnotationDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
+        ForeignKey(AgentDAO.database_id), primary_key=True, use_existing_column=True
     )
 
     torso_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
@@ -5753,21 +5917,29 @@ class AbstractRobotDAO(
     manipulators: Mapped[typing.List[ManipulatorDAO]] = relationship(
         "ManipulatorDAO",
         secondary="abstractrobotdao_manipulators_association",
+        primaryjoin="AbstractRobotDAO.database_id == abstractrobotdao_manipulators_association.c.source_abstractrobotdao_id",
+        secondaryjoin="ManipulatorDAO.database_id == abstractrobotdao_manipulators_association.c.target_manipulatordao_id",
         cascade="save-update, merge",
     )
     sensors: Mapped[typing.List[SensorDAO]] = relationship(
         "SensorDAO",
         secondary="abstractrobotdao_sensors_association",
+        primaryjoin="AbstractRobotDAO.database_id == abstractrobotdao_sensors_association.c.source_abstractrobotdao_id",
+        secondaryjoin="SensorDAO.database_id == abstractrobotdao_sensors_association.c.target_sensordao_id",
         cascade="save-update, merge",
     )
     manipulator_chains: Mapped[typing.List[KinematicChainDAO]] = relationship(
         "KinematicChainDAO",
         secondary="abstractrobotdao_manipulator_chains_association",
+        primaryjoin="AbstractRobotDAO.database_id == abstractrobotdao_manipulator_chains_association.c.source_abstractrobotdao_id",
+        secondaryjoin="KinematicChainDAO.database_id == abstractrobotdao_manipulator_chains_association.c.target_kinematicchaindao_id",
         cascade="save-update, merge",
     )
     sensor_chains: Mapped[typing.List[KinematicChainDAO]] = relationship(
         "KinematicChainDAO",
         secondary="abstractrobotdao_sensor_chains_association",
+        primaryjoin="AbstractRobotDAO.database_id == abstractrobotdao_sensor_chains_association.c.source_abstractrobotdao_id",
+        secondaryjoin="KinematicChainDAO.database_id == abstractrobotdao_sensor_chains_association.c.target_kinematicchaindao_id",
         cascade="save-update, merge",
     )
     default_collision_config: Mapped[CollisionCheckingConfigDAO] = relationship(
@@ -5779,7 +5951,24 @@ class AbstractRobotDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "AbstractRobotDAO",
-        "inherit_condition": database_id == RootedSemanticAnnotationDAO.database_id,
+        "inherit_condition": database_id == AgentDAO.database_id,
+    }
+
+
+class HumanDAO(
+    AgentDAO,
+    DataAccessObject[semantic_digital_twin.world_description.world_entity.Human],
+):
+
+    __tablename__ = "HumanDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(AgentDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HumanDAO",
+        "inherit_condition": database_id == AgentDAO.database_id,
     }
 
 
@@ -5858,6 +6047,8 @@ class KinematicChainDAO(
     sensors: Mapped[typing.List[SensorDAO]] = relationship(
         "SensorDAO",
         secondary="kinematicchaindao_sensors_association",
+        primaryjoin="KinematicChainDAO.database_id == kinematicchaindao_sensors_association.c.source_kinematicchaindao_id",
+        secondaryjoin="SensorDAO.database_id == kinematicchaindao_sensors_association.c.target_sensordao_id",
         cascade="save-update, merge",
     )
 
@@ -5979,7 +6170,7 @@ class ManipulatorDAO(
         use_existing_column=True,
     )
     front_facing_orientation_id: Mapped[int] = mapped_column(
-        ForeignKey("PyCRAMQuaternionMappingDAO.database_id", use_alter=True),
+        ForeignKey("QuaternionMappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
@@ -5992,8 +6183,8 @@ class ManipulatorDAO(
     tool_frame: Mapped[BodyDAO] = relationship(
         "BodyDAO", uselist=False, foreign_keys=[tool_frame_id], post_update=True
     )
-    front_facing_orientation: Mapped[PyCRAMQuaternionMappingDAO] = relationship(
-        "PyCRAMQuaternionMappingDAO",
+    front_facing_orientation: Mapped[QuaternionMappingDAO] = relationship(
+        "QuaternionMappingDAO",
         uselist=False,
         foreign_keys=[front_facing_orientation_id],
         post_update=True,
@@ -6166,6 +6357,25 @@ class WorldEntityWithIDDAO(
     }
 
 
+class ActuatorDAO(
+    WorldEntityWithIDDAO,
+    DataAccessObject[semantic_digital_twin.world_description.world_entity.Actuator],
+):
+
+    __tablename__ = "ActuatorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldEntityWithIDDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ActuatorDAO",
+        "inherit_condition": database_id == WorldEntityWithIDDAO.database_id,
+    }
+
+
 class DegreeOfFreedomMappingDAO(
     WorldEntityWithIDDAO,
     DataAccessObject[semantic_digital_twin.orm.model.DegreeOfFreedomMapping],
@@ -6331,6 +6541,37 @@ class WorldModelModificationDAO(
     }
 
 
+class AddActuatorModificationDAO(
+    WorldModelModificationDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.world_modification.AddActuatorModification
+    ],
+):
+
+    __tablename__ = "AddActuatorModificationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldModelModificationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    actuator_id: Mapped[int] = mapped_column(
+        ForeignKey("ActuatorDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    actuator: Mapped[ActuatorDAO] = relationship(
+        "ActuatorDAO", uselist=False, foreign_keys=[actuator_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "AddActuatorModificationDAO",
+        "inherit_condition": database_id == WorldModelModificationDAO.database_id,
+    }
+
+
 class AddConnectionModificationDAO(
     WorldModelModificationDAO,
     DataAccessObject[
@@ -6460,6 +6701,31 @@ class AddSemanticAnnotationModificationDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "AddSemanticAnnotationModificationDAO",
+        "inherit_condition": database_id == WorldModelModificationDAO.database_id,
+    }
+
+
+class RemoveActuatorModificationDAO(
+    WorldModelModificationDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.world_modification.RemoveActuatorModification
+    ],
+):
+
+    __tablename__ = "RemoveActuatorModificationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldModelModificationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    actuator_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "RemoveActuatorModificationDAO",
         "inherit_condition": database_id == WorldModelModificationDAO.database_id,
     }
 
@@ -6619,6 +6885,8 @@ class WorldModelModificationBlockDAO(
     modifications: Mapped[typing.List[WorldModelModificationDAO]] = relationship(
         "WorldModelModificationDAO",
         secondary="worldmodelmodificationblockdao_modifications_association",
+        primaryjoin="WorldModelModificationBlockDAO.database_id == worldmodelmodificationblockdao_modifications_association.c.source_worldmodelmodificationblockdao_id",
+        secondaryjoin="WorldModelModificationDAO.database_id == worldmodelmodificationblockdao_modifications_association.c.target_worldmodelmodificationdao_id",
         cascade="save-update, merge",
     )
 

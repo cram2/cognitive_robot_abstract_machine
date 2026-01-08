@@ -3,14 +3,21 @@ from __future__ import annotations
 from ctypes import c_int
 from dataclasses import dataclass, field
 from enum import Enum
-from typing_extensions import Dict, TYPE_CHECKING, List, Tuple
 
 import daqp
 import numpy as np
+from typing_extensions import Dict, TYPE_CHECKING, List, Tuple
 
-from ..world_description.connections import ActiveConnection
+import krrood.symbolic_math.symbolic_math as sm
+from krrood.symbolic_math.symbolic_math import (
+    Vector,
+    FloatVariable,
+    Matrix,
+    Scalar,
+    VariableParameters,
+)
+from ..spatial_types import HomogeneousTransformationMatrix, RotationMatrix, Vector3
 from ..world_description.degree_of_freedom import DegreeOfFreedom
-from ..spatial_types import spatial_types as cas
 
 if TYPE_CHECKING:
     from ..world import World
@@ -144,7 +151,7 @@ class InverseKinematicsSolver:
         self,
         root: KinematicStructureEntity,
         tip: KinematicStructureEntity,
-        target: cas.TransformationMatrix,
+        target: HomogeneousTransformationMatrix,
         dt: float = 0.05,
         max_iterations: int = 200,
         translation_velocity: float = 0.2,
@@ -292,7 +299,7 @@ class QPProblem:
     Tip body of the kinematic chain.
     """
 
-    target: cas.TransformationMatrix
+    target: HomogeneousTransformationMatrix
     """
     Desired tip pose relative to the root body.
     """
@@ -322,8 +329,8 @@ class QPProblem:
     ) -> Tuple[
         list[DegreeOfFreedom],
         list[DegreeOfFreedom],
-        list[cas.FloatVariable],
-        list[cas.FloatVariable],
+        list[FloatVariable],
+        list[FloatVariable],
     ]:
         """
         Extract active and passive DOFs from the kinematic chain.
@@ -366,7 +373,7 @@ class QPProblem:
         self.lower_box_constraints, self.upper_box_constraints = (
             self.constraint_builder.build_box_constraints(self.active_dofs)
         )
-        self.box_constraint_matrix = cas.Expression.eye(len(self.lower_box_constraints))
+        self.box_constraint_matrix = Matrix.eye(len(self.lower_box_constraints))
 
         # Goal constraints
         self.eq_bound_expr, self.neq_matrix = (
@@ -374,9 +381,9 @@ class QPProblem:
         )
 
         # Combine constraints
-        self.l = cas.Expression.vstack([self.lower_box_constraints, self.eq_bound_expr])
-        self.u = cas.Expression.vstack([self.upper_box_constraints, self.eq_bound_expr])
-        self.A = cas.Expression.vstack([self.box_constraint_matrix, self.neq_matrix])
+        self.l = Matrix.vstack([self.lower_box_constraints, self.eq_bound_expr])
+        self.u = Matrix.vstack([self.upper_box_constraints, self.eq_bound_expr])
+        self.A = Matrix.vstack([self.box_constraint_matrix, self.neq_matrix])
 
     def _setup_weights(self):
         """Setup quadratic and linear weights for the QP problem."""
@@ -386,18 +393,22 @@ class QPProblem:
         ]
         slack_weights = [2500 * (1.0 / 0.2) ** 2] * 6
 
-        self.quadratic_weights = cas.Expression(dof_weights + slack_weights)
-        self.linear_weights = cas.Expression.zeros(*self.quadratic_weights.shape)
+        self.quadratic_weights = Matrix(dof_weights + slack_weights)
+        self.linear_weights = Matrix.zeros(*self.quadratic_weights.shape)
 
     def _compile_functions(self):
         """Compile all symbolic expressions into functions."""
         variable_args = [self.active_variables, self.passive_variables]
 
-        self.l_f = self.l.compile(variable_args)
-        self.u_f = self.u.compile(variable_args)
-        self.A_f = self.A.compile(variable_args)
-        self.quadratic_weights_f = self.quadratic_weights.compile(variable_args)
-        self.linear_weights_f = self.linear_weights.compile(variable_args)
+        self.l_f = self.l.compile(VariableParameters.from_lists(*variable_args))
+        self.u_f = self.u.compile(VariableParameters.from_lists(*variable_args))
+        self.A_f = self.A.compile(VariableParameters.from_lists(*variable_args))
+        self.quadratic_weights_f = self.quadratic_weights.compile(
+            VariableParameters.from_lists(*variable_args)
+        )
+        self.linear_weights_f = self.linear_weights.compile(
+            VariableParameters.from_lists(*variable_args)
+        )
 
     def evaluate_at_state(self, solver_state) -> QPMatrices:
         """Evaluate QP matrices at the current solver state."""
@@ -437,7 +448,7 @@ class ConstraintBuilder:
     Tip body of the kinematic chain.
     """
 
-    target: cas.TransformationMatrix
+    target: HomogeneousTransformationMatrix
     """
     Desired tip pose relative to the root body.
     """
@@ -457,18 +468,22 @@ class ConstraintBuilder:
 
     def build_box_constraints(
         self, active_dofs: List[DegreeOfFreedom]
-    ) -> Tuple[cas.Expression, cas.Expression]:
+    ) -> Tuple[Vector, Vector]:
         """Build position and velocity limit constraints for DOFs."""
         lower_constraints = []
         upper_constraints = []
 
         for dof in active_dofs:
-            ll = cas.max(-self.maximum_velocity, dof.lower_limits.velocity)
-            ul = cas.min(self.maximum_velocity, dof.upper_limits.velocity)
+            ll = max(-self.maximum_velocity, dof.lower_limits.velocity)
+            ul = min(self.maximum_velocity, dof.upper_limits.velocity)
 
             if dof.has_position_limits():
-                ll = cas.max(dof.lower_limits.position - dof.variables.position, ll)
-                ul = cas.min(dof.upper_limits.position - dof.variables.position, ul)
+                ll = sm.max(
+                    dof.lower_limits.position - dof.variables.position, Scalar(ll)
+                )
+                ul = sm.min(
+                    dof.upper_limits.position - dof.variables.position, Scalar(ul)
+                )
 
             lower_constraints.append(ll)
             upper_constraints.append(ul)
@@ -478,11 +493,11 @@ class ConstraintBuilder:
         lower_constraints.extend([-_large_value] * 6)
         upper_constraints.extend([_large_value] * 6)
 
-        return cas.Expression(lower_constraints), cas.Expression(upper_constraints)
+        return Vector(lower_constraints), Vector(upper_constraints)
 
     def build_goal_constraints(
-        self, active_variables: List[cas.FloatVariable]
-    ) -> Tuple[cas.Expression, cas.Expression]:
+        self, active_variables: List[FloatVariable]
+    ) -> Tuple[Matrix, Matrix]:
         """Build position and rotation goal constraints."""
         root_T_tip = self.world.compose_forward_kinematics_expression(
             self.root, self.tip
@@ -493,41 +508,39 @@ class ConstraintBuilder:
         rotation_state, rotation_error = self._compute_rotation_error(root_T_tip)
 
         # Current state and jacobian
-        current_expr = cas.Expression.vstack([position_state, rotation_state])
-        eq_bound_expr = cas.Expression.vstack([position_error, rotation_error])
+        current_expr = Matrix.vstack([position_state, rotation_state])
+        eq_bound_expr = Matrix.vstack([position_error, rotation_error])
 
         J = current_expr.jacobian(active_variables)
-        neq_matrix = cas.Expression.hstack(
-            [J * self.dt, cas.Expression.eye(6) * self.dt]
-        )
+        neq_matrix = Matrix.hstack([J * self.dt, Matrix.eye(6) * self.dt])
 
         return eq_bound_expr, neq_matrix
 
     def _compute_position_error(
-        self, root_T_tip: cas.TransformationMatrix
-    ) -> Tuple[cas.Expression, cas.Expression]:
+        self, root_T_tip: HomogeneousTransformationMatrix
+    ) -> Tuple[Vector, Vector]:
         """
         Compute position error with velocity limits.
         :param root_T_tip: Forward kinematics expression.
         :return: Expression describing the position, and the error vector.
         """
         root_P_tip = root_T_tip.to_position()
-        root_T_tip_goal = cas.TransformationMatrix(self.target)
+        root_T_tip_goal = HomogeneousTransformationMatrix(self.target)
         root_P_tip_goal = root_T_tip_goal.to_position()
 
         translation_cap = self.max_translation_velocity * self.dt
         position_error = root_P_tip_goal[:3] - root_P_tip[:3]
 
         for i in range(3):
-            position_error[i] = cas.limit(
+            position_error[i] = sm.limit(
                 position_error[i], -translation_cap, translation_cap
             )
 
         return root_P_tip[:3], position_error
 
     def _compute_rotation_error(
-        self, root_T_tip: cas.TransformationMatrix
-    ) -> Tuple[cas.Expression, cas.Expression]:
+        self, root_T_tip: HomogeneousTransformationMatrix
+    ) -> Tuple[Vector, Vector]:
         """
         Compute rotation error with velocity limits.
         :param root_T_tip: Forward kinematics expression.
@@ -535,18 +548,16 @@ class ConstraintBuilder:
         """
         rotation_cap = self.max_rotation_velocity * self.dt
 
-        hack = cas.RotationMatrix.from_axis_angle(cas.Vector3.Z(), -0.0001)
+        hack = RotationMatrix.from_axis_angle(Vector3.Z(), -0.0001)
         root_R_tip = root_T_tip.to_rotation_matrix().dot(hack)
-        q_actual = cas.TransformationMatrix(self.target).to_quaternion()
+        q_actual = HomogeneousTransformationMatrix(self.target).to_quaternion()
         q_goal = root_R_tip.to_quaternion()
-        q_goal = cas.if_less(q_goal.dot(q_actual), 0, -q_goal, q_goal)
+        q_goal = sm.if_less(q_goal.dot(q_actual), 0, -q_goal, q_goal)
         q_error = q_actual.diff(q_goal)
 
         rotation_error = -q_error
         for i in range(3):
-            rotation_error[i] = cas.limit(
-                rotation_error[i], -rotation_cap, rotation_cap
-            )
+            rotation_error[i] = sm.limit(rotation_error[i], -rotation_cap, rotation_cap)
 
         return q_error[:3], rotation_error[:3]
 

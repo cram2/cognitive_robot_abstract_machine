@@ -3,19 +3,22 @@ from dataclasses import dataclass, field
 import numpy as np
 from typing_extensions import Callable, List
 
+from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import (
-    FloatVariable,
     Point3,
-    TransformationMatrix,
+    HomogeneousTransformationMatrix,
     Vector3,
 )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, init=False)
 class AuxiliaryVariable(FloatVariable):
-    name: PrefixedName = field(kw_only=True)
     provider: Callable[[], float] = field(kw_only=True)
+
+    def __init__(self, name: str, provider: Callable[[], float]):
+        super().__init__(str(name))
+        self.provider = provider
 
     def resolve(self) -> float:
         return float(self.provider())
@@ -26,16 +29,16 @@ class AuxiliaryVariable(FloatVariable):
 
 def create_point(name: PrefixedName, provider: Callable[[], List[float]]):
     return Point3(
-        x_init=AuxiliaryVariable(
-            name=PrefixedName("x", str(name)),
+        x=AuxiliaryVariable(
+            name=str(PrefixedName("x", str(name))),
             provider=lambda: provider()[0],
         ),
-        y_init=AuxiliaryVariable(
-            name=PrefixedName("y", str(name)),
+        y=AuxiliaryVariable(
+            name=str(PrefixedName("y", str(name))),
             provider=lambda: provider()[1],
         ),
-        z_init=AuxiliaryVariable(
-            name=PrefixedName("z", str(name)),
+        z=AuxiliaryVariable(
+            name=str(PrefixedName("z", str(name))),
             provider=lambda: provider()[2],
         ),
     )
@@ -43,16 +46,16 @@ def create_point(name: PrefixedName, provider: Callable[[], List[float]]):
 
 def create_vector3(name: PrefixedName, provider: Callable[[], List[float]]):
     return Vector3(
-        x_init=AuxiliaryVariable(
-            name=PrefixedName("x", str(name)),
+        x=AuxiliaryVariable(
+            name=str(PrefixedName("x", str(name))),
             provider=lambda: provider()[0],
         ),
-        y_init=AuxiliaryVariable(
-            name=PrefixedName("y", str(name)),
+        y=AuxiliaryVariable(
+            name=str(PrefixedName("y", str(name))),
             provider=lambda: provider()[1],
         ),
-        z_init=AuxiliaryVariable(
-            name=PrefixedName("z", str(name)),
+        z=AuxiliaryVariable(
+            name=str(PrefixedName("z", str(name))),
             provider=lambda: provider()[2],
         ),
     )
@@ -70,7 +73,7 @@ class AuxiliaryVariableManager:
     def create_float_variable(
         self, name: PrefixedName, provider: Callable[[], float] = None
     ) -> AuxiliaryVariable:
-        v = AuxiliaryVariable(name=name, provider=provider)
+        v = AuxiliaryVariable(name=str(name), provider=provider)
         self.add_variable(v)
         return v
 
@@ -78,13 +81,13 @@ class AuxiliaryVariableManager:
         self, name: PrefixedName, provider: Callable[[], List[float]] = None
     ) -> Point3:
         x = AuxiliaryVariable(
-            name=PrefixedName("x", str(name)), provider=lambda: provider()[0]
+            name=str(PrefixedName("x", str(name))), provider=lambda: provider()[0]
         )
         y = AuxiliaryVariable(
-            name=PrefixedName("y", str(name)), provider=lambda: provider()[1]
+            name=str(PrefixedName("y", str(name))), provider=lambda: provider()[1]
         )
         z = AuxiliaryVariable(
-            name=PrefixedName("z", str(name)), provider=lambda: provider()[2]
+            name=str(PrefixedName("z", str(name))), provider=lambda: provider()[2]
         )
         self.add_variable(x)
         self.add_variable(y)
@@ -93,12 +96,12 @@ class AuxiliaryVariableManager:
 
     def create_transformation_matrix(
         self, name: PrefixedName, provider: Callable[[], np.ndarray] = None
-    ) -> TransformationMatrix:
-        transformation_matrix = TransformationMatrix()
+    ) -> HomogeneousTransformationMatrix:
+        transformation_matrix = HomogeneousTransformationMatrix()
         for row in range(3):
             for column in range(4):
                 auxiliary_variable = AuxiliaryVariable(
-                    name=PrefixedName(f"t[{row},{column}]", str(name)),
+                    name=str(PrefixedName(f"t[{row},{column}]", str(name))),
                     provider=lambda r=row, c=column: provider()[r, c],
                 )
                 self.add_variable(auxiliary_variable)

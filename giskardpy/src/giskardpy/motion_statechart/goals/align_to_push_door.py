@@ -2,11 +2,16 @@ from dataclasses import dataclass
 
 import numpy as np
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.motion_statechart.exceptions import NodeInitializationError
 from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.exceptions import NodeInitializationError
 from giskardpy.motion_statechart.graph_node import Goal
 from giskardpy.motion_statechart.graph_node import Task
+from semantic_digital_twin.spatial_types import (
+    Point3,
+    RotationMatrix,
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -17,7 +22,7 @@ class AlignToPushDoor(Goal):
     tip_link: Body
     door_object: Body
     door_handle: Body
-    tip_gripper_axis: cas.Vector3
+    tip_gripper_axis: Vector3
     reference_linear_velocity: float = 0.1
     reference_angular_velocity: float = 0.5
     weight: float = DefaultWeights.WEIGHT_BELOW_CA
@@ -34,7 +39,7 @@ class AlignToPushDoor(Goal):
         object_joint_angle = context.world.state[object_joint_name].position
 
         self.tip_gripper_axis.scale(1)
-        object_V_object_rotation_axis = cas.Vector3(
+        object_V_object_rotation_axis = Vector3(
             context.world.get_joint(object_joint_name).axis
         )
         joint_limit = context.world.compute_joint_limits(object_joint_name, 0)
@@ -45,7 +50,7 @@ class AlignToPushDoor(Goal):
         root_T_door_expr = context.world._forward_kinematic_manager.compose_expression(
             self.root, self.door_object
         )
-        tip_V_tip_grasp_axis = cas.Vector3.from_iterable(self.tip_gripper_axis)
+        tip_V_tip_grasp_axis = Vector3.from_iterable(self.tip_gripper_axis)
         root_V_object_rotation_axis = root_T_door_expr @ object_V_object_rotation_axis
         root_V_tip_grasp_axis = root_T_tip @ tip_V_tip_grasp_axis
         door_P_handle = context.world.compute_fk_point(self.door_object, self.handle)
@@ -56,7 +61,7 @@ class AlignToPushDoor(Goal):
         # axis pointing in the direction of handle frame from door joint frame
         direction_axis = np.argmax(abs(temp_point))
         door_P_intermediate_point[direction_axis] = temp_point[direction_axis] * 3 / 4
-        door_P_intermediate_point = cas.Point3(
+        door_P_intermediate_point = Point3(
             [
                 door_P_intermediate_point[0],
                 door_P_intermediate_point[1],
@@ -68,15 +73,17 @@ class AlignToPushDoor(Goal):
         desired_angle = object_joint_angle * 0.5  # just chose 1/2 of the goal angle
 
         # find point w.r.t rotated door in local frame
-        door_R_door_rotated = cas.RotationMatrix.from_axis_angle(
+        door_R_door_rotated = RotationMatrix.from_axis_angle(
             axis=object_V_object_rotation_axis, angle=desired_angle
         )
-        door_T_door_rotated = cas.TransformationMatrix(door_R_door_rotated)
+        door_T_door_rotated = HomogeneousTransformationMatrix(door_R_door_rotated)
         # as the root_T_door is already pointing to a completely rotated door, we invert desired angle to get to the
         # intermediate point
         door_rotated_P_top = door_T_door_rotated.inverse() @ door_P_intermediate_point
 
-        root_P_top = cas.TransformationMatrix(root_T_door_expr) @ door_rotated_P_top
+        root_P_top = (
+            HomogeneousTransformationMatrix(root_T_door_expr) @ door_rotated_P_top
+        )
 
         minimum_angle_to_push_door = joint_limit[1] / 4
 

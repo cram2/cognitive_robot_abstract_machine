@@ -9,7 +9,9 @@ import numpy
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -306,7 +308,7 @@ class MujocoSimTestCase(unittest.TestCase):
 
         start_time = time.time()
         new_body = Body(name=PrefixedName("test_body"))
-        box_origin = TransformationMatrix.from_xyz_rpy(
+        box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=0.2, y=0.4, z=-0.3, roll=0, pitch=0.5, yaw=0, reference_frame=new_body
         )
         box = Box(
@@ -340,7 +342,7 @@ class MujocoSimTestCase(unittest.TestCase):
         region = Region(name=PrefixedName("test_region"))
         region_box = Box(
             scale=Scale(0.1, 0.5, 0.2),
-            origin=TransformationMatrix.from_xyz_rpy(reference_frame=region),
+            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=region),
             color=Color(
                 0.0,
                 1.0,
@@ -356,7 +358,7 @@ class MujocoSimTestCase(unittest.TestCase):
                 FixedConnection(
                     parent=self.test_urdf_1_world.root,
                     child=region,
-                    parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                         z=0.5
                     ),
                 )

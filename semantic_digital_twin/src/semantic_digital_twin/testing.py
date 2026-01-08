@@ -8,7 +8,7 @@ from typing_extensions import Tuple
 
 from .adapters.urdf import URDFParser
 from .datastructures.prefixed_name import PrefixedName
-from .spatial_types import TransformationMatrix
+from .spatial_types import HomogeneousTransformationMatrix
 from .spatial_types.derivatives import DerivativeMap
 from .spatial_types.spatial_types import Vector3
 from .utils import rclpy_installed, tracy_installed, hsrb_installed
@@ -83,7 +83,7 @@ def world_setup_simple():
         collision=ShapeCollection(
             [
                 Box(
-                    origin=TransformationMatrix.from_xyz_rpy(),
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
                     scale=Scale(0.25, 0.25, 0.25),
                 )
             ]
@@ -94,7 +94,7 @@ def world_setup_simple():
         collision=ShapeCollection(
             [
                 Box(
-                    origin=TransformationMatrix.from_xyz_rpy(),
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
                     scale=Scale(0.25, 0.25, 0.25),
                 )
             ]
@@ -103,14 +103,14 @@ def world_setup_simple():
     body3 = Body(
         name=PrefixedName("name3", prefix="test"),
         collision=ShapeCollection(
-            [Sphere(origin=TransformationMatrix.from_xyz_rpy(), radius=0.01)]
+            [Sphere(origin=HomogeneousTransformationMatrix.from_xyz_rpy(), radius=0.01)]
         ),
     )
 
     body4 = Body(
         name=PrefixedName("name4", prefix="test"),
         collision=ShapeCollection(
-            [Sphere(origin=TransformationMatrix.from_xyz_rpy(), radius=0.01)]
+            [Sphere(origin=HomogeneousTransformationMatrix.from_xyz_rpy(), radius=0.01)]
         ),
     )
 
@@ -180,108 +180,3 @@ def pr2_world():
         world_with_pr2.add_connection(c_root_bf)
 
     return world_with_pr2
-
-
-@pytest.fixture
-def tracy_world():
-    if not tracy_installed():
-        pytest.skip("Tracy not installed")
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf"
-    )
-    tracy = os.path.join(urdf_dir, "tracy.urdf")
-    world = World()
-    with world.modify_world():
-        localization_body = Body(name=PrefixedName("odom_combined"))
-        world.add_kinematic_structure_entity(localization_body)
-
-        tracy_parser = URDFParser.from_file(file_path=tracy)
-        world_with_tracy = tracy_parser.parse()
-        # world_with_tracy.plot_kinematic_structure()
-        tracy_root = world_with_tracy.root
-        c_root_bf = Connection6DoF.create_with_dofs(
-            parent=localization_body, child=tracy_root, world=world
-        )
-        world.merge_world(world_with_tracy, c_root_bf)
-
-    return world
-
-
-@pytest.fixture
-def hsrb_world():
-    if not hsrb_installed():
-        pytest.skip("HSRB not installed")
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf"
-    )
-    hsrb = os.path.join(urdf_dir, "hsrb.urdf")
-    world = World()
-    with world.modify_world():
-        localization_body = Body(name=PrefixedName("odom_combined"))
-        world.add_kinematic_structure_entity(localization_body)
-
-        hsrb_parser = URDFParser.from_file(file_path=hsrb)
-        world_with_hsrb = hsrb_parser.parse()
-        hsrb_root = world_with_hsrb.root
-        c_root_bf = Connection6DoF.create_with_dofs(
-            parent=localization_body, child=hsrb_root, world=world
-        )
-        world.merge_world(world_with_hsrb, c_root_bf)
-
-    return world
-
-
-@pytest.fixture
-def apartment_world() -> World:
-    """
-    Return the apartment world parsed from the URDF file.
-    """
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf"
-    )
-    apartment = os.path.join(urdf_dir, "apartment.urdf")
-    parser = URDFParser.from_file(file_path=apartment)
-    world = parser.parse()
-    world.validate()
-    return world
-
-
-@pytest.fixture(scope="function")
-def rclpy_node():
-    if not rclpy_installed():
-        pytest.skip("ROS not installed")
-    import rclpy
-    from rclpy.executors import SingleThreadedExecutor
-
-    rclpy.init()
-    node = rclpy.create_node("test_node")
-
-    executor = SingleThreadedExecutor()
-    executor.add_node(node)
-
-    thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
-    thread.start()
-    time.sleep(0.1)
-    try:
-        yield node
-    finally:
-        # Stop executor cleanly and wait for the thread to exit
-        executor.shutdown()
-        thread.join(timeout=2.0)
-
-        # Remove the node from the executor and destroy it
-        # (executor.shutdown() takes care of spinning; add_node is safe to keep as-is)
-        node.destroy_node()
-
-        # Shut down the ROS client library
-        rclpy.shutdown()
-
-@pytest.fixture()
-def kitchen_world():
-    path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "resources", "urdf", "kitchen-small.urdf"
-    )
-    parser = URDFParser.from_file(file_path=path)
-    world = parser.parse()
-    world.validate()
-    return world

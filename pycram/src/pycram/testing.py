@@ -6,15 +6,18 @@ import unittest
 from copy import deepcopy
 
 import pytest
+
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.adapters.procthor.procthor_semantic_annotations import Milk
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Milk,
+)
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.utils import rclpy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
-from krrood.entity_query_language.symbol_graph import SymbolGraph
-
 from .datastructures.dataclasses import Context
 from .datastructures.enums import WorldMode
 from .plan import Plan
@@ -28,53 +31,6 @@ except ImportError:
     logger.info(
         "Could not import VizMarkerPublisher. This is probably because you are not running ROS."
     )
-
-
-@pytest.fixture(autouse=True, scope="session")
-def cleanup_ros():
-    """
-    Fixture to ensure that ROS is properly cleaned up after all tests.
-    """
-    if os.environ.get("ROS_VERSION") == "2":
-        import rclpy
-
-        if not rclpy.ok():
-            rclpy.init()
-    yield
-    if os.environ.get("ROS_VERSION") == "2":
-        if rclpy.ok():
-            rclpy.shutdown()
-
-
-@pytest.fixture(scope="function")
-def rclpy_node():
-    if not rclpy_installed():
-        pytest.skip("ROS not installed")
-    import rclpy
-    from rclpy.executors import SingleThreadedExecutor
-
-    rclpy.init()
-    node = rclpy.create_node("test_node")
-
-    executor = SingleThreadedExecutor()
-    executor.add_node(node)
-
-    thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
-    thread.start()
-    time.sleep(0.1)
-    try:
-        yield node
-    finally:
-        # Stop executor cleanly and wait for the thread to exit
-        executor.shutdown()
-        thread.join(timeout=2.0)
-
-        # Remove the node from the executor and destroy it
-        # (executor.shutdown() takes care of spinning; add_node is safe to keep as-is)
-        node.destroy_node()
-
-        # Shut down the ROS client library
-        rclpy.shutdown()
 
 
 def setup_world() -> World:
@@ -126,16 +82,16 @@ def setup_world() -> World:
             parent=apartment_root, child=pr2_root, world=apartment_world
         )
         apartment_world.merge_world(pr2_sem_world, c_root_bf)
-        c_root_bf.origin = TransformationMatrix.from_xyz_rpy(1.5, 2.5, 0)
+        c_root_bf.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2.5, 0)
 
     apartment_world.get_body_by_name("milk.stl").parent_connection.origin = (
-        TransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix.from_xyz_rpy(
             2.37, 2, 1.05, reference_frame=apartment_world.root
         )
     )
     apartment_world.get_body_by_name(
         "breakfast_cereal.stl"
-    ).parent_connection.origin = TransformationMatrix.from_xyz_rpy(
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         2.37, 1.8, 1.05, reference_frame=apartment_world.root
     )
     milk_view = Milk(body=apartment_world.get_body_by_name("milk.stl"))

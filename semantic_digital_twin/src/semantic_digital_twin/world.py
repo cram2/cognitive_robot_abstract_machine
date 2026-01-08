@@ -24,6 +24,7 @@ from typing_extensions import (
     Callable,
     Any,
     Iterable,
+    TYPE_CHECKING,
 )
 from typing_extensions import List
 from typing_extensions import Type, Set
@@ -43,7 +44,7 @@ from .robots.abstract_robot import AbstractRobot
 from .spatial_computations.forward_kinematics import ForwardKinematicsManager
 from .spatial_computations.ik_solver import InverseKinematicsSolver
 from .spatial_computations.raytracer import RayTracer
-from .spatial_types import spatial_types as cas
+from .spatial_types import HomogeneousTransformationMatrix, Quaternion
 from .spatial_types.derivatives import Derivatives
 from .utils import IDGenerator
 from .world_description.connections import (
@@ -84,6 +85,9 @@ from .world_description.world_modification import (
     RemoveActuatorModification,
 )
 from .world_description.world_state import WorldState
+
+if TYPE_CHECKING:
+    from .spatial_types import GenericSpatialType
 
 logger = logging.getLogger(__name__)
 
@@ -1210,7 +1214,9 @@ class World:
         return entity_hash in self._world_entity_hash_table
 
     # %% World Merging
-    def merge_world_at_pose(self, other: World, pose: cas.TransformationMatrix) -> None:
+    def merge_world_at_pose(
+        self, other: World, pose: HomogeneousTransformationMatrix
+    ) -> None:
         """
         Merge another world into the existing one, creates a 6DoF connection between the root of this world and the root
         of the other world.
@@ -1739,7 +1745,7 @@ class World:
 
     def compute_forward_kinematics(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
-    ) -> cas.TransformationMatrix:
+    ) -> HomogeneousTransformationMatrix:
         """
         Compute the forward kinematics from the root KinematicStructureEntity to the tip KinematicStructureEntity.
 
@@ -1754,7 +1760,7 @@ class World:
 
     def compose_forward_kinematics_expression(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
-    ) -> cas.TransformationMatrix:
+    ) -> HomogeneousTransformationMatrix:
         """
         :param root: The root KinematicStructureEntity in the kinematic chain.
             It determines the starting point of the forward kinematics calculation.
@@ -1791,7 +1797,7 @@ class World:
         self,
         root: KinematicStructureEntity,
         tip: KinematicStructureEntity,
-        target: cas.TransformationMatrix,
+        target: HomogeneousTransformationMatrix,
         dt: float = 0.05,
         max_iterations: int = 200,
         translation_velocity: float = 0.2,
@@ -1842,9 +1848,9 @@ class World:
 
     def transform(
         self,
-        spatial_object: cas.GenericSpatialType,
+        spatial_object: GenericSpatialType,
         target_frame: KinematicStructureEntity,
-    ) -> cas.GenericSpatialType:
+    ) -> GenericSpatialType:
         """
         Transform a given spatial object from its reference frame to a target frame.
 
@@ -1868,7 +1874,7 @@ class World:
         )
 
         match spatial_object:
-            case cas.Quaternion():
+            case Quaternion():
                 reference_frame_R = spatial_object.to_rotation_matrix()
                 target_frame_R = target_frame_T_reference_frame @ reference_frame_R
                 return target_frame_R.to_quaternion()
@@ -1887,12 +1893,12 @@ class World:
         with new_world.modify_world():
             for body in self.bodies:
                 new_body = Body(
-                    visual=body.visual,
-                    collision=body.collision,
                     name=body.name,
                     id=body.id,
                 )
                 new_world.add_kinematic_structure_entity(new_body)
+                new_body.visual = body.visual.copy_for_world(new_world)
+                new_body.collision = body.collision.copy_for_world(new_world)
             for region in self.regions:
                 new_region = Region(
                     name=region.name,

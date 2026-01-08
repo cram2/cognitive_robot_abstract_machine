@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import IntEnum, Enum
 from typing import Union
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+from krrood.symbolic_math.symbolic_math import Scalar
 
 goal_parameter = Union[str, float, bool, dict, list, IntEnum, None]
 
@@ -21,9 +21,9 @@ class FloatEnum(float, Enum):
 
 
 class ObservationStateValues(FloatEnum):
-    FALSE = cas.TrinaryFalse.to_np()[0]
-    UNKNOWN = cas.TrinaryUnknown.to_np()[0]
-    TRUE = cas.TrinaryTrue.to_np()[0]
+    FALSE = float(Scalar.const_false())
+    UNKNOWN = float(Scalar.const_trinary_unknown())
+    TRUE = float(Scalar.const_true())
 
 
 class DefaultWeights(FloatEnum):

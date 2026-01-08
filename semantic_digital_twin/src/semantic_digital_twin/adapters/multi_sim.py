@@ -25,7 +25,11 @@ from trimesh.visual import TextureVisuals
 
 from ..callbacks.callback import ModelChangeCallback
 from ..datastructures.prefixed_name import PrefixedName
-from ..spatial_types.spatial_types import TransformationMatrix, Point3, Quaternion
+from ..spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+    Quaternion,
+)
 from ..world import World
 from ..world_description.connections import (
     RevoluteConnection,
@@ -60,7 +64,7 @@ from ..world_description.world_modification import (
 logger = logging.getLogger(__name__)
 
 
-def cas_pose_to_list(pose: TransformationMatrix) -> List[float]:
+def cas_pose_to_list(pose: HomogeneousTransformationMatrix) -> List[float]:
     """
     Converts a CAS TransformationMatrix to a list of 7 floats (position + quaternion).
 
@@ -181,10 +185,10 @@ class InertialConverter:
         R_diag = Rotation.from_matrix(eigenvectors)  # type: ignore
         updated_quat = (R_orig * R_diag).as_quat(scalar_first=True)
         return Quaternion(
-            x_init=updated_quat[1],
-            y_init=updated_quat[2],
-            z_init=updated_quat[3],
-            w_init=updated_quat[0],
+            x=updated_quat[1],
+            y=updated_quat[2],
+            z=updated_quat[3],
+            w=updated_quat[0],
         )
 
 

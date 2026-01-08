@@ -4,18 +4,18 @@ import itertools
 import logging
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing_extensions import Dict, Any, Self, Optional, List, Iterator
 
 import numpy as np
 from random_events.product_algebra import Event, SimpleEvent
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 from trimesh import Trimesh
 from trimesh.util import concatenate
+from typing_extensions import Dict, Any, Self, Optional, List, Iterator
 from typing_extensions import TYPE_CHECKING
 
+from krrood.adapters.json_serializer import SubclassJSONSerializer
 from .geometry import Shape, BoundingBox
 from ..datastructures.variables import SpatialVariables
-from ..spatial_types import TransformationMatrix, Point3
+from ..spatial_types import HomogeneousTransformationMatrix, Point3
 
 if TYPE_CHECKING:
     from .world_entity import KinematicStructureEntity
@@ -114,7 +114,7 @@ class ShapeCollection(SubclassJSONSerializer):
         return concatenate(transformed_meshes)
 
     def as_bounding_box_collection_at_origin(
-        self, origin: TransformationMatrix
+        self, origin: HomogeneousTransformationMatrix
     ) -> BoundingBoxCollection:
         """
         Provides the bounding box collection for this entity given a transformation matrix as origin.
@@ -144,7 +144,7 @@ class ShapeCollection(SubclassJSONSerializer):
         :returns: A collection of bounding boxes in world-space coordinates.
         """
         return self.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=reference_frame)
+            HomogeneousTransformationMatrix(reference_frame=reference_frame)
         )
 
     def to_json(self) -> Dict[str, Any]:
@@ -165,12 +165,21 @@ class ShapeCollection(SubclassJSONSerializer):
         com_local: np.ndarray[np.float64] = self.combined_mesh.center_mass  # (3,)
         # Transform to world frame using the body's global pose
         com = Point3(
-            x_init=com_local[0],
-            y_init=com_local[1],
-            z_init=com_local[2],
+            x=com_local[0],
+            y=com_local[1],
+            z=com_local[2],
             reference_frame=self.reference_frame,
         )
         return self.world.transform(com, self.world.root)
+
+    def copy_for_world(self, world: World) -> ShapeCollection:
+        new_shapes = [s.copy_for_world(world) for s in self.shapes]
+        new_reference_frame = (
+            world.get_kinematic_structure_entity_by_name(self.reference_frame.name)
+            if self.reference_frame
+            else None
+        )
+        return ShapeCollection(new_shapes, new_reference_frame)
 
 
 @dataclass
@@ -264,14 +273,12 @@ class BoundingBoxCollection(ShapeCollection):
                 x.upper,
                 y.upper,
                 z.upper,
-                TransformationMatrix.from_xyz_quaternion(
-                    x.upper - (x.upper - x.lower) / 2,
-                    y.upper - (y.upper - y.lower) / 2,
-                    z.upper - (z.upper - z.lower) / 2,
-                    0,
-                    0,
-                    0,
-                    1,
+                HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                    point=Point3(
+                        x.upper - (x.upper - x.lower) / 2,
+                        y.upper - (y.upper - y.lower) / 2,
+                        z.upper - (z.upper - z.lower) / 2,
+                    ),
                     reference_frame=reference_frame,
                 ),
             )
@@ -350,7 +357,7 @@ class BoundingBoxCollection(ShapeCollection):
             max(all_x),
             max(all_y),
             max(all_z),
-            TransformationMatrix.from_xyz_quaternion(
+            HomogeneousTransformationMatrix.from_xyz_quaternion(
                 reference_frame=self.reference_frame
             ),
         )

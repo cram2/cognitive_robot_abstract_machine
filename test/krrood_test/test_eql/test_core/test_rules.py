@@ -1,6 +1,6 @@
 from krrood.entity_query_language.conclusion import Add
-from krrood.entity_query_language.entity import let, entity, and_, inference
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity import variable, entity, and_, inference
+from krrood.entity_query_language.entity_result_processors import an
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.rule import refinement, alternative, next_rule
 from ...dataset.semantic_world_like_classes import (
@@ -19,19 +19,16 @@ from ...dataset.semantic_world_like_classes import (
 
 def test_generate_drawers(handles_and_containers_world):
     world = handles_and_containers_world
-    container = let(type_=Container, domain=world.bodies)
-    handle = let(type_=Handle, domain=world.bodies)
-    fixed_connection = let(type_=FixedConnection, domain=world.connections)
-    prismatic_connection = let(type_=PrismaticConnection, domain=world.connections)
-
+    container = variable(Container, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    prismatic_connection = variable(PrismaticConnection, domain=world.connections)
+    drawers = variable(Drawer, domain=None)
     query = an(
-        entity(
-            drawers := let(type_=Drawer, domain=None),
-            and_(
-                container == fixed_connection.parent,
-                handle == fixed_connection.child,
-                container == prismatic_connection.child,
-            ),
+        entity(drawers).where(
+            container == fixed_connection.parent,
+            handle == fixed_connection.child,
+            container == prismatic_connection.child,
         )
     )
 
@@ -54,14 +51,13 @@ def test_generate_drawers(handles_and_containers_world):
 def test_add_conclusion(handles_and_containers_world):
     world = handles_and_containers_world
 
-    container = let(type_=Container, domain=world.bodies)
-    handle = let(type_=Handle, domain=world.bodies)
-    fixed_connection = let(type_=FixedConnection, domain=world.connections)
-    prismatic_connection = let(type_=PrismaticConnection, domain=world.connections)
-
+    container = variable(Container, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    prismatic_connection = variable(PrismaticConnection, domain=world.connections)
+    drawers = variable(Drawer, domain=None)
     query = an(
-        entity(
-            drawers := let(type_=Drawer, domain=None),
+        entity(drawers).where(
             container == fixed_connection.parent,
             handle == fixed_connection.child,
             container == prismatic_connection.child,
@@ -86,13 +82,12 @@ def test_add_conclusion(handles_and_containers_world):
 
 def test_rule_tree_with_a_refinement(doors_and_drawers_world):
     world = doors_and_drawers_world
-    body = let(type_=Body, domain=world.bodies)
-    handle = let(type_=Handle, domain=world.bodies)
-    fixed_connection = let(type_=FixedConnection, domain=world.connections)
-
+    body = variable(Body, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    drawers_and_doors = variable(View, domain=None, inferred=True)
     query = an(
-        entity(
-            drawers_and_doors := let(type_=View, domain=None),
+        entity(drawers_and_doors).where(
             body == fixed_connection.parent,
             handle == fixed_connection.child,
         )
@@ -120,15 +115,14 @@ def test_rule_tree_with_a_refinement(doors_and_drawers_world):
 
 def test_rule_tree_with_multiple_refinements(doors_and_drawers_world):
     world = doors_and_drawers_world
-    body = let(type_=Body, domain=world.bodies)
-    container = let(type_=Container, domain=world.bodies)
-    handle = let(type_=Handle, domain=world.bodies)
-    fixed_connection = let(type_=FixedConnection, domain=world.connections)
-    revolute_connection = let(type_=RevoluteConnection, domain=world.connections)
-
+    body = variable(Body, domain=world.bodies)
+    container = variable(Container, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    revolute_connection = variable(RevoluteConnection, domain=world.connections)
+    views = variable(View, domain=None, inferred=True)
     query = an(
-        entity(
-            views := inference(View)(),
+        entity(views).where(
             body == fixed_connection.parent,
             handle == fixed_connection.child,
         )
@@ -148,7 +142,6 @@ def test_rule_tree_with_multiple_refinements(doors_and_drawers_world):
                 )
 
     # query._render_tree_()
-
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 3, "Should generate 1 drawer, 1 door and 1 wardrobe."
     assert isinstance(all_solutions[0], Door)
@@ -165,14 +158,13 @@ def test_rule_tree_with_multiple_refinements(doors_and_drawers_world):
 
 def test_rule_tree_with_an_alternative(doors_and_drawers_world):
     world = doors_and_drawers_world
-    body = let(type_=Body, domain=world.bodies)
-    handle = let(type_=Handle, domain=world.bodies)
-    fixed_connection = let(type_=FixedConnection, domain=world.connections)
-    revolute_connection = let(type_=RevoluteConnection, domain=world.connections)
-
+    body = variable(Body, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    revolute_connection = variable(RevoluteConnection, domain=world.connections)
+    views = variable(View, domain=None, inferred=True)
     query = an(
-        entity(
-            views := inference(View)(),
+        entity(views).where(
             body == fixed_connection.parent,
             handle == fixed_connection.child,
         )
@@ -205,16 +197,15 @@ def test_rule_tree_with_an_alternative(doors_and_drawers_world):
 
 def test_rule_tree_with_multiple_alternatives(doors_and_drawers_world):
     world = doors_and_drawers_world
-    body = let(type_=Body, domain=world.bodies)
-    container = let(type_=Container, domain=world.bodies)
-    handle = let(type_=Handle, domain=world.bodies)
-    fixed_connection = let(type_=FixedConnection, domain=world.connections)
-    prismatic_connection = let(type_=PrismaticConnection, domain=world.connections)
-    revolute_connection = let(type_=RevoluteConnection, domain=world.connections)
-
+    body = variable(Body, domain=world.bodies)
+    container = variable(Container, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    prismatic_connection = variable(PrismaticConnection, domain=world.connections)
+    revolute_connection = variable(RevoluteConnection, domain=world.connections)
+    views = variable(View, domain=None, inferred=True)
     query = an(
-        entity(
-            views := inference(View)(),
+        entity(views).where(
             body == fixed_connection.parent,
             handle == fixed_connection.child,
             body == prismatic_connection.child,
@@ -260,13 +251,12 @@ def test_rule_tree_with_multiple_alternatives(doors_and_drawers_world):
 
 def test_rule_tree_with_multiple_alternatives_optimized(doors_and_drawers_world):
     world = doors_and_drawers_world
-    fixed_connection = let(type_=FixedConnection, domain=world.connections)
-    prismatic_connection = let(type_=PrismaticConnection, domain=world.connections)
-    revolute_connection = let(type_=RevoluteConnection, domain=world.connections)
-
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    prismatic_connection = variable(PrismaticConnection, domain=world.connections)
+    revolute_connection = variable(RevoluteConnection, domain=world.connections)
+    views = variable(View, domain=None, inferred=True)
     query = an(
-        entity(
-            views := inference(View)(),
+        entity(views).where(
             HasType(fixed_connection.child, Handle),
             fixed_connection.parent == prismatic_connection.child,
         )
@@ -322,16 +312,15 @@ def test_rule_tree_with_multiple_alternatives_optimized(doors_and_drawers_world)
 
 def test_rule_tree_with_multiple_alternatives_better_rule_tree(doors_and_drawers_world):
     world = doors_and_drawers_world
-    body = let(type_=Body, domain=world.bodies)
-    container = let(type_=Container, domain=world.bodies)
-    handle = let(type_=Handle, domain=world.bodies)
-    fixed_connection = let(type_=FixedConnection, domain=world.connections)
-    prismatic_connection = let(type_=PrismaticConnection, domain=world.connections)
-    revolute_connection = let(type_=RevoluteConnection, domain=world.connections)
-
+    body = variable(Body, domain=world.bodies)
+    container = variable(Container, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    prismatic_connection = variable(PrismaticConnection, domain=world.connections)
+    revolute_connection = variable(RevoluteConnection, domain=world.connections)
+    views = variable(View, domain=None, inferred=True)
     query = an(
-        entity(
-            views := inference(View)(),
+        entity(views).where(
             body == fixed_connection.parent,
             handle == fixed_connection.child,
         )
@@ -377,13 +366,12 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree_optimized(
     doors_and_drawers_world,
 ):
     world = doors_and_drawers_world
-    fixed_connection = let(type_=FixedConnection, domain=world.connections)
-    prismatic_connection = let(type_=PrismaticConnection, domain=world.connections)
-    revolute_connection = let(type_=RevoluteConnection, domain=world.connections)
-
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    prismatic_connection = variable(PrismaticConnection, domain=world.connections)
+    revolute_connection = variable(RevoluteConnection, domain=world.connections)
+    views = variable(View, domain=None, inferred=True)
     query = an(
-        entity(
-            views := inference(View)(),
+        entity(views).where(
             HasType(fixed_connection.child, Handle),
         )
     )

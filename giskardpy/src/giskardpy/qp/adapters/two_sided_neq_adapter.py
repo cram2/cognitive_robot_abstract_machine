@@ -5,9 +5,10 @@ from typing import Tuple, TYPE_CHECKING
 import numpy as np
 from line_profiler import profile
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.adapters.qp_adapter import GiskardToQPAdapter
 from giskardpy.qp.qp_data import QPData
+from krrood.symbolic_math.symbolic_math import VariableParameters
 
 if TYPE_CHECKING:
     import scipy.sparse as sp
@@ -30,36 +31,36 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
 
     def general_qp_to_specific_qp(
         self,
-        quadratic_weights: cas.Expression,
-        linear_weights: cas.Expression,
-        box_lower_constraints: cas.Expression,
-        box_upper_constraints: cas.Expression,
-        eq_matrix_dofs: cas.Expression,
-        eq_matrix_slack: cas.Expression,
-        eq_bounds: cas.Expression,
-        neq_matrix_dofs: cas.Expression,
-        neq_matrix_slack: cas.Expression,
-        neq_lower_bounds: cas.Expression,
-        neq_upper_bounds: cas.Expression,
+        quadratic_weights: sm.Vector,
+        linear_weights: sm.Vector,
+        box_lower_constraints: sm.Vector,
+        box_upper_constraints: sm.Vector,
+        eq_matrix_dofs: sm.Matrix,
+        eq_matrix_slack: sm.Matrix,
+        eq_bounds: sm.Vector,
+        neq_matrix_dofs: sm.Matrix,
+        neq_matrix_slack: sm.Matrix,
+        neq_lower_bounds: sm.Vector,
+        neq_upper_bounds: sm.Vector,
     ):
         if len(neq_matrix_dofs) == 0:
-            constraint_matrix = cas.hstack([eq_matrix_dofs, eq_matrix_slack])
+            constraint_matrix = sm.hstack([eq_matrix_dofs, eq_matrix_slack])
         else:
-            eq_matrix = cas.hstack(
+            eq_matrix = sm.hstack(
                 [
                     eq_matrix_dofs,
                     eq_matrix_slack,
-                    cas.zeros(eq_matrix_dofs.shape[0], neq_matrix_slack.shape[1]),
+                    sm.Matrix.zeros(eq_matrix_dofs.shape[0], neq_matrix_slack.shape[1]),
                 ]
             )
-            neq_matrix = cas.hstack(
+            neq_matrix = sm.hstack(
                 [
                     neq_matrix_dofs,
-                    cas.zeros(neq_matrix_dofs.shape[0], eq_matrix_slack.shape[1]),
+                    sm.Matrix.zeros(neq_matrix_dofs.shape[0], eq_matrix_slack.shape[1]),
                     neq_matrix_slack,
                 ]
             )
-            constraint_matrix = cas.vstack([eq_matrix, neq_matrix])
+            constraint_matrix = sm.vstack([eq_matrix, neq_matrix])
 
         self.free_symbols = [
             self.world_state_symbols,
@@ -82,7 +83,7 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
             + neq_upper_bounds.shape[0]
         )
 
-        self.combined_vector_f = cas.CompiledFunctionWithViews(
+        self.combined_vector_f = sm.CompiledFunctionWithViews(
             expressions=[
                 quadratic_weights,
                 box_lower_constraints,
@@ -93,7 +94,7 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
                 neq_upper_bounds,
                 linear_weights,
             ],
-            variable_parameters=self.free_symbols,
+            parameters=VariableParameters.from_lists(*self.free_symbols),
             additional_views=[
                 slice(quadratic_weights.shape[0], len_lb_be_lba_end),
                 slice(len_lb_be_lba_end, len_ub_be_uba_end),
@@ -101,7 +102,8 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
         )
 
         self.neq_matrix_compiled = constraint_matrix.compile(
-            parameters=self.free_symbols, sparse=self.sparse
+            parameters=VariableParameters.from_lists(*self.free_symbols),
+            sparse=self.sparse,
         )
 
         self.b_bE_bA_filter = np.ones(

@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
     CartesianOrientation,
 )
 from giskardpy.motion_statechart.graph_node import Task
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -34,9 +35,9 @@ class SpiralMixing(Task):
         a = self.angle_increment * t
         h = self.upward_increment * t
 
-        object_T_goal = cas.TransformationMatrix()
-        x = r * cas.cos(a)
-        y = r * cas.sin(a)
+        object_T_goal = HomogeneousTransformationMatrix()
+        x = r * sm.cos(a)
+        y = r * sm.sin(a)
         z = h
 
         object_T_goal.x = x

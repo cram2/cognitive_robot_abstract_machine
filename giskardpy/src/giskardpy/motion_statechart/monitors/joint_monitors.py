@@ -1,6 +1,6 @@
 from dataclasses import field, dataclass
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
 from semantic_digital_twin.world_description.connections import (
@@ -21,7 +21,7 @@ class JointPositionReached(MotionStatechartNode):
             isinstance(self.connection, RevoluteConnection)
             and not self.connection.dof.has_position_limits()
         ):
-            error = cas.shortest_angular_distance(current, self.position)
+            error = sm.shortest_angular_distance(current, self.position)
         else:
             error = self.position - current
-        return NodeArtifacts(observation=cas.abs(error) < self.threshold)
+        return NodeArtifacts(observation=sm.abs(error) < self.threshold)

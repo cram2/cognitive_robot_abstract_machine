@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 
 from semantic_digital_twin.reasoning.predicates import (
@@ -39,7 +41,7 @@ def two_block_world():
         result = Body(name=PrefixedName(name))
         collision = Box(
             scale=Scale(1.0, 1.0, 1.0),
-            origin=TransformationMatrix.from_xyz_rpy(reference_frame=result),
+            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=result),
         )
         result.collision = ShapeCollection([collision], reference_frame=result)
         return result
@@ -53,7 +55,7 @@ def two_block_world():
         connection = FixedConnection(
             parent=body_1,
             child=body_2,
-            parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 z=3, reference_frame=body_1
             ),
         )
@@ -67,7 +69,7 @@ def test_in_contact():
     b1 = Body(name=PrefixedName("b1"))
     collision1 = Box(
         scale=Scale(1.0, 1.0, 1.0),
-        origin=TransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
             0,
             0,
             0.0,
@@ -83,7 +85,7 @@ def test_in_contact():
     b2 = Body(name=PrefixedName("b2"))
     collision2 = Box(
         scale=Scale(1.0, 1.0, 1.0),
-        origin=TransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
             0.9, 0, 0.0, 0, 0, 0, reference_frame=b2
         ),
         color=Color(0.0, 1.0, 0.0),
@@ -93,7 +95,7 @@ def test_in_contact():
     b3 = Body(name=PrefixedName("b3"))
     collision3 = Box(
         scale=Scale(1.0, 1.0, 1.0),
-        origin=TransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
             1.8, 0, 0.0, 0, 0, 0, reference_frame=b3
         ),
         color=Color(0.0, 0.0, 1.0),
@@ -111,13 +113,13 @@ def test_in_contact():
     assert contact(b2, b3)
 
 
-def test_robot_in_contact(pr2_world: World):
-    pr2: PR2 = PR2.from_world(pr2_world)
+def test_robot_in_contact(pr2_world_state_reset: World):
+    pr2: PR2 = PR2.from_world(pr2_world_state_reset)
 
     body = Body(name=PrefixedName("test_body"))
     collision1 = Box(
         scale=Scale(1.0, 1.0, 1.0),
-        origin=TransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
             z=0.5,
             reference_frame=body,
         ),
@@ -125,30 +127,32 @@ def test_robot_in_contact(pr2_world: World):
     )
     body.collision = ShapeCollection([collision1])
 
-    with pr2_world.modify_world():
-        pr2_world.add_connection(
+    with pr2_world_state_reset.modify_world():
+        pr2_world_state_reset.add_connection(
             Connection6DoF.create_with_dofs(
-                parent=pr2_world.root, child=body, world=pr2_world
+                parent=pr2_world_state_reset.root,
+                child=body,
+                world=pr2_world_state_reset,
             )
         )
 
     # Ensure the call runs without raising
     assert robot_in_collision(pr2)
 
-    body.parent_connection.origin = TransformationMatrix.from_xyz_rpy(
-        4, 0, 0.5, 0, 0, 0, pr2_world.root
+    body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        4, 0, 0.5, 0, 0, 0, pr2_world_state_reset.root
     )
     assert not robot_in_collision(pr2)
 
 
-def test_get_visible_objects(pr2_world: World):
+def test_get_visible_objects(pr2_world_state_reset: World):
 
-    pr2: PR2 = PR2.from_world(pr2_world)
+    pr2: PR2 = PR2.from_world(pr2_world_state_reset)
 
     body = Body(name=PrefixedName("test_body"))
     collision1 = Box(
         scale=Scale(1.0, 1.0, 1.0),
-        origin=TransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
             x=2.0,
             z=1.0,
             reference_frame=body,
@@ -157,26 +161,32 @@ def test_get_visible_objects(pr2_world: World):
     )
     body.collision = ShapeCollection([collision1])
 
-    with pr2_world.modify_world():
-        pr2_world.add_connection(
+    with pr2_world_state_reset.modify_world():
+        pr2_world_state_reset.add_connection(
             Connection6DoF.create_with_dofs(
-                parent=pr2_world.root, child=body, world=pr2_world
+                parent=pr2_world_state_reset.root,
+                child=body,
+                world=pr2_world_state_reset,
             )
         )
 
-    camera = pr2_world.get_semantic_annotations_by_type(Camera)[0]
+    camera = pr2_world_state_reset.get_semantic_annotations_by_type(Camera)[0]
 
     assert visible(camera, body)
 
 
-def test_occluding_bodies(pr2_world: World):
-    pr2: PR2 = PR2.from_world(pr2_world)
+def test_occluding_bodies(pr2_world_state_reset: World):
+    world = deepcopy(pr2_world_state_reset)
+    world.get_body_by_name("base_footprint").parent_connection.origin = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
+    )
+    pr2: PR2 = PR2.from_world(world)
 
     def make_body(name: str) -> Body:
         result = Body(name=PrefixedName(name))
         collision = Box(
             scale=Scale(1.0, 1.0, 1.0),
-            origin=TransformationMatrix.from_xyz_rpy(reference_frame=result),
+            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=result),
         )
         result.collision = ShapeCollection([collision])
         return result
@@ -184,26 +194,26 @@ def test_occluding_bodies(pr2_world: World):
     obstacle = make_body("obstacle")
     occluded_body = make_body("occluded_body")
 
-    with pr2_world.modify_world():
-        root = pr2_world.root
+    with world.modify_world():
+        root = world.root
         c1 = FixedConnection(
             parent=root,
             child=obstacle,
-            parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 reference_frame=root, x=3, z=0.8
             ),
         )
         c2 = FixedConnection(
             parent=root,
             child=occluded_body,
-            parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 reference_frame=root, x=10, z=0.5
             ),
         )
-        pr2_world.add_connection(c1)
-        pr2_world.add_connection(c2)
+        world.add_connection(c1)
+        world.add_connection(c2)
 
-    camera = pr2_world.get_semantic_annotations_by_type(Camera)[0]
+    camera = world.get_semantic_annotations_by_type(Camera)[0]
 
     bodies = occluding_bodies(camera, occluded_body)
     assert obstacle in bodies
@@ -214,15 +224,15 @@ def test_occluding_bodies(pr2_world: World):
 def test_above_and_below(two_block_world):
     center, top = two_block_world
 
-    pov = TransformationMatrix.from_xyz_rpy(x=-3)
+    pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=-3)
     assert Above(top, center, pov)()
     assert Below(center, top, pov)()
 
-    pov = TransformationMatrix.from_xyz_rpy(x=3, yaw=np.pi)
+    pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, yaw=np.pi)
     assert Above(top, center, pov)()
     assert Below(center, top, pov)()
 
-    pov = TransformationMatrix.from_xyz_rpy(x=3, roll=np.pi)
+    pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, roll=np.pi)
     assert Above(center, top, pov)()
     assert Below(top, center, pov)()
 
@@ -230,11 +240,11 @@ def test_above_and_below(two_block_world):
 def test_left_and_right(two_block_world):
     center, top = two_block_world
 
-    pov = TransformationMatrix.from_xyz_rpy(x=3, roll=np.pi / 2)
+    pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, roll=np.pi / 2)
     assert LeftOf(top, center, pov)()
     assert RightOf(center, top, pov)()
 
-    pov = TransformationMatrix.from_xyz_rpy(x=3, roll=-np.pi / 2)
+    pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, roll=-np.pi / 2)
     assert RightOf(top, center, pov)()
     assert LeftOf(center, top, pov)()
 
@@ -242,11 +252,11 @@ def test_left_and_right(two_block_world):
 def test_behind_and_in_front_of(two_block_world):
     center, top = two_block_world
 
-    pov = TransformationMatrix.from_xyz_rpy(z=-5, pitch=np.pi / 2)
+    pov = HomogeneousTransformationMatrix.from_xyz_rpy(z=-5, pitch=np.pi / 2)
     assert Behind(top, center, pov)()
     assert InFrontOf(center, top, pov)()
 
-    pov = TransformationMatrix.from_xyz_rpy(z=5, pitch=-np.pi / 2)
+    pov = HomogeneousTransformationMatrix.from_xyz_rpy(z=5, pitch=-np.pi / 2)
     assert InFrontOf(top, center, pov)()
     assert Behind(center, top, pov)()
 
@@ -256,7 +266,7 @@ def test_body_in_region(two_block_world):
     region = Region(name=PrefixedName("test_region"))
     region_box = Box(
         scale=Scale(1.0, 1.0, 1.0),
-        origin=TransformationMatrix.from_xyz_rpy(reference_frame=region),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=region),
     )
     region.area = ShapeCollection([region_box])
 
@@ -264,7 +274,7 @@ def test_body_in_region(two_block_world):
         connection = FixedConnection(
             parent=center,
             child=region,
-            parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 z=0.5, reference_frame=center
             ),
         )
@@ -278,18 +288,18 @@ def test_supporting(two_block_world):
 
     with center._world.modify_world():
         top.parent_connection.parent_T_connection_expression = (
-            TransformationMatrix.from_xyz_rpy(reference_frame=center, z=1.0)
+            HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=center, z=1.0)
         )
     assert is_supported_by(top, center)
     assert not is_supported_by(center, top)
 
 
 def test_is_body_in_gripper(
-    pr2_world,
+    pr2_world_state_reset,
 ):
-    pr2: PR2 = PR2.from_world(pr2_world)
+    pr2: PR2 = PR2.from_world(pr2_world_state_reset)
 
-    gripper = pr2_world.get_semantic_annotations_by_type(ParallelGripper)
+    gripper = pr2_world_state_reset.get_semantic_annotations_by_type(ParallelGripper)
 
     left_gripper = (
         gripper[0]
@@ -301,7 +311,7 @@ def test_is_body_in_gripper(
     test_box = Body(name=PrefixedName("test_box"))
     box_collision = Box(
         scale=Scale(0.05, 0.01, 0.05),
-        origin=TransformationMatrix.from_xyz_rpy(reference_frame=test_box),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=test_box),
         color=Color(1.0, 0.0, 0.0),
     )
     test_box.collision = ShapeCollection([box_collision])
@@ -316,15 +326,15 @@ def test_is_body_in_gripper(
     between_fingers = (finger1_pos + finger2_pos) / 2.0
 
     # Add box to world
-    with pr2_world.modify_world():
-        root = pr2_world.root
+    with pr2_world_state_reset.modify_world():
+        root = pr2_world_state_reset.root
         connection = Connection6DoF.create_with_dofs(
             parent=root,
             child=test_box,
-            world=pr2_world,
+            world=pr2_world_state_reset,
         )
-        pr2_world.add_connection(connection)
-        connection.origin = TransformationMatrix.from_xyz_rpy(
+        pr2_world_state_reset.add_connection(connection)
+        connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=between_fingers[0],
             y=between_fingers[1],
             z=between_fingers[2],
@@ -333,14 +343,14 @@ def test_is_body_in_gripper(
 
     assert is_body_in_gripper(test_box, left_gripper) > 0
     assert robot_holds_body(pr2, test_box)
-    connection.origin = TransformationMatrix()
+    connection.origin = HomogeneousTransformationMatrix()
     assert is_body_in_gripper(test_box, left_gripper) == 0
 
 
-def test_reachable(pr2_world):
-    pr2: PR2 = PR2.from_world(pr2_world)
+def test_reachable(pr2_world_state_reset):
+    pr2: PR2 = PR2.from_world(pr2_world_state_reset)
 
-    tool_frame_T_reachable_goal = TransformationMatrix.from_xyz_rpy(
+    tool_frame_T_reachable_goal = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=-0.2,
         y=0.3,
         reference_frame=pr2.left_arm.manipulator.tool_frame,
@@ -356,7 +366,7 @@ def test_reachable(pr2_world):
         pr2.left_arm.root,
         pr2.left_arm.manipulator.tool_frame,
     )
-    tool_frame_T_unreachable_goal = TransformationMatrix.from_xyz_rpy(
+    tool_frame_T_unreachable_goal = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=10, y=10, reference_frame=pr2.left_arm.manipulator.tool_frame
     )
     assert not reachable(
@@ -365,7 +375,7 @@ def test_reachable(pr2_world):
         pr2.left_arm.manipulator.tool_frame,
     )
 
-    tool_frame_T_rotated_reachable_goal = TransformationMatrix.from_xyz_rpy(
+    tool_frame_T_rotated_reachable_goal = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=-0.2,
         y=0.3,
         yaw=np.pi / 2,
@@ -377,11 +387,13 @@ def test_reachable(pr2_world):
         pr2.left_arm.manipulator.tool_frame,
     )
 
-    tool_frame_T_rotated_unreachable_goal = TransformationMatrix.from_xyz_rpy(
-        x=-0.2,
-        y=0.3,
-        yaw=-np.pi / 2,
-        reference_frame=pr2.left_arm.manipulator.tool_frame,
+    tool_frame_T_rotated_unreachable_goal = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=-0.2,
+            y=0.3,
+            yaw=-np.pi / 2,
+            reference_frame=pr2.left_arm.manipulator.tool_frame,
+        )
     )
     assert not reachable(
         tool_frame_T_rotated_unreachable_goal,
@@ -390,36 +402,38 @@ def test_reachable(pr2_world):
     )
 
 
-def test_blocking(pr2_world):
+def test_blocking(pr2_world_state_reset):
 
-    pr2: PR2 = PR2.from_world(pr2_world)
+    pr2: PR2 = PR2.from_world(pr2_world_state_reset)
 
     obstacle = Body(name=PrefixedName("obstacle"))
     collision = Box(
         scale=Scale(3.0, 1.0, 1.0),
-        origin=TransformationMatrix.from_xyz_rpy(x=1.0, z=0.5),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, z=0.5),
     )
     obstacle.collision = ShapeCollection([collision])
 
-    with pr2_world.modify_world():
+    with pr2_world_state_reset.modify_world():
         new_root = Body(name=PrefixedName("new_root"))
-        pr2_world.add_connection(
+        pr2_world_state_reset.add_connection(
             Connection6DoF.create_with_dofs(
-                parent=new_root, child=pr2_world.root, world=pr2_world
+                parent=new_root,
+                child=pr2_world_state_reset.root,
+                world=pr2_world_state_reset,
             )
         )
-        pr2_world.add_connection(
+        pr2_world_state_reset.add_connection(
             Connection6DoF.create_with_dofs(
                 parent=new_root,
                 child=obstacle,
-                world=pr2_world,
+                world=pr2_world_state_reset,
             )
         )
 
     assert obstacle not in pr2.bodies
     assert robot_in_collision(pr2)
 
-    tool_frame_T_reachable_goal = TransformationMatrix.from_xyz_rpy(
+    tool_frame_T_reachable_goal = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=-0.2,
         y=0.3,
         reference_frame=pr2.left_arm.manipulator.tool_frame,

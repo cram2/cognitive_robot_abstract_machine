@@ -6,19 +6,19 @@ from typing import Optional, List
 
 import trimesh.sample
 from krrood.entity_query_language.entity import (
-    let,
+    variable,
     entity,
     and_,
     not_,
     contains,
 )
-from krrood.entity_query_language.quantify_entity import an, the
+from krrood.entity_query_language.entity_result_processors import an, the
 
 from ..collision_checking.collision_detector import Collision, CollisionCheck
 from ..collision_checking.trimesh_collision_detector import TrimeshCollisionDetector
 from ..robots.abstract_robot import AbstractRobot, ParallelGripper
 from ..spatial_computations.raytracer import RayTracer
-from ..spatial_types import TransformationMatrix
+from ..spatial_types import HomogeneousTransformationMatrix
 from ..world_description.world_entity import Body
 
 
@@ -39,10 +39,9 @@ def robot_in_collision(
     if ignore_collision_with is None:
         ignore_collision_with = []
 
-    body = let(type_=Body, domain=robot._world.bodies_with_enabled_collision)
+    body = variable(type_=Body, domain=robot._world.bodies_with_enabled_collision)
     possible_collisions_bodies = an(
-        entity(
-            body,
+        entity(body).where(
             and_(
                 not_(contains(robot.bodies, body)),
                 not_(contains(ignore_collision_with, body)),
@@ -72,9 +71,9 @@ def robot_holds_body(robot: AbstractRobot, body: Body) -> bool:
     :param body: The body to check if it is picked
     :return: True if the robot is holding the object, False otherwise
     """
+    g = variable(ParallelGripper, robot._world.semantic_annotations)
     grippers = an(
-        entity(
-            g := let(ParallelGripper, robot._world.semantic_annotations),
+        entity(g).where(
             g._robot == robot,
         )
     )
@@ -85,7 +84,7 @@ def robot_holds_body(robot: AbstractRobot, body: Body) -> bool:
 
 
 def blocking(
-    pose: TransformationMatrix,
+    pose: HomogeneousTransformationMatrix,
     root: Body,
     tip: Body,
 ) -> List[Collision]:
@@ -105,9 +104,9 @@ def blocking(
         for dof, state in result.items():
             root._world.state[dof.id].position = state
 
+    r = variable(AbstractRobot, root._world.semantic_annotations)
     robot = the(
-        entity(
-            r := let(AbstractRobot, root._world.semantic_annotations),
+        entity(r).where(
             contains(r.bodies, tip),
         )
     )

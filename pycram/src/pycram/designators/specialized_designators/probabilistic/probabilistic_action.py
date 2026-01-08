@@ -13,7 +13,7 @@ from probabilistic_model.utils import MissingDict
 from random_events.product_algebra import SimpleEvent
 from random_events.set import Set
 from random_events.variable import Symbolic, Continuous
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.shape_collection import (
@@ -108,7 +108,7 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
             max_x=obj_pose.pose.position.x + search_space_size,
             max_y=obj_pose.pose.position.y + search_space_size,
             max_z=obj_pose.pose.position.z + search_space_size,
-            origin=TransformationMatrix(reference_frame=self.world.root),
+            origin=HomogeneousTransformationMatrix(reference_frame=self.world.root),
         )
         bb_collection = BoundingBoxCollection(
             [search_space], reference_frame=self.world.root

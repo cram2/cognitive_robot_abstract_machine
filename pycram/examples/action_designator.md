@@ -46,16 +46,16 @@ We will start with a simple example of the {meth}`~pycram.robot_plans.NavigateAc
 First, we need a BulletWorld with a robot.
 
 All plans need a context in which they are performed, this context consists of the world as well as the robot that is to 
-perform the plan. 
+perform the plan.
 
 ```python
 import os
 
-from semantic_digital_twin.adapters.urdf import  URDFParser
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.world import World
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
 from pycram.datastructures.pose import PoseStamped
 from pycram.datastructures.dataclasses import Context
 from pycram.testing import setup_world

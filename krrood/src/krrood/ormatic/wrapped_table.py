@@ -600,8 +600,12 @@ class WrappedTable:
         )
 
         # create foreign key names for the association table
-        left_fk_name = f"{self.tablename.lower()}{self.ormatic.foreign_key_postfix}"
-        right_fk_name = f"{target_wrapped_table.tablename.lower()}{self.ormatic.foreign_key_postfix}"
+        # Always disambiguate sides using source_/target_ prefixes to avoid
+        # duplicated column names in self-referential relationships
+        left_fk_name = (
+            f"source_{self.tablename.lower()}{self.ormatic.foreign_key_postfix}"
+        )
+        right_fk_name = f"target_{target_wrapped_table.tablename.lower()}{self.ormatic.foreign_key_postfix}"
 
         # create association table metadata
         association_table = AssociationTable(
@@ -622,7 +626,16 @@ class WrappedTable:
         rel_type = (
             f"Mapped[{module_and_class_name(List)}[{target_wrapped_table.tablename}]]"
         )
-        rel_constructor = f"relationship('{target_wrapped_table.tablename}', secondary='{association_table_name}', cascade='save-update, merge')"
+        # Provide explicit join conditions to disambiguate self-referential associations
+        primaryjoin = f"{self.tablename}.{self.primary_key_name} == {association_table_name}.c.{left_fk_name}"
+        secondaryjoin = f"{target_wrapped_table.tablename}.{target_wrapped_table.primary_key_name} == {association_table_name}.c.{right_fk_name}"
+        rel_constructor = (
+            f"relationship('{target_wrapped_table.tablename}', "
+            f"secondary='{association_table_name}', "
+            f"primaryjoin='{primaryjoin}', "
+            f"secondaryjoin='{secondaryjoin}', "
+            f"cascade='save-update, merge')"
+        )
         self.relationships.append(
             ColumnConstructor(rel_name, rel_type, rel_constructor)
         )

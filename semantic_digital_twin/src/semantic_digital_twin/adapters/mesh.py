@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from ..world_description.geometry import FileMesh
 from ..datastructures.prefixed_name import PrefixedName
-from ..spatial_types import TransformationMatrix
+from ..spatial_types import HomogeneousTransformationMatrix
 from ..world import World
 from ..world_description.shape_collection import ShapeCollection
 from ..world_description.world_entity import Body
@@ -28,7 +28,9 @@ class MeshParser:
         """
         file_name = os.path.basename(self.file_path)
 
-        mesh_shape = FileMesh(origin=TransformationMatrix(), filename=self.file_path)
+        mesh_shape = FileMesh(
+            origin=HomogeneousTransformationMatrix(), filename=self.file_path
+        )
         body = Body(
             name=PrefixedName(file_name),
             collision=ShapeCollection([mesh_shape]),

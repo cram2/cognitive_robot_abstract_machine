@@ -1,7 +1,7 @@
 import re
 
 from ...datastructures.prefixed_name import PrefixedName
-from ...spatial_types.spatial_types import TransformationMatrix
+from ...spatial_types.spatial_types import HomogeneousTransformationMatrix
 from ...semantic_annotations.factories import (
     HandleFactory,
     ContainerFactory,
@@ -30,13 +30,15 @@ def drawer_factory_from_body(drawer: Body) -> DrawerFactory:
     container_factory = ContainerFactory(
         name=PrefixedName(drawer.name.name + "_container", drawer.name.prefix),
         scale=drawer.collision.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=drawer._world.root)
+            HomogeneousTransformationMatrix(reference_frame=drawer._world.root)
         )
         .bounding_boxes[0]
         .scale,
         direction=Direction.Z,
     )
-    drawer_T_handle = TransformationMatrix.from_xyz_rpy(x=container_factory.scale.x / 2)
+    drawer_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=container_factory.scale.x / 2
+    )
     drawer_factory = DrawerFactory(
         name=drawer.name,
         handle_factory=handle_factory,
@@ -60,7 +62,7 @@ def door_factory_from_body(door: Body) -> DoorFactory:
     door_factory = DoorFactory(
         name=door.name,
         scale=door.collision.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=door._world.root)
+            HomogeneousTransformationMatrix(reference_frame=door._world.root)
         )
         .bounding_boxes[0]
         .scale,
@@ -104,7 +106,7 @@ def dresser_factory_from_body(dresser: Body) -> DresserFactory:
     dresser_container_factory = ContainerFactory(
         name=PrefixedName(dresser.name.name + "_container", dresser.name.prefix),
         scale=dresser.collision.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=dresser._world.root)
+            HomogeneousTransformationMatrix(reference_frame=dresser._world.root)
         )
         .bounding_boxes[0]
         .scale,

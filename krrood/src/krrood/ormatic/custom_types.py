@@ -1,8 +1,8 @@
 import importlib
-from typing_extensions import Type, Optional
 
 from sqlalchemy import TypeDecorator
 from sqlalchemy import types
+from typing_extensions import Type, Optional
 
 from ..ormatic.utils import module_and_class_name
 

@@ -1,19 +1,22 @@
 import json
 import uuid
 from dataclasses import dataclass
+from enum import Enum
 from typing import Dict, Any, Self
 
 import pytest
 
 
 from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    to_json,
+    from_json,
+)
+from krrood.adapters.exceptions import (
     MissingTypeError,
     InvalidTypeFormatError,
     UnknownModuleError,
     ClassNotFoundError,
-    SubclassJSONSerializer,
-    to_json,
-    from_json,
     JSON_TYPE_NAME,
 )
 from krrood.utils import get_full_class_name
@@ -138,6 +141,11 @@ class ClassThatNeedsKWARGS(SubclassJSONSerializer):
         return cls(a=(data["a"]), b=(kwargs["b"]))
 
 
+class CustomEnum(str, Enum):
+    A = "a"
+    B = "b"
+
+
 def test_roundtrip_dog_and_cat():
     dog = Dog(name="Rex", age=5, breed="Shepherd")
     cat = Cat(name="Misty", age=3, lives=7)
@@ -210,3 +218,19 @@ def test_with_kwargs():
     data = obj.to_json()
     result = from_json(data, b=2.0)
     assert obj == result
+
+
+def test_list_of_enums():
+    obj = [CustomEnum.A, CustomEnum.B]
+    data = to_json(obj)
+    result = from_json(data)
+    assert result == obj
+
+
+def test_exception():
+    e = ImportError("test")
+    data = to_json(e)
+    result = from_json(data)
+
+    assert isinstance(result, ImportError)
+    assert result.args == e.args

@@ -1,9 +1,7 @@
+import numpy as np
 from typing_extensions import Tuple, Union, List
 
-import numpy as np
-
 from semantic_digital_twin.datastructures.types import AnyMatrix4x4, NpMatrix4x4
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
 
 
 def quaternion_multiply(quaternion1: np.ndarray, quaternion0: np.ndarray) -> np.ndarray:
@@ -25,18 +23,6 @@ def quaternion_conjugate(quaternion: np.ndarray) -> np.ndarray:
         (-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]),
         dtype=np.float64,
     )
-
-
-def qv_mult(quaternion: np.ndarray, vector: np.ndarray) -> np.ndarray:
-    """
-    Transforms a vector by a quaternion
-    :param quaternion: Quaternion
-    :param vector: vector
-    :return: transformed vector
-    """
-    q = quaternion
-    v = [vector[0], vector[1], vector[2], 0]
-    return quaternion_multiply(quaternion_multiply(q, v), quaternion_conjugate(q))[:-1]
 
 
 def quaternion_from_axis_angle(
@@ -190,10 +176,6 @@ def axis_angle_from_quaternion(
     x, y, z, w = x / l, y / l, z / l, w / l
     w2 = np.sqrt(1 - w**2)
     if w2 == 0:
-        m = 1
-    else:
-        m = w2
-    if w2 == 0:
         angle = 0
     else:
         angle = 2 * np.arccos(min(max(-1, w), 1))
@@ -202,88 +184,14 @@ def axis_angle_from_quaternion(
         y = 0
         z = 1
     else:
-        x = x / m
-        y = y / m
-        z = z / m
+        x = x / w2
+        y = y / w2
+        z = z / w2
     return np.array([x, y, z]), angle
 
 
 def axis_angle_from_rotation_matrix(m: NpMatrix4x4) -> Tuple[np.ndarray, float]:
     return axis_angle_from_quaternion(*quaternion_from_rotation_matrix(m))
-
-
-def axis_angle_from_rpy(
-    roll: float, pitch: float, yaw: float
-) -> Tuple[np.ndarray, float]:
-    return axis_angle_from_quaternion(*quaternion_from_rpy(roll, pitch, yaw))
-
-
-def gauss(n: float) -> float:
-    return (n**2 + n) / 2
-
-
-def max_velocity_from_horizon_and_jerk(
-    prediction_horizon: int,
-    vel_limit: float,
-    acc_limit: float,
-    jerk_limit: float,
-    sample_period: float,
-    max_derivative: Derivatives,
-):
-    n2 = int((prediction_horizon) / 2)
-    vel_jerk_limited = (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period**2
-    vel_acc_limits = acc_limit * sample_period * prediction_horizon
-    if max_derivative == Derivatives.jerk:
-        return min(vel_limit, vel_acc_limits, vel_jerk_limited)
-    if max_derivative == Derivatives.acceleration:
-        return min(vel_limit, vel_acc_limits)
-    return vel_limit
-
-
-def limit(a: float, lower_limit: float, upper_limit: float) -> float:
-    return max(lower_limit, min(upper_limit, a))
-
-
-def angle_between_vector(v1: np.ndarray, v2: np.ndarray) -> float:
-    """
-    :param v1: vector length 3
-    :param v2: vector length 3
-    """
-    return np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
-
-
-def normalize(v: np.ndarray) -> np.ndarray:
-    return v / np.linalg.norm(v)
-
-
-def my_cross(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
-    """
-    :param v1: vector length 3 or 4
-    :param v2: vector length 3 or 4
-    :return: cross product vector length 3
-    """
-    return np.cross(v1[:-1], v2[:-1])
-
-
-def point_to_single_caster_angle(px, py, caster_v, forward_velocity):
-    max_angular_velocity = 1
-    z = np.array([0, 0, 1, 0])
-    x = np.array([1, 0, 0, 0])
-    center_P_p = np.array([px, py, 0, 1])
-    c_V_p = center_P_p - caster_v
-    c_V_goal = my_cross(c_V_p, z)
-    angle = angle_between_vector(x[:-1], c_V_goal)
-    radius = np.linalg.norm(c_V_p)
-    if radius > 0.01:
-        circumference = 2 * np.pi * radius
-        number_of_revolutions = forward_velocity / circumference
-        angular_velocity = number_of_revolutions / (2 * np.pi)
-        angular_velocity = min(
-            max(angular_velocity, -max_angular_velocity), max_angular_velocity
-        )
-    else:
-        angular_velocity = max_angular_velocity
-    return angle, c_V_goal
 
 
 def shortest_angular_distance(from_angle, to_angle):

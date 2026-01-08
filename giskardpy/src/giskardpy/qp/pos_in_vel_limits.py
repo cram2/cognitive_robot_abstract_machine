@@ -3,16 +3,19 @@ from typing import List
 
 import numpy as np
 from line_profiler import profile
+from typing_extensions import Tuple
 
 import giskardpy.utils.math as gm
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.utils.decorators import memoize
+from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar, Vector
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 
 
-def shifted_velocity_profile(vel_profile, acc_profile, distance, dt):
-    distance = cas.Expression(distance)
-    vel_profile = vel_profile.copy()
+def shifted_velocity_profile(
+    vel_profile: Vector, acc_profile: Vector, distance: Scalar, dt: float
+) -> Tuple[Vector, Vector]:
+    vel_profile = copy(vel_profile)
     vel_profile[vel_profile < 0] = 0
     vel_if_cases = []
     acc_if_cases = []
@@ -21,56 +24,50 @@ def shifted_velocity_profile(vel_profile, acc_profile, distance, dt):
         vel_result = np.concatenate([vel_profile[x + 1 :], np.zeros(x + 1)])
         acc_result = np.concatenate([acc_profile[x + 1 :], np.zeros(x + 1)])
         if condition > 0:
-            vel_if_cases.append((condition, cas.Expression(vel_result)))
-            acc_if_cases.append((condition, cas.Expression(acc_result)))
+            vel_if_cases.append((condition, sm.Vector(vel_result)))
+            acc_if_cases.append((condition, sm.Vector(acc_result)))
     vel_if_cases.append(
-        (2 * vel_if_cases[-1][0] - vel_if_cases[-2][0], cas.Expression(vel_profile))
+        (2 * vel_if_cases[-1][0] - vel_if_cases[-2][0], sm.Vector(vel_profile))
     )
     default_vel_profile = np.full(vel_profile.shape[0], vel_profile[0])
 
-    shifted_vel_profile = cas.if_less_eq_cases(
-        distance, vel_if_cases, cas.Expression(default_vel_profile)
+    shifted_vel_profile = sm.if_less_eq_cases(
+        distance, vel_if_cases, sm.Vector(default_vel_profile)
     )
-    shifted_acc_profile = cas.if_less_eq_cases(
-        distance, acc_if_cases, cas.Expression(acc_profile)
+    shifted_acc_profile = sm.if_less_eq_cases(
+        distance, acc_if_cases, sm.Vector(acc_profile)
     )
     return shifted_vel_profile, shifted_acc_profile
 
 
-def r_gauss(integral):
-    return cas.sqrt(2 * integral + (1 / 4)) - 1 / 2
+def r_gauss(integral: Scalar) -> Scalar:
+    return sm.sqrt(2 * integral + (1 / 4)) - 1 / 2
 
 
-def acc_cap(current_vel, jerk_limit, dt):
-    acc_integral = cas.abs(current_vel) / dt
+def acc_cap(current_vel: Scalar, jerk_limit: Scalar, dt: Scalar) -> Scalar:
+    acc_integral = sm.abs(current_vel) / dt
     jerk_step = jerk_limit * dt
-    n = cas.floor(r_gauss(cas.abs(acc_integral / jerk_step)))
-    x = (-cas.gauss(n) * jerk_limit * dt + acc_integral) / (n + 1)
-    return cas.abs(n * jerk_limit * dt + x)
-
-
-# def compute_next_vel_and_acc(current_vel, current_acc, vel_limit, jerk_limit, dt):
-#     next_acc_min = current_acc - jerk_limit * dt  # what are the next possible acc limits given jerk limits
-#     next_acc_max = current_acc + jerk_limit * dt
-#
-#     acc_to_vel = (vel_limit - current_vel) / dt  # the acc needed to fix the vel in one step
-#
-#     next_acc = cas.limit(acc_to_vel, next_acc_min, next_acc_max)  # apply acc limits imposed by current acc and jerk
-#
-#     next_vel = current_vel + next_acc * dt
-#     return next_vel, next_acc
+    n = sm.floor(r_gauss(sm.abs(acc_integral / jerk_step)))
+    x = (-sm.gauss(n) * jerk_limit * dt + acc_integral) / (n + 1)
+    return sm.abs(n * jerk_limit * dt + x)
 
 
 def compute_next_vel_and_acc(
-    current_vel, current_acc, vel_limit, jerk_limit, dt, remaining_ph, no_cap
-):
+    current_vel: Scalar,
+    current_acc: Scalar,
+    vel_limit: Scalar,
+    jerk_limit: Scalar,
+    dt: Scalar,
+    remaining_ph: Scalar,
+    no_cap: Scalar,
+) -> Tuple[Scalar, Scalar]:
     acc_cap1 = acc_cap(
         current_vel, jerk_limit, dt
     )  # if we start at arbitrary horizon and jerk as strongly as possible, which acc do we have when we reach the vel limit
     acc_cap2 = (
         remaining_ph * jerk_limit * dt
     )  # max acc reachable given horizon depending only on vel
-    acc_ph_max = cas.min(
+    acc_ph_max = sm.min(
         acc_cap1, acc_cap2
     )  # in reality we have a limited horizon, so we have to use the min of the two.
     acc_ph_min = -acc_ph_max
@@ -84,19 +81,25 @@ def compute_next_vel_and_acc(
         vel_limit - current_vel
     ) / dt  # the total acc needed to reach vel target vel
 
-    target_acc = cas.max(next_acc_min, acc_to_vel)
-    target_acc = cas.if_else(
-        no_cap, target_acc, cas.limit(target_acc, acc_ph_min, acc_ph_max)
+    target_acc = sm.max(next_acc_min, acc_to_vel)
+    target_acc = sm.if_else(
+        no_cap, target_acc, sm.limit(target_acc, acc_ph_min, acc_ph_max)
     )  # skip when vel_limit is negative
-    next_acc = cas.limit(target_acc, next_acc_min, next_acc_max)
+    next_acc = sm.limit(target_acc, next_acc_min, next_acc_max)
 
     next_vel = current_vel + next_acc * dt
     return next_vel, next_acc
 
 
 def compute_slowdown_asap_vel_profile(
-    current_vel, current_acc, target_vel_profile, jerk_limit, dt, ph, skip_first
-):
+    current_vel: Scalar,
+    current_acc: Scalar,
+    target_vel_profile: Vector,
+    jerk_limit: Scalar,
+    dt: Scalar,
+    ph: int,
+    skip_first: Scalar,
+) -> Tuple[Vector, Vector, Vector]:
     """
     Compute the vel, acc and jerk profile for slowing down asap.
     """
@@ -111,17 +114,17 @@ def compute_slowdown_asap_vel_profile(
             jerk_limit,
             dt,
             ph - i - 1,
-            cas.logic_and(skip_first, i == 0),
+            sm.logic_and(skip_first, i == 0),
         )
         vel_profile.append(next_vel)
         acc_profile.append(next_acc)
-    acc_profile = copy(cas.Expression(acc_profile))
-    acc_profile2 = copy(cas.Expression(acc_profile))
+    acc_profile = copy(Vector(acc_profile))
+    acc_profile2 = copy(Vector(acc_profile))
     acc_profile2[1:] = acc_profile[:-1]
     acc_profile2[0] = current_acc
     jerk_profile = (acc_profile - acc_profile2) / dt
 
-    return cas.Expression(vel_profile), acc_profile, jerk_profile
+    return Vector(vel_profile), acc_profile, jerk_profile
 
 
 def implicit_vel_profile(
@@ -141,7 +144,7 @@ def implicit_vel_profile(
 @memoize
 @profile
 def b_profile(
-    dof_symbols: DerivativeMap[cas.FloatVariable],
+    dof_symbols: DerivativeMap[FloatVariable],
     lower_limits: DerivativeMap[float],
     upper_limits: DerivativeMap[float],
     solver_class,
@@ -190,39 +193,41 @@ def b_profile(
         # %% when limits are violated, compute the max velocity that can be reached in one step from zero and put it as
         # negative limits
         one_step_change_ = jerk_limit * dt**2
-        one_step_change_lb = cas.min(cas.max(0, pos_error_lb / dt), one_step_change_)
-        one_step_change_lb = cas.limit(one_step_change_lb, -vel_limit, vel_limit)
-        one_step_change_ub = cas.max(cas.min(0, pos_error_ub / dt), -one_step_change_)
-        one_step_change_ub = cas.limit(one_step_change_ub, -vel_limit, vel_limit)
-        pos_vel_profile_lb[0] = cas.if_greater(
+        one_step_change_lb = sm.min(
+            sm.max(Scalar(0), pos_error_lb / dt), Scalar(one_step_change_)
+        )
+        one_step_change_lb = sm.limit(one_step_change_lb, -vel_limit, vel_limit)
+        one_step_change_ub = sm.max(
+            sm.min(Scalar(0), pos_error_ub / dt), -Scalar(one_step_change_)
+        )
+        one_step_change_ub = sm.limit(one_step_change_ub, -vel_limit, vel_limit)
+        pos_vel_profile_lb[0] = sm.if_greater(
             pos_error_lb, 0, one_step_change_lb, copy(pos_vel_profile_lb[0])
         )
-        pos_vel_profile_ub[0] = cas.if_less(
+        pos_vel_profile_ub[0] = sm.if_less(
             pos_error_ub, 0, one_step_change_ub, copy(pos_vel_profile_ub[0])
         )
 
         # all 0, unless lower or upper position limits are violated
-        goal_profile = cas.max(pos_vel_profile_lb, 0) + cas.min(pos_vel_profile_ub, 0)
+        goal_profile = sm.max(pos_vel_profile_lb, 0) + sm.min(pos_vel_profile_ub, 0)
         # skip first when lower or upper position limit are violated
-        skip_first = cas.logic_or(
-            pos_vel_profile_lb[0] >= 0, pos_vel_profile_ub[0] <= 0
-        )
+        skip_first = sm.logic_or(pos_vel_profile_lb[0] >= 0, pos_vel_profile_ub[0] <= 0)
     else:
-        goal_profile = cas.Expression.zeros(ph, 1)
-        pos_vel_profile_ub = cas.Expression.ones(ph, 1) * vel_limit
+        goal_profile = sm.Vector.zeros(ph)
+        pos_vel_profile_ub = sm.Vector.ones(ph) * vel_limit
         pos_vel_profile_lb = -pos_vel_profile_ub
         skip_first = 0
 
-    acc_profile = cas.Expression.ones(*pos_vel_profile_ub.shape) * acc_limit
-    jerk_profile = cas.Expression.ones(*pos_vel_profile_ub.shape) * jerk_limit
+    acc_profile = sm.Vector.ones(pos_vel_profile_ub.shape[0]) * acc_limit
+    jerk_profile = sm.Vector.ones(pos_vel_profile_ub.shape[0]) * jerk_limit
 
     # vel and acc profile for slowing down asap
     proj_vel_profile, proj_acc_profile, _ = compute_slowdown_asap_vel_profile(
         dof_symbols.velocity,
         dof_symbols.acceleration,
         goal_profile,
-        jerk_limit,
-        dt,
+        Scalar(jerk_limit),
+        Scalar(dt),
         ph,
         skip_first,
     )
@@ -231,42 +236,42 @@ def b_profile(
         dof_symbols.velocity,
         dof_symbols.acceleration,
         goal_profile,
-        np.inf,
-        dt,
+        Scalar(np.inf),
+        Scalar(dt),
         ph,
         skip_first,
     )
     # check if my projected vel profile violated position limits
-    vel_lb_violated = cas.logic_or(
-        cas.logic_any(proj_vel_profile < pos_vel_profile_lb - eps),
-        cas.abs(proj_vel_profile[-1]) >= eps,
+    vel_lb_violated = sm.logic_or(
+        sm.logic_any(proj_vel_profile < pos_vel_profile_lb - eps),
+        sm.abs(proj_vel_profile[-1]) >= eps,
     )
-    vel_ub_violated = cas.logic_or(
-        cas.logic_any(proj_vel_profile > pos_vel_profile_ub + eps),
-        cas.abs(proj_vel_profile[-1]) >= eps,
+    vel_ub_violated = sm.logic_or(
+        sm.logic_any(proj_vel_profile > pos_vel_profile_ub + eps),
+        sm.abs(proj_vel_profile[-1]) >= eps,
     )
 
     # if either lower or upper position limits would get violated, relax jerk constraints to max slow down.
-    special_jerk_limits = cas.logic_or(vel_lb_violated, vel_ub_violated)
+    special_jerk_limits = sm.logic_or(vel_lb_violated, vel_ub_violated)
     # with 3 derivatives, slow down is possible in 3 steps
-    jerk_profile[0] = cas.if_else(
+    jerk_profile[0] = sm.if_else(
         special_jerk_limits,
-        cas.max(jerk_limit, cas.abs(proj_jerk_profile_violated[0])),
-        cas.Expression(jerk_limit),
+        sm.max(Scalar(jerk_limit), sm.abs(proj_jerk_profile_violated[0])),
+        sm.Scalar(jerk_limit),
     )
-    jerk_profile[1] = cas.if_else(
+    jerk_profile[1] = sm.if_else(
         special_jerk_limits,
-        cas.max(jerk_limit, cas.abs(proj_jerk_profile_violated[1])),
-        cas.Expression(jerk_limit),
+        sm.max(Scalar(jerk_limit), sm.abs(proj_jerk_profile_violated[1])),
+        sm.Scalar(jerk_limit),
     )
-    jerk_profile[2] = cas.if_else(
+    jerk_profile[2] = sm.if_else(
         special_jerk_limits,
-        cas.max(jerk_limit, cas.abs(proj_jerk_profile_violated[2])),
-        cas.Expression(jerk_limit),
+        sm.max(Scalar(jerk_limit), sm.abs(proj_jerk_profile_violated[2])),
+        sm.Scalar(jerk_limit),
     )
 
-    lb_profile = cas.vstack([pos_vel_profile_lb, -acc_profile, -jerk_profile])
-    ub_profile = cas.vstack([pos_vel_profile_ub, acc_profile, jerk_profile])
-    lb_profile = cas.min(lb_profile, ub_profile)
-    ub_profile = cas.max(lb_profile, ub_profile)
+    lb_profile = sm.concatenate(pos_vel_profile_lb, -acc_profile, -jerk_profile)
+    ub_profile = sm.concatenate(pos_vel_profile_ub, acc_profile, jerk_profile)
+    lb_profile = sm.min(lb_profile, ub_profile)
+    ub_profile = sm.max(lb_profile, ub_profile)
     return lb_profile, ub_profile

@@ -37,6 +37,14 @@ jobs:
           source /opt/ros/cram-env/bin/activate
           poetry install
 
+      - name: Build ORM
+        if: ${{inputs.lib == 'pycram' || inputs.lib == 'semantic_digital_twin'}}
+        run: |
+          cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/cram-env/bin/activate
+          python generate_orm.py
+
       - name: Run tests
         run: |
           source /opt/ros/overlay_ws/install/setup.bash

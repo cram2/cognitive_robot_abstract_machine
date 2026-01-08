@@ -1,8 +1,14 @@
 from dataclasses import dataclass
 from typing import List
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from semantic_digital_twin.spatial_types import (
+    Point3,
+    Vector3,
+    RotationMatrix,
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -31,9 +37,9 @@ class InWorldSpace(MotionStatechartNode):
         error = map_T_tip.to_position() - map_T_drive.to_position()
         error.vis_frame = self.drive_link
         context.context.add_debug_expression(f"{self.name}/error", error)
-        self.observation_expression = cas.logic_and(
-            cas.abs(error.x) <= self.xyz[0],
-            cas.abs(error.y) <= self.xyz[1],
+        self.observation_expression = sm.logic_and(
+            sm.abs(error.x) <= self.xyz[0],
+            sm.abs(error.y) <= self.xyz[1],
         )
 
 
@@ -41,7 +47,7 @@ class InWorldSpace(MotionStatechartNode):
 class PoseReached(MotionStatechartNode):
     root_link: Body
     tip_link: Body
-    goal_pose: cas.TransformationMatrix
+    goal_pose: HomogeneousTransformationMatrix
     position_threshold: float = 0.01
     orientation_threshold: float = 0.01
     absolute: bool = False
@@ -72,9 +78,9 @@ class PoseReached(MotionStatechartNode):
             self.root_link, self.tip_link
         ).to_rotation_matrix()
         rotation_error = r_R_c.rotational_error(r_R_g)
-        orientation_reached = cas.abs(rotation_error) < self.orientation_threshold
+        orientation_reached = sm.abs(rotation_error) < self.orientation_threshold
 
-        self.observation_expression = cas.logic_and(
+        self.observation_expression = sm.logic_and(
             position_reached, orientation_reached
         )
 
@@ -83,7 +89,7 @@ class PoseReached(MotionStatechartNode):
 class PositionReached(MotionStatechartNode):
     root_link: Body
     tip_link: Body
-    goal_point: cas.Point3
+    goal_point: Point3
     threshold: float = 0.01
     absolute: bool = False
 
@@ -110,7 +116,7 @@ class PositionReached(MotionStatechartNode):
 class OrientationReached(MotionStatechartNode):
     root_link: Body
     tip_link: Body
-    goal_orientation: cas.RotationMatrix
+    goal_orientation: RotationMatrix
     threshold: float = 0.01
     absolute: bool = False
 
@@ -130,15 +136,15 @@ class OrientationReached(MotionStatechartNode):
             self.root_link, self.tip_link
         ).to_rotation_matrix()
         rotation_error = r_R_c.rotational_error(r_R_g)
-        self.observation_expression = cas.abs(rotation_error) < self.threshold
+        self.observation_expression = sm.abs(rotation_error) < self.threshold
 
 
 @dataclass
 class PointingAt(MotionStatechartNode):
     tip_link: Body
-    goal_point: cas.Point3
+    goal_point: Point3
     root_link: Body
-    pointing_axis: cas.Vector3
+    pointing_axis: Vector3
     threshold: float = 0.01
 
     def __post_init__(self):
@@ -161,7 +167,7 @@ class PointingAt(MotionStatechartNode):
             frame_P_line_point=root_P_tip,
             frame_V_line_direction=root_V_pointing_axis,
         )
-        expr = cas.abs(distance) < self.threshold
+        expr = sm.abs(distance) < self.threshold
         self.observation_expression = expr
 
 
@@ -169,8 +175,8 @@ class PointingAt(MotionStatechartNode):
 class VectorsAligned(MotionStatechartNode):
     root_link: Body
     tip_link: Body
-    goal_normal: cas.Vector3
-    tip_normal: cas.Vector3
+    goal_normal: Vector3
+    tip_normal: Vector3
     threshold: float = 0.01
 
     def __post_init__(self):
@@ -197,8 +203,8 @@ class VectorsAligned(MotionStatechartNode):
 class DistanceToLine(MotionStatechartNode):
     root_link: Body
     tip_link: Body
-    center_point: cas.Point3
-    line_axis: cas.Vector3
+    center_point: Point3
+    line_axis: Vector3
     line_length: float
     threshold: float = 0.01
 
@@ -216,10 +222,10 @@ class DistanceToLine(MotionStatechartNode):
         root_P_line_start = root_P_center + root_V_line_axis * (self.line_length / 2)
         root_P_line_end = root_P_center - root_V_line_axis * (self.line_length / 2)
 
-        distance, closest_point = cas.distance_point_to_line_segment(
+        distance, closest_point = sm.distance_point_to_line_segment(
             frame_P_current=root_P_current,
             frame_P_line_start=root_P_line_start,
             frame_P_line_end=root_P_line_end,
         )
-        expr = cas.less(distance, self.threshold)
+        expr = distance < self.threshold
         self.observation_expression = expr

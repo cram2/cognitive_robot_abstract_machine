@@ -28,8 +28,8 @@ from dataclasses import dataclass
 
 from typing_extensions import List
 
-from krrood.entity_query_language.entity import entity, let, contains, Symbol
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity import entity, variable, contains, Symbol
+from krrood.entity_query_language.entity_result_processors import an
 
 
 @dataclass
@@ -45,8 +45,8 @@ class World:
 
 world = World(1, [Body("Body1"), Body("Body2")])
 
-body = let(Body, domain=world.bodies)
-query = an(entity(body, contains(body.name, "2"),
+body = variable(Body, domain=world.bodies)
+query = an(entity(body).where(contains(body.name, "2"),
                   body.name.startswith("Body"))
                )
 print(*query.evaluate(), sep="\n")

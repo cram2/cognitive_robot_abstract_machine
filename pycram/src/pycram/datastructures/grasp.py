@@ -12,7 +12,7 @@ from scipy.spatial.transform import Rotation as R
 
 from .dataclasses import Rotations
 from .enums import Grasp, AxisIdentifier, ApproachDirection, VerticalAlignment
-from .pose import PoseStamped, Vector3
+from .pose import PoseStamped, PyCramVector3
 from ..has_parameters import HasParameters
 from ..tf_transformations import quaternion_multiply
 from ..utils import translate_pose_along_local_axis
@@ -156,10 +156,10 @@ class GraspDescription(HasParameters):
         )
         vector_x, vector_y, vector_z = object_to_robot_vector_local
 
-        vector_side = Vector3(vector_x, vector_y, np.nan)
+        vector_side = PyCramVector3(vector_x, vector_y, np.nan)
         side_faces = GraspDescription.calculate_closest_faces(vector_side, side_axis)
 
-        vector_vertical = Vector3(np.nan, np.nan, vector_z)
+        vector_vertical = PyCramVector3(np.nan, np.nan, vector_z)
         if vertical:
             vertical_faces = GraspDescription.calculate_closest_faces(vector_vertical)
         else:
@@ -179,7 +179,7 @@ class GraspDescription(HasParameters):
 
     @staticmethod
     def calculate_closest_faces(
-        pose_to_robot_vector: Vector3,
+        pose_to_robot_vector: PyCramVector3,
         specified_grasp_axis: AxisIdentifier = AxisIdentifier.Undefined,
     ) -> Union[
         Tuple[ApproachDirection, ApproachDirection],

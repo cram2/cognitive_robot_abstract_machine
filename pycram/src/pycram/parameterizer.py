@@ -16,7 +16,7 @@ from random_events.utils import recursive_subclasses
 from random_events.variable import Symbolic, Integer, Variable, Continuous
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.graph_of_convex_sets import (
@@ -184,7 +184,7 @@ def collision_free_event(
                     np.inf,
                     np.inf,
                     np.inf,
-                    origin=TransformationMatrix(reference_frame=world.root),
+                    origin=HomogeneousTransformationMatrix(reference_frame=world.root),
                 )
             ],
         )

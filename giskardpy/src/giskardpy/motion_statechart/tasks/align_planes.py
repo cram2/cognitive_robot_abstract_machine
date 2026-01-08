@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
-
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Task, NodeArtifacts, DebugExpression
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -23,9 +22,9 @@ class AlignPlanes(Task):
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """tip link of the kinematic chain."""
 
-    goal_normal: cas.Vector3 = field(kw_only=True)
+    goal_normal: Vector3 = field(kw_only=True)
     """normal vector of the goal plane."""
-    tip_normal: cas.Vector3 = field(kw_only=True)
+    tip_normal: Vector3 = field(kw_only=True)
     """normal vector of the tip plane."""
 
     threshold: float = field(default=0.01, kw_only=True)

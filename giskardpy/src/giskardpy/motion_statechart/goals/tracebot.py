@@ -5,19 +5,20 @@ from typing import Optional
 
 import numpy as np
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Goal
 from giskardpy.motion_statechart.graph_node import Task
+from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
 class InsertCylinder(Goal):
     cylinder_name: Body = field(kw_only=True)
-    hole_point: cas.Point3 = field(kw_only=True)
+    hole_point: Point3 = field(kw_only=True)
     cylinder_height: Optional[float] = None
-    up: Optional[cas.Vector3] = None
+    up: Optional[Vector3] = None
     pre_grasp_height: float = 0.1
     tilt: float = np.pi / 10
     get_straight_after: float = 0.02
@@ -33,7 +34,7 @@ class InsertCylinder(Goal):
             target_frame=self.root, spatial_object=self.hole_point
         )
         if self.up is None:
-            self.up = cas.Vector3.Z()
+            self.up = Vector3.Z()
             self.up.reference_frame = self.root
         self.root_V_up = context.world.transform(
             target_frame=self.root, spatial_object=self.up
@@ -47,10 +48,10 @@ class InsertCylinder(Goal):
             self.root, self.tip
         )
         root_P_tip = root_T_tip.to_position()
-        tip_P_cylinder_bottom = cas.Vector3.Z() * self.cylinder_height / 2
+        tip_P_cylinder_bottom = Vector3.Z() * self.cylinder_height / 2
         root_P_cylinder_bottom = root_T_tip @ tip_P_cylinder_bottom
         root_P_tip = root_P_tip + root_P_cylinder_bottom
-        root_V_cylinder_z = root_T_tip @ -cas.Vector3.Z()
+        root_V_cylinder_z = root_T_tip @ -Vector3.Z()
 
         # %% straight line goal
         root_P_top = root_P_hole + root_V_up * self.pre_grasp_height
@@ -82,7 +83,7 @@ class InsertCylinder(Goal):
             weight=self.weight,
         )
         root_V_cylinder_z.vis_frame = self.tip
-        tilt_task.observation_expression = cas.abs(tilt_error - self.tilt) <= 0.01
+        tilt_task.observation_expression = sm.abs(tilt_error - self.tilt) <= 0.01
 
         init_done = f"{reach_top} and {tilt_task}"
 

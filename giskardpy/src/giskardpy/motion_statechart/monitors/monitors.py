@@ -4,7 +4,7 @@ import abc
 from abc import ABC
 from dataclasses import field
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import (
@@ -52,16 +52,16 @@ class LocalMinimumReached(MotionStatechartNode):
             )
             ref.append(velocity_limit)
             symbols.append(dof.variables.velocity)
-        ref = cas.Expression(ref)
-        vel_symbols = cas.Expression(symbols)
+        ref = sm.Vector(ref)
+        vel_symbols = sm.Vector(symbols)
 
         dt = (
             context.qp_controller_config.control_dt
             or context.qp_controller_config.mpc_dt
         )
         traj_longer_than_1_sec = context.control_cycle_variable * dt > 1
-        artifacts.observation = cas.trinary_logic_and(
-            traj_longer_than_1_sec, cas.logic_all(cas.abs(vel_symbols) < ref)
+        artifacts.observation = sm.trinary_logic_and(
+            traj_longer_than_1_sec, sm.logic_all(sm.abs(vel_symbols) < ref)
         )
         return artifacts
 
@@ -82,5 +82,5 @@ class Alternator(MotionStatechartNode):
 
     def __post_init__(self):
         time = context.time_symbol
-        expr = cas.fmod(cas.floor(time), self.mod) == 0
+        expr = sm.fmod(sm.floor(time), self.mod) == 0
         self.observation_expression = expr

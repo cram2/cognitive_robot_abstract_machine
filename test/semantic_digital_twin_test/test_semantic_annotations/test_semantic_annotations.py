@@ -1,7 +1,7 @@
 import logging
 
-from krrood.entity_query_language.quantify_entity import an
-from krrood.entity_query_language.entity import entity, let, in_, inference
+from krrood.entity_query_language.entity_result_processors import an
+from krrood.entity_query_language.entity import entity, variable, in_, inference
 from numpy.ma.testutils import (
     assert_equal,
 )  # You could replace this with numpy's regular assert for better compatibility
@@ -74,13 +74,15 @@ class TestSemanticAnnotation(SemanticAnnotation):
         )
 
 
-def test_semantic_annotation_hash(apartment_world):
-    semantic_annotation1 = Handle(body=apartment_world.bodies[0])
-    with apartment_world.modify_world():
-        apartment_world.add_semantic_annotation(semantic_annotation1)
-    assert hash(semantic_annotation1) == hash((Handle, apartment_world.bodies[0].id))
+def test_semantic_annotation_hash(apartment_world_setup):
+    semantic_annotation1 = Handle(body=apartment_world_setup.bodies[0])
+    with apartment_world_setup.modify_world():
+        apartment_world_setup.add_semantic_annotation(semantic_annotation1)
+    assert hash(semantic_annotation1) == hash(
+        (Handle, apartment_world_setup.bodies[0].id)
+    )
 
-    semantic_annotation2 = Handle(body=apartment_world.bodies[0])
+    semantic_annotation2 = Handle(body=apartment_world_setup.bodies[0])
     assert semantic_annotation1 == semantic_annotation2
 
 
@@ -134,10 +136,12 @@ def test_aggregate_bodies(kitchen_world):
     )
 
 
-def test_handle_semantic_annotation_eql(apartment_world):
-    body = let(type_=Body, domain=apartment_world.bodies)
+def test_handle_semantic_annotation_eql(apartment_world_setup):
+    body = variable(type_=Body, domain=apartment_world_setup.bodies)
     query = an(
-        entity(inference(Handle)(body=body), in_("handle", body.name.name.lower()))
+        entity(inference(Handle)(body=body)).where(
+            in_("handle", body.name.name.lower())
+        )
     )
 
     handles = list(query.evaluate())
@@ -158,10 +162,10 @@ def test_infer_apartment_semantic_annotation(
     semantic_annotation_type,
     update_existing_semantic_annotations,
     scenario,
-    apartment_world,
+    apartment_world_setup,
 ):
     fit_rules_and_assert_semantic_annotations(
-        apartment_world,
+        apartment_world_setup,
         semantic_annotation_type,
         update_existing_semantic_annotations,
         scenario,
@@ -180,11 +184,11 @@ def test_generated_semantic_annotations(kitchen_world):
 
 
 @pytest.mark.order("second_to_last")
-def test_apartment_semantic_annotations(apartment_world):
-    world_reasoner = WorldReasoner(apartment_world)
+def test_apartment_semantic_annotations(apartment_world_setup):
+    world_reasoner = WorldReasoner(apartment_world_setup)
     world_reasoner.fit_semantic_annotations(
         [Handle, Container, Drawer, Cabinet],
-        world_factory=lambda: apartment_world,
+        world_factory=lambda: apartment_world_setup,
         scenario=None,
     )
 
@@ -212,15 +216,15 @@ def fit_rules_and_assert_semantic_annotations(
     )
 
 
-def test_semantic_annotation_serde_once(apartment_world):
-    handle_body = apartment_world.bodies[0]
-    door_body = apartment_world.bodies[1]
+def test_semantic_annotation_serde_once(apartment_world_setup):
+    handle_body = apartment_world_setup.bodies[0]
+    door_body = apartment_world_setup.bodies[1]
 
     handle = Handle(body=handle_body)
     door = Door(body=door_body, handle=handle)
-    with apartment_world.modify_world():
-        apartment_world.add_semantic_annotation(handle)
-        apartment_world.add_semantic_annotation(door)
+    with apartment_world_setup.modify_world():
+        apartment_world_setup.add_semantic_annotation(handle)
+        apartment_world_setup.add_semantic_annotation(door)
 
     door_se = door.to_json()
     door_de = Door.from_json(door_se)
@@ -230,16 +234,16 @@ def test_semantic_annotation_serde_once(apartment_world):
     assert type(door.body) == type(door_de.body)
 
 
-def test_semantic_annotation_serde_multiple(apartment_world):
-    handle_body = apartment_world.bodies[0]
-    door_body = apartment_world.bodies[1]
+def test_semantic_annotation_serde_multiple(apartment_world_setup):
+    handle_body = apartment_world_setup.bodies[0]
+    door_body = apartment_world_setup.bodies[1]
 
     handle = Handle(body=handle_body)
     door = Door(body=door_body, handle=handle)
 
-    with apartment_world.modify_world():
-        apartment_world.add_semantic_annotation(handle)
-        apartment_world.add_semantic_annotation(door)
+    with apartment_world_setup.modify_world():
+        apartment_world_setup.add_semantic_annotation(handle)
+        apartment_world_setup.add_semantic_annotation(door)
 
     door_se1 = door.to_json()
     door_de1 = Door.from_json(door_se1)
@@ -256,7 +260,7 @@ def test_semantic_annotation_serde_multiple(apartment_world):
     assert type(door.body) == type(door_de2.body)
 
 
-def test_minimal_robot_annotation(pr2_world):
+def test_minimal_robot_annotation(pr2_world_state_reset):
     urdf_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
         "..",
@@ -280,6 +284,6 @@ def test_minimal_robot_annotation(pr2_world):
         world_with_pr2.add_connection(c_root_bf)
 
     robot = world_with_pr2.get_semantic_annotations_by_type(MinimalRobot)[0]
-    pr2 = PR2.from_world(pr2_world)
+    pr2 = PR2.from_world(pr2_world_state_reset)
     assert len(robot.bodies) == len(pr2.bodies)
     assert len(robot.connections) == len(pr2.connections)

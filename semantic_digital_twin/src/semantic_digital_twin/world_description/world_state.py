@@ -7,6 +7,7 @@ from typing_extensions import MutableMapping, List, Dict, Self, TYPE_CHECKING
 
 import numpy as np
 
+from krrood.symbolic_math.symbolic_math import FloatVariable
 from .degree_of_freedom import DegreeOfFreedom
 from ..callbacks.callback import StateChangeCallback
 from ..datastructures.prefixed_name import PrefixedName
@@ -16,7 +17,6 @@ from ..exceptions import (
     MismatchingCommandLengthError,
 )
 from ..spatial_types.derivatives import Derivatives
-from ..spatial_types import spatial_types as cas
 
 if TYPE_CHECKING:
     from ..world import World
@@ -264,7 +264,7 @@ class WorldState(MutableMapping):
         self._add_dof(dof.id)
         self[dof.id].position = initial_position
 
-    def get_variables(self) -> List[cas.FloatVariable]:
+    def get_variables(self) -> List[FloatVariable]:
         """
         Constructs and returns a list of variables representing the state of the system. The state
         is defined in terms of positions, velocities, accelerations, and jerks for each degree

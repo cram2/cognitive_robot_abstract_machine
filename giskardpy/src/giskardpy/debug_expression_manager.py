@@ -4,7 +4,7 @@ from typing import Dict, Optional, List, Union
 import numpy as np
 from line_profiler import profile
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.middleware import get_middleware
 from giskardpy.model.trajectory import Trajectory
 from semantic_digital_twin.world_description.geometry import Color
@@ -14,8 +14,8 @@ from semantic_digital_twin.world_description.world_state import WorldState
 
 
 class DebugExpressionManager:
-    debug_expressions: Dict[PrefixedName, cas.Expression]
-    compiled_debug_expressions: Dict[PrefixedName, cas.CompiledFunction]
+    debug_expressions: Dict[PrefixedName, sm.Scalar]
+    compiled_debug_expressions: Dict[PrefixedName, sm.CompiledFunction]
     evaluated_debug_expressions: Dict[PrefixedName, np.ndarray]
     _raw_debug_trajectory: List[Dict[PrefixedName, np.ndarray]]
 
@@ -31,7 +31,7 @@ class DebugExpressionManager:
     def add_debug_expression(
         self,
         name: str,
-        expression: cas.Expression,
+        expression: sm.SymbolicMathType,
         color: Optional[Color] = None,
         derivative: Derivatives = Derivatives.position,
         derivatives_to_plot: Optional[List[Derivatives]] = None,
@@ -39,8 +39,8 @@ class DebugExpressionManager:
         if derivatives_to_plot is None:
             derivatives_to_plot = [derivative]
         if isinstance(expression, (int, float)):
-            expression = cas.Expression(expression)
-        if isinstance(expression, cas.SymbolicType):
+            expression = sm.Scalar(expression)
+        if isinstance(expression, sm.SymbolicMathType):
             expression.color = color
         expression.debug_derivative = derivative
         expression.debug_derivatives_to_plot = derivatives_to_plot
@@ -49,14 +49,14 @@ class DebugExpressionManager:
     def compile_debug_expressions(self):
         for name, expr in self.debug_expressions.items():
             if isinstance(expr, (int, float)):
-                self.debug_expressions[name] = cas.Expression(expr)
+                self.debug_expressions[name] = sm.Scalar(expr)
         self.compiled_debug_expressions = {}
         free_symbols = set()
         for name, expr in self.debug_expressions.items():
             free_symbols.update(expr.free_variables())
         free_symbols = list(free_symbols)
         for name, expr in self.debug_expressions.items():
-            self.compiled_debug_expressions[name] = expr.compile([free_symbols])
+            self.compiled_debug_expressions[name] = expr.compile(free_symbols)
         num_debug_expressions = len(self.compiled_debug_expressions)
         if num_debug_expressions > 0:
             get_middleware().loginfo(

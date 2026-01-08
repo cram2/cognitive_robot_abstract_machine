@@ -13,9 +13,8 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Door
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.testing import pr2_world
-from semantic_digital_twin.testing import rclpy_node
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -136,7 +135,7 @@ def test_service_callback_with_multiple_modifications(rclpy_node):
 def test_world_fetching(rclpy_node):
     world = create_dummy_world()
     world.get_body_by_name("body_2").parent_connection.origin = (
-        TransformationMatrix.from_xyz_rpy(1, 1, 1)
+        HomogeneousTransformationMatrix.from_xyz_rpy(1, 1, 1)
     )
     fetcher = FetchWorldServer(node=rclpy_node, world=world)
 
@@ -175,14 +174,14 @@ def test_semantic_annotation_modifications(rclpy_node):
     ]
 
 
-def test_pr2_semantic_annotation(rclpy_node, pr2_world):
-    PR2.from_world(pr2_world)
-    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world)
+def test_pr2_semantic_annotation(rclpy_node, pr2_world_state_reset):
+    PR2.from_world(pr2_world_state_reset)
+    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
 
     pr2_world_copy = fetch_world_from_service(
         rclpy_node,
     )
 
-    assert [sa.name for sa in pr2_world.semantic_annotations] == [
+    assert [sa.name for sa in pr2_world_state_reset.semantic_annotations] == [
         sa.name for sa in pr2_world_copy.semantic_annotations
     ]

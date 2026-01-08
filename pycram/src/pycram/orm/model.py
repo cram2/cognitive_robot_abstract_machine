@@ -9,7 +9,7 @@ from typing_extensions import Optional
 
 from ..datastructures.dataclasses import ExecutionData
 from ..datastructures.enums import TaskStatus
-from ..datastructures.pose import Quaternion
+from ..datastructures.pose import PyCramQuaternion
 from ..designator import DesignatorDescription
 from ..failures import PlanFailure
 from ..language import TryInOrderNode, ParallelNode, TryAllNode, CodeNode, MonitorNode
@@ -34,18 +34,18 @@ from ..robot_plans import ActionDescription, BaseMotion
 
 
 @dataclass
-class PyCRAMQuaternionMapping(AlternativeMapping[Quaternion]):
+class PyCRAMQuaternionMapping(AlternativeMapping[PyCramQuaternion]):
     x: float = 0
     y: float = 0
     z: float = 0
     w: float = 1
 
     @classmethod
-    def create_instance(cls, obj: T):
-        return Quaternion(obj.x, obj.y, obj.z, obj.w)
+    def from_domain_object(cls, obj: T):
+        return PyCramQuaternion(obj.x, obj.y, obj.z, obj.w)
 
-    def create_from_dao(self) -> T:
-        return Quaternion(self.x, self.y, self.z, self.w)
+    def to_domain_object(self) -> T:
+        return PyCramQuaternion(self.x, self.y, self.z, self.w)
 
 
 @dataclass
@@ -56,7 +56,7 @@ class PlanNodeMapping(AlternativeMapping[PlanNode]):
     reason: Optional[PlanFailure] = None
 
     @classmethod
-    def create_instance(cls, obj: PlanNode):
+    def from_domain_object(cls, obj: PlanNode):
         """
         Convert a PlanNode to a PlanNodeDAO.
         """
@@ -67,7 +67,7 @@ class PlanNodeMapping(AlternativeMapping[PlanNode]):
             reason=obj.reason,
         )
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         raise NotImplementedError()
 
 
@@ -77,7 +77,7 @@ class DesignatorNodeMapping(PlanNodeMapping, AlternativeMapping[DesignatorNode])
     designator_type: Type[DesignatorDescription] = None
 
     @classmethod
-    def create_instance(cls, obj: DesignatorNode):
+    def from_domain_object(cls, obj: DesignatorNode):
         """
         Convert a DesignatorNode to a DesignatorNodeDAO.
         """
@@ -90,7 +90,7 @@ class DesignatorNodeMapping(PlanNodeMapping, AlternativeMapping[DesignatorNode])
             reason=obj.reason,
         )
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         raise NotImplementedError()
 
 
@@ -98,7 +98,7 @@ class DesignatorNodeMapping(PlanNodeMapping, AlternativeMapping[DesignatorNode])
 class ActionNodeMapping(DesignatorNodeMapping, AlternativeMapping[ActionNode]):
 
     @classmethod
-    def create_instance(cls, obj: ActionNode):
+    def from_domain_object(cls, obj: ActionNode):
         """
         Convert an ActionNode to an ActionNodeDAO.
         """
@@ -110,7 +110,7 @@ class ActionNodeMapping(DesignatorNodeMapping, AlternativeMapping[ActionNode]):
             reason=obj.reason,
         )
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         raise NotImplementedError()
 
 
@@ -130,7 +130,7 @@ class MotionNodeMapping(DesignatorNodeMapping, AlternativeMapping[MotionNode]):
     #         reason=obj.reason,
     #     )
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         raise NotImplementedError()
 
 
@@ -142,7 +142,7 @@ class ResolvedActionNodeMapping(
     execution_data: ExecutionData = None
 
     @classmethod
-    def create_instance(cls, obj: ResolvedActionNode):
+    def from_domain_object(cls, obj: ResolvedActionNode):
         """
         Convert a ResolvedActionNode to a ResolvedActionNodeDAO.
         """
@@ -156,7 +156,7 @@ class ResolvedActionNodeMapping(
             execution_data=obj.execution_data,
         )
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         raise NotImplementedError()
 
 
@@ -172,13 +172,13 @@ class PlanMapping(AlternativeMapping[Plan]):
     edges: List[PlanEdge]
 
     @classmethod
-    def create_instance(cls, obj: Plan):
+    def from_domain_object(cls, obj: Plan):
         return cls(
             nodes=obj.nodes,
             edges=[PlanEdge(edge[0], edge[1]) for edge in obj.edges],
         )
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         raise NotImplementedError()
 
 

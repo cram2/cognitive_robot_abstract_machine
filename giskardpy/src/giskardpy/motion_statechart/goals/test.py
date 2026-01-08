@@ -2,13 +2,14 @@ from __future__ import division
 
 from dataclasses import dataclass, field
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Goal, CancelMotion
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.test_nodes.test_nodes import ConstTrueNode
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -17,7 +18,7 @@ class GraspSequence(Goal):
     tip_link: Body = field(kw_only=True)
     root_link: Body = field(kw_only=True)
     gripper_joint: PrefixedName = field(kw_only=True)
-    goal_pose: cas.TransformationMatrix = field(kw_only=True)
+    goal_pose: HomogeneousTransformationMatrix = field(kw_only=True)
     max_velocity: float = 100
     weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
@@ -130,8 +131,8 @@ class Cutting(Goal):
         self.add_task(move_right)
 
         self.arrange_in_sequence([cut_down, cut_up, move_right])
-        self.observation_expression = cas.if_else(
-            move_right.observation_state_symbol == cas.TrinaryTrue,
-            cas.TrinaryTrue,
-            cas.TrinaryFalse,
+        self.observation_expression = sm.if_else(
+            move_right.observation_state_symbol == sm.TrinaryTrue,
+            sm.TrinaryTrue,
+            sm.TrinaryFalse,
         )

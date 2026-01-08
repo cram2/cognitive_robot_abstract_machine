@@ -3,16 +3,15 @@ from __future__ import division
 from dataclasses import dataclass, field
 from typing import List
 
+from typing_extensions import Optional
+
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.graph_node import (
     Goal,
     MotionStatechartNode,
     NodeArtifacts,
 )
-from giskardpy.utils.utils import JsonSerializableEnum
-from typing_extensions import Optional
-
-from semantic_digital_twin.spatial_types.spatial_types import trinary_logic_and
+from krrood.symbolic_math.symbolic_math import trinary_logic_and
 
 
 @dataclass(repr=False, eq=False)

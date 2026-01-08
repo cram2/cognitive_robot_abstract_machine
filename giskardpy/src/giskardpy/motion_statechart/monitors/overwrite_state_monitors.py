@@ -3,7 +3,7 @@ from __future__ import division
 from dataclasses import field, dataclass
 from typing import Optional, Type, Tuple
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.exceptions import NodeInitializationError
 from giskardpy.motion_statechart.context import BuildContext, ExecutionContext
 from giskardpy.motion_statechart.graph_node import (
@@ -11,6 +11,7 @@ from giskardpy.motion_statechart.graph_node import (
     NodeArtifacts,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointState
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
 )
@@ -29,7 +30,7 @@ class SetSeedConfiguration(MotionStatechartNode):
     seed_configuration: JointState = field(kw_only=True)
 
     def build(self, context: BuildContext) -> NodeArtifacts:
-        return NodeArtifacts(observation=cas.TrinaryTrue)
+        return NodeArtifacts(observation=sm.Scalar.const_true())
 
     def on_start(self, context: ExecutionContext):
         # TODO does notify state change too often
@@ -39,7 +40,7 @@ class SetSeedConfiguration(MotionStatechartNode):
 
 @dataclass(eq=False, repr=False)
 class SetOdometry(MotionStatechartNode):
-    base_pose: cas.TransformationMatrix = field(kw_only=True)
+    base_pose: HomogeneousTransformationMatrix = field(kw_only=True)
     _odom_joints: Tuple[Type[Connection], ...] = field(default=(OmniDrive,), init=False)
     odom_connection: Optional[OmniDrive] = field(default=None, kw_only=True)
 
@@ -57,10 +58,10 @@ class SetOdometry(MotionStatechartNode):
                     node=self,
                     reason="Multiple drive joint found in world, please set 'group_name'",
                 )
-        return NodeArtifacts(observation=cas.TrinaryTrue)
+        return NodeArtifacts(observation=sm.Scalar.const_true())
 
     def on_start(self, context: ExecutionContext):
-        parent_T_pose_ref = cas.TransformationMatrix(
+        parent_T_pose_ref = HomogeneousTransformationMatrix(
             context.world.compute_forward_kinematics_np(
                 self.odom_connection.parent, self.base_pose.reference_frame
             )

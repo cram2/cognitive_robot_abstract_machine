@@ -29,7 +29,8 @@ import threading
 import time
 
 import numpy as np
-from krrood.entity_query_language.entity import the, entity, let, in_
+from krrood.entity_query_language.entity import, entity, variable, in_
+from krrood.entity_query_language.entity_result_processors import the
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
@@ -88,7 +89,7 @@ Let's get a reference to the drawer we built above.
 ```{code-cell} ipython3
 drawer = the(
     entity(
-        let(type_=Drawer, domain=world.semantic_annotations),
+        variable(type_=Drawer, domain=world.semantic_annotations),
     )
 ).evaluate()
 ```
@@ -131,7 +132,8 @@ Now we can start moving the dresser everywhere and even rotate it.
 ```{code-cell} ipython3
 from semantic_digital_twin.world_description.world_entity import Connection
 
-free_connection = the(entity(connection := let(type_=Connection, domain=world.connections), connection.parent == world.root)).evaluate()
+connection = variable(type_=Connection, domain=world.connections)
+free_connection = the(entity(connection).where(connection.parent == world.root)).evaluate()
 with world.modify_world():
     free_connection.origin = TransformationMatrix.from_xyz_rpy(1., 1., 0., 0., 0., 0.5 * np.pi)
 rt = RayTracer(world)
@@ -146,7 +148,8 @@ Since it is an aggregation of all degree of freedoms existing in the world, it c
 We can close the drawer again as follows:
 
 ```{code-cell} ipython3
-connection = the(entity(connection := let(type_=PrismaticConnection, domain=world.connections), in_("drawer", connection.child.name.name))).evaluate()
+connection = variable(PrismaticConnection, domain=world.connections)
+connection = the(entity(connection).where(in_("drawer", connection.child.name.name))).evaluate()
 with world.modify_world():
     world.state[connection.dof.id] = [0., 0., 0., 0.]
 rt = RayTracer(world)

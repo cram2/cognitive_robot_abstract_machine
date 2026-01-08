@@ -1,28 +1,19 @@
 from __future__ import annotations
 
 import inspect
-from copy import copy, deepcopy
-
 import itertools
 from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Iterable, Mapping
+from copy import deepcopy
 from dataclasses import dataclass, field
 from dataclasses import fields
-from functools import lru_cache
+from functools import lru_cache, cached_property
 from uuid import UUID, uuid4
-from typing import ClassVar, List, Dict, Any
 
 import numpy as np
 import trimesh
 import trimesh.boolean
-from krrood.adapters.json_serializer import (
-    SubclassJSONSerializer,
-    JSON_TYPE_NAME,
-    to_json,
-    from_json,
-)
-from krrood.entity_query_language.predicate import Symbol
 from scipy.stats import geom
 from trimesh.proximity import closest_point, nearby_faces
 from trimesh.sample import sample_surface
@@ -33,10 +24,19 @@ from typing_extensions import (
     Dict,
     Any,
     Self,
+    ClassVar,
 )
 from typing_extensions import List, Optional, TYPE_CHECKING, Tuple
 from typing_extensions import Set
 
+from krrood.adapters.exceptions import JSON_TYPE_NAME
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    to_json,
+    from_json,
+)
+from krrood.entity_query_language.predicate import Symbol
+from krrood.symbolic_math.symbolic_math import Matrix
 from .geometry import TriangleMesh
 from .inertial_properties import Inertial
 from .shape_collection import ShapeCollection, BoundingBoxCollection
@@ -45,8 +45,10 @@ from ..adapters.world_entity_kwargs_tracker import (
 )
 from ..datastructures.prefixed_name import PrefixedName
 from ..exceptions import ReferenceFrameMismatchError
-from ..spatial_types import spatial_types as cas
-from ..spatial_types.spatial_types import TransformationMatrix, Expression, Point3
+from ..spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+)
 from ..utils import IDGenerator, type_string_to_type, camel_case_split
 
 if TYPE_CHECKING:
@@ -114,8 +116,12 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
     A unique identifier for this world entity.
     """
 
-    def __hash__(self):
+    @cached_property
+    def _hash(self):
         return hash(self.id)
+
+    def __hash__(self):
+        return self._hash
 
     def add_to_world(self, world: World):
         super().add_to_world(world)
@@ -204,16 +210,16 @@ class KinematicStructureEntity(WorldEntityWithID, SubclassJSONSerializer, ABC):
         com_local: np.ndarray[np.float64] = self.combined_mesh.center_mass  # (3,)
         # Transform to world frame using the body's global pose
         com = Point3(
-            x_init=com_local[0],
-            y_init=com_local[1],
-            z_init=com_local[2],
+            x=com_local[0],
+            y=com_local[1],
+            z=com_local[2],
             reference_frame=self,
         )
         world = self._world
         return world.transform(com, world.root)
 
     @property
-    def global_pose(self) -> TransformationMatrix:
+    def global_pose(self) -> HomogeneousTransformationMatrix:
         """
         Computes the pose of the KinematicStructureEntity in the world frame.
         :return: TransformationMatrix representing the global pose.
@@ -585,7 +591,8 @@ class Region(KinematicStructureEntity):
         hull.process()
 
         area_mesh = TriangleMesh(
-            mesh=hull, origin=TransformationMatrix(reference_frame=reference_frame)
+            mesh=hull,
+            origin=HomogeneousTransformationMatrix(reference_frame=reference_frame),
         )
         return cls(name=name, area=ShapeCollection([area_mesh]))
 
@@ -598,9 +605,15 @@ class Region(KinematicStructureEntity):
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         result = cls(
-            name=PrefixedName.from_json(data["name"], id=from_json(data["id"]))
+            name=PrefixedName.from_json(data["name"]), id=from_json(data["id"])
         )
-        area = ShapeCollection.from_json(data["area"])
+        # add the new body so that the transformation matrices in the shapes can use it as reference frame.
+        tracker = KinematicStructureEntityKwargsTracker.from_kwargs(kwargs)
+        if not tracker.has_kinematic_structure_entity(result.id):
+            tracker.add_kinematic_structure_entity(result)
+        else:
+            result = tracker.get_kinematic_structure_entity(result.id)
+        area = ShapeCollection.from_json(data["area"], **kwargs)
         for shape in area:
             shape.origin.reference_frame = result
         result.area = area
@@ -765,7 +778,7 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
         return self._kinematic_structure_entities(set(), Region)
 
     def as_bounding_box_collection_at_origin(
-        self, origin: TransformationMatrix
+        self, origin: HomogeneousTransformationMatrix
     ) -> BoundingBoxCollection:
         """
         Returns a bounding box collection that contains the bounding boxes of all bodies in this semantic annotation.
@@ -794,7 +807,7 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
         :returns: A collection of bounding boxes in world-space coordinates.
         """
         return self.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=reference_frame)
+            HomogeneousTransformationMatrix(reference_frame=reference_frame)
         )
 
 
@@ -826,6 +839,7 @@ class RootedSemanticAnnotation(SemanticAnnotation):
             if body.has_collision() and not body.get_collision_config().disabled
         )
 
+
 @dataclass(eq=False)
 class Agent(RootedSemanticAnnotation):
     """
@@ -839,6 +853,7 @@ class Agent(RootedSemanticAnnotation):
 
     ...
 
+
 @dataclass(eq=False)
 class Human(Agent):
     """
@@ -850,7 +865,9 @@ class Human(Agent):
     This class exists primarily for semantic distinction, so that algorithms
     can treat human agents differently from robots if needed.
     """
+
     ...
+
 
 @dataclass(eq=False)
 class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
@@ -866,8 +883,6 @@ class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
         return set(
             self._world.get_kinematic_structure_entities_of_branch(self.root)
         ) | {self.root}
-
-
 
 
 @dataclass(eq=False)
@@ -891,11 +906,13 @@ class Connection(WorldEntity, SubclassJSONSerializer):
     The child KinematicStructureEntity of the connection.
     """
 
-    parent_T_connection_expression: TransformationMatrix = field(default=None)
-    _kinematics: TransformationMatrix = field(
-        default_factory=TransformationMatrix, init=False
+    parent_T_connection_expression: HomogeneousTransformationMatrix = field(
+        default=None
     )
-    connection_T_child_expression: TransformationMatrix = field(default=None)
+    _kinematics: HomogeneousTransformationMatrix = field(
+        default_factory=HomogeneousTransformationMatrix, init=False
+    )
+    connection_T_child_expression: HomogeneousTransformationMatrix = field(default=None)
     """
     The origin expression of a connection is split into 2 transforms:
     1. parent_T_connection describes the pose of the connection relative to its parent and must be constant.
@@ -916,9 +933,9 @@ class Connection(WorldEntity, SubclassJSONSerializer):
 
         # If I use default factories, I'd have to complicate the from_json, because I couldn't blindly pass these args
         if self.parent_T_connection_expression is None:
-            self.parent_T_connection_expression = TransformationMatrix()
+            self.parent_T_connection_expression = HomogeneousTransformationMatrix()
         if self.connection_T_child_expression is None:
-            self.connection_T_child_expression = TransformationMatrix()
+            self.connection_T_child_expression = HomogeneousTransformationMatrix()
 
         if not self.parent_T_connection_expression.is_constant():
             raise RuntimeError(
@@ -966,13 +983,13 @@ class Connection(WorldEntity, SubclassJSONSerializer):
             name=PrefixedName.from_json(data["name"]),
             parent=parent,
             child=child,
-            parent_T_connection_expression=TransformationMatrix.from_json(
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),
         )
 
     @property
-    def origin_expression(self) -> TransformationMatrix:
+    def origin_expression(self) -> HomogeneousTransformationMatrix:
         return (
             self.parent_T_connection_expression
             @ self._kinematics
@@ -1010,7 +1027,7 @@ class Connection(WorldEntity, SubclassJSONSerializer):
         return hash((self.parent, self.child))
 
     @property
-    def origin(self) -> cas.TransformationMatrix:
+    def origin(self) -> HomogeneousTransformationMatrix:
         """
         :return: The relative transform between the parent and child frame.
         """
@@ -1022,10 +1039,10 @@ class Connection(WorldEntity, SubclassJSONSerializer):
             f"Origin can not be set for Connection: {self.__class__.__name__}"
         )
 
-    def origin_as_position_quaternion(self) -> Expression:
+    def origin_as_position_quaternion(self) -> Matrix:
         position = self.origin_expression.to_position()[:3]
         orientation = self.origin_expression.to_quaternion()
-        return cas.Expression.vstack([position, orientation]).T
+        return Matrix.vstack([position, orientation]).T
 
     @property
     def dofs(self) -> Set[DegreeOfFreedom]:
@@ -1069,8 +1086,8 @@ class Connection(WorldEntity, SubclassJSONSerializer):
     def _find_references_in_world(self, world: World) -> Tuple[
         KinematicStructureEntity,
         KinematicStructureEntity,
-        TransformationMatrix,
-        TransformationMatrix,
+        HomogeneousTransformationMatrix,
+        HomogeneousTransformationMatrix,
     ]:
         """
         Finds the reference frames to this connection in the given world and returns them as usable objects.
@@ -1207,4 +1224,3 @@ class Actuator(WorldEntityWithID, SubclassJSONSerializer):
         :param dof: The degree of freedom to add.
         """
         self._dofs.append(dof)
-

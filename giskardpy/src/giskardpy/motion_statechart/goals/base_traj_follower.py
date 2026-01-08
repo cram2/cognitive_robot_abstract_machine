@@ -4,11 +4,12 @@ from dataclasses import field, dataclass
 
 from line_profiler import profile
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Goal
 from giskardpy.motion_statechart.graph_node import Task
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.world_description.world_entity import Connection
@@ -37,7 +38,7 @@ class BaseTrajFollower(Goal):
         t: int,
         free_variable_name: PrefixedName,
         derivative: Derivatives = Derivatives.position,
-    ) -> cas.FloatVariable:
+    ) -> sm.FloatVariable:
         expr = (
             f"god_map.trajectory.get_exact({t})['{free_variable_name}'][{derivative}]"
         )
@@ -49,7 +50,7 @@ class BaseTrajFollower(Goal):
         free_variable_name: PrefixedName,
         start_t: float,
         derivative: Derivatives = Derivatives.position,
-    ) -> cas.Expression:
+    ) -> sm.Scalar:
         time = context.time_symbol
         b_result_cases = []
         for t in range(self.trajectory_length):
@@ -57,7 +58,7 @@ class BaseTrajFollower(Goal):
             eq_result = self.x_symbol(t, free_variable_name, derivative)
             b_result_cases.append((b, eq_result))
             # FIXME if less eq cases behavior changed
-        return cas.if_less_eq_cases(
+        return sm.if_less_eq_cases(
             a=time + start_t,
             b_result_cases=b_result_cases,
             else_result=self.x_symbol(
@@ -75,7 +76,7 @@ class BaseTrajFollower(Goal):
         else:
             y = 0
         rot = self.current_traj_point(self.joint.yaw.name, t_in_s, derivative)
-        odom_T_base_footprint_goal = cas.TransformationMatrix.from_xyz_rpy(
+        odom_T_base_footprint_goal = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=x, y=y, yaw=rot
         )
         return odom_T_base_footprint_goal
@@ -133,7 +134,7 @@ class BaseTrajFollower(Goal):
                 )
             else:
                 y = 0
-            base_footprint_P_vel = cas.Vector3((x, y, 0))
+            base_footprint_P_vel = Vector3((x, y, 0))
             map_P_vel = map_T_base_footprint @ base_footprint_P_vel
             if t == 0 and not self.track_only_velocity:
                 actual_error_x, actual_error_y = self.trans_error_at(0)
@@ -171,7 +172,7 @@ class BaseTrajFollower(Goal):
         rotation_goal = self.current_traj_point(self.joint.yaw.name, t_in_s)
         rotation_current = self.joint.yaw.variables.position
         error = (
-            cas.shortest_angular_distance(rotation_current, rotation_goal)
+            sm.shortest_angular_distance(rotation_current, rotation_goal)
             / context.qp_controller.mpc_dt
         )
         return error

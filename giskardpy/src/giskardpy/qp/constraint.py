@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
+from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 
 
@@ -12,16 +13,16 @@ class BaseConstraint:
 
     name: str
 
-    expression: cas.SymbolicScalar
+    expression: Scalar
 
-    quadratic_weight: cas.ScalarData
+    quadratic_weight: sm.ScalarData
 
-    linear_weight: cas.ScalarData
+    linear_weight: sm.ScalarData
 
 
 @dataclass
 class IntegralConstraint(BaseConstraint):
-    normalization_factor: cas.ScalarData
+    normalization_factor: float
     """
     This value is important to make constraints with different units comparable.
     The meaning depends on derivative.
@@ -34,15 +35,13 @@ class IntegralConstraint(BaseConstraint):
         - a rad/s value for rotation
     """
 
-    def normalized_weight(self, control_horizon: int) -> cas.Expression:
+    def normalized_weight(self, control_horizon: int) -> Scalar:
         return self.quadratic_weight * (
             1 / (self.normalization_factor**2 * control_horizon)
         )
 
-    def _apply_cap(
-        self, value: cas.Expression, dt: float, control_horizon: int
-    ) -> cas.Expression:
-        return cas.limit(
+    def _apply_cap(self, value: Scalar, dt: float, control_horizon: int) -> Scalar:
+        return sm.limit(
             value,
             -self.normalization_factor * dt * control_horizon,
             self.normalization_factor * dt * control_horizon,
@@ -57,16 +56,16 @@ class InequalityConstraint(IntegralConstraint):
     lower_slack_limit <= slack <= upper_slack_limit
     """
 
-    lower_error: cas.ScalarData
-    upper_error: cas.ScalarData
+    lower_error: sm.ScalarData
+    upper_error: sm.ScalarData
 
-    lower_slack_limit: cas.ScalarData
-    upper_slack_limit: cas.ScalarData
+    lower_slack_limit: sm.ScalarData
+    upper_slack_limit: sm.ScalarData
 
-    def capped_lower_error(self, dt: float, control_horizon: int) -> cas.Expression:
+    def capped_lower_error(self, dt: float, control_horizon: int) -> Scalar:
         return self._apply_cap(self.lower_error, dt, control_horizon)
 
-    def capped_upper_error(self, dt: float, control_horizon: int) -> cas.Expression:
+    def capped_upper_error(self, dt: float, control_horizon: int) -> Scalar:
         return self._apply_cap(self.upper_error, dt, control_horizon)
 
 
@@ -74,12 +73,12 @@ class InequalityConstraint(IntegralConstraint):
 class EqualityConstraint(IntegralConstraint):
     """ """
 
-    bound: cas.ScalarData
+    bound: sm.ScalarData
 
-    lower_slack_limit: cas.ScalarData
-    upper_slack_limit: cas.ScalarData
+    lower_slack_limit: sm.ScalarData
+    upper_slack_limit: sm.ScalarData
 
-    def capped_bound(self, dt: float, control_horizon: int) -> cas.Expression:
+    def capped_bound(self, dt: float, control_horizon: int) -> Scalar:
         return self._apply_cap(self.bound, dt, control_horizon)
 
 
@@ -93,7 +92,7 @@ class DerivativeConstraint(BaseConstraint):
     As a result, position constraints are cheaper, as they only require a single constraint.
     """
 
-    normalization_factor: cas.ScalarData = field(kw_only=True)
+    normalization_factor: sm.ScalarData = field(kw_only=True)
     """
     This value is important to make constraints with different units comparable.
     The meaning depends on derivative.
@@ -118,15 +117,15 @@ class DerivativeConstraint(BaseConstraint):
 
 @dataclass
 class DerivativeInequalityConstraint(DerivativeConstraint):
-    lower_limit: cas.ScalarData
-    upper_limit: cas.ScalarData
+    lower_limit: sm.ScalarData
+    upper_limit: sm.ScalarData
 
-    lower_slack_limit: cas.ScalarData
-    upper_slack_limit: cas.ScalarData
+    lower_slack_limit: sm.ScalarData
+    upper_slack_limit: sm.ScalarData
 
 
 @dataclass
 class DerivativeEqualityConstraint(DerivativeConstraint):
-    bound: cas.ScalarData
-    lower_slack_limit: cas.ScalarData
-    upper_slack_limit: cas.ScalarData
+    bound: sm.ScalarData
+    lower_slack_limit: sm.ScalarData
+    upper_slack_limit: sm.ScalarData

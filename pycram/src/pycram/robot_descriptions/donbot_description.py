@@ -3,7 +3,7 @@ from types import MethodType
 import numpy as np
 
 from ..datastructures.dataclasses import VirtualMobileBaseJoints
-from ..pose_generator_and_validator import PoseGenerator
+from ..pose_validator import PoseGenerator
 from ..ros import get_ros_package_path
 from ..robot_description import (
     RobotDescription,

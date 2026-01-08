@@ -5,10 +5,9 @@ from dataclasses import asdict
 
 import numpy as np
 from pkg_resources import resource_filename
-
-from krrood.ormatic.utils import create_engine
 from sqlalchemy.orm import Session
 
+from krrood.ormatic.utils import create_engine
 from semantic_digital_twin.adapters.procthor.procthor_parser import (
     ProcTHORParser,
     ProcthorRoom,
@@ -17,11 +16,13 @@ from semantic_digital_twin.adapters.procthor.procthor_parser import (
     ProcthorWall,
     ProcthorObject,
 )
-from semantic_digital_twin.adapters.procthor.procthor_semantic_annotations import (
+from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
-    Bread,
 )
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Bread
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Region
 
@@ -32,7 +33,7 @@ class ProcTHORTestCase(unittest.TestCase):
     def setUpClass(cls):
         super().setUpClass()
         json_dir = os.path.join(
-            resource_filename('semantic_digital_twin', '../../'),
+            resource_filename("semantic_digital_twin", "../../"),
             "resources",
             "procthor_json",
         )
@@ -42,14 +43,18 @@ class ProcTHORTestCase(unittest.TestCase):
 
     def test_unity_to_semantic_digital_twin_transform_identity_matrix(self):
         m = np.eye(4)
-        result = unity_to_semantic_digital_twin_transform(TransformationMatrix(data=m))
+        result = unity_to_semantic_digital_twin_transform(
+            HomogeneousTransformationMatrix(data=m)
+        )
         np.testing.assert_allclose(result.to_np(), np.eye(4), rtol=1e-6, atol=1e-6)
 
     def test_unity_to_semantic_digital_twin_transform_translation_along_x(self):
         """Unity +X should map to semantic –Y (because of reflection)."""
         m = np.eye(4)
         m[0, 3] = 1.0
-        result = unity_to_semantic_digital_twin_transform(TransformationMatrix(data=m))
+        result = unity_to_semantic_digital_twin_transform(
+            HomogeneousTransformationMatrix(data=m)
+        )
         self.assertAlmostEqual(result.to_position().to_np()[1], -1.0)
         np.testing.assert_allclose(
             result.to_rotation_matrix().to_np()[:3, :3], np.eye(3)
@@ -59,7 +64,9 @@ class ProcTHORTestCase(unittest.TestCase):
         """Unity +Z should map to semantic +X."""
         m = np.eye(4)
         m[2, 3] = 2.0
-        result = unity_to_semantic_digital_twin_transform(TransformationMatrix(data=m))
+        result = unity_to_semantic_digital_twin_transform(
+            HomogeneousTransformationMatrix(data=m)
+        )
         self.assertAlmostEqual(result.to_position().to_np()[0], 2.0, places=6)
         np.testing.assert_allclose(
             result.to_rotation_matrix().to_np()[:3, :3], np.eye(3)
@@ -76,7 +83,9 @@ class ProcTHORTestCase(unittest.TestCase):
                 [-np.sin(theta), 0, np.cos(theta)],
             ]
         )
-        result = unity_to_semantic_digital_twin_transform(TransformationMatrix(data=m))
+        result = unity_to_semantic_digital_twin_transform(
+            HomogeneousTransformationMatrix(data=m)
+        )
 
         expected = np.eye(4)
         expected[:3, :3] = np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]])
@@ -97,7 +106,7 @@ class ProcTHORTestCase(unittest.TestCase):
             procthor_room.world_T_room.to_rotation_matrix().to_np(), np.eye(4)
         )
         np.testing.assert_array_equal(
-            procthor_room.world_T_room.to_translation().to_np()[:3, 3],
+            procthor_room.world_T_room.to_translation_matrix().to_np()[:3, 3],
             np.array([1.5, -1.5, 0]),
         )
 
@@ -321,7 +330,7 @@ class ProcTHORTestCase(unittest.TestCase):
     def test_parse_full_world(self):
         world = ProcTHORParser.from_file(
             os.path.join(
-                resource_filename('semantic_digital_twin', '../../'),
+                resource_filename("semantic_digital_twin", "../../"),
                 "resources",
                 "procthor_json",
                 "house_987654321.json",

@@ -1,38 +1,34 @@
-import unittest
+import pytest
 
-from krrood.entity_query_language.entity import entity, let, and_, contains
-from krrood.entity_query_language.quantify_entity import an, the
+from krrood.entity_query_language.entity import entity, variable, and_, contains
+from krrood.entity_query_language.entity_result_processors import an, the
 
 from pycram.designator import EQLObjectDesignator, NamedObject
 from pycram.designators.object_designator import *
 from pycram.language import SequentialPlan
-from pycram.testing import ApartmentWorldTestCase
 
 
-class TestObjectDesignator(ApartmentWorldTestCase):
-
-    def test_eql_designator(self):
-        milk_desig = EQLObjectDesignator(
-            an(
-                entity(
-                    obj := let(type_=Body, domain=self.world.bodies),
-                    contains(obj.name.name, "milk"),
-                )
+def test_eql_designator(immutable_model_world):
+    world, robot_view, context = immutable_model_world
+    obj = variable(type_=Body, domain=world.bodies)
+    milk_desig = EQLObjectDesignator(
+        an(
+            entity(obj).where(
+                contains(obj.name.name, "milk"),
             )
         )
-        found_milks = list(milk_desig)
-        self.assertEqual(1, len(found_milks))
-        self.assertEqual("milk.stl", found_milks[0].name.name)
-        self.assertEqual(self.world.get_body_by_name("milk.stl"), found_milks[0])
-
-    def test_named_object(self):
-        named_desig = NamedObject("milk.stl")
-        plan = SequentialPlan(self.context, named_desig)
-        found_milks = list(named_desig)
-        self.assertEqual(1, len(found_milks))
-        self.assertEqual("milk.stl", found_milks[0].name.name)
-        self.assertEqual(self.world.get_body_by_name("milk.stl"), found_milks[0])
+    )
+    found_milks = list(milk_desig)
+    assert 1 == len(found_milks)
+    assert "milk.stl" == found_milks[0].name.name
+    assert world.get_body_by_name("milk.stl") == found_milks[0]
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_named_object(immutable_model_world):
+    world, robot_view, context = immutable_model_world
+    named_desig = NamedObject("milk.stl")
+    plan = SequentialPlan(context, named_desig)
+    found_milks = list(named_desig)
+    assert 1 == len(found_milks)
+    assert "milk.stl" == found_milks[0].name.name
+    assert world.get_body_by_name("milk.stl") == found_milks[0]

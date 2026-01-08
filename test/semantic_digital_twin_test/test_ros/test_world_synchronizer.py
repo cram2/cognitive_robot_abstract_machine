@@ -23,7 +23,6 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.orm.ormatic_interface import Base, WorldMappingDAO
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Door
 from semantic_digital_twin.spatial_types import Vector3
-from semantic_digital_twin.testing import rclpy_node
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -255,7 +254,7 @@ def test_model_synchronization_merge_full_world(rclpy_node):
 
     pr2_world = URDFParser.from_file(
         os.path.join(
-            resource_filename('semantic_digital_twin', '../../'),
+            resource_filename("semantic_digital_twin", "../../"),
             "resources",
             "urdf",
             "pr2_kinematic_tree.urdf",

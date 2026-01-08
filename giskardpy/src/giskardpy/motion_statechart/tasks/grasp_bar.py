@@ -2,9 +2,9 @@ from __future__ import division
 
 from dataclasses import dataclass
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Task
+from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -12,9 +12,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 class GraspBar(Task):
     root_link: Body
     tip_link: Body
-    tip_grasp_axis: cas.Vector3
-    bar_center: cas.Point3
-    bar_axis: cas.Vector3
+    tip_grasp_axis: Vector3
+    bar_center: Point3
+    bar_axis: Vector3
     bar_length: float
     threshold: float = 0.01
     reference_linear_velocity: float = 0.1

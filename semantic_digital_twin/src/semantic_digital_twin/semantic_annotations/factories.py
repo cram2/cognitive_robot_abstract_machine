@@ -7,13 +7,13 @@ from functools import reduce
 from operator import or_
 
 from krrood.entity_query_language.entity import (
-    let,
+    variable,
     entity,
     not_,
     in_,
     for_all,
 )
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity_result_processors import an
 from numpy import ndarray
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     uniform_measure_of_simple_event,
@@ -26,7 +26,7 @@ from ..datastructures.prefixed_name import PrefixedName
 from ..datastructures.variables import SpatialVariables
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import (
-    TransformationMatrix,
+    HomogeneousTransformationMatrix,
     Vector3,
     Point3,
 )
@@ -80,7 +80,7 @@ class HasDoorLikeFactories(ABC):
     The factories used to create the doors.
     """
 
-    door_transforms: List[TransformationMatrix] = field(
+    door_transforms: List[HomogeneousTransformationMatrix] = field(
         default_factory=list, hash=False
     )
     """
@@ -108,7 +108,7 @@ class HasDoorLikeFactories(ABC):
         return upper_limits, lower_limits
 
     def _add_hinge_to_door(
-        self, door_factory: DoorFactory, parent_T_door: TransformationMatrix
+        self, door_factory: DoorFactory, parent_T_door: HomogeneousTransformationMatrix
     ):
         """
         Adds a hinge to the door. The hinge's pivot point is on the opposite side of the handle.
@@ -140,7 +140,7 @@ class HasDoorLikeFactories(ABC):
     def _add_door_to_world(
         self,
         door_factory: DoorFactory,
-        parent_T_door: TransformationMatrix,
+        parent_T_door: HomogeneousTransformationMatrix,
         parent_world: World,
     ):
         """
@@ -208,9 +208,9 @@ class HasDoorLikeFactories(ABC):
     def _calculate_door_pivot_point(
         self,
         semantic_door_annotation: Door,
-        parent_T_door: TransformationMatrix,
+        parent_T_door: HomogeneousTransformationMatrix,
         scale: Scale,
-    ) -> TransformationMatrix:
+    ) -> HomogeneousTransformationMatrix:
         """
         Calculate the door pivot point based on the handle position and the door scale. The pivot point is on the opposite
         side of the handle.
@@ -230,7 +230,7 @@ class HasDoorLikeFactories(ABC):
         offset = sign * (scale.y / 2)
         parent_P_hinge = parent_T_door.to_np()[:3, 3] + np.array([0, offset, 0])
 
-        parent_T_hinge = TransformationMatrix.from_point_rotation_matrix(
+        parent_T_hinge = HomogeneousTransformationMatrix.from_point_rotation_matrix(
             Point3(*parent_P_hinge)
         )
 
@@ -239,7 +239,7 @@ class HasDoorLikeFactories(ABC):
     def _add_double_door_to_world(
         self,
         door_factory: DoubleDoorFactory,
-        parent_T_double_door: TransformationMatrix,
+        parent_T_double_door: HomogeneousTransformationMatrix,
         parent_world: World,
     ):
         """
@@ -282,7 +282,7 @@ class HasDoorLikeFactories(ABC):
         self,
         new_parent: KinematicStructureEntity,
         door: Door,
-        parent_T_double_door: TransformationMatrix,
+        parent_T_double_door: HomogeneousTransformationMatrix,
     ):
         """
         Move a door from a double door world into a new world with a revolute connection.
@@ -352,11 +352,13 @@ class HasDoorLikeFactories(ABC):
         :param world: The world from which to get the bodies.
         :return: A list of bodies that are not part of any door semantic annotation.
         """
-        all_doors = let(Door, domain=world.semantic_annotations)
-        other_body = let(type_=Body, domain=world.bodies)
+        all_doors = variable(Door, domain=world.semantic_annotations)
+        other_body = variable(type_=Body, domain=world.bodies)
         door_bodies = all_doors.bodies
         bodies_without_excluded_bodies_query = an(
-            entity(other_body, for_all(door_bodies, not_(in_(other_body, door_bodies))))
+            entity(other_body).where(
+                for_all(door_bodies, not_(in_(other_body, door_bodies)))
+            )
         )
 
         filtered_bodies = list(bodies_without_excluded_bodies_query.evaluate())
@@ -587,7 +589,7 @@ class HasHandleFactory(ABC):
     The direction on the door in which the handle positioned.
     """
 
-    parent_T_handle: Optional[TransformationMatrix] = field(default=None)
+    parent_T_handle: Optional[HomogeneousTransformationMatrix] = field(default=None)
     """
     The transformation matrix of the handle from the parent
     """
@@ -603,7 +605,7 @@ class HasHandleFactory(ABC):
 
     def create_parent_T_handle_from_parent_scale(
         self, scale: Scale
-    ) -> Optional[TransformationMatrix]:
+    ) -> Optional[HomogeneousTransformationMatrix]:
         """
         Return a transformation matrix that defines the position and orientation of the handle relative to its parent.
         :raises: NotImplementedError if the handle direction is Z or NEGATIVE_Z.
@@ -613,13 +615,13 @@ class HasHandleFactory(ABC):
             scale.simple_event.as_composite_set().marginal(SpatialVariables.yz)
         )
 
-        return TransformationMatrix.from_xyz_rpy(
+        return HomogeneousTransformationMatrix.from_xyz_rpy(
             x=scale.x / 2, y=sampled_2d_point[0], z=sampled_2d_point[1]
         )
 
     def add_handle_to_world(
         self,
-        parent_T_handle: TransformationMatrix,
+        parent_T_handle: HomogeneousTransformationMatrix,
         parent_world: World,
     ):
         """
@@ -651,7 +653,7 @@ class HasDrawerFactories(ABC):
     The factories used to create drawers.
     """
 
-    parent_T_drawers: List[TransformationMatrix] = field(
+    parent_T_drawers: List[HomogeneousTransformationMatrix] = field(
         default_factory=list, hash=False
     )
     """
@@ -661,7 +663,7 @@ class HasDrawerFactories(ABC):
     def _add_drawer_to_world(
         self,
         drawer_factory: DrawerFactory,
-        parent_T_drawer: TransformationMatrix,
+        parent_T_drawer: HomogeneousTransformationMatrix,
         parent_world: World,
     ):
 
@@ -1148,7 +1150,7 @@ class DresserFactory(
         """
         dresser_body: Body = world.root
         container_event = dresser_body.collision.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=dresser_body)
+            HomogeneousTransformationMatrix(reference_frame=dresser_body)
         ).event
 
         container_footprint = self._subtract_bodies_from_container_footprint(
@@ -1186,7 +1188,7 @@ class DresserFactory(
             if body == dresser_body:
                 continue
             body_footprint = body.collision.as_bounding_box_collection_at_origin(
-                TransformationMatrix(reference_frame=dresser_body)
+                HomogeneousTransformationMatrix(reference_frame=dresser_body)
             ).event.marginal(SpatialVariables.yz)
             container_footprint -= body_footprint
             if container_footprint.is_empty():
@@ -1245,7 +1247,7 @@ class RoomFactory(SemanticAnnotationFactory[Room]):
         connection = FixedConnection(
             parent=room_body,
             child=region,
-            parent_T_connection_expression=TransformationMatrix(),
+            parent_T_connection_expression=HomogeneousTransformationMatrix(),
         )
         world.add_connection(connection)
 
