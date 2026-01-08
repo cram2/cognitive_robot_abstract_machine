@@ -488,17 +488,27 @@ class CartesianPositionVelocityLimit(Task):
     """
 
     root_link: KinematicStructureEntity = field(kw_only=True)
-    """Root link of the kinematic chain. Defines the reference frame from which the tip's motion is measured."""
+    """
+    Root link of the kinematic chain. 
+    Defines the reference frame from which the tip's motion is measured.
+    """
     tip_link: KinematicStructureEntity = field(kw_only=True)
-    """Tip link of the kinematic chain. The translational velocity of this link (expressed in the root link frame) is constrained."""
+    """
+    Tip link of the kinematic chain. 
+    The translational velocity of this link (expressed in the root link frame) is constrained.
+    """
     max_linear_velocity: float = field(default=0.1, kw_only=True)
-    """Maximum allowed linear speed of the tip in meters per second (m/s).
+    """
+    Maximum allowed linear speed of the tip in meters per second (m/s).
     Default: 0.1 m/s. The enforcement ensures the Euclidean norm of the
-    tip-frame translational velocity does not exceed this value."""
+    tip-frame translational velocity does not exceed this value.
+    """
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
-    """Optimization weight determining how strongly the linear velocity
+    """
+    Optimization weight determining how strongly the linear velocity
     limit is enforced. Higher weights give this constraint soft priority
-    over lower weighted constraints when conflicts occur."""
+    over lower weighted constraints when conflicts occur.
+    """
 
     def build(self, context: BuildContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
