@@ -14,20 +14,10 @@ on:
 
 # This job installs dependencies, builds the book, and pushes it to `gh-pages`
 jobs:
-  to-lowercase:
-    runs-on: ubuntu-latest
-    outputs:
-      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
-    steps:
-      - id: lowercase
-        run: |
-          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
-
   deploy-book:
-    needs: to-lowercase
     runs-on: ubuntu-latest
     container:
-      image: ${{ needs.to-lowercase.outputs.repo_lowercase }}
+      image: pycram/semantic_world:jazzy
     environment:
       name: github-pages
     permissions:
@@ -39,7 +29,8 @@ jobs:
       # Install dependencies
       - name: Install dependencies
         run: |
-          source /opt/ros/cram-env/bin/activate
+          source /opt/ros/semantic_digital_twin-venv/bin/activate
+          python3 -m pip install poetry
           poetry install
           python3 -m pip install -r krrood/doc/requirements.txt
           python3 -m pip install jupyter-book jupytext nbconvert
@@ -47,7 +38,7 @@ jobs:
       # Build the book
       - name: Build the book
         run: |
-          source /opt/ros/cram-env/bin/activate
+          source /opt/ros/semantic_digital_twin-venv/bin/activate
           jupyter-book build krrood/doc
 
       # Upload the book's HTML as an artifact

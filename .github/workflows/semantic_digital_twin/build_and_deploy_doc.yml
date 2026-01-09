@@ -21,20 +21,10 @@ on:
 
 # This job installs dependencies, builds the book, and pushes it to `gh-pages`
 jobs:
-  to-lowercase:
-    runs-on: ubuntu-latest
-    outputs:
-      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
-    steps:
-      - id: lowercase
-        run: |
-          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
-
   deploy-book:
-    needs: to-lowercase
     runs-on: ubuntu-latest
     container:
-      image: ${{ needs.to-lowercase.outputs.repo_lowercase }}
+      image: pycram/semantic_world:jazzy
     permissions:
       pages: write
       id-token: write
@@ -43,14 +33,15 @@ jobs:
 
     - name: Install dependencies
       run: |
-        source /opt/ros/cram-env/bin/activate
+        source /opt/ros/semantic_digital_twin-venv/bin/activate
+        python3 -m pip install poetry
         poetry install
         python3 -m pip install -r semantic_digital_twin/doc/requirements.txt
         python3 -m pip install jupyter-book jupytext nbconvert
 
     - name: Strip exercise-tagged cells in self_assessment/exercises/
       run: |
-        source /opt/ros/cram-env/bin/activate
+        source /opt/ros/semantic_digital_twin-venv/bin/activate
         cd semantic_digital_twin/doc/self_assessment/exercises
         find . -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
           ipynb="${f%.md}.ipynb"
@@ -65,7 +56,7 @@ jobs:
     # Build the book
     - name: Build the book
       run: |
-        source /opt/ros/cram-env/bin/activate
+        source /opt/ros/semantic_digital_twin-venv/bin/activate
         jupyter-book build semantic_digital_twin/doc
 
     # Upload the book's HTML as an artifact

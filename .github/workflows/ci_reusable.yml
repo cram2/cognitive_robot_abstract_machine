@@ -12,19 +12,10 @@ on:
         type: string
 
 jobs:
-  to-lowercase:
-    runs-on: ubuntu-latest
-    outputs:
-      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
-    steps:
-      - id: lowercase
-        run: |
-          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
   test:
-    needs: to-lowercase
     runs-on: ubuntu-latest
     container:
-      image: ${{ needs.to-lowercase.outputs.repo_lowercase }}
+      image: pycram/semantic_world:jazzy
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,7 +25,8 @@ jobs:
       - name: Install dependencies
         run: |
           cd cognitive_robot_abstract_machine
-          source /opt/ros/cram-env/bin/activate
+          source /opt/ros/semantic_digital_twin-venv/bin/activate
+          python3 -m pip install poetry
           poetry install
 
       - name: Build ORM
@@ -42,11 +34,11 @@ jobs:
         run: |
           cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
           source /opt/ros/overlay_ws/install/setup.bash
-          source /opt/ros/cram-env/bin/activate
+          source /opt/ros/semantic_digital_twin-venv/bin/activate
           python generate_orm.py
 
       - name: Run tests
         run: |
           source /opt/ros/overlay_ws/install/setup.bash
-          source /opt/ros/cram-env/bin/activate
+          source /opt/ros/semantic_digital_twin-venv/bin/activate
           python -m pytest -sv cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test

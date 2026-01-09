@@ -14,23 +14,10 @@ permissions:
   id-token: write
 
 jobs:
-  build-docs:
-    runs-on: ubuntu-latest
-    outputs:
-      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
-    steps:
-      - id: lowercase
-        run: |
-          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
   build:
-    needs: build-docs
     runs-on: ubuntu-latest
     container:
-      image: ${{ needs.build-docs.outputs.repo_lowercase }}
+      image: pycram/semantic_world:jazzy
     
     steps:
       - name: Checkout repository
@@ -40,7 +27,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc
-          source /opt/ros/cram-env/bin/activate
+          source /opt/ros/semantic_digital_twin-venv/bin/activate
+          python3 -m pip install poetry
           poetry install
           # Install doc-specific dependencies that might not be in poetry
           python3 -m pip install -r krrood/doc/requirements.txt
@@ -49,12 +37,12 @@ jobs:
 
       - name: Build KRROOD documentation
         run: |
-          source /opt/ros/cram-env/bin/activate
+          source /opt/ros/semantic_digital_twin-venv/bin/activate
           jupyter-book build krrood/doc
 
       - name: Build Semantic Digital Twin documentation
         run: |
-          source /opt/ros/cram-env/bin/activate
+          source /opt/ros/semantic_digital_twin-venv/bin/activate
           # Strip exercise-tagged cells (following existing practice)
           cd semantic_digital_twin/doc/self_assessment/exercises
           find . -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
@@ -72,7 +60,7 @@ jobs:
 
       - name: Prepare staging area
         run: |
-          source /opt/ros/cram-env/bin/activate
+          source /opt/ros/semantic_digital_twin-venv/bin/activate
           mkdir -p staging
           pandoc --standalone doc/index.md -o staging/index.html --metadata title="CRAM Documentation" --css doc/style.css --self-contained
           cp -r krrood/doc/_build/html staging/krrood
