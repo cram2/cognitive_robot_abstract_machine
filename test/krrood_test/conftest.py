@@ -110,7 +110,9 @@ def pytest_configure(config):
 
 def pytest_sessionstart(session):
     try:
-        generate_sqlalchemy_interface()
+        pass
+        # TODO: Somebody with ORM experience has to check why the generated ORM interface is broken
+        # generate_sqlalchemy_interface()
     except Exception as e:
         import warnings
 

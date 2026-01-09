@@ -111,8 +111,8 @@ class RayTracer:
         self,
         camera_pose: GenericSpatialType,
         resolution: int = 512,
-        min_dist: float = 0,
-        max_dist: float = np.inf,
+        min_distance: float = 0,
+        max_distance: float = np.inf,
     ) -> np.ndarray:
         """
         Creates a segmentation mask for the ray tracer scene from the camera position to the target position. Each pixel
@@ -120,8 +120,8 @@ class RayTracer:
 
         :param camera_pose: The position of the camera.
         :param resolution: The resolution of the segmentation mask.
-        :param min_dist: The minimum distance of a body to be considered a hit.
-        :param max_dist: The maximum distance of a body to be considered a hit.
+        :param min_distance: The minimum distance of a body to be considered a hit.
+        :param max_distance: The maximum distance of a body to be considered a hit.
         :return: A segmentation mask as a numpy array.
         """
         self.update_scene()
@@ -135,8 +135,8 @@ class RayTracer:
             ray_origins,
             target_points,
             multiple_hits=True,
-            min_dist=min_dist,
-            max_dist=max_dist,
+            min_distance=min_distance,
+            max_distance=max_distance,
         )
         unique_index = np.unique(index_ray, return_index=True)[1]
 
@@ -159,8 +159,8 @@ class RayTracer:
         self,
         camera_pose: GenericSpatialType,
         resolution: int = 512,
-        min_dist: float = 0,
-        max_dist: float = np.inf,
+        min_distance: float = 0,
+        max_distance: float = np.inf,
     ) -> np.ndarray:
         """
         Creates a depth map for the ray tracer scene from the camera position to the target position. Each pixel in the
@@ -169,8 +169,8 @@ class RayTracer:
 
         :param camera_pose: The position of the camera.
         :param resolution: The resolution of the depth map.
-        :param min_dist: The minimum distance of a body to be considered a hit.
-        :param max_dist: The maximum distance of a body to be considered a hit.
+        :param min_distance: The minimum distance of a body to be considered a hit.
+        :param max_distance: The maximum distance of a body to be considered a hit.
         :return: A depth map as a numpy array.
         """
         self.update_scene()
@@ -184,8 +184,8 @@ class RayTracer:
             ray_origins,
             target_points,
             multiple_hits=True,
-            min_dist=min_dist,
-            max_dist=max_dist,
+            min_distance=min_distance,
+            max_distance=max_distance,
         )
         unique_index = np.unique(index_ray, return_index=True)[1]
         index_ray = index_ray[unique_index]
@@ -240,8 +240,8 @@ class RayTracer:
         origin_points: np.ndarray,
         target_points: np.ndarray,
         multiple_hits=False,
-        min_dist: float = 0,
-        max_dist: float = np.inf,
+        min_distance: float = 0,
+        max_distance: float = np.inf,
     ) -> Tuple[np.ndarray, np.ndarray, List[Body]]:
         """
         Performs a ray test from the origin point to the target point in the ray tracer scene.
@@ -249,8 +249,8 @@ class RayTracer:
         :param origin_points: The starting point of the ray.
         :param target_points: The end point of the ray.
         :param multiple_hits: Whether to return multiple hits or not.
-        :param min_dist: The minimum distance of a body to be considered a hit.
-        :param max_dist: The maximum distance of a body to be considered a hit.
+        :param min_distance: The minimum distance of a body to be considered a hit.
+        :param max_distance: The maximum distance of a body to be considered a hit.
         :return: A tuple containing the points where the ray intersects and the indices of rays that hit the scene as well as the bodies that were.
         """
         origin_points = np.array(origin_points)
@@ -267,7 +267,7 @@ class RayTracer:
         )
         dist = np.linalg.norm(points - origin_points[index_ray], axis=1)
 
-        valid_indices = np.where((dist >= min_dist) & (dist <= max_dist))[0]
+        valid_indices = np.where((dist >= min_distance) & (dist <= max_distance))[0]
         points = points[valid_indices]
         index_ray = index_ray[valid_indices]
         index_tri = index_tri[valid_indices]

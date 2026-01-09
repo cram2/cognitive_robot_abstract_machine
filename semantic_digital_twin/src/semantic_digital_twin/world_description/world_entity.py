@@ -8,7 +8,7 @@ from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from dataclasses import fields
-from functools import lru_cache
+from functools import lru_cache, cached_property
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -116,8 +116,12 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
     A unique identifier for this world entity.
     """
 
-    def __hash__(self):
+    @cached_property
+    def _hash(self):
         return hash(self.id)
+
+    def __hash__(self):
+        return self._hash
 
     def add_to_world(self, world: World):
         super().add_to_world(world)
@@ -601,9 +605,15 @@ class Region(KinematicStructureEntity):
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         result = cls(
-            name=PrefixedName.from_json(data["name"], id=from_json(data["id"]))
+            name=PrefixedName.from_json(data["name"]), id=from_json(data["id"])
         )
-        area = ShapeCollection.from_json(data["area"])
+        # add the new body so that the transformation matrices in the shapes can use it as reference frame.
+        tracker = KinematicStructureEntityKwargsTracker.from_kwargs(kwargs)
+        if not tracker.has_kinematic_structure_entity(result.id):
+            tracker.add_kinematic_structure_entity(result)
+        else:
+            result = tracker.get_kinematic_structure_entity(result.id)
+        area = ShapeCollection.from_json(data["area"], **kwargs)
         for shape in area:
             shape.origin.reference_frame = result
         result.area = area

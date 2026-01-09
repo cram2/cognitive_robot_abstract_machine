@@ -15,6 +15,7 @@ from ....has_parameters import has_parameters
 from ....language import SequentialPlan
 from ....robot_description import RobotDescription
 from ....robot_descriptions.pr2_states import *
+from ....robot_descriptions.hsrb_states import *
 from ....robot_plans.actions.base import ActionDescription
 from ....robot_plans.motions.gripper import MoveGripperMotion
 from ....robot_plans.motions.robot_body import MoveJointsMotion

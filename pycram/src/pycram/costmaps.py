@@ -1,6 +1,7 @@
 # used for delayed evaluation of typing until python 3.11 becomes mainstream
 from __future__ import annotations
 
+import random
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Union
@@ -11,6 +12,7 @@ import psutil
 import random_events
 import logging
 from matplotlib import colors
+from skimage.measure import label
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
@@ -22,7 +24,7 @@ from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import Tuple, List, Optional, Iterator
+from typing_extensions import Tuple, List, Optional, Iterator, Callable
 
 from .datastructures.dataclasses import Color
 from .datastructures.pose import PoseStamped
@@ -35,6 +37,47 @@ except ImportError:
     pass
 
 logger = logging.getLogger(__name__)
+
+
+class OrientationGenerator:
+    """
+    Provides methods to generate orientations for pose candidates.
+    """
+
+    @staticmethod
+    def generate_origin_orientation(
+        position: List[float], origin: PoseStamped
+    ) -> List[float]:
+        """
+        Generates an orientation such that the robot faces the origin of the costmap.
+
+        :param position: The position in the costmap, already converted to the world coordinate frame.
+        :param origin: The origin of the costmap, the point which the robot should face.
+        :return: A quaternion of the calculated orientation.
+        """
+        angle = (
+            np.arctan2(position[1] - origin.position.y, position[0] - origin.position.x)
+            + np.pi
+        )
+        quaternion = list(quaternion_from_euler(0, 0, angle, axes="sxyz"))
+        return quaternion
+
+    @staticmethod
+    def generate_random_orientation(
+        *_, rng: random.Random = random.Random(42)
+    ) -> List[float]:
+        """
+        Generates a random orientation rotated around the z-axis (yaw).
+        A random angle is sampled using a provided RNG instance to ensure reproducibility.
+
+        :param _: Ignored parameters to maintain compatibility with other orientation generators.
+        :param rng: Random number generator instance for reproducible sampling.
+
+        :return: A quaternion of the randomly generated orientation.
+        """
+        random_yaw = rng.uniform(0, 2 * np.pi)
+        quaternion = list(quaternion_from_euler(0, 0, random_yaw, axes="sxyz"))
+        return quaternion
 
 
 @dataclass
@@ -88,17 +131,49 @@ class Costmap:
     """
     map: np.ndarray = field(default_factory=lambda: np.zeros((10, 10)), kw_only=True)
     """
-    Numpy array representing the costmap.
+    Numpy array to save the costmap distribution
+    
+    Costmaps represent the 2D distribution in a numpy array where axis 0 is the X-Axis of the coordinate system and axis 1 
+    is the Y-Axis of the coordinate system. An increase in the index of the axis of the numpy array corresponds to an increase in the 
+    value of the spatial axis. The factor by how the value of the index of the numpy corresponds to the spatial coordinate 
+    system is given by the resolution. 
+
+    Furthermore, there is a difference in the origin of the two representations while the numpy arrays start from the top left 
+    corner, the origin given as PoseStamped is placed in the middle of the array. The costmap is build around the origin and 
+    since the array start from 0, 0 in the corner this conversion is necessary. 
+
+                y-axis      0, 10
+        0,0 ------------------
+            ------------------
+            ------------------
+    x-axis  ------------------
+            ------------------
+            ------------------
+      10, 0 ------------------
     """
+
     world: World
     """
     The world from which this costmap was created.
     """
     vis_ids: List[int] = field(default_factory=list, init=False)
 
-    # @property
-    # def size(self) -> Tuple[int, int]:
-    #     return self.height, self.width
+    number_of_samples: int = field(kw_only=True, default=200)
+    """
+    Number of samples to return at max
+    """
+
+    sample_randomly: bool = field(kw_only=True, default=False)
+    """
+    If the sampling should randomly pick valid entries
+    """
+
+    orientation_generator: Callable[PoseStamped, PoseStamped, [float]] = field(
+        kw_only=True, default=None
+    )
+    """
+    An optional orientatoin generator to use to generate the orientation for a sampled pose
+    """
 
     def visualize(self) -> None:
         """
@@ -328,6 +403,88 @@ class Costmap:
 
         return rectangles
 
+    def __iter__(self) -> Iterator[PoseStamped]:
+        """
+        A generator that crates pose candidates from a given costmap. The generator
+        selects the highest 100 values and returns the corresponding positions.
+        Orientations are calculated such that the Robot faces the center of the costmap.
+
+        :Yield: A tuple of position and orientation
+        """
+
+        ori_gen = (
+            self.orientation_generator
+            or OrientationGenerator.generate_origin_orientation
+        )
+
+        # Determines how many positions should be sampled from the costmap
+        if (
+            self.number_of_samples == -1
+            or self.number_of_samples > self.map.flatten().shape[0]
+        ):
+            self.number_of_samples = self.map.flatten().shape[0]
+
+        segmented_maps = self.segment_map()
+        samples_per_map = self.number_of_samples // len(segmented_maps)
+        for seg_map in segmented_maps:
+
+            if self.sample_randomly:
+                indices = np.random.choice(seg_map.size, samples_per_map, replace=False)
+            else:
+                indices = np.argpartition(seg_map.flatten(), -samples_per_map)[
+                    -samples_per_map:
+                ]
+
+            indices = np.dstack(np.unravel_index(indices, self.map.shape)).reshape(
+                samples_per_map, 2
+            )
+
+            height = seg_map.shape[0]
+            width = seg_map.shape[1]
+            center = np.array([height // 2, width // 2])
+            for ind in indices:
+                if seg_map[ind[0]][ind[1]] == 0:
+                    continue
+                # The position is calculated by creating a vector from the 2D position in the costmap (given by x and y)
+                # and the center of the costmap (since this is the origin). This vector is then turned into a transformation
+                # and multiplied with the transformation of the origin.
+                vector_to_origin = (center - ind) * self.resolution
+                point_to_origin = TransformStamped.from_list(
+                    [*vector_to_origin, 0], self.origin.orientation.to_list()
+                )
+                origin_to_map = ~self.origin.to_transform_stamped(None)
+                point_to_map = point_to_origin * origin_to_map
+                map_to_point = ~point_to_map
+
+                orientation = ori_gen(map_to_point.translation.to_list(), self.origin)
+                yield PoseStamped.from_list(
+                    map_to_point.translation.to_list(),
+                    orientation,
+                    self.world.root,
+                )
+
+    def segment_map(self) -> List[np.ndarray]:
+        """
+        Finds partitions in the costmap and isolates them, a partition is a number of entries in the costmap which are
+        neighbours. Returns a list of numpy arrays with one partition per array.
+
+        :return: A list of numpy arrays with one partition per array
+        """
+        discrete_map = np.copy(self.map)
+        # Label only works on integer arrays
+        discrete_map[discrete_map != 0] = 1
+
+        labeled_map, num_labels = label(discrete_map, return_num=True, connectivity=2)
+        result_maps = []
+        # We don't want the maps for value 0
+        for i in range(1, num_labels + 1):
+            copy_map = deepcopy(self.map)
+            copy_map[labeled_map != i] = 0
+            result_maps.append(copy_map)
+        # Maps with the highest values go first
+        result_maps.sort(key=lambda m: np.max(m), reverse=True)
+        return result_maps
+
 
 @dataclass
 class OccupancyCostmap(Costmap):
@@ -462,55 +619,6 @@ class VisibilityCostmap(Costmap):
             PoseStamped.from_list(self.world.root) if not self.origin else self.origin
         )
         self._generate_map()
-
-    # def __init__(
-    #     self,
-    #     min_height: float,
-    #     max_height: float,
-    #     world: Optional[World],
-    #     size: Optional[int] = 100,
-    #     resolution: Optional[float] = 0.02,
-    #     origin: Optional[PoseStamped] = None,
-    #     target_object: Optional[Body] = None,
-    # ):
-    #     """
-    #     Visibility Costmaps show for every position around the origin pose if the origin can be seen from this pose.
-    #     The costmap is able to deal with height differences of the camera while in a single position, for example, if
-    #     the robot has a movable torso.
-    #
-    #     :param min_height: This is the minimal height the camera can be. This parameter
-    #         is mostly relevant if the vertical position of the camera can change.
-    #     :param max_height: This is the maximal height the camera can be. This is
-    #         mostly relevant if the vertical position of the camera can change.
-    #     :param size: The length of the side of the costmap, the costmap is created
-    #         as a square.
-    #     :param resolution: This parameter specifies how much meter a pixel in the
-    #         costmap represents.
-    #     :param origin: The pose in world coordinate frame around which the
-    #         costmap should be created.
-    #     :param world: The World for which the costmap should be created.
-    #     :param target_object: The object that should be visible.
-    #     """
-    #     if (11 * size**2 + size**3) * 2 > psutil.virtual_memory().available:
-    #         raise OSError("Not enough free RAM to calculate a costmap of this size")
-    #
-    #     self.world = world
-    #     self.map = np.zeros((size, size))
-    #     self.size = size
-    #     self.resolution = resolution
-    #     # for pr2 = 1.27
-    #     self.max_height: float = max_height
-    #     # for pr2 = 1.6
-    #     self.min_height: float = min_height
-    #     self.origin: PoseStamped = (
-    #         PoseStamped.from_list(self.world.root) if not origin else origin
-    #     )
-    #     self.target_object: Optional[Body] = target_object
-    #
-    #     self._generate_map()
-    #     # Costmap.__init__(
-    #     #     self, resolution, size, size, self.origin, self.map, self.world
-    #     # )
 
     def _create_images(self) -> List[np.ndarray]:
         """
@@ -718,9 +826,9 @@ class GaussianCostmap(Costmap):
         """
         self.gau: np.ndarray = self._gaussian_window(mean, sigma)
         self.map: np.ndarray = np.outer(self.gau, self.gau)
-        cut_dist = int(0.15 * mean)
+        cut_dist = int(0.05 * mean)
         center = int(mean / 2)
-        # Cuts out the middle 15% of the gaussian to avoid the robot being too close to the target since this is usually
+        # Cuts out the middle 5% of the gaussian to avoid the robot being too close to the target since this is usually
         # bad for reaching the target with a manipulator. 15% is a magic number that might need some tuning in the future
         self.map[
             center - cut_dist : center + cut_dist, center - cut_dist : center + cut_dist
@@ -733,9 +841,6 @@ class GaussianCostmap(Costmap):
         self.origin: PoseStamped = (
             PoseStamped.from_list(self.world.root) if not origin else origin
         )
-        # Costmap.__init__(
-        #     self, resolution, mean, mean, self.origin, self.map, self.world
-        # )
 
     def _gaussian_window(self, mean: int, std: float) -> np.ndarray:
         """
@@ -747,6 +852,41 @@ class GaussianCostmap(Costmap):
         sig2 = 2 * std * std
         w = np.exp(-(n**2) / sig2)
         return w
+
+
+@dataclass
+class RingCostmap(Costmap):
+    """
+    Creates a ring costmap, similar to the gaussian costmap but this looks more like a donut. Can be used to create poses
+    for reaching a point for the robot.
+    """
+
+    std: int
+    """
+    Standard deviation of the gaussian distribution that makes up the ring.
+    """
+
+    distance: float
+    """
+    Distance between the center of the costmap and the center of the ring. A distance of 0 results in a gaussian costmap
+    """
+
+    def __post_init__(self):
+        self.map = self.ring()
+
+    def ring(self) -> np.ndarray:
+        radius_in_pixels = self.distance / self.resolution
+
+        y, x = np.ogrid[: self.width, : self.height]
+        center_x = (self.height - int(self.height % 2 == 0)) / 2.0
+        center_y = (self.width - int(self.width % 2 == 0)) / 2.0
+
+        distance_from_center = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+
+        ring_costmap = np.exp(
+            -((distance_from_center - radius_in_pixels) ** 2) / (2 * self.std**2)
+        )
+        return ring_costmap
 
 
 class SemanticCostmap(Costmap):

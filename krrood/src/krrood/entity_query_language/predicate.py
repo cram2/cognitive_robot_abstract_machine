@@ -32,7 +32,7 @@ from .utils import T
 
 def symbolic_function(
     function: Callable[..., T],
-) -> Callable[..., SymbolicExpression[T]]:
+) -> Callable[..., Variable[T]]:
     """
     Function decorator that constructs a symbolic expression representing the function call
      when inside a symbolic_rule context.

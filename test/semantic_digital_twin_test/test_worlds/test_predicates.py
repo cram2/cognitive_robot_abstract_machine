@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 
 from semantic_digital_twin.reasoning.predicates import (
@@ -111,8 +113,8 @@ def test_in_contact():
     assert contact(b2, b3)
 
 
-def test_robot_in_contact(pr2_world: World):
-    pr2: PR2 = PR2.from_world(pr2_world)
+def test_robot_in_contact(pr2_world_state_reset: World):
+    pr2: PR2 = PR2.from_world(pr2_world_state_reset)
 
     body = Body(name=PrefixedName("test_body"))
     collision1 = Box(
@@ -125,10 +127,12 @@ def test_robot_in_contact(pr2_world: World):
     )
     body.collision = ShapeCollection([collision1])
 
-    with pr2_world.modify_world():
-        pr2_world.add_connection(
+    with pr2_world_state_reset.modify_world():
+        pr2_world_state_reset.add_connection(
             Connection6DoF.create_with_dofs(
-                parent=pr2_world.root, child=body, world=pr2_world
+                parent=pr2_world_state_reset.root,
+                child=body,
+                world=pr2_world_state_reset,
             )
         )
 
@@ -136,14 +140,14 @@ def test_robot_in_contact(pr2_world: World):
     assert robot_in_collision(pr2)
 
     body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        4, 0, 0.5, 0, 0, 0, pr2_world.root
+        4, 0, 0.5, 0, 0, 0, pr2_world_state_reset.root
     )
     assert not robot_in_collision(pr2)
 
 
-def test_get_visible_objects(pr2_world: World):
+def test_get_visible_objects(pr2_world_state_reset: World):
 
-    pr2: PR2 = PR2.from_world(pr2_world)
+    pr2: PR2 = PR2.from_world(pr2_world_state_reset)
 
     body = Body(name=PrefixedName("test_body"))
     collision1 = Box(
@@ -157,20 +161,26 @@ def test_get_visible_objects(pr2_world: World):
     )
     body.collision = ShapeCollection([collision1])
 
-    with pr2_world.modify_world():
-        pr2_world.add_connection(
+    with pr2_world_state_reset.modify_world():
+        pr2_world_state_reset.add_connection(
             Connection6DoF.create_with_dofs(
-                parent=pr2_world.root, child=body, world=pr2_world
+                parent=pr2_world_state_reset.root,
+                child=body,
+                world=pr2_world_state_reset,
             )
         )
 
-    camera = pr2_world.get_semantic_annotations_by_type(Camera)[0]
+    camera = pr2_world_state_reset.get_semantic_annotations_by_type(Camera)[0]
 
     assert visible(camera, body)
 
 
-def test_occluding_bodies(pr2_world: World):
-    pr2: PR2 = PR2.from_world(pr2_world)
+def test_occluding_bodies(pr2_world_state_reset: World):
+    world = deepcopy(pr2_world_state_reset)
+    world.get_body_by_name("base_footprint").parent_connection.origin = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
+    )
+    pr2: PR2 = PR2.from_world(world)
 
     def make_body(name: str) -> Body:
         result = Body(name=PrefixedName(name))
@@ -184,8 +194,8 @@ def test_occluding_bodies(pr2_world: World):
     obstacle = make_body("obstacle")
     occluded_body = make_body("occluded_body")
 
-    with pr2_world.modify_world():
-        root = pr2_world.root
+    with world.modify_world():
+        root = world.root
         c1 = FixedConnection(
             parent=root,
             child=obstacle,
@@ -200,10 +210,10 @@ def test_occluding_bodies(pr2_world: World):
                 reference_frame=root, x=10, z=0.5
             ),
         )
-        pr2_world.add_connection(c1)
-        pr2_world.add_connection(c2)
+        world.add_connection(c1)
+        world.add_connection(c2)
 
-    camera = pr2_world.get_semantic_annotations_by_type(Camera)[0]
+    camera = world.get_semantic_annotations_by_type(Camera)[0]
 
     bodies = occluding_bodies(camera, occluded_body)
     assert obstacle in bodies
@@ -285,11 +295,11 @@ def test_supporting(two_block_world):
 
 
 def test_is_body_in_gripper(
-    pr2_world,
+    pr2_world_state_reset,
 ):
-    pr2: PR2 = PR2.from_world(pr2_world)
+    pr2: PR2 = PR2.from_world(pr2_world_state_reset)
 
-    gripper = pr2_world.get_semantic_annotations_by_type(ParallelGripper)
+    gripper = pr2_world_state_reset.get_semantic_annotations_by_type(ParallelGripper)
 
     left_gripper = (
         gripper[0]
@@ -316,14 +326,14 @@ def test_is_body_in_gripper(
     between_fingers = (finger1_pos + finger2_pos) / 2.0
 
     # Add box to world
-    with pr2_world.modify_world():
-        root = pr2_world.root
+    with pr2_world_state_reset.modify_world():
+        root = pr2_world_state_reset.root
         connection = Connection6DoF.create_with_dofs(
             parent=root,
             child=test_box,
-            world=pr2_world,
+            world=pr2_world_state_reset,
         )
-        pr2_world.add_connection(connection)
+        pr2_world_state_reset.add_connection(connection)
         connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=between_fingers[0],
             y=between_fingers[1],
@@ -337,8 +347,8 @@ def test_is_body_in_gripper(
     assert is_body_in_gripper(test_box, left_gripper) == 0
 
 
-def test_reachable(pr2_world):
-    pr2: PR2 = PR2.from_world(pr2_world)
+def test_reachable(pr2_world_state_reset):
+    pr2: PR2 = PR2.from_world(pr2_world_state_reset)
 
     tool_frame_T_reachable_goal = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=-0.2,
@@ -392,9 +402,9 @@ def test_reachable(pr2_world):
     )
 
 
-def test_blocking(pr2_world):
+def test_blocking(pr2_world_state_reset):
 
-    pr2: PR2 = PR2.from_world(pr2_world)
+    pr2: PR2 = PR2.from_world(pr2_world_state_reset)
 
     obstacle = Body(name=PrefixedName("obstacle"))
     collision = Box(
@@ -403,18 +413,20 @@ def test_blocking(pr2_world):
     )
     obstacle.collision = ShapeCollection([collision])
 
-    with pr2_world.modify_world():
+    with pr2_world_state_reset.modify_world():
         new_root = Body(name=PrefixedName("new_root"))
-        pr2_world.add_connection(
+        pr2_world_state_reset.add_connection(
             Connection6DoF.create_with_dofs(
-                parent=new_root, child=pr2_world.root, world=pr2_world
+                parent=new_root,
+                child=pr2_world_state_reset.root,
+                world=pr2_world_state_reset,
             )
         )
-        pr2_world.add_connection(
+        pr2_world_state_reset.add_connection(
             Connection6DoF.create_with_dofs(
                 parent=new_root,
                 child=obstacle,
-                world=pr2_world,
+                world=pr2_world_state_reset,
             )
         )
 

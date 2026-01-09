@@ -40,6 +40,16 @@ with world.modify_world():
     connection = FixedConnection(
         parent=world.get_body_by_name("cabinet10_drawer_top"), child=spoon.root
     )
+try:
+    import rclpy
+
+    rclpy.init()
+    from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+
+    v = VizMarkerPublisher(world, rclpy.create_node("viz_marker"))
+except ImportError:
+    pass
+
     world.merge_world(spoon, connection)
 
 try:

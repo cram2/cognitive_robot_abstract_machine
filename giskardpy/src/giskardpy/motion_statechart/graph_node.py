@@ -447,6 +447,21 @@ class MotionStatechartNode(SubclassJSONSerializer):
             return None
         return self._motion_statechart.get_node_by_index(self.parent_node_index)
 
+    @property
+    def depth(self) -> int:
+        """
+        Distance (in edges) from this node to the root of the motion statechart.
+
+        The root node (no parent) has depth 0, its children depth 1, and so on.
+        """
+        depth = 0
+        current = self
+        # Walk up the parent chain until there is no parent
+        while current.parent_node is not None:
+            depth += 1
+            current = current.parent_node
+        return depth
+
     @parent_node.setter
     def parent_node(self, parent_node: Optional[MotionStatechartNode]) -> None:
         if parent_node is None:

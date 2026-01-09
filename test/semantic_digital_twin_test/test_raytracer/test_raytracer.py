@@ -124,7 +124,7 @@ def test_min_distance(world_setup_simple):
     rays = np.array([[0, 0, 0.1], [-1, 0, 0.1]])
     targets = np.array([[1, 0, 0.1], [1, 0, 0.1]])
 
-    hits, indices, bodies = rt.ray_test(rays, targets, min_dist=1)
+    hits, indices, bodies = rt.ray_test(rays, targets, min_distance=1)
 
     assert len(hits) == 1
     assert bodies[0] == body1
@@ -149,6 +149,6 @@ def test_max_distance(world_setup_simple):
 
     assert len(hits) == 2
 
-    hits, indices, bodies = rt.ray_test(rays, targets, max_dist=1)
+    hits, indices, bodies = rt.ray_test(rays, targets, max_distance=1)
 
     assert len(hits) == 0
