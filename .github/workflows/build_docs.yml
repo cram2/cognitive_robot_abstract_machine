@@ -26,23 +26,23 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y pandoc
-          pip install -U pip
-          pip install jupyter-book jupytext nbconvert
+          sudo apt-get install -y pandoc python3-pip
+          python3 -m pip install -U pip
+          python3 -m pip install jupyter-book jupytext nbconvert
           
           # Install KRROOD dependencies
           cd krrood
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-          pip install -r doc/requirements.txt
-          pip install .
+          python3 -m pip install -r requirements.txt
+          python3 -m pip install -r requirements-dev.txt
+          python3 -m pip install -r doc/requirements.txt
+          python3 -m pip install .
           cd ..
           
           # Install Semantic Digital Twin dependencies
           cd semantic_digital_twin
-          pip install -r requirements.txt
-          pip install -r doc/requirements.txt
-          pip install .
+          python3 -m pip install -r requirements.txt
+          python3 -m pip install -r doc/requirements.txt
+          python3 -m pip install .
           cd ..
 
       - name: Build KRROOD documentation
