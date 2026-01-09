@@ -73,7 +73,12 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
                 thumb=gripper_thumb,
                 finger=gripper_finger,
                 front_facing_axis=Vector3(0, 0, 1),
-                front_facing_orientation=Quaternion(-1, 0, -1, 0),
+                front_facing_orientation=Quaternion(
+                    -0.70710678,
+                    0.0,
+                    -0.70710678,
+                    0.0,
+                ),
                 _world=world,
             )
 

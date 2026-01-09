@@ -146,6 +146,7 @@ def hsr_world_setup():
     hsr = os.path.join(urdf_dir, "hsrb.urdf")
     hsr_parser = URDFParser.from_file(file_path=hsr)
     world_with_hsr = hsr_parser.parse()
+    HSRB.from_world(world_with_hsr)
     with world_with_hsr.modify_world():
         hsr_root = world_with_hsr.root
         localization_body = Body(name=PrefixedName("odom_combined"))
