@@ -1,0 +1,1136 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>krrood.entity_query_language.failures &#8212; KRROOD</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-thebe.css?v=4fa983c6" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../../../../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="../../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script async="async" src="../../../../_static/sphinx-thebe.js?v=c100c467"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'autoapi/krrood/entity_query_language/failures/index';</script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="krrood.entity_query_language.match" href="../match/index.html" />
+    <link rel="prev" title="krrood.entity_query_language.enums" href="../enums/index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search this book..."
+         aria-label="Search this book..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../intro.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/krrood_logo.svg" class="logo__image only-light" alt="KRROOD - Home"/>
+    <script>document.write(`<img src="../../../../_static/krrood_logo.svg" class="logo__image only-dark" alt="KRROOD - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../../../../intro.html">
+                    Knowledge Representation & Reasoning Through Object-Oriented Design
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Entity Query Language</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../eql/intro.html">Introduction</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/writing_queries.html">Writing Queries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/result_quantifiers.html">Result Quantifiers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/result_processors.html">Result Processors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/logical_operators.html">Logical Operators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/comparators.html">Comparators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/domain_mapping.html">Domain Mapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/predicate_and_symbolic_function.html">Predicate and Symbolic Function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/cache.html">Using Cached Symbols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/match.html">Pattern matching with <code class="docutils literal notranslate"><span class="pre">match_variable</span></code> and <code class="docutils literal notranslate"><span class="pre">match</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/writing_rule_trees.html">Advanced Example: Rule Trees with Alternatives and Exceptions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/eql_for_sql_experts.html">EQL for SQL Experts</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">ORMatic</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/intro.html">ORMatic Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/orm_generation.html">Generating an ORMatic Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/alternative_mapping.html">Dealing with unmappable dataclasses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/interface_usage.html">Interface Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/eql_for_ormatic.html">Using EQL With ORMatic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/tips_and_tricks.html">Tips and Tricks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/json.html">Working with JSON: SubclassJSONSerializer</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">References</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../../../index.html">API Reference</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../../index.html">krrood</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../adapters/index.html">krrood.adapters</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../adapters/exceptions/index.html">krrood.adapters.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../adapters/json_serializer/index.html">krrood.adapters.json_serializer</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../class_diagrams/index.html">krrood.class_diagrams</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/attribute_introspector/index.html">krrood.class_diagrams.attribute_introspector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/class_diagram/index.html">krrood.class_diagrams.class_diagram</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/failures/index.html">krrood.class_diagrams.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/utils/index.html">krrood.class_diagrams.utils</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html">krrood.class_diagrams.wrapped_field</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="../index.html">krrood.entity_query_language</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../cache_data/index.html">krrood.entity_query_language.cache_data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../conclusion/index.html">krrood.entity_query_language.conclusion</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../conclusion_selector/index.html">krrood.entity_query_language.conclusion_selector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../entity/index.html">krrood.entity_query_language.entity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../entity_result_processors/index.html">krrood.entity_query_language.entity_result_processors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../enums/index.html">krrood.entity_query_language.enums</a></li>
+<li class="toctree-l4 current active"><a class="current reference internal" href="#">krrood.entity_query_language.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../match/index.html">krrood.entity_query_language.match</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../orm/index.html">krrood.entity_query_language.orm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../predicate/index.html">krrood.entity_query_language.predicate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../result_quantification_constraint/index.html">krrood.entity_query_language.result_quantification_constraint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../rule/index.html">krrood.entity_query_language.rule</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../rxnode/index.html">krrood.entity_query_language.rxnode</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../symbol_graph/index.html">krrood.entity_query_language.symbol_graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../symbolic/index.html">krrood.entity_query_language.symbolic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../utils/index.html">krrood.entity_query_language.utils</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ontomatic/index.html">krrood.ontomatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ontomatic/failures/index.html">krrood.ontomatic.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ontomatic/property_descriptor/index.html">krrood.ontomatic.property_descriptor</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ormatic/index.html">krrood.ormatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/alternative_mappings/index.html">krrood.ormatic.alternative_mappings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/custom_types/index.html">krrood.ormatic.custom_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/dao/index.html">krrood.ormatic.dao</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/eql_interface/index.html">krrood.ormatic.eql_interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/exceptions/index.html">krrood.ormatic.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/ormatic/index.html">krrood.ormatic.ormatic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/sqlalchemy_generator/index.html">krrood.ormatic.sqlalchemy_generator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/utils/index.html">krrood.ormatic.utils</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/wrapped_table/index.html">krrood.ormatic.wrapped_table</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../singleton/index.html">krrood.singleton</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../symbolic_math/index.html">krrood.symbolic_math</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../symbolic_math/exceptions/index.html">krrood.symbolic_math.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../symbolic_math/symbolic_math/index.html">krrood.symbolic_math.symbolic_math</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../utils/index.html">krrood.utils</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../bibliography.html">Bibliography</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/code-iai/krrood" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/code-iai/krrood/issues/new?title=Issue%20on%20page%20%2Fautoapi/krrood/entity_query_language/failures/index.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../../_sources/autoapi/krrood/entity_query_language/failures/index.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>krrood.entity_query_language.failures</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#exceptions">Exceptions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.QuantificationNotSatisfiedError"><code class="docutils literal notranslate"><span class="pre">QuantificationNotSatisfiedError</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.QuantificationNotSatisfiedError.expression"><code class="docutils literal notranslate"><span class="pre">QuantificationNotSatisfiedError.expression</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.QuantificationNotSatisfiedError.expected_number"><code class="docutils literal notranslate"><span class="pre">QuantificationNotSatisfiedError.expected_number</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.GreaterThanExpectedNumberOfSolutions"><code class="docutils literal notranslate"><span class="pre">GreaterThanExpectedNumberOfSolutions</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.LessThanExpectedNumberOfSolutions"><code class="docutils literal notranslate"><span class="pre">LessThanExpectedNumberOfSolutions</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.LessThanExpectedNumberOfSolutions.found_number"><code class="docutils literal notranslate"><span class="pre">LessThanExpectedNumberOfSolutions.found_number</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.MultipleSolutionFound"><code class="docutils literal notranslate"><span class="pre">MultipleSolutionFound</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.MultipleSolutionFound.expected_number"><code class="docutils literal notranslate"><span class="pre">MultipleSolutionFound.expected_number</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoSolutionFound"><code class="docutils literal notranslate"><span class="pre">NoSolutionFound</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoSolutionFound.expected_number"><code class="docutils literal notranslate"><span class="pre">NoSolutionFound.expected_number</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoSolutionFound.found_number"><code class="docutils literal notranslate"><span class="pre">NoSolutionFound.found_number</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.LogicalError"><code class="docutils literal notranslate"><span class="pre">LogicalError</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.VariableCannotBeEvaluated"><code class="docutils literal notranslate"><span class="pre">VariableCannotBeEvaluated</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.VariableCannotBeEvaluated.variable"><code class="docutils literal notranslate"><span class="pre">VariableCannotBeEvaluated.variable</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UsageError"><code class="docutils literal notranslate"><span class="pre">UsageError</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoKwargsInMatchVar"><code class="docutils literal notranslate"><span class="pre">NoKwargsInMatchVar</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoKwargsInMatchVar.match_variable"><code class="docutils literal notranslate"><span class="pre">NoKwargsInMatchVar.match_variable</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.WrongSelectableType"><code class="docutils literal notranslate"><span class="pre">WrongSelectableType</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.WrongSelectableType.wrong_variable_type"><code class="docutils literal notranslate"><span class="pre">WrongSelectableType.wrong_variable_type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.WrongSelectableType.expected_types"><code class="docutils literal notranslate"><span class="pre">WrongSelectableType.expected_types</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.LiteralConditionError"><code class="docutils literal notranslate"><span class="pre">LiteralConditionError</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.LiteralConditionError.literal_conditions"><code class="docutils literal notranslate"><span class="pre">LiteralConditionError.literal_conditions</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.CannotProcessResultOfGivenChildType"><code class="docutils literal notranslate"><span class="pre">CannotProcessResultOfGivenChildType</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.CannotProcessResultOfGivenChildType.unsupported_child_type"><code class="docutils literal notranslate"><span class="pre">CannotProcessResultOfGivenChildType.unsupported_child_type</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NonPositiveLimitValue"><code class="docutils literal notranslate"><span class="pre">NonPositiveLimitValue</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NonPositiveLimitValue.wrong_limit_value"><code class="docutils literal notranslate"><span class="pre">NonPositiveLimitValue.wrong_limit_value</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UnsupportedOperation"><code class="docutils literal notranslate"><span class="pre">UnsupportedOperation</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UnSupportedOperand"><code class="docutils literal notranslate"><span class="pre">UnSupportedOperand</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UnSupportedOperand.operation"><code class="docutils literal notranslate"><span class="pre">UnSupportedOperand.operation</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UnSupportedOperand.unsupported_operand"><code class="docutils literal notranslate"><span class="pre">UnSupportedOperand.unsupported_operand</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UnsupportedNegation"><code class="docutils literal notranslate"><span class="pre">UnsupportedNegation</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UnsupportedNegation.operation_type"><code class="docutils literal notranslate"><span class="pre">UnsupportedNegation.operation_type</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.QuantificationSpecificationError"><code class="docutils literal notranslate"><span class="pre">QuantificationSpecificationError</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.QuantificationConsistencyError"><code class="docutils literal notranslate"><span class="pre">QuantificationConsistencyError</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NegativeQuantificationError"><code class="docutils literal notranslate"><span class="pre">NegativeQuantificationError</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NegativeQuantificationError.message"><code class="docutils literal notranslate"><span class="pre">NegativeQuantificationError.message</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.InvalidChildType"><code class="docutils literal notranslate"><span class="pre">InvalidChildType</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.InvalidChildType.invalid_child_type"><code class="docutils literal notranslate"><span class="pre">InvalidChildType.invalid_child_type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.InvalidChildType.correct_child_types"><code class="docutils literal notranslate"><span class="pre">InvalidChildType.correct_child_types</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.InvalidEntityType"><code class="docutils literal notranslate"><span class="pre">InvalidEntityType</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.ClassDiagramError"><code class="docutils literal notranslate"><span class="pre">ClassDiagramError</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoneWrappedFieldError"><code class="docutils literal notranslate"><span class="pre">NoneWrappedFieldError</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoneWrappedFieldError.clazz"><code class="docutils literal notranslate"><span class="pre">NoneWrappedFieldError.clazz</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoneWrappedFieldError.attr_name"><code class="docutils literal notranslate"><span class="pre">NoneWrappedFieldError.attr_name</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="module-krrood.entity_query_language.failures">
+<span id="krrood-entity-query-language-failures"></span><h1>krrood.entity_query_language.failures<a class="headerlink" href="#module-krrood.entity_query_language.failures" title="Link to this heading">#</a></h1>
+<p>This module defines some custom exception types used by the entity_query_language package.</p>
+<section id="exceptions">
+<h2>Exceptions<a class="headerlink" href="#exceptions" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.QuantificationNotSatisfiedError" title="krrood.entity_query_language.failures.QuantificationNotSatisfiedError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">QuantificationNotSatisfiedError</span></code></a></p></td>
+<td><p>Represents a custom exception where the quantification constraints are not satisfied.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.GreaterThanExpectedNumberOfSolutions" title="krrood.entity_query_language.failures.GreaterThanExpectedNumberOfSolutions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GreaterThanExpectedNumberOfSolutions</span></code></a></p></td>
+<td><p>Represents an error when the number of solutions exceeds the</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.LessThanExpectedNumberOfSolutions" title="krrood.entity_query_language.failures.LessThanExpectedNumberOfSolutions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LessThanExpectedNumberOfSolutions</span></code></a></p></td>
+<td><p>Represents an error that occurs when the number of solutions found</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.MultipleSolutionFound" title="krrood.entity_query_language.failures.MultipleSolutionFound"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultipleSolutionFound</span></code></a></p></td>
+<td><p>Raised when a query unexpectedly yields more than one solution where a single</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.NoSolutionFound" title="krrood.entity_query_language.failures.NoSolutionFound"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NoSolutionFound</span></code></a></p></td>
+<td><p>Raised when a query does not yield any solution.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.LogicalError" title="krrood.entity_query_language.failures.LogicalError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LogicalError</span></code></a></p></td>
+<td><p>Raised when there is an error in the logical structure/evaluation of the query.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.VariableCannotBeEvaluated" title="krrood.entity_query_language.failures.VariableCannotBeEvaluated"><code class="xref py py-obj docutils literal notranslate"><span class="pre">VariableCannotBeEvaluated</span></code></a></p></td>
+<td><p>Raised when a variable cannot be evaluated due to missing or invalid information in the variable.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.UsageError" title="krrood.entity_query_language.failures.UsageError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UsageError</span></code></a></p></td>
+<td><p>Raised when there is an incorrect usage of the entity query language API.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.NoKwargsInMatchVar" title="krrood.entity_query_language.failures.NoKwargsInMatchVar"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NoKwargsInMatchVar</span></code></a></p></td>
+<td><p>Raised when a match_variable is used without any keyword arguments.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.WrongSelectableType" title="krrood.entity_query_language.failures.WrongSelectableType"><code class="xref py py-obj docutils literal notranslate"><span class="pre">WrongSelectableType</span></code></a></p></td>
+<td><p>Raised when a wrong variable type is given to the select() statement.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.LiteralConditionError" title="krrood.entity_query_language.failures.LiteralConditionError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LiteralConditionError</span></code></a></p></td>
+<td><p>Raised when a literal (i.e. a non-variable) condition is given to the query.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.CannotProcessResultOfGivenChildType" title="krrood.entity_query_language.failures.CannotProcessResultOfGivenChildType"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CannotProcessResultOfGivenChildType</span></code></a></p></td>
+<td><p>Raised when the entity query language API cannot process the results of a given child type during evaluation.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.NonPositiveLimitValue" title="krrood.entity_query_language.failures.NonPositiveLimitValue"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NonPositiveLimitValue</span></code></a></p></td>
+<td><p>Raised when a limit value for the query results is not positive.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.UnsupportedOperation" title="krrood.entity_query_language.failures.UnsupportedOperation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UnsupportedOperation</span></code></a></p></td>
+<td><p>Raised when an operation is not supported by the entity query language API.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.UnSupportedOperand" title="krrood.entity_query_language.failures.UnSupportedOperand"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UnSupportedOperand</span></code></a></p></td>
+<td><p>Raised when an operand is not supported by the operation.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.UnsupportedNegation" title="krrood.entity_query_language.failures.UnsupportedNegation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UnsupportedNegation</span></code></a></p></td>
+<td><p>Raised when negating quantifiers.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.QuantificationSpecificationError" title="krrood.entity_query_language.failures.QuantificationSpecificationError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">QuantificationSpecificationError</span></code></a></p></td>
+<td><p>Raised when the quantification constraints specified on the query results are invalid or inconsistent.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.QuantificationConsistencyError" title="krrood.entity_query_language.failures.QuantificationConsistencyError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">QuantificationConsistencyError</span></code></a></p></td>
+<td><p>Raised when the quantification constraints specified on the query results are inconsistent.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.NegativeQuantificationError" title="krrood.entity_query_language.failures.NegativeQuantificationError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NegativeQuantificationError</span></code></a></p></td>
+<td><p>Raised when the quantification constraints specified on the query results have a negative value.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.InvalidChildType" title="krrood.entity_query_language.failures.InvalidChildType"><code class="xref py py-obj docutils literal notranslate"><span class="pre">InvalidChildType</span></code></a></p></td>
+<td><p>Raised when an invalid entity type is given to the quantification operation.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.InvalidEntityType" title="krrood.entity_query_language.failures.InvalidEntityType"><code class="xref py py-obj docutils literal notranslate"><span class="pre">InvalidEntityType</span></code></a></p></td>
+<td><p>Raised when an invalid entity type is given to the quantification operation.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.ClassDiagramError" title="krrood.entity_query_language.failures.ClassDiagramError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ClassDiagramError</span></code></a></p></td>
+<td><p>An error related to the class diagram.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.entity_query_language.failures.NoneWrappedFieldError" title="krrood.entity_query_language.failures.NoneWrappedFieldError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NoneWrappedFieldError</span></code></a></p></td>
+<td><p>Raised when a field of a class is not wrapped by a WrappedField.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading">#</a></h2>
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.QuantificationNotSatisfiedError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">QuantificationNotSatisfiedError</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.QuantificationNotSatisfiedError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../utils/index.html#krrood.utils.DataclassException" title="krrood.utils.DataclassException"><code class="xref py py-obj docutils literal notranslate"><span class="pre">krrood.utils.DataclassException</span></code></a>, <code class="xref py py-obj docutils literal notranslate"><span class="pre">abc.ABC</span></code></p>
+<p>Represents a custom exception where the quantification constraints are not satisfied.</p>
+<p>This exception is used to indicate errors related to the quantification
+of the query results.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.QuantificationNotSatisfiedError.expression">
+<span class="sig-name descname"><span class="pre">expression</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../symbolic/index.html#krrood.entity_query_language.symbolic.ResultQuantifier" title="krrood.entity_query_language.symbolic.ResultQuantifier"><span class="pre">krrood.entity_query_language.symbolic.ResultQuantifier</span></a></em><a class="headerlink" href="#krrood.entity_query_language.failures.QuantificationNotSatisfiedError.expression" title="Link to this definition">#</a></dt>
+<dd><p>The result quantifier expression where the error occurred.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.QuantificationNotSatisfiedError.expected_number">
+<span class="sig-name descname"><span class="pre">expected_number</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.QuantificationNotSatisfiedError.expected_number" title="Link to this definition">#</a></dt>
+<dd><p>Expected number of solutions (i.e, quantification constraint value).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.GreaterThanExpectedNumberOfSolutions">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">GreaterThanExpectedNumberOfSolutions</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.GreaterThanExpectedNumberOfSolutions" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.QuantificationNotSatisfiedError" title="krrood.entity_query_language.failures.QuantificationNotSatisfiedError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">QuantificationNotSatisfiedError</span></code></a></p>
+<p>Represents an error when the number of solutions exceeds the
+expected threshold.</p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.LessThanExpectedNumberOfSolutions">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">LessThanExpectedNumberOfSolutions</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.LessThanExpectedNumberOfSolutions" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.QuantificationNotSatisfiedError" title="krrood.entity_query_language.failures.QuantificationNotSatisfiedError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">QuantificationNotSatisfiedError</span></code></a></p>
+<p>Represents an error that occurs when the number of solutions found
+is lower than the expected number.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.LessThanExpectedNumberOfSolutions.found_number">
+<span class="sig-name descname"><span class="pre">found_number</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.LessThanExpectedNumberOfSolutions.found_number" title="Link to this definition">#</a></dt>
+<dd><p>The number of solutions found.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.MultipleSolutionFound">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">MultipleSolutionFound</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.MultipleSolutionFound" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.GreaterThanExpectedNumberOfSolutions" title="krrood.entity_query_language.failures.GreaterThanExpectedNumberOfSolutions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GreaterThanExpectedNumberOfSolutions</span></code></a></p>
+<p>Raised when a query unexpectedly yields more than one solution where a single
+result was expected.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.MultipleSolutionFound.expected_number">
+<span class="sig-name descname"><span class="pre">expected_number</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.MultipleSolutionFound.expected_number" title="Link to this definition">#</a></dt>
+<dd><p>Expected number of solutions (i.e, quantification constraint value).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.NoSolutionFound">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">NoSolutionFound</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.NoSolutionFound" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.LessThanExpectedNumberOfSolutions" title="krrood.entity_query_language.failures.LessThanExpectedNumberOfSolutions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LessThanExpectedNumberOfSolutions</span></code></a></p>
+<p>Raised when a query does not yield any solution.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.NoSolutionFound.expected_number">
+<span class="sig-name descname"><span class="pre">expected_number</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.NoSolutionFound.expected_number" title="Link to this definition">#</a></dt>
+<dd><p>Expected number of solutions (i.e, quantification constraint value).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.NoSolutionFound.found_number">
+<span class="sig-name descname"><span class="pre">found_number</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.NoSolutionFound.found_number" title="Link to this definition">#</a></dt>
+<dd><p>The number of solutions found.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.LogicalError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">LogicalError</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.LogicalError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../utils/index.html#krrood.utils.DataclassException" title="krrood.utils.DataclassException"><code class="xref py py-obj docutils literal notranslate"><span class="pre">krrood.utils.DataclassException</span></code></a></p>
+<p>Raised when there is an error in the logical structure/evaluation of the query.</p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.VariableCannotBeEvaluated">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">VariableCannotBeEvaluated</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.VariableCannotBeEvaluated" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../utils/index.html#krrood.utils.DataclassException" title="krrood.utils.DataclassException"><code class="xref py py-obj docutils literal notranslate"><span class="pre">krrood.utils.DataclassException</span></code></a></p>
+<p>Raised when a variable cannot be evaluated due to missing or invalid information in the variable.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.VariableCannotBeEvaluated.variable">
+<span class="sig-name descname"><span class="pre">variable</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../symbolic/index.html#krrood.entity_query_language.symbolic.Variable" title="krrood.entity_query_language.symbolic.Variable"><span class="pre">Variable</span></a></em><a class="headerlink" href="#krrood.entity_query_language.failures.VariableCannotBeEvaluated.variable" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.UsageError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">UsageError</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.UsageError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../utils/index.html#krrood.utils.DataclassException" title="krrood.utils.DataclassException"><code class="xref py py-obj docutils literal notranslate"><span class="pre">krrood.utils.DataclassException</span></code></a></p>
+<p>Raised when there is an incorrect usage of the entity query language API.</p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.NoKwargsInMatchVar">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">NoKwargsInMatchVar</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.NoKwargsInMatchVar" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.UsageError" title="krrood.entity_query_language.failures.UsageError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UsageError</span></code></a></p>
+<p>Raised when a match_variable is used without any keyword arguments.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.NoKwargsInMatchVar.match_variable">
+<span class="sig-name descname"><span class="pre">match_variable</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../match/index.html#krrood.entity_query_language.match.Match" title="krrood.entity_query_language.match.Match"><span class="pre">krrood.entity_query_language.match.Match</span></a></em><a class="headerlink" href="#krrood.entity_query_language.failures.NoKwargsInMatchVar.match_variable" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.WrongSelectableType">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">WrongSelectableType</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.WrongSelectableType" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.UsageError" title="krrood.entity_query_language.failures.UsageError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UsageError</span></code></a></p>
+<p>Raised when a wrong variable type is given to the select() statement.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.WrongSelectableType.wrong_variable_type">
+<span class="sig-name descname"><span class="pre">wrong_variable_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Type</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.WrongSelectableType.wrong_variable_type" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.WrongSelectableType.expected_types">
+<span class="sig-name descname"><span class="pre">expected_types</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.entity_query_language.failures.WrongSelectableType.expected_types" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.LiteralConditionError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">LiteralConditionError</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.LiteralConditionError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.UsageError" title="krrood.entity_query_language.failures.UsageError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UsageError</span></code></a></p>
+<p>Raised when a literal (i.e. a non-variable) condition is given to the query.
+Example:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">body</span> <span class="o">=</span> <span class="n">let</span><span class="p">(</span><span class="n">Body</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">query</span> <span class="o">=</span> <span class="n">an</span><span class="p">(</span><span class="n">entity</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">a</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>This could also happen when you are using a predicate or a symbolic_function and all the given arguments are literals.
+Example:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">predicate</span> <span class="o">=</span> <span class="n">HasType</span><span class="p">(</span><span class="n">Body</span><span class="p">(</span><span class="s2">&quot;Body1&quot;</span><span class="p">),</span> <span class="n">Body</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">query</span> <span class="o">=</span> <span class="n">an</span><span class="p">(</span><span class="n">entity</span><span class="p">(</span><span class="n">let</span><span class="p">(</span><span class="n">Body</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">predicate</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>So make sure that at least one of the arguments to the predicate or symbolic function are variables.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.LiteralConditionError.literal_conditions">
+<span class="sig-name descname"><span class="pre">literal_conditions</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Any</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.entity_query_language.failures.LiteralConditionError.literal_conditions" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.CannotProcessResultOfGivenChildType">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">CannotProcessResultOfGivenChildType</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.CannotProcessResultOfGivenChildType" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.UsageError" title="krrood.entity_query_language.failures.UsageError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UsageError</span></code></a></p>
+<p>Raised when the entity query language API cannot process the results of a given child type during evaluation.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.CannotProcessResultOfGivenChildType.unsupported_child_type">
+<span class="sig-name descname"><span class="pre">unsupported_child_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Type</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.CannotProcessResultOfGivenChildType.unsupported_child_type" title="Link to this definition">#</a></dt>
+<dd><p>The unsupported child type.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.NonPositiveLimitValue">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">NonPositiveLimitValue</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.NonPositiveLimitValue" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.UsageError" title="krrood.entity_query_language.failures.UsageError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UsageError</span></code></a></p>
+<p>Raised when a limit value for the query results is not positive.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.NonPositiveLimitValue.wrong_limit_value">
+<span class="sig-name descname"><span class="pre">wrong_limit_value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.NonPositiveLimitValue.wrong_limit_value" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.UnsupportedOperation">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">UnsupportedOperation</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.UnsupportedOperation" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.UsageError" title="krrood.entity_query_language.failures.UsageError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UsageError</span></code></a></p>
+<p>Raised when an operation is not supported by the entity query language API.</p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.UnSupportedOperand">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">UnSupportedOperand</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.UnSupportedOperand" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.UnsupportedOperation" title="krrood.entity_query_language.failures.UnsupportedOperation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UnsupportedOperation</span></code></a></p>
+<p>Raised when an operand is not supported by the operation.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.UnSupportedOperand.operation">
+<span class="sig-name descname"><span class="pre">operation</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../symbolic/index.html#krrood.entity_query_language.symbolic.SymbolicExpression" title="krrood.entity_query_language.symbolic.SymbolicExpression"><span class="pre">krrood.entity_query_language.symbolic.SymbolicExpression</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.entity_query_language.failures.UnSupportedOperand.operation" title="Link to this definition">#</a></dt>
+<dd><p>The operation used.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.UnSupportedOperand.unsupported_operand">
+<span class="sig-name descname"><span class="pre">unsupported_operand</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Any</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.UnSupportedOperand.unsupported_operand" title="Link to this definition">#</a></dt>
+<dd><p>The operand that is not supported by the operation.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.UnsupportedNegation">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">UnsupportedNegation</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.UnsupportedNegation" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.UnsupportedOperation" title="krrood.entity_query_language.failures.UnsupportedOperation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UnsupportedOperation</span></code></a></p>
+<p>Raised when negating quantifiers.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.UnsupportedNegation.operation_type">
+<span class="sig-name descname"><span class="pre">operation_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../symbolic/index.html#krrood.entity_query_language.symbolic.SymbolicExpression" title="krrood.entity_query_language.symbolic.SymbolicExpression"><span class="pre">krrood.entity_query_language.symbolic.SymbolicExpression</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.entity_query_language.failures.UnsupportedNegation.operation_type" title="Link to this definition">#</a></dt>
+<dd><p>The type of the operation that is being negated.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.QuantificationSpecificationError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">QuantificationSpecificationError</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.QuantificationSpecificationError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.UsageError" title="krrood.entity_query_language.failures.UsageError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UsageError</span></code></a></p>
+<p>Raised when the quantification constraints specified on the query results are invalid or inconsistent.</p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.QuantificationConsistencyError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">QuantificationConsistencyError</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.QuantificationConsistencyError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.QuantificationSpecificationError" title="krrood.entity_query_language.failures.QuantificationSpecificationError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">QuantificationSpecificationError</span></code></a></p>
+<p>Raised when the quantification constraints specified on the query results are inconsistent.</p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.NegativeQuantificationError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">NegativeQuantificationError</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.NegativeQuantificationError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.QuantificationConsistencyError" title="krrood.entity_query_language.failures.QuantificationConsistencyError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">QuantificationConsistencyError</span></code></a></p>
+<p>Raised when the quantification constraints specified on the query results have a negative value.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.NegativeQuantificationError.message">
+<span class="sig-name descname"><span class="pre">message</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ResultQuantificationConstraint</span> <span class="pre">must</span> <span class="pre">be</span> <span class="pre">a</span> <span class="pre">non-negative</span> <span class="pre">integer.'</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.NegativeQuantificationError.message" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.InvalidChildType">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">InvalidChildType</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.InvalidChildType" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.UsageError" title="krrood.entity_query_language.failures.UsageError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UsageError</span></code></a></p>
+<p>Raised when an invalid entity type is given to the quantification operation.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.InvalidChildType.invalid_child_type">
+<span class="sig-name descname"><span class="pre">invalid_child_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Type</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.InvalidChildType.invalid_child_type" title="Link to this definition">#</a></dt>
+<dd><p>The invalid child type.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.InvalidChildType.correct_child_types">
+<span class="sig-name descname"><span class="pre">correct_child_types</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.entity_query_language.failures.InvalidChildType.correct_child_types" title="Link to this definition">#</a></dt>
+<dd><p>The list of valid child types.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.InvalidEntityType">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">InvalidEntityType</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.InvalidEntityType" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.InvalidChildType" title="krrood.entity_query_language.failures.InvalidChildType"><code class="xref py py-obj docutils literal notranslate"><span class="pre">InvalidChildType</span></code></a></p>
+<p>Raised when an invalid entity type is given to the quantification operation.</p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.ClassDiagramError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">ClassDiagramError</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.ClassDiagramError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../utils/index.html#krrood.utils.DataclassException" title="krrood.utils.DataclassException"><code class="xref py py-obj docutils literal notranslate"><span class="pre">krrood.utils.DataclassException</span></code></a></p>
+<p>An error related to the class diagram.</p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.NoneWrappedFieldError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.entity_query_language.failures.</span></span><span class="sig-name descname"><span class="pre">NoneWrappedFieldError</span></span><a class="headerlink" href="#krrood.entity_query_language.failures.NoneWrappedFieldError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.entity_query_language.failures.ClassDiagramError" title="krrood.entity_query_language.failures.ClassDiagramError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ClassDiagramError</span></code></a></p>
+<p>Raised when a field of a class is not wrapped by a WrappedField.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.NoneWrappedFieldError.clazz">
+<span class="sig-name descname"><span class="pre">clazz</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Type</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.NoneWrappedFieldError.clazz" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.entity_query_language.failures.NoneWrappedFieldError.attr_name">
+<span class="sig-name descname"><span class="pre">attr_name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#krrood.entity_query_language.failures.NoneWrappedFieldError.attr_name" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            name: "python3",
+            path: "./autoapi/krrood/entity_query_language/failures"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../enums/index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">krrood.entity_query_language.enums</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../match/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">krrood.entity_query_language.match</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#exceptions">Exceptions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.QuantificationNotSatisfiedError"><code class="docutils literal notranslate"><span class="pre">QuantificationNotSatisfiedError</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.QuantificationNotSatisfiedError.expression"><code class="docutils literal notranslate"><span class="pre">QuantificationNotSatisfiedError.expression</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.QuantificationNotSatisfiedError.expected_number"><code class="docutils literal notranslate"><span class="pre">QuantificationNotSatisfiedError.expected_number</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.GreaterThanExpectedNumberOfSolutions"><code class="docutils literal notranslate"><span class="pre">GreaterThanExpectedNumberOfSolutions</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.LessThanExpectedNumberOfSolutions"><code class="docutils literal notranslate"><span class="pre">LessThanExpectedNumberOfSolutions</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.LessThanExpectedNumberOfSolutions.found_number"><code class="docutils literal notranslate"><span class="pre">LessThanExpectedNumberOfSolutions.found_number</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.MultipleSolutionFound"><code class="docutils literal notranslate"><span class="pre">MultipleSolutionFound</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.MultipleSolutionFound.expected_number"><code class="docutils literal notranslate"><span class="pre">MultipleSolutionFound.expected_number</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoSolutionFound"><code class="docutils literal notranslate"><span class="pre">NoSolutionFound</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoSolutionFound.expected_number"><code class="docutils literal notranslate"><span class="pre">NoSolutionFound.expected_number</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoSolutionFound.found_number"><code class="docutils literal notranslate"><span class="pre">NoSolutionFound.found_number</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.LogicalError"><code class="docutils literal notranslate"><span class="pre">LogicalError</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.VariableCannotBeEvaluated"><code class="docutils literal notranslate"><span class="pre">VariableCannotBeEvaluated</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.VariableCannotBeEvaluated.variable"><code class="docutils literal notranslate"><span class="pre">VariableCannotBeEvaluated.variable</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UsageError"><code class="docutils literal notranslate"><span class="pre">UsageError</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoKwargsInMatchVar"><code class="docutils literal notranslate"><span class="pre">NoKwargsInMatchVar</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoKwargsInMatchVar.match_variable"><code class="docutils literal notranslate"><span class="pre">NoKwargsInMatchVar.match_variable</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.WrongSelectableType"><code class="docutils literal notranslate"><span class="pre">WrongSelectableType</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.WrongSelectableType.wrong_variable_type"><code class="docutils literal notranslate"><span class="pre">WrongSelectableType.wrong_variable_type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.WrongSelectableType.expected_types"><code class="docutils literal notranslate"><span class="pre">WrongSelectableType.expected_types</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.LiteralConditionError"><code class="docutils literal notranslate"><span class="pre">LiteralConditionError</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.LiteralConditionError.literal_conditions"><code class="docutils literal notranslate"><span class="pre">LiteralConditionError.literal_conditions</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.CannotProcessResultOfGivenChildType"><code class="docutils literal notranslate"><span class="pre">CannotProcessResultOfGivenChildType</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.CannotProcessResultOfGivenChildType.unsupported_child_type"><code class="docutils literal notranslate"><span class="pre">CannotProcessResultOfGivenChildType.unsupported_child_type</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NonPositiveLimitValue"><code class="docutils literal notranslate"><span class="pre">NonPositiveLimitValue</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NonPositiveLimitValue.wrong_limit_value"><code class="docutils literal notranslate"><span class="pre">NonPositiveLimitValue.wrong_limit_value</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UnsupportedOperation"><code class="docutils literal notranslate"><span class="pre">UnsupportedOperation</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UnSupportedOperand"><code class="docutils literal notranslate"><span class="pre">UnSupportedOperand</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UnSupportedOperand.operation"><code class="docutils literal notranslate"><span class="pre">UnSupportedOperand.operation</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UnSupportedOperand.unsupported_operand"><code class="docutils literal notranslate"><span class="pre">UnSupportedOperand.unsupported_operand</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UnsupportedNegation"><code class="docutils literal notranslate"><span class="pre">UnsupportedNegation</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.UnsupportedNegation.operation_type"><code class="docutils literal notranslate"><span class="pre">UnsupportedNegation.operation_type</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.QuantificationSpecificationError"><code class="docutils literal notranslate"><span class="pre">QuantificationSpecificationError</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.QuantificationConsistencyError"><code class="docutils literal notranslate"><span class="pre">QuantificationConsistencyError</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NegativeQuantificationError"><code class="docutils literal notranslate"><span class="pre">NegativeQuantificationError</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NegativeQuantificationError.message"><code class="docutils literal notranslate"><span class="pre">NegativeQuantificationError.message</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.InvalidChildType"><code class="docutils literal notranslate"><span class="pre">InvalidChildType</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.InvalidChildType.invalid_child_type"><code class="docutils literal notranslate"><span class="pre">InvalidChildType.invalid_child_type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.InvalidChildType.correct_child_types"><code class="docutils literal notranslate"><span class="pre">InvalidChildType.correct_child_types</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.InvalidEntityType"><code class="docutils literal notranslate"><span class="pre">InvalidEntityType</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.ClassDiagramError"><code class="docutils literal notranslate"><span class="pre">ClassDiagramError</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoneWrappedFieldError"><code class="docutils literal notranslate"><span class="pre">NoneWrappedFieldError</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoneWrappedFieldError.clazz"><code class="docutils literal notranslate"><span class="pre">NoneWrappedFieldError.clazz</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.entity_query_language.failures.NoneWrappedFieldError.attr_name"><code class="docutils literal notranslate"><span class="pre">NoneWrappedFieldError.attr_name</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By AICOR Institute for Artificial Intelligence
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

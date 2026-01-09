@@ -1,0 +1,762 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Domain Mapping &#8212; KRROOD</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-thebe.css?v=4fa983c6" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script async="async" src="../_static/sphinx-thebe.js?v=c100c467"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'eql/domain_mapping';</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Predicate and Symbolic Function" href="predicate_and_symbolic_function.html" />
+    <link rel="prev" title="Comparators" href="comparators.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search this book..."
+         aria-label="Search this book..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../intro.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/krrood_logo.svg" class="logo__image only-light" alt="KRROOD - Home"/>
+    <script>document.write(`<img src="../_static/krrood_logo.svg" class="logo__image only-dark" alt="KRROOD - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../intro.html">
+                    Knowledge Representation & Reasoning Through Object-Oriented Design
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Entity Query Language</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="intro.html">Introduction</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="writing_queries.html">Writing Queries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="result_quantifiers.html">Result Quantifiers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="result_processors.html">Result Processors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logical_operators.html">Logical Operators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="comparators.html">Comparators</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Domain Mapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="predicate_and_symbolic_function.html">Predicate and Symbolic Function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cache.html">Using Cached Symbols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="match.html">Pattern matching with <code class="docutils literal notranslate"><span class="pre">match_variable</span></code> and <code class="docutils literal notranslate"><span class="pre">match</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="writing_rule_trees.html">Advanced Example: Rule Trees with Alternatives and Exceptions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="eql_for_sql_experts.html">EQL for SQL Experts</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">ORMatic</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../ormatic/intro.html">ORMatic Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ormatic/orm_generation.html">Generating an ORMatic Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ormatic/alternative_mapping.html">Dealing with unmappable dataclasses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ormatic/interface_usage.html">Interface Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ormatic/eql_for_ormatic.html">Using EQL With ORMatic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ormatic/tips_and_tricks.html">Tips and Tricks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ormatic/json.html">Working with JSON: SubclassJSONSerializer</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">References</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../autoapi/index.html">API Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/krrood/index.html">krrood</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../autoapi/krrood/adapters/index.html">krrood.adapters</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/adapters/exceptions/index.html">krrood.adapters.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/adapters/json_serializer/index.html">krrood.adapters.json_serializer</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../autoapi/krrood/class_diagrams/index.html">krrood.class_diagrams</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/class_diagrams/attribute_introspector/index.html">krrood.class_diagrams.attribute_introspector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/class_diagrams/class_diagram/index.html">krrood.class_diagrams.class_diagram</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/class_diagrams/failures/index.html">krrood.class_diagrams.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/class_diagrams/utils/index.html">krrood.class_diagrams.utils</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/class_diagrams/wrapped_field/index.html">krrood.class_diagrams.wrapped_field</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../autoapi/krrood/entity_query_language/index.html">krrood.entity_query_language</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/cache_data/index.html">krrood.entity_query_language.cache_data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/conclusion/index.html">krrood.entity_query_language.conclusion</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/conclusion_selector/index.html">krrood.entity_query_language.conclusion_selector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/entity/index.html">krrood.entity_query_language.entity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/entity_result_processors/index.html">krrood.entity_query_language.entity_result_processors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/enums/index.html">krrood.entity_query_language.enums</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/failures/index.html">krrood.entity_query_language.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/match/index.html">krrood.entity_query_language.match</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/orm/index.html">krrood.entity_query_language.orm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/predicate/index.html">krrood.entity_query_language.predicate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/result_quantification_constraint/index.html">krrood.entity_query_language.result_quantification_constraint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/rule/index.html">krrood.entity_query_language.rule</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/rxnode/index.html">krrood.entity_query_language.rxnode</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/symbol_graph/index.html">krrood.entity_query_language.symbol_graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/symbolic/index.html">krrood.entity_query_language.symbolic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/entity_query_language/utils/index.html">krrood.entity_query_language.utils</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../autoapi/krrood/ontomatic/index.html">krrood.ontomatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/ontomatic/failures/index.html">krrood.ontomatic.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/ontomatic/property_descriptor/index.html">krrood.ontomatic.property_descriptor</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../autoapi/krrood/ormatic/index.html">krrood.ormatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/ormatic/alternative_mappings/index.html">krrood.ormatic.alternative_mappings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/ormatic/custom_types/index.html">krrood.ormatic.custom_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/ormatic/dao/index.html">krrood.ormatic.dao</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/ormatic/eql_interface/index.html">krrood.ormatic.eql_interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/ormatic/exceptions/index.html">krrood.ormatic.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/ormatic/ormatic/index.html">krrood.ormatic.ormatic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/ormatic/sqlalchemy_generator/index.html">krrood.ormatic.sqlalchemy_generator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/ormatic/utils/index.html">krrood.ormatic.utils</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/ormatic/wrapped_table/index.html">krrood.ormatic.wrapped_table</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/krrood/singleton/index.html">krrood.singleton</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../autoapi/krrood/symbolic_math/index.html">krrood.symbolic_math</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/symbolic_math/exceptions/index.html">krrood.symbolic_math.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/krrood/symbolic_math/symbolic_math/index.html">krrood.symbolic_math.symbolic_math</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/krrood/utils/index.html">krrood.utils</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../bibliography.html">Bibliography</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/code-iai/krrood" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/code-iai/krrood/issues/new?title=Issue%20on%20page%20%2Feql/domain_mapping.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/eql/domain_mapping.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Domain Mapping</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#setup">Setup</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#flatten-iterable-attributes">Flatten iterable attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#indexing-into-container-attributes">Indexing into container attributes</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="domain-mapping">
+<h1>Domain Mapping<a class="headerlink" href="#domain-mapping" title="Link to this heading">#</a></h1>
+<p>Domain mapping transforms iterable attributes or nested collections into element-wise bindings while preserving existing
+variable bindings. This page covers two common patterns:</p>
+<ul class="simple">
+<li><p>Flattening an iterable attribute (<code class="docutils literal notranslate"><span class="pre">flatten</span></code>)</p></li>
+<li><p>Indexing into container attributes (capturing <code class="docutils literal notranslate"><span class="pre">__getitem__</span></code> symbolically)</p></li>
+</ul>
+<section id="setup">
+<h2>Setup<a class="headerlink" href="#setup" title="Link to this heading">#</a></h2>
+<p>We first define a small world used by both examples below.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span> <span class="nn">typing_extensions</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span>
+
+<span class="kn">from</span> <span class="nn">krrood.entity_query_language.entity</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">entity</span><span class="p">,</span>
+    <span class="n">set_of</span><span class="p">,</span>
+    <span class="n">variable</span><span class="p">,</span>
+    <span class="n">flatten</span><span class="p">,</span>
+    <span class="n">Symbol</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">krrood.entity_query_language.entity_result_processors</span> <span class="kn">import</span> <span class="n">an</span>
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Body</span><span class="p">(</span><span class="n">Symbol</span><span class="p">):</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Handle</span><span class="p">(</span><span class="n">Body</span><span class="p">):</span>
+    <span class="o">...</span>
+
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Container</span><span class="p">(</span><span class="n">Body</span><span class="p">):</span>
+    <span class="o">...</span>
+
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">View</span><span class="p">(</span><span class="n">Symbol</span><span class="p">):</span>
+    <span class="n">world</span><span class="p">:</span> <span class="nb">object</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Drawer</span><span class="p">(</span><span class="n">View</span><span class="p">):</span>
+    <span class="n">handle</span><span class="p">:</span> <span class="n">Handle</span>
+    <span class="n">container</span><span class="p">:</span> <span class="n">Container</span>
+
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">World</span><span class="p">(</span><span class="n">Symbol</span><span class="p">):</span>
+    <span class="n">id_</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">bodies</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Body</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">views</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">View</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+
+<span class="c1"># Build a small world</span>
+<span class="n">world</span> <span class="o">=</span> <span class="n">World</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">container1</span> <span class="o">=</span> <span class="n">Container</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Container1&quot;</span><span class="p">)</span>
+<span class="n">container3</span> <span class="o">=</span> <span class="n">Container</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Container3&quot;</span><span class="p">)</span>
+<span class="n">handle1</span> <span class="o">=</span> <span class="n">Handle</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Handle1&quot;</span><span class="p">)</span>
+<span class="n">handle3</span> <span class="o">=</span> <span class="n">Handle</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Handle3&quot;</span><span class="p">)</span>
+<span class="n">world</span><span class="o">.</span><span class="n">bodies</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">container1</span><span class="p">,</span> <span class="n">container3</span><span class="p">,</span> <span class="n">handle1</span><span class="p">,</span> <span class="n">handle3</span><span class="p">])</span>
+
+<span class="c1"># Two drawers</span>
+<span class="n">drawer1</span> <span class="o">=</span> <span class="n">Drawer</span><span class="p">(</span><span class="n">handle</span><span class="o">=</span><span class="n">handle1</span><span class="p">,</span> <span class="n">container</span><span class="o">=</span><span class="n">container1</span><span class="p">)</span>
+<span class="n">drawer2</span> <span class="o">=</span> <span class="n">Drawer</span><span class="p">(</span><span class="n">handle</span><span class="o">=</span><span class="n">handle3</span><span class="p">,</span> <span class="n">container</span><span class="o">=</span><span class="n">container3</span><span class="p">)</span>
+
+<span class="c1"># A simple view-like class with an iterable attribute `drawers`</span>
+<span class="k">class</span> <span class="nc">CabinetLike</span><span class="p">(</span><span class="n">View</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">drawers</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">drawers</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">drawers</span><span class="p">)</span>
+
+
+<span class="n">cabinet</span> <span class="o">=</span> <span class="n">CabinetLike</span><span class="p">([</span><span class="n">drawer1</span><span class="p">,</span> <span class="n">drawer2</span><span class="p">])</span>
+<span class="n">world</span><span class="o">.</span><span class="n">views</span> <span class="o">=</span> <span class="p">[</span><span class="n">cabinet</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="flatten-iterable-attributes">
+<h2>Flatten iterable attributes<a class="headerlink" href="#flatten-iterable-attributes" title="Link to this heading">#</a></h2>
+<p>Flatten turns an iterable-of-iterables into a flat sequence of items while keeping the original parent binding
+(similar to <a class="reference external" href="https://www.postgresql.org/docs/current/functions-array.html#:~:text=unnest%20(%20anyarray%20)%20%E2%86%92%20setof%20anyelement">SQL UNNEST</a>).
+It is handy when a selected variable has an attribute that is a list and you want one row per element of that list.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">views</span> <span class="o">=</span> <span class="n">variable</span><span class="p">(</span><span class="n">type_</span><span class="o">=</span><span class="n">View</span><span class="p">,</span> <span class="n">domain</span><span class="o">=</span><span class="n">world</span><span class="o">.</span><span class="n">views</span><span class="p">)</span>
+<span class="n">drawers</span> <span class="o">=</span> <span class="n">flatten</span><span class="p">(</span><span class="n">views</span><span class="o">.</span><span class="n">drawers</span><span class="p">)</span>  <span class="c1"># UNNEST-like flatten of each view&#39;s drawers</span>
+<span class="n">query</span> <span class="o">=</span> <span class="n">an</span><span class="p">(</span><span class="n">set_of</span><span class="p">(</span><span class="n">views</span><span class="p">,</span> <span class="n">drawers</span><span class="p">))</span>
+
+<span class="n">rows</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">query</span><span class="o">.</span><span class="n">evaluate</span><span class="p">())</span>
+<span class="c1"># Each solution contains both the parent view and one flattened drawer</span>
+<span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+<span class="k">assert</span> <span class="p">{</span><span class="n">r</span><span class="p">[</span><span class="n">drawers</span><span class="p">]</span><span class="o">.</span><span class="n">handle</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">}</span> <span class="o">==</span> <span class="p">{</span><span class="s2">&quot;Handle1&quot;</span><span class="p">,</span> <span class="s2">&quot;Handle3&quot;</span><span class="p">}</span>
+<span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="n">views</span><span class="p">]</span> <span class="ow">is</span> <span class="n">cabinet</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span><span class="p">[</span><span class="n">drawers</span><span class="p">],</span> <span class="n">rows</span><span class="p">),</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Drawer(handle=Handle(name=&#39;Handle1&#39;), container=Container(name=&#39;Container1&#39;))
+Drawer(handle=Handle(name=&#39;Handle3&#39;), container=Container(name=&#39;Container3&#39;))
+</pre></div>
+</div>
+</div>
+</div>
+<p>Notes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">flatten</span></code> works on any expression that yields an iterable (for example, an attribute like <code class="docutils literal notranslate"><span class="pre">views.drawers</span></code>).</p></li>
+<li><p>Each solution produced by <code class="docutils literal notranslate"><span class="pre">flatten</span></code> retains the original bindings (here, <code class="docutils literal notranslate"><span class="pre">views</span></code>), so they can be used in further constraints or selections.</p></li>
+</ul>
+</section>
+<section id="indexing-into-container-attributes">
+<h2>Indexing into container attributes<a class="headerlink" href="#indexing-into-container-attributes" title="Link to this heading">#</a></h2>
+<p>Indexing on symbolic variables is captured in the expression graph. You can index into containers (such as dictionaries or lists) held by your symbolic variable, and the operation is represented symbolically within the query.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">ScoredBody</span><span class="p">(</span><span class="n">Symbol</span><span class="p">):</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">props</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">ScoreWorld</span><span class="p">(</span><span class="n">Symbol</span><span class="p">):</span>
+    <span class="n">bodies</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ScoredBody</span><span class="p">]</span>
+
+
+<span class="n">score_world</span> <span class="o">=</span> <span class="n">ScoreWorld</span><span class="p">([</span>
+    <span class="n">ScoredBody</span><span class="p">(</span><span class="s2">&quot;Body1&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span>
+    <span class="n">ScoredBody</span><span class="p">(</span><span class="s2">&quot;Body2&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">}),</span>
+<span class="p">])</span>
+
+<span class="n">b</span> <span class="o">=</span> <span class="n">variable</span><span class="p">(</span><span class="n">type_</span><span class="o">=</span><span class="n">ScoredBody</span><span class="p">,</span> <span class="n">domain</span><span class="o">=</span><span class="n">score_world</span><span class="o">.</span><span class="n">bodies</span><span class="p">)</span>
+<span class="c1"># Use indexing on a dict field; the indexing is preserved symbolically</span>
+<span class="n">query</span> <span class="o">=</span> <span class="n">an</span><span class="p">(</span><span class="n">entity</span><span class="p">(</span><span class="n">b</span><span class="p">)</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">props</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">))</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">query</span><span class="o">.</span><span class="n">evaluate</span><span class="p">())</span>
+<span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">results</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;Body2&quot;</span>
+<span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">results</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>ScoredBody(name=&#39;Body2&#39;, props={&#39;score&#39;: 2})
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            name: "python3",
+            path: "./eql"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="comparators.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Comparators</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="predicate_and_symbolic_function.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Predicate and Symbolic Function</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#setup">Setup</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#flatten-iterable-attributes">Flatten iterable attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#indexing-into-container-attributes">Indexing into container attributes</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By AICOR Institute for Artificial Intelligence
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

@@ -1,0 +1,1114 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>krrood.class_diagrams.class_diagram &#8212; KRROOD</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-thebe.css?v=4fa983c6" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../../../../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="../../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script async="async" src="../../../../_static/sphinx-thebe.js?v=c100c467"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'autoapi/krrood/class_diagrams/class_diagram/index';</script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="krrood.class_diagrams.failures" href="../failures/index.html" />
+    <link rel="prev" title="krrood.class_diagrams.attribute_introspector" href="../attribute_introspector/index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search this book..."
+         aria-label="Search this book..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../intro.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/krrood_logo.svg" class="logo__image only-light" alt="KRROOD - Home"/>
+    <script>document.write(`<img src="../../../../_static/krrood_logo.svg" class="logo__image only-dark" alt="KRROOD - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../../../../intro.html">
+                    Knowledge Representation & Reasoning Through Object-Oriented Design
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Entity Query Language</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../eql/intro.html">Introduction</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/writing_queries.html">Writing Queries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/result_quantifiers.html">Result Quantifiers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/result_processors.html">Result Processors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/logical_operators.html">Logical Operators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/comparators.html">Comparators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/domain_mapping.html">Domain Mapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/predicate_and_symbolic_function.html">Predicate and Symbolic Function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/cache.html">Using Cached Symbols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/match.html">Pattern matching with <code class="docutils literal notranslate"><span class="pre">match_variable</span></code> and <code class="docutils literal notranslate"><span class="pre">match</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/writing_rule_trees.html">Advanced Example: Rule Trees with Alternatives and Exceptions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/eql_for_sql_experts.html">EQL for SQL Experts</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">ORMatic</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/intro.html">ORMatic Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/orm_generation.html">Generating an ORMatic Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/alternative_mapping.html">Dealing with unmappable dataclasses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/interface_usage.html">Interface Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/eql_for_ormatic.html">Using EQL With ORMatic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/tips_and_tricks.html">Tips and Tricks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/json.html">Working with JSON: SubclassJSONSerializer</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">References</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../../../index.html">API Reference</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../../index.html">krrood</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../adapters/index.html">krrood.adapters</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../adapters/exceptions/index.html">krrood.adapters.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../adapters/json_serializer/index.html">krrood.adapters.json_serializer</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="../index.html">krrood.class_diagrams</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../attribute_introspector/index.html">krrood.class_diagrams.attribute_introspector</a></li>
+<li class="toctree-l4 current active"><a class="current reference internal" href="#">krrood.class_diagrams.class_diagram</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../failures/index.html">krrood.class_diagrams.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../utils/index.html">krrood.class_diagrams.utils</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../wrapped_field/index.html">krrood.class_diagrams.wrapped_field</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../entity_query_language/index.html">krrood.entity_query_language</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/cache_data/index.html">krrood.entity_query_language.cache_data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/conclusion/index.html">krrood.entity_query_language.conclusion</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/conclusion_selector/index.html">krrood.entity_query_language.conclusion_selector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/entity/index.html">krrood.entity_query_language.entity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/entity_result_processors/index.html">krrood.entity_query_language.entity_result_processors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/enums/index.html">krrood.entity_query_language.enums</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/failures/index.html">krrood.entity_query_language.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/match/index.html">krrood.entity_query_language.match</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/orm/index.html">krrood.entity_query_language.orm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/predicate/index.html">krrood.entity_query_language.predicate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/result_quantification_constraint/index.html">krrood.entity_query_language.result_quantification_constraint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/rule/index.html">krrood.entity_query_language.rule</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/rxnode/index.html">krrood.entity_query_language.rxnode</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/symbol_graph/index.html">krrood.entity_query_language.symbol_graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/symbolic/index.html">krrood.entity_query_language.symbolic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/utils/index.html">krrood.entity_query_language.utils</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ontomatic/index.html">krrood.ontomatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ontomatic/failures/index.html">krrood.ontomatic.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ontomatic/property_descriptor/index.html">krrood.ontomatic.property_descriptor</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ormatic/index.html">krrood.ormatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/alternative_mappings/index.html">krrood.ormatic.alternative_mappings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/custom_types/index.html">krrood.ormatic.custom_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/dao/index.html">krrood.ormatic.dao</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/eql_interface/index.html">krrood.ormatic.eql_interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/exceptions/index.html">krrood.ormatic.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/ormatic/index.html">krrood.ormatic.ormatic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/sqlalchemy_generator/index.html">krrood.ormatic.sqlalchemy_generator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/utils/index.html">krrood.ormatic.utils</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ormatic/wrapped_table/index.html">krrood.ormatic.wrapped_table</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../singleton/index.html">krrood.singleton</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../symbolic_math/index.html">krrood.symbolic_math</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../symbolic_math/exceptions/index.html">krrood.symbolic_math.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../symbolic_math/symbolic_math/index.html">krrood.symbolic_math.symbolic_math</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../utils/index.html">krrood.utils</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../bibliography.html">Bibliography</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/code-iai/krrood" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/code-iai/krrood/issues/new?title=Issue%20on%20page%20%2Fautoapi/krrood/class_diagrams/class_diagram/index.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../../_sources/autoapi/krrood/class_diagrams/class_diagram/index.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>krrood.class_diagrams.class_diagram</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#attributes">Attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#exceptions">Exceptions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.RWXNode"><code class="docutils literal notranslate"><span class="pre">RWXNode</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassRelation"><code class="docutils literal notranslate"><span class="pre">ClassRelation</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassRelation.source"><code class="docutils literal notranslate"><span class="pre">ClassRelation.source</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassRelation.target"><code class="docutils literal notranslate"><span class="pre">ClassRelation.target</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassRelation.color"><code class="docutils literal notranslate"><span class="pre">ClassRelation.color</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.Inheritance"><code class="docutils literal notranslate"><span class="pre">Inheritance</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.Association"><code class="docutils literal notranslate"><span class="pre">Association</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.Association.field"><code class="docutils literal notranslate"><span class="pre">Association.field</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.Association.one_to_many"><code class="docutils literal notranslate"><span class="pre">Association.one_to_many</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.Association.get_key"><code class="docutils literal notranslate"><span class="pre">Association.get_key()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.HasRoleTaker"><code class="docutils literal notranslate"><span class="pre">HasRoleTaker</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ParseError"><code class="docutils literal notranslate"><span class="pre">ParseError</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.WrappedClass"><code class="docutils literal notranslate"><span class="pre">WrappedClass</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.WrappedClass.index"><code class="docutils literal notranslate"><span class="pre">WrappedClass.index</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.WrappedClass.clazz"><code class="docutils literal notranslate"><span class="pre">WrappedClass.clazz</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.WrappedClass.fields"><code class="docutils literal notranslate"><span class="pre">WrappedClass.fields</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.WrappedClass.name"><code class="docutils literal notranslate"><span class="pre">WrappedClass.name</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram"><code class="docutils literal notranslate"><span class="pre">ClassDiagram</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.classes"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.classes</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.introspector"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.introspector</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_associations_with_condition"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_associations_with_condition()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_outgoing_relations"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_outgoing_relations()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_common_role_taker_associations"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_common_role_taker_associations()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_role_taker_associations_of_cls"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_role_taker_associations_of_cls()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_neighbors_with_relation_type"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_neighbors_with_relation_type()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_outgoing_neighbors_with_relation_type"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_outgoing_neighbors_with_relation_type()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_incoming_neighbors_with_relation_type"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_incoming_neighbors_with_relation_type()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_out_edges"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_out_edges()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.parent_map"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.parent_map</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.all_ancestors"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.all_ancestors()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_assoc_keys_by_source"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_assoc_keys_by_source()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.to_subdiagram_without_inherited_associations"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.to_subdiagram_without_inherited_associations()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.remove_edges"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.remove_edges()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.wrapped_classes"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.wrapped_classes</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.associations"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.associations</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.inheritance_relations"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.inheritance_relations</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_wrapped_class"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_wrapped_class()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.add_node"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.add_node()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.add_relation"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.add_relation()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.visualize"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.visualize()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.clear"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.clear()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="module-krrood.class_diagrams.class_diagram">
+<span id="krrood-class-diagrams-class-diagram"></span><h1>krrood.class_diagrams.class_diagram<a class="headerlink" href="#module-krrood.class_diagrams.class_diagram" title="Link to this heading">#</a></h1>
+<section id="attributes">
+<h2>Attributes<a class="headerlink" href="#attributes" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.class_diagrams.class_diagram.RWXNode" title="krrood.class_diagrams.class_diagram.RWXNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RWXNode</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="exceptions">
+<h2>Exceptions<a class="headerlink" href="#exceptions" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.class_diagrams.class_diagram.ParseError" title="krrood.class_diagrams.class_diagram.ParseError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ParseError</span></code></a></p></td>
+<td><p>Error that will be raised when the parser encounters something that can/should not be parsed.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.class_diagrams.class_diagram.ClassRelation" title="krrood.class_diagrams.class_diagram.ClassRelation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ClassRelation</span></code></a></p></td>
+<td><p>Abstract base class representing a relationship between two classes in a UML class diagram.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.class_diagrams.class_diagram.Inheritance" title="krrood.class_diagrams.class_diagram.Inheritance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Inheritance</span></code></a></p></td>
+<td><p>Represents an inheritance (generalization) relationship in UML.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.class_diagrams.class_diagram.Association" title="krrood.class_diagrams.class_diagram.Association"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Association</span></code></a></p></td>
+<td><p>Represents a general association relationship between two classes.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.class_diagrams.class_diagram.HasRoleTaker" title="krrood.class_diagrams.class_diagram.HasRoleTaker"><code class="xref py py-obj docutils literal notranslate"><span class="pre">HasRoleTaker</span></code></a></p></td>
+<td><p>This is an association between a role and a role taker where the role class contains a role taker field.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><code class="xref py py-obj docutils literal notranslate"><span class="pre">WrappedClass</span></code></a></p></td>
+<td><p>A node wrapper around a Python class used in the class diagram graph.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.class_diagrams.class_diagram.ClassDiagram" title="krrood.class_diagrams.class_diagram.ClassDiagram"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ClassDiagram</span></code></a></p></td>
+<td><p>A graph of classes and their relations discovered via attribute introspection.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading">#</a></h2>
+<dl class="py data">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.RWXNode">
+<span class="sig-prename descclassname"><span class="pre">krrood.class_diagrams.class_diagram.</span></span><span class="sig-name descname"><span class="pre">RWXNode</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.RWXNode" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassRelation">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.class_diagrams.class_diagram.</span></span><span class="sig-name descname"><span class="pre">ClassRelation</span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassRelation" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">abc.ABC</span></code></p>
+<p>Abstract base class representing a relationship between two classes in a UML class diagram.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassRelation.source">
+<span class="sig-name descname"><span class="pre">source</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassRelation.source" title="Link to this definition">#</a></dt>
+<dd><p>The source class in the relation.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassRelation.target">
+<span class="sig-name descname"><span class="pre">target</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassRelation.target" title="Link to this definition">#</a></dt>
+<dd><p>The target class in the relation.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassRelation.color">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">color</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassRelation.color" title="Link to this definition">#</a></dt>
+<dd><p>Default edge color used when visualizing the relation.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.Inheritance">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.class_diagrams.class_diagram.</span></span><span class="sig-name descname"><span class="pre">Inheritance</span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.Inheritance" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.class_diagrams.class_diagram.ClassRelation" title="krrood.class_diagrams.class_diagram.ClassRelation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ClassRelation</span></code></a></p>
+<p>Represents an inheritance (generalization) relationship in UML.</p>
+<p>This is an “is-a” relationship where the source class inherits from the target class.
+In UML notation, this is represented by a solid line with a hollow triangle pointing to the parent class.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.Association">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.class_diagrams.class_diagram.</span></span><span class="sig-name descname"><span class="pre">Association</span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.Association" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.class_diagrams.class_diagram.ClassRelation" title="krrood.class_diagrams.class_diagram.ClassRelation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ClassRelation</span></code></a></p>
+<p>Represents a general association relationship between two classes.</p>
+<p>This is the most general form of relationship, indicating that instances of one class
+are connected to instances of another class. In UML notation, this is shown as a solid line.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.Association.field">
+<span class="sig-name descname"><span class="pre">field</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.Association.field" title="Link to this definition">#</a></dt>
+<dd><p>The field in the source class that creates this association with the target class.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.Association.one_to_many">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">one_to_many</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.Association.one_to_many" title="Link to this definition">#</a></dt>
+<dd><p>Whether the association is one-to-many (True) or many-to-one (False).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.Association.get_key">
+<span class="sig-name descname"><span class="pre">get_key</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">include_field_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.Association.get_key" title="Link to this definition">#</a></dt>
+<dd><p>A tuple representing the key of the association.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.HasRoleTaker">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.class_diagrams.class_diagram.</span></span><span class="sig-name descname"><span class="pre">HasRoleTaker</span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.HasRoleTaker" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.class_diagrams.class_diagram.Association" title="krrood.class_diagrams.class_diagram.Association"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Association</span></code></a></p>
+<p>This is an association between a role and a role taker where the role class contains a role taker field.</p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ParseError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.class_diagrams.class_diagram.</span></span><span class="sig-name descname"><span class="pre">ParseError</span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ParseError" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">TypeError</span></code></p>
+<p>Error that will be raised when the parser encounters something that can/should not be parsed.</p>
+<p>For instance, Union types</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.WrappedClass">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.class_diagrams.class_diagram.</span></span><span class="sig-name descname"><span class="pre">WrappedClass</span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="Link to this definition">#</a></dt>
+<dd><p>A node wrapper around a Python class used in the class diagram graph.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.WrappedClass.index">
+<span class="sig-name descname"><span class="pre">index</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.WrappedClass.index" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.WrappedClass.clazz">
+<span class="sig-name descname"><span class="pre">clazz</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Type</span></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.WrappedClass.clazz" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.WrappedClass.fields">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">fields</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.WrappedClass.fields" title="Link to this definition">#</a></dt>
+<dd><p>Return wrapped fields discovered by the diagram’s attribute introspector.</p>
+<p>Public names from the introspector are used to index <cite>_wrapped_field_name_map_</cite>.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.WrappedClass.name">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.WrappedClass.name" title="Link to this definition">#</a></dt>
+<dd><p>Return a unique display name composed of class name and node index.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.class_diagrams.class_diagram.</span></span><span class="sig-name descname"><span class="pre">ClassDiagram</span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram" title="Link to this definition">#</a></dt>
+<dd><p>A graph of classes and their relations discovered via attribute introspection.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.classes">
+<span class="sig-name descname"><span class="pre">classes</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dataclasses.InitVar</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.classes" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.introspector">
+<span class="sig-name descname"><span class="pre">introspector</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../attribute_introspector/index.html#krrood.class_diagrams.attribute_introspector.AttributeIntrospector" title="krrood.class_diagrams.attribute_introspector.AttributeIntrospector"><span class="pre">krrood.class_diagrams.attribute_introspector.AttributeIntrospector</span></a></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.introspector" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.get_associations_with_condition">
+<span class="sig-name descname"><span class="pre">get_associations_with_condition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clazz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.Association" title="krrood.class_diagrams.class_diagram.Association"><span class="pre">Association</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">bool</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Iterable</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.Association" title="krrood.class_diagrams.class_diagram.Association"><span class="pre">Association</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_associations_with_condition" title="Link to this definition">#</a></dt>
+<dd><p>Get all associations that match the condition.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>clazz</strong> – The source class or wrapped class for which outgoing edges are to be retrieved.</p></li>
+<li><p><strong>condition</strong> – The condition to filter relations by.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.get_outgoing_relations">
+<span class="sig-name descname"><span class="pre">get_outgoing_relations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clazz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Iterable</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.ClassRelation" title="krrood.class_diagrams.class_diagram.ClassRelation"><span class="pre">ClassRelation</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_outgoing_relations" title="Link to this definition">#</a></dt>
+<dd><p>Get all outgoing edge relations of the given class.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>clazz</strong> – The source class or wrapped class for which outgoing edges are to be retrieved.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.get_common_role_taker_associations">
+<span class="sig-name descname"><span class="pre">get_common_role_taker_associations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cls2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.HasRoleTaker" title="krrood.class_diagrams.class_diagram.HasRoleTaker"><span class="pre">HasRoleTaker</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.HasRoleTaker" title="krrood.class_diagrams.class_diagram.HasRoleTaker"><span class="pre">HasRoleTaker</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_common_role_taker_associations" title="Link to this definition">#</a></dt>
+<dd><p>Return pair of role-taker associations if both classes point to the same target.</p>
+<p>The method checks whether both classes have a HasRoleTaker association to the
+same target class and returns the matching associations, otherwise <code class="docutils literal notranslate"><span class="pre">(None,</span> <span class="pre">None)</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.get_role_taker_associations_of_cls">
+<span class="sig-name descname"><span class="pre">get_role_taker_associations_of_cls</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.HasRoleTaker" title="krrood.class_diagrams.class_diagram.HasRoleTaker"><span class="pre">HasRoleTaker</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_role_taker_associations_of_cls" title="Link to this definition">#</a></dt>
+<dd><p>Return the role-taker association of a class if present.</p>
+<p>A role taker is a field that is a one-to-one relationship and is not optional.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.get_neighbors_with_relation_type">
+<span class="sig-name descname"><span class="pre">get_neighbors_with_relation_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">relation_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.ClassRelation" title="krrood.class_diagrams.class_diagram.ClassRelation"><span class="pre">ClassRelation</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ellipsis</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_neighbors_with_relation_type" title="Link to this definition">#</a></dt>
+<dd><p>Return all neighbors of a class whose connecting edge matches the relation type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cls</strong> – The class or wrapped class for which neighbors are to be found.</p></li>
+<li><p><strong>relation_type</strong> – The type of the relation to filter edges by.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple containing the neighbors of the class, filtered by the specified relation type.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.get_outgoing_neighbors_with_relation_type">
+<span class="sig-name descname"><span class="pre">get_outgoing_neighbors_with_relation_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">relation_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.ClassRelation" title="krrood.class_diagrams.class_diagram.ClassRelation"><span class="pre">ClassRelation</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ellipsis</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_outgoing_neighbors_with_relation_type" title="Link to this definition">#</a></dt>
+<dd><p>Caches and retrieves the outgoing neighbors of a given class with a specific relation type
+using the dependency graph.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>cls</strong> – The class or wrapped class for which outgoing neighbors are to be found.
+relation_type: The type of the relation to filter edges by.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple containing the outgoing neighbors of the class, filtered by the specified relation type.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Any exceptions raised internally by <cite>find_successors_by_edge</cite> or during class wrapping.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.get_incoming_neighbors_with_relation_type">
+<span class="sig-name descname"><span class="pre">get_incoming_neighbors_with_relation_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">relation_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.ClassRelation" title="krrood.class_diagrams.class_diagram.ClassRelation"><span class="pre">ClassRelation</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ellipsis</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_incoming_neighbors_with_relation_type" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.get_out_edges">
+<span class="sig-name descname"><span class="pre">get_out_edges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.ClassRelation" title="krrood.class_diagrams.class_diagram.ClassRelation"><span class="pre">ClassRelation</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ellipsis</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_out_edges" title="Link to this definition">#</a></dt>
+<dd><p>Caches and retrieves the outgoing edges (relations) for the provided class in a
+dependency graph.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>cls</strong> – The class or wrapped class for which outgoing edges are to be retrieved.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple of outgoing edges (relations) associated with the provided class.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.parent_map">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">parent_map</span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.parent_map" title="Link to this definition">#</a></dt>
+<dd><p>Build parent map from inheritance edges: child_idx -&gt; set(parent_idx)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.all_ancestors">
+<span class="sig-name descname"><span class="pre">all_ancestors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_idx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">set</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.all_ancestors" title="Link to this definition">#</a></dt>
+<dd><p>DFS to compute all ancestors for each node index</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.get_assoc_keys_by_source">
+<span class="sig-name descname"><span class="pre">get_assoc_keys_by_source</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">include_field_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">set</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_assoc_keys_by_source" title="Link to this definition">#</a></dt>
+<dd><p>Fetches association keys grouped by their source from the internal dependency graph.</p>
+<p>This method traverses the edges of the dependency graph, identifies associations,
+and groups their keys by their source nodes. Optionally includes the field name
+of associations in the resulting keys.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Include_field_name<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional; If True, includes the field name in the
+association keys. Defaults to False.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A dictionary where the keys are source node identifiers (int), and the
+values are sets of tuples representing association keys.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.to_subdiagram_without_inherited_associations">
+<span class="sig-name descname"><span class="pre">to_subdiagram_without_inherited_associations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">include_field_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#krrood.class_diagrams.class_diagram.ClassDiagram" title="krrood.class_diagrams.class_diagram.ClassDiagram"><span class="pre">ClassDiagram</span></a></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.to_subdiagram_without_inherited_associations" title="Link to this definition">#</a></dt>
+<dd><p>Return a new class diagram where association edges that are present on any
+ancestor of the source class are removed from descendants.</p>
+<p>Inheritance edges are preserved.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.remove_edges">
+<span class="sig-name descname"><span class="pre">remove_edges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">edges</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.remove_edges" title="Link to this definition">#</a></dt>
+<dd><p>Remove edges from the dependency graph</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.wrapped_classes">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">wrapped_classes</span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.wrapped_classes" title="Link to this definition">#</a></dt>
+<dd><p>Return all wrapped classes present in the diagram.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.associations">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">associations</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.Association" title="krrood.class_diagrams.class_diagram.Association"><span class="pre">Association</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.associations" title="Link to this definition">#</a></dt>
+<dd><p>Return all association relations present in the diagram.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.inheritance_relations">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">inheritance_relations</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.Inheritance" title="krrood.class_diagrams.class_diagram.Inheritance"><span class="pre">Inheritance</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.inheritance_relations" title="Link to this definition">#</a></dt>
+<dd><p>Return all inheritance relations present in the diagram.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.get_wrapped_class">
+<span class="sig-name descname"><span class="pre">get_wrapped_class</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clazz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Type</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_wrapped_class" title="Link to this definition">#</a></dt>
+<dd><p>Gets the wrapped class corresponding to the provided class type.</p>
+<p>If the class type is already a WrappedClass, it will be returned as is. Otherwise, the
+method checks if the class type has an associated WrappedClass in the internal mapping
+and returns it if found.</p>
+<p>:param clazz : The class type to check or retrieve the associated WrappedClass.
+:return: The associated WrappedClass if it exists, None otherwise.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.add_node">
+<span class="sig-name descname"><span class="pre">add_node</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clazz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">WrappedClass</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.add_node" title="Link to this definition">#</a></dt>
+<dd><p>Adds a new node to the dependency graph for the specified wrapped class.</p>
+<p>The method sets the position of the given wrapped class in the dependency graph,
+links it with the current class diagram, and updates the mapping of the underlying
+class to the wrapped class.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>clazz</strong> – The wrapped class object to be added to the dependency graph.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.add_relation">
+<span class="sig-name descname"><span class="pre">add_relation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">relation</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#krrood.class_diagrams.class_diagram.ClassRelation" title="krrood.class_diagrams.class_diagram.ClassRelation"><span class="pre">ClassRelation</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.add_relation" title="Link to this definition">#</a></dt>
+<dd><p>Adds a relation to the internal dependency graph.</p>
+<p>The method establishes a directed edge in the graph between the source and
+target indices of the provided relation. This function is used to model
+dependencies among entities represented within the graph.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Relation<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The relation object that contains the source and target entities and</p>
+</dd>
+</dl>
+<p>encapsulates the relationship between them.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.visualize">
+<span class="sig-name descname"><span class="pre">visualize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'class_diagram.pdf'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'Class</span> <span class="pre">Diagram'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">(35,</span> <span class="pre">30)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">7000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">font_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">25</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'layered'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">edge_style</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'straight'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.visualize" title="Link to this definition">#</a></dt>
+<dd><p>Visualize the class diagram using rustworkx_utils.</p>
+<p>Creates a visual representation of the class diagram showing classes and their relationships.
+The diagram is saved as a PDF file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> – Output filename for the visualization</p></li>
+<li><p><strong>title</strong> – Title for the diagram</p></li>
+<li><p><strong>figsize</strong> – Figure size as (width, height) tuple</p></li>
+<li><p><strong>node_size</strong> – Size of the nodes in the visualization</p></li>
+<li><p><strong>font_size</strong> – Font size for labels</p></li>
+<li><p><strong>kwargs</strong> – Additional keyword arguments passed to RWXNode.visualize()</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.class_diagrams.class_diagram.ClassDiagram.clear">
+<span class="sig-name descname"><span class="pre">clear</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#krrood.class_diagrams.class_diagram.ClassDiagram.clear" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            name: "python3",
+            path: "./autoapi/krrood/class_diagrams/class_diagram"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../attribute_introspector/index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">krrood.class_diagrams.attribute_introspector</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../failures/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">krrood.class_diagrams.failures</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#attributes">Attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#exceptions">Exceptions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.RWXNode"><code class="docutils literal notranslate"><span class="pre">RWXNode</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassRelation"><code class="docutils literal notranslate"><span class="pre">ClassRelation</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassRelation.source"><code class="docutils literal notranslate"><span class="pre">ClassRelation.source</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassRelation.target"><code class="docutils literal notranslate"><span class="pre">ClassRelation.target</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassRelation.color"><code class="docutils literal notranslate"><span class="pre">ClassRelation.color</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.Inheritance"><code class="docutils literal notranslate"><span class="pre">Inheritance</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.Association"><code class="docutils literal notranslate"><span class="pre">Association</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.Association.field"><code class="docutils literal notranslate"><span class="pre">Association.field</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.Association.one_to_many"><code class="docutils literal notranslate"><span class="pre">Association.one_to_many</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.Association.get_key"><code class="docutils literal notranslate"><span class="pre">Association.get_key()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.HasRoleTaker"><code class="docutils literal notranslate"><span class="pre">HasRoleTaker</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ParseError"><code class="docutils literal notranslate"><span class="pre">ParseError</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.WrappedClass"><code class="docutils literal notranslate"><span class="pre">WrappedClass</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.WrappedClass.index"><code class="docutils literal notranslate"><span class="pre">WrappedClass.index</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.WrappedClass.clazz"><code class="docutils literal notranslate"><span class="pre">WrappedClass.clazz</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.WrappedClass.fields"><code class="docutils literal notranslate"><span class="pre">WrappedClass.fields</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.WrappedClass.name"><code class="docutils literal notranslate"><span class="pre">WrappedClass.name</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram"><code class="docutils literal notranslate"><span class="pre">ClassDiagram</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.classes"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.classes</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.introspector"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.introspector</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_associations_with_condition"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_associations_with_condition()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_outgoing_relations"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_outgoing_relations()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_common_role_taker_associations"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_common_role_taker_associations()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_role_taker_associations_of_cls"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_role_taker_associations_of_cls()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_neighbors_with_relation_type"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_neighbors_with_relation_type()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_outgoing_neighbors_with_relation_type"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_outgoing_neighbors_with_relation_type()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_incoming_neighbors_with_relation_type"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_incoming_neighbors_with_relation_type()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_out_edges"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_out_edges()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.parent_map"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.parent_map</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.all_ancestors"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.all_ancestors()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_assoc_keys_by_source"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_assoc_keys_by_source()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.to_subdiagram_without_inherited_associations"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.to_subdiagram_without_inherited_associations()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.remove_edges"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.remove_edges()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.wrapped_classes"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.wrapped_classes</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.associations"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.associations</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.inheritance_relations"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.inheritance_relations</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.get_wrapped_class"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.get_wrapped_class()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.add_node"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.add_node()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.add_relation"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.add_relation()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.visualize"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.visualize()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.class_diagrams.class_diagram.ClassDiagram.clear"><code class="docutils literal notranslate"><span class="pre">ClassDiagram.clear()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By AICOR Institute for Artificial Intelligence
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

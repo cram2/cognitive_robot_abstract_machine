@@ -1,0 +1,1444 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>krrood.ormatic.dao &#8212; KRROOD</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-thebe.css?v=4fa983c6" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../../../../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="../../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script async="async" src="../../../../_static/sphinx-thebe.js?v=c100c467"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'autoapi/krrood/ormatic/dao/index';</script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="krrood.ormatic.eql_interface" href="../eql_interface/index.html" />
+    <link rel="prev" title="krrood.ormatic.custom_types" href="../custom_types/index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search this book..."
+         aria-label="Search this book..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../intro.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/krrood_logo.svg" class="logo__image only-light" alt="KRROOD - Home"/>
+    <script>document.write(`<img src="../../../../_static/krrood_logo.svg" class="logo__image only-dark" alt="KRROOD - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../../../../intro.html">
+                    Knowledge Representation & Reasoning Through Object-Oriented Design
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Entity Query Language</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../eql/intro.html">Introduction</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/writing_queries.html">Writing Queries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/result_quantifiers.html">Result Quantifiers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/result_processors.html">Result Processors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/logical_operators.html">Logical Operators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/comparators.html">Comparators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/domain_mapping.html">Domain Mapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/predicate_and_symbolic_function.html">Predicate and Symbolic Function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/cache.html">Using Cached Symbols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/match.html">Pattern matching with <code class="docutils literal notranslate"><span class="pre">match_variable</span></code> and <code class="docutils literal notranslate"><span class="pre">match</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/writing_rule_trees.html">Advanced Example: Rule Trees with Alternatives and Exceptions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/eql_for_sql_experts.html">EQL for SQL Experts</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">ORMatic</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/intro.html">ORMatic Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/orm_generation.html">Generating an ORMatic Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/alternative_mapping.html">Dealing with unmappable dataclasses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/interface_usage.html">Interface Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/eql_for_ormatic.html">Using EQL With ORMatic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/tips_and_tricks.html">Tips and Tricks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/json.html">Working with JSON: SubclassJSONSerializer</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">References</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../../../index.html">API Reference</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../../index.html">krrood</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../adapters/index.html">krrood.adapters</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../adapters/exceptions/index.html">krrood.adapters.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../adapters/json_serializer/index.html">krrood.adapters.json_serializer</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../class_diagrams/index.html">krrood.class_diagrams</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/attribute_introspector/index.html">krrood.class_diagrams.attribute_introspector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/class_diagram/index.html">krrood.class_diagrams.class_diagram</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/failures/index.html">krrood.class_diagrams.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/utils/index.html">krrood.class_diagrams.utils</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html">krrood.class_diagrams.wrapped_field</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../entity_query_language/index.html">krrood.entity_query_language</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/cache_data/index.html">krrood.entity_query_language.cache_data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/conclusion/index.html">krrood.entity_query_language.conclusion</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/conclusion_selector/index.html">krrood.entity_query_language.conclusion_selector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/entity/index.html">krrood.entity_query_language.entity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/entity_result_processors/index.html">krrood.entity_query_language.entity_result_processors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/enums/index.html">krrood.entity_query_language.enums</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/failures/index.html">krrood.entity_query_language.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/match/index.html">krrood.entity_query_language.match</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/orm/index.html">krrood.entity_query_language.orm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/predicate/index.html">krrood.entity_query_language.predicate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/result_quantification_constraint/index.html">krrood.entity_query_language.result_quantification_constraint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/rule/index.html">krrood.entity_query_language.rule</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/rxnode/index.html">krrood.entity_query_language.rxnode</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/symbol_graph/index.html">krrood.entity_query_language.symbol_graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/symbolic/index.html">krrood.entity_query_language.symbolic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/utils/index.html">krrood.entity_query_language.utils</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ontomatic/index.html">krrood.ontomatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ontomatic/failures/index.html">krrood.ontomatic.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ontomatic/property_descriptor/index.html">krrood.ontomatic.property_descriptor</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="../index.html">krrood.ormatic</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../alternative_mappings/index.html">krrood.ormatic.alternative_mappings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../custom_types/index.html">krrood.ormatic.custom_types</a></li>
+<li class="toctree-l4 current active"><a class="current reference internal" href="#">krrood.ormatic.dao</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../eql_interface/index.html">krrood.ormatic.eql_interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../exceptions/index.html">krrood.ormatic.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ormatic/index.html">krrood.ormatic.ormatic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../sqlalchemy_generator/index.html">krrood.ormatic.sqlalchemy_generator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../utils/index.html">krrood.ormatic.utils</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../wrapped_table/index.html">krrood.ormatic.wrapped_table</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../singleton/index.html">krrood.singleton</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../symbolic_math/index.html">krrood.symbolic_math</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../symbolic_math/exceptions/index.html">krrood.symbolic_math.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../symbolic_math/symbolic_math/index.html">krrood.symbolic_math.symbolic_math</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../utils/index.html">krrood.utils</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../bibliography.html">Bibliography</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/code-iai/krrood" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/code-iai/krrood/issues/new?title=Issue%20on%20page%20%2Fautoapi/krrood/ormatic/dao/index.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../../_sources/autoapi/krrood/ormatic/dao/index.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>krrood.ormatic.dao</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#attributes">Attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.logger"><code class="docutils literal notranslate"><span class="pre">logger</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.T"><code class="docutils literal notranslate"><span class="pre">T</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.WorkItemT"><code class="docutils literal notranslate"><span class="pre">WorkItemT</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.InstanceDict"><code class="docutils literal notranslate"><span class="pre">InstanceDict</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.InProgressDict"><code class="docutils literal notranslate"><span class="pre">InProgressDict</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.is_data_column"><code class="docutils literal notranslate"><span class="pre">is_data_column()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectWorkItem"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectWorkItem</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectWorkItem.dao_instance"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectWorkItem.dao_instance</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.memo"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.memo</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.work_items"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.work_items</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.push_work_item"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.push_work_item()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.has"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.has()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.get"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.get()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.register"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.register()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.pop"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.pop()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectWorkItem"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectWorkItem</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectWorkItem.source_object"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectWorkItem.source_object</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectWorkItem.alternative_base"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectWorkItem.alternative_base</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectState"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectState</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectState.keep_alive"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectState.keep_alive</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectState.push_work_item"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectState.push_work_item()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectState.apply_alternative_mapping_if_needed"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectState.apply_alternative_mapping_if_needed()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectState.register"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectState.register()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectWorkItem"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectWorkItem</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectWorkItem.domain_object"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectWorkItem.domain_object</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.discovery_mode"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.discovery_mode</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.initialized_ids"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.initialized_ids</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.is_processing"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.is_processing</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.synthetic_parent_daos"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.synthetic_parent_daos</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.is_initialized"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.is_initialized()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.mark_initialized"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.mark_initialized()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.push_work_item"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.push_work_item()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.allocate_and_memoize"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.allocate_and_memoize()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.apply_circular_fixes"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.apply_circular_fixes()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.HasGeneric"><code class="docutils literal notranslate"><span class="pre">HasGeneric</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.HasGeneric.original_class"><code class="docutils literal notranslate"><span class="pre">HasGeneric.original_class()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject"><code class="docutils literal notranslate"><span class="pre">DataAccessObject</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.to_dao"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.to_dao()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.uses_alternative_mapping"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.uses_alternative_mapping()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.fill_dao_default"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.fill_dao_default()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.fill_dao_if_subclass_of_alternative_mapping"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.fill_dao_if_subclass_of_alternative_mapping()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.get_columns_from"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.get_columns_from()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.fill_relationships_from"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.fill_relationships_from()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.from_dao"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.from_dao()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.AlternativeMapping"><code class="docutils literal notranslate"><span class="pre">AlternativeMapping</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.AlternativeMapping.to_dao"><code class="docutils literal notranslate"><span class="pre">AlternativeMapping.to_dao()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.AlternativeMapping.from_domain_object"><code class="docutils literal notranslate"><span class="pre">AlternativeMapping.from_domain_object()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.AlternativeMapping.to_domain_object"><code class="docutils literal notranslate"><span class="pre">AlternativeMapping.to_domain_object()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.get_dao_class"><code class="docutils literal notranslate"><span class="pre">get_dao_class()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.get_alternative_mapping"><code class="docutils literal notranslate"><span class="pre">get_alternative_mapping()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.to_dao"><code class="docutils literal notranslate"><span class="pre">to_dao()</span></code></a></li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="module-krrood.ormatic.dao">
+<span id="krrood-ormatic-dao"></span><h1>krrood.ormatic.dao<a class="headerlink" href="#module-krrood.ormatic.dao" title="Link to this heading">#</a></h1>
+<section id="attributes">
+<h2>Attributes<a class="headerlink" href="#attributes" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.dao.logger" title="krrood.ormatic.dao.logger"><code class="xref py py-obj docutils literal notranslate"><span class="pre">logger</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.ormatic.dao.T" title="krrood.ormatic.dao.T"><code class="xref py py-obj docutils literal notranslate"><span class="pre">T</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.dao.WorkItemT" title="krrood.ormatic.dao.WorkItemT"><code class="xref py py-obj docutils literal notranslate"><span class="pre">WorkItemT</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.ormatic.dao.InstanceDict" title="krrood.ormatic.dao.InstanceDict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">InstanceDict</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.dao.InProgressDict" title="krrood.ormatic.dao.InProgressDict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">InProgressDict</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObjectWorkItem" title="krrood.ormatic.dao.DataAccessObjectWorkItem"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DataAccessObjectWorkItem</span></code></a></p></td>
+<td><p>Abstract base class for conversion work items.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObjectState" title="krrood.ormatic.dao.DataAccessObjectState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DataAccessObjectState</span></code></a></p></td>
+<td><p>Abstract base class for conversion states.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.dao.ToDataAccessObjectWorkItem" title="krrood.ormatic.dao.ToDataAccessObjectWorkItem"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ToDataAccessObjectWorkItem</span></code></a></p></td>
+<td><p>Work item for converting an object to a Data Access Object.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.ormatic.dao.ToDataAccessObjectState" title="krrood.ormatic.dao.ToDataAccessObjectState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ToDataAccessObjectState</span></code></a></p></td>
+<td><p>State for converting objects to Data Access Objects.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.dao.FromDataAccessObjectWorkItem" title="krrood.ormatic.dao.FromDataAccessObjectWorkItem"><code class="xref py py-obj docutils literal notranslate"><span class="pre">FromDataAccessObjectWorkItem</span></code></a></p></td>
+<td><p>Work item for converting a Data Access Object back to a domain object.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.ormatic.dao.FromDataAccessObjectState" title="krrood.ormatic.dao.FromDataAccessObjectState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">FromDataAccessObjectState</span></code></a></p></td>
+<td><p>State for converting Data Access Objects back to domain objects.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.dao.HasGeneric" title="krrood.ormatic.dao.HasGeneric"><code class="xref py py-obj docutils literal notranslate"><span class="pre">HasGeneric</span></code></a></p></td>
+<td><p>Base class for classes that carry a generic type argument.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DataAccessObject</span></code></a></p></td>
+<td><p>Base class for Data Access Objects (DAOs) providing bidirectional conversion between</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.dao.AlternativeMapping" title="krrood.ormatic.dao.AlternativeMapping"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AlternativeMapping</span></code></a></p></td>
+<td><p>Base class for alternative mapping implementations.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.dao.is_data_column" title="krrood.ormatic.dao.is_data_column"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_data_column</span></code></a>(→ bool)</p></td>
+<td><p>Check if a column contains data.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.ormatic.dao.get_dao_class" title="krrood.ormatic.dao.get_dao_class"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_dao_class</span></code></a>(...)</p></td>
+<td><p>Retrieve the DAO class for a domain class.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.dao.get_alternative_mapping" title="krrood.ormatic.dao.get_alternative_mapping"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_alternative_mapping</span></code></a>(...)</p></td>
+<td><p>Retrieve the alternative mapping for a domain class.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.ormatic.dao.to_dao" title="krrood.ormatic.dao.to_dao"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_dao</span></code></a>(→ DataAccessObject)</p></td>
+<td><p>Convert an object to its corresponding DAO.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading">#</a></h2>
+<dl class="py data">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.logger">
+<span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">logger</span></span><a class="headerlink" href="#krrood.ormatic.dao.logger" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.T">
+<span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">T</span></span><a class="headerlink" href="#krrood.ormatic.dao.T" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.WorkItemT">
+<span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">WorkItemT</span></span><a class="headerlink" href="#krrood.ormatic.dao.WorkItemT" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.InstanceDict">
+<span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">InstanceDict</span></span><a class="headerlink" href="#krrood.ormatic.dao.InstanceDict" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.InProgressDict">
+<span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">InProgressDict</span></span><a class="headerlink" href="#krrood.ormatic.dao.InProgressDict" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.is_data_column">
+<span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">is_data_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">column</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">sqlalchemy.Column</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.is_data_column" title="Link to this definition">#</a></dt>
+<dd><p>Check if a column contains data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>column</strong> – The SQLAlchemy column to check.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if it is a data column.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObjectWorkItem">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">DataAccessObjectWorkItem</span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObjectWorkItem" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">abc.ABC</span></code></p>
+<p>Abstract base class for conversion work items.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObjectWorkItem.dao_instance">
+<span class="sig-name descname"><span class="pre">dao_instance</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a></em><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObjectWorkItem.dao_instance" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObjectState">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">DataAccessObjectState</span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObjectState" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">typing_extensions.Generic</span></code>[<a class="reference internal" href="#krrood.ormatic.dao.WorkItemT" title="krrood.ormatic.dao.WorkItemT"><code class="xref py py-obj docutils literal notranslate"><span class="pre">WorkItemT</span></code></a>], <code class="xref py py-obj docutils literal notranslate"><span class="pre">abc.ABC</span></code></p>
+<p>Abstract base class for conversion states.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObjectState.memo">
+<span class="sig-name descname"><span class="pre">memo</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">InstanceDict</span></em><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObjectState.memo" title="Link to this definition">#</a></dt>
+<dd><p>Cache for converted objects to prevent duplicates and handle circular references.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObjectState.work_items">
+<span class="sig-name descname"><span class="pre">work_items</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">collections.deque</span><span class="p"><span class="pre">[</span></span><span class="pre">WorkItemT</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObjectState.work_items" title="Link to this definition">#</a></dt>
+<dd><p>Deque of work items to be processed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObjectState.push_work_item">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">push_work_item</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObjectState.push_work_item" title="Link to this definition">#</a></dt>
+<dd><p>Add a new work item to the processing queue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>args</strong> – Positional arguments for the work item.</p></li>
+<li><p><strong>kwargs</strong> – Keyword arguments for the work item.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObjectState.has">
+<span class="sig-name descname"><span class="pre">has</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObjectState.has" title="Link to this definition">#</a></dt>
+<dd><p>Check if the given source object has already been converted.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>source</strong> – The object to check.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if already converted.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObjectState.get">
+<span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObjectState.get" title="Link to this definition">#</a></dt>
+<dd><p>Get the converted object for the given source object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>source</strong> – The source object.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The converted object if it exists.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObjectState.register">
+<span class="sig-name descname"><span class="pre">register</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObjectState.register" title="Link to this definition">#</a></dt>
+<dd><p>Register a conversion result in the memoization store.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source</strong> – The source object.</p></li>
+<li><p><strong>target</strong> – The conversion result.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObjectState.pop">
+<span class="sig-name descname"><span class="pre">pop</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObjectState.pop" title="Link to this definition">#</a></dt>
+<dd><p>Remove and return the conversion result for the given source object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>source</strong> – The source object.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The conversion result if it existed.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.ToDataAccessObjectWorkItem">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">ToDataAccessObjectWorkItem</span></span><a class="headerlink" href="#krrood.ormatic.dao.ToDataAccessObjectWorkItem" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.ormatic.dao.DataAccessObjectWorkItem" title="krrood.ormatic.dao.DataAccessObjectWorkItem"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DataAccessObjectWorkItem</span></code></a></p>
+<p>Work item for converting an object to a Data Access Object.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.ToDataAccessObjectWorkItem.source_object">
+<span class="sig-name descname"><span class="pre">source_object</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Any</span></em><a class="headerlink" href="#krrood.ormatic.dao.ToDataAccessObjectWorkItem.source_object" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.ToDataAccessObjectWorkItem.alternative_base">
+<span class="sig-name descname"><span class="pre">alternative_base</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#krrood.ormatic.dao.ToDataAccessObjectWorkItem.alternative_base" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.ToDataAccessObjectState">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">ToDataAccessObjectState</span></span><a class="headerlink" href="#krrood.ormatic.dao.ToDataAccessObjectState" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.ormatic.dao.DataAccessObjectState" title="krrood.ormatic.dao.DataAccessObjectState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DataAccessObjectState</span></code></a>[<a class="reference internal" href="#krrood.ormatic.dao.ToDataAccessObjectWorkItem" title="krrood.ormatic.dao.ToDataAccessObjectWorkItem"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ToDataAccessObjectWorkItem</span></code></a>]</p>
+<p>State for converting objects to Data Access Objects.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.ToDataAccessObjectState.keep_alive">
+<span class="sig-name descname"><span class="pre">keep_alive</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">InstanceDict</span></em><a class="headerlink" href="#krrood.ormatic.dao.ToDataAccessObjectState.keep_alive" title="Link to this definition">#</a></dt>
+<dd><p>Dictionary that prevents objects from being garbage collected.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.ToDataAccessObjectState.push_work_item">
+<span class="sig-name descname"><span class="pre">push_work_item</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dao_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">alternative_base</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.dao.ToDataAccessObjectState.push_work_item" title="Link to this definition">#</a></dt>
+<dd><p>Add a new work item to the processing queue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_object</strong> – The object being converted.</p></li>
+<li><p><strong>dao_instance</strong> – The DAO instance being populated.</p></li>
+<li><p><strong>alternative_base</strong> – Base class for alternative mapping, if any.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.ToDataAccessObjectState.apply_alternative_mapping_if_needed">
+<span class="sig-name descname"><span class="pre">apply_alternative_mapping_if_needed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dao_clazz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Any</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.ToDataAccessObjectState.apply_alternative_mapping_if_needed" title="Link to this definition">#</a></dt>
+<dd><p>Apply an alternative mapping if the DAO class requires it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dao_clazz</strong> – The DAO class to check.</p></li>
+<li><p><strong>source_object</strong> – The object being converted.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The source object or the result of alternative mapping.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.ToDataAccessObjectState.register">
+<span class="sig-name descname"><span class="pre">register</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dao_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.ToDataAccessObjectState.register" title="Link to this definition">#</a></dt>
+<dd><p>Register a partially built DAO in the memoization stores.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_object</strong> – The object being converted.</p></li>
+<li><p><strong>dao_instance</strong> – The partially built DAO.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.FromDataAccessObjectWorkItem">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">FromDataAccessObjectWorkItem</span></span><a class="headerlink" href="#krrood.ormatic.dao.FromDataAccessObjectWorkItem" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.ormatic.dao.DataAccessObjectWorkItem" title="krrood.ormatic.dao.DataAccessObjectWorkItem"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DataAccessObjectWorkItem</span></code></a></p>
+<p>Work item for converting a Data Access Object back to a domain object.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.FromDataAccessObjectWorkItem.domain_object">
+<span class="sig-name descname"><span class="pre">domain_object</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Any</span></em><a class="headerlink" href="#krrood.ormatic.dao.FromDataAccessObjectWorkItem.domain_object" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.FromDataAccessObjectState">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">FromDataAccessObjectState</span></span><a class="headerlink" href="#krrood.ormatic.dao.FromDataAccessObjectState" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.ormatic.dao.DataAccessObjectState" title="krrood.ormatic.dao.DataAccessObjectState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DataAccessObjectState</span></code></a>[<a class="reference internal" href="#krrood.ormatic.dao.FromDataAccessObjectWorkItem" title="krrood.ormatic.dao.FromDataAccessObjectWorkItem"><code class="xref py py-obj docutils literal notranslate"><span class="pre">FromDataAccessObjectWorkItem</span></code></a>]</p>
+<p>State for converting Data Access Objects back to domain objects.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.FromDataAccessObjectState.discovery_mode">
+<span class="sig-name descname"><span class="pre">discovery_mode</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#krrood.ormatic.dao.FromDataAccessObjectState.discovery_mode" title="Link to this definition">#</a></dt>
+<dd><p>Whether the state is currently in discovery mode.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.FromDataAccessObjectState.initialized_ids">
+<span class="sig-name descname"><span class="pre">initialized_ids</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Set</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.ormatic.dao.FromDataAccessObjectState.initialized_ids" title="Link to this definition">#</a></dt>
+<dd><p>Set of DAO ids that have been fully initialized.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.FromDataAccessObjectState.is_processing">
+<span class="sig-name descname"><span class="pre">is_processing</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#krrood.ormatic.dao.FromDataAccessObjectState.is_processing" title="Link to this definition">#</a></dt>
+<dd><p>Whether the state is currently in the processing loop.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.FromDataAccessObjectState.synthetic_parent_daos">
+<span class="sig-name descname"><span class="pre">synthetic_parent_daos</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.ormatic.dao.FromDataAccessObjectState.synthetic_parent_daos" title="Link to this definition">#</a></dt>
+<dd><p>Cache for synthetic parent DAOs to maintain identity across discovery and filling phases.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.FromDataAccessObjectState.is_initialized">
+<span class="sig-name descname"><span class="pre">is_initialized</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dao_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.FromDataAccessObjectState.is_initialized" title="Link to this definition">#</a></dt>
+<dd><p>Check if the given DAO instance has been fully initialized.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dao_instance</strong> – The DAO instance to check.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if fully initialized.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.FromDataAccessObjectState.mark_initialized">
+<span class="sig-name descname"><span class="pre">mark_initialized</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dao_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.dao.FromDataAccessObjectState.mark_initialized" title="Link to this definition">#</a></dt>
+<dd><p>Mark the given DAO instance as fully initialized.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dao_instance</strong> – The DAO instance to mark.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.FromDataAccessObjectState.push_work_item">
+<span class="sig-name descname"><span class="pre">push_work_item</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dao_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.dao.FromDataAccessObjectState.push_work_item" title="Link to this definition">#</a></dt>
+<dd><p>Add a new work item to the processing queue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dao_instance</strong> – The DAO instance being converted.</p></li>
+<li><p><strong>domain_object</strong> – The domain object being populated.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.FromDataAccessObjectState.allocate_and_memoize">
+<span class="sig-name descname"><span class="pre">allocate_and_memoize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dao_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">original_clazz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Type</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Any</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.FromDataAccessObjectState.allocate_and_memoize" title="Link to this definition">#</a></dt>
+<dd><p>Allocate a new instance and store it in the memoization dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dao_instance</strong> – The DAO instance to register.</p></li>
+<li><p><strong>original_clazz</strong> – The domain class to instantiate.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The uninitialized domain object instance.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.FromDataAccessObjectState.apply_circular_fixes">
+<span class="sig-name descname"><span class="pre">apply_circular_fixes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">circular_references</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">typing_extensions.Any</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.FromDataAccessObjectState.apply_circular_fixes" title="Link to this definition">#</a></dt>
+<dd><p>Resolve circular references in the domain object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>domain_object</strong> – The object to fix.</p></li>
+<li><p><strong>circular_references</strong> – Mapping of attribute names to circular reference identifiers.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.HasGeneric">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">HasGeneric</span></span><a class="headerlink" href="#krrood.ormatic.dao.HasGeneric" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">typing_extensions.Generic</span></code>[<a class="reference internal" href="#krrood.ormatic.dao.T" title="krrood.ormatic.dao.T"><code class="xref py py-obj docutils literal notranslate"><span class="pre">T</span></code></a>]</p>
+<p>Base class for classes that carry a generic type argument.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.HasGeneric.original_class">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">original_class</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">T</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.HasGeneric.original_class" title="Link to this definition">#</a></dt>
+<dd><p>Get the concrete generic argument.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The generic type argument.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="../exceptions/index.html#krrood.ormatic.exceptions.NoGenericError" title="krrood.ormatic.exceptions.NoGenericError"><strong>NoGenericError</strong></a> – If no generic argument is found.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObject">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">DataAccessObject</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObject" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.ormatic.dao.HasGeneric" title="krrood.ormatic.dao.HasGeneric"><code class="xref py py-obj docutils literal notranslate"><span class="pre">HasGeneric</span></code></a>[<a class="reference internal" href="#krrood.ormatic.dao.T" title="krrood.ormatic.dao.T"><code class="xref py py-obj docutils literal notranslate"><span class="pre">T</span></code></a>]</p>
+<p>Base class for Data Access Objects (DAOs) providing bidirectional conversion between
+domain objects and SQLAlchemy models.</p>
+<p>This class automates the mapping between complex domain object graphs and relational
+database schemas using SQLAlchemy. It supports inheritance, circular references,
+and custom mappings via <a class="reference internal" href="#krrood.ormatic.dao.AlternativeMapping" title="krrood.ormatic.dao.AlternativeMapping"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlternativeMapping</span></code></a>.</p>
+<section id="conversion-directions">
+<h3>Conversion Directions<a class="headerlink" href="#conversion-directions" title="Link to this heading">#</a></h3>
+<ol class="arabic simple">
+<li><p><strong>Domain to DAO (to_dao)</strong>:
+Converts a domain object into its DAO representation. It uses an iterative
+BFS approach with a queue of work items to traverse the object graph. New work items
+for nested relationships are added to the queue during processing, ensuring all
+reachable objects are converted while maintaining the BFS order.</p></li>
+<li><p><strong>DAO to Domain (from_dao)</strong>:
+Converts a DAO back into a domain object. To handle the strict initialization
+requirements of <code class="docutils literal notranslate"><span class="pre">dataclasses</span></code> and the potential for circular references,
+it uses a Two-Pass Iterative Approach:</p>
+<ul class="simple">
+<li><p>Phase 1: Discovery (DFS):
+Traverses the DAO graph to identify all reachable DAOs. For each DAO, it
+allocates an uninitialized domain object (using <code class="docutils literal notranslate"><span class="pre">__new__</span></code>) and records
+the discovery order.</p></li>
+<li><p>Phase 2: Filling (Bottom-Up):
+Processes the discovered objects in reverse order. By moving from leaves
+to roots, it ensures that child dependencies are fully initialized before
+they are passed to a parent’s constructor (<code class="docutils literal notranslate"><span class="pre">__init__</span></code>).</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="handling-circular-references">
+<h3>Handling Circular References<a class="headerlink" href="#handling-circular-references" title="Link to this heading">#</a></h3>
+<p>Circular references are handled by separating object allocation from initialization.
+If a circular dependency is detected during Phase 2 of <code class="docutils literal notranslate"><span class="pre">from_dao</span></code> (i.e., a
+required dependency is not yet initialized), the converter identifies the
+cycle and applies a fix-up step after the parent’s <code class="docutils literal notranslate"><span class="pre">__init__</span></code> has been called,
+using <code class="xref py py-meth docutils literal notranslate"><span class="pre">DataAccessObject._apply_circular_fixes()</span></code>.</p>
+</section>
+<section id="alternative-mappings">
+<h3>Alternative Mappings<a class="headerlink" href="#alternative-mappings" title="Link to this heading">#</a></h3>
+<p>For domain objects that do not map 1:1 to a single DAO (e.g., those requiring
+special constructor logic or representing a view of multiple tables),
+<a class="reference internal" href="#krrood.ormatic.dao.AlternativeMapping" title="krrood.ormatic.dao.AlternativeMapping"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlternativeMapping</span></code></a> can be used. The converter recognizes these and
+delegates the creation of the domain object to the mapping’s <code class="docutils literal notranslate"><span class="pre">create_from_dao</span></code>
+method during the Filling Phase.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObject.to_dao">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">to_dao</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">T</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.dao.ToDataAccessObjectState" title="krrood.ormatic.dao.ToDataAccessObjectState"><span class="pre">ToDataAccessObjectState</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">register</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">_DAO</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObject.to_dao" title="Link to this definition">#</a></dt>
+<dd><p>Convert an object to its Data Access Object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_object</strong> – The object to convert.</p></li>
+<li><p><strong>state</strong> – The conversion state.</p></li>
+<li><p><strong>register</strong> – Whether to register the result in the memo.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The converted DAO instance.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObject.uses_alternative_mapping">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">uses_alternative_mapping</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">class_to_check</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Type</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObject.uses_alternative_mapping" title="Link to this definition">#</a></dt>
+<dd><p>Check if a class uses an alternative mapping.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>class_to_check</strong> – The class to check.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if alternative mapping is used.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObject.fill_dao_default">
+<span class="sig-name descname"><span class="pre">fill_dao_default</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">T</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#krrood.ormatic.dao.ToDataAccessObjectState" title="krrood.ormatic.dao.ToDataAccessObjectState"><span class="pre">ToDataAccessObjectState</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObject.fill_dao_default" title="Link to this definition">#</a></dt>
+<dd><p>Populate the DAO instance from a source object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_object</strong> – The source object.</p></li>
+<li><p><strong>state</strong> – The conversion state.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObject.fill_dao_if_subclass_of_alternative_mapping">
+<span class="sig-name descname"><span class="pre">fill_dao_if_subclass_of_alternative_mapping</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">T</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alternative_base</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#krrood.ormatic.dao.ToDataAccessObjectState" title="krrood.ormatic.dao.ToDataAccessObjectState"><span class="pre">ToDataAccessObjectState</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObject.fill_dao_if_subclass_of_alternative_mapping" title="Link to this definition">#</a></dt>
+<dd><p>Populate the DAO instance for an alternatively mapped subclass.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_object</strong> – The source object.</p></li>
+<li><p><strong>alternative_base</strong> – The base class using alternative mapping.</p></li>
+<li><p><strong>state</strong> – The conversion state.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObject.get_columns_from">
+<span class="sig-name descname"><span class="pre">get_columns_from</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">columns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">sqlalchemy.Column</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObject.get_columns_from" title="Link to this definition">#</a></dt>
+<dd><p>Assign values from specified columns of a source object to the DAO.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_object</strong> – The source of column values.</p></li>
+<li><p><strong>columns</strong> – The columns to copy.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObject.fill_relationships_from">
+<span class="sig-name descname"><span class="pre">fill_relationships_from</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">relationships</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">sqlalchemy.orm.RelationshipProperty</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#krrood.ormatic.dao.ToDataAccessObjectState" title="krrood.ormatic.dao.ToDataAccessObjectState"><span class="pre">ToDataAccessObjectState</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObject.fill_relationships_from" title="Link to this definition">#</a></dt>
+<dd><p>Populate relationships from a source object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_object</strong> – The source of relationship values.</p></li>
+<li><p><strong>relationships</strong> – The relationships to process.</p></li>
+<li><p><strong>state</strong> – The conversion state.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.DataAccessObject.from_dao">
+<span class="sig-name descname"><span class="pre">from_dao</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.dao.FromDataAccessObjectState" title="krrood.ormatic.dao.FromDataAccessObjectState"><span class="pre">FromDataAccessObjectState</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">T</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.DataAccessObject.from_dao" title="Link to this definition">#</a></dt>
+<dd><p>Convert the DAO back into a domain object instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>state</strong> – The conversion state.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The converted domain object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.AlternativeMapping">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">AlternativeMapping</span></span><a class="headerlink" href="#krrood.ormatic.dao.AlternativeMapping" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#krrood.ormatic.dao.HasGeneric" title="krrood.ormatic.dao.HasGeneric"><code class="xref py py-obj docutils literal notranslate"><span class="pre">HasGeneric</span></code></a>[<a class="reference internal" href="#krrood.ormatic.dao.T" title="krrood.ormatic.dao.T"><code class="xref py py-obj docutils literal notranslate"><span class="pre">T</span></code></a>], <code class="xref py py-obj docutils literal notranslate"><span class="pre">abc.ABC</span></code></p>
+<p>Base class for alternative mapping implementations.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.AlternativeMapping.to_dao">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">to_dao</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">T</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.dao.ToDataAccessObjectState" title="krrood.ormatic.dao.ToDataAccessObjectState"><span class="pre">ToDataAccessObjectState</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">_DAO</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.AlternativeMapping.to_dao" title="Link to this definition">#</a></dt>
+<dd><p>Resolve a source object to a DAO.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_object</strong> – The object to convert.</p></li>
+<li><p><strong>state</strong> – The conversion state.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The converted DAO instance.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.AlternativeMapping.from_domain_object">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_domain_object</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">obj</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">T</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Self</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.AlternativeMapping.from_domain_object" title="Link to this definition">#</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Abstractmethod<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Create this from a domain object.
+Do not create any DAOs here but the target DAO of <cite>T</cite>.
+The rest of the <cite>to_dao</cite> algorithm will process the fields of the created instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>obj</strong> – The source object.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A new instance of this mapping class.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.AlternativeMapping.to_domain_object">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">to_domain_object</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">T</span></span></span><a class="headerlink" href="#krrood.ormatic.dao.AlternativeMapping.to_domain_object" title="Link to this definition">#</a></dt>
+<dd><p>Create a domain object from this instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The constructed domain object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.get_dao_class">
+<span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">get_dao_class</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_clazz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Type</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.ormatic.dao.get_dao_class" title="Link to this definition">#</a></dt>
+<dd><p>Retrieve the DAO class for a domain class.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>original_clazz</strong> – The domain class.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The corresponding DAO class or None.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.get_alternative_mapping">
+<span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">get_alternative_mapping</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_clazz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Type</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.dao.AlternativeMapping" title="krrood.ormatic.dao.AlternativeMapping"><span class="pre">AlternativeMapping</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#krrood.ormatic.dao.get_alternative_mapping" title="Link to this definition">#</a></dt>
+<dd><p>Retrieve the alternative mapping for a domain class.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>original_clazz</strong> – The domain class.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The corresponding alternative mapping or None.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="krrood.ormatic.dao.to_dao">
+<span class="sig-prename descclassname"><span class="pre">krrood.ormatic.dao.</span></span><span class="sig-name descname"><span class="pre">to_dao</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.dao.ToDataAccessObjectState" title="krrood.ormatic.dao.ToDataAccessObjectState"><span class="pre">ToDataAccessObjectState</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#krrood.ormatic.dao.DataAccessObject" title="krrood.ormatic.dao.DataAccessObject"><span class="pre">DataAccessObject</span></a></span></span><a class="headerlink" href="#krrood.ormatic.dao.to_dao" title="Link to this definition">#</a></dt>
+<dd><p>Convert an object to its corresponding DAO.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_object</strong> – The object to convert.</p></li>
+<li><p><strong>state</strong> – The conversion state.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The converted DAO instance.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            name: "python3",
+            path: "./autoapi/krrood/ormatic/dao"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../custom_types/index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">krrood.ormatic.custom_types</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../eql_interface/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">krrood.ormatic.eql_interface</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#attributes">Attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.logger"><code class="docutils literal notranslate"><span class="pre">logger</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.T"><code class="docutils literal notranslate"><span class="pre">T</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.WorkItemT"><code class="docutils literal notranslate"><span class="pre">WorkItemT</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.InstanceDict"><code class="docutils literal notranslate"><span class="pre">InstanceDict</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.InProgressDict"><code class="docutils literal notranslate"><span class="pre">InProgressDict</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.is_data_column"><code class="docutils literal notranslate"><span class="pre">is_data_column()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectWorkItem"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectWorkItem</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectWorkItem.dao_instance"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectWorkItem.dao_instance</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.memo"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.memo</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.work_items"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.work_items</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.push_work_item"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.push_work_item()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.has"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.has()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.get"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.get()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.register"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.register()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObjectState.pop"><code class="docutils literal notranslate"><span class="pre">DataAccessObjectState.pop()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectWorkItem"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectWorkItem</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectWorkItem.source_object"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectWorkItem.source_object</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectWorkItem.alternative_base"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectWorkItem.alternative_base</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectState"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectState</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectState.keep_alive"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectState.keep_alive</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectState.push_work_item"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectState.push_work_item()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectState.apply_alternative_mapping_if_needed"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectState.apply_alternative_mapping_if_needed()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.ToDataAccessObjectState.register"><code class="docutils literal notranslate"><span class="pre">ToDataAccessObjectState.register()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectWorkItem"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectWorkItem</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectWorkItem.domain_object"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectWorkItem.domain_object</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.discovery_mode"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.discovery_mode</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.initialized_ids"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.initialized_ids</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.is_processing"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.is_processing</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.synthetic_parent_daos"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.synthetic_parent_daos</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.is_initialized"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.is_initialized()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.mark_initialized"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.mark_initialized()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.push_work_item"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.push_work_item()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.allocate_and_memoize"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.allocate_and_memoize()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.FromDataAccessObjectState.apply_circular_fixes"><code class="docutils literal notranslate"><span class="pre">FromDataAccessObjectState.apply_circular_fixes()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.HasGeneric"><code class="docutils literal notranslate"><span class="pre">HasGeneric</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.HasGeneric.original_class"><code class="docutils literal notranslate"><span class="pre">HasGeneric.original_class()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject"><code class="docutils literal notranslate"><span class="pre">DataAccessObject</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.to_dao"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.to_dao()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.uses_alternative_mapping"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.uses_alternative_mapping()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.fill_dao_default"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.fill_dao_default()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.fill_dao_if_subclass_of_alternative_mapping"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.fill_dao_if_subclass_of_alternative_mapping()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.get_columns_from"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.get_columns_from()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.fill_relationships_from"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.fill_relationships_from()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.DataAccessObject.from_dao"><code class="docutils literal notranslate"><span class="pre">DataAccessObject.from_dao()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.AlternativeMapping"><code class="docutils literal notranslate"><span class="pre">AlternativeMapping</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.AlternativeMapping.to_dao"><code class="docutils literal notranslate"><span class="pre">AlternativeMapping.to_dao()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.AlternativeMapping.from_domain_object"><code class="docutils literal notranslate"><span class="pre">AlternativeMapping.from_domain_object()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.AlternativeMapping.to_domain_object"><code class="docutils literal notranslate"><span class="pre">AlternativeMapping.to_domain_object()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.get_dao_class"><code class="docutils literal notranslate"><span class="pre">get_dao_class()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.get_alternative_mapping"><code class="docutils literal notranslate"><span class="pre">get_alternative_mapping()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.dao.to_dao"><code class="docutils literal notranslate"><span class="pre">to_dao()</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By AICOR Institute for Artificial Intelligence
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
