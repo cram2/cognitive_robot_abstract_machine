@@ -1,0 +1,12 @@
+# Table of contents
+# Learn more at https://jupyterbook.org/customize/toc.html
+
+format: jb-book
+root: intro
+chapters:
+- file: quickstart
+- file: conceptual_guide
+- file: technical_guide
+- file: advanced_use
+- file: polytope
+- file: autoapi/index

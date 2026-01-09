@@ -1,0 +1,68 @@
+name: Run tests and build the Python distribution
+
+on:
+  push:
+    branches:
+      - master
+
+  # --------------------------------------------------------------------------------------------------------------------
+
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+      python-versions:
+        required: true
+        type: string
+        default: "cp38-cp38"
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+defaults:
+  run:
+    shell: bash
+    working-directory: .
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+concurrency:
+  group: 'random-events-building-and-deployment'
+  cancel-in-progress: true
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+jobs:
+  test-and-build:
+    name: Build and Test the Python distribution
+    runs-on: ubuntu-22.04
+
+    steps:
+
+      - name: Checkout 🛎
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+
+      # ----------------------------------------------------------------------------------------------------------------
+
+      - name: Setup python 🐍
+        uses: actions/setup-python@v4
+        with:
+            python-version: "3.9"
+            cache: pip
+            
+      # ----------------------------------------------------------------------------------------------------------------
+
+      - name: Install user dependencies 🍼
+        uses: py-actions/py-dependency-install@v4
+        with:
+          path: "requirements-dev.txt"
+
+      # ----------------------------------------------------------------------------------------------------------------
+
+      - name: Run Tests 🎓
+        run: |
+          cd test
+          PYTHONPATH=../src python -m unittest discover

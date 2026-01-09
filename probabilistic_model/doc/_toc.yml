@@ -1,0 +1,30 @@
+# Table of contents
+# Learn more at https://jupyterbook.org/customize/toc.html
+
+format: jb-book
+root: intro
+parts:
+  - caption: Implementation
+    chapters:
+    - file: pc_guide
+    - file: layered_circuit
+    - file: architecture
+  - caption: Theoretical Concepts
+    chapters:
+    - file: probability_theory
+    - file: queries
+  - caption: Probabilistic Models
+    chapters:
+    - file: graphical_models
+    - file: circuits
+    - file: truncated_gaussian
+    - file: nyga_distribution
+    - file: joint_probability_trees
+  - caption: Miscellaneous
+    chapters:
+    - file: pendulum
+    - file: general_remarks
+    - file: glossary
+  - caption: API
+    chapters:
+    - file: autoapi/index

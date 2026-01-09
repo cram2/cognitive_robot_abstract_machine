@@ -1,0 +1,15 @@
+-r ../requirements.txt
+
+jupyter-book
+jupyter
+pillow
+polytope
+ortools
+scipy
+cvxopt
+matplotlib
+ghp-import
+sphinx-proof
+sphinx-autoapi
+random-events
+graphviz

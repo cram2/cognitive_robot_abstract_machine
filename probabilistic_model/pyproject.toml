@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.pyrefly]
+project-includes = ["**/*"]
+project-excludes = ["**/*venv/**/*"]
+
+[project]
+name = "probabilistic_model"
+authors = [
+    { name="Tom Schierenbeck", email="tom_sch@uni-bremen.de" },
+
+]
+description = "Models for probabilistic reasoning"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+keywords=["probabilistic models", "probabilistic machine learning", "probability theory", "variables",
+    "reasoning under uncertainty"]
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+"Source" = 'https://github.com/probabilistic_model/probabilistic_model'
+"Bug Tracker" = 'https://github.com/tomsch420/probabilistic_model/issues'
+
+[tool.setuptools.packages.find]
+where = ["src"]  # list of folders that contain the packages (["."] by default)
+include = ["probabilistic_model*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "probabilistic_model.__version__"}
+dependencies = {file = "requirements.txt"}
