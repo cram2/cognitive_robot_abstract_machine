@@ -58,7 +58,7 @@ jobs:
             jupytext --to md:myst "$ipynb" -o "$f"
             rm -f "$ipynb"
           done
-          cd ../../../
+          cd ../../../../
           
           jupyter-book build semantic_digital_twin/doc
 

@@ -52,6 +52,7 @@ jobs:
           jupytext --to md:myst "$ipynb" -o "$f"
           rm -f "$ipynb"
         done
+        cd ../../../../
 
     # Build the book
     - name: Build the book
