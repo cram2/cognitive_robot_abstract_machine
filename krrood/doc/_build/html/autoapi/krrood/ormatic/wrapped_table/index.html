@@ -1,0 +1,1097 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>krrood.ormatic.wrapped_table &#8212; KRROOD</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-thebe.css?v=4fa983c6" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../../../../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="../../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script async="async" src="../../../../_static/sphinx-thebe.js?v=c100c467"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'autoapi/krrood/ormatic/wrapped_table/index';</script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="krrood.singleton" href="../../singleton/index.html" />
+    <link rel="prev" title="krrood.ormatic.utils" href="../utils/index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search this book..."
+         aria-label="Search this book..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../intro.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/krrood_logo.svg" class="logo__image only-light" alt="KRROOD - Home"/>
+    <script>document.write(`<img src="../../../../_static/krrood_logo.svg" class="logo__image only-dark" alt="KRROOD - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../../../../intro.html">
+                    Knowledge Representation & Reasoning Through Object-Oriented Design
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Entity Query Language</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../eql/intro.html">Introduction</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/writing_queries.html">Writing Queries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/result_quantifiers.html">Result Quantifiers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/result_processors.html">Result Processors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/logical_operators.html">Logical Operators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/comparators.html">Comparators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/domain_mapping.html">Domain Mapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/predicate_and_symbolic_function.html">Predicate and Symbolic Function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/cache.html">Using Cached Symbols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/match.html">Pattern matching with <code class="docutils literal notranslate"><span class="pre">match_variable</span></code> and <code class="docutils literal notranslate"><span class="pre">match</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/writing_rule_trees.html">Advanced Example: Rule Trees with Alternatives and Exceptions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../eql/eql_for_sql_experts.html">EQL for SQL Experts</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">ORMatic</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/intro.html">ORMatic Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/orm_generation.html">Generating an ORMatic Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/alternative_mapping.html">Dealing with unmappable dataclasses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/interface_usage.html">Interface Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/eql_for_ormatic.html">Using EQL With ORMatic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/tips_and_tricks.html">Tips and Tricks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ormatic/json.html">Working with JSON: SubclassJSONSerializer</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">References</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../../../index.html">API Reference</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../../index.html">krrood</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../adapters/index.html">krrood.adapters</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../adapters/exceptions/index.html">krrood.adapters.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../adapters/json_serializer/index.html">krrood.adapters.json_serializer</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../class_diagrams/index.html">krrood.class_diagrams</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/attribute_introspector/index.html">krrood.class_diagrams.attribute_introspector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/class_diagram/index.html">krrood.class_diagrams.class_diagram</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/failures/index.html">krrood.class_diagrams.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/utils/index.html">krrood.class_diagrams.utils</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html">krrood.class_diagrams.wrapped_field</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../entity_query_language/index.html">krrood.entity_query_language</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/cache_data/index.html">krrood.entity_query_language.cache_data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/conclusion/index.html">krrood.entity_query_language.conclusion</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/conclusion_selector/index.html">krrood.entity_query_language.conclusion_selector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/entity/index.html">krrood.entity_query_language.entity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/entity_result_processors/index.html">krrood.entity_query_language.entity_result_processors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/enums/index.html">krrood.entity_query_language.enums</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/failures/index.html">krrood.entity_query_language.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/match/index.html">krrood.entity_query_language.match</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/orm/index.html">krrood.entity_query_language.orm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/predicate/index.html">krrood.entity_query_language.predicate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/result_quantification_constraint/index.html">krrood.entity_query_language.result_quantification_constraint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/rule/index.html">krrood.entity_query_language.rule</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/rxnode/index.html">krrood.entity_query_language.rxnode</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/symbol_graph/index.html">krrood.entity_query_language.symbol_graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/symbolic/index.html">krrood.entity_query_language.symbolic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../entity_query_language/utils/index.html">krrood.entity_query_language.utils</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ontomatic/index.html">krrood.ontomatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ontomatic/failures/index.html">krrood.ontomatic.failures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ontomatic/property_descriptor/index.html">krrood.ontomatic.property_descriptor</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="../index.html">krrood.ormatic</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../alternative_mappings/index.html">krrood.ormatic.alternative_mappings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../custom_types/index.html">krrood.ormatic.custom_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../dao/index.html">krrood.ormatic.dao</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../eql_interface/index.html">krrood.ormatic.eql_interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../exceptions/index.html">krrood.ormatic.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ormatic/index.html">krrood.ormatic.ormatic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../sqlalchemy_generator/index.html">krrood.ormatic.sqlalchemy_generator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../utils/index.html">krrood.ormatic.utils</a></li>
+<li class="toctree-l4 current active"><a class="current reference internal" href="#">krrood.ormatic.wrapped_table</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../singleton/index.html">krrood.singleton</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../symbolic_math/index.html">krrood.symbolic_math</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../symbolic_math/exceptions/index.html">krrood.symbolic_math.exceptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../symbolic_math/symbolic_math/index.html">krrood.symbolic_math.symbolic_math</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../utils/index.html">krrood.utils</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../bibliography.html">Bibliography</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/code-iai/krrood" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/code-iai/krrood/issues/new?title=Issue%20on%20page%20%2Fautoapi/krrood/ormatic/wrapped_table/index.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../../_sources/autoapi/krrood/ormatic/wrapped_table/index.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>krrood.ormatic.wrapped_table</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#attributes">Attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#exceptions">Exceptions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.logger"><code class="docutils literal notranslate"><span class="pre">logger</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTableNotFound"><code class="docutils literal notranslate"><span class="pre">WrappedTableNotFound</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTableNotFound.type_"><code class="docutils literal notranslate"><span class="pre">WrappedTableNotFound.type_</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTableNotFound.wrapped_field"><code class="docutils literal notranslate"><span class="pre">WrappedTableNotFound.wrapped_field</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.ColumnConstructor"><code class="docutils literal notranslate"><span class="pre">ColumnConstructor</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.ColumnConstructor.name"><code class="docutils literal notranslate"><span class="pre">ColumnConstructor.name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.ColumnConstructor.type"><code class="docutils literal notranslate"><span class="pre">ColumnConstructor.type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.ColumnConstructor.constructor"><code class="docutils literal notranslate"><span class="pre">ColumnConstructor.constructor</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable"><code class="docutils literal notranslate"><span class="pre">AssociationTable</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.name"><code class="docutils literal notranslate"><span class="pre">AssociationTable.name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.left_table_name"><code class="docutils literal notranslate"><span class="pre">AssociationTable.left_table_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.left_foreign_key"><code class="docutils literal notranslate"><span class="pre">AssociationTable.left_foreign_key</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.left_primary_key"><code class="docutils literal notranslate"><span class="pre">AssociationTable.left_primary_key</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.right_table_name"><code class="docutils literal notranslate"><span class="pre">AssociationTable.right_table_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.right_foreign_key"><code class="docutils literal notranslate"><span class="pre">AssociationTable.right_foreign_key</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.right_primary_key"><code class="docutils literal notranslate"><span class="pre">AssociationTable.right_primary_key</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable"><code class="docutils literal notranslate"><span class="pre">WrappedTable</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.wrapped_clazz"><code class="docutils literal notranslate"><span class="pre">WrappedTable.wrapped_clazz</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.ormatic"><code class="docutils literal notranslate"><span class="pre">WrappedTable.ormatic</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.builtin_columns"><code class="docutils literal notranslate"><span class="pre">WrappedTable.builtin_columns</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.custom_columns"><code class="docutils literal notranslate"><span class="pre">WrappedTable.custom_columns</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.foreign_keys"><code class="docutils literal notranslate"><span class="pre">WrappedTable.foreign_keys</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.relationships"><code class="docutils literal notranslate"><span class="pre">WrappedTable.relationships</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.mapper_args"><code class="docutils literal notranslate"><span class="pre">WrappedTable.mapper_args</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.primary_key_name"><code class="docutils literal notranslate"><span class="pre">WrappedTable.primary_key_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.polymorphic_on_name"><code class="docutils literal notranslate"><span class="pre">WrappedTable.polymorphic_on_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.skip_fields"><code class="docutils literal notranslate"><span class="pre">WrappedTable.skip_fields</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.primary_key"><code class="docutils literal notranslate"><span class="pre">WrappedTable.primary_key</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.child_tables"><code class="docutils literal notranslate"><span class="pre">WrappedTable.child_tables</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.has_children"><code class="docutils literal notranslate"><span class="pre">WrappedTable.has_children</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_mapper_args"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_mapper_args()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.full_primary_key_name"><code class="docutils literal notranslate"><span class="pre">WrappedTable.full_primary_key_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.tablename"><code class="docutils literal notranslate"><span class="pre">WrappedTable.tablename</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.parent_table"><code class="docutils literal notranslate"><span class="pre">WrappedTable.parent_table</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.is_alternatively_mapped"><code class="docutils literal notranslate"><span class="pre">WrappedTable.is_alternatively_mapped</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.fields"><code class="docutils literal notranslate"><span class="pre">WrappedTable.fields</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.parse_fields"><code class="docutils literal notranslate"><span class="pre">WrappedTable.parse_fields()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.parse_field"><code class="docutils literal notranslate"><span class="pre">WrappedTable.parse_field()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_builtin_column"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_builtin_column()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_type_type_column"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_type_type_column()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.get_table_of_wrapped_field"><code class="docutils literal notranslate"><span class="pre">WrappedTable.get_table_of_wrapped_field()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_one_to_one_relationship"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_one_to_one_relationship()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_one_to_many_relationship"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_one_to_many_relationship()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_json_column"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_json_column()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_custom_type"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_custom_type()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.base_class_name"><code class="docutils literal notranslate"><span class="pre">WrappedTable.base_class_name</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="module-krrood.ormatic.wrapped_table">
+<span id="krrood-ormatic-wrapped-table"></span><h1>krrood.ormatic.wrapped_table<a class="headerlink" href="#module-krrood.ormatic.wrapped_table" title="Link to this heading">#</a></h1>
+<section id="attributes">
+<h2>Attributes<a class="headerlink" href="#attributes" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.wrapped_table.logger" title="krrood.ormatic.wrapped_table.logger"><code class="xref py py-obj docutils literal notranslate"><span class="pre">logger</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="exceptions">
+<h2>Exceptions<a class="headerlink" href="#exceptions" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.wrapped_table.WrappedTableNotFound" title="krrood.ormatic.wrapped_table.WrappedTableNotFound"><code class="xref py py-obj docutils literal notranslate"><span class="pre">WrappedTableNotFound</span></code></a></p></td>
+<td><p>Mapping key not found.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.wrapped_table.ColumnConstructor" title="krrood.ormatic.wrapped_table.ColumnConstructor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ColumnConstructor</span></code></a></p></td>
+<td><p>Represents a column constructor that can be used to create a column in SQLAlchemy.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#krrood.ormatic.wrapped_table.AssociationTable" title="krrood.ormatic.wrapped_table.AssociationTable"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AssociationTable</span></code></a></p></td>
+<td><p>Represents an association table for many-to-many relationships in SQLAlchemy.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#krrood.ormatic.wrapped_table.WrappedTable" title="krrood.ormatic.wrapped_table.WrappedTable"><code class="xref py py-obj docutils literal notranslate"><span class="pre">WrappedTable</span></code></a></p></td>
+<td><p>A class that wraps a dataclass and contains all the information needed to create a SQLAlchemy table from it.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading">#</a></h2>
+<dl class="py data">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.logger">
+<span class="sig-prename descclassname"><span class="pre">krrood.ormatic.wrapped_table.</span></span><span class="sig-name descname"><span class="pre">logger</span></span><a class="headerlink" href="#krrood.ormatic.wrapped_table.logger" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTableNotFound">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.wrapped_table.</span></span><span class="sig-name descname"><span class="pre">WrappedTableNotFound</span></span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTableNotFound" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">KeyError</span></code></p>
+<p>Mapping key not found.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTableNotFound.type_">
+<span class="sig-name descname"><span class="pre">type_</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Type</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTableNotFound.type_" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTableNotFound.wrapped_field">
+<span class="sig-name descname"><span class="pre">wrapped_field</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTableNotFound.wrapped_field" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.ColumnConstructor">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.wrapped_table.</span></span><span class="sig-name descname"><span class="pre">ColumnConstructor</span></span><a class="headerlink" href="#krrood.ormatic.wrapped_table.ColumnConstructor" title="Link to this definition">#</a></dt>
+<dd><p>Represents a column constructor that can be used to create a column in SQLAlchemy.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.ColumnConstructor.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.ColumnConstructor.name" title="Link to this definition">#</a></dt>
+<dd><p>The name of the column.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.ColumnConstructor.type">
+<span class="sig-name descname"><span class="pre">type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.ColumnConstructor.type" title="Link to this definition">#</a></dt>
+<dd><p>The type of the column.
+Needs to be like “Mapped[&lt;type&gt;]”.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.ColumnConstructor.constructor">
+<span class="sig-name descname"><span class="pre">constructor</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.ColumnConstructor.constructor" title="Link to this definition">#</a></dt>
+<dd><p>The constructor call for sqlalchemy of the column.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.AssociationTable">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.wrapped_table.</span></span><span class="sig-name descname"><span class="pre">AssociationTable</span></span><a class="headerlink" href="#krrood.ormatic.wrapped_table.AssociationTable" title="Link to this definition">#</a></dt>
+<dd><p>Represents an association table for many-to-many relationships in SQLAlchemy.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.AssociationTable.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.AssociationTable.name" title="Link to this definition">#</a></dt>
+<dd><p>The name of the association table.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.AssociationTable.left_table_name">
+<span class="sig-name descname"><span class="pre">left_table_name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.AssociationTable.left_table_name" title="Link to this definition">#</a></dt>
+<dd><p>The name of the left (source) table.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.AssociationTable.left_foreign_key">
+<span class="sig-name descname"><span class="pre">left_foreign_key</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.AssociationTable.left_foreign_key" title="Link to this definition">#</a></dt>
+<dd><p>The foreign key column name for the left table.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.AssociationTable.left_primary_key">
+<span class="sig-name descname"><span class="pre">left_primary_key</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.AssociationTable.left_primary_key" title="Link to this definition">#</a></dt>
+<dd><p>The full primary key reference for the left table (e.g., ‘TableName.primary_key’).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.AssociationTable.right_table_name">
+<span class="sig-name descname"><span class="pre">right_table_name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.AssociationTable.right_table_name" title="Link to this definition">#</a></dt>
+<dd><p>The name of the right (target) table.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.AssociationTable.right_foreign_key">
+<span class="sig-name descname"><span class="pre">right_foreign_key</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.AssociationTable.right_foreign_key" title="Link to this definition">#</a></dt>
+<dd><p>The foreign key column name for the right table.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.AssociationTable.right_primary_key">
+<span class="sig-name descname"><span class="pre">right_primary_key</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.AssociationTable.right_primary_key" title="Link to this definition">#</a></dt>
+<dd><p>The full primary key reference for the right table (e.g., ‘TableName.primary_key’).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">krrood.ormatic.wrapped_table.</span></span><span class="sig-name descname"><span class="pre">WrappedTable</span></span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable" title="Link to this definition">#</a></dt>
+<dd><p>A class that wraps a dataclass and contains all the information needed to create a SQLAlchemy table from it.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.wrapped_clazz">
+<span class="sig-name descname"><span class="pre">wrapped_clazz</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../../class_diagrams/class_diagram/index.html#krrood.class_diagrams.class_diagram.WrappedClass" title="krrood.class_diagrams.class_diagram.WrappedClass"><span class="pre">krrood.class_diagrams.class_diagram.WrappedClass</span></a></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.wrapped_clazz" title="Link to this definition">#</a></dt>
+<dd><p>The wrapped class that this table wraps.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.ormatic">
+<span class="sig-name descname"><span class="pre">ormatic</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../ormatic/index.html#krrood.ormatic.ormatic.ORMatic" title="krrood.ormatic.ormatic.ORMatic"><span class="pre">krrood.ormatic.ormatic.ORMatic</span></a></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.ormatic" title="Link to this definition">#</a></dt>
+<dd><p>Reference to the ORMatic instance that created this WrappedTable.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.builtin_columns">
+<span class="sig-name descname"><span class="pre">builtin_columns</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.wrapped_table.ColumnConstructor" title="krrood.ormatic.wrapped_table.ColumnConstructor"><span class="pre">ColumnConstructor</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.builtin_columns" title="Link to this definition">#</a></dt>
+<dd><p>List of columns that can be directly mapped using builtin types</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.custom_columns">
+<span class="sig-name descname"><span class="pre">custom_columns</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.wrapped_table.ColumnConstructor" title="krrood.ormatic.wrapped_table.ColumnConstructor"><span class="pre">ColumnConstructor</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.custom_columns" title="Link to this definition">#</a></dt>
+<dd><p>List for custom columns that need to by fully qualified as triple of (name, type, constructor)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.foreign_keys">
+<span class="sig-name descname"><span class="pre">foreign_keys</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.wrapped_table.ColumnConstructor" title="krrood.ormatic.wrapped_table.ColumnConstructor"><span class="pre">ColumnConstructor</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.foreign_keys" title="Link to this definition">#</a></dt>
+<dd><p>List of columns that represent foreign keys as triple of (name, type, constructor)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.relationships">
+<span class="sig-name descname"><span class="pre">relationships</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.wrapped_table.ColumnConstructor" title="krrood.ormatic.wrapped_table.ColumnConstructor"><span class="pre">ColumnConstructor</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.relationships" title="Link to this definition">#</a></dt>
+<dd><p>List of relationships that should be added to the table.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.mapper_args">
+<span class="sig-name descname"><span class="pre">mapper_args</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.mapper_args" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.primary_key_name">
+<span class="sig-name descname"><span class="pre">primary_key_name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'database_id'</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.primary_key_name" title="Link to this definition">#</a></dt>
+<dd><p>The name of the primary key column.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.polymorphic_on_name">
+<span class="sig-name descname"><span class="pre">polymorphic_on_name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'polymorphic_type'</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.polymorphic_on_name" title="Link to this definition">#</a></dt>
+<dd><p>The name of the column that will be used to identify polymorphic identities if any present.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.skip_fields">
+<span class="sig-name descname"><span class="pre">skip_fields</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.skip_fields" title="Link to this definition">#</a></dt>
+<dd><p>A list of fields that should be skipped when processing the dataclass.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.primary_key">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">primary_key</span></span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.primary_key" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.child_tables">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">child_tables</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.wrapped_table.WrappedTable" title="krrood.ormatic.wrapped_table.WrappedTable"><span class="pre">WrappedTable</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.child_tables" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.has_children">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">has_children</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.has_children" title="Link to this definition">#</a></dt>
+<dd><p>Indicate whether this table has subclasses in the generated DAO model.</p>
+<p>The check is performed in two simple steps:
+- Use the inheritance graph to determine direct children of this wrapped class.
+- Additionally, scan existing wrapped tables for any table that resolves this</p>
+<blockquote>
+<div><p>instance as its <code class="docutils literal notranslate"><span class="pre">parent_table</span></code> (covers alternative-mapping hierarchies).</p>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.create_mapper_args">
+<span class="sig-name descname"><span class="pre">create_mapper_args</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.create_mapper_args" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.full_primary_key_name">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">full_primary_key_name</span></span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.full_primary_key_name" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.tablename">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">tablename</span></span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.tablename" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.parent_table">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">parent_table</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#krrood.ormatic.wrapped_table.WrappedTable" title="krrood.ormatic.wrapped_table.WrappedTable"><span class="pre">WrappedTable</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.parent_table" title="Link to this definition">#</a></dt>
+<dd><p>Resolve the parent DAO table for this table.</p>
+<p>This first tries to use a direct inheritance relation. If that is not
+available and this table is an alternative mapping, it resolves the
+parent through the original classes’ inheritance and maps back to the
+correct DAO table.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The parent <code class="docutils literal notranslate"><span class="pre">WrappedTable</span></code> or <code class="docutils literal notranslate"><span class="pre">None</span></code> if there is no parent.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.is_alternatively_mapped">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_alternatively_mapped</span></span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.is_alternatively_mapped" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.fields">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">fields</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.fields" title="Link to this definition">#</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The list of fields specified only in this associated dataclass that should be mapped.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.parse_fields">
+<span class="sig-name descname"><span class="pre">parse_fields</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.parse_fields" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.parse_field">
+<span class="sig-name descname"><span class="pre">parse_field</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_field</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.parse_field" title="Link to this definition">#</a></dt>
+<dd><p>Parses a given <cite>WrappedField</cite> and determines its type or relationship to create the
+appropriate column or define relationships in an ORM context.
+The method processes several
+types of fields, such as type types, built-in types, enumerations, one-to-one relationships,
+custom types, JSON containers, and one-to-many relationships.</p>
+<p>This creates the right information in the right place in the table definition to be read later by the jinja
+template.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>wrapped_field</strong> – An instance of <cite>WrappedField</cite> that contains metadata about the field
+such as its data type, whether it represents a built-in or user-defined type, or if it has
+specific ORM container properties.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.create_builtin_column">
+<span class="sig-name descname"><span class="pre">create_builtin_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_field</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.create_builtin_column" title="Link to this definition">#</a></dt>
+<dd><p>Creates a built-in column mapping for the given wrapped field. Depending on the
+properties of the <cite>wrapped_field</cite>, this function determines whether it’s an enum,
+a built-in type, or requires additional imports. It then constructs appropriate
+column definitions and adds them to the respective list of database mappings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>wrapped_field</strong> – The WrappedField instance representing the field
+to create a built-in column for.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.create_type_type_column">
+<span class="sig-name descname"><span class="pre">create_type_type_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_field</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.create_type_type_column" title="Link to this definition">#</a></dt>
+<dd><p>Create a column for a field of type <cite>Type</cite>.
+:param wrapped_field: The field to extract type information from.
+:return:</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.get_table_of_wrapped_field">
+<span class="sig-name descname"><span class="pre">get_table_of_wrapped_field</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_field</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#krrood.ormatic.wrapped_table.WrappedTable" title="krrood.ormatic.wrapped_table.WrappedTable"><span class="pre">WrappedTable</span></a></span></span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.get_table_of_wrapped_field" title="Link to this definition">#</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>wrapped_field</strong> – The wrapped field to get the table for.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The wrapped table for the given wrapped field.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.create_one_to_one_relationship">
+<span class="sig-name descname"><span class="pre">create_one_to_one_relationship</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_field</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.create_one_to_one_relationship" title="Link to this definition">#</a></dt>
+<dd><p>Create a one-to-one relationship with using the given field.
+This adds a foreign key and a relationship to this table.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>wrapped_field</strong> – The field to get the information from.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.create_one_to_many_relationship">
+<span class="sig-name descname"><span class="pre">create_one_to_many_relationship</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_field</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.create_one_to_many_relationship" title="Link to this definition">#</a></dt>
+<dd><p>Creates a many-to-many relationship mapping for the given wrapped field using an association table.
+This allows multiple instances of the source table to reference the same instances of the target table.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>wrapped_field</strong> – The field for the many-to-many relationship.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.create_json_column">
+<span class="sig-name descname"><span class="pre">create_json_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_field</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.create_json_column" title="Link to this definition">#</a></dt>
+<dd><p>Create a column for a list-like of built-in values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>wrapped_field</strong> – The field to extract the information from.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.create_custom_type">
+<span class="sig-name descname"><span class="pre">create_custom_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_field</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../class_diagrams/wrapped_field/index.html#krrood.class_diagrams.wrapped_field.WrappedField" title="krrood.class_diagrams.wrapped_field.WrappedField"><span class="pre">krrood.class_diagrams.wrapped_field.WrappedField</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.create_custom_type" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="krrood.ormatic.wrapped_table.WrappedTable.base_class_name">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">base_class_name</span></span><a class="headerlink" href="#krrood.ormatic.wrapped_table.WrappedTable.base_class_name" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            name: "python3",
+            path: "./autoapi/krrood/ormatic/wrapped_table"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../utils/index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">krrood.ormatic.utils</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../../singleton/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">krrood.singleton</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#attributes">Attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#exceptions">Exceptions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.logger"><code class="docutils literal notranslate"><span class="pre">logger</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTableNotFound"><code class="docutils literal notranslate"><span class="pre">WrappedTableNotFound</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTableNotFound.type_"><code class="docutils literal notranslate"><span class="pre">WrappedTableNotFound.type_</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTableNotFound.wrapped_field"><code class="docutils literal notranslate"><span class="pre">WrappedTableNotFound.wrapped_field</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.ColumnConstructor"><code class="docutils literal notranslate"><span class="pre">ColumnConstructor</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.ColumnConstructor.name"><code class="docutils literal notranslate"><span class="pre">ColumnConstructor.name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.ColumnConstructor.type"><code class="docutils literal notranslate"><span class="pre">ColumnConstructor.type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.ColumnConstructor.constructor"><code class="docutils literal notranslate"><span class="pre">ColumnConstructor.constructor</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable"><code class="docutils literal notranslate"><span class="pre">AssociationTable</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.name"><code class="docutils literal notranslate"><span class="pre">AssociationTable.name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.left_table_name"><code class="docutils literal notranslate"><span class="pre">AssociationTable.left_table_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.left_foreign_key"><code class="docutils literal notranslate"><span class="pre">AssociationTable.left_foreign_key</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.left_primary_key"><code class="docutils literal notranslate"><span class="pre">AssociationTable.left_primary_key</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.right_table_name"><code class="docutils literal notranslate"><span class="pre">AssociationTable.right_table_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.right_foreign_key"><code class="docutils literal notranslate"><span class="pre">AssociationTable.right_foreign_key</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.AssociationTable.right_primary_key"><code class="docutils literal notranslate"><span class="pre">AssociationTable.right_primary_key</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable"><code class="docutils literal notranslate"><span class="pre">WrappedTable</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.wrapped_clazz"><code class="docutils literal notranslate"><span class="pre">WrappedTable.wrapped_clazz</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.ormatic"><code class="docutils literal notranslate"><span class="pre">WrappedTable.ormatic</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.builtin_columns"><code class="docutils literal notranslate"><span class="pre">WrappedTable.builtin_columns</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.custom_columns"><code class="docutils literal notranslate"><span class="pre">WrappedTable.custom_columns</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.foreign_keys"><code class="docutils literal notranslate"><span class="pre">WrappedTable.foreign_keys</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.relationships"><code class="docutils literal notranslate"><span class="pre">WrappedTable.relationships</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.mapper_args"><code class="docutils literal notranslate"><span class="pre">WrappedTable.mapper_args</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.primary_key_name"><code class="docutils literal notranslate"><span class="pre">WrappedTable.primary_key_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.polymorphic_on_name"><code class="docutils literal notranslate"><span class="pre">WrappedTable.polymorphic_on_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.skip_fields"><code class="docutils literal notranslate"><span class="pre">WrappedTable.skip_fields</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.primary_key"><code class="docutils literal notranslate"><span class="pre">WrappedTable.primary_key</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.child_tables"><code class="docutils literal notranslate"><span class="pre">WrappedTable.child_tables</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.has_children"><code class="docutils literal notranslate"><span class="pre">WrappedTable.has_children</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_mapper_args"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_mapper_args()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.full_primary_key_name"><code class="docutils literal notranslate"><span class="pre">WrappedTable.full_primary_key_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.tablename"><code class="docutils literal notranslate"><span class="pre">WrappedTable.tablename</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.parent_table"><code class="docutils literal notranslate"><span class="pre">WrappedTable.parent_table</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.is_alternatively_mapped"><code class="docutils literal notranslate"><span class="pre">WrappedTable.is_alternatively_mapped</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.fields"><code class="docutils literal notranslate"><span class="pre">WrappedTable.fields</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.parse_fields"><code class="docutils literal notranslate"><span class="pre">WrappedTable.parse_fields()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.parse_field"><code class="docutils literal notranslate"><span class="pre">WrappedTable.parse_field()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_builtin_column"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_builtin_column()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_type_type_column"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_type_type_column()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.get_table_of_wrapped_field"><code class="docutils literal notranslate"><span class="pre">WrappedTable.get_table_of_wrapped_field()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_one_to_one_relationship"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_one_to_one_relationship()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_one_to_many_relationship"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_one_to_many_relationship()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_json_column"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_json_column()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.create_custom_type"><code class="docutils literal notranslate"><span class="pre">WrappedTable.create_custom_type()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#krrood.ormatic.wrapped_table.WrappedTable.base_class_name"><code class="docutils literal notranslate"><span class="pre">WrappedTable.base_class_name</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By AICOR Institute for Artificial Intelligence
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
