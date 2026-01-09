@@ -115,7 +115,7 @@ jobs:
         rm -rf /opt/ros/semantic_digital_twin/* 
         cd /opt/ros/semantic_digital_twin
         rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
-        cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_digital_twin /opt/ros
+        cp -r $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/* /opt/ros/semantic_digital_twin/
 
     - name: Install dependencies
       run: |
@@ -164,6 +164,7 @@ jobs:
   # ============================================================================
   deploy-combined-docs:
     needs: [build-krrood-docs, build-pycram-docs, build-semantic-docs]
+    if: always() && (needs.build-krrood-docs.result == 'success' || needs.build-pycram-docs.result == 'success' || needs.build-semantic-docs.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -175,18 +176,21 @@ jobs:
     steps:
     - name: Download krrood docs
       uses: actions/download-artifact@v4.1.3
+      continue-on-error: true
       with:
         name: krrood-docs
         path: _combined_docs/krrood
 
     - name: Download pycram docs
       uses: actions/download-artifact@v4.1.3
+      continue-on-error: true
       with:
         name: pycram-docs
         path: _combined_docs/pycram
 
     - name: Download semantic_digital_twin docs
       uses: actions/download-artifact@v4.1.3
+      continue-on-error: true
       with:
         name: semantic-docs
         path: _combined_docs/semantic_digital_twin

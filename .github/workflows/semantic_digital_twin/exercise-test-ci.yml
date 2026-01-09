@@ -29,9 +29,9 @@ jobs:
     - name: Update semantic_digital_twin source files
       run: |
         rm -rf /opt/ros/semantic_digital_twin/* 
-        cd /opt/ros//semantic_digital_twin
+        cd /opt/ros/semantic_digital_twin
         rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
-        cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_digital_twin /opt/ros/
+        cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_digital_twin/* /opt/ros/semantic_digital_twin/
 
     - name: Install dependencies
       run: |
