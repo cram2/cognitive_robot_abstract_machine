@@ -265,7 +265,10 @@ class ClassJSONSerializer(ExternalClassJSONSerializer[None]):
         This is a special case because we need to remember that the type of the class is a class, not a type.
         .. note:: We can't do type(obj) because that often returns just `type`.
         """
-        return {JSON_TYPE_NAME: get_full_class_name(obj), JSON_IS_CLASS: True}
+        return {
+            JSON_TYPE_NAME: get_full_class_name(obj),
+            JSON_IS_CLASS: inspect.isclass(obj),
+        }
 
     @classmethod
     def from_json(cls, data: Dict[str, Any], clazz: Type, **kwargs) -> Type:

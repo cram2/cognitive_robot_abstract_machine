@@ -1,14 +1,13 @@
 from nav2_msgs.action import NavigateToPose
 
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
-from giskardpy.motion_statechart.tasks.ros_tasks import (
-    ActionServerTask,
+from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
     NavigateActionServerTask,
 )
 from semantic_digital_twin.robots.hsrb import HSRB
 from ..datastructures.enums import ExecutionType
 from ..robot_description import ViewManager
-from ..robot_plans import MoveMotion, MoveGripperMotion, MoveTCPMotion
+from ..robot_plans import MoveMotion, MoveTCPMotion
 
 from ..robot_plans.motions.base import AlternativeMotion
 
