@@ -767,8 +767,6 @@ class MotionStatechartNode(SubclassJSONSerializer):
     def start_condition(self, expression: Scalar) -> None:
         if self._start_condition is None:
             raise NotInMotionStatechartError(self.name)
-        free_variables = expression.free_variables
-
         self._start_condition.update_expression(expression, self)
 
     @property

@@ -1,21 +1,19 @@
+import logging
 from dataclasses import dataclass, field
 from typing import List, Any
 
-from giskardpy.executor import Executor
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
+from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
-    LifeCycleState,
 )
-from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.world import World
-
+from giskardpy.ros_executor import Ros2Executor
 from pycram.datastructures.enums import ExecutionType
 from pycram.process_module import ProcessModuleManager
-import logging
+from semantic_digital_twin.world import World
 
 logger = logging.getLogger(__name__)
 
@@ -73,11 +71,12 @@ class MotionExecutor:
         Creates an executor and executes the motion state chart until it is done.
         """
         logger.debug(f"Executing {self.motions} motions in simulation")
-        executor = Executor(
+        executor = Ros2Executor(
             self.world,
             controller_config=QPControllerConfig(
                 target_frequency=50, prediction_horizon=4, verbose=False
             ),
+            ros_node=self.ros_node,
         )
         executor.compile(self.motion_state_chart)
         try:

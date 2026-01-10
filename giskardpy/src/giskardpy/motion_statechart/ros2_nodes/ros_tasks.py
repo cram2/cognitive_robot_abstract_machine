@@ -3,32 +3,39 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
 
-import rclpy
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
 from std_msgs.msg import Header
-from typing_extensions import Any, Type, TypeVar
+from typing_extensions import Type, TypeVar, Generic
 
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import ExecutionContext, BuildContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
     NodeArtifacts,
 )
+from giskardpy.motion_statechart.ros_context import RosContextExtension
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
 
 
-T = TypeVar("T")
+Action = TypeVar("Action")
+ActionGoal = TypeVar("ActionGoal")
+ActionResult = TypeVar("ActionResult")
+ActionFeedback = TypeVar("ActionFeedback")
 
 
 @dataclass
-class ActionServerTask(MotionStatechartNode, ABC):
+class ActionServerTask(
+    MotionStatechartNode,
+    ABC,
+    Generic[Action, ActionGoal, ActionResult, ActionFeedback],
+):
     """
     Abstract base class for tasks that call a ROS2 action server.
     """
@@ -38,14 +45,9 @@ class ActionServerTask(MotionStatechartNode, ABC):
     Topic name for the action server.
     """
 
-    message_type: Type[T]
+    message_type: Type[Action]
     """
     Fully specified goal message that can be send out. 
-    """
-
-    node_handle: rclpy.node.Node
-    """
-    A ROS node to create the action client.
     """
 
     _action_client: ActionClient = field(init=False)
@@ -53,12 +55,12 @@ class ActionServerTask(MotionStatechartNode, ABC):
     ROS action client, is created in `build`.
     """
 
-    _msg: T.Goal = field(init=False, default=None)
+    _msg: ActionGoal = field(init=False, default=None)
     """
     ROS message to send to the action server.
     """
 
-    _result: T.Result = field(init=False, default=None)
+    _result: ActionResult = field(init=False, default=None)
     """
     ROS action server result.
     """
@@ -74,8 +76,9 @@ class ActionServerTask(MotionStatechartNode, ABC):
         """
         Creates the action client.
         """
+        ros_context_extension = context.require_extension(RosContextExtension)
         self._action_client = ActionClient(
-            self.node_handle, self.message_type, self.action_topic
+            ros_context_extension.ros_node, self.message_type, self.action_topic
         )
         self.build_msg(context)
         logger.info(f"Waiting for action server {self.action_topic}")
@@ -97,7 +100,14 @@ class ActionServerTask(MotionStatechartNode, ABC):
 
 
 @dataclass
-class NavigateActionServerTask(ActionServerTask):
+class NavigateActionServerTask(
+    ActionServerTask[
+        NavigateToPose,
+        NavigateToPose.Goal,
+        NavigateToPose.Result,
+        NavigateToPose.Feedback,
+    ]
+):
     """
     Node for calling a Navigation2 ROS2 action server to navigate to a given pose.1
     """
@@ -142,20 +152,24 @@ class NavigateActionServerTask(ActionServerTask):
         Builds the motion state node this includes creating the action client and setting the observation expression.
         The observation is true if the robot is within 1cm of the target pose.
         """
-        super()
-        self._action_client = ActionClient(
-            self.node_handle, NavigateToPose, self.action_topic
-        )
+        super().build_msg(context)
         artifacts = NodeArtifacts()
-        root_p_goal = context.world.transform(
+        root_T_goal = context.world.transform(
             target_frame=context.world.root, spatial_object=self.target_pose
         )
-        r_P_c = context.world.compose_forward_kinematics_expression(
+        root_T_current = context.world.compose_forward_kinematics_expression(
             context.world.root, self.base_link
-        ).to_position()
+        )
 
-        artifacts.observation = (
-            root_p_goal.to_position().euclidean_distance(r_P_c) < 0.01
+        position_error = root_T_goal.to_position().euclidean_distance(
+            root_T_current.to_position()
+        )
+        rotation_error = root_T_goal.to_rotation_matrix().rotational_error(
+            root_T_current.to_rotation_matrix()
+        )
+
+        artifacts.observation = sm.trinary_logic_and(
+            position_error < 0.01, sm.abs(rotation_error) < 0.01
         )
 
         logger.info(f"Waiting for action server {self.action_topic}")
