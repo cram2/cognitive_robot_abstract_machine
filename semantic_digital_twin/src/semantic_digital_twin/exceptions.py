@@ -80,6 +80,32 @@ class IncorrectWorldStateValueShapeError(DataclassException, ValueError):
 
 
 @dataclass
+class WrongWorldModelVersion(LogicalError):
+    """
+    Raised when a specific world model version is required.
+    """
+
+    expected_version: int
+    actual_version: int
+
+    def __post_init__(self):
+        self.message = f"Expected world model version {self.expected_version}, but got {self.actual_version}."
+
+
+@dataclass
+class NonMonotonicTimeError(LogicalError):
+    """
+    Raised when attempting to append a world state with a time that is not strictly greater than the last time.
+    """
+
+    last_time: float
+    attempted_time: float
+
+    def __post_init__(self):
+        self.message = f"Time must be strictly increasing. Last time: {self.last_time}, attempted time: {self.attempted_time}"
+
+
+@dataclass
 class MismatchingCommandLengthError(DataclassException, ValueError):
     """
     An exception raised when the length of a command does not match the expected length.

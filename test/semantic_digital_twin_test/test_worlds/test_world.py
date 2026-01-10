@@ -22,6 +22,8 @@ from semantic_digital_twin.exceptions import (
     UsageError,
     MissingWorldModificationContextError,
     DofNotInWorldStateError,
+    WrongWorldModelVersion,
+    NonMonotonicTimeError,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
@@ -38,6 +40,10 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     CollisionCheckingConfig,
     Actuator,
+)
+from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
+from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
+    WorldStateTrajectoryPlotter,
 )
 
 
@@ -1052,3 +1058,72 @@ def test_add_body_hash():
     with world.modify_world():
         world.remove_kinematic_structure_entity(body)
     assert hash(body) not in world._world_entity_hash_table
+
+
+def test_world_state_trajectory(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    time = 1337.0
+
+    connection: PrismaticConnection = world.get_connection(r1, r2)
+    dof_uuid = connection.dof_id
+
+    traj = WorldStateTrajectory.from_world_state(world.state, time)
+    cmd = np.array([100.0, 0, 0, 0, 0, 0, 0, 0])
+    dt = 0.1
+
+    # Verify initial state
+    assert len(traj.times) == 1
+    assert traj.times[0] == time
+    assert traj.data.shape[0] == 1  # One timestep
+    assert traj.data.shape[1] == 4  # Four derivatives (pos, vel, acc, jerk)
+    assert traj.data.shape[2] == len(world.state)  # Number of DOFs
+
+    # Store initial state for comparison
+    initial_state = deepcopy(world.state)
+
+    for i in range(10):
+        time += dt
+        world.apply_control_commands(cmd, dt, Derivatives.jerk)
+        traj.append(world.state, time)
+
+    # Verify final trajectory structure
+    assert len(traj.times) == 11  # Initial + 10 appended states
+    assert traj.data.shape[0] == 11  # 11 timesteps
+    assert traj.data.shape[1] == 4  # Four derivatives
+    assert traj.data.shape[2] == len(world.state)  # Number of DOFs
+
+    # Verify time progression
+    expected_times = np.array([1337.0 + i * dt for i in range(11)])
+    np.testing.assert_allclose(traj.times, expected_times)
+
+    # Verify that the trajectory captures state changes
+    # The first DOF should have changed due to jerk command
+    assert not np.allclose(traj.data[0, :, 0], traj.data[-1, :, 0])  # First DOF changed
+    assert np.allclose(
+        traj.data[0, :, 1:], initial_state.data[:, 1:]
+    )  # Other DOFs unchanged initially
+
+    WorldStateTrajectoryPlotter().plot_trajectory(traj, "./traj.pdf")
+
+    # Verify world version consistency
+    assert traj._world_version == world.get_world_model_manager().version
+
+    # Verify that trajectory data matches current world state
+    np.testing.assert_allclose(traj.data[-1, :, :], world.state.data)
+
+    # verify that the state increased on each step
+    previous = initial_state[dof_uuid]
+    for time, data in list(traj.items())[1:]:
+        next = data[dof_uuid]
+        assert next.position > previous.position
+        assert next.velocity > previous.velocity
+        assert next.acceleration > previous.acceleration
+        previous = next
+
+    with pytest.raises(NonMonotonicTimeError):
+        traj.append(world.state, time - dt)
+
+    world._notify_model_change()
+    with pytest.raises(WrongWorldModelVersion):
+        traj.append(world.state, time + dt)
