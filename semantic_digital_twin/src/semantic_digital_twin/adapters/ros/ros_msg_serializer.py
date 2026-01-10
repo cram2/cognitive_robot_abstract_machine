@@ -10,6 +10,7 @@ from typing_extensions import Dict, Type, Any
 from krrood.adapters.exceptions import JSON_TYPE_NAME
 from krrood.adapters.json_serializer import ExternalClassJSONSerializer
 from krrood.utils import get_full_class_name
+from semantic_digital_twin.adapters.ros.utils import is_ros2_message_class
 
 
 @dataclass
@@ -31,20 +32,6 @@ class Ros2MessageJSONSerializer(ExternalClassJSONSerializer[None]):
     def from_json(cls, data: Dict[str, Any], clazz: Type, **kwargs) -> Any:
         return convert_dictionary_to_ros_message(clazz, data["data"], **kwargs)
 
-    @staticmethod
-    def is_ros_message_class(clazz: Type) -> bool:
-        """
-        Checks if a class is a ROS2 message based on its slots and field types and hope nothing else has the same.
-        :param clazz: class to check
-        :return: is its a ros2 message
-        """
-        return (
-            inspect.isclass(clazz)
-            and hasattr(clazz, "__slots__")
-            and hasattr(clazz, "get_fields_and_field_types")
-            and hasattr(clazz, "SLOT_TYPES")  # present on generated message classes
-        )
-
     @classmethod
     def matches_generic_type(cls, clazz: Type):
-        return cls.is_ros_message_class(clazz)
+        return is_ros2_message_class(clazz)
