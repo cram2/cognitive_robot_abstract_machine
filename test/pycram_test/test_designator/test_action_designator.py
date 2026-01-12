@@ -233,7 +233,7 @@ def test_detect(immutable_model_world):
     world, robot_view, context = immutable_model_world
     milk_body = world.get_body_by_name("milk.stl")
     with world.modify_world():
-        world.add_semantic_annotation(Milk(body=milk_body))
+        world.add_semantic_annotation(Milk(root=milk_body))
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         2.5, 2, 1.2, reference_frame=world.root
     )

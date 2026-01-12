@@ -961,7 +961,7 @@ def test_overwrite_dof_limits_mimic(world_setup):
 def test_missing_world_modification_context(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     with pytest.raises(MissingWorldModificationContextError):
-        world.add_semantic_annotation(Handle(body=l1))
+        world.add_semantic_annotation(Handle(root=l1))
 
 
 def test_dof_removal_simple():

@@ -76,14 +76,14 @@ class TestSemanticAnnotation(SemanticAnnotation):
 
 
 def test_semantic_annotation_hash(apartment_world_setup):
-    semantic_annotation1 = Handle(body=apartment_world_setup.bodies[0])
+    semantic_annotation1 = Handle(root=apartment_world_setup.bodies[0])
     with apartment_world_setup.modify_world():
         apartment_world_setup.add_semantic_annotation(semantic_annotation1)
     assert hash(semantic_annotation1) == hash(
         (Handle, apartment_world_setup.bodies[0].id)
     )
 
-    semantic_annotation2 = Handle(body=apartment_world_setup.bodies[0])
+    semantic_annotation2 = Handle(root=apartment_world_setup.bodies[0])
     assert semantic_annotation1 == semantic_annotation2
 
 
@@ -140,7 +140,7 @@ def test_aggregate_bodies(kitchen_world):
 def test_handle_semantic_annotation_eql(apartment_world_setup):
     body = variable(type_=Body, domain=apartment_world_setup.bodies)
     query = an(
-        entity(inference(Handle)(body=body)).where(
+        entity(inference(Handle)(root=body)).where(
             in_("handle", body.name.name.lower())
         )
     )
@@ -154,7 +154,7 @@ def test_handle_semantic_annotation_eql(apartment_world_setup):
     [
         (Handle, False, None),
         (Drawer, False, None),
-        (Cabinet, False, None),
+        (Wardrobe, False, None),
         (Door, False, None),
     ],
 )
@@ -178,7 +178,7 @@ def test_generated_semantic_annotations(kitchen_world):
         "semantic_annotations"
     ]
     drawer_container_names = [
-        v.body.name.name
+        v.root.name.name
         for v in found_semantic_annotations
         if isinstance(v, HasCaseAsRootBody)
     ]
@@ -189,14 +189,14 @@ def test_generated_semantic_annotations(kitchen_world):
 def test_apartment_semantic_annotations(apartment_world_setup):
     world_reasoner = WorldReasoner(apartment_world_setup)
     world_reasoner.fit_semantic_annotations(
-        [Handle, Drawer, Cabinet],
+        [Handle, Drawer, Wardrobe],
         world_factory=lambda: apartment_world_setup,
         scenario=None,
     )
 
     found_semantic_annotations = world_reasoner.infer_semantic_annotations()
     drawer_container_names = [
-        v.body.name.name
+        v.root.name.name
         for v in found_semantic_annotations
         if isinstance(v, HasCaseAsRootBody)
     ]
@@ -224,8 +224,8 @@ def test_semantic_annotation_serde_once(apartment_world_setup):
     handle_body = apartment_world_setup.bodies[0]
     door_body = apartment_world_setup.bodies[1]
 
-    handle = Handle(body=handle_body)
-    door = Door(body=door_body, handle=handle)
+    handle = Handle(root=handle_body)
+    door = Door(root=door_body, handle=handle)
     with apartment_world_setup.modify_world():
         apartment_world_setup.add_semantic_annotation(handle)
         apartment_world_setup.add_semantic_annotation(door)
@@ -235,15 +235,15 @@ def test_semantic_annotation_serde_once(apartment_world_setup):
 
     assert door == door_de
     assert type(door.handle) == type(door_de.handle)
-    assert type(door.body) == type(door_de.body)
+    assert type(door.root) == type(door_de.root)
 
 
 def test_semantic_annotation_serde_multiple(apartment_world_setup):
     handle_body = apartment_world_setup.bodies[0]
     door_body = apartment_world_setup.bodies[1]
 
-    handle = Handle(body=handle_body)
-    door = Door(body=door_body, handle=handle)
+    handle = Handle(root=handle_body)
+    door = Door(root=door_body, handle=handle)
 
     with apartment_world_setup.modify_world():
         apartment_world_setup.add_semantic_annotation(handle)
@@ -254,14 +254,14 @@ def test_semantic_annotation_serde_multiple(apartment_world_setup):
 
     assert door == door_de1
     assert type(door.handle) == type(door_de1.handle)
-    assert type(door.body) == type(door_de1.body)
+    assert type(door.root) == type(door_de1.root)
 
     door_se2 = door_de1.to_json()
     door_de2 = Door.from_json(door_se2)
 
     assert door == door_de2
     assert type(door.handle) == type(door_de2.handle)
-    assert type(door.body) == type(door_de2.body)
+    assert type(door.root) == type(door_de2.root)
 
 
 def test_minimal_robot_annotation(pr2_world_state_reset):

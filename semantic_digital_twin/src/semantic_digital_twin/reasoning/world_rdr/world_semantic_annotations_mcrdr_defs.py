@@ -2,7 +2,7 @@ from typing_extensions import List, Union
 
 from ...semantic_annotations.mixins import HasCaseAsRootBody
 from ...semantic_annotations.semantic_annotations import (
-    Cabinet,
+    Wardrobe,
     Door,
     Drawer,
     Fridge,
@@ -30,7 +30,7 @@ def conclusion_90574698325129464513441443063592862114(case) -> List[Handle]:
     def get_handles(case: World) -> Union[set, list, Handle]:
         """Get possible value(s) for World.semantic_annotations of types list/set of Handle"""
         return [
-            Handle(body=b)
+            Handle(root=b)
             for b in case.kinematic_structure_entities
             if "handle" in b.name.name.lower()
         ]
@@ -53,7 +53,7 @@ def conclusion_331345798360792447350644865254855982739(case) -> List[Drawer]:
         fixed_connections = [
             c
             for c in case.connections
-            if isinstance(c, FixedConnection) and c.child in [h.body for h in handles]
+            if isinstance(c, FixedConnection) and c.child in [h.root for h in handles]
         ]
         prismatic_connections = [
             c for c in case.connections if isinstance(c, PrismaticConnection)
@@ -64,7 +64,7 @@ def conclusion_331345798360792447350644865254855982739(case) -> List[Drawer]:
             if fc.parent in [pc.child for pc in prismatic_connections]
         ]
         drawers = [
-            Drawer(body=fc.parent, handle=[h for h in handles if h.body == fc.child][0])
+            Drawer(root=fc.parent, handle=[h for h in handles if h.root == fc.child][0])
             for fc in drawer_handle_connections
         ]
         return drawers
@@ -74,41 +74,41 @@ def conclusion_331345798360792447350644865254855982739(case) -> List[Drawer]:
 
 def conditions_35528769484583703815352905256802298589(case) -> bool:
     def has_drawers(case: World) -> bool:
-        """Get conditions on whether it's possible to conclude a value for World.semantic_annotations  of type Cabinet."""
+        """Get conditions on whether it's possible to conclude a value for World.semantic_annotations  of type Wardrobe."""
         return any(v for v in case.semantic_annotations if type(v) is Drawer)
 
     return has_drawers(case)
 
 
-def conclusion_35528769484583703815352905256802298589(case) -> List[Cabinet]:
-    def get_cabinets(case: World) -> Union[set, Cabinet, list]:
-        """Get possible value(s) for World.semantic_annotations of types list/set of Cabinet"""
+def conclusion_35528769484583703815352905256802298589(case) -> List[Wardrobe]:
+    def get_wardrobes(case: World) -> Union[set, Wardrobe, list]:
+        """Get possible value(s) for World.semantic_annotations of types list/set of Wardrobe"""
         drawers = [v for v in case.semantic_annotations if isinstance(v, Drawer)]
         prismatic_connections = [
             c
             for c in case.connections
             if isinstance(c, PrismaticConnection)
-            and c.child in [drawer.body for drawer in drawers]
+            and c.child in [drawer.root for drawer in drawers]
         ]
-        cabinet_HasCaseAsMainBody_bodies = [pc.parent for pc in prismatic_connections]
-        cabinets = []
-        for ccb in cabinet_HasCaseAsMainBody_bodies:
-            if ccb in [cabinet.body for cabinet in cabinets]:
+        wardrobe_HasCaseAsMainBody_bodies = [pc.parent for pc in prismatic_connections]
+        wardrobes = []
+        for ccb in wardrobe_HasCaseAsMainBody_bodies:
+            if ccb in [wardrobe.root for wardrobe in wardrobes]:
                 continue
             cc_prismatic_connections = [
                 pc for pc in prismatic_connections if pc.parent is ccb
             ]
-            cabinet_drawer_HasCaseAsMainBody_bodies = [
+            wardrobe_drawer_HasCaseAsMainBody_bodies = [
                 pc.child for pc in cc_prismatic_connections
             ]
-            cabinet_drawers = [
-                d for d in drawers if d.body in cabinet_drawer_HasCaseAsMainBody_bodies
+            wardrobe_drawers = [
+                d for d in drawers if d.root in wardrobe_drawer_HasCaseAsMainBody_bodies
             ]
-            cabinets.append(Cabinet(body=ccb, drawers=cabinet_drawers))
+            wardrobes.append(Wardrobe(root=ccb, drawers=wardrobe_drawers))
 
-        return cabinets
+        return wardrobes
 
-    return get_cabinets(case)
+    return get_wardrobes(case)
 
 
 def conditions_59112619694893607910753808758642808601(case) -> bool:
@@ -125,7 +125,7 @@ def conclusion_59112619694893607910753808758642808601(case) -> List[Door]:
     def get_doors(case: World) -> List[Door]:
         """Get possible value(s) for World.semantic_annotations  of type Door."""
         handles = [v for v in case.semantic_annotations if isinstance(v, Handle)]
-        handle_bodies = [h.body for h in handles]
+        handle_bodies = [h.root for h in handles]
         connections_with_handles = [
             c
             for c in case.connections
@@ -151,7 +151,7 @@ def conclusion_59112619694893607910753808758642808601(case) -> List[Door]:
             if c.parent in bodies_that_have_revolute_joints
         ]
         doors = [
-            Door(body=c.parent, handle=[h for h in handles if h.body == c.child][0])
+            Door(root=c.parent, handle=[h for h in handles if h.root == c.child][0])
             for c in body_handle_connections
         ]
         return doors
@@ -165,7 +165,7 @@ def conditions_10840634078579061471470540436169882059(case) -> bool:
         return any(
             v
             for v in case.semantic_annotations
-            if isinstance(v, Door) and "fridge" in v.body.name.name.lower()
+            if isinstance(v, Door) and "fridge" in v.root.name.name.lower()
         )
 
     return has_doors_with_fridge_in_their_name(case)
@@ -178,10 +178,10 @@ def conclusion_10840634078579061471470540436169882059(case) -> List[Fridge]:
         fridge_doors = [
             v
             for v in case.semantic_annotations
-            if isinstance(v, Door) and "fridge" in v.body.name.name.lower()
+            if isinstance(v, Door) and "fridge" in v.root.name.name.lower()
         ]
         # Precompute bodies of the fridge doors
-        fridge_doors_bodies = [d.body for d in fridge_doors]
+        fridge_doors_bodies = [d.root for d in fridge_doors]
         # Filter relevant revolute connections
         fridge_door_connections = [
             c
@@ -192,7 +192,7 @@ def conclusion_10840634078579061471470540436169882059(case) -> List[Fridge]:
         ]
         return [
             Fridge(
-                body=c.parent,
+                root=c.parent,
                 doors=[fridge_doors[fridge_doors_bodies.index(c.child)]],
             )
             for c in fridge_door_connections

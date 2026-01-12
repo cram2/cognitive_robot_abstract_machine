@@ -141,8 +141,8 @@ class ConnectionModificationTestCase(unittest.TestCase):
     def test_semantic_annotation_modifications(self):
         w = World()
         b1 = Body(name=PrefixedName("b1"))
-        v1 = Handle(body=b1)
-        v2 = Door(body=b1, handle=v1)
+        v1 = Handle(root=b1)
+        v2 = Door(root=b1, handle=v1)
 
         add_v1 = AddSemanticAnnotationModification(v1)
         add_v2 = AddSemanticAnnotationModification(v2)

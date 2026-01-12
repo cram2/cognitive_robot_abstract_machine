@@ -155,8 +155,8 @@ def test_world_fetching(rclpy_node):
 def test_semantic_annotation_modifications(rclpy_node):
     w1 = World(name="w1")
     b1 = Body(name=PrefixedName("b1"))
-    v1 = Handle(body=b1)
-    v2 = Door(body=b1, handle=v1)
+    v1 = Handle(root=b1)
+    v2 = Door(root=b1, handle=v1)
 
     with w1.modify_world():
         w1.add_body(b1)
