@@ -177,6 +177,30 @@ class SemiRealRobot:
         return self
 
 
+class NoExecution:
+
+    def __init__(self):
+        self.pre: ExecutionType = ExecutionType.SEMI_REAL
+
+    def __enter__(self):
+        """
+        Entering function for 'with' scope, saves the previously set :py:attr:`~ProcessModuleManager.execution_type` and
+        sets it to 'semi_real'
+        """
+        self.pre = ProcessModuleManager.execution_type
+        ProcessModuleManager.execution_type = ExecutionType.NO_EXECUTION
+
+    def __exit__(self, type, value, traceback):
+        """
+        Exit method for the 'with' scope, sets the :py:attr:`~ProcessModuleManager.execution_type` to the previously
+        used one.
+        """
+        ProcessModuleManager.execution_type = self.pre
+
+    def __call__(self):
+        return self
+
+
 def with_real_robot(func: Callable) -> Callable:
     """
     Decorator to execute designators in the decorated class on the real robot.
@@ -233,6 +257,7 @@ def with_simulated_robot(func: Callable) -> Callable:
 simulated_robot = SimulatedRobot()
 real_robot = RealRobot()
 semi_real_robot = SemiRealRobot()
+no_execution = NoExecution()
 
 
 class ProcessModuleManager(ABC):

@@ -1,38 +1,49 @@
 from __future__ import annotations
 
+import logging
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
+from inspect import signature
 from typing import Optional
 
-# from giskardpy.motion_statechart.tasks.task import Task
+from typing_extensions import TypeVar, ClassVar, Type
+
+from giskardpy.motion_statechart.graph_node import Task
+from krrood.ormatic.dao import HasGeneric
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.world import World
-from typing_extensions import TYPE_CHECKING
-
+from ...datastructures.enums import ExecutionType
 from ...designator import DesignatorDescription
+from ...process_module import ProcessModuleManager
 
-if TYPE_CHECKING:
-    pass
+logger = logging.getLogger(__name__)
+
+
+T = TypeVar("T", bound=AbstractRobot)
 
 
 @dataclass
-class AlternativeMotionMapping(ABC):
-    robot_view: AbstractRobot
+class AlternativeMotion(HasGeneric[T], ABC):
+    execution_type: ClassVar[ExecutionType]
 
-    motion: BaseMotion
-
-    @property
-    @abstractmethod
-    def motion_chart(self) -> Task:
+    def perform(self):
         pass
 
     @staticmethod
     def check_for_alternative(
         robot_view: AbstractRobot, motion: BaseMotion
-    ) -> Optional[Task]:
-        for alternative in AlternativeMotionMapping.__subclasses__():
-            if alternative.robot_view == robot_view and alternative.motion == motion:
-                return alternative.motion_chart
+    ) -> Optional[Type[BaseMotion]]:
+        """
+        Checks if there is an alternative motion for the given robot view, motion and execution type.
+
+        :return: The alternative motion class if found, None otherwise
+        """
+        for alternative in AlternativeMotion.__subclasses__():
+            if (
+                issubclass(alternative, motion.__class__)
+                and alternative.original_class() == robot_view.__class__
+                and ProcessModuleManager.execution_type == alternative.execution_type
+            ):
+                return alternative
         return None
 
 
@@ -48,47 +59,26 @@ class BaseMotion(DesignatorDescription):
 
     @property
     def motion_chart(self) -> Task:
-        alternative = AlternativeMotionMapping.check_for_alternative(
-            self.robot_view, self
-        )
-        if alternative is not None:
-            return alternative
-        else:
-            return self._motion_chart
+        """
+        Returns the mapped motion chart for this motion or the alternative motion if there is one.
+
+        :return: The motion chart for this motion in this context
+        """
+        alternative = self.get_alternative_motion()
+        if alternative:
+            parameter = signature(self.__init__).parameters
+            # Initialize alternative motion with the same parameters as the current motion
+            alternative_instance = alternative(
+                **{param: getattr(self, param) for param in parameter}
+            )
+            alternative_instance.plan_node = self.plan_node
+            return alternative_instance._motion_chart
+        return self._motion_chart
 
     @property
     @abstractmethod
     def _motion_chart(self) -> Task:
         pass
 
-    def __post_init__(self):
-        """
-        Checks if types are missing or wrong
-        """
-
-        return
-        # TODO include type checks for this again (use type guard?)
-        #
-        # right_types = get_type_hints(self)
-        # attributes = self.__dict__.copy()
-        # `
-        # missing = []
-        # wrong_type = {}
-        # current_type = {}
-        #
-        # for k in attributes.keys():
-        #     attribute = attributes[k]
-        #     attribute_type = type(attributes[k])
-        #     right_type = right_types[k]
-        #     types = get_args(right_type)
-        #     if attribute is None:
-        #         if not any([x is type(None) for x in get_args(right_type)]):
-        #             missing.append(k)
-        #     elif not issubclass(attribute_type, right_type): # attribute_type is not right_type:
-        #         if attribute_type not in types:
-        #             if attribute_type not in [get_origin(x) for x in types if x is not type(None)]:
-        #                 wrong_type[k] = right_types[k]
-        #                 current_type[k] = attribute_type
-        # if missing != [] or wrong_type != {}:
-        #     raise ResolutionError(missing, wrong_type, current_type, self.__class__)
-        #
+    def get_alternative_motion(self) -> Optional[Type[AlternativeMotion]]:
+        return AlternativeMotion.check_for_alternative(self.robot_view, self)

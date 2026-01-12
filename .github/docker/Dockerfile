@@ -8,7 +8,7 @@ SHELL ["/bin/bash", "-c"]
 
 WORKDIR /opt/ros
 RUN apt update  \
-    && apt install python3.12-venv ros-jazzy-xacro python3-vcstool git ros-dev-tools default-jre graphviz graphviz-dev pip -y  \
+    && apt install python3.12-venv ros-jazzy-xacro ros-jazzy-navigation2 python3-vcstool git ros-dev-tools default-jre graphviz graphviz-dev ros-jazzy-rclpy-message-converter pip -y  \
     && apt-get clean  \
     && rm -rf /var/lib/apt/lists/*
 
