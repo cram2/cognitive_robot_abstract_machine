@@ -263,16 +263,16 @@ class OffsetEstimator:
 
 
 @dataclass
-class LowPassButter:
+class LowPassButterworthFilter:
     """
-    Stateful Butterworth low-pass filter using SOS form for stability.
+    Stateful Butterworth low-pass filter using Second-Order-Sections form for stability.
     """
 
     cutoff_hz: float
     """
     Cutoff frequency of the low-pass filter in hertz.
     """
-    fs_hz: float
+    sampling_frequency: float
     """
     Sampling frequency of the input signal in hertz.
     """
@@ -280,21 +280,40 @@ class LowPassButter:
     """
     Order of the Butterworth filter.
     """
-    sos: np.ndarray = field(init=False, repr=False)
+    second_order_sections: np.ndarray = field(init=False, repr=False)
     """
-    Second-order sections representation of the filter.
+    Internal filter coefficients that define how the low-pass filter processes signals.
+
+    This array contains the mathematical recipe for the Butterworth filter, broken down
+    into smaller, more stable pieces called "second-order sections". Think of it like
+    having a complex filter recipe split into simpler sub-recipes that work together.
+
+    Why this approach?
+    - **Stability**: Large filters can become numerically unstable when represented as 
+      a single equation. Breaking them into smaller pieces prevents this.
+    - **Accuracy**: Each smaller piece maintains better precision during calculations.
+
+    Technical details:
+    - Shape: (n_sections, 6) where n_sections ≈ filter_order/2
+    - Each row contains 6 coefficients [b0, b1, b2, a0, a1, a2] for one filter section
+    - Created automatically from filter parameters (cutoff frequency, order, sample rate)
+    - Used internally by scipy.signal.sosfilt() for real-time filtering
+
+    You don't need to modify this directly - it's automatically generated when the
+    filter is initialized with your desired cutoff frequency and filter order.
     """
+
     filter_state: np.ndarray = field(init=False, repr=False)
     """
     Internal filter state for streaming processing.
     """
 
     def __post_init__(self) -> None:
-        nyq = 0.5 * float(self.fs_hz)
+        nyq = 0.5 * float(self.sampling_frequency)
         wn = float(self.cutoff_hz) / nyq
-        self.sos = butter(int(self.order), wn, btype="low", output="sos")
+        self.second_order_sections = butter(int(self.order), wn, btype="low", output="sos")
         # zi per SOS section: shape (n_sections, 2)
-        self.filter_state = np.zeros((self.sos.shape[0], 2))
+        self.filter_state = np.zeros((self.second_order_sections.shape[0], 2))
 
     def step(self, x: float) -> float:
         """
@@ -303,7 +322,7 @@ class LowPassButter:
         :param x: Input sample.
         :return: Filtered sample.
         """
-        y, self.filter_state = sosfilt(self.sos, [x], zi=self.filter_state)
+        y, self.filter_state = sosfilt(self.second_order_sections, [x], zi=self.filter_state)
         return float(y[-1])
 
 
@@ -384,12 +403,12 @@ class WrenchProcessor:
             for _ in range(6)
         ]
         self.main = [
-            LowPassButter(self.config.cutoff_main_hz, fs, self.config.order_main)
+            LowPassButterworthFilter(self.config.cutoff_main_hz, fs, self.config.order_main)
             for _ in range(6)
         ]
         self.diff = [DerivativeEstimator() for _ in range(6)]
         self.diff_smooth = [
-            LowPassButter(self.config.cutoff_diff_hz, fs, self.config.order_diff)
+            LowPassButterworthFilter(self.config.cutoff_diff_hz, fs, self.config.order_diff)
             for _ in range(6)
         ]
 

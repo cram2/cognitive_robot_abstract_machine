@@ -33,13 +33,22 @@ class BuildContext:
     """
 
     world: World
+    """There world in which to execute the Motion Statechart."""
     auxiliary_variable_manager: AuxiliaryVariableManager
+    """Auxiliary variable manager used by nodes to create auxiliary variables."""
     collision_scene: CollisionWorldSynchronizer
+    """Synchronization of the collision world with the world in which the Motion Statechart is executed."""
     qp_controller_config: QPControllerConfig
+    """Configuration of the QP controller used to solve the QP problem."""
     control_cycle_variable: AuxiliaryVariable
+    """Auxiliary variable used to count control cycles, can be used my Motion StatechartNodes to implement time-dependent actions."""
     extensions: Dict[Type[ContextExtension], ContextExtension] = field(
         default_factory=dict, repr=False, init=False
     )
+    """
+    Dictionary of extensions used to augment the build context.
+    Ros2 extensions are automatically added to the build context when using the Ros2Executor.
+    """
 
     def require_extension(
         self, extension_type: Type[GenericContextExtension]

@@ -7,7 +7,7 @@ import pytest
 
 from giskardpy.ros2_tools.force_torque_filter_node import (
     OffsetEstimator,
-    LowPassButter,
+    LowPassButterworthFilter,
     DerivativeEstimator,
     FilterConfig,
     WrenchProcessor,
@@ -38,7 +38,7 @@ def test_offset_estimator_initializes_to_first_sample():
 
 def test_lowpass_butter_reduces_high_freq():
     fs = 100.0
-    filt = LowPassButter(cutoff_hz=5.0, fs_hz=fs, order=3)
+    filt = LowPassButterworthFilter(cutoff_hz=5.0, sampling_frequency=fs, order=3)
     t = np.arange(0, 2.0, 1.0 / fs)
     low = np.sin(2 * np.pi * 1 * t)
     high = 0.5 * np.sin(2 * np.pi * 30 * t)
