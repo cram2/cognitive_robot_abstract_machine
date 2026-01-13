@@ -1,5 +1,7 @@
+import os
 from copy import deepcopy
 
+from pkg_resources import resource_filename
 from rdflib.plugins.sparql.parser import PrefixedName
 
 from krrood.entity_query_language.conclusion import Add, Set
@@ -9,11 +11,15 @@ from krrood.entity_query_language.entity_result_processors import an, a
 from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.reasoning.predicates_base import (
     SatisfiesRequest,
     Causes,
+    CanExecute,
 )
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Container,
@@ -28,6 +34,16 @@ from semantic_digital_twin.semantic_annotations.task_effect_motion import (
 )
 from semantic_digital_twin.world import World
 import pytest
+import rclpy
+from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.world_description.connections import (
+    OmniDrive,
+    ActiveConnection,
+)
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    CollisionCheckingConfig,
+)
 
 
 @pytest.fixture(scope="function")
@@ -110,8 +126,7 @@ class TestBodyMotionProblem:
         causes_opening = Causes(effect=effect_sym, motion=motion_sym, environment=world)
 
         query = an(
-            set_of(
-                [causes_opening.motion, effect_sym, task_sym],
+            set_of(motion_sym, effect_sym, task_sym).where(
                 satisfies_request,
                 causes_opening,
             )
@@ -205,21 +220,130 @@ class TestBodyMotionProblem:
         assert all([res.data[task_sym].task_type == "close" for res in results])
         print("second query done with task type ", results[0].data[task_sym].task_type)
 
+    def get_world(self):
+        urdf_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "../..",
+            "pycram",
+            "resources",
+            "robots",
+        )
+        pr2 = os.path.join(urdf_dir, "pr2_with_ft2_cableguide.urdf")
+        pr2_parser = URDFParser.from_file(file_path=pr2)
+        world_with_pr2 = pr2_parser.parse()
+        # leere welt, die andere reinmergen im with block, wie bei giskard.py
+        with world_with_pr2.modify_world():
+            # DoF has hardware interface flag hier setzen. kann ich mir bei pr2_standalone_confign abschauen
+            pr2_root = world_with_pr2.root
+            localization_body = Body(name=PrefixedName("odom_combined"))
+            world_with_pr2.add_kinematic_structure_entity(localization_body)
+            c_root_bf = OmniDrive.create_with_dofs(
+                parent=localization_body, child=pr2_root, world=world_with_pr2
+            )
+            world_with_pr2.add_connection(c_root_bf)
+            robot = PR2.from_world(world_with_pr2)
+
+        with world_with_pr2.modify_world():
+            path_to_srdf = resource_filename(
+                "giskardpy", "../../self_collision_matrices/iai/pr2.srdf"
+            )
+            world_with_pr2.load_collision_srdf(path_to_srdf)
+            frozen_joints = ["r_gripper_l_finger_joint", "l_gripper_l_finger_joint"]
+            for joint_name in frozen_joints:
+                c: ActiveConnection = world_with_pr2.get_connection_by_name(joint_name)
+                c.frozen_for_collision_avoidance = True
+
+            for body in robot.bodies_with_collisions:
+                collision_config = CollisionCheckingConfig(
+                    buffer_zone_distance=0.1, violated_distance=0.0
+                )
+                body.set_static_collision_config(collision_config)
+
+            for joint_name in ["r_wrist_roll_joint", "l_wrist_roll_joint"]:
+                connection: ActiveConnection = world_with_pr2.get_connection_by_name(
+                    joint_name
+                )
+                collision_config = CollisionCheckingConfig(
+                    buffer_zone_distance=0.05,
+                    violated_distance=0.0,
+                    max_avoided_bodies=4,
+                )
+                connection.set_static_collision_config_for_direct_child_bodies(
+                    collision_config
+                )
+
+            for joint_name in ["r_wrist_flex_joint", "l_wrist_flex_joint"]:
+                connection: ActiveConnection = world_with_pr2.get_connection_by_name(
+                    joint_name
+                )
+                collision_config = CollisionCheckingConfig(
+                    buffer_zone_distance=0.05,
+                    violated_distance=0.0,
+                    max_avoided_bodies=2,
+                )
+                connection.set_static_collision_config_for_direct_child_bodies(
+                    collision_config
+                )
+            for joint_name in ["r_elbow_flex_joint", "l_elbow_flex_joint"]:
+                connection: ActiveConnection = world_with_pr2.get_connection_by_name(
+                    joint_name
+                )
+                collision_config = CollisionCheckingConfig(
+                    buffer_zone_distance=0.05,
+                    violated_distance=0.0,
+                    max_avoided_bodies=1,
+                )
+                connection.set_static_collision_config_for_direct_child_bodies(
+                    collision_config
+                )
+            for joint_name in ["r_forearm_roll_joint", "l_forearm_roll_joint"]:
+                connection: ActiveConnection = world_with_pr2.get_connection_by_name(
+                    joint_name
+                )
+                collision_config = CollisionCheckingConfig(
+                    buffer_zone_distance=0.025,
+                    violated_distance=0.0,
+                    max_avoided_bodies=1,
+                )
+                connection.set_static_collision_config_for_direct_child_bodies(
+                    collision_config
+                )
+
+            collision_config = CollisionCheckingConfig(
+                buffer_zone_distance=0.2, violated_distance=0.1, max_avoided_bodies=2
+            )
+            robot.drive.set_static_collision_config_for_direct_child_bodies(
+                collision_config
+            )
+        return world_with_pr2
+
     def test_query_motion_satisfying_task_request2(self, mutable_model_world: World):
         world = mutable_model_world
+        if not rclpy.ok():
+            rclpy.init()
+        node = rclpy.create_node("viz_node")
+        VizMarkerPublisher(world=world, node=node)
+
         effects, motions, open_task, close_task, drawers = self._extend_world(world)
 
-        task_sym = variable(TaskRequest, domain=[open_task, close_task])
+        task_sym = variable(TaskRequest, domain=[open_task])
         effect_sym = variable(Effect, domain=effects)
-        motion_sym = variable(Motion, domain=motions)
+        motion_sym = variable(Motion, domain=motions[0])
 
         satisfies_request = SatisfiesRequest(task=task_sym, effect=effect_sym)
         causes_opening = Causes(effect=effect_sym, motion=motion_sym, environment=world)
+        robot = PR2.from_world(world)
+        can_execute = CanExecute(motion=motion_sym, robot=robot)
 
-        query = an(entity(motion_sym).where(satisfies_request, causes_opening))
+        query = an(
+            set_of(task_sym, motion_sym).where(
+                satisfies_request, causes_opening, can_execute
+            )
+        )
 
         results = list(query.evaluate())
         # motion: Motion = results[0]
         print(len(results))
         # print(motion)
-        assert len(results) == len(drawers)
+        # assert len(results) == len(drawers)

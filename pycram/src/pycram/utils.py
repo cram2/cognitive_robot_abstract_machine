@@ -18,6 +18,8 @@ from typing import Union, Iterator
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
+
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 from .tf_transformations import (
@@ -43,7 +45,7 @@ if TYPE_CHECKING:
 
 
 def link_pose_for_joint_config(
-    obj: Body, joint_config: Dict[str, float]
+    obj: Body, joint_config: Dict[str, float], test_world: World = None
 ) -> PoseStamped:
     """
     Get the pose a link would be in if the given joint configuration would be applied to the object.
@@ -54,7 +56,7 @@ def link_pose_for_joint_config(
     :param joint_config: Dict with the goal joint configuration
     :return: The pose of the link after applying the joint configuration
     """
-    reasoning_world = deepcopy(obj._world)
+    reasoning_world = test_world or deepcopy(obj._world)
     for joint_name, joint_pose in joint_config.items():
         reasoning_world.state[
             reasoning_world.get_degree_of_freedom_by_name(joint_name).id

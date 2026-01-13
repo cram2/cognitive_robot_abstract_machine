@@ -87,9 +87,8 @@ class ExternalCollisionAvoidanceTask(Task):
         )
 
         buffer_zone_distance = max(
-            b.get_collision_config().buffer_zone_distance
+            b.get_collision_config().buffer_zone_distance or 0.1
             for b in direct_children
-            if b.get_collision_config().buffer_zone_distance is not None
         )
         violated_distance = max(
             b.get_collision_config().violated_distance for b in direct_children
