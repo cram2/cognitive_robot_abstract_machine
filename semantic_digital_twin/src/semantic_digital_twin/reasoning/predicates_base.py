@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 from giskardpy.executor import Executor
 from giskardpy.model.collision_matrix_manager import CollisionRequest
+from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.motion_statechart.goals.templates import Sequence
@@ -167,13 +168,15 @@ class CanExecute(Predicate):
             # The MSC ends when the sequence is done
             msc.add_node(EndMotion.when_true(sequence_goal))
             # Simulate execution in the world
-            executor = Executor(world=self.robot._world)
+            executor = Executor(
+                world=self.robot._world, collision_checker=CollisionCheckerLib.bpb
+            )
             executor.compile(msc)
 
             with self.robot._world.reset_state_context():
                 # Tick the executor until the motion ends or times out
                 try:
-                    executor.tick_until_end(timeout=1000)
+                    executor.tick_until_end(timeout=400)
                 except TimeoutError as e:
                     # If timeout is reached, the motion is considered not executable
                     pass

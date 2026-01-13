@@ -262,8 +262,8 @@ class TestBodyMotionProblem:
 
             controlled_joints = [
                 "torso_lift_joint",
-                "head_pan_joint",
-                "head_tilt_joint",
+                # "head_pan_joint",
+                # "head_tilt_joint",
                 "r_shoulder_pan_joint",
                 "r_shoulder_lift_joint",
                 "r_upper_arm_roll_joint",
@@ -435,3 +435,10 @@ class TestBodyMotionProblem:
         print(len(results))
         # print(motion)
         # assert len(results) == len(drawers)
+
+    def test_what_needs_to_be_done(self):
+        world = self.get_world()
+        if not rclpy.ok():
+            rclpy.init()
+        node = rclpy.create_node("viz_node")
+        VizMarkerPublisher(world=world, node=node)
