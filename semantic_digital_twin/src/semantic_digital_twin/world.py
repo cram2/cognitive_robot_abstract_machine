@@ -611,7 +611,7 @@ class World:
             b
             for b in self.bodies
             if b.has_collision()
-            and b.get_collision_config
+            and b.get_collision_config()
             and not b.get_collision_config().disabled
         ]
 
