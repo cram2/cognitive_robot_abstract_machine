@@ -665,6 +665,30 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
         for entity in self.kinematic_structure_entities:
             entity._semantic_annotations.add(self)
 
+        for semantic_annotation_field in fields(self):
+            if semantic_annotation_field.name.startswith(
+                "_"
+            ) or semantic_annotation_field.name.startswith("__"):
+                continue
+
+            value = getattr(self, semantic_annotation_field.name)
+            if isinstance(value, (list, set)):
+                for item in value:
+                    self._assign_field_value_if_possible(item)
+            else:
+                self._assign_field_value_if_possible(value)
+
+    def _assign_field_value_if_possible(self, obj: Any):
+        """
+        Hook method called during post-initialization for each value in a dataclass field.
+
+        This method allows subclasses to perform additional setup on objects that are
+        assigned to its fields. By default, this is a no-op.
+
+        :param obj: The object to potentially process.
+        """
+        pass
+
     def __hash__(self):
         return hash(
             tuple(
@@ -682,15 +706,29 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
         }
 
         for semantic_annotation_field in fields(self):
-            value = getattr(self, semantic_annotation_field.name)
             if semantic_annotation_field.name.startswith(
                 "_"
             ) or semantic_annotation_field.name.startswith("__"):
                 continue
-            if not issubclass(type(value), SubclassJSONSerializer):
+
+            if self._should_skip_field_for_json(semantic_annotation_field.name):
                 continue
-            result[semantic_annotation_field.name] = value.to_json()
+
+            value = getattr(self, semantic_annotation_field.name)
+            if isinstance(value, (list, set)):
+                json_list = []
+                for item in value:
+                    if isinstance(item, SubclassJSONSerializer):
+                        json_list.append(item.to_json())
+                    else:
+                        json_list.append(item)
+                result[semantic_annotation_field.name] = json_list
+            elif isinstance(value, SubclassJSONSerializer):
+                result[semantic_annotation_field.name] = value.to_json()
         return result
+
+    def _should_skip_field_for_json(self, field_name: str) -> bool:
+        return False
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
@@ -701,9 +739,26 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
         for k, v in semantic_annotation_fields.items():
             if k not in data.keys():
                 continue
-            field_type = type_string_to_type(data[k][JSON_TYPE_NAME])
-            if issubclass(field_type, SubclassJSONSerializer):
-                init_args[k] = field_type.from_json(data[k], **kwargs)
+
+            field_data = data[k]
+            if isinstance(field_data, list):
+                deserialized_list = []
+                for item in field_data:
+                    if isinstance(item, dict) and JSON_TYPE_NAME in item:
+                        deserialized_list.append(from_json(item, **kwargs))
+                    else:
+                        deserialized_list.append(item)
+
+                if v.default_factory is set or (
+                    hasattr(v.type, "__origin__") and v.type.__origin__ is set
+                ):
+                    init_args[k] = set(deserialized_list)
+                else:
+                    init_args[k] = deserialized_list
+            elif isinstance(field_data, dict) and JSON_TYPE_NAME in field_data:
+                field_type = type_string_to_type(field_data[JSON_TYPE_NAME])
+                if issubclass(field_type, SubclassJSONSerializer):
+                    init_args[k] = field_type.from_json(field_data, **kwargs)
 
         return cls(**init_args)
 

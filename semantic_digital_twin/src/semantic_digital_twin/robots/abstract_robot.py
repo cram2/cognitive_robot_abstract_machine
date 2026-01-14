@@ -13,6 +13,7 @@ from typing_extensions import (
     Self,
     DefaultDict,
     List,
+    Any,
 )
 
 from ..collision_checking.collision_detector import CollisionCheck
@@ -400,6 +401,28 @@ class AbstractRobot(Agent, ABC):
     - an optional collection of sensor chains, each containing a sensor, such as a camera
     => If a kinematic chain contains both a manipulator and a sensor, it will be part of both collections
     """
+
+    def _assign_field_value_if_possible(self, obj: Any):
+        """
+        Re-establishes bidirectional links between the robot and its components.
+
+        If the object has an `assign_to_robot` method, it is called with this robot as
+        an argument. This is used during reconstruction from JSON to ensure all
+        components (arms, sensors, etc.) are correctly registered with the robot.
+
+        :param obj: The component to register with the robot.
+        """
+        if isinstance(obj, SemanticRobotAnnotation):
+            obj.assign_to_robot(self)
+
+    def _should_skip_field_for_json(self, field_name: str) -> bool:
+        # Skip redundant internal collections for Robots as they are rebuilt from components
+        return field_name in [
+            "manipulators",
+            "sensors",
+            "manipulator_chains",
+            "sensor_chains",
+        ]
 
     torso: Optional[Torso] = None
     """

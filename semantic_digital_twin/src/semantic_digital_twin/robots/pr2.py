@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from itertools import product
 from typing import Self
 
-from typing_extensions import List
+from typing_extensions import List, Dict, Any
 
 from giskardpy.model.collision_matrix_manager import CollisionRequest
 from .robot_mixins import HasNeck, SpecifiesLeftRightArm
