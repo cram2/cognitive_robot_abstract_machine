@@ -163,20 +163,23 @@ class CanExecute(Predicate):
         # 2. Test execution for each gripper
         result = False
         initial_state_data = self.robot._world.state.data.copy()
+        root = self.robot._world.root
         for gripper in self.robot.manipulators:
             msc = MotionStatechart()
-
+            pointing_axis = self.robot.base.main_axis
+            goal_point = handle_trajectory[0].to_spatial_type().to_position()
+            goal_point.z = self.robot.base.bodies[0].global_pose.z
             # Facing the direction
             point = Pointing(
-                root_link=self.robot._world.root,
+                root_link=root,
                 tip_link=self.robot.root,
-                pointing_axis=self.robot.base.main_axis,
-                goal_point=handle_trajectory[0].to_spatial_type().to_position(),
+                pointing_axis=pointing_axis,
+                goal_point=goal_point,
+                threshold=0.2,
             )
             msc.add_node(point)
 
             # Create CartesianPose tasks for each waypoint
-            root = self.robot._world.root
             approach_waypoints = []
             for i, pose in enumerate(approach_trajectory):
                 goal = CartesianPose(
@@ -202,6 +205,9 @@ class CanExecute(Predicate):
                 nodes=approach_waypoints + waypoints, name="full_trajectory_sequence"
             )
             msc.add_node(full_trajectory_sequence)
+
+            full_trajectory_sequence.start_condition = point.observation_variable
+            point.end_condition = point.observation_variable
 
             collision_node = CollisionAvoidance(
                 collision_entries=[
@@ -234,7 +240,7 @@ class CanExecute(Predicate):
 
             # Tick the executor until the motion ends or times out
             try:
-                executor.tick_until_end(timeout=400)
+                executor.tick_until_end(timeout=600)
             except TimeoutError as e:
                 # If timeout is reached, the motion is considered not executable
                 pass
