@@ -10,7 +10,12 @@ from krrood.entity_query_language.entity_result_processors import an, a
 from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from pycram.robot_descriptions.pr2_states import both_park as park_pr2
+from pycram.datastructures.enums import GripperState
+from pycram.robot_descriptions.pr2_states import (
+    both_park as park_pr2,
+    left_gripper_open,
+    right_gripper_open,
+)
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -308,14 +313,14 @@ class TestBodyMotionProblem:
 
             for body in robot.bodies_with_collisions:
                 collision_config = CollisionCheckingConfig(
-                    buffer_zone_distance=0.1, violated_distance=0.0
+                    buffer_zone_distance=0.01, violated_distance=0.0
                 )
                 body.set_static_collision_config(collision_config)
 
             for joint_name in ["r_wrist_roll_joint", "l_wrist_roll_joint"]:
                 connection: ActiveConnection = world.get_connection_by_name(joint_name)
                 collision_config = CollisionCheckingConfig(
-                    buffer_zone_distance=0.05,
+                    buffer_zone_distance=0.005,
                     violated_distance=0.0,
                     max_avoided_bodies=4,
                 )
@@ -326,7 +331,7 @@ class TestBodyMotionProblem:
             for joint_name in ["r_wrist_flex_joint", "l_wrist_flex_joint"]:
                 connection: ActiveConnection = world.get_connection_by_name(joint_name)
                 collision_config = CollisionCheckingConfig(
-                    buffer_zone_distance=0.05,
+                    buffer_zone_distance=0.005,
                     violated_distance=0.0,
                     max_avoided_bodies=2,
                 )
@@ -336,7 +341,7 @@ class TestBodyMotionProblem:
             for joint_name in ["r_elbow_flex_joint", "l_elbow_flex_joint"]:
                 connection: ActiveConnection = world.get_connection_by_name(joint_name)
                 collision_config = CollisionCheckingConfig(
-                    buffer_zone_distance=0.05,
+                    buffer_zone_distance=0.005,
                     violated_distance=0.0,
                     max_avoided_bodies=1,
                 )
@@ -346,7 +351,7 @@ class TestBodyMotionProblem:
             for joint_name in ["r_forearm_roll_joint", "l_forearm_roll_joint"]:
                 connection: ActiveConnection = world.get_connection_by_name(joint_name)
                 collision_config = CollisionCheckingConfig(
-                    buffer_zone_distance=0.025,
+                    buffer_zone_distance=0.0025,
                     violated_distance=0.0,
                     max_avoided_bodies=1,
                 )
@@ -416,6 +421,8 @@ class TestBodyMotionProblem:
         for j in robot.joint_states:
             if j.state_type == "Park":
                 j.apply_to_world(world)
+        left_gripper_open.apply_to_world(world)
+        right_gripper_open.apply_to_world(world)
 
         return world
 
@@ -702,10 +709,10 @@ class TestBodyMotionProblem:
 
     def test_query_motion_satisfying_task_request2(self):
         world = self.get_world()
-        # if not rclpy.ok():
-        #     rclpy.init()
-        # node = rclpy.create_node("viz_node")
-        # VizMarkerPublisher(world=world, node=node, throttle_state_updates=10)
+        if not rclpy.ok():
+            rclpy.init()
+        node = rclpy.create_node("viz_node")
+        VizMarkerPublisher(world=world, node=node, throttle_state_updates=10)
 
         effects, motions, open_task, close_task, drawers = self._extend_world(world)
 

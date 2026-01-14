@@ -146,7 +146,7 @@ class CanExecute(Predicate):
 
         # 1. Transform trajectory to handle coordinates (PoseStamped sequence)
         handle_trajectory = []
-        for position in self.motion.trajectory[2:]:
+        for position in self.motion.trajectory[:]:
             joint_config = {self.motion.actuator.name.name: position}
             # Calculate the global pose of the target body for the given joint position
             pose = link_pose_for_joint_config(
@@ -162,9 +162,9 @@ class CanExecute(Predicate):
 
         # 2. Test execution for each gripper
         result = False
-        initial_state_data = self.robot._world.state.data.copy()
         root = self.robot._world.root
         for gripper in self.robot.manipulators:
+            initial_state_data = self.robot._world.state.data.copy()
             msc = MotionStatechart()
             pointing_axis = self.robot.base.main_axis
             goal_point = handle_trajectory[0].to_spatial_type().to_position()
@@ -242,7 +242,6 @@ class CanExecute(Predicate):
             try:
                 executor.tick_until_end(timeout=600)
             except TimeoutError as e:
-                # If timeout is reached, the motion is considered not executable
                 pass
             except HardConstraintsViolatedException:
                 pass
