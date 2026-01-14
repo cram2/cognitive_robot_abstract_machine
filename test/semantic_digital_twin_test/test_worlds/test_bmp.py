@@ -10,6 +10,7 @@ from krrood.entity_query_language.entity_result_processors import an, a
 from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from pycram.robot_descriptions.pr2_states import both_park as park_pr2
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -411,6 +412,8 @@ class TestBodyMotionProblem:
         world.get_body_by_name("base_footprint").parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
         )
+
+        park_pr2.apply_to_world(world)
         return world
 
     def get_stretch_world(self):
@@ -446,14 +449,47 @@ class TestBodyMotionProblem:
                 rotation_velocity_limits=0.2,
                 world=world,
             )
-
+            robot = Stretch.from_world(world_with_robot)
             world.merge_world(world_with_robot, odom)
+
+            controlled_joints = [
+                "joint_gripper_finger_left",
+                "joint_gripper_finger_right",
+                # "joint_right_wheel",
+                # "joint_left_wheel",
+                "joint_lift",
+                "joint_arm_l3",
+                "joint_arm_l2",
+                "joint_arm_l1",
+                "joint_arm_l0",
+                "joint_wrist_yaw",
+                "joint_head_pan",
+                "joint_head_tilt",
+                odom.name,
+            ]
+            for joint_name in controlled_joints:
+                connection: ActiveConnection = world.get_connection_by_name(joint_name)
+                if not isinstance(connection, ActiveConnection):
+                    raise Exception(
+                        f"{joint_name} is not an active connection and cannot be controlled."
+                    )
+                connection.has_hardware_interface = True
 
         with world.modify_world():
             path_to_srdf = resource_filename(
                 "giskardpy", "../../self_collision_matrices/iai/stretch.srdf"
             )
             world.load_collision_srdf(path_to_srdf)
+            frozen_joints = ["joint_gripper_finger_left", "joint_gripper_finger_right"]
+            for joint_name in frozen_joints:
+                c: ActiveConnection = world.get_connection_by_name(joint_name)
+                c.frozen_for_collision_avoidance = True
+
+            for body in robot.bodies_with_collisions:
+                collision_config = CollisionCheckingConfig(
+                    buffer_zone_distance=0.1, violated_distance=0.0
+                )
+                body.set_static_collision_config(collision_config)
 
         #### apartment
         apartment_world = URDFParser.from_file(
@@ -541,14 +577,60 @@ class TestBodyMotionProblem:
                 rotation_velocity_limits=0.2,
                 world=world,
             )
-
+            robot = Tiago.from_world(world_with_robot)
             world.merge_world(world_with_robot, odom)
+            controlled_joints = [
+                "torso_lift_joint",
+                "head_1_joint",
+                "head_2_joint",
+                "arm_left_1_joint",
+                "arm_left_2_joint",
+                "arm_left_3_joint",
+                "arm_left_4_joint",
+                "arm_left_5_joint",
+                "arm_left_6_joint",
+                "arm_left_7_joint",
+                "arm_right_1_joint",
+                "arm_right_2_joint",
+                "arm_right_3_joint",
+                "arm_right_4_joint",
+                "arm_right_5_joint",
+                "arm_right_6_joint",
+                "arm_right_7_joint",
+                "gripper_right_left_finger_joint",
+                "gripper_right_right_finger_joint",
+                "gripper_left_left_finger_joint",
+                "gripper_left_right_finger_joint",
+                odom.name,
+            ]
+            for joint_name in controlled_joints:
+                connection: ActiveConnection = world.get_connection_by_name(joint_name)
+                if not isinstance(connection, ActiveConnection):
+                    raise Exception(
+                        f"{joint_name} is not an active connection and cannot be controlled."
+                    )
+                connection.has_hardware_interface = True
 
         with world.modify_world():
             path_to_srdf = resource_filename(
                 "giskardpy", "../../self_collision_matrices/iai/tiago_dual.srdf"
             )
             world.load_collision_srdf(path_to_srdf)
+            frozen_joints = [
+                "gripper_right_left_finger_joint",
+                "gripper_right_right_finger_joint",
+                "gripper_left_left_finger_joint",
+                "gripper_left_right_finger_joint",
+            ]
+            for joint_name in frozen_joints:
+                c: ActiveConnection = world.get_connection_by_name(joint_name)
+                c.frozen_for_collision_avoidance = True
+
+            for body in robot.bodies_with_collisions:
+                collision_config = CollisionCheckingConfig(
+                    buffer_zone_distance=0.1, violated_distance=0.0
+                )
+                body.set_static_collision_config(collision_config)
 
         #### apartment
         apartment_world = URDFParser.from_file(
@@ -605,16 +687,16 @@ class TestBodyMotionProblem:
 
     def test_query_motion_satisfying_task_request2(self):
         world = self.get_world()
-        if not rclpy.ok():
-            rclpy.init()
-        node = rclpy.create_node("viz_node")
-        VizMarkerPublisher(world=world, node=node, throttle_state_updates=15)
+        # if not rclpy.ok():
+        #     rclpy.init()
+        # node = rclpy.create_node("viz_node")
+        # VizMarkerPublisher(world=world, node=node, throttle_state_updates=10)
 
         effects, motions, open_task, close_task, drawers = self._extend_world(world)
 
         task_sym = variable(TaskRequest, domain=[open_task])
         effect_sym = variable(Effect, domain=effects)
-        motion_sym = variable(Motion, domain=motions[0])
+        motion_sym = variable(Motion, domain=motions)
 
         satisfies_request = SatisfiesRequest(task=task_sym, effect=effect_sym)
         causes_opening = Causes(effect=effect_sym, motion=motion_sym, environment=world)
@@ -638,7 +720,7 @@ class TestBodyMotionProblem:
         if not rclpy.ok():
             rclpy.init()
         node = rclpy.create_node("viz_node")
-        VizMarkerPublisher(world=world, node=node, throttle_state_updates=15)
+        VizMarkerPublisher(world=world, node=node, throttle_state_updates=5)
 
         effects, motions, open_task, close_task, drawers = self._extend_world(world)
 
@@ -668,7 +750,7 @@ class TestBodyMotionProblem:
         if not rclpy.ok():
             rclpy.init()
         node = rclpy.create_node("viz_node")
-        VizMarkerPublisher(world=world, node=node, throttle_state_updates=15)
+        VizMarkerPublisher(world=world, node=node, throttle_state_updates=5)
 
         effects, motions, open_task, close_task, drawers = self._extend_world(world)
 
