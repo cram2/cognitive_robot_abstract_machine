@@ -21,6 +21,7 @@ from semantic_digital_twin.reasoning.predicates_base import (
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Container,
@@ -54,6 +55,11 @@ from semantic_digital_twin.world_description.world_entity import (
 def mutable_model_world(pr2_apartment_world):
     world = deepcopy(pr2_apartment_world)
     return world
+
+
+@pytest.fixture
+def mutable_stretch_world(stretch_apartment_world):
+    return deepcopy(stretch_apartment_world)
 
 
 class TestBodyMotionProblem:
@@ -406,6 +412,101 @@ class TestBodyMotionProblem:
         )
         return world
 
+    def get_stretch_world(self):
+        urdf_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "../..",
+            "pycram",
+            "resources",
+            "robots",
+        )
+        stretch = os.path.join(urdf_dir, "stretch_description.urdf")
+        stretch_parser = URDFParser.from_file(file_path=stretch)
+        world = World()
+
+        # leere welt, die andere reinmergen im with block, wie bei giskard.py
+        with world.modify_world():
+            # DoF has hardware interface flag hier setzen. kann ich mir bei pr2_standalone_confign abschauen
+            map = Body(name=PrefixedName("map"))
+            odom = Body(name=PrefixedName("odom"))
+            localization = Connection6DoF.create_with_dofs(
+                parent=map, child=odom, world=world
+            )
+            world.add_connection(localization)
+
+            world_with_robot = stretch_parser.parse()
+            # robot = Stretch.from_world(world_with_robot)
+
+            odom = OmniDrive.create_with_dofs(
+                parent=odom,
+                child=world_with_robot.root,
+                translation_velocity_limits=0.2,
+                rotation_velocity_limits=0.2,
+                world=world,
+            )
+
+            world.merge_world(world_with_robot, odom)
+
+        with world.modify_world():
+            path_to_srdf = resource_filename(
+                "giskardpy", "../../self_collision_matrices/iai/stretch.srdf"
+            )
+            world.load_collision_srdf(path_to_srdf)
+
+        #### apartment
+        apartment_world = URDFParser.from_file(
+            os.path.join(
+                os.path.dirname(__file__),
+                "../../..",
+                "pycram",
+                "resources",
+                "worlds",
+                "apartment.urdf",
+            )
+        ).parse()
+        milk_world = STLParser(
+            os.path.join(
+                os.path.dirname(__file__),
+                "../../..",
+                "pycram",
+                "resources",
+                "objects",
+                "milk.stl",
+            )
+        ).parse()
+        cereal_world = STLParser(
+            os.path.join(
+                os.path.dirname(__file__),
+                "../../..",
+                "pycram",
+                "resources",
+                "objects",
+                "breakfast_cereal.stl",
+            )
+        ).parse()
+        apartment_world.merge_world_at_pose(
+            milk_world,
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                2.37, 2, 1.05, reference_frame=apartment_world.root
+            ),
+        )
+        apartment_world.merge_world_at_pose(
+            cereal_world,
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                2.37, 1.8, 1.05, reference_frame=apartment_world.root
+            ),
+        )
+        milk_view = Milk(body=apartment_world.get_body_by_name("milk.stl"))
+        with apartment_world.modify_world():
+            apartment_world.add_semantic_annotation(milk_view)
+
+        world.merge_world(apartment_world)
+        world.get_body_by_name("base_link").parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
+        )
+        return world
+
     def test_query_motion_satisfying_task_request2(self):
         world = self.get_world()
         if not rclpy.ok():
@@ -422,6 +523,36 @@ class TestBodyMotionProblem:
         satisfies_request = SatisfiesRequest(task=task_sym, effect=effect_sym)
         causes_opening = Causes(effect=effect_sym, motion=motion_sym, environment=world)
         robot = PR2.from_world(world)
+        can_execute = CanExecute(motion=motion_sym, robot=robot)
+
+        query = an(
+            set_of(task_sym, motion_sym).where(
+                satisfies_request, causes_opening, can_execute
+            )
+        )
+
+        results = list(query.evaluate())
+        # motion: Motion = results[0]
+        print(len(results))
+        # print(motion)
+        # assert len(results) == len(drawers)
+
+    def test_query_motion_satisfying_task_request_stretch(self):
+        world = self.get_stretch_world()
+        if not rclpy.ok():
+            rclpy.init()
+        node = rclpy.create_node("viz_node")
+        VizMarkerPublisher(world=world, node=node)
+
+        effects, motions, open_task, close_task, drawers = self._extend_world(world)
+
+        task_sym = variable(TaskRequest, domain=[open_task])
+        effect_sym = variable(Effect, domain=effects)
+        motion_sym = variable(Motion, domain=motions[0])
+
+        satisfies_request = SatisfiesRequest(task=task_sym, effect=effect_sym)
+        causes_opening = Causes(effect=effect_sym, motion=motion_sym, environment=world)
+        robot = Stretch.from_world(world)
         can_execute = CanExecute(motion=motion_sym, robot=robot)
 
         query = an(

@@ -246,7 +246,6 @@ def tracy_world():
 
         tracy_parser = URDFParser.from_file(file_path=tracy)
         world_with_tracy = tracy_parser.parse()
-        # world_with_tracy.plot_kinematic_structure()
         tracy_root = world_with_tracy.root
         c_root_bf = Connection6DoF.create_with_dofs(
             parent=localization_body, child=tracy_root, world=world
@@ -254,6 +253,30 @@ def tracy_world():
         world.merge_world(world_with_tracy, c_root_bf)
 
     return world
+
+
+@pytest.fixture(scope="session")
+def stretch_world():
+    urdf_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "pycram",
+        "resources",
+        "urdf",
+    )
+    stretch = os.path.join(urdf_dir, "stretch_description.urdf")
+    world = World()
+    with world.modify_world():
+        localization_body = Body(name=PrefixedName("odom_combined"))
+        world.add_kinematic_structure_entity(localization_body)
+
+        stretch_parser = URDFParser.from_file(file_path=stretch)
+        world_with_stretch = stretch_parser.parse()
+        stretch_root = world_with_stretch.root
+        c_root_bf = OmniDrive.create_with_dofs(
+            parent=localization_body, child=stretch_root, world=world
+        )
+        world.merge_world(world_with_stretch, c_root_bf)
 
 
 @pytest.fixture(scope="session")
@@ -445,6 +468,15 @@ def simple_pr2_world_setup(pr2_world_setup, simple_apartment_setup):
 
     robot_view = PR2.from_world(world)
     return world, robot_view, Context(world, robot_view)
+
+
+@pytest.fixture(scope="session")
+def stretch_apartment_world(stretch_world, apartment_world_setup):
+    stretch_copy = deepcopy(stretch_world)
+    apartment_copy = deepcopy(apartment_world_setup)
+
+    apartment_copy.merge_world(stretch_copy)
+    return apartment_copy
 
 
 @pytest.fixture(scope="session")
