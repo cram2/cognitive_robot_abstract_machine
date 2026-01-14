@@ -47,6 +47,7 @@ class SimplePouringAction(ActionDescription):
 
     def execute(self) -> None:
         gripper = self.world.get_semantic_annotations_by_type(ParallelGripper)[0]
+        # tool_frame = gripper.tool_frame
         # grasp=gripper.front_facing_orientation
 
         # for arm_chain in self.robot_view.manipulator_chains:
