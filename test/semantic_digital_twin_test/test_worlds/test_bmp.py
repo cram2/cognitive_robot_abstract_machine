@@ -267,6 +267,55 @@ class TestBodyMotionProblem:
         assert all([res.data[task_sym].task_type == "close" for res in results])
         print("second query done with task type ", results[0].data[task_sym].task_type)
 
+    def get_apartment_world(self):
+        #### apartment
+        apartment_world = URDFParser.from_file(
+            os.path.join(
+                os.path.dirname(__file__),
+                "../../..",
+                "pycram",
+                "resources",
+                "worlds",
+                "apartment.urdf",
+            )
+        ).parse()
+        milk_world = STLParser(
+            os.path.join(
+                os.path.dirname(__file__),
+                "../../..",
+                "pycram",
+                "resources",
+                "objects",
+                "milk.stl",
+            )
+        ).parse()
+        cereal_world = STLParser(
+            os.path.join(
+                os.path.dirname(__file__),
+                "../../..",
+                "pycram",
+                "resources",
+                "objects",
+                "breakfast_cereal.stl",
+            )
+        ).parse()
+        apartment_world.merge_world_at_pose(
+            milk_world,
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                2.37, 2, 1.05, reference_frame=apartment_world.root
+            ),
+        )
+        apartment_world.merge_world_at_pose(
+            cereal_world,
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                2.37, 1.8, 1.05, reference_frame=apartment_world.root
+            ),
+        )
+        milk_view = Milk(body=apartment_world.get_body_by_name("milk.stl"))
+        with apartment_world.modify_world():
+            apartment_world.add_semantic_annotation(milk_view)
+        return apartment_world
+
     def get_world(self):
         urdf_dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
@@ -396,52 +445,7 @@ class TestBodyMotionProblem:
                 collision_config
             )
 
-        #### apartment
-        apartment_world = URDFParser.from_file(
-            os.path.join(
-                os.path.dirname(__file__),
-                "../../..",
-                "pycram",
-                "resources",
-                "worlds",
-                "apartment.urdf",
-            )
-        ).parse()
-        milk_world = STLParser(
-            os.path.join(
-                os.path.dirname(__file__),
-                "../../..",
-                "pycram",
-                "resources",
-                "objects",
-                "milk.stl",
-            )
-        ).parse()
-        cereal_world = STLParser(
-            os.path.join(
-                os.path.dirname(__file__),
-                "../../..",
-                "pycram",
-                "resources",
-                "objects",
-                "breakfast_cereal.stl",
-            )
-        ).parse()
-        apartment_world.merge_world_at_pose(
-            milk_world,
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                2.37, 2, 1.05, reference_frame=apartment_world.root
-            ),
-        )
-        apartment_world.merge_world_at_pose(
-            cereal_world,
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                2.37, 1.8, 1.05, reference_frame=apartment_world.root
-            ),
-        )
-        milk_view = Milk(body=apartment_world.get_body_by_name("milk.stl"))
-        with apartment_world.modify_world():
-            apartment_world.add_semantic_annotation(milk_view)
+        apartment_world = self.get_apartment_world()
 
         world.merge_world(apartment_world)
         world.get_body_by_name("base_footprint").parent_connection.origin = (
@@ -531,52 +535,7 @@ class TestBodyMotionProblem:
                 )
                 body.set_static_collision_config(collision_config)
 
-        #### apartment
-        apartment_world = URDFParser.from_file(
-            os.path.join(
-                os.path.dirname(__file__),
-                "../../..",
-                "pycram",
-                "resources",
-                "worlds",
-                "apartment.urdf",
-            )
-        ).parse()
-        milk_world = STLParser(
-            os.path.join(
-                os.path.dirname(__file__),
-                "../../..",
-                "pycram",
-                "resources",
-                "objects",
-                "milk.stl",
-            )
-        ).parse()
-        cereal_world = STLParser(
-            os.path.join(
-                os.path.dirname(__file__),
-                "../../..",
-                "pycram",
-                "resources",
-                "objects",
-                "breakfast_cereal.stl",
-            )
-        ).parse()
-        apartment_world.merge_world_at_pose(
-            milk_world,
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                2.37, 2, 1.05, reference_frame=apartment_world.root
-            ),
-        )
-        apartment_world.merge_world_at_pose(
-            cereal_world,
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                2.37, 1.8, 1.05, reference_frame=apartment_world.root
-            ),
-        )
-        milk_view = Milk(body=apartment_world.get_body_by_name("milk.stl"))
-        with apartment_world.modify_world():
-            apartment_world.add_semantic_annotation(milk_view)
+        apartment_world = self.get_apartment_world()
 
         world.merge_world(apartment_world)
         world.get_body_by_name("base_link").parent_connection.origin = (
@@ -678,52 +637,7 @@ class TestBodyMotionProblem:
                 )
                 body.set_static_collision_config(collision_config)
 
-        #### apartment
-        apartment_world = URDFParser.from_file(
-            os.path.join(
-                os.path.dirname(__file__),
-                "../../..",
-                "pycram",
-                "resources",
-                "worlds",
-                "apartment.urdf",
-            )
-        ).parse()
-        milk_world = STLParser(
-            os.path.join(
-                os.path.dirname(__file__),
-                "../../..",
-                "pycram",
-                "resources",
-                "objects",
-                "milk.stl",
-            )
-        ).parse()
-        cereal_world = STLParser(
-            os.path.join(
-                os.path.dirname(__file__),
-                "../../..",
-                "pycram",
-                "resources",
-                "objects",
-                "breakfast_cereal.stl",
-            )
-        ).parse()
-        apartment_world.merge_world_at_pose(
-            milk_world,
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                2.37, 2, 1.05, reference_frame=apartment_world.root
-            ),
-        )
-        apartment_world.merge_world_at_pose(
-            cereal_world,
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                2.37, 1.8, 1.05, reference_frame=apartment_world.root
-            ),
-        )
-        milk_view = Milk(body=apartment_world.get_body_by_name("milk.stl"))
-        with apartment_world.modify_world():
-            apartment_world.add_semantic_annotation(milk_view)
+        apartment_world = self.get_apartment_world()
 
         world.merge_world(apartment_world)
         world.get_body_by_name("base_footprint").parent_connection.origin = (
