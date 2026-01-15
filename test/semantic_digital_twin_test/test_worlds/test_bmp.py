@@ -1,6 +1,8 @@
 import os
 from copy import deepcopy
+import time
 
+from multiverse_simulator import MultiverseViewer
 from pkg_resources import resource_filename
 
 from krrood.entity_query_language.conclusion import Add, Set
@@ -17,6 +19,8 @@ from pycram.robot_descriptions.pr2_states import (
     right_gripper_open,
 )
 from semantic_digital_twin.adapters.mesh import STLParser
+from semantic_digital_twin.adapters.mjcf import MJCFParser
+from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.reasoning.predicates_base import (
@@ -48,11 +52,17 @@ from semantic_digital_twin.world import World
 import pytest
 import rclpy
 from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.adapters.simulator_to_world_state import (
+    SimulatorToWorldStateSynchronizer,
+)
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     ActiveConnection,
     Connection6DoF,
+    FixedConnection,
 )
+from semantic_digital_twin.world_description.geometry import Box, Scale, Color
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     CollisionCheckingConfig,
@@ -788,8 +798,76 @@ class TestBodyMotionProblem:
         )
 
     def test_what_needs_to_be_done(self):
-        world = self.get_world()
+        scene_path = os.path.join(
+            "/home/malte/libs/semantic_digital_twin_demo/assets/apartment.xml"
+        )
+        world = MJCFParser(scene_path).parse()
+        viewer = MultiverseViewer()
+
+        box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=1.6, y=2, z=1, roll=0, pitch=0, yaw=0, reference_frame=world.root
+        )
+        box = Box(
+            scale=Scale(1.0, 1.0, 2),
+            color=Color(
+                1.0,
+                0.0,
+                0.0,
+                1.0,
+            ),
+        )
+        collision = ShapeCollection([box])
+        visual = ShapeCollection([box])
+        body = Body(
+            name=PrefixedName("my first body", "my first prefix"),
+            visual=visual,
+            collision=collision,
+        )
+
+        with world.modify_world():
+            world.add_body(body)
+            con = FixedConnection(
+                parent=world.root, child=body, parent_T_connection_expression=box_origin
+            )
+            world.add_connection(con)
+
+        with world.modify_world():
+            world_reasoner = WorldReasoner(world)
+            world_reasoner.reason()
+
         if not rclpy.ok():
             rclpy.init()
         node = rclpy.create_node("viz_node")
         VizMarkerPublisher(world=world, node=node)
+
+        headless = (
+            os.environ.get("CI", "false").lower() == "true"
+        )  # headless in CI environments
+        multi_sim = MujocoSim(
+            world=world,
+            viewer=viewer,
+            headless=headless,
+            step_size=5e-3,
+            integrator="IMPLICITFAST",
+        )
+        multi_sim.start_simulation()
+
+        time.sleep(1)
+        # Initialize state feedback from simulator to world and perform on-demand sync
+        sync = SimulatorToWorldStateSynchronizer(
+            world=world, sim=multi_sim, poll_period_s=0.1
+        )
+        sync.initialize_subscriptions()
+
+        for i in range(101):
+            viewer.write_objects = {
+                "cabinet11_drawer1_joint": {"joint_angular_position": [0.003 * i]},
+            }
+            time.sleep(0.1)
+
+        # Pull the final simulator state into the world before asserting
+        sync.synchronize_once()
+
+        assert world.get_connection_by_name(
+            "cabinet11_drawer1_joint"
+        ).position == pytest.approx(0.3, abs=0.01)
