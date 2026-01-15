@@ -39,7 +39,7 @@ from ..semantic_annotations.task_effect_motion import (
     OpenedEffect,
     ClosedEffect,
 )
-from ..spatial_types import Vector3
+from ..spatial_types import Vector3, HomogeneousTransformationMatrix
 from ..world import World
 
 
@@ -200,13 +200,38 @@ class CanExecute(Predicate):
                 )
                 waypoints.append(goal)
 
+            approach_trajectory_sequence = Sequence(
+                nodes=approach_waypoints, name="approach_trajectory_sequence"
+            )
+            msc.add_node(approach_trajectory_sequence)
             # Use Sequence to wire waypoints together
             full_trajectory_sequence = Sequence(
-                nodes=approach_waypoints + waypoints, name="full_trajectory_sequence"
+                nodes=waypoints, name="full_trajectory_sequence"
             )
             msc.add_node(full_trajectory_sequence)
+            keep_relation = CartesianPose(
+                name="hold handle",
+                root_link=target_body,
+                tip_link=gripper.tool_frame,
+                goal_pose=HomogeneousTransformationMatrix(
+                    reference_frame=gripper.tool_frame, child_frame=gripper.tool_frame
+                ),
+                # weight=self.weight,
+            )
+            msc.add_node(keep_relation)
 
-            full_trajectory_sequence.start_condition = point.observation_variable
+            approach_trajectory_sequence.start_condition = point.observation_variable
+
+            full_trajectory_sequence.start_condition = (
+                approach_trajectory_sequence.observation_variable
+            )
+            keep_relation.start_condition = (
+                approach_trajectory_sequence.observation_variable
+            )
+
+            approach_trajectory_sequence.end_condition = (
+                approach_trajectory_sequence.observation_variable
+            )
             point.end_condition = point.observation_variable
 
             collision_node = CollisionAvoidance(
