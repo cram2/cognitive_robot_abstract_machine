@@ -833,14 +833,76 @@ class MujocoEquality(SemanticAnnotation):
 
 
 @dataclass(eq=False)
-class MujocoMocapBody(SemanticAnnotation):
+class MujocoGeom(SemanticAnnotation):
     """
-    Semantic annotation declaring that a Body is a MujocoMocapBody.
+    Semantic annotation declaring that a Shape is a MujocoGeom.
+    """
+
+    shape: Shape
+    """
+    The shape which is a MujocoGeom.
+    """
+
+    solver_impedance: List[float] = field(
+        default_factory=lambda: [0.9, 0.95, 0.001, 0.5, 2]
+    )
+    """
+    The solver impedance parameters for the geom. See https://mujoco.readthedocs.io/en/stable/modeling.html#solver-parameters for more details.
+    """
+
+    solver_reference: List[float] = field(default_factory=lambda: [0.02, 1.0])
+    """
+    The solver reference parameters for the geom. See https://mujoco.readthedocs.io/en/stable/modeling.html#solver-parameters for more details.
+    """
+
+    friction: List[float] = field(default_factory=lambda: [1, 0.005, 0.0001])
+    """
+    Contact friction parameters for dynamically generated contact pairs. 
+    The first number is the sliding friction, acting along both axes of the tangent plane. 
+    The second number is the torsional friction, acting around the contact normal. 
+    The third number is the rolling friction, acting around both axes of the tangent plane. 
+    """
+
+
+@dataclass(eq=False)
+class MujocoJoint(SemanticAnnotation):
+    """
+    Semantic annotation declaring that a Connection is a MujocoJoint.
+    """
+
+    connection: Connection
+    """
+    The connection which is a MujocoJoint.
+    """
+
+    stiffness: float = 0.0
+    """
+    The stiffness of the joint.
+    """
+
+
+@dataclass(eq=False)
+class MujocoBody(SemanticAnnotation):
+    """
+    Semantic annotation declaring that a Body is a MujocoBody.
     """
 
     body: Body
     """
-    The body which is a MujocoMocapBody.
+    The body which is a MujocoBody.
+    """
+
+    gravitation_compensation_factor: float = 0.0
+    """
+    Gravity compensation force, specified as fraction of body weight. 
+    This attribute creates an upwards force applied to the body’s center of mass, countering the force of gravity. 
+    As an example, a value of 1 creates an upward force equal to the body’s weight and compensates for gravity exactly. 
+    Values greater than 1 will create a net upwards force or buoyancy effect.
+    """
+
+    motion_capture: bool = False
+    """
+    If True, the body is treated as a motion capture body.
     """
 
 
@@ -1317,6 +1379,20 @@ class MujocoBuilder(MultiSimBuilder):
                 f"Mesh {shape.mesh} could not be parsed. Skipping geom {geom_props['name']}."
             )
             return
+        geom_semantic_annotations = [
+            geom_semantic_annotation
+            for geom_semantic_annotation in self.world.get_semantic_annotations_by_type(
+                MujocoGeom
+            )
+            if id(geom_semantic_annotation.shape) == id(shape)
+        ]
+        if len(geom_semantic_annotations) > 0:
+            assert (
+                len(geom_semantic_annotations) == 1
+            ), f"Expected exactly one MujocoGeom for shape {shape}, found {len(geom_semantic_annotations)}."
+            geom_props["solimp"] = geom_semantic_annotations[0].solver_impedance
+            geom_props["solref"] = geom_semantic_annotations[0].solver_reference
+            geom_props["friction"] = geom_semantic_annotations[0].friction
         geom_spec = parent_body_spec.add_geom(**geom_props)
         if geom_spec.type == mujoco.mjtGeom.mjGEOM_BOX and geom_spec.size[2] == 0:
             geom_spec.type = mujoco.mjtGeom.mjGEOM_PLANE
@@ -1400,6 +1476,18 @@ class MujocoBuilder(MultiSimBuilder):
             equality.name1 = joint_props["name"]
             equality.name2 = equality_joint["joint"]
             equality.data = equality_joint["data"]
+        joint_semantic_annotations = [
+            joint_semantic_annotation
+            for joint_semantic_annotation in self.world.get_semantic_annotations_by_type(
+                MujocoJoint
+            )
+            if joint_semantic_annotation.connection == connection
+        ]
+        if len(joint_semantic_annotations) > 0:
+            assert (
+                len(joint_semantic_annotations) == 1
+            ), f"Expected exactly one MujocoJoint for connection {connection.name.name}, found {len(joint_semantic_annotations)}."
+            joint_props["stiffness"] = joint_semantic_annotations[0].stiffness
 
         child_body_name = connection.child.name.name
         child_body_spec = self._find_entity(
@@ -1484,6 +1572,21 @@ class MujocoBuilder(MultiSimBuilder):
         if body.name.name == "world":
             return
         body_props = MujocoKinematicStructureEntityConverter.convert(body)
+        body_semantic_annotations = [
+            body_semantic_annotation
+            for body_semantic_annotation in self.world.get_semantic_annotations_by_type(
+                MujocoBody
+            )
+            if body_semantic_annotation.body == body
+        ]
+        if len(body_semantic_annotations) > 0:
+            assert (
+                len(body_semantic_annotations) == 1
+            ), f"Expected exactly one MujocoBody for body {body.name.name}, found {len(body_semantic_annotations)}."
+            body_props["gravcomp"] = body_semantic_annotations[
+                0
+            ].gravitation_compensation_factor
+            body_props["mocap"] = body_semantic_annotations[0].motion_capture
         parent_body_name = body.parent_connection.parent.name.name
         parent_body_spec = self._find_entity(
             entity_type=mujoco.mjtObj.mjOBJ_BODY, entity_name=parent_body_name
@@ -1493,15 +1596,6 @@ class MujocoBuilder(MultiSimBuilder):
                 entity_name=parent_body_name,
                 entity_type=mujoco.mjtObj.mjOBJ_BODY,
             )
-        if any(
-            [
-                semantic_annotation.body == body
-                for semantic_annotation in self.world.get_semantic_annotations_by_type(
-                    MujocoMocapBody
-                )
-            ]
-        ):
-            body_props["mocap"] = 1
         body_spec = parent_body_spec.add_body(**body_props)
         if body_spec is None:
             raise MujocoEntityNotFoundError(

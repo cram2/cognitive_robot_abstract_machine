@@ -46,7 +46,9 @@ from .multi_sim import (
     GeomVisibilityAndCollisionType,
     MujocoCamera,
     MujocoEquality,
-    MujocoMocapBody,
+    MujocoGeom,
+    MujocoJoint,
+    MujocoBody,
 )
 
 logger = logging.getLogger(__name__)
@@ -118,6 +120,13 @@ class MJCFParser:
         collisions = []
         for mujoco_geom in mujoco_body.geoms:
             shape = self.parse_geom(mujoco_geom=mujoco_geom)
+            self.world.add_semantic_annotation(
+                MujocoGeom(
+                    shape=shape,
+                    solver_impedance=mujoco_geom.solimp.tolist(),
+                    solver_reference=mujoco_geom.solref.tolist(),
+                )
+            )
             if mujoco_geom.contype != 0 or mujoco_geom.conaffinity != 0:
                 collisions.append(shape)
             if mujoco_geom.group in [
@@ -130,8 +139,13 @@ class MJCFParser:
         body.visual = ShapeCollection(shapes=visuals, reference_frame=body)
         body.collision = ShapeCollection(shapes=collisions, reference_frame=body)
         self.world.add_kinematic_structure_entity(body)
-        if mujoco_body.mocap:
-            self.world.add_semantic_annotation(MujocoMocapBody(body=body))
+        self.world.add_semantic_annotation(
+            MujocoBody(
+                body=body,
+                gravitation_compensation_factor=mujoco_body.gravcomp,
+                motion_capture=mujoco_body.mocap,
+            )
+        )
         for mujoco_child_body in mujoco_body.bodies:
             self.parse_body(mujoco_body=mujoco_child_body)
 
@@ -410,6 +424,9 @@ class MJCFParser:
                     raise NotImplementedError(
                         f"Joint type {mujoco_joint.type} not implemented yet."
                     )
+                self.world.add_semantic_annotation(
+                    MujocoJoint(connection=connection, stiffness=mujoco_joint.stiffness)
+                )
         self.world.add_connection(connection)
 
     def parse_dof(self, mujoco_joint: mujoco.MjsJoint) -> DegreeOfFreedom:
@@ -560,7 +577,7 @@ class MJCFParser:
                             obj_type=mujoco.mjtObj.mjOBJ_BODY,
                             name_1=equality.name1,
                             name_2=equality.name2,
-                            data=equality.data,
+                            data=equality.data.tolist(),
                         )
                     )
                 case _:

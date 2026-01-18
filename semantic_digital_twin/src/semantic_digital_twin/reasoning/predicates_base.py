@@ -25,7 +25,13 @@ from giskardpy.qp.exceptions import (
     HardConstraintsViolatedException,
     InfeasibleException,
 )
-from krrood.entity_query_language.entity import entity, variable, variable_from, or_
+from krrood.entity_query_language.entity import (
+    entity,
+    variable,
+    variable_from,
+    or_,
+    and_,
+)
 from krrood.entity_query_language.entity_result_processors import an
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from krrood.entity_query_language.predicate import Predicate, HasType, HasTypes
@@ -42,6 +48,7 @@ from ..semantic_annotations.task_effect_motion import (
 )
 from ..spatial_types import Vector3, HomogeneousTransformationMatrix
 from ..world import World
+from ..world_description.world_entity import SemanticAnnotation
 
 
 @dataclass
@@ -143,7 +150,26 @@ class CanExecute(Predicate):
         initial_state_data = self.robot._world.state.data.copy()
         # The child of the connection (actuator) is typically the movable part (e.g., drawer container)
 
-        target_body = self.motion.motion_model.msc.nodes[0].tip_link
+        if self.motion.motion_model:
+            target_body = self.motion.motion_model.msc.nodes[0].tip_link
+        else:
+            target_body = list(
+                an(
+                    entity(drawer := variable(SemanticAnnotation, None)).where(
+                        or_(
+                            and_(
+                                HasType(drawer, Drawer),
+                                drawer.container.body.parent_connection
+                                == self.motion.actuator,
+                            ),
+                            and_(
+                                HasType(drawer, Door),
+                                drawer.body.parent_connection == self.motion.actuator,
+                            ),
+                        )
+                    )
+                ).evaluate()
+            )[0].handle.body
 
         # 1. Transform trajectory to handle coordinates (PoseStamped sequence)
         handle_trajectory = []
