@@ -20,7 +20,10 @@ from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion, CancelMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPose,
+    CartesianPosition,
+)
 from giskardpy.qp.exceptions import (
     HardConstraintsViolatedException,
     InfeasibleException,
@@ -193,7 +196,7 @@ class CanExecute(Predicate):
             handle_trajectory.append(pose)
 
         # 1.1 take first half of the handle trajectory points and invert them to be used as an approach movement
-        approach_trajectory = handle_trajectory[: len(handle_trajectory) // 2][::-1]
+        approach_trajectory = handle_trajectory[: len(handle_trajectory) // 4][::-1]
 
         self.robot._world.state.data = initial_state_data
         self.robot._world.notify_state_change()
