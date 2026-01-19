@@ -193,6 +193,7 @@ class CanExecute(Predicate):
             )
             if "sink_area_sink" in [b.name.name for b in self.robot._world.bodies]:
                 pose.rotate_by_quaternion([0, 0, 1, 0])
+                pose.rotate_by_quaternion([0.6816388, 0, 0, 0.7316889])
             handle_trajectory.append(pose)
 
         # 1.1 take first half of the handle trajectory points and invert them to be used as an approach movement
@@ -311,7 +312,7 @@ class CanExecute(Predicate):
 
             # Tick the executor until the motion ends or times out
             try:
-                executor.tick_until_end(timeout=600)
+                executor.tick_until_end(timeout=900)
             except TimeoutError as e:
                 pass
             except HardConstraintsViolatedException:
