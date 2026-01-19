@@ -1563,32 +1563,49 @@ PERCEIVED_OBJECT_MAPPING = {
     "cucumber": Cucumber,
     "zucchini": Zucchini,
 }
+@dataclass(eq=False)
 class PerceivedObjectFactory(SemanticAnnotationFactory[SemanticAnnotation]):
     """
-    Factory for creating perceived objects from the perception system.
-    Maps a class name (e.g., "apple") to the actual semantic annotation class.
+    Factory for creating a perceived object from the perception system.
+
+    Maps a class name (e.g., "apple") to the actual semantic annotation class via a mapping.
+    The factory creates a world with a body and the corresponding semantic annotation.
+
+    This factory is used by Planning to spawn objects based on perception output.
     """
 
-    def __init__(
-        self,
-        perceived_object_class: str,
-        object_dimensions: Scale,
-        name: Optional[PrefixedName] = None,
-    ) -> None:
-        """
-        :param perceived_object_class: Class name of the object, e.g., "apple"
-        :param object_dimensions: Dimensions (x, y, z) in meters as Scale
-        :param name: Optional name; if None, the class name is used
-        """
-        self.perceived_object_class = perceived_object_class
-        self.object_dimensions = object_dimensions
-        self.name = name or PrefixedName(perceived_object_class)
+    perceived_object_class: str
+    """
+    The class name of the perceived object, e.g., "apple", "salt_aquasale_can".
+    Must be a key in PERCEIVED_OBJECT_MAPPING.
+    """
 
-        # Validate that the class exists in the mapping
-        if perceived_object_class not in PERCEIVED_OBJECT_MAPPING:
-            raise ValueError(f"Unknown perceived object class: {perceived_object_class}")
+    object_dimensions: Scale
+    """
+    The dimensions (x, y, z) in meters as Scale.
+    """
 
-        self._target_class = PERCEIVED_OBJECT_MAPPING[perceived_object_class]
+    name: Optional[PrefixedName] = None
+    """
+    Optional name for the object; if None, the class name is used.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Validate that the perceived_object_class exists in the mapping.
+        """
+        if self.perceived_object_class not in PERCEIVED_OBJECT_MAPPING:
+            raise ValueError(
+                f"Unknown perceived object class: {self.perceived_object_class}. "
+                f"Must be in PERCEIVED_OBJECT_MAPPING."
+            )
+
+        # Set default name if not provided
+        if self.name is None:
+            self.name = PrefixedName(self.perceived_object_class)
+
+        # Store the target class
+        self._target_class = PERCEIVED_OBJECT_MAPPING[self.perceived_object_class]
 
     def _create(self, world: World) -> World:
         """

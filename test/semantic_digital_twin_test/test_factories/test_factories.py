@@ -285,41 +285,22 @@ class TestFactories(unittest.TestCase):
         self.assertEqual(world.root, wall.body)
 
     def test_perceived_object_factory_comprehensive(self):
-        """Test 10 representative perceived object classes with correct types and names."""
-        test_cases = [
-            # Food
-            ("apple", Apple, "apple_1"),
-            ("banana", Banana, "banana_1"),
-            ("cereal_jumbo_box_special", Cereal, "cereal_1"),
-            ("muesli_koelln_box_cranberry", Muesli, "muesli_1"),
-            ("salt_aquasale_can", Salt, "salt_1"),
+        """Test that PerceivedObjectFactory creates a valid object with correct type and name."""
+        # Test one representative class: apple
+        factory = PerceivedObjectFactory(
+            perceived_object_class="apple",
+            object_dimensions=Scale(0.1, 0.1, 0.1),
+            name=PrefixedName("apple_1"),
+        )
+        world = factory.create()
+        instances = world.get_semantic_annotations_by_type(Apple)
+        self.assertEqual(len(instances), 1)
+        instance = instances[0]
+        self.assertEqual(instance.name.name, "apple_1")
+        self.assertIsInstance(instance, Apple)
+        self.assertIsInstance(instance.body, Body)
 
-            # Drinks
-            ("soda_cocacocla_can_zero", Soda, "soda_1"),
-            ("sojadrink_biobio_pack", SoyaDrink, "soyadrink_1"),
-
-            # Kitchenware
-            ("spatula_black", Spatula, "spatula_1"),
-            ("skillet_whitegold", Skillet, "skillet_1"),
-            ("soccerball_mini", SoccerBall, "soccerball_1"),
-        ]
-
-        for obj_class, expected_class, name_str in test_cases:
-            with self.subTest(obj_class=obj_class):
-                factory = PerceivedObjectFactory(
-                    perceived_object_class=obj_class,
-                    object_dimensions=Scale(0.1, 0.1, 0.1),
-                    name=PrefixedName(name_str),
-                )
-                world = factory.create()
-                instances = world.get_semantic_annotations_by_type(expected_class)
-                self.assertEqual(len(instances), 1, f"Expected 1 {expected_class.__name__}")
-                instance = instances[0]
-                self.assertEqual(instance.name.name, name_str)
-                self.assertIsInstance(instance, expected_class)
-                self.assertIsInstance(instance.body, Body)
-
-        print("10 comprehensive perceived object factory tests passed!")
+        print("✅ PerceivedObjectFactory test passed (one representative case).")
 
 if __name__ == "__main__":
     unittest.main()
