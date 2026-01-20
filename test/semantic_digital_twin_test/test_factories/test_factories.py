@@ -3,10 +3,10 @@ from time import sleep
 import pytest
 
 from semantic_digital_twin.exceptions import IncorrectScaleError
-from semantic_digital_twin.worlddescription.geometry import Scale
+from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.datastructures.prefixedname import PrefixedName
-from semantic_digital_twin.spatialtypes.spatialtypes import HomogeneousTransformationMatrix
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle, Door, Container, Drawer, Dresser, Wall
 )
@@ -15,8 +15,7 @@ from semantic_digital_twin.semantic_annotations.factories import (
     DrawerFactory, DresserFactory, WallFactory, SemanticPositionDescription,
     HorizontalSemanticDirection, VerticalSemanticDirection,
     # NEU:
-    PerceivedObjectFactory, query_object_by_class, query_objects_by_class,
-    get_all_perceived_objects, query_object_by_name
+    PerceivedObjectFactory
 )
 
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
