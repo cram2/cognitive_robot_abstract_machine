@@ -7,8 +7,6 @@ from ..utils import DataclassException
 
 JSON_TYPE_NAME = "__json_type__"  # the key used in JSON dicts to identify the class
 
-UUID_TYPE_NAME = "uuid.UUID"
-
 
 @dataclass
 class JSONSerializationError(DataclassException):

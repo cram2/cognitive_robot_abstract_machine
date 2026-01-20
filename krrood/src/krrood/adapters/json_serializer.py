@@ -7,8 +7,9 @@ import uuid
 from abc import ABC
 from collections import Counter
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import NoneType
+from typing import List
 
 from typing_extensions import Dict, Any, Self, Union, Type, TypeVar
 
@@ -218,32 +219,71 @@ def to_json(obj: Union[SubclassJSONSerializer, Any]) -> JSON_RETURN_TYPE:
     return registered_json_serializer.to_json(obj)
 
 
-def shallow_diff_json(
-    first_json: Dict[str, Any], second_json: Dict[str, Any]
-) -> Dict[str, Any]:
-    diff: Dict[str, Any] = {}
+@dataclass
+class JSONAttributeDiff(SubclassJSONSerializer):
+    """
+    A class representing a shallow diff for JSON-serializable keyword arguments.
+    """
 
-    all_keys = first_json.keys() | second_json.keys()
+    attribute_name: str = field(kw_only=True)
+    """
+    The name of the attribute that has changed.
+    """
+
+    add: List[Any] = field(default_factory=list)
+    """
+    The items that have been added to the attribute.
+    """
+
+    remove: List[Any] = field(default_factory=list)
+    """
+    The items that have been removed from the attribute.
+    """
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            JSON_TYPE_NAME: get_full_class_name(self.__class__),
+            "attribute_name": self.attribute_name,
+            "remove": to_json(self.remove),
+            "add": to_json(self.add),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(
+            attribute_name=data["attribute_name"],
+            remove=from_json(data["remove"]),
+            add=from_json(data["add"]),
+        )
+
+
+def shallow_diff_json(
+    original_json: Dict[str, Any], new_json: Dict[str, Any]
+) -> List[JSONAttributeDiff]:
+    """
+    Create a shallow diff between two JSON dicts. Result describes the changes that need to be applied to first json to get second json.
+    """
+    diff: List[JSONAttributeDiff] = []
+
+    all_keys = original_json.keys() | new_json.keys()
     for key in all_keys:
-        first_value = first_json.get(key)
-        second_value = second_json.get(key)
-        change = {"add": [], "remove": []}
-        if isinstance(first_value, Iterable):
-            for item in first_value:
-                if item not in second_value:
-                    change["remove"].append(item)
-            for item in second_value:
-                if item not in first_value:
-                    change["add"].append(item)
+        original_value = original_json.get(key)
+        new_value = new_json.get(key)
+        change = JSONAttributeDiff(attribute_name=key)
+        if isinstance(original_value, Iterable):
+            for item_to_check in original_value:
+                if item_to_check not in new_value:
+                    change.remove.append(from_json(item_to_check))
+            for item_to_check in new_value:
+                if item_to_check not in original_value:
+                    change.add.append(from_json(item_to_check))
         else:
-            if first_value == second_value:
+            if original_value == new_value:
                 continue
-            if first_value is None:
-                change["add"] = second_value
-            else:
-                change["remove"] = first_value
-        if change["add"] or change["remove"]:
-            diff[key] = change
+            change.add.append(from_json(new_value))
+
+        if change.add or change.remove:
+            diff.append(change)
     return diff
 
 

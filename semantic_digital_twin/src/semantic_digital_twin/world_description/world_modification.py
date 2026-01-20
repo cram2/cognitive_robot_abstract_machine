@@ -12,8 +12,13 @@ from typing_extensions import (
     TYPE_CHECKING,
 )
 
-from krrood.adapters.exceptions import JSON_TYPE_NAME, UUID_TYPE_NAME
-from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
+from krrood.adapters.exceptions import JSON_TYPE_NAME
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    to_json,
+    from_json,
+    JSONAttributeDiff,
+)
 from .degree_of_freedom import DegreeOfFreedom
 from .world_entity import (
     KinematicStructureEntity,
@@ -63,54 +68,52 @@ class WorldModelModification(SubclassJSONSerializer, ABC):
 class AttributeUpdateModification(WorldModelModification):
 
     entity_id: UUID
-    updated_kwargs: Dict[str, Any]
+    updated_kwargs: List[JSONAttributeDiff]
 
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]):
-        return cls(from_json(kwargs["entity_id"]), kwargs["updated_kwargs"])
+        return cls(from_json(kwargs["entity_id"]), from_json(kwargs["updated_kwargs"]))
 
     def apply(self, world: World):
         entity = world.get_world_entity_with_id_by_id(self.entity_id)
-        for key, value in self.updated_kwargs.items():
-            current_value = getattr(entity, key)
-            if current_value == value:
-                continue
+        for diff in self.updated_kwargs:
+            current_value = getattr(entity, diff.attribute_name)
             if isinstance(current_value, list):
-                self._apply_to_list(world, current_value, value)
+                self._apply_to_list(world, current_value, diff)
             else:
-                setattr(entity, key, value)
+                obj = self._resolve_item(world, diff.add[0])
+                setattr(entity, diff.attribute_name, obj)
 
     def _apply_to_list(
-        self, world: World, current_value: List[Any], value: Dict[str, Any]
+        self, world: World, current_value: List[Any], diff: JSONAttributeDiff
     ):
-        for raw in value.get("remove", ()):
-            obj = self._resolve_list_item(world, raw)
+        for raw in diff.remove:
+            obj = self._resolve_item(world, raw)
             if obj in current_value:
                 current_value.remove(obj)
 
-        for raw in value.get("add", ()):
-            obj = self._resolve_list_item(world, raw)
+        for raw in diff.add:
+            obj = self._resolve_item(world, raw)
             if obj not in current_value:
                 current_value.append(obj)
 
-    def _resolve_list_item(self, world: World, item: Any):
-        if item.get(JSON_TYPE_NAME) == UUID_TYPE_NAME:
-            uuid = from_json(item)
-            return world.get_world_entity_with_id_by_id(uuid)
-        return from_json(item)
+    def _resolve_item(self, world: World, item: Any):
+        if isinstance(item, UUID):
+            return world.get_world_entity_with_id_by_id(item)
+        return item
 
     def to_json(self):
         return {
             **super().to_json(),
             "entity_id": to_json(self.entity_id),
-            "updated_kwargs": self.updated_kwargs,
+            "updated_kwargs": to_json(self.updated_kwargs),
         }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(
             entity_id=from_json(data["entity_id"]),
-            updated_kwargs=data["updated_kwargs"],
+            updated_kwargs=from_json(data["updated_kwargs"]),
         )
 
 

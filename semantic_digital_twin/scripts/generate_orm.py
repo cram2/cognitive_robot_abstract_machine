@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import uuid
 from dataclasses import is_dataclass
+from typing import Any
 
 import sqlalchemy
 
@@ -23,6 +24,7 @@ import semantic_digital_twin.world_description.degree_of_freedom
 import semantic_digital_twin.world_description.geometry
 import semantic_digital_twin.world_description.shape_collection
 import semantic_digital_twin.world_description.world_entity
+from krrood.adapters.json_serializer import JSONAttributeDiff
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.utils import classes_of_module
@@ -82,6 +84,7 @@ all_classes |= set(
     classes_of_module(semantic_digital_twin.world_description.world_modification)
 )
 all_classes |= set(classes_of_module(semantic_digital_twin.callbacks.callback))
+all_classes |= set([JSONAttributeDiff])
 
 # remove classes that should not be mapped
 all_classes -= {

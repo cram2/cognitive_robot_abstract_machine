@@ -92,7 +92,7 @@ def synchronized_attribute_modification(func):
             AttributeUpdateModification.from_kwargs(
                 {
                     "entity_id": object_after_change["id"],
-                    "updated_kwargs": diff,
+                    "updated_kwargs": to_json(diff),
                 }
             )
         )

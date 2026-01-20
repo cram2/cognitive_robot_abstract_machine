@@ -16,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 
 import builtins
+import krrood.adapters.json_serializer
 import krrood.ormatic.custom_types
 import semantic_digital_twin.callbacks.callback
 import semantic_digital_twin.datastructures.prefixed_name
@@ -201,6 +202,17 @@ kinematicchaindao_sensors_association = Table(
     Base.metadata,
     Column("source_kinematicchaindao_id", ForeignKey("KinematicChainDAO.database_id")),
     Column("target_sensordao_id", ForeignKey("SensorDAO.database_id")),
+)
+attributeupdatemodificationdao_updated_kwargs_association = Table(
+    "attributeupdatemodificationdao_updated_kwargs_association",
+    Base.metadata,
+    Column(
+        "source_attributeupdatemodificationdao_id",
+        ForeignKey("AttributeUpdateModificationDAO.database_id"),
+    ),
+    Column(
+        "target_jsonattributediffdao_id", ForeignKey("JSONAttributeDiffDAO.database_id")
+    ),
 )
 worldmodelmodificationblockdao_modifications_association = Table(
     "worldmodelmodificationblockdao_modifications_association",
@@ -556,6 +568,21 @@ class IsPerceivableDAO(
         "polymorphic_on": "polymorphic_type",
         "polymorphic_identity": "IsPerceivableDAO",
     }
+
+
+class JSONAttributeDiffDAO(
+    Base, DataAccessObject[krrood.adapters.json_serializer.JSONAttributeDiff]
+):
+
+    __tablename__ = "JSONAttributeDiffDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    attribute_name: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
 
 
 class JerkVariableDAO(
@@ -4861,6 +4888,14 @@ class AttributeUpdateModificationDAO(
 
     entity_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+
+    updated_kwargs: Mapped[typing.List[JSONAttributeDiffDAO]] = relationship(
+        "JSONAttributeDiffDAO",
+        secondary="attributeupdatemodificationdao_updated_kwargs_association",
+        primaryjoin="AttributeUpdateModificationDAO.database_id == attributeupdatemodificationdao_updated_kwargs_association.c.source_attributeupdatemodificationdao_id",
+        secondaryjoin="JSONAttributeDiffDAO.database_id == attributeupdatemodificationdao_updated_kwargs_association.c.target_jsonattributediffdao_id",
+        cascade="save-update, merge",
     )
 
     __mapper_args__ = {
