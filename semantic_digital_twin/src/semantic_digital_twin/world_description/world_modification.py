@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
+from functools import wraps
+from typing import Any
 from uuid import UUID
 
 from typing_extensions import (
@@ -18,6 +20,7 @@ from krrood.adapters.json_serializer import (
     from_json,
     JSONAttributeDiff,
     list_like_classes,
+    shallow_diff_json,
 )
 from .degree_of_freedom import DegreeOfFreedom
 from .world_entity import (
@@ -25,7 +28,9 @@ from .world_entity import (
     SemanticAnnotation,
     Connection,
     Actuator,
+    WorldEntityWithID,
 )
+from ..exceptions import MissingWorldModificationContextError
 
 if TYPE_CHECKING:
     from ..world import World
@@ -496,3 +501,39 @@ class SetDofHasHardwareInterface(WorldModelModification):
             ],
             value=data["value"],
         )
+
+
+def synchronized_attribute_modification(func):
+    """
+    Decorator to synchronize attribute modifications.
+
+    Ensures that any modifications to the attributes of an instance of WorldEntityWithID are properly recorded and any
+    resultant changes are appended to the current model modification block in the world model manager. Keeps track of
+    the pre- and post-modification states of the object to compute the differences and maintain a log of updates.
+    """
+
+    @wraps(func)
+    def wrapper(self: WorldEntityWithID, *args: Any, **kwargs: Any) -> Any:
+
+        object_before_change = to_json(self)
+        result = func(self, *args, **kwargs)
+        object_after_change = to_json(self)
+        diff = shallow_diff_json(object_before_change, object_after_change)
+
+        current_model_modification_block = (
+            self._world.get_world_model_manager().current_model_modification_block
+        )
+        if current_model_modification_block is None:
+            raise MissingWorldModificationContextError(func)
+
+        current_model_modification_block.append(
+            AttributeUpdateModification.from_kwargs(
+                {
+                    "entity_id": object_after_change["id"],
+                    "updated_kwargs": to_json(diff),
+                }
+            )
+        )
+        return result
+
+    return wrapper

@@ -44,8 +44,8 @@ from ..world_description.world_entity import (
     Region,
     KinematicStructureEntity,
     Connection,
-    synchronized_attribute_modification,
 )
+from ..world_description.world_modification import synchronized_attribute_modification
 
 if TYPE_CHECKING:
     from .semantic_annotations import (

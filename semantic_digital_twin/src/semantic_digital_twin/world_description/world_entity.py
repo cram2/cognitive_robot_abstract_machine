@@ -9,8 +9,7 @@ from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from dataclasses import fields
-from functools import lru_cache, cached_property, wraps
-from typing import ClassVar, Any
+from functools import lru_cache, cached_property
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -36,7 +35,6 @@ from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
     to_json,
     from_json,
-    shallow_diff_json,
 )
 
 from krrood.entity_query_language.predicate import Symbol
@@ -44,20 +42,18 @@ from krrood.symbolic_math.symbolic_math import Matrix
 from .geometry import TriangleMesh
 from .inertial_properties import Inertial
 from .shape_collection import ShapeCollection, BoundingBoxCollection
-from .world_modification import AttributeUpdateModification
 from ..adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from ..datastructures.prefixed_name import PrefixedName
 from ..exceptions import (
     ReferenceFrameMismatchError,
-    MissingWorldModificationContextError,
 )
 from ..spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
 )
-from ..utils import IDGenerator, type_string_to_type, camel_case_split
+from ..utils import IDGenerator, camel_case_split
 
 if TYPE_CHECKING:
     from ..world_description.degree_of_freedom import DegreeOfFreedom
@@ -1255,39 +1251,3 @@ class Actuator(WorldEntityWithID, SubclassJSONSerializer):
         :param dof: The degree of freedom to add.
         """
         self._dofs.append(dof)
-
-
-def synchronized_attribute_modification(func):
-    """
-    Decorator to synchronize attribute modifications.
-
-    Ensures that any modifications to the attributes of an instance of WorldEntityWithID are properly recorded and any
-    resultant changes are appended to the current model modification block in the world model manager. Keeps track of
-    the pre- and post-modification states of the object to compute the differences and maintain a log of updates.
-    """
-
-    @wraps(func)
-    def wrapper(self: WorldEntityWithID, *args: Any, **kwargs: Any) -> Any:
-
-        object_before_change = to_json(self)
-        result = func(self, *args, **kwargs)
-        object_after_change = to_json(self)
-        diff = shallow_diff_json(object_before_change, object_after_change)
-
-        current_model_modification_block = (
-            self._world.get_world_model_manager().current_model_modification_block
-        )
-        if current_model_modification_block is None:
-            raise MissingWorldModificationContextError(func)
-
-        current_model_modification_block.append(
-            AttributeUpdateModification.from_kwargs(
-                {
-                    "entity_id": object_after_change["id"],
-                    "updated_kwargs": to_json(diff),
-                }
-            )
-        )
-        return result
-
-    return wrapper
