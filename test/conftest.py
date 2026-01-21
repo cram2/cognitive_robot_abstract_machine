@@ -3,6 +3,7 @@ import os
 import threading
 import time
 from copy import deepcopy
+from dataclasses import dataclass
 
 import numpy as np
 import pytest
@@ -19,6 +20,7 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -29,10 +31,12 @@ from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     Connection6DoF,
 )
-from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.geometry import Box, Scale, Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
-
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    CollisionCheckingConfig,
+)
 
 ###############################
 ### Fixture Usage Guide #######
@@ -104,6 +108,46 @@ def cleanup_ros():
             rclpy.shutdown()
 
 
+#############################################
+############### Worlds ######################
+#############################################
+
+
+@pytest.fixture()
+def box_bot_world():
+    world = World()
+    with world.modify_world():
+        body = Body(
+            name=PrefixedName("map"),
+        )
+        body2 = Body(
+            name=PrefixedName("bot"),
+            collision=ShapeCollection(shapes=[Cylinder(width=0.1, height=0.5)]),
+            collision_config=CollisionCheckingConfig(
+                buffer_zone_distance=0.05, violated_distance=0.0, max_avoided_bodies=3
+            ),
+        )
+        connection = OmniDrive.create_with_dofs(world=world, parent=body, child=body2)
+        world.add_connection(connection)
+        connection.has_hardware_interface = True
+
+        environment = Body(
+            name=PrefixedName("environment"),
+            collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.5)]),
+        )
+        env_connection = FixedConnection(
+            parent=body,
+            child=environment,
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                1
+            ),
+        )
+        world.add_connection(env_connection)
+        MinimalRobot.from_world(world)
+
+    return world
+
+
 @pytest.fixture(scope="session")
 def pr2_world_setup():
     urdf_dir = os.path.join(
@@ -127,11 +171,6 @@ def pr2_world_setup():
         PR2.from_world(world_with_pr2)
 
     return world_with_pr2
-
-
-#############################################
-############### Worlds ######################
-#############################################
 
 
 @pytest.fixture(scope="session")

@@ -57,6 +57,7 @@ class TfPublisherModelCallback(ModelChangeCallback):
         tf = Matrix.vstack([pose for pose in self.connections_to_expression.values()])
         params = [v.variables.position for v in self.world.degrees_of_freedom]
         self.compiled_tf = tf.compile(parameters=VariableParameters.from_lists(params))
+        self.compiled_tf.bind_args_to_memory_view(0, self.world.state.positions)
 
     def compute_tf(self) -> np.ndarray:
         return self.compiled_tf.evaluate()
@@ -72,8 +73,8 @@ class TfPublisherModelCallback(ModelChangeCallback):
             )
             child_link = self.world.get_kinematic_structure_entity_by_id(child_link_id)
 
-            self.tf_message.transforms[i].header.frame_id = str(parent_link.name.name)
-            self.tf_message.transforms[i].child_frame_id = str(child_link.name.name)
+            self.tf_message.transforms[i].header.frame_id = str(parent_link.name)
+            self.tf_message.transforms[i].child_frame_id = str(child_link.name)
 
     def update_tf_message(self):
         tf_data = self.compute_tf()
@@ -107,6 +108,7 @@ class TFPublisher(StateChangeCallback):
     tf_model_cb: TfPublisherModelCallback = field(init=False)
 
     def __post_init__(self):
+        super().__post_init__()
         self.tf_pub = self.node.create_publisher(TFMessage, self.tf_topic, 10)
         self.tf_model_cb = TfPublisherModelCallback(
             node=self.node,

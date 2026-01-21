@@ -1,5 +1,3 @@
-import unittest
-
 import pytest
 import rclpy
 import rustworkx
@@ -10,8 +8,7 @@ from pycram.motion_executor import MotionExecutor
 from pycram.process_module import simulated_robot
 from pycram.robot_plans.actions import *
 from pycram.robot_plans.motions import MoveTCPWaypointsMotion
-from pycram.testing import ApartmentWorldTestCase
-from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.adapters.ros.viz_marker import VizMarkerPublisher
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
 )

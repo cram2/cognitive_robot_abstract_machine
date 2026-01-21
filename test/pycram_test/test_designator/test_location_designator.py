@@ -1,16 +1,7 @@
-import unittest
-
-import rclpy
-
-from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
-
-from pycram.designator import ObjectDesignatorDescription
 from pycram.designators.location_designator import *
 from pycram.language import SequentialPlan
-from pycram.robot_description import RobotDescription
 from pycram.datastructures.pose import PoseStamped
 from pycram.robot_plans import NavigateActionDescription
-from pycram.testing import ApartmentWorldTestCase
 
 arm_park = {
     "l_shoulder_pan_joint": 1.712,
