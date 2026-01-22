@@ -130,7 +130,7 @@ class MultiSimError(Exception):
 class MultiSimCamera(SemanticAnnotation):
     """Semantic annotation declaring that a Body is a MultiSimCamera."""
 
-    body: Body
+    body: Body = field(kw_only=True)
     """
     The body which is the camera
     """
@@ -806,27 +806,27 @@ class MujocoEquality(SemanticAnnotation):
     Semantic annotation declaring that two MuJoCo entities are constrained.
     """
 
-    type: mujoco.mjtEq
+    type: mujoco.mjtEq = field(kw_only=True)
     """
     The type of the equality constraint.
     """
 
-    obj_type: mujoco.mjtObj
+    obj_type: mujoco.mjtObj = field(kw_only=True)
     """
     The type of the objects being constrained.
     """
 
-    name_1: str
+    name_1: str = field(kw_only=True)
     """
     The name of the first entity being constrained.
     """
 
-    name_2: str
+    name_2: str = field(kw_only=True)
     """
     The name of the second entity being constrained.
     """
 
-    data: List[float]
+    data: List[float] = field(kw_only=True)
     """
     The data associated with the equality constraint.
     """
@@ -838,7 +838,7 @@ class MujocoMocapBody(SemanticAnnotation):
     Semantic annotation declaring that a Body is a MujocoMocapBody.
     """
 
-    body: Body
+    body: Body = field(kw_only=True)
     """
     The body which is a MujocoMocapBody.
     """

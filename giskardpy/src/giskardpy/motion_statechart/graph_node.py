@@ -40,7 +40,7 @@ from krrood.adapters.json_serializer import (
     JSON_TYPE_NAME,
     to_json,
 )
-from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
+from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar, trinary_logic_not
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -83,7 +83,7 @@ class TrinaryCondition(SubclassJSONSerializer):
     """
 
     def __hash__(self) -> int:
-        return hash((str(self), self.kind))
+        return hash((str(self), self.kind, self.owner.index))
 
     def __eq__(self, other):
         return hash(self) == hash(other)
@@ -994,6 +994,15 @@ class EndMotion(MotionStatechartNode):
         """
         end = cls()
         end.start_condition = node.observation_variable
+        return end
+
+    @classmethod
+    def when_false(cls, node: MotionStatechartNode) -> Self:
+        """
+        Factory method for creating an EndMotion node that activates when the given node has a false observation state.
+        """
+        end = cls()
+        end.start_condition = trinary_logic_not(node.observation_variable)
         return end
 
     @classmethod

@@ -204,6 +204,14 @@ class WorldEntityNotFoundError(UsageError):
 
 
 @dataclass
+class WorldEntityWithIDNotFoundError(UsageError):
+    id: UUID
+
+    def __post_init__(self):
+        self.message = f"WorldEntity with id {self.id} not found"
+
+
+@dataclass
 class AlreadyBelongsToAWorldError(UsageError):
     world: World
     type_trying_to_add: Type[WorldEntity]
@@ -227,12 +235,12 @@ class SpatialTypeNotJsonSerializable(NotJsonSerializable):
 
 
 @dataclass
-class KinematicStructureEntityNotInKwargs(JSONSerializationError):
-    kinematic_structure_entity_id: UUID
+class WorldEntityWithIDNotInKwargs(JSONSerializationError):
+    world_entity_id: UUID
 
     def __post_init__(self):
         self.message = (
-            f"Kinematic structure entity '{self.kinematic_structure_entity_id}' is not in the kwargs of the "
+            f"World entity '{self.world_entity_id}' is not in the kwargs of the "
             f"method that created it."
         )
 

@@ -23,7 +23,7 @@ from .world_entity import (
     Actuator,
 )
 from ..adapters.world_entity_kwargs_tracker import (
-    KinematicStructureEntityKwargsTracker,
+    WorldEntityWithIDKwargsTracker,
 )
 from ..datastructures.prefixed_name import PrefixedName
 

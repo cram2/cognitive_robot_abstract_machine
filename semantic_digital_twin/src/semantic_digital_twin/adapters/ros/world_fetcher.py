@@ -7,7 +7,7 @@ from rclpy.node import Node
 from rclpy.service import Service
 from std_srvs.srv import Trigger
 
-from ..world_entity_kwargs_tracker import KinematicStructureEntityKwargsTracker
+from ..world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
 from ...world import World
 from ...world_description.world_modification import (
     WorldModelModification,
@@ -162,7 +162,7 @@ def fetch_world_from_service(
     # fetch world
     response = client.call(Trigger.Request())
 
-    tracker = KinematicStructureEntityKwargsTracker()
+    tracker = WorldEntityWithIDKwargsTracker()
     kwargs = tracker.create_kwargs()
 
     # New format is an object {"modifications": [...], "state": {...}}.

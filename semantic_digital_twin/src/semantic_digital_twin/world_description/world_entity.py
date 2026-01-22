@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import itertools
+import uuid
 from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Iterable, Mapping
@@ -35,13 +36,14 @@ from krrood.adapters.json_serializer import (
     to_json,
     from_json,
 )
+
 from krrood.entity_query_language.predicate import Symbol
 from krrood.symbolic_math.symbolic_math import Matrix
 from .geometry import TriangleMesh
 from .inertial_properties import Inertial
 from .shape_collection import ShapeCollection, BoundingBoxCollection
 from ..adapters.world_entity_kwargs_tracker import (
-    KinematicStructureEntityKwargsTracker,
+    WorldEntityWithIDKwargsTracker,
 )
 from ..datastructures.prefixed_name import PrefixedName
 from ..exceptions import ReferenceFrameMismatchError
@@ -133,6 +135,23 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
         result["id"] = to_json(self.id)
         return result
 
+    def _track_object_in_from_json(
+        self, from_json_kwargs
+    ) -> WorldEntityWithIDKwargsTracker:
+        """
+        Add this object to the WorldEntityWithIDKwargsTracker.
+
+        .. note::
+            Always use this when referencing WorldEntityWithID in the current class.
+            Call this when the _from_json
+
+        :param from_json_kwargs: The kwargs passed to the _from_json method.
+        :return: The instance of WorldEntityWithIDKwargsTracker.
+        """
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs)
+        tracker.add_world_entity_with_id(self)
+        return tracker
+
 
 @dataclass
 class CollisionCheckingConfig(SubclassJSONSerializer):
@@ -177,7 +196,7 @@ class CollisionCheckingConfig(SubclassJSONSerializer):
 
 
 @dataclass(eq=False)
-class KinematicStructureEntity(WorldEntityWithID, SubclassJSONSerializer, ABC):
+class KinematicStructureEntity(WorldEntityWithID, ABC):
     """
     An entity that is part of the kinematic structure of the world.
     """
@@ -267,7 +286,7 @@ class KinematicStructureEntity(WorldEntityWithID, SubclassJSONSerializer, ABC):
 
 
 @dataclass(eq=False)
-class Body(KinematicStructureEntity, SubclassJSONSerializer):
+class Body(KinematicStructureEntity):
     """
     Represents a body in the world.
     A body is a semantic atom, meaning that it cannot be decomposed into meaningful smaller parts.
@@ -467,12 +486,7 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
             name=PrefixedName.from_json(data["name"], **kwargs),
             id=from_json(data["id"]),
         )
-        # add the new body so that the transformation matrices in the shapes can use it as reference frame.
-        tracker = KinematicStructureEntityKwargsTracker.from_kwargs(kwargs)
-        if not tracker.has_kinematic_structure_entity(result.id):
-            tracker.add_kinematic_structure_entity(result)
-        else:
-            result = tracker.get_kinematic_structure_entity(result.id)
+        result._track_object_in_from_json(kwargs)
 
         collision = ShapeCollection.from_json(data["collision"], **kwargs)
         visual = ShapeCollection.from_json(data["visual"], **kwargs)
@@ -609,12 +623,7 @@ class Region(KinematicStructureEntity):
         result = cls(
             name=PrefixedName.from_json(data["name"]), id=from_json(data["id"])
         )
-        # add the new body so that the transformation matrices in the shapes can use it as reference frame.
-        tracker = KinematicStructureEntityKwargsTracker.from_kwargs(kwargs)
-        if not tracker.has_kinematic_structure_entity(result.id):
-            tracker.add_kinematic_structure_entity(result)
-        else:
-            result = tracker.get_kinematic_structure_entity(result.id)
+        result._track_object_in_from_json(kwargs)
         area = ShapeCollection.from_json(data["area"], **kwargs)
         for shape in area:
             shape.origin.reference_frame = result
@@ -630,7 +639,7 @@ GenericWorldEntity = TypeVar("GenericWorldEntity", bound=WorldEntity)
 
 
 @dataclass
-class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
+class SemanticAnnotation(WorldEntityWithID, SubclassJSONSerializer):
     """
     Represents a semantic annotation on a set of bodies in the world.
 
@@ -679,23 +688,48 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
         return hash(self) == hash(other)
 
     def to_json(self) -> Dict[str, Any]:
+        """
+        .. warn::
+
+            This will not work if any of the classes' fields have a type UUID or some container of UUID.
+            Whenever this happens, the UUIDs are resolved to WorldEntityWithID objects, which leads to undefined
+            behavior.
+        """
         result = {
             **super().to_json(),
         }
 
         for semantic_annotation_field in fields(self):
-            value = getattr(self, semantic_annotation_field.name)
             if semantic_annotation_field.name.startswith(
                 "_"
             ) or semantic_annotation_field.name.startswith("__"):
                 continue
-            if not issubclass(type(value), SubclassJSONSerializer):
-                continue
-            result[semantic_annotation_field.name] = value.to_json()
+            value = getattr(self, semantic_annotation_field.name)
+
+            if isinstance(value, (list, set)):
+                current_result = [self._item_to_json(item) for item in value]
+            else:
+                current_result = self._item_to_json(value)
+            result[semantic_annotation_field.name] = current_result
+        return result
+
+    @classmethod
+    def _item_to_json(cls, item: Any):
+        if isinstance(item, WorldEntityWithID):
+            result = to_json(item.id)
+        else:
+            result = to_json(item)
         return result
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        """
+        .. warn::
+
+            This will not work if any of the classes' fields have a type UUID or some container of UUID.
+            Whenever this happens, the UUIDs are resolved to WorldEntityWithID objects, which leads to undefined
+            behavior.
+        """
         semantic_annotation_fields = {f.name: f for f in fields(cls)}
 
         init_args = {}
@@ -703,11 +737,32 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
         for k, v in semantic_annotation_fields.items():
             if k not in data.keys():
                 continue
-            field_type = type_string_to_type(data[k][JSON_TYPE_NAME])
-            if issubclass(field_type, SubclassJSONSerializer):
-                init_args[k] = field_type.from_json(data[k], **kwargs)
 
-        return cls(**init_args)
+            current_data = data[k]
+
+            if k == "id":
+                current_result = from_json(current_data, **kwargs)
+            elif isinstance(current_data, list):
+                current_result = [
+                    cls._item_from_json(data, **kwargs) for data in current_data
+                ]
+            else:
+                current_result = cls._item_from_json(current_data, **kwargs)
+            init_args[k] = current_result
+        result = cls(**init_args)
+        result._track_object_in_from_json(kwargs)
+        return result
+
+    @classmethod
+    def _item_from_json(cls, data: Dict[str, Any], **kwargs) -> Any:
+        state = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        obj = from_json(data, **kwargs)
+
+        if isinstance(obj, uuid.UUID):
+            obj = from_json(data, **kwargs)
+            return state.get_world_entity_with_id(obj)
+        else:
+            return obj
 
     def _kinematic_structure_entities(
         self, visited: Set[int], aggregation_type: Type[GenericKinematicStructureEntity]
@@ -977,9 +1032,9 @@ class Connection(WorldEntity, SubclassJSONSerializer):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        tracker = KinematicStructureEntityKwargsTracker.from_kwargs(kwargs)
-        parent = tracker.get_kinematic_structure_entity(id=from_json(data["parent_id"]))
-        child = tracker.get_kinematic_structure_entity(id=from_json(data["child_id"]))
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        parent = tracker.get_world_entity_with_id(id=from_json(data["parent_id"]))
+        child = tracker.get_world_entity_with_id(id=from_json(data["child_id"]))
         return cls(
             name=PrefixedName.from_json(data["name"]),
             parent=parent,

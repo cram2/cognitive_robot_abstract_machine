@@ -1,0 +1,6 @@
+numpy
+plotly
+typing_extensions
+sortedcontainers
+pybind11
+setuptools-scm

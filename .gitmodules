@@ -1,3 +1,7 @@
 [submodule "src/ripple_down_rules_meta"]
 	path = semantic_digital_twin/src/ripple_down_rules_meta
 	url = https://github.com/code-iai/ripple_down_rules_meta.git
+
+[submodule "random_events/src/random-events-lib"]
+	path = random_events/src/random-events-lib
+	url = https://github.com/tomsch420/random-events-lib.git

@@ -8,7 +8,7 @@ from semantic_digital_twin.adapters.ros.world_fetcher import (
     fetch_world_from_service,
 )
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    KinematicStructureEntityKwargsTracker,
+    WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
@@ -69,7 +69,7 @@ def test_service_callback_success(rclpy_node):
 
     assert result.success is True
 
-    tracker = KinematicStructureEntityKwargsTracker()
+    tracker = WorldEntityWithIDKwargsTracker()
     kwargs = tracker.create_kwargs()
 
     # Verify the message is valid JSON (expects new envelope format)
@@ -119,7 +119,7 @@ def test_service_callback_with_multiple_modifications(rclpy_node):
     assert result.success is True
     # Verify the message is valid JSON
 
-    tracker = KinematicStructureEntityKwargsTracker.from_world(world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
     kwargs = tracker.create_kwargs()
     payload = json.loads(result.message)
     modifications_json = payload["modifications"]
@@ -175,24 +175,17 @@ def test_semantic_annotation_modifications(rclpy_node):
 
 
 def test_pr2_semantic_annotation(rclpy_node, pr2_world_state_reset):
-    PR2.from_world(pr2_world_state_reset)
+    pr2 = PR2.from_world(pr2_world_state_reset)
     fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
 
     pr2_world_copy = fetch_world_from_service(
         rclpy_node,
     )
 
-    assert [sa.name for sa in pr2_world_state_reset.semantic_annotations] == [
-        sa.name for sa in pr2_world_copy.semantic_annotations
-    ]
+    fetched_pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
 
-
-def test_hsr_semantic_annotation(rclpy_node, hsr_world_setup):
-    PR2.from_world(pr2_world_state_reset)
-    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
-
-    pr2_world_copy = fetch_world_from_service(
-        rclpy_node,
+    assert set(map(lambda x: x.id, fetched_pr2.manipulators)) == set(
+        map(lambda x: x.id, pr2.manipulators)
     )
 
     assert [sa.name for sa in pr2_world_state_reset.semantic_annotations] == [

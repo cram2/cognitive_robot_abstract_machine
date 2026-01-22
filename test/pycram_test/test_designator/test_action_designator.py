@@ -114,7 +114,7 @@ def test_navigate(immutable_model_world):
     )
 
 
-def test_reach_to_pick_up(immutable_model_world):
+def  test_reach_to_pick_up(immutable_model_world):
     world, robot_view, context = immutable_model_world
     grasp_description = GraspDescription(
         ApproachDirection.FRONT, VerticalAlignment.NoAlignment, False

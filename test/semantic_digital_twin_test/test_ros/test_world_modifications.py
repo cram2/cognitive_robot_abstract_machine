@@ -1,7 +1,7 @@
 import unittest
 
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    KinematicStructureEntityKwargsTracker,
+    WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
@@ -112,7 +112,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
         # reconstruct this world
         w2 = World()
 
-        tracker = KinematicStructureEntityKwargsTracker()
+        tracker = WorldEntityWithIDKwargsTracker()
         kwargs = tracker.create_kwargs()
         # copy modifications
         modifications_copy = WorldModelModificationBlock.from_json(
@@ -188,7 +188,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
             w.add_connection(c2)
 
         modifications = w.get_world_model_manager().model_modification_blocks[-1]
-        tracker = KinematicStructureEntityKwargsTracker()
+        tracker = WorldEntityWithIDKwargsTracker()
         kwargs = tracker.create_kwargs()
 
         modifications_copy = WorldModelModificationBlock.from_json(
@@ -216,7 +216,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
             w.add_actuator(actuator)
 
         modifications = w.get_world_model_manager().model_modification_blocks[-1]
-        tracker = KinematicStructureEntityKwargsTracker()
+        tracker = WorldEntityWithIDKwargsTracker()
         kwargs = tracker.create_kwargs()
 
         modifications_copy = WorldModelModificationBlock.from_json(

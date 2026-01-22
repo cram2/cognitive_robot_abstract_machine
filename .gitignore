@@ -46,6 +46,7 @@ CMakeLists.txt.user
 srv/_*.py
 *.pcd
 *.pyc
+*.pyo
 qtcreator-*
 *.user
 *.prof
@@ -68,6 +69,13 @@ poetry.lock
 
 # Created during tests
 file::memory:
+
+dist
+
+# probabilistic model dependent
+mlruns
+mlartifacts
+.drawio
 
 # Documentation build artifacts
 **/doc/_build/

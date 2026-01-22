@@ -364,6 +364,10 @@ class MotionStatechart(SubclassJSONSerializer):
                     node_copy = Goal(name=node.name)
                 case Task():
                     node_copy = Task(name=node.name)
+                case EndMotion():
+                    node_copy = EndMotion(name=node.name)
+                case CancelMotion():
+                    node_copy = CancelMotion(name=node.name, exception=node.exception)
                 case _:
                     node_copy = MotionStatechartNode(name=node.name)
             motion_statechart_copy.add_node(node_copy)

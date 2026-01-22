@@ -52,7 +52,7 @@ class GraspDescription(HasParameters):
         return [self.approach_direction, self.vertical_alignment, self.rotate_gripper]
 
     def get_grasp_pose(
-        self, end_effector, body: Body, translate_rim_offset: bool = False
+        self, end_effector: Manipulator, body: Body, translate_rim_offset: bool = False
     ) -> PoseStamped:
         """
         Translates the grasp pose of the object using the desired grasp description and object knowledge.

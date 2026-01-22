@@ -107,8 +107,8 @@ def conclusion_331345798360792447350644865254855982739(case) -> List[Drawer]:
         ]
         drawers = [
             Drawer(
-                [cont for cont in containers if dc.parent == cont.body][0],
-                [h for h in handles if dc.child == h.body][0],
+                container=[cont for cont in containers if dc.parent == cont.body][0],
+                handle=[h for h in handles if dc.child == h.body][0],
             )
             for dc in drawer_handle_connections
         ]
@@ -151,7 +151,9 @@ def conclusion_35528769484583703815352905256802298589(case) -> List[Cabinet]:
                 for d in drawers
                 if d.container.body in cabinet_drawer_container_bodies
             ]
-            cabinets.append(Cabinet(Container(body=ccb), drawers=cabinet_drawers))
+            cabinets.append(
+                Cabinet(container=Container(body=ccb), drawers=cabinet_drawers)
+            )
 
         return cabinets
 

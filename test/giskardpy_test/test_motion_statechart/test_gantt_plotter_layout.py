@@ -6,7 +6,7 @@ import pytest
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from giskardpy.motion_statechart.monitors.payload_monitors import CountTicks
+from giskardpy.motion_statechart.monitors.payload_monitors import CountControlCycles
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.plotters.gantt_chart_plotter import (
     HistoryGanttChartPlotter,
@@ -58,7 +58,7 @@ def _render_and_capture_axes(plotter: HistoryGanttChartPlotter, monkeypatch):
 def test_main_and_final_widths_control_cycles(monkeypatch, ticks):
     # Build a small statechart that runs for `ticks` control cycles
     msc = MotionStatechart()
-    counter = CountTicks(ticks=ticks)
+    counter = CountControlCycles(control_cycles=ticks)
     msc.add_node(counter)
     msc.add_node(EndMotion.when_true(counter))
 
@@ -117,7 +117,7 @@ def test_long_labels_not_clipped_on_right(monkeypatch):
 
 def test_x_axis_units_control_cycles_vs_seconds(monkeypatch):
     msc = MotionStatechart()
-    counter = CountTicks(ticks=5)
+    counter = CountControlCycles(control_cycles=5)
     msc.add_nodes([counter])
     msc.add_node(EndMotion.when_true(counter))
 

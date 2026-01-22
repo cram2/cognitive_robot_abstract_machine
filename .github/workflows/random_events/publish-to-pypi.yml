@@ -1,0 +1,145 @@
+on:
+  push:
+    tags:
+      - '*'
+
+defaults:
+  run:
+    working-directory: random_events
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Setup submodules
+        run: |
+          git config --global --add safe.directory '*'
+          git submodule update --init --recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install cibuildwheel
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cibuildwheel
+
+      - name: Build wheels
+        env:
+          CIBW_BUILD: cp${{ matrix.python-version == '3.10' && '310' || matrix.python-version == '3.11' && '311' || matrix.python-version == '3.12' && '312' || matrix.python-version == '3.9' && '39' || '38' }}-manylinux_x86_64
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+          CIBW_BEFORE_BUILD: pip install -r requirements.txt
+          CIBW_REPAIR_WHEEL_COMMAND: auditwheel repair -w {dest_dir} {wheel}
+        run: |
+          python -m cibuildwheel --output-dir wheelhouse
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.python-version }}
+          path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Setup submodules
+        run: |
+          git config --global --add safe.directory '*'
+          git submodule update --init --recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Build SDist
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+          python -m build --sdist
+
+      - name: Upload SDist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  collect_artifacts:
+    name: Collect artifacts
+    runs-on: ubuntu-latest
+    needs: [build_wheels, build_sdist]
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Create dist directory
+        run: mkdir -p dist
+
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: temp
+          merge-multiple: true
+
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: temp
+
+      - name: Move artifacts to dist
+        run: |
+          mv temp/* dist/
+
+      - name: Upload combined artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-dist
+          path: dist/
+
+  pypi-publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: collect_artifacts
+    defaults:
+      run:
+        working-directory: .
+    environment:
+      name: pypi
+      url: https://pypi.org/p/random-events
+    permissions:
+      id-token: write  # required for trusted publishing
+    steps:
+      - name: Download built dist
+        uses: actions/download-artifact@v4
+        with:
+          name: built-dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: false
+          verbose: 'true'

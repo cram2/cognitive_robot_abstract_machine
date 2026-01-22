@@ -4,6 +4,7 @@ import logging
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from itertools import product
+from typing import Dict, Any
 
 from typing_extensions import (
     Iterable,
@@ -15,6 +16,7 @@ from typing_extensions import (
     List,
 )
 
+from krrood.adapters.json_serializer import SubclassJSONSerializer
 from ..collision_checking.collision_detector import CollisionCheck
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import (
@@ -283,13 +285,27 @@ class Sensor(SemanticRobotAnnotation, ABC):
 
 
 @dataclass
-class FieldOfView:
+class FieldOfView(SubclassJSONSerializer):
     """
     Represents the field of view of a camera sensor, defined by the vertical and horizontal angles of the camera's view.
     """
 
     vertical_angle: float
     horizontal_angle: float
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "vertical_angle": self.vertical_angle,
+            "horizontal_angle": self.horizontal_angle,
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(
+            vertical_angle=data["vertical_angle"],
+            horizontal_angle=data["horizontal_angle"],
+        )
 
 
 @dataclass
