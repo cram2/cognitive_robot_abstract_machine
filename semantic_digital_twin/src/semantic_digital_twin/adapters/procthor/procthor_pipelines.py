@@ -26,13 +26,7 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
     This function assumes that the drawer body has a bounding box that can be used to determine its
     scale and that a handle can be created with a standard size.
     """
-    drawer_scale = (
-        drawer_body.collision.as_bounding_box_collection_at_origin(
-            HomogeneousTransformationMatrix(reference_frame=drawer_body._world.root)
-        )
-        .bounding_boxes[0]
-        .scale
-    )
+    drawer_scale = drawer_body.collision.scale
 
     with world.modify_world():
         drawer = Drawer.create_with_new_body_in_world(
@@ -85,11 +79,7 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
     with world.modify_world():
         door = Door.create_with_new_body_in_world(
             name=door_body.name,
-            scale=door_body.collision.as_bounding_box_collection_at_origin(
-                HomogeneousTransformationMatrix(reference_frame=door_body._world.root)
-            )
-            .bounding_boxes[0]
-            .scale,
+            scale=door_body.collision.scale,
             world=world,
         )
 
@@ -126,11 +116,7 @@ def dresser_from_body_in_world(dresser: Body, world: World) -> Dresser:
     with world.modify_world():
         dresser = Dresser.create_with_new_body_in_world(
             name=dresser.name,
-            scale=dresser.collision.as_bounding_box_collection_at_origin(
-                HomogeneousTransformationMatrix(reference_frame=dresser._world.root)
-            )
-            .bounding_boxes[0]
-            .scale,
+            scale=dresser.collision.scale,
             world=world,
         )
         for child in dresser._world.compute_child_kinematic_structure_entities(

@@ -28,7 +28,7 @@ from ..datastructures.prefixed_name import PrefixedName
 from ..datastructures.variables import SpatialVariables
 from ..exceptions import (
     InvalidPlaneDimensions,
-    InvalidAxisError,
+    InvalidHingeActiveAxis,
     MissingSemanticAnnotationError,
 )
 from ..reasoning.predicates import InsideOf
@@ -296,7 +296,7 @@ class Door(HasHandle, HasHinge):
                 door_T_hinge = HomogeneousTransformationMatrix.from_xyz_rpy(y=offset)
 
             case _:
-                raise InvalidAxisError(axis=opening_axis)
+                raise InvalidHingeActiveAxis(axis=opening_axis)
 
         world_T_hinge = world_T_door @ door_T_hinge
 
@@ -335,7 +335,7 @@ class DoubleDoor(SemanticAnnotation):
 @dataclass(eq=False)
 class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasSlider, HasStorageSpace):
 
-    @property
+    @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.Z()
 
@@ -352,7 +352,7 @@ class Table(Furniture, HasSupportingSurface):
 
 @dataclass(eq=False)
 class Cabinet(Furniture, HasCaseAsRootBody):
-    @property
+    @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.NEGATIVE_X()
 

@@ -181,7 +181,7 @@ class ShapeCollection(SubclassJSONSerializer):
         )
         return ShapeCollection(new_shapes, new_reference_frame)
 
-    @cached_property
+    @property
     def scale(self):
         return (
             self.as_bounding_box_collection_at_origin(

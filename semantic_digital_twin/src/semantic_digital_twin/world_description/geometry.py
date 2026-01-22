@@ -120,7 +120,6 @@ class Scale(SubclassJSONSerializer):
         self.y = float(self.y)
         self.z = float(self.z)
 
-    @lru_cache
     def to_simple_event(
         self,
         extend_result_in_direction: Optional[Vector3] = None,
@@ -150,28 +149,28 @@ class Scale(SubclassJSONSerializer):
 
         :return: The modified inner event with the specified direction extended.
         """
-        match direction:
-            case Vector3.X():
+        match direction.to_np().tolist():
+            case [1, 0, 0, 0]:
                 simple_event[SpatialVariables.x.value] = closed(
                     -self.x / 2, self.x / 2 + amount
                 )
-            case Vector3.Y():
+            case [0, 1, 0, 0]:
                 simple_event[SpatialVariables.y.value] = closed(
                     -self.y / 2, self.y / 2 + amount
                 )
-            case Vector3.Z():
+            case [0, 0, 1, 0]:
                 simple_event[SpatialVariables.z.value] = closed(
                     -self.z / 2, self.z / 2 + amount
                 )
-            case Vector3.NEGATIVE_X():
+            case [-1, 0, 0, 0]:
                 simple_event[SpatialVariables.x.value] = closed(
                     -(self.x / 2 + amount), self.x / 2
                 )
-            case Vector3.NEGATIVE_Y():
+            case [0, -1, 0, 0]:
                 simple_event[SpatialVariables.y.value] = closed(
                     -(self.y / 2 + amount), self.y / 2
                 )
-            case Vector3.NEGATIVE_Z():
+            case [0, 0, -1, 0]:
                 simple_event[SpatialVariables.z.value] = closed(
                     -(self.z / 2 + amount), self.z / 2
                 )

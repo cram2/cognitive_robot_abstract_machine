@@ -16,7 +16,6 @@ from typing_extensions import (
     Self,
     Iterable,
     Type,
-    assert_never,
 )
 
 from krrood.ormatic.utils import classproperty
@@ -26,13 +25,9 @@ from ..exceptions import (
     MismatchingWorld,
 )
 from ..spatial_types import Point3, HomogeneousTransformationMatrix, Vector3
-from ..spatial_types.derivatives import DerivativeMap
 from ..world import World
 from ..world_description.connections import (
-    RevoluteConnection,
     FixedConnection,
-    PrismaticConnection,
-    ActiveConnection1DOF,
 )
 from ..world_description.degree_of_freedom import DegreeOfFreedomLimits
 from ..world_description.geometry import Scale

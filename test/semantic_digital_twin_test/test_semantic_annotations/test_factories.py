@@ -11,7 +11,7 @@ from krrood.ormatic.dao import to_dao
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     InvalidPlaneDimensions,
-    InvalidAxisError,
+    InvalidHingeActiveAxis,
     InvalidConnectionLimits,
     MissingSemanticAnnotationError,
     MismatchingWorld,
@@ -507,7 +507,7 @@ class TestFactories(unittest.TestCase):
                 world=world,
             )
             door.add_handle(handle)
-        with self.assertRaises(InvalidAxisError):
+        with self.assertRaises(InvalidHingeActiveAxis):
             door.calculate_world_T_hinge_based_on_handle(Vector3.X())
 
     def test_calculate_supporting_surface(self):

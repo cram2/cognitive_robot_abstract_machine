@@ -207,7 +207,7 @@ class InvalidPlaneDimensions(UsageError):
 
 
 @dataclass
-class InvalidAxisError(UsageError):
+class InvalidHingeActiveAxis(UsageError):
     """
     Raised when an invalid axis is provided.
     """
@@ -218,7 +218,10 @@ class InvalidAxisError(UsageError):
     """
 
     def __post_init__(self):
-        self.message = f"Invalid axis {self.axis}."
+        self.message = (
+            f"Axis {self.axis} provided when trying to calculate the hinge position is invalid. "
+            f"If you think this is incorrect, consider extending Door.calculate_world_T_hinge_based_on_handle"
+        )
 
 
 @dataclass
