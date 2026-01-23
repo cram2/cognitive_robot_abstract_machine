@@ -724,13 +724,13 @@ class TestBodyMotionProblem:
 
     def test_query_motion_satisfying_task_request2(self):
         world = self.get_world(use_kitchen=True)
-        if not rclpy.ok():
-            rclpy.init()
-        node = rclpy.create_node("viz_node")
-        VizMarkerPublisher(world=world, node=node, throttle_state_updates=20)
+        # if not rclpy.ok():
+        #     rclpy.init()
+        # node = rclpy.create_node("viz_node")
+        # VizMarkerPublisher(world=world, node=node, throttle_state_updates=1)
 
         effects, motions, open_task, close_task, drawers = self._extend_world(
-            world, only_doors=False
+            world, only_doors=True
         )
 
         task_sym = variable(
@@ -783,13 +783,16 @@ class TestBodyMotionProblem:
         if not rclpy.ok():
             rclpy.init()
         node = rclpy.create_node("viz_node")
-        VizMarkerPublisher(world=world, node=node, throttle_state_updates=10)
+        VizMarkerPublisher(world=world, node=node, throttle_state_updates=1)
 
         effects, motions, open_task, close_task, drawers = self._extend_world(
-            world,
+            world, only_doors=True
         )
 
-        task_sym = variable(TaskRequest, domain=[open_task])
+        task_sym = variable(
+            TaskRequest,
+            domain=[TaskRequest(task_type="open", name="oven_area_oven_door")],
+        )
         effect_sym = variable(Effect, domain=effects)
         motion_sym = variable(Motion, domain=motions)
 
@@ -836,10 +839,10 @@ class TestBodyMotionProblem:
         if not rclpy.ok():
             rclpy.init()
         node = rclpy.create_node("viz_node")
-        VizMarkerPublisher(world=world, node=node, throttle_state_updates=15)
+        VizMarkerPublisher(world=world, node=node, throttle_state_updates=30)
 
         effects, motions, open_task, close_task, drawers = self._extend_world(
-            world,  # only_doors=True
+            world, only_doors=True
         )
 
         task_sym = variable(TaskRequest, domain=[open_task])
@@ -999,3 +1002,60 @@ class TestBodyMotionProblem:
         assert world.get_connection_by_name(
             "cabinet11_drawer1_joint"
         ).position == pytest.approx(0.3, abs=0.01)
+
+
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Point
+from builtin_interfaces.msg import Duration
+from rclpy.time import Time
+
+
+def points_to_path_marker_array(
+    points,  # iterable of (x, y, z)
+    frame_id="map",
+    marker_ns="path",
+    marker_id=0,
+    line_width=0.02,
+    lifetime_sec=0.0,
+    r=1.0,
+    g=0.0,
+    b=0.0,  # red path
+) -> MarkerArray:
+    """
+    Convert a list of 3D points into a MarkerArray containing
+    a single LINE_STRIP marker for RViz2.
+    """
+    marker = Marker()
+    marker.header.frame_id = frame_id
+    marker.header.stamp = Time().to_msg()
+    marker.ns = marker_ns
+    marker.id = marker_id
+    marker.type = Marker.LINE_STRIP
+    marker.action = Marker.ADD
+
+    # Identity pose, points are in the given frame directly
+    marker.pose.orientation.w = 1.0
+
+    # Line width (only x is used for LINE_STRIP)
+    marker.scale.x = float(line_width)
+
+    # Color (RGBA in [0, 1], alpha must be > 0)
+    marker.color.r = float(r)
+    marker.color.g = float(g)
+    marker.color.b = float(b)
+    marker.color.a = 1.0
+
+    # Optional lifetime (0 = forever)
+    marker.lifetime = Duration(
+        sec=int(lifetime_sec), nanosec=int((lifetime_sec % 1.0) * 1e9)
+    )
+
+    # Fill points
+    for x, y, z in points:
+        p = Point()
+        p.x, p.y, p.z = float(x), float(y), float(z)
+        marker.points.append(p)
+
+    marker_array = MarkerArray()
+    marker_array.markers.append(marker)
+    return marker_array
