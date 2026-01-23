@@ -25,6 +25,8 @@ pycram-robotics = { path = "pycram", develop = true }
 giskardpy = { path = "giskardpy", develop = true }
 semantic_digital_twin = { path = "semantic_digital_twin", develop = true }
 krrood = { path = "krrood", develop = true }
+random_events = { path = "random_events", develop = true }
+probabilistic_model = { path = "probabilistic_model", develop = true }
 
 
 [tool.setuptools]

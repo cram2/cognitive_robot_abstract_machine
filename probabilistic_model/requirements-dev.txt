@@ -1,0 +1,6 @@
+-r requirements.txt
+pandas>=2.2.3
+graphviz
+matplotlib>=3.10.1
+random_events>=4.1.17
+typing_extensions>=4.13.2

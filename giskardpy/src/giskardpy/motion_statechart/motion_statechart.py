@@ -6,6 +6,10 @@ from typing import Dict, Any
 
 import numpy as np
 import rustworkx as rx
+
+from giskardpy.motion_statechart.plotters.gantt_chart_plotter import (
+    HistoryGanttChartPlotter,
+)
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from line_profiler.explicit_profiler import profile
 from typing_extensions import List, MutableMapping, ClassVar, Self, Type
@@ -276,7 +280,7 @@ class StateHistory:
 
     def get_observation_history_of_node(
         self, node: MotionStatechartNode
-    ) -> list[LifeCycleValues]:
+    ) -> list[ObservationStateValues]:
         return [history_item.observation_state[node] for history_item in self.history]
 
     def __len__(self) -> int:
@@ -360,6 +364,10 @@ class MotionStatechart(SubclassJSONSerializer):
                     node_copy = Goal(name=node.name)
                 case Task():
                     node_copy = Task(name=node.name)
+                case EndMotion():
+                    node_copy = EndMotion(name=node.name)
+                case CancelMotion():
+                    node_copy = CancelMotion(name=node.name, exception=node.exception)
                 case _:
                     node_copy = MotionStatechartNode(name=node.name)
             motion_statechart_copy.add_node(node_copy)
@@ -587,6 +595,16 @@ class MotionStatechart(SubclassJSONSerializer):
         Uses graphviz to draw the motion statechart and safe it at `file_name`.
         """
         MotionStatechartGraphviz(self).to_dot_graph_pdf(file_name=file_name)
+
+    def plot_gantt_chart(
+        self,
+        path: str = "./ganttchart.pdf",
+        context: ExecutionContext = None,
+        second_length_in_cm: float = 2.0,
+    ):
+        HistoryGanttChartPlotter(
+            self, second_width_in_cm=second_length_in_cm, context=context
+        ).plot_gantt_chart(path)
 
     def to_json(self) -> Dict[str, Any]:
         self._add_transitions()

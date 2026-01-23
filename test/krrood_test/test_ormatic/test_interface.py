@@ -1,11 +1,12 @@
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, inspect
 
 from krrood.ormatic.alternative_mappings import FunctionMapping, UncallableFunction
 from krrood.ormatic.dao import (
     to_dao,
     is_data_column,
     ToDataAccessObjectState,
+    get_dao_class,
 )
 from krrood.ormatic.exceptions import NoDAOFoundError
 from ..dataset.example_classes import *
@@ -648,3 +649,12 @@ def test_persons(session, database):
     q = session.scalar(select(PersonDAO).where(PersonDAO.name == "Alice"))
     assert q.name == "Alice"
     assert q.knows[0].name == "Bob"
+
+
+def test_underspecified_types():
+    dao_class = get_dao_class(UnderspecifiedTypesContainer)
+    assert dao_class is not None
+    inst = inspect(dao_class)
+    column_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
+    assert "any_list" not in column_names
+    assert "any_field" not in column_names

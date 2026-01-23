@@ -1604,6 +1604,20 @@ class UUIDWrapperDAO(
     )
 
 
+class UnderspecifiedTypesContainerDAO(
+    Base,
+    DataAccessObject[
+        test.krrood_test.dataset.example_classes.UnderspecifiedTypesContainer
+    ],
+):
+
+    __tablename__ = "UnderspecifiedTypesContainerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
 class VectorMappedDAO(
     SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.VectorMapped]
 ):

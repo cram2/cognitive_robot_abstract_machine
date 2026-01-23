@@ -172,6 +172,15 @@ class ShapeCollection(SubclassJSONSerializer):
         )
         return self.world.transform(com, self.world.root)
 
+    def copy_for_world(self, world: World) -> ShapeCollection:
+        new_shapes = [s.copy_for_world(world) for s in self.shapes]
+        new_reference_frame = (
+            world.get_kinematic_structure_entity_by_name(self.reference_frame.name)
+            if self.reference_frame
+            else None
+        )
+        return ShapeCollection(new_shapes, new_reference_frame)
+
 
 @dataclass
 class BoundingBoxCollection(ShapeCollection):

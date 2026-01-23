@@ -1,0 +1,9 @@
+-r requirements.txt
+src/random-events-lib
+
+jupyter
+pillow
+polytope
+ortools
+scipy
+cvxopt

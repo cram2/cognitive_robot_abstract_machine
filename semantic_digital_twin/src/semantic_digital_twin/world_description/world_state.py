@@ -15,6 +15,8 @@ from ..exceptions import (
     DofNotInWorldStateError,
     IncorrectWorldStateValueShapeError,
     MismatchingCommandLengthError,
+    WrongWorldModelVersion,
+    NonMonotonicTimeError,
 )
 from ..spatial_types.derivatives import Derivatives
 
@@ -22,7 +24,7 @@ if TYPE_CHECKING:
     from ..world import World
 
 
-class WorldStateView:
+class WorldStateEntryView:
     """
     Returned if you access members in WorldState.
     Provides a more convenient interface to the data of a single DOF.
@@ -123,16 +125,18 @@ class WorldState(MutableMapping):
         else:
             self.data = np.hstack((self.data, new_col))
 
-    def __getitem__(self, dof_id: UUID) -> WorldStateView:
+    def __getitem__(self, dof_id: UUID) -> WorldStateEntryView:
         if dof_id not in self._index:
             raise DofNotInWorldStateError(dof_id)
         idx = self._index[dof_id]
-        return WorldStateView(self.data[:, idx])
+        return WorldStateEntryView(self.data[:, idx])
 
-    def __setitem__(self, dof_id: UUID, value: np.ndarray | WorldStateView) -> None:
+    def __setitem__(
+        self, dof_id: UUID, value: np.ndarray | WorldStateEntryView
+    ) -> None:
         if dof_id not in self._index:
             raise DofNotInWorldStateError(dof_id)
-        if isinstance(value, WorldStateView):
+        if isinstance(value, WorldStateEntryView):
             value = value.data
         arr = np.asarray(value, dtype=float)
         if arr.shape != (4,):
@@ -320,3 +324,148 @@ class WorldState(MutableMapping):
                 i,
                 self.get_derivative(i) + self.get_derivative(i + 1) * dt,
             )
+
+
+@dataclass
+class WorldStateView:
+    """
+    A lightweight view on a single time step of the trajectory that offers the
+    same convenience interface as `WorldState` for per-DOF access.
+
+    ..warning:: It does not own memory; mutation writes through to the parent trajectory.
+    """
+
+    _data: np.ndarray
+    """
+    Multidimensional array containing the recorded world state data.
+    shape (4, N), view into trajectory.
+    """
+    _ids: List[UUID]
+    """List of DOF ids in column order."""
+    _index: Dict[UUID, int]
+    """Maps DOF ids to column indices."""
+
+    def __getitem__(self, dof_id: UUID) -> WorldStateEntryView:
+        return WorldStateEntryView(self._data[:, self._index[dof_id]])
+
+    @property
+    def data(self) -> np.ndarray:
+        return self._data
+
+    @property
+    def positions(self) -> np.ndarray:
+        return self._data[Derivatives.position, :]
+
+    @property
+    def velocities(self) -> np.ndarray:
+        return self._data[Derivatives.velocity, :]
+
+    @property
+    def accelerations(self) -> np.ndarray:
+        return self._data[Derivatives.acceleration, :]
+
+    @property
+    def jerks(self) -> np.ndarray:
+        return self._data[Derivatives.jerk, :]
+
+
+@dataclass
+class WorldStateTrajectory:
+    """
+    Represents a trajectory of world states over time in a given world.
+
+    This class is used to track and manage a sequence of world states at various
+    timestamps. It provides functionality to append new states to the trajectory,
+    and to retrieve states or their timing information.
+
+    :ivar times: Array of timestamps corresponding to the recorded world states.
+    :type times: numpy.ndarray
+    :ivar data: Multidimensional array containing the recorded world state data.
+    :type data: numpy.ndarray
+    """
+
+    world: World
+    """The world instance associated with this trajectory."""
+    _ids: List[UUID] = field(default_factory=list)
+    """List of DOF ids in column order."""
+    _index: Dict[UUID, int] = field(default_factory=dict)
+    """Maps DOF ids to column indices."""
+    times: np.ndarray = field(default_factory=lambda: np.zeros((0,), dtype=float))
+    """Array of timestamps corresponding to the recorded world states."""
+    data: np.ndarray = field(default_factory=lambda: np.zeros((0, 4, 0), dtype=float))
+    """
+    Multidimensional array containing the recorded world state data.
+    The first dimension indexes the DOFs. 
+    The second dimension indexes the derivatives.
+    The third dimension indexes time steps.
+    """
+    _world_version: int = field(init=False)
+    """
+    The version of the world model at the time of trajectory creation.
+    All states appended to this trajectory must have the same version as this value.
+    """
+
+    def __post_init__(self):
+        self._world_version = self.world.get_world_model_manager().version
+
+    @classmethod
+    def from_world_state(cls, state: WorldState, time: float):
+        """
+        Creates an instance of the class using the given world state and timestamp.
+
+        :param state: The current state of the world. Represents the state as an
+            object of type `WorldState`.
+        :param time: The timestamp associated with the state. This represents the
+            specific time as a floating-point value.
+        :return: An instance of the class created using the provided world state and timestamp.
+        """
+        return cls(
+            world=state._world,
+            _ids=state._ids,
+            _index=state._index,
+            times=np.array([time], dtype=float),
+            data=state.data[np.newaxis, :],
+        )
+
+    def append(self, state: WorldState, time: float):
+        """
+        Appends a new state and corresponding time to the internal data structure,
+        ensuring that the time values are monotonically increasing and world model
+        version consistency is maintained.
+
+        :param state: The current state of the world to append.
+        :param time: The time corresponding to the new state to append. Must be
+            greater than the last time in the series.
+        """
+        current_world_model_version = state._world.get_world_model_manager().version
+        if current_world_model_version != self._world_version:
+            raise WrongWorldModelVersion(
+                expected_version=self._world_version,
+                actual_version=current_world_model_version,
+            )
+        if time <= self.times[-1]:
+            raise NonMonotonicTimeError(
+                last_time=float(self.times[-1]), attempted_time=time
+            )
+        self.times = np.append(self.times, time)
+        self.data = np.vstack((self.data, state.data[np.newaxis, :]))
+
+    def keys(self) -> Iterator[float]:
+        yield from self.times
+
+    def values(self) -> Iterator[WorldStateView]:
+        """
+        Yields state views for every time step.
+
+        This method iterates over the available time steps and generates
+        a `WorldStateView` object for each one. The yielded views represent
+        the state at that specific time step.
+
+        :yield: An iterator of `WorldStateView` objects representing the data
+                at each time step.
+        """
+        for idx in range(len(self.times)):
+            yield WorldStateView(self.data[idx, :, :], self._ids, self._index)
+
+    def items(self) -> Iterator[tuple[float, WorldStateView]]:
+        yield from zip(self.keys(), self.values())

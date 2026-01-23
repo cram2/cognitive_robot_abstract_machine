@@ -27,7 +27,7 @@ from krrood.symbolic_math.exceptions import (
 )
 from krrood.symbolic_math.symbolic_math import Matrix, to_sx
 from ..adapters.world_entity_kwargs_tracker import (
-    KinematicStructureEntityKwargsTracker,
+    WorldEntityWithIDKwargsTracker,
 )
 from ..exceptions import (
     SpatialTypesError,
@@ -79,8 +79,8 @@ class SpatialType:
         frame_data = data.get(key, {})
         if not frame_data:
             return None
-        tracker = KinematicStructureEntityKwargsTracker.from_kwargs(kwargs)
-        return tracker.get_kinematic_structure_entity(id=from_json(frame_data))
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        return tracker.get_world_entity_with_id(id=from_json(frame_data))
 
     @staticmethod
     def _ensure_consistent_frame(

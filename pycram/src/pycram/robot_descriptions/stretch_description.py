@@ -2,7 +2,7 @@ import numpy as np
 from types import MethodType
 from ..tf_transformations import quaternion_from_euler
 
-from ..pose_generator_and_validator import PoseGenerator
+from ..pose_validator import PoseGenerator
 from ..ros import get_ros_package_path
 
 from ..robot_description import (

@@ -23,7 +23,8 @@ from typing_extensions import (
     Union,
     Callable,
     Any,
-    Iterable, TYPE_CHECKING,
+    Iterable,
+    TYPE_CHECKING,
 )
 from typing_extensions import List
 from typing_extensions import Type, Set
@@ -38,6 +39,7 @@ from .exceptions import (
     WorldEntityNotFoundError,
     AlreadyBelongsToAWorldError,
     MissingWorldModificationContextError,
+    WorldEntityWithIDNotFoundError,
 )
 from .robots.abstract_robot import AbstractRobot
 from .spatial_computations.forward_kinematics import ForwardKinematicsManager
@@ -58,6 +60,7 @@ from .world_description.visitors import CollisionBodyCollector, ConnectionCollec
 from .world_description.world_entity import (
     Connection,
     SemanticAnnotation,
+    WorldEntityWithID,
     KinematicStructureEntity,
     Region,
     GenericKinematicStructureEntity,
@@ -1152,6 +1155,17 @@ class World:
     def get_degree_of_freedom_by_id(self, id: UUID) -> DegreeOfFreedom:
         return self._get_world_entity_by_hash(hash(id))
 
+    def get_world_entity_with_id_by_id(self, id: UUID) -> WorldEntityWithID:
+        result = [
+            v
+            for v in self._world_entity_hash_table.values()
+            if isinstance(v, WorldEntityWithID) and v.id == id
+        ]
+        if len(result) == 0:
+            raise WorldEntityWithIDNotFoundError(id)
+        else:
+            return result[0]
+
     def get_kinematic_structure_entity_by_id(
         self, id: UUID
     ) -> KinematicStructureEntity:
@@ -1159,6 +1173,9 @@ class World:
 
     def get_actuator_by_id(self, id: UUID) -> Actuator:
         return self._get_world_entity_by_hash(hash(id))
+
+    def get_semantic_annotation_by_id(self, id: UUID) -> SemanticAnnotation:
+        return [s for s in self.semantic_annotations if s.id == id][0]
 
     def _get_world_entity_by_hash(self, entity_hash: int) -> GenericWorldEntity:
         """
@@ -1892,12 +1909,12 @@ class World:
         with new_world.modify_world():
             for body in self.bodies:
                 new_body = Body(
-                    visual=body.visual,
-                    collision=body.collision,
                     name=body.name,
                     id=body.id,
                 )
                 new_world.add_kinematic_structure_entity(new_body)
+                new_body.visual = body.visual.copy_for_world(new_world)
+                new_body.collision = body.collision.copy_for_world(new_world)
             for region in self.regions:
                 new_region = Region(
                     name=region.name,

@@ -654,3 +654,9 @@ class Person:
     name: str
 
     knows: List[Person] = field(default_factory=list)
+
+
+@dataclass
+class UnderspecifiedTypesContainer:
+    any_list: List[Any] = field(default_factory=list)
+    any_field: Any = None

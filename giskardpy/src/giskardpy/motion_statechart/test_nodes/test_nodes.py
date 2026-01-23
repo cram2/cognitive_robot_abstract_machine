@@ -12,7 +12,10 @@ from giskardpy.motion_statechart.graph_node import (
     CancelMotion,
     EndMotion,
 )
-from giskardpy.motion_statechart.monitors.payload_monitors import CountTicks, Pulse
+from giskardpy.motion_statechart.monitors.payload_monitors import (
+    CountControlCycles,
+    Pulse,
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -85,13 +88,13 @@ class TestRunAfterStop(Goal):
     Uses a CancelMotion node to raise an exception if the child node runs after the parent has stopped.
     """
 
-    ticking1: CountTicks = field(init=False)
-    ticking2: CountTicks = field(init=False)
+    ticking1: CountControlCycles = field(init=False)
+    ticking2: CountControlCycles = field(init=False)
     cancel: CancelMotion = field(init=False)
 
     def expand(self, context: BuildContext) -> None:
-        self.ticking1 = CountTicks(name="3ticks", ticks=3)
-        self.ticking2 = CountTicks(name="2ticks", ticks=2)
+        self.ticking1 = CountControlCycles(name="3ticks", control_cycles=3)
+        self.ticking2 = CountControlCycles(name="2ticks", control_cycles=2)
         self.cancel = CancelMotion(
             name="Cancel_on_tick_after_done",
             exception=GiskardException("Node ticked after template stopped"),
@@ -120,12 +123,12 @@ class TestEndBeforeStart(Goal):
     On the next tick, node3 should end because its end condition is already fulfilled by node2.
     """
 
-    node1: CountTicks = field(init=False)
+    node1: CountControlCycles = field(init=False)
     node2: ConstTrueNode = field(init=False)
     node3: ConstTrueNode = field(init=False)
 
     def expand(self, context: BuildContext) -> None:
-        self.node1 = CountTicks(ticks=1)
+        self.node1 = CountControlCycles(control_cycles=1)
         self.node2 = ConstTrueNode()
         self.node3 = ConstTrueNode()
 
@@ -145,16 +148,18 @@ class TestRunAfterStopFromPause(Goal):
     Uses a CancelMotion node to raise an exception if the child node runs after the parent has stopped.
     """
 
-    ticking1: CountTicks = field(init=False)
-    ticking2: CountTicks = field(init=False)
-    ticking3: CountTicks = field(init=False)
+    ticking1: CountControlCycles = field(init=False)
+    ticking2: CountControlCycles = field(init=False)
+    ticking3: CountControlCycles = field(init=False)
     pulse: Pulse = field(init=False)
     cancel: CancelMotion = field(init=False)
 
     def expand(self, context: BuildContext) -> None:
-        self.ticking1 = CountTicks(name="3ticks", ticks=3)
-        self.ticking2 = CountTicks(name="trigger_cancel_after_unpause", ticks=4)
-        self.ticking3 = CountTicks(name="2ticks", ticks=2)
+        self.ticking1 = CountControlCycles(name="3ticks", control_cycles=3)
+        self.ticking2 = CountControlCycles(
+            name="trigger_cancel_after_unpause", control_cycles=4
+        )
+        self.ticking3 = CountControlCycles(name="2ticks", control_cycles=2)
         self.pulse = Pulse()
         self.cancel = CancelMotion(
             name="Cancel_on_tick_after_done",
@@ -180,13 +185,13 @@ class TestUnpauseUnknownFromParentPause(Goal):
     When parent unpauses, child should transition back to RUNNING.
     """
 
-    count_ticks1: CountTicks = field(init=False)
-    count_ticks2: CountTicks = field(init=False)
+    count_ticks1: CountControlCycles = field(init=False)
+    count_ticks2: CountControlCycles = field(init=False)
     cancel: CancelMotion = field(init=False)
 
     def expand(self, context: BuildContext) -> None:
-        self.count_ticks1 = CountTicks(ticks=2)
-        self.count_ticks2 = CountTicks(ticks=5)
+        self.count_ticks1 = CountControlCycles(control_cycles=2)
+        self.count_ticks2 = CountControlCycles(control_cycles=5)
         self.cancel = CancelMotion(
             name="check_unpause_failed",
             exception=GiskardException("Node did not unpause correctly"),

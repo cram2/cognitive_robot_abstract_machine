@@ -1,21 +1,19 @@
+import logging
 from dataclasses import dataclass, field
 from typing import List, Any
 
-from giskardpy.executor import Executor
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
+from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
-    LifeCycleState,
 )
-from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.world import World
-
+from giskardpy.ros_executor import Ros2Executor
 from pycram.datastructures.enums import ExecutionType
 from pycram.process_module import ProcessModuleManager
-import logging
+from semantic_digital_twin.world import World
 
 logger = logging.getLogger(__name__)
 
@@ -56,30 +54,44 @@ class MotionExecutor:
         # If there are no motions to construct an msc, return
         if len(self.motions) == 0:
             return
-        if ProcessModuleManager.execution_type == ExecutionType.SIMULATED:
-            self._execute_for_simulation()
-        elif ProcessModuleManager.execution_type == ExecutionType.REAL:
-            self._execute_for_real()
+        match ProcessModuleManager.execution_type:
+            case ExecutionType.SIMULATED:
+                self._execute_for_simulation()
+            case ExecutionType.REAL:
+                self._execute_for_real()
+            case ExecutionType.NO_EXECUTION:
+                return
+            case _:
+                logger.error(
+                    f"Unknown execution type: {ProcessModuleManager.execution_type}"
+                )
 
     def _execute_for_simulation(self):
         """
         Creates an executor and executes the motion state chart until it is done.
         """
         logger.debug(f"Executing {self.motions} motions in simulation")
-        executor = Executor(
+        executor = Ros2Executor(
             self.world,
             controller_config=QPControllerConfig(
                 target_frequency=50, prediction_horizon=4, verbose=False
             ),
+            ros_node=self.ros_node,
         )
         executor.compile(self.motion_state_chart)
         try:
             executor.tick_until_end(timeout=2000)
         except TimeoutError as e:
             failed_nodes = [
-                node if node.life_cycle_state != LifeCycleValues.DONE else None
+                (
+                    node
+                    if node.life_cycle_state
+                    not in [LifeCycleValues.DONE, LifeCycleValues.NOT_STARTED]
+                    else None
+                )
                 for node in self.motion_state_chart.nodes
             ]
+            failed_nodes = list(filter(None, failed_nodes))
             logger.error(f"Failed Nodes: {failed_nodes}")
             raise e
 

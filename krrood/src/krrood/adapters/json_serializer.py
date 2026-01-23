@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import importlib
+import inspect
 import uuid
 from abc import ABC
 from dataclasses import dataclass
@@ -38,6 +39,10 @@ JSON_DICT_TYPE = Dict[str, Any]  # Commonly referred JSON dict
 JSON_RETURN_TYPE = Union[
     JSON_DICT_TYPE, list[JSON_DICT_TYPE], *leaf_types
 ]  # Commonly referred JSON types
+JSON_IS_CLASS = "__is_class__"
+"""
+We need to remember if something is a class, because the type of a class is often just type.
+"""
 
 
 @dataclass
@@ -64,7 +69,7 @@ class JSONSerializableTypeRegistry(metaclass=SingletonMeta):
         distances = {}  # mapping of subclasses to the distance to the clazz
 
         for subclass in recursive_subclasses(ExternalClassJSONSerializer):
-            if subclass.original_class() == clazz:
+            if subclass.matches_generic_type(clazz):
                 return subclass
             else:
                 distance = inheritance_path_length(clazz, subclass.original_class())
@@ -136,6 +141,9 @@ class SubclassJSONSerializer:
         except AttributeError as exc:
             raise ClassNotFoundError(class_name, module_name) from exc
 
+        if data.get(JSON_IS_CLASS, False):
+            return ClassJSONSerializer.from_json(data, clazz=target_cls, **kwargs)
+
         if issubclass(target_cls, SubclassJSONSerializer):
             return target_cls._from_json(data, **kwargs)
 
@@ -172,6 +180,9 @@ def to_json(obj: Union[SubclassJSONSerializer, Any]) -> JSON_RETURN_TYPE:
 
     if isinstance(obj, SubclassJSONSerializer):
         return obj.to_json()
+
+    if inspect.isclass(obj):
+        return ClassJSONSerializer.to_json(obj)
 
     registered_json_serializer = JSONSerializableTypeRegistry().get_external_serializer(
         type(obj)
@@ -212,6 +223,17 @@ class ExternalClassJSONSerializer(HasGeneric[T], ABC):
         :return: The instantiated class object.
         """
 
+    @classmethod
+    def matches_generic_type(cls, clazz: Type) -> bool:
+        """
+        Determines if the provided class type matches the original class type.
+
+        :param clazz: The class type to compare against the original class type.
+        :return: A boolean value indicating whether the provided class type matches
+                 the original class type.
+        """
+        return cls.original_class() == clazz
+
 
 @dataclass
 class UUIDJSONSerializer(ExternalClassJSONSerializer[uuid.UUID]):
@@ -228,6 +250,29 @@ class UUIDJSONSerializer(ExternalClassJSONSerializer[uuid.UUID]):
         cls, data: Dict[str, Any], clazz: Type[uuid.UUID], **kwargs
     ) -> uuid.UUID:
         return clazz(data["value"])
+
+
+@dataclass
+class ClassJSONSerializer(ExternalClassJSONSerializer[None]):
+    """
+    A class that provides mechanisms for serializing and deserializing Python classes
+    to and from JSON representations.
+    """
+
+    @classmethod
+    def to_json(cls, obj: Type) -> Dict[str, Any]:
+        """
+        This is a special case because we need to remember that the type of the class is a class, not a type.
+        .. note:: We can't do type(obj) because that often returns just `type`.
+        """
+        return {
+            JSON_TYPE_NAME: get_full_class_name(obj),
+            JSON_IS_CLASS: inspect.isclass(obj),
+        }
+
+    @classmethod
+    def from_json(cls, data: Dict[str, Any], clazz: Type, **kwargs) -> Type:
+        return clazz
 
 
 @dataclass

@@ -53,8 +53,8 @@ class Fridge(SemanticAnnotation):
     A fridge that has a door and a body.
     """
 
-    container: Container
-    door: Door
+    container: Container = field(kw_only=True)
+    door: Door = field(kw_only=True)
 
 
 @dataclass(eq=False)
@@ -96,7 +96,7 @@ class Door(HasBody):
     A door is a physical entity that has covers an opening, has a movable body and a handle.
     """
 
-    handle: Handle
+    handle: Handle = field(kw_only=True)
     """
     The handle of the door.
     """
@@ -104,20 +104,20 @@ class Door(HasBody):
 
 @dataclass(eq=False)
 class DoubleDoor(SemanticAnnotation):
-    left_door: Door
-    right_door: Door
+    left_door: Door = field(kw_only=True)
+    right_door: Door = field(kw_only=True)
 
 
 @dataclass(eq=False)
 class Drawer(SemanticAnnotation):
-    container: Container
-    handle: Handle
+    container: Container = field(kw_only=True)
+    handle: Handle = field(kw_only=True)
 
 
 ############################### subclasses to Furniture
 @dataclass(eq=False)
 class Cabinet(Furniture, HasDrawers, HasDoors):
-    container: Container
+    container: Container = field(kw_only=True)
 
 
 @dataclass(eq=False)
@@ -144,7 +144,7 @@ class Room(SemanticAnnotation):
     A closed area with a specific purpose
     """
 
-    floor: Floor
+    floor: Floor = field(kw_only=True)
     """
     The room's floor.
     """
@@ -152,7 +152,7 @@ class Room(SemanticAnnotation):
 
 @dataclass(eq=False)
 class Wall(SemanticAnnotation):
-    body: Body
+    body: Body = field(kw_only=True)
 
     @property
     def doors(self) -> Iterable[Door]:

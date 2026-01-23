@@ -234,3 +234,10 @@ def test_exception():
 
     assert isinstance(result, ImportError)
     assert result.args == e.args
+
+
+def test_classes():
+    obj = [Dog("muh", 23, "cow"), Dog]
+    data = to_json(obj)
+    result = from_json(data)
+    assert result == obj

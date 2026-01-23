@@ -15,11 +15,24 @@ left_arm = ArmState(
         "arm_flex_joint",
         "arm_roll_joint",
         "wrist_flex_joint",
-        "wrist_roll_joint"
+        "wrist_roll_joint",
     ],
     joint_positions=[0.0, 1.5, -1.85, 0.0],
     state_type=StaticJointState.Park,
     arm=Arms.LEFT,
+)
+
+both_arm = ArmState(
+    name=PrefixedName("hsrb", "arm"),
+    joint_names=[
+        "arm_flex_joint",
+        "arm_roll_joint",
+        "wrist_flex_joint",
+        "wrist_roll_joint",
+    ],
+    joint_positions=[0.0, 1.5, -1.85, 0.0],
+    state_type=StaticJointState.Park,
+    arm=Arms.BOTH,
 )
 
 left_gripper_open = GripperState(
@@ -63,6 +76,7 @@ torso_high = JointState(
 JointStateManager().add_joint_states(
     HSRB,
     [
+        both_arm,
         left_arm,
         left_gripper_open,
         left_gripper_close,

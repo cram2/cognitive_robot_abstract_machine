@@ -3,10 +3,12 @@ from __future__ import division
 from dataclasses import field, dataclass
 from typing import Union
 from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod
 
 import numpy as np
 
 import krrood.symbolic_math.symbolic_math as sm
+
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
@@ -21,27 +23,44 @@ from semantic_digital_twin.world_description.world_entity import (
 @dataclass(eq=False, repr=False)
 class FeatureFunctionGoal(Task, ABC):
     """
-    Base class for all feature function tasks that operate on geometric features.
+    Base for feature tasks operating on geometric features.
 
-    This class provides the foundation for tasks that need to control and reference
-    geometric features (points or vectors) in different coordinate frames. It handles
-    the transformation of features between frames and sets up debug visualizations.
-
-    The class automatically transforms the controlled feature from the tip frame and
-    the reference feature from the root frame into a common coordinate system for
-    comparison and control.
+    Transforms the controlled feature (from `tip_link`) and the reference feature
+    (from `root_link`) into a common frame and registers debug visualizations.
     """
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
-    """The link where the controlled feature is attached. Defines the moving frame of reference."""
+    """
+    The link where the controlled feature is attached. Defines the moving frame of reference.
+    """
     root_link: KinematicStructureEntity = field(kw_only=True)
-    """The static reference link. Defines the fixed frame of reference."""
-    controlled_feature: Union[cas.Point3, cas.Vector3] = field(init=False)
-    """The geometric feature (point or vector) that is being controlled, expressed in the tip link frame."""
-    reference_feature: Union[cas.Point3, cas.Vector3] = field(init=False)
-    """The geometric feature (point or vector) that serves as reference, expressed in the root link frame."""
+    """
+    The static reference link. Defines the fixed frame of reference.
+    """
+    controlled_feature: Union[Point3, Vector3] = field(init=False)
+    """
+    The geometric feature (point or vector) that is being controlled, expressed in the tip link frame.
+    """
+    reference_feature: Union[Point3, Vector3] = field(init=False)
+    """
+    The geometric feature (point or vector) that serves as reference, expressed in the root link frame.
+    """
+
+    @abstractmethod
+    def get_controlled_and_reference_features(
+        self,
+    ) -> tuple[Union[Point3, Vector3], Union[Point3, Vector3]]:
+        """
+        Return the controlled and reference features.
+
+        :return: Tuple (controlled_feature, reference_feature), each a Point3 or Vector3.
+        """
+        raise NotImplementedError
 
     def build(self, context: BuildContext) -> NodeArtifacts:
+        self.controlled_feature, self.reference_feature = (
+            self.get_controlled_and_reference_features()
+        )
         artifacts = NodeArtifacts()
         root_reference_feature = context.world.transform(
             target_frame=self.root_link, spatial_object=self.reference_feature
@@ -102,31 +121,43 @@ class AlignPerpendicular(FeatureFunctionGoal):
     """
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
-    """The link where the controlled normal vector is attached."""
+    """
+    The link where the controlled normal vector is attached.
+    """
     root_link: KinematicStructureEntity = field(kw_only=True)
-    """The reference link defining the fixed coordinate frame."""
-    tip_normal: cas.Vector3 = field(kw_only=True)
-    """The normal vector to be controlled, defined in the tip link frame."""
-    reference_normal: cas.Vector3 = field(kw_only=True)
-    """The reference normal vector to align against, defined in the root link frame."""
+    """
+    The reference link defining the fixed coordinate frame.
+    """
+    tip_normal: Vector3 = field(kw_only=True)
+    """
+    The normal vector to be controlled, defined in the tip link frame.
+    """
+    reference_normal: Vector3 = field(kw_only=True)
+    """
+    The reference normal vector to align against, defined in the root link frame.
+    """
     weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
-    """Priority weight for the alignment constraint in the optimization problem."""
+    """
+    Priority weight for the alignment constraint in the optimization problem.
+    """
     max_vel: float = field(default=0.2, kw_only=True)
-    """Maximum allowed angular velocity for the alignment motion in radians per second."""
+    """
+    Maximum allowed angular velocity for the alignment motion in radians per second.
+    """
     threshold: float = field(default=0.01, kw_only=True)
-    """Tolerance threshold in radians. The goal is considered achieved when the absolute
-    difference between the current angle and 90 degrees is below this value."""
+    """
+    Tolerance threshold in radians. The goal is considered achieved when the absolute
+    difference between the current angle and 90 degrees is below this value.
+    """
+
+    def get_controlled_and_reference_features(self):
+        return self.tip_normal, self.reference_normal
 
     def build(self, context: BuildContext) -> NodeArtifacts:
-        self.controlled_feature = self.tip_normal
-        self.reference_feature = self.reference_normal
         artifacts = super().build(context)
 
-        expr = self.root_V_reference_feature.angle_between(
-            self.root_V_controlled_feature
-        )
+        expr = self.root_V_reference_feature @ self.root_V_controlled_feature
 
-        angle = np.pi / 2
         artifacts.constraints.add_equality_constraint(
             reference_velocity=self.max_vel,
             equality_bound=angle - expr,
@@ -134,6 +165,8 @@ class AlignPerpendicular(FeatureFunctionGoal):
             task_expression=expr,
             name=f"{self.name}_constraint",
         )
+        artifacts.observation = sm.abs(0 - expr) < self.threshold
+        return artifacts
 
         artifacts.observation = cas.abs(angle - expr) < self.threshold
         return artifacts
@@ -262,23 +295,36 @@ class AngleGoal(FeatureFunctionGoal):
     """
 
     root_link: KinematicStructureEntity = field(kw_only=True)
-    """root link of the kinematic chain."""
+    """
+    Root link of the kinematic chain.
+    """
     tip_link: KinematicStructureEntity = field(kw_only=True)
-    """tip link of the kinematic chain."""
+    """
+    Tip link of the kinematic chain.
+    """
     tip_vector: cas.Vector3 = field(kw_only=True)
-    """Tip vector to be controlled."""
+    """
+    Tip vector to be controlled.
+    """
     reference_vector: cas.Vector3 = field(kw_only=True)
-    """Reference vector to measure the angle against."""
+    """
+    Reference vector to measure the angle against.
+    """
     lower_angle: float = field(kw_only=True)
-    """Lower limit to control the angle between the tip_vector and the reference_vector."""
+    """
+    Lower limit to control the angle between the tip_vector and the reference_vector.
+    """
     upper_angle: float = field(kw_only=True)
-    """Upper limit to control the angle between the tip_vector and the reference_vector."""
+    """
+    Upper limit to control the angle between the tip_vector and the reference_vector.
+    """
     weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
     max_vel: float = field(default=0.2, kw_only=True)
 
+    def get_controlled_and_reference_features(self):
+        return self.tip_vector, self.reference_vector
+
     def build(self, context: BuildContext) -> NodeArtifacts:
-        self.controlled_feature = self.tip_vector
-        self.reference_feature = self.reference_vector
         artifacts = super().build(context)
 
         expr = self.root_V_reference_feature.angle_between(

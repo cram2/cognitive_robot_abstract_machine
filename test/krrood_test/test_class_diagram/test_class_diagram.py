@@ -57,3 +57,15 @@ def test_class_diagram_visualization():
         )
         == 1
     )
+
+
+def test_underspecified_classes():
+
+    classes = filter(
+        is_dataclass,
+        classes_of_module(example_classes),
+    )
+    diagram = ClassDiagram(classes)
+
+    r = diagram.get_wrapped_class(example_classes.UnderspecifiedTypesContainer)
+    assert r.clazz is example_classes.UnderspecifiedTypesContainer

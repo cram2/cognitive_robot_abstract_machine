@@ -1,32 +1,34 @@
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, InitVar
 
-import time
-from typing_extensions import Optional, Protocol, Self
+from typing_extensions import Optional
 
-from giskardpy.data_types.exceptions import (
-    NoQPControllerConfigException,
-)
-from giskardpy.model.better_pybullet_syncer import BulletCollisionDetector
-from giskardpy.model.collision_world_syncer import (
-    CollisionWorldSynchronizer,
-    CollisionCheckerLib,
-)
-from giskardpy.model.collisions import NullCollisionDetector
-from giskardpy.motion_statechart.auxilary_variable_manager import (
-    AuxiliaryVariableManager,
-    AuxiliaryVariable,
-)
-from giskardpy.motion_statechart.context import BuildContext, ExecutionContext
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from giskardpy.qp.exceptions import EmptyProblemException
-from giskardpy.qp.qp_controller import QPController
-from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import (
     AbstractRobot,
 )
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
+from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
+    WorldStateTrajectoryPlotter,
+)
+from .data_types.exceptions import NoQPControllerConfigException
+from .model.better_pybullet_syncer import BulletCollisionDetector
+from .model.collision_world_syncer import (
+    CollisionWorldSynchronizer,
+    CollisionCheckerLib,
+)
+from .model.collisions import NullCollisionDetector
+from .motion_statechart.auxilary_variable_manager import (
+    AuxiliaryVariableManager,
+    AuxiliaryVariable,
+)
+from .motion_statechart.context import BuildContext, ExecutionContext
+from .motion_statechart.motion_statechart import MotionStatechart
+from .qp.exceptions import EmptyProblemException
+from .qp.qp_controller import QPController
+from .qp.qp_controller_config import QPControllerConfig
 
 
 @dataclass
@@ -108,6 +110,14 @@ class Executor:
     """Library used for collision checking. Can be set to Bullet or None."""
     tmp_folder: str = field(default="/tmp/")
     """Path to safe temporary files."""
+    record_trajectory: bool = False
+    """Whether to record the trajectory of the robot."""
+    world_state_trajectory: WorldStateTrajectory = field(init=False)
+    """The trajectory of the robot's world state."""
+    trajectory_plotter: WorldStateTrajectoryPlotter = field(
+        default_factory=WorldStateTrajectoryPlotter
+    )
+    """The trajectory plotter used to plot the robot's trajectory."""
 
     pacer: Pacer = field(default_factory=SimulationPacer)
 
@@ -130,10 +140,12 @@ class Executor:
     _control_cycles_variable: AuxiliaryVariable = field(init=False)
     """Auxiliary variable linked to the control_cycles attribute."""
 
-    _time: float = field(init=False)
-    """The time that has passed since the execution started."""
     _time_variable: AuxiliaryVariable = field(init=False)
     """Auxiliary variable representing the current time in seconds since the start of the simulation."""
+
+    @property
+    def time(self) -> float:
+        return self.control_cycles * self.controller_config.control_dt
 
     def __post_init__(self, collision_checker: CollisionCheckerLib):
         if collision_checker == CollisionCheckerLib.bpb:
@@ -163,6 +175,9 @@ class Executor:
         self._create_control_cycles_variable()
         self.motion_statechart.compile(self.build_context)
         self._compile_qp_controller(self.controller_config)
+        self.world_state_trajectory = WorldStateTrajectory.from_world_state(
+            self.world.state, time=self.time
+        )
 
     @property
     def build_context(self) -> BuildContext:
@@ -204,6 +219,7 @@ class Executor:
             self.qp_controller.config.control_dt,
             self.qp_controller.config.max_derivative,
         )
+        self.world_state_trajectory.append(self.world.state, self.time)
 
     def tick_until_end(self, timeout: int = 1_000):
         """
@@ -253,3 +269,6 @@ class Executor:
         )
         if self.qp_controller.has_not_free_variables():
             raise EmptyProblemException()
+
+    def plot_trajectory(self, file_name: str = "./trajectory.pdf"):
+        self.trajectory_plotter.plot_trajectory(self.world_state_trajectory, file_name)

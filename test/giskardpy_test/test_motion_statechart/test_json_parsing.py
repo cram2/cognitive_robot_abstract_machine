@@ -41,7 +41,7 @@ from krrood.symbolic_math.symbolic_math import (
     trinary_logic_or,
 )
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    KinematicStructureEntityKwargsTracker,
+    WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
@@ -64,8 +64,8 @@ def test_TrueMonitor():
     assert node_copy.name == node.name
 
 
-def test_CollisionRequest(pr2_world: World):
-    robot = pr2_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+def test_CollisionRequest(pr2_world_setup: World):
+    robot = pr2_world_setup.get_semantic_annotations_by_type(AbstractRobot)[0]
     collision_request = CollisionRequest(
         type_=CollisionAvoidanceTypes.AVOID_COLLISION,
         distance=0.2,
@@ -75,7 +75,7 @@ def test_CollisionRequest(pr2_world: World):
     json_data = collision_request.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
-    tracker = KinematicStructureEntityKwargsTracker.from_world(pr2_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_setup)
     kwargs = tracker.create_kwargs()
     collision_request_copy = CollisionRequest.from_json(new_json_data, **kwargs)
     assert collision_request_copy.type_ == collision_request.type_
@@ -240,9 +240,9 @@ def test_executing_json_parsed_statechart():
     assert observation_copy == msc_copy.observation_state
 
 
-def test_cart_goal_simple(pr2_world: World):
-    tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+def test_cart_goal_simple(pr2_world_setup: World):
+    tip = pr2_world_setup.get_kinematic_structure_entity_by_name("base_footprint")
+    root = pr2_world_setup.get_kinematic_structure_entity_by_name("odom_combined")
     tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=-0.2, reference_frame=tip
     )
@@ -262,25 +262,25 @@ def test_cart_goal_simple(pr2_world: World):
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
-    tracker = KinematicStructureEntityKwargsTracker.from_world(pr2_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_setup)
     kwargs = tracker.create_kwargs()
     msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
 
     kin_sim = Executor(
-        world=pr2_world,
+        world=pr2_world_setup,
         controller_config=QPControllerConfig.create_with_simulation_defaults(),
     )
 
     kin_sim.compile(motion_statechart=msc_copy)
     kin_sim.tick_until_end()
 
-    fk = pr2_world.compute_forward_kinematics_np(root, tip)
+    fk = pr2_world_setup.compute_forward_kinematics_np(root, tip)
     assert np.allclose(fk, tip_goal, atol=cart_goal.threshold)
 
 
-def test_compressed_copy_can_be_plotted(pr2_world: World):
-    tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+def test_compressed_copy_can_be_plotted(pr2_world_setup: World):
+    tip = pr2_world_setup.get_kinematic_structure_entity_by_name("base_footprint")
+    root = pr2_world_setup.get_kinematic_structure_entity_by_name("odom_combined")
     tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=-0.2, reference_frame=tip
     )
@@ -295,6 +295,7 @@ def test_compressed_copy_can_be_plotted(pr2_world: World):
     end = EndMotion()
     msc.add_node(end)
     end.start_condition = cart_goal.observation_variable
+    msc.add_node(CancelMotion.when_true(cart_goal))
 
     msc._expand_goals(BuildContext.empty())
     json_data = msc.create_structure_copy().to_json()
@@ -302,6 +303,9 @@ def test_compressed_copy_can_be_plotted(pr2_world: World):
     new_json_data = json.loads(json_str)
 
     msc_copy = MotionStatechart.from_json(new_json_data)
+    msc_copy._add_transitions()
+    assert isinstance(msc_copy.nodes[-2], EndMotion)
+    assert isinstance(msc_copy.nodes[-1], CancelMotion)
     msc_copy.draw("muh.pdf")
 
 
@@ -355,9 +359,9 @@ def test_cancel_motion():
         kin_sim.tick_until_end()
 
 
-def test_unreachable_cart_goal(pr2_world):
-    root = pr2_world.root
-    tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
+def test_unreachable_cart_goal(pr2_world_setup):
+    root = pr2_world_setup.root
+    tip = pr2_world_setup.get_kinematic_structure_entity_by_name("base_footprint")
     msc = MotionStatechart()
     msc.add_node(
         cart_goal := CartesianPose(
@@ -377,15 +381,43 @@ def test_unreachable_cart_goal(pr2_world):
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
-    tracker = KinematicStructureEntityKwargsTracker.from_world(pr2_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_setup)
     kwargs = tracker.create_kwargs()
     msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
 
     kin_sim = Executor(
-        world=pr2_world,
+        world=pr2_world_setup,
         controller_config=QPControllerConfig.create_with_simulation_defaults(),
     )
 
     kin_sim.compile(motion_statechart=msc_copy)
 
     kin_sim.tick_until_end()
+
+
+def test_duplicate_condition():
+    """
+    Tests if two condition with the same name and type will be preserved.
+    """
+    msc = MotionStatechart()
+    msc.add_nodes(
+        [
+            node1 := ConstTrueNode(),
+            node2 := ConstTrueNode(),
+            node3 := ConstTrueNode(),
+            end := EndMotion(),
+        ]
+    )
+    node2.start_condition = node1.observation_variable
+    node3.start_condition = node1.observation_variable
+    end.start_condition = trinary_logic_and(
+        node2.observation_variable, node3.observation_variable
+    )
+
+    json_data = msc.to_json()
+    json_str = json.dumps(json_data)
+    new_json_data = json.loads(json_str)
+
+    msc_copy = MotionStatechart.from_json(new_json_data)
+    msc_copy._add_transitions()
+    assert len(msc_copy.unique_edges) == 3

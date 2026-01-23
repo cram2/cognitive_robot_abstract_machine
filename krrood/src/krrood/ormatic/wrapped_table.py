@@ -478,7 +478,10 @@ class WrappedTable:
             self.create_json_column(wrapped_field)
 
         # handle one to many relationships
-        elif wrapped_field.is_one_to_many_relationship:
+        elif (
+            wrapped_field.is_one_to_many_relationship
+            and wrapped_field.type_endpoint in self.ormatic.mapped_classes
+        ):
             logger.info(f"Parsing as one to many relationship.")
             self.create_one_to_many_relationship(wrapped_field)
         else:

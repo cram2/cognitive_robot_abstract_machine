@@ -8,10 +8,9 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, fro
 
 from giskardpy.utils.utils import JsonSerializableEnum
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    KinematicStructureEntityKwargsTracker,
+    WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.collision_checking.collision_detector import CollisionCheck
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -46,13 +45,13 @@ class CollisionRequest(SubclassJSONSerializer):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        tracker = KinematicStructureEntityKwargsTracker.from_kwargs(kwargs)
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
         body_group1 = [
-            tracker.get_kinematic_structure_entity(from_json(id_))
+            tracker.get_world_entity_with_id(from_json(id_))
             for id_ in data["body_group1_ids"]
         ]
         body_group2 = [
-            tracker.get_kinematic_structure_entity(from_json(id_))
+            tracker.get_world_entity_with_id(from_json(id_))
             for id_ in data["body_group2_ids"]
         ]
         return cls(

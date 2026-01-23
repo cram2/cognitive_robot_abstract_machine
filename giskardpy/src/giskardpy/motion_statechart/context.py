@@ -1,24 +1,71 @@
-from dataclasses import dataclass
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 
 import numpy as np
-from typing_extensions import Self
+from typing_extensions import Self, Dict, Type, TypeVar, Optional
 
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.motion_statechart.auxilary_variable_manager import (
     AuxiliaryVariableManager,
     AuxiliaryVariable,
 )
+from giskardpy.motion_statechart.exceptions import MissingContextExtensionError
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.world import World
 
 
 @dataclass
+class ContextExtension:
+    """
+    Context extension for build context.
+    Used together with require_extension to augment BuildContext with custom data.
+    """
+
+
+GenericContextExtension = TypeVar("GenericContextExtension", bound=ContextExtension)
+
+
+@dataclass
 class BuildContext:
+    """
+    Context used during the build phase of a MotionStatechartNode.
+    """
+
     world: World
+    """There world in which to execute the Motion Statechart."""
     auxiliary_variable_manager: AuxiliaryVariableManager
+    """Auxiliary variable manager used by nodes to create auxiliary variables."""
     collision_scene: CollisionWorldSynchronizer
+    """Synchronization of the collision world with the world in which the Motion Statechart is executed."""
     qp_controller_config: QPControllerConfig
+    """Configuration of the QP controller used to solve the QP problem."""
     control_cycle_variable: AuxiliaryVariable
+    """Auxiliary variable used to count control cycles, can be used my Motion StatechartNodes to implement time-dependent actions."""
+    extensions: Dict[Type[ContextExtension], ContextExtension] = field(
+        default_factory=dict, repr=False, init=False
+    )
+    """
+    Dictionary of extensions used to augment the build context.
+    Ros2 extensions are automatically added to the build context when using the Ros2Executor.
+    """
+
+    def require_extension(
+        self, extension_type: Type[GenericContextExtension]
+    ) -> GenericContextExtension:
+        """
+        Return an extension instance or raise ``MissingContextExtensionError``.
+        """
+        extension = self.extensions.get(extension_type)
+        if extension is None:
+            raise MissingContextExtensionError(expected_extension=extension_type)
+        return extension
+
+    def add_extension(self, extension: GenericContextExtension):
+        """
+        Extend the build context with a custom extension.
+        """
+        self.extensions[type(extension)] = extension
 
     @classmethod
     def empty(cls) -> Self:

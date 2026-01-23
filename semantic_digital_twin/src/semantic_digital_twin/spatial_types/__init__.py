@@ -5,4 +5,5 @@ from .spatial_types import (
     HomogeneousTransformationMatrix,
     SpatialType,
     Quaternion,
+    GenericSpatialType,
 )

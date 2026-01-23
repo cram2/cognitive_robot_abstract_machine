@@ -76,6 +76,7 @@ class ExecutionType(Enum):
     REAL = auto()
     SIMULATED = auto()
     SEMI_REAL = auto()
+    NO_EXECUTION = auto()
 
 
 class Arms(IntEnum):
