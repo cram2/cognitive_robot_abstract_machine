@@ -508,7 +508,7 @@ class TestFactories(unittest.TestCase):
             )
             door.add_handle(handle)
         with self.assertRaises(InvalidHingeActiveAxis):
-            door.calculate_world_T_hinge_based_on_handle(Vector3.X())
+            door.calculate_world_T_hinge_based_on_handle(Vector3(1, 1, 0))
 
     def test_calculate_supporting_surface(self):
         world = World()
