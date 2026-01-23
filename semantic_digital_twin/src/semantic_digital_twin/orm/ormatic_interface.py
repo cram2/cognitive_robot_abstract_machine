@@ -51,6 +51,18 @@ class Base(DeclarativeBase):
 
 
 # Association tables for many-to-many relationships
+jointstatedao_joint_names_association = Table(
+    "jointstatedao_joint_names_association",
+    Base.metadata,
+    Column("source_jointstatedao_id", ForeignKey("JointStateDAO.database_id")),
+    Column("target_connectiondao_id", ForeignKey("ConnectionDAO.database_id")),
+)
+jointstatedao_kinematic_chains_association = Table(
+    "jointstatedao_kinematic_chains_association",
+    Base.metadata,
+    Column("source_jointstatedao_id", ForeignKey("JointStateDAO.database_id")),
+    Column("target_kinematicchaindao_id", ForeignKey("KinematicChainDAO.database_id")),
+)
 shapecollectiondao_shapes_association = Table(
     "shapecollectiondao_shapes_association",
     Base.metadata,
@@ -169,6 +181,12 @@ abstractrobotdao_sensor_chains_association = Table(
     Base.metadata,
     Column("source_abstractrobotdao_id", ForeignKey("AbstractRobotDAO.database_id")),
     Column("target_kinematicchaindao_id", ForeignKey("KinematicChainDAO.database_id")),
+)
+abstractrobotdao_joint_states_association = Table(
+    "abstractrobotdao_joint_states_association",
+    Base.metadata,
+    Column("source_abstractrobotdao_id", ForeignKey("AbstractRobotDAO.database_id")),
+    Column("target_jointstatedao_id", ForeignKey("JointStateDAO.database_id")),
 )
 kinematicchaindao_sensors_association = Table(
     "kinematicchaindao_sensors_association",
@@ -466,6 +484,49 @@ class JerkVariableDAO(
         uselist=False,
         foreign_keys=[dof_id],
         post_update=True,
+    )
+
+
+class JointStateDAO(
+    Base, DataAccessObject[semantic_digital_twin.robots.abstract_robot.JointState]
+):
+
+    __tablename__ = "JointStateDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    state_type: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    joint_positions: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    name_id: Mapped[int] = mapped_column(
+        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    name: Mapped[PrefixedNameDAO] = relationship(
+        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
+    )
+    joint_names: Mapped[typing.List[ConnectionDAO]] = relationship(
+        "ConnectionDAO",
+        secondary="jointstatedao_joint_names_association",
+        primaryjoin="JointStateDAO.database_id == jointstatedao_joint_names_association.c.source_jointstatedao_id",
+        secondaryjoin="ConnectionDAO.database_id == jointstatedao_joint_names_association.c.target_connectiondao_id",
+        cascade="save-update, merge",
+    )
+    kinematic_chains: Mapped[typing.List[KinematicChainDAO]] = relationship(
+        "KinematicChainDAO",
+        secondary="jointstatedao_kinematic_chains_association",
+        primaryjoin="JointStateDAO.database_id == jointstatedao_kinematic_chains_association.c.source_jointstatedao_id",
+        secondaryjoin="KinematicChainDAO.database_id == jointstatedao_kinematic_chains_association.c.target_kinematicchaindao_id",
+        cascade="save-update, merge",
     )
 
 
@@ -3910,6 +3971,13 @@ class AbstractRobotDAO(
         secondaryjoin="KinematicChainDAO.database_id == abstractrobotdao_sensor_chains_association.c.target_kinematicchaindao_id",
         cascade="save-update, merge",
     )
+    joint_states: Mapped[typing.List[JointStateDAO]] = relationship(
+        "JointStateDAO",
+        secondary="abstractrobotdao_joint_states_association",
+        primaryjoin="AbstractRobotDAO.database_id == abstractrobotdao_joint_states_association.c.source_abstractrobotdao_id",
+        secondaryjoin="JointStateDAO.database_id == abstractrobotdao_joint_states_association.c.target_jointstatedao_id",
+        cascade="save-update, merge",
+    )
     default_collision_config: Mapped[CollisionCheckingConfigDAO] = relationship(
         "CollisionCheckingConfigDAO",
         uselist=False,
@@ -4055,6 +4123,19 @@ class BaseDAO(
         ForeignKey(KinematicChainDAO.database_id),
         primary_key=True,
         use_existing_column=True,
+    )
+
+    main_axis_id: Mapped[int] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    main_axis: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO",
+        uselist=False,
+        foreign_keys=[main_axis_id],
+        post_update=True,
     )
 
     __mapper_args__ = {

@@ -101,7 +101,7 @@ def find_best_jerk_limit(
         else:
             lower_bound = jerk_limit
             jerk_limit = round((jerk_limit + upper_bound) / 2, 4)
-    print(
+    get_middleware().loginfo(
         f"best velocity limit: {best_vel_limit} "
         f"(target = {target_vel_limit}) with jerk limit: {best_jerk_limit} after {i + 1} iterations"
     )

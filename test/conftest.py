@@ -6,6 +6,7 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
+from pkg_resources import resource_filename
 
 from krrood.class_diagrams import ClassDiagram
 from krrood.entity_query_language.predicate import Symbol
@@ -28,11 +29,14 @@ from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     FixedConnection,
     Connection6DoF,
+    ActiveConnection,
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
-
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    CollisionCheckingConfig,
+)
 
 ###############################
 ### Fixture Usage Guide #######
@@ -113,7 +117,7 @@ def pr2_world_setup():
         "resources",
         "robots",
     )
-    pr2 = os.path.join(urdf_dir, "pr2_calibrated_with_ft.urdf")
+    pr2 = os.path.join(urdf_dir, "pr2_with_ft2_cableguide.urdf")
     pr2_parser = URDFParser.from_file(file_path=pr2)
     world_with_pr2 = pr2_parser.parse()
     with world_with_pr2.modify_world():
@@ -124,7 +128,72 @@ def pr2_world_setup():
             parent=localization_body, child=pr2_root, world=world_with_pr2
         )
         world_with_pr2.add_connection(c_root_bf)
-        PR2.from_world(world_with_pr2)
+        robot = PR2.from_world(world_with_pr2)
+
+    with world_with_pr2.modify_world():
+        path_to_srdf = resource_filename(
+            "giskardpy", "../../self_collision_matrices/iai/pr2.srdf"
+        )
+        world_with_pr2.load_collision_srdf(path_to_srdf)
+        frozen_joints = ["r_gripper_l_finger_joint", "l_gripper_l_finger_joint"]
+        for joint_name in frozen_joints:
+            c: ActiveConnection = world_with_pr2.get_connection_by_name(joint_name)
+            c.frozen_for_collision_avoidance = True
+
+        for body in robot.bodies_with_collisions:
+            collision_config = CollisionCheckingConfig(
+                buffer_zone_distance=0.1, violated_distance=0.0
+            )
+            body.set_static_collision_config(collision_config)
+
+        for joint_name in ["r_wrist_roll_joint", "l_wrist_roll_joint"]:
+            connection: ActiveConnection = world_with_pr2.get_connection_by_name(
+                joint_name
+            )
+            collision_config = CollisionCheckingConfig(
+                buffer_zone_distance=0.05, violated_distance=0.0, max_avoided_bodies=4
+            )
+            connection.set_static_collision_config_for_direct_child_bodies(
+                collision_config
+            )
+
+        for joint_name in ["r_wrist_flex_joint", "l_wrist_flex_joint"]:
+            connection: ActiveConnection = world_with_pr2.get_connection_by_name(
+                joint_name
+            )
+            collision_config = CollisionCheckingConfig(
+                buffer_zone_distance=0.05, violated_distance=0.0, max_avoided_bodies=2
+            )
+            connection.set_static_collision_config_for_direct_child_bodies(
+                collision_config
+            )
+        for joint_name in ["r_elbow_flex_joint", "l_elbow_flex_joint"]:
+            connection: ActiveConnection = world_with_pr2.get_connection_by_name(
+                joint_name
+            )
+            collision_config = CollisionCheckingConfig(
+                buffer_zone_distance=0.05, violated_distance=0.0, max_avoided_bodies=1
+            )
+            connection.set_static_collision_config_for_direct_child_bodies(
+                collision_config
+            )
+        for joint_name in ["r_forearm_roll_joint", "l_forearm_roll_joint"]:
+            connection: ActiveConnection = world_with_pr2.get_connection_by_name(
+                joint_name
+            )
+            collision_config = CollisionCheckingConfig(
+                buffer_zone_distance=0.025, violated_distance=0.0, max_avoided_bodies=1
+            )
+            connection.set_static_collision_config_for_direct_child_bodies(
+                collision_config
+            )
+
+        collision_config = CollisionCheckingConfig(
+            buffer_zone_distance=0.2, violated_distance=0.1, max_avoided_bodies=2
+        )
+        robot.drive.set_static_collision_config_for_direct_child_bodies(
+            collision_config
+        )
 
     return world_with_pr2
 
@@ -178,7 +247,6 @@ def tracy_world():
 
         tracy_parser = URDFParser.from_file(file_path=tracy)
         world_with_tracy = tracy_parser.parse()
-        # world_with_tracy.plot_kinematic_structure()
         tracy_root = world_with_tracy.root
         c_root_bf = Connection6DoF.create_with_dofs(
             parent=localization_body, child=tracy_root, world=world
@@ -186,6 +254,30 @@ def tracy_world():
         world.merge_world(world_with_tracy, c_root_bf)
 
     return world
+
+
+@pytest.fixture(scope="session")
+def stretch_world():
+    urdf_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "pycram",
+        "resources",
+        "urdf",
+    )
+    stretch = os.path.join(urdf_dir, "stretch_description.urdf")
+    world = World()
+    with world.modify_world():
+        localization_body = Body(name=PrefixedName("odom_combined"))
+        world.add_kinematic_structure_entity(localization_body)
+
+        stretch_parser = URDFParser.from_file(file_path=stretch)
+        world_with_stretch = stretch_parser.parse()
+        stretch_root = world_with_stretch.root
+        c_root_bf = OmniDrive.create_with_dofs(
+            parent=localization_body, child=stretch_root, world=world
+        )
+        world.merge_world(world_with_stretch, c_root_bf)
 
 
 @pytest.fixture(scope="session")
@@ -377,6 +469,15 @@ def simple_pr2_world_setup(pr2_world_setup, simple_apartment_setup):
 
     robot_view = PR2.from_world(world)
     return world, robot_view, Context(world, robot_view)
+
+
+@pytest.fixture(scope="session")
+def stretch_apartment_world(stretch_world, apartment_world_setup):
+    stretch_copy = deepcopy(stretch_world)
+    apartment_copy = deepcopy(apartment_world_setup)
+
+    apartment_copy.merge_world(stretch_copy)
+    return apartment_copy
 
 
 @pytest.fixture(scope="session")

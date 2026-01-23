@@ -122,7 +122,7 @@ class ResetStateContextManager:
         self.world = world
 
     def __enter__(self) -> None:
-        self.state = deepcopy(self.world.state)
+        self.state = deepcopy(self.world.state.data)
 
     def __exit__(
         self,
@@ -131,7 +131,7 @@ class ResetStateContextManager:
         exc_tb: Optional[type],
     ) -> None:
         if exc_type is None:
-            self.world.state = self.state
+            self.world.state.data = self.state
             self.world.notify_state_change()
 
 
@@ -613,7 +613,7 @@ class World:
             b
             for b in self.bodies
             if b.has_collision()
-            and b.get_collision_config
+            and b.get_collision_config()
             and not b.get_collision_config().disabled
         ]
 

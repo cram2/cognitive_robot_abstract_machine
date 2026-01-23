@@ -22,6 +22,7 @@ from ..robots.abstract_robot import (
     Torso,
     AbstractRobot,
     Base,
+    JointState,
 )
 from ..spatial_types import Quaternion, Vector3
 from ..world import World
@@ -236,6 +237,50 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             )
 
             robot.add_base(base)
+
+            right_arm_park = JointState(
+                name=PrefixedName("right_park", prefix=robot.name.name),
+                joint_names=[
+                    world.get_connection_by_name("r_shoulder_pan_joint"),
+                    world.get_connection_by_name("r_shoulder_lift_joint"),
+                    world.get_connection_by_name("r_upper_arm_roll_joint"),
+                    world.get_connection_by_name("r_elbow_flex_joint"),
+                    world.get_connection_by_name("r_forearm_roll_joint"),
+                    world.get_connection_by_name("r_wrist_flex_joint"),
+                    world.get_connection_by_name("r_wrist_roll_joint"),
+                ],
+                joint_positions=[-1.712, -0.256, -1.463, -2.12, 1.766, -0.07, 0.051],
+                state_type="Park",
+                kinematic_chains=[right_arm],
+                _world=world,
+            )
+
+            left_arm_park = JointState(
+                name=PrefixedName("left_park", prefix=robot.name.name),
+                joint_names=[
+                    world.get_connection_by_name("l_shoulder_pan_joint"),
+                    world.get_connection_by_name("l_shoulder_lift_joint"),
+                    world.get_connection_by_name("l_upper_arm_roll_joint"),
+                    world.get_connection_by_name("l_elbow_flex_joint"),
+                    world.get_connection_by_name("l_forearm_roll_joint"),
+                    world.get_connection_by_name("l_wrist_flex_joint"),
+                    world.get_connection_by_name("l_wrist_roll_joint"),
+                ],
+                joint_positions=[
+                    1.712,
+                    -0.264,
+                    1.38,
+                    -2.12,
+                    16.996 + 3.14159,
+                    -0.073,
+                    0.0,
+                ],
+                state_type="Park",
+                kinematic_chains=[left_arm],
+                _world=world,
+            )
+
+            robot.add_joint_states([right_arm_park, left_arm_park])
 
             world.add_semantic_annotation(robot)
 
