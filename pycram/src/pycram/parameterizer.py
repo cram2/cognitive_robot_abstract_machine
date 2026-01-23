@@ -160,51 +160,6 @@ class Parameterizer:
         return result
 
 
-def collision_free_event(
-    world: World, search_space: Optional[BoundingBoxCollection] = None
-) -> Event:
-    """
-    Create an event that describes the free space of the world.
-    :param world: The world to create the event from.
-    :param search_space: The search space to limit the collision free event to.
-    :return: An event that describes the free space.
-    """
-
-    # xy = SortedSet([BoundingBox.x_variable, BoundingBox.y_variable])
-    xy = SpatialVariables.xy
-
-    # create search space for calculations
-    if search_space is None:
-        search_space = BoundingBoxCollection(
-            [
-                BoundingBox(
-                    -np.inf,
-                    -np.inf,
-                    -np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    origin=HomogeneousTransformationMatrix(reference_frame=world.root),
-                )
-            ],
-        )
-
-    # remove the z axis
-    search_event = search_space.event
-
-    # get obstacles
-    obstacles = GraphOfConvexSets.obstacles_from_world(world, search_space)
-
-    free_space = search_event - obstacles
-    free_space = free_space.marginal(xy)
-
-    # create floor level
-    z_event = SimpleEvent({SpatialVariables.z.value: singleton(0.0)}).as_composite_set()
-    z_event.fill_missing_variables(xy)
-    free_space.fill_missing_variables(SortedSet([SpatialVariables.z.value]))
-    free_space &= z_event
-
-    return free_space
 
 
 def update_variables_of_simple_event(
