@@ -730,7 +730,7 @@ class DataAccessObject(HasGeneric[T]):
         state.is_processing = True
         discovery_order = []
         if not state.has(self):
-            self._allocate_uninitialized_and_memoize(state)
+            state.allocate_and_memoize(self, self.original_class())
         state.push_work_item(self, state.get(self))
 
         self._discover_dependencies(state, discovery_order)
@@ -844,7 +844,7 @@ class DataAccessObject(HasGeneric[T]):
         :return: The uninitialized domain object.
         """
         if not state.has(self):
-            domain_object = self._allocate_uninitialized_and_memoize(state)
+            domain_object = state.allocate_and_memoize(self, self.original_class())
             state.push_work_item(self, domain_object)
         return state.get(self)
 
@@ -857,20 +857,16 @@ class DataAccessObject(HasGeneric[T]):
         :return: The populated domain object.
         """
         mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(type(self))
-        argument_names = self._argument_names()
 
         if state.discovery_mode:
-            return self._trigger_discovery(domain_object, mapper, argument_names, state)
+            return self._trigger_discovery(domain_object, mapper, state)
 
-        return self._populate_domain_object(
-            domain_object, mapper, argument_names, state
-        )
+        return self._populate_domain_object(domain_object, mapper, state)
 
     def _trigger_discovery(
         self,
         domain_object: T,
         mapper: sqlalchemy.orm.Mapper,
-        argument_names: List[str],
         state: FromDataAccessObjectState,
     ) -> T:
         """
@@ -878,20 +874,25 @@ class DataAccessObject(HasGeneric[T]):
 
         :param domain_object: The domain object.
         :param mapper: The SQLAlchemy mapper.
-        :param argument_names: Constructor argument names.
         :param state: The conversion state.
         :return: The domain object.
         """
         for relationship in mapper.relationships:
-            self._collect_relationship_kwarg(relationship, {}, state)
-        self._build_base_keyword_arguments_for_alternative_parent(argument_names, state)
+            value = getattr(self, relationship.key)
+            if self._is_single_relationship(relationship):
+                if value is not None:
+                    value.from_dao(state=state)
+            elif relationship.direction in (ONETOMANY, MANYTOMANY):
+                for item in value:
+                    item.from_dao(state=state)
+
+        self._build_base_keyword_arguments_for_alternative_parent(domain_object, state)
         return domain_object
 
     def _populate_domain_object(
         self,
         domain_object: T,
         mapper: sqlalchemy.orm.Mapper,
-        argument_names: List[str],
         state: FromDataAccessObjectState,
     ) -> T:
         """
@@ -899,7 +900,6 @@ class DataAccessObject(HasGeneric[T]):
 
         :param domain_object: The domain object to populate.
         :param mapper: The SQLAlchemy mapper.
-        :param argument_names: Constructor argument names.
         :param state: The conversion state.
         :return: The populated domain object.
         """
@@ -914,11 +914,7 @@ class DataAccessObject(HasGeneric[T]):
             self._populate_relationship(domain_object, relationship, state)
 
         # Populate from alternative parent if any
-        base_arguments = self._build_base_keyword_arguments_for_alternative_parent(
-            argument_names, state
-        )
-        for key, val in base_arguments.items():
-            object.__setattr__(domain_object, key, val)
+        self._build_base_keyword_arguments_for_alternative_parent(domain_object, state)
 
         if isinstance(domain_object, AlternativeMapping):
             return self._handle_alternative_mapping_result(domain_object, state)
@@ -1007,121 +1003,56 @@ class DataAccessObject(HasGeneric[T]):
         :param state: The conversion state.
         :return: The corresponding domain object.
         """
-        return self._resolve_dao_to_domain(dao_instance, state)
-
-    def _allocate_uninitialized_and_memoize(
-        self, state: FromDataAccessObjectState
-    ) -> Any:
-        """
-        Allocate an uninitialized domain object and record it in the state.
-
-        :param state: The conversion state.
-        :return: The newly allocated instance.
-        """
-        return state.allocate_and_memoize(self, self.original_class())
-
-    def _argument_names(self) -> List[str]:
-        """
-        Get constructor argument names of the domain class.
-
-        :return: List of parameter names excluding 'self'.
-        """
-        init_of_original_class = self.original_class().__init__
-        return [
-            parameter.name
-            for parameter in inspect.signature(
-                init_of_original_class
-            ).parameters.values()
-        ][1:]
-
-    def _collect_relationship_kwarg(
-        self,
-        relationship: RelationshipProperty,
-        relationship_keyword_arguments: Dict[str, Any],
-        state: FromDataAccessObjectState,
-    ) -> None:
-        """
-        Collect constructor argument for a specific relationship.
-
-        :param relationship: The relationship property.
-        :param relationship_keyword_arguments: Target dictionary for arguments.
-        :param state: The conversion state.
-        """
-        value = getattr(self, relationship.key)
-        if self._is_single_relationship(relationship):
-            res = self._resolve_single_relationship_from_dao(value, state)
-            relationship_keyword_arguments[relationship.key] = res
-        elif relationship.direction in (ONETOMANY, MANYTOMANY):
-            res = self._resolve_collection_relationship_from_dao(value, state)
-            relationship_keyword_arguments[relationship.key] = res
-        else:
-            raise UnsupportedRelationshipError(relationship)
-
-    def _resolve_single_relationship_from_dao(
-        self, value: Any, state: FromDataAccessObjectState
-    ) -> Any:
-        """
-        Resolve a single DAO relationship to its domain object.
-
-        :param value: The DAO instance.
-        :param state: The conversion state.
-        :return: The domain object.
-        """
-        if value is None:
-            return None
-        return self._resolve_dao_to_domain(value, state)
-
-    def _resolve_collection_relationship_from_dao(
-        self, value: Any, state: FromDataAccessObjectState
-    ) -> Any:
-        """
-        Resolve a collection of DAOs to domain objects.
-
-        :param value: The collection of DAO instances.
-        :param state: The conversion state.
-        :return: The domain object collection.
-        """
-        if not value:
-            return value
-
-        instances = []
-        for v in value:
-            instance = self._resolve_dao_to_domain(v, state)
-            instances.append(instance)
-
-        return list(instances)
-
-    def _resolve_dao_to_domain(
-        self, dao_instance: DataAccessObject, state: FromDataAccessObjectState
-    ) -> Any:
-        """
-        Resolve a single DAO instance to its domain object.
-
-        :param dao_instance: The DAO instance.
-        :param state: The conversion state.
-        :return: The domain object.
-        """
-        if state.has(dao_instance):
-            return state.get(dao_instance)
-
-        # Delegation to from_dao handles discovery/allocation without recursion depth risk
         return dao_instance.from_dao(state=state)
+
+    def _register_for_conversion(self, state: FromDataAccessObjectState) -> T:
+        """
+        Register this DAO for conversion if not already present.
+
+        :param state: The conversion state.
+        :return: The uninitialized domain object.
+        """
+        if not state.has(self):
+            domain_object = state.allocate_and_memoize(self, self.original_class())
+            state.push_work_item(self, domain_object)
+        return state.get(self)
+
+    def _perform_from_dao_conversion(self, state: FromDataAccessObjectState) -> T:
+        """
+        Perform the four-phase conversion process.
+
+        :param state: The conversion state.
+        :return: The converted domain object.
+        """
+        state.is_processing = True
+        discovery_order = []
+        if not state.has(self):
+            state.allocate_and_memoize(self, self.original_class())
+        state.push_work_item(self, state.get(self))
+
+        self._discover_dependencies(state, discovery_order)
+        self._fill_domain_objects(state, discovery_order)
+        self._finalize_containers(state, discovery_order)
+        self._call_post_inits(state, discovery_order)
+
+        state.is_processing = False
+
+        return state.get(self)
 
     def _build_base_keyword_arguments_for_alternative_parent(
         self,
-        argument_names: List[str],
+        domain_object: T,
         state: FromDataAccessObjectState,
-    ) -> Dict[str, Any]:
+    ) -> None:
         """
         Build keyword arguments from an alternative parent DAO.
 
-        :param argument_names: Target constructor argument names.
+        :param domain_object: The domain object to populate.
         :param state: The conversion state.
-        :return: Dictionary of keyword arguments.
         """
         base_clazz = self.__class__.__bases__[0]
         if not self.uses_alternative_mapping(base_clazz):
-            return {}
+            return
 
         # The cache key uses id(self) because synthetic parent DAOs are only valid
         # for the lifetime of this specific DAO instance and are scoped to the
@@ -1136,7 +1067,10 @@ class DataAccessObject(HasGeneric[T]):
 
         base_result = parent_dao.from_dao(state=state)
 
-        return self._extract_arguments_from_parent_result(base_result, argument_names)
+        if not state.discovery_mode:
+            for key in _get_type_hints_cached(type(domain_object)):
+                if not hasattr(self, key) and hasattr(base_result, key):
+                    object.__setattr__(domain_object, key, getattr(base_result, key))
 
     def _create_filled_parent_dao(
         self, base_clazz: Type[DataAccessObject]
@@ -1153,22 +1087,6 @@ class DataAccessObject(HasGeneric[T]):
         for relationship in parent_mapper.relationships:
             setattr(parent_dao, relationship.key, getattr(self, relationship.key))
         return parent_dao
-
-    def _extract_arguments_from_parent_result(
-        self, base_result: Any, argument_names: List[str]
-    ) -> Dict[str, Any]:
-        """
-        Extract constructor arguments from a parent's conversion result.
-
-        :param base_result: The parent domain object.
-        :param argument_names: The required argument names.
-        :return: Dictionary of missing keyword arguments.
-        """
-        base_keyword_arguments: Dict[str, Any] = {}
-        for argument in argument_names:
-            if not hasattr(self, argument) and hasattr(base_result, argument):
-                base_keyword_arguments[argument] = getattr(base_result, argument)
-        return base_keyword_arguments
 
     def __repr__(self) -> str:
         """
