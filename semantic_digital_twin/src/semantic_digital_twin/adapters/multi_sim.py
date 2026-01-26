@@ -1360,11 +1360,6 @@ class MujocoBuilder(MultiSimBuilder):
             f"Converting Collada mesh to STL for MuJoCo: {original_mesh_file_path}"
         )
         tm = trimesh.load(original_mesh_file_path, force="mesh")
-        if tm.is_empty:
-            logger.warning(
-                f"Failed to load .dae mesh (empty): {original_mesh_file_path}. Skipping."
-            )
-            return
 
         tm.export(stl_file_path)
 
