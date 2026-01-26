@@ -6,6 +6,7 @@ import unittest
 import mujoco
 import numpy
 
+from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
@@ -231,6 +232,7 @@ class MujocoSimReadWriteTestCase(unittest.TestCase):
 class MujocoSimTestCase(unittest.TestCase):
     test_urdf_1 = os.path.normpath(os.path.join(urdf_dir, "simple_two_arm_robot.urdf"))
     test_urdf_2 = os.path.normpath(os.path.join(urdf_dir, "hsrb.urdf"))
+    test_urdf_tracy = os.path.normpath(os.path.join(urdf_dir, "tracy.urdf"))
     test_mjcf_1 = os.path.normpath(
         os.path.join(mjcf_dir, "mjx_single_cube_no_mesh.xml")
     )
@@ -577,6 +579,56 @@ class MujocoSimTestCase(unittest.TestCase):
             step_size=self.step_size,
         )
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIs(multi_sim.simulator.headless, headless)
+        self.assertEqual(multi_sim.simulator.step_size, self.step_size)
+        multi_sim.start_simulation()
+        start_time = time.time()
+        time.sleep(5.0)
+        multi_sim.stop_simulation()
+        self.assertGreaterEqual(time.time() - start_time, 5.0)
+
+    def test_mujoco_with_tracy_dae_files(self):
+        # tracy used .dae files for the UR arms and the robotiq grippers
+
+        dae_world = URDFParser.from_file(file_path=self.test_urdf_tracy).parse()
+
+        viewer = MultiverseViewer()
+        multi_sim = MujocoSim(viewer=viewer, world=dae_world, headless=headless)
+        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
+        self.assertIs(multi_sim.simulator.headless, headless)
+        self.assertEqual(multi_sim.simulator.step_size, self.step_size)
+        multi_sim.start_simulation()
+        start_time = time.time()
+        time.sleep(5.0)
+        multi_sim.stop_simulation()
+        self.assertGreaterEqual(time.time() - start_time, 5.0)
+
+    def test_mujocosim_world_with_added_objects(self):
+        viewer = MultiverseViewer()
+        milk_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "..",
+            "..",
+            "semantic_digital_twin",
+            "resources",
+            "stl",
+            "milk.stl",
+        )
+        stl_parser = STLParser(milk_path)
+        mesh_world = stl_parser.parse()
+        transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=0.5, reference_frame=self.test_urdf_1_world.root
+        )
+        with self.test_urdf_1_world.modify_world():
+            self.test_urdf_1_world.merge_world_at_pose(mesh_world, transformation)
+
+        multi_sim = MujocoSim(
+            viewer=viewer, world=self.test_urdf_1_world, headless=headless
+        )
+        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
