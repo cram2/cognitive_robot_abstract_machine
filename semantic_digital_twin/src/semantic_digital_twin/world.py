@@ -29,6 +29,7 @@ from typing_extensions import (
 from typing_extensions import List
 from typing_extensions import Type, Set
 
+from .mixin import SimulatorAdditionalPropertiesMixin
 from .callbacks.callback import ModelChangeCallback
 from .collision_checking.collision_detector import CollisionDetector
 from .collision_checking.trimesh_collision_detector import TrimeshCollisionDetector
@@ -448,7 +449,7 @@ _LRU_CACHE_SIZE: int = 2048
 
 
 @dataclass
-class World:
+class World(SimulatorAdditionalPropertiesMixin):
     """
     A class representing the world.
     The world manages a set of kinematic structure entities and connections represented as a tree-like graph.
