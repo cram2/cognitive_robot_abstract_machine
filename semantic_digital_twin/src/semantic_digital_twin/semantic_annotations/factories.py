@@ -20,7 +20,9 @@ from probabilistic_model.probabilistic_circuit.rx.helper import (
 )
 from random_events.interval import Bound
 from random_events.product_algebra import *
+from typing import Optional, List
 from typing_extensions import Generic, TypeVar
+
 
 from ..datastructures.prefixed_name import PrefixedName
 from ..datastructures.variables import SpatialVariables
@@ -43,6 +45,90 @@ from ..semantic_annotations.semantic_annotations import (
     Room,
     Floor,
 )
+from ..semantic_annotations.semantic_annotations import (
+    SemanticAnnotation,
+)
+
+from ..semantic_annotations.semantic_annotations import (
+    Apple,
+    Banana,
+    Baseball,
+    Bowl,
+    Milk,
+    Candy,
+    Cereal,
+    Pringles,
+    Cola,
+    Corn,
+    CheezeIt,
+    Chips,
+    Crispbread,
+    Cup,
+    DishwasherTab,
+    TunaCan,
+    Fork,
+    Knife,
+    GelatinBox,
+    GlassCleaner,
+    Grapes,
+    GroundCoffee,
+    Hammer,
+    HoneyWafers,
+    IcedTea,
+    Juice,
+    Ketchup,
+    Liquorice,
+    Lemon,
+    Mayonnaise,
+    Salt,
+    Marker,
+    Muesli,
+    Mug,
+    Mustard,
+    Noodles,
+    Orange,
+    Oregano,
+    PancakeMix,
+    Peach,
+    Pear,
+    Pitcher,
+    Plate,
+    Plum,
+    Pot,
+    PottedMeat,
+    Pudding,
+    Racquetball,
+    Rice,
+    RubiksCube,
+    Sauce,
+    Saucer,
+    Sausage,
+    Scissors,
+    Screwdriver,
+    Skillet,
+    Soap,
+    SoccerBall,
+    Softball,
+    Soda,
+    SoyaDrink,
+    TomatoSoup,
+    Spatula,
+    Sponge,
+    Spoon,
+    Sprinkles,
+    Strawberry,
+    Sugar,
+    TennisBall,
+    Vase,
+    Vegetables,
+    Wafer,
+    Water,
+    WineGlass,
+    WoodBlock,
+    Cucumber,
+    Zucchini,
+)
+
 from ..world import World
 from ..world_description.connections import (
     PrismaticConnection,
@@ -1342,3 +1428,201 @@ class WallFactory(SemanticAnnotationFactory[Wall], HasDoorLikeFactories):
             }
         )
         return wall_event
+
+
+# ============================================================
+# Perceived object factory and helpers
+# ============================================================
+# Mapping from string class name to actual semantic annotation class
+PERCEIVED_OBJECT_MAPPING = {
+    "apple": Apple,
+    "banana": Banana,
+    "baseball": Baseball,
+    "bowl_collapsable_greengrey": Bowl,
+    "bowl_collapsable_redgrey": Bowl,
+    "bowl_collapsable_yellowgrey": Bowl,
+    "bowl_cone_red_plastic": Bowl,
+    "bowl_red_metal": Bowl,
+    "bowl_redwhite_plastic": Bowl,
+    "buttermilk_mueller_bottle_original": Milk,
+    "buttermilk_mueller_bottle_raspberry": Milk,
+    "candy_autodrop_cadillacs": Candy,
+    "candy_autodrop_totalloss": Candy,
+    "candy_tictac": Candy,
+    "cappuccinopowder_combo_can": Cereal,
+    "cappuccinopowder_magico_can": Cereal,
+    "cereal_jumbo_box_special": Cereal,
+    "cereal_kellogs_box_original": Cereal,
+    "cereal_nesquick_box_chocoballs": Cereal,
+    "chips_feurich_can_paprika": Chips,
+    "chips_jumbo_bag_blue_paprika": Chips,
+    "chips_jumbo_bag_red_naturel": Chips,
+    "chips_pringles_can_original": Pringles,
+    "chips_pringles_can_so": Pringles,
+    "chips_pringles_can_sv": Pringles,
+    "chips_stacked_can_original": Chips,
+    "colabottle": Cola,
+    "corn_bonduelle_can": Corn,
+    "cracker_cheezit_box_original": CheezeIt,
+    "crispbread_wasa_pack_rosemaryseasalt": Crispbread,
+    "cup_small": Cup,
+    "cup_tigerpattern": Cup,
+    "dishwashertab": DishwasherTab,
+    "dishwashertab_somat_pack": DishwasherTab,
+    "fish_tuna_starkist_can": TunaCan,
+    "fork_dinner_blackgrip": Fork,
+    "fork_dinner_redgrip": Fork,
+    "gelatine_jello_box_strawberry": GelatinBox,
+    "glasscleaner_windex_spraybottle": GlassCleaner,
+    "grapes": Grapes,
+    "groundcoffee_coop_pack": GroundCoffee,
+    "groundcoffee_masterchef_can": GroundCoffee,
+    "hammer_woodgrip": Hammer,
+    "honeywafers_jumbo_pack": HoneyWafers,
+    "icetea_lipton_can_green": IcedTea,
+    "icetea_pfanner_pack_green": IcedTea,
+    "icetea_pfanner_pack_peach": IcedTea,
+    "juice_albi_pack_hm": Juice,
+    "juice_dubbelfriss_box_ap": Juice,
+    "ketchup_hela_bottle_curry": Ketchup,
+    "knife_butter_blackgrip": Knife,
+    "knife_butter_redgrip": Knife,
+    "lemon": Lemon,
+    "liquorice_jumbo_gemengdedrop": Liquorice,
+    "marker_black": Marker,
+    "mayonaise_remia_bottle": Mayonnaise,
+    "milk_baerenmarke_pack": Milk,
+    "milk_hansano_pack": Milk,
+    "milk_ja_pack": Milk,
+    "milk_jumbo_pack_halfvoll": Milk,
+    "milk_jumbo_pack_voll": Milk,
+    "milk_milbona_pack": Milk,
+    "milk_weihenstephan_pack": Milk,
+    "mill_salt_transparent": Salt,
+    "muesli_koelln_box_cranberry": Muesli,
+    "muesli_koelln_box_hn": Muesli,
+    "muesli_koelln_box_sk": Muesli,
+    "mug_cylinder_blue": Mug,
+    "mug_grey": Mug,
+    "mug_highgrip_blue": Mug,
+    "mug_red_metal": Mug,
+    "mustard_frenchs_bottle": Mustard,
+    "noodles_barilla_box_fusilli": Noodles,
+    "orange": Orange,
+    "oregano_ostmann_shaker": Oregano,
+    "pancakemix_koopmans_original": PancakeMix,
+    "peach": Peach,
+    "pear": Pear,
+    "pitcher_blue": Pitcher,
+    "plate_red_metal": Plate,
+    "plum": Plum,
+    "pot_silver": Pot,
+    "pot_white": Pot,
+    "pottedmeat_spam_can": PottedMeat,
+    "pudding_jello_box_chocolate": Pudding,
+    "racquetball": Racquetball,
+    "rice_gutguenstig_pack_langkorn": Rice,
+    "rubikscube": RubiksCube,
+    "salt_aquasale_can": Salt,
+    "salt_aquasale_mill_transparent": Salt,
+    "salt_gutguenstig_pack": Salt,
+    "sauce_knorr_basilikum": Sauce,
+    "saucer_grey": Saucer,
+    "sausage_jumbo_can": Sausage,
+    "scissors_blackgrip": Scissors,
+    "screwdriver_blackgreyredgrip": Screwdriver,
+    "skillet_whitegold": Skillet,
+    "soap_jumbo_bottle_almond": Soap,
+    "soccerball_mini": SoccerBall,
+    "soda_cocacocla_can_zero": Soda,
+    "soda_fanta_can_zero": Soda,
+    "soda_jumbo_bottle_cola": Soda,
+    "softball": Softball,
+    "sojadrink_biobio_pack": SoyaDrink,
+    "soup_jumbo_can": TomatoSoup,
+    "spatula_black": Spatula,
+    "sponge": Sponge,
+    "sponge_abrasive": Sponge,
+    "spoon_dinner_blackgrip": Spoon,
+    "spoon_dinner_redgrip": Spoon,
+    "spoon_tea_metal": Spoon,
+    "sprinkles_jumbo_melk": Sprinkles,
+    "sprinkles_jumbo_puur": Sprinkles,
+    "strawberry": Strawberry,
+    "sugar_domino_box": Sugar,
+    "tennisball": TennisBall,
+    "tomatosoup_campbelli_can": TomatoSoup,
+    "vase_curved_blackblue": Vase,
+    "vase_cylinder_black": Vase,
+    "vegetables_gutguenstig_can": Vegetables,
+    "wafer_kinder_pack_bueno": Wafer,
+    "water_jumbo_bottle": Water,
+    "waterbottle": Water,
+    "wineglass_shortstemm": WineGlass,
+    "woodblock": WoodBlock,
+    "cucumber": Cucumber,
+    "zucchini": Zucchini,
+}
+
+@dataclass
+class PerceivedObjectFactory(SemanticAnnotationFactory[SemanticAnnotation]):
+    """
+    Factory for creating a perceived object from the perception system.
+    """
+
+    perceived_object_class: str = field(kw_only=True)
+    """
+    String identifier of the perceived object class as provided by Perception.
+    """
+
+    object_dimensions: Scale = field(kw_only=True)
+    """
+    Dimensions of the perceived object (x, y, z) in meters.
+    """
+
+    name: Optional[PrefixedName] = None
+    """
+    Optional name of the perceived object.
+
+    If not provided, a name is generated automatically from the object class.
+    """
+
+    def __post_init__(self) -> None:
+        if self.perceived_object_class not in PERCEIVED_OBJECT_MAPPING:
+            raise ValueError(
+                f"Unknown perceived object class: {self.perceived_object_class}"
+            )
+
+        if self.name is None:
+            self.name = PrefixedName(self.perceived_object_class)
+
+        self._target_class = PERCEIVED_OBJECT_MAPPING[self.perceived_object_class]
+
+    def _create(self, world: World) -> World:
+        """
+        Create the perceived object in the given world.
+
+        :param world: World in which the perceived object should be created.
+        :return: World containing the newly created body and semantic annotation.
+        """
+        # Create body from perceived dimensions
+        object_body = Body(name=self.name)
+        object_event = self.object_dimensions.simple_event.as_composite_set()
+
+        collision_shapes = BoundingBoxCollection.from_event(
+            object_body, object_event
+        ).as_shapes()
+
+        object_body.collision = collision_shapes
+        object_body.visual = collision_shapes
+
+        world.add_kinematic_structure_entity(object_body)
+
+        # Create the corresponding semantic annotation
+        semantic_annotation = self._target_class(
+            name=self.name,
+            body=object_body,
+        )
+        world.add_semantic_annotation(semantic_annotation)
+
+        return world

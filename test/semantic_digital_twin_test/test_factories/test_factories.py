@@ -1,35 +1,37 @@
 import unittest
 from time import sleep
-
 import pytest
 
 from semantic_digital_twin.exceptions import IncorrectScaleError
 from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Handle,
-    Door,
-    Container,
-    Drawer,
-    Dresser,
-    Wall,
+    Handle, Door, Container, Drawer, Dresser, Wall
 )
 from semantic_digital_twin.semantic_annotations.factories import (
-    HandleFactory,
-    Direction,
-    DoorFactory,
-    ContainerFactory,
-    DoubleDoorFactory,
-    DrawerFactory,
-    DresserFactory,
-    WallFactory,
-    SemanticPositionDescription,
-    HorizontalSemanticDirection,
-    VerticalSemanticDirection,
+    HandleFactory, Direction, DoorFactory, ContainerFactory, DoubleDoorFactory,
+    DrawerFactory, DresserFactory, WallFactory, SemanticPositionDescription,
+    HorizontalSemanticDirection, VerticalSemanticDirection,
+    # NEU:
+    PerceivedObjectFactory,
 )
+
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Apple,
+    Banana,
+    Cereal,
+    Muesli,
+    Salt,
+    Soda,
+    SoyaDrink,
+    Spatula,
+    Skillet,
+    SoccerBall,
+
+)
+from semantic_digital_twin.world import World
 
 
 class TestFactories(unittest.TestCase):
@@ -281,6 +283,21 @@ class TestFactories(unittest.TestCase):
         wall: Wall = semantic_wall_annotations[0]
         self.assertEqual(world.root, wall.body)
 
+    def test_perceived_object_factory(self):
+        """Test that PerceivedObjectFactory creates a valid object with correct type and name."""
+        # Test one representative class: apple
+        factory = PerceivedObjectFactory(
+            perceived_object_class="apple",
+            object_dimensions=Scale(0.1, 0.1, 0.1),
+            name=PrefixedName("apple_1"),
+        )
+        world = factory.create()
+        instances = world.get_semantic_annotations_by_type(Apple)
+        self.assertEqual(len(instances), 1)
+        instance = instances[0]
+        self.assertEqual(instance.name.name, "apple_1")
+        self.assertIsInstance(instance, Apple)
+        self.assertIsInstance(instance.body, Body)
 
 if __name__ == "__main__":
     unittest.main()
