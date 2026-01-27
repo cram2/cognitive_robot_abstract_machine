@@ -773,7 +773,7 @@ class BoundingBox:
         """
         :return: The dimensions of the bounding box as a list [width, depth, height].
         """
-        return [self.width, self.depth, self.height]
+        return [self.depth, self.width, self.height]
 
     def bloat(
         self, x_amount: float = 0.0, y_amount: float = 0, z_amount: float = 0
