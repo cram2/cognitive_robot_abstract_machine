@@ -129,7 +129,9 @@ class MultiSimError(Exception):
 
 @dataclass(eq=False)
 class MultiSimCamera(SimulatorAdditionalProperty):
-    """Semantic annotation declaring that a Body is a MultiSimCamera."""
+    """
+    Additional property representing a camera in MultiSim.
+    """
 
 
 @dataclass
@@ -621,7 +623,7 @@ class ActuatorConverter(EntityConverter, ABC):
 
 class CameraConverter(EntityConverter, ABC):
     """
-    Converts an Camera object to a dictionary of actuator properties for Multiverse simulator.
+    Converts a Camera object to a dictionary of camera properties for Multiverse simulator.
     """
 
     entity_type: ClassVar[Type[MultiSimCamera]] = MultiSimCamera
@@ -642,11 +644,15 @@ class CameraConverter(EntityConverter, ABC):
 
 
 class MujocoError(MultiSimError):
-    """Base class for all MuJoCo-related exceptions."""
+    """
+    Base class for all MuJoCo-related exceptions.
+    """
 
 
 class MujocoEntityNotFoundError(MujocoError):
-    """Raised when a MuJoCo entity of a given type and name cannot be found."""
+    """
+    Raised when a MuJoCo entity of a given type and name cannot be found.
+    """
 
     def __init__(
         self, entity_name: str, entity_type: mujoco.mjtObj, action: str = "find"
@@ -747,7 +753,9 @@ class MujocoActuator(SimulatorAdditionalProperty):
 
 @dataclass
 class MujocoCamera(SimulatorAdditionalProperty):
-    """Semantic annotation declaring that a Body has a MuJoCo camera."""
+    """
+    Additional property representing a MuJoCo camera in the world model.
+    """
 
     name: str = ""
     mode: mujoco.mjtCamLight = mujoco.mjtCamLight.mjCAMLIGHT_FIXED
@@ -767,7 +775,7 @@ class MujocoCamera(SimulatorAdditionalProperty):
 @dataclass
 class MujocoEquality(SimulatorAdditionalProperty):
     """
-    Semantic annotation declaring that two MuJoCo entities are constrained.
+    Additional properties representing a MuJoCo equality constraint in the world model.
     """
 
     type: mujoco.mjtEq = field(kw_only=True)
@@ -799,7 +807,7 @@ class MujocoEquality(SimulatorAdditionalProperty):
 @dataclass(eq=False)
 class MujocoGeom(SimulatorAdditionalProperty):
     """
-    Semantic annotation declaring that a Shape is a MujocoGeom.
+    An additional property declaring that a Shape is a MujocoGeom.
     """
 
     solver_impedance: List[float] = field(
@@ -826,7 +834,7 @@ class MujocoGeom(SimulatorAdditionalProperty):
 @dataclass(eq=False)
 class MujocoJoint(SimulatorAdditionalProperty):
     """
-    Semantic annotation declaring that a Connection is a MujocoJoint.
+    An additional property declaring that a Connection is a MujocoJoint.
     """
 
     stiffness: float = 0.0
@@ -838,7 +846,7 @@ class MujocoJoint(SimulatorAdditionalProperty):
 @dataclass(eq=False)
 class MujocoBody(SimulatorAdditionalProperty):
     """
-    Semantic annotation declaring that a Body is a MujocoBody.
+    Additional properties representing a MuJoCo body in the world model.
     """
 
     gravitation_compensation_factor: float = 0.0
@@ -1164,8 +1172,9 @@ class MultiSimBuilder(ABC):
                 is_visible=shape in body.visual,
                 is_collidable=shape in body.collision,
             )
-        for camera in body.get_semantic_annotations_by_type(MultiSimCamera):
-            self._build_camera(camera=camera)
+        for camera in body.simulator_additional_properties:
+            if isinstance(camera, MultiSimCamera):
+                self._build_camera(camera=camera)
 
     def build_region(self, region: Region):
         """
@@ -1774,7 +1783,7 @@ class ActuatorSpawner(EntitySpawner):
 
     def _spawn(self, simulator: MultiverseSimulator, entity: Actuator) -> bool:
         """
-        Spawns a Actuator object in the Multiverse simulator including its dofs.
+        Spawns an Actuator object in the Multiverse simulator, including its dofs.
 
         :param simulator: The Multiverse simulator to spawn the entity in.
         :param entity: The Actuator object to spawn.
@@ -1787,6 +1796,12 @@ class ActuatorSpawner(EntitySpawner):
     def _spawn_actuator(
         self, simulator: MultiverseSimulator, actuator: Actuator
     ) -> bool:
+        """
+        Spawns an Actuator object in the Multiverse simulator.
+
+        :param simulator: The Multiverse simulator to spawn the entity in.
+        :param actuator: The Actuator object to spawn.
+        """
         raise NotImplementedError
 
 
