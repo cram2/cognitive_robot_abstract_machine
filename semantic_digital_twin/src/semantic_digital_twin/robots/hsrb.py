@@ -1,5 +1,5 @@
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Self
 
 from .abstract_robot import (
@@ -11,29 +11,23 @@ from .abstract_robot import (
     Camera,
     Torso,
     FieldOfView,
+    JointState,
 )
 from .robot_mixins import HasNeck, HasArms
+from ..datastructures.definitions import StaticJointState, GripperState, TorsoState
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import Quaternion
 from ..spatial_types.spatial_types import Vector3
 from ..world import World
 
 
-@dataclass
+@dataclass(eq=False)
 class HSRB(AbstractRobot, HasArms, HasNeck):
     """
     Class that describes the Human Support Robot variant B (https://upmroboticclub.wordpress.com/robot/).
     """
 
-    def __hash__(self):
-        return hash(
-            tuple(
-                [self.__class__]
-                + sorted([kse.name for kse in self.kinematic_structure_entities])
-            )
-        )
-
-    def setup_collision_config(self):
+    def load_srdf(self):
         """
         Loads the SRDF file for the PR2 robot, if it exists.
         """
@@ -176,6 +170,70 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
                 _world=world,
             )
             hsrb.add_torso(torso)
+
+            #Create states
+            arm_park = JointState(
+                name=PrefixedName("arm_park", prefix=hsrb.name.name),
+                joints=[world.get_connection_by_name("arm_flex_joint"), world.get_connection_by_name("arm_roll_joint"),
+                             world.get_connection_by_name("wrist_flex_joint"), world.get_connection_by_name("wrist_roll_joint")],
+                joint_positions=[0.0, 1.5, -1.85, 0.0],
+                state_type=StaticJointState.PARK,
+                kinematic_chains=[arm],
+                _world=world,
+            )
+
+            gripper_joints = [world.get_connection_by_name("hand_l_proximal_joint"),
+                             world.get_connection_by_name("hand_r_proximal_joint"),
+                             world.get_connection_by_name("hand_motor_joint")]
+
+            gripper_open = JointState(
+                name=PrefixedName("gripper_open", prefix=hsrb.name.name),
+                joints=gripper_joints,
+                joint_positions=[0.3, 0.3, 0.3],
+                state_type=GripperState.OPEN,
+                kinematic_chains=[gripper],
+                _world=world,
+            )
+
+            gripper_close = JointState(
+                name=PrefixedName("gripper_close", prefix=hsrb.name.name),
+                joints=gripper_joints,
+                joint_positions=[0.0, 0.0, 0.0],
+                state_type=GripperState.CLOSE,
+                kinematic_chains=[gripper],
+                _world=world,
+            )
+
+            torso_joint = [world.get_connection_by_name("torso_lift_joint")]
+
+            torso_low = JointState(
+                name=PrefixedName("torso_low", prefix=hsrb.name.name),
+                joints=torso_joint,
+                joint_positions=[0.0],
+                state_type=TorsoState.LOW,
+                kinematic_chains=[torso],
+                _world=world,
+            )
+
+            torso_mid = JointState(
+                name=PrefixedName("torso_mid", prefix=hsrb.name.name),
+                joints=torso_joint,
+                joint_positions=[0.17],
+                state_type=TorsoState.MID,
+                kinematic_chains=[torso],
+                _world=world,
+            )
+
+            torso_high = JointState(
+                name=PrefixedName("torso_high", prefix=hsrb.name.name),
+                joints=torso_joint,
+                joint_positions=[0.34],
+                state_type=TorsoState.HIGH,
+                kinematic_chains=[torso],
+                _world=world,
+            )
+
+            hsrb.add_joint_states([arm_park, gripper_open, gripper_close, torso_low, torso_mid, torso_high])
 
             world.add_semantic_annotation(hsrb)
 
