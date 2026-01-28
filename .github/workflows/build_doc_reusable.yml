@@ -1,0 +1,127 @@
+name: Build Doc Reusable
+
+on:
+  workflow_call:
+    inputs:
+      lib:
+        description: "Library folder name"
+        required: true
+        type: string
+      doc_path:
+        description: "Path to documentation source relative to library folder"
+        required: true
+        type: string
+      artifact_name:
+        description: "Name of the artifact to upload"
+        required: true
+        type: string
+      use_container:
+        description: "Whether to use the semantic_world container"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ inputs.use_container && 'pycram/semantic_world:jazzy' || '' }}
+    defaults:
+      run:
+        shell: ${{ inputs.use_container && 'bash -ieo pipefail {0}' || 'bash' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: ${{ inputs.use_container && 'ros/src/semantic_digital_twin' || '.' }}
+          submodules: ${{ inputs.use_container && 'false' || 'true' }}
+
+      - name: Update semantic_digital_twin source files (Container only)
+        if: ${{ inputs.use_container }}
+        run: |
+          rm -rf /opt/ros/semantic_digital_twin/*
+          cd /opt/ros/semantic_digital_twin
+          rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
+          cp -r $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/semantic_digital_twin/* /opt/ros/semantic_digital_twin/
+
+      - name: Set up Python (Non-container)
+        if: ${{ !inputs.use_container }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install Node.js (Container only)
+        if: ${{ inputs.use_container }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Graphviz
+        if: ${{ inputs.lib == 'pycram' || inputs.lib == 'probabilistic_model' || inputs.lib == 'random_events' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install graphviz libgraphviz-dev -y
+
+      - name: Install dependencies (Non-container)
+        if: ${{ !inputs.use_container }}
+        working-directory: ${{ inputs.lib }}
+        run: |
+          pip install -U pip setuptools wheel pybind11
+          [ -f requirements-dev.txt ] && pip install -r requirements-dev.txt || echo "No requirements-dev.txt"
+          [ -f requirements.txt ] && pip install -r requirements.txt || echo "No requirements.txt"
+          pip install .
+          [ -f ${{ inputs.doc_path }}/requirements.txt ] && pip install -r ${{ inputs.doc_path }}/requirements.txt || echo "No doc requirements"
+          [ -f doc/requirements.txt ] && pip install -r doc/requirements.txt || echo "No root doc requirements"
+          pip install 'jupyter-book<2'
+
+      - name: Install dependencies (Container)
+        if: ${{ inputs.use_container }}
+        run: |
+          sudo apt-get update
+          cd /opt/ros/semantic_digital_twin
+          source /opt/ros/semantic_digital_twin-venv/bin/activate
+          pip install -U pip && pip install -r requirements.txt && pip install . && pip install -r doc/requirements.txt
+
+      - name: Strip exercise-tagged cells (semantic_digital_twin only)
+        if: ${{ inputs.lib == 'semantic_digital_twin' }}
+        run: |
+          cd /opt/ros/semantic_digital_twin/doc/self_assessment/exercises
+          source /opt/ros/semantic_digital_twin-venv/bin/activate
+          find . -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
+            ipynb="${f%.md}.ipynb"
+            jupytext --from md:myst --to ipynb "$f" -o "$ipynb"
+            jupyter nbconvert --config /opt/ros/semantic_digital_twin/scripts/configs/nb_remove_exercises.json \
+              --to notebook --inplace \
+              "$ipynb"
+            jupytext --to md:myst "$ipynb" -o "$f"
+            rm -f "$ipynb"
+          done
+
+      - name: Build the book (Non-container)
+        if: ${{ !inputs.use_container }}
+        working-directory: ${{ inputs.lib }}
+        run: |
+          jupyter-book build ${{ inputs.doc_path }}
+
+      - name: Build the book (Container)
+        if: ${{ inputs.use_container }}
+        run: |
+          cd /opt/ros/semantic_digital_twin
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/semantic_digital_twin-venv/bin/activate
+          jupyter-book build ${{ inputs.doc_path }}
+
+      - name: Upload artifact (Non-container)
+        if: ${{ !inputs.use_container && !env.ACT }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: "${{ inputs.lib }}/${{ inputs.doc_path }}/_build/html"
+
+      - name: Upload artifact (Container)
+        if: ${{ inputs.use_container && (github.event_name == 'push' || github.event_name == 'workflow_call') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: "/opt/ros/semantic_digital_twin/doc/_build/html"
