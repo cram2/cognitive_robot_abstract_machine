@@ -5,7 +5,13 @@ from typing_extensions import Optional, Set, List, Dict, Iterable
 import fcl
 from trimesh.collision import CollisionManager, mesh_to_BVH
 
-from .collision_detector import CollisionDetector, CollisionCheck, Collision
+from .collision_detector import (
+    CollisionDetector,
+    CollisionCheck,
+    Collision,
+    CollisionMatrix,
+    CollisionCheckingResult,
+)
 from ..world_description.world_entity import Body
 
 
@@ -68,8 +74,8 @@ class TrimeshCollisionDetector(CollisionDetector):
             )
 
     def check_collisions(
-        self, collision_matrix: Optional[Iterable[CollisionCheck]] = None
-    ) -> List[Collision]:
+        self, collision_matrix: CollisionMatrix
+    ) -> CollisionCheckingResult:
         """
         Checks for collisions in the current world state. The collision manager from trimesh returns all collisions,
         which are then filtered based on the provided collision matrix. If there are multiple contacts between two bodies,
@@ -78,17 +84,11 @@ class TrimeshCollisionDetector(CollisionDetector):
         :param collision_matrix: An optional set of CollisionCheck objects to filter the collisions. If None is provided, all collisions are checked.
         :return: A list of Collision objects representing the detected collisions.
         """
-        self.sync_world_model()
-        self.sync_world_state()
-
-        if collision_matrix is None:
-            return []
-
-        collision_pairs = [
-            (cc.body_a, cc.body_b, cc.distance) for cc in collision_matrix
-        ]
         result = []
-        for body_a, body_b, distance in collision_pairs:
+        for collision_check in collision_matrix.collision_checks:
+            body_a = collision_check.body_a
+            body_b = collision_check.body_b
+            distance = collision_check.distance
             if (
                 body_a not in self._collision_objects
                 or body_b not in self._collision_objects
@@ -119,7 +119,7 @@ class TrimeshCollisionDetector(CollisionDetector):
                     )
                 )
 
-        return result
+        return CollisionCheckingResult(result)
 
     def reset_cache(self):
         pass

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass, field
-from itertools import chain
+from itertools import chain, combinations
 from uuid import UUID
 
 import numpy as np
-from typing_extensions import Tuple, List, Optional, Iterable, TYPE_CHECKING
+from typing_extensions import Tuple, List, Optional, Iterable, TYPE_CHECKING, Self
 
 from krrood.symbolic_math.symbolic_math import (
     Matrix,
@@ -35,26 +35,11 @@ class CollisionCheck:
     """
     Minimum distance to check for collisions.
     """
-    _world: World
-    """
-    The world context for validation and sorting.
-    """
 
-    def __post_init__(self):
-        self.body_a, self.body_b = self.sort_bodies(self.body_a, self.body_b)
-
-    def __hash__(self):
-        return hash((self.body_a, self.body_b))
-
-    def __eq__(self, other: CollisionCheck):
-        return self.body_a == other.body_a and self.body_b == other.body_b
-
-    def bodies(self) -> Tuple[Body, Body]:
-        return self.body_a, self.body_b
-
-    def _validate(self) -> None:
-        """Validates the collision check parameters."""
-        if self.distance <= 0:
+    @classmethod
+    def create_and_validate(cls, body_a: Body, body_b: Body, distance: float) -> Self:
+        self = cls(body_a=body_a, body_b=body_b, distance=distance)
+        if self.distance < 0:
             raise ValueError(f"Distance must be positive, got {self.distance}")
 
         if self.body_a == self.body_b:
@@ -67,52 +52,51 @@ class CollisionCheck:
 
         if not self.body_b.has_collision():
             raise ValueError(f"Body {self.body_b.name} has no collision geometry")
+        return self
 
-        if self.body_a not in self._world.bodies_with_enabled_collision:
-            raise ValueError(
-                f"Body {self.body_a.name} is not in list of bodies with collisions"
-            )
+    def __hash__(self):
+        return hash((self.body_a, self.body_b))
 
-        if self.body_b not in self._world.bodies_with_enabled_collision:
-            raise ValueError(
-                f"Body {self.body_b.name} is not in list of bodies with collisions"
-            )
+    def __eq__(self, other: CollisionCheck):
+        return self.body_a == other.body_a and self.body_b == other.body_b
 
-        root_chain, tip_chain = self._world.compute_split_chain_of_connections(
-            self.body_a, self.body_b
-        )
-        if all(
-            not isinstance(c, ActiveConnection) for c in chain(root_chain, tip_chain)
-        ):
-            raise ValueError(
-                f"Relative pose between {self.body_a.name} and {self.body_b.name} is fixed"
-            )
+    def bodies(self) -> Tuple[Body, Body]:
+        return self.body_a, self.body_b
+
+    def sort_bodies(self):
+        if self.body_a.id > self.body_b.id:
+            self.body_a, self.body_b = self.body_b, self.body_a
+
+
+@dataclass
+class CollisionMatrix:
+    collision_checks: set[CollisionCheck] = field(default_factory=set)
+
+    def __post_init__(self):
+        self.sort_bodies()
+
+    def sort_bodies(self):
+        for collision in self.collision_checks:
+            collision.sort_bodies()
 
     @classmethod
-    def create_and_validate(
-        cls, body_a: Body, body_b: Body, distance: float, world: World
-    ) -> CollisionCheck:
-        """
-        Creates a collision check with additional world-context validation.
-        Returns None if the check should be skipped (e.g., bodies are linked).
-        """
-        collision_check = cls(
-            body_a=body_a, body_b=body_b, distance=distance, _world=world
+    def create_all_checks(cls, distance: float, world: World) -> Self:
+        return CollisionMatrix(
+            collision_checks={
+                CollisionCheck(body_a=body_a, body_b=body_b, distance=distance)
+                for body_a, body_b in combinations(
+                    world.bodies_with_enabled_collision, 2
+                )
+            }
         )
-        collision_check._validate()
-        return collision_check
 
-    def sort_bodies(self, body_a: Body, body_b: Body) -> Tuple[Body, Body]:
-        """
-        Sort both bodies in a consistent manner, needed to avoid checking B with A, when A with B is already checked.
-        """
-        if body_a.id > body_b.id:
-            body_a, body_b = body_b, body_a
-        is_body_a_controlled = self._world.is_body_controlled(body_a)
-        is_body_b_controlled = self._world.is_body_controlled(body_b)
-        if not is_body_a_controlled and is_body_b_controlled:
-            body_a, body_b = body_b, body_a
-        return body_a, body_b
+
+@dataclass
+class CollisionCheckingResult:
+    contacts: list[Collision] = field(default_factory=list)
+
+    def any(self) -> bool:
+        return len(self.contacts) > 0
 
 
 @dataclass
@@ -253,8 +237,8 @@ class CollisionDetector(abc.ABC):
 
     @abc.abstractmethod
     def check_collisions(
-        self, collision_matrix: Optional[Iterable[CollisionCheck]] = None
-    ) -> List[Collision]:
+        self, collision_matrix: CollisionMatrix
+    ) -> CollisionCheckingResult:
         """
         Computes the collisions for all checks in the collision matrix.
         If collision_matrix is None, checks all collisions.
@@ -263,12 +247,14 @@ class CollisionDetector(abc.ABC):
         """
 
     def check_collision_between_bodies(
-        self, body_a: Body, body_b: Body
-    ) -> Optional[Collision]:
+        self, body_a: Body, body_b: Body, distance: float = 0.0
+    ) -> Collision | None:
         collision = self.check_collisions(
-            {CollisionCheck(body_a, body_b, 0.0, self.world)}
+            CollisionMatrix(
+                {CollisionCheck.create_and_validate(body_a, body_b, distance)}
+            )
         )
-        return collision[0] if collision else None
+        return collision.contacts[0] if collision.any() else None
 
     @abc.abstractmethod
     def reset_cache(self):

@@ -3,6 +3,9 @@ import threading
 import time
 
 import pytest
+from Cryptodome.SelfTest.Cipher.test_OFB import file_name
+from pkg_resources import resource_filename
+
 from krrood.entity_query_language.symbol_graph import SymbolGraph
 from typing_extensions import Tuple
 
@@ -21,7 +24,7 @@ from .world_description.connections import (
     OmniDrive,
 )
 from .world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
-from .world_description.geometry import Box, Scale, Sphere
+from .world_description.geometry import Box, Scale, Sphere, Cylinder, FileMesh
 from .world_description.shape_collection import ShapeCollection
 from .world_description.world_entity import Body
 
@@ -81,7 +84,7 @@ def world_setup_simple():
     world = World()
     root = Body(name=PrefixedName(name="root", prefix="world"))
     body1 = Body(
-        name=PrefixedName("name1", prefix="test"),
+        name=PrefixedName("box", prefix="test"),
         collision=ShapeCollection(
             [
                 Box(
@@ -92,27 +95,38 @@ def world_setup_simple():
         ),
     )
     body2 = Body(
-        name=PrefixedName("name2", prefix="test"),
+        name=PrefixedName("cylinder", prefix="test"),
         collision=ShapeCollection(
             [
-                Box(
+                Cylinder(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
-                    scale=Scale(0.25, 0.25, 0.25),
+                    width=0.5,
+                    height=0.25,
                 )
             ]
         ),
     )
     body3 = Body(
-        name=PrefixedName("name3", prefix="test"),
+        name=PrefixedName("sphere", prefix="test"),
         collision=ShapeCollection(
-            [Sphere(origin=HomogeneousTransformationMatrix.from_xyz_rpy(), radius=0.01)]
+            [Sphere(origin=HomogeneousTransformationMatrix.from_xyz_rpy(), radius=0.1)]
         ),
     )
 
     body4 = Body(
-        name=PrefixedName("name4", prefix="test"),
+        name=PrefixedName("mesh", prefix="test"),
         collision=ShapeCollection(
-            [Sphere(origin=HomogeneousTransformationMatrix.from_xyz_rpy(), radius=0.01)]
+            [
+                FileMesh(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                    filename=os.path.join(
+                        resource_filename("semantic_digital_twin", "../../"),
+                        "resources",
+                        "stl",
+                        "jeroen_cup.stl",
+                    ),
+                )
+            ]
         ),
     )
 

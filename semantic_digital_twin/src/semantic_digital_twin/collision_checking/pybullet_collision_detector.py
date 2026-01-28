@@ -7,7 +7,12 @@ import giskardpy_bullet_bindings as bpb
 
 
 from .bpb_wrapper import create_shape_from_link, create_collision
-from .collision_detector import CollisionDetector, CollisionCheck
+from .collision_detector import (
+    CollisionDetector,
+    CollisionCheck,
+    CollisionMatrix,
+    CollisionCheckingResult,
+)
 from .collisions import GiskardCollision
 from ..datastructures.prefixed_name import PrefixedName
 from ..world_description.world_entity import Body
@@ -26,6 +31,8 @@ class BulletCollisionDetector(CollisionDetector):
     query: Optional[
         DefaultDict[PrefixedName, Set[Tuple[bpb.CollisionObject, float]]]
     ] = field(default=None, init=False)
+
+    buffer: float = field(default=0.05, init=False)
 
     def sync_world_model(self) -> None:
         self.reset_cache()
@@ -53,8 +60,8 @@ class BulletCollisionDetector(CollisionDetector):
     def reset_cache(self):
         self.query = None
 
-    def cut_off_distances_to_query(
-        self, collision_matrix: Set[CollisionCheck], buffer: float = 0.05
+    def collision_matrix_to_bullet_query(
+        self, collision_matrix: CollisionMatrix
     ) -> DefaultDict[PrefixedName, Set[Tuple[bpb.CollisionObject, float]]]:
         if self.query is None:
             self.query = {
@@ -62,19 +69,19 @@ class BulletCollisionDetector(CollisionDetector):
                     self.body_to_bullet_object[check.body_a],
                     self.body_to_bullet_object[check.body_b],
                 ): check.distance
-                + buffer
-                for check in collision_matrix
+                + self.buffer
+                for check in collision_matrix.collision_checks
             }
         return self.query
 
     def check_collisions(
-        self,
-        collision_matrix: Optional[Set[CollisionCheck]] = None,
-        buffer: float = 0.05,
-    ) -> List[GiskardCollision]:
+        self, collision_matrix: CollisionMatrix
+    ) -> CollisionCheckingResult:
 
-        query = self.cut_off_distances_to_query(collision_matrix, buffer=buffer)
+        query = self.collision_matrix_to_bullet_query(collision_matrix)
         result: List[bpb.Collision] = (
             self.kineverse_world.get_closest_filtered_map_batch(query)
         )
-        return [create_collision(collision, self.world) for collision in result]
+        return CollisionCheckingResult(
+            [create_collision(collision, self.world) for collision in result]
+        )
