@@ -6,6 +6,7 @@ import geometry_msgs.msg as geometry_msgs
 import std_msgs.msg as std_msgs
 import visualization_msgs.msg as visualization_msgs
 from std_msgs.msg import ColorRGBA
+from trimesh.visual import TextureVisuals
 from visualization_msgs.msg import Marker
 
 from .msg_converter import SemDTToRos2Converter, InputType
@@ -218,7 +219,8 @@ class FileMeshToRos2Converter(ShapeToRos2Converter[FileMesh]):
         marker.scale.y = data.scale.y
         marker.scale.z = data.scale.z
         marker.mesh_use_embedded_materials = True
-        marker.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0)
+        if data.mesh.visual.kind == TextureVisuals().kind:
+            marker.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0)
         return marker
 
 
@@ -234,5 +236,6 @@ class TriangleMeshToRos2Converter(ShapeToRos2Converter[TriangleMesh]):
         marker.scale.y = data.scale.y
         marker.scale.z = data.scale.z
         marker.mesh_use_embedded_materials = True
-        marker.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0)
+        if data.mesh.visual.kind == TextureVisuals().kind:
+            marker.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0)
         return marker

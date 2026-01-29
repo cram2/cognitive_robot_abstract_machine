@@ -110,6 +110,49 @@ def test_visualization_marker_pr2(rclpy_node, pr2_world_state_reset):
     assert len(callback.last_msg.markers) == 54
 
 
+def test_visualization_marker_tracy(rclpy_node, tracy_world):
+    tf_wrapper = TFWrapper(node=rclpy_node)
+    tf_publisher = TFPublisher(node=rclpy_node, world=tracy_world)
+    viz = VizMarkerPublisher(world=tracy_world, node=rclpy_node, use_visuals=True)
+
+    callback = Callback()
+
+    sub = rclpy_node.create_subscription(
+        msg_type=MarkerArray,
+        topic=viz.topic_name,
+        callback=callback,
+        qos_profile=viz.qos_profile,
+    )
+    for i in range(30):
+        if callback.last_msg is not None:
+            break
+        sleep(0.1)
+    else:
+        assert False, "Callback timed out"
+
+    # table has no texture, so white should be used
+    for marker in callback.last_msg.markers:
+        if marker.ns == str(tracy_world.get_body_by_name("table").name):
+            assert marker.color.r == 1.0
+            assert marker.color.g == 1.0
+            assert marker.color.b == 1.0
+            assert marker.color.a == 1.0
+            break
+    else:
+        assert False, "Marker not found"
+
+    # ur5 has texture, 0,0,0,0 must be used for correct visualization
+    for marker in callback.last_msg.markers:
+        if marker.ns == str(tracy_world.get_body_by_name("left_forearm_link").name):
+            assert marker.color.r == 0.0
+            assert marker.color.g == 0.0
+            assert marker.color.b == 0.0
+            assert marker.color.a == 0.0
+            break
+    else:
+        assert False, "Marker not found"
+
+
 def test_trimesh(rclpy_node):
     world = STLParser(
         os.path.join(
