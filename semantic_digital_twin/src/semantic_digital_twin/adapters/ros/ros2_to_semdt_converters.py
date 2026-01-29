@@ -236,7 +236,7 @@ class MeshMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, FileMesh]):
             ).to_homogeneous_matrix(),
             color=ColorToSemDTConverter.convert(data.color, world),
             scale=Scale(data.scale.x, data.scale.y, data.scale.z),
-            filename=data.mesh_resource.split("/")[-1],
+            filename=data.mesh_resource.split("//")[-1],
         )
         result.origin.reference_frame = world.get_kinematic_structure_entity_by_name(
             data.header.frame_id
