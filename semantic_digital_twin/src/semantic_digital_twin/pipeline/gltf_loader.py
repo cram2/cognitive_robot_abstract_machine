@@ -1,7 +1,7 @@
 from typing import List, Tuple
 
 import trimesh
-from pipeline import Step
+from .pipeline import Step
 from semantic_digital_twin.world import World
 import re
 
@@ -10,6 +10,9 @@ class GLTFLoader(Step):
     file_path: str #where i get it??
     scene: trimesh.Scene = None
 
+    def __init__(self, file_path: str):
+        self.file_path = file_path
+
     def _get_root_node(self) -> str:
         base_frame = self.scene.graph.base_frame
         root_children = self.scene.graph.transforms.children.get(base_frame, [])
@@ -17,11 +20,12 @@ class GLTFLoader(Step):
             raise ValueError("More than one root node found in the scene, or no root node found.")
         return root_children[0]
 
-    def _grouping_similar_meshes(self, base_node) -> Tuple[List, List]:
-        base_name_pattern = re.compile(r"^(.*?)(_\d+)?$")#could be diffrent systems but freeCAD export always this
+    def _grouping_similar_meshes(self, base_node) -> Tuple[set, set]:
+        base_name_pattern = re.compile(r"^(.*?)(_[A-Za-z0-9]+)?$")#could be diffrent systems but freeCAD export always this
         #biggest problem if same names connect it will fuse then like Bolt_Simple
-        base_name, _ = base_name_pattern.match(str(base_node)).groups()
-        object_nodes = set(base_node)
+        base_name, _ = base_name_pattern.match(base_node).groups()
+        object_nodes = set()
+        object_nodes.add(base_node)
         new_object_notes = set()
         to_search = [base_node]
         while to_search:
@@ -35,7 +39,7 @@ class GLTFLoader(Step):
                     to_search.append(child)
                 else:
                     new_object_notes.add(child)
-        return list(object_nodes), list(new_object_notes)
+        return object_nodes, new_object_notes
 
     def _fusion_meshes(self, object_nodes) -> trimesh.Trimesh:
         meshes: List[trimesh.Trimesh] = []
@@ -77,25 +81,30 @@ class GLTFLoader(Step):
         world_elements = {}
         connection = {} # will be filled greedy first to note no more against cycle if directed
         visited_nodes = set()
-        to_visit_new_object = set()
-        to_visit_new_object.add(root)
-        while to_visit_new_object:
-            node = to_visit_new_object.pop()
+        to_visit_new_node = set()
+        to_visit_new_node.add(root)
+        while to_visit_new_node:
+
+            node = to_visit_new_node.pop()
+            print(node)
+            print(to_visit_new_node)
             _, geometry_name = self.scene.graph.get(node)
             if geometry_name is None:
                 new_nodes = self.scene.graph.transforms.children.get(node, [])
-                # will add meshless elements that will be ignored later on
-                connection[node] = [n for n in new_nodes if n not in visited_nodes]
-                to_visit_new_object.update()
+                new_nodes = [n for n in new_nodes if n not in visited_nodes]
+                connection[node] = new_nodes
+                to_visit_new_node.update(new_nodes)
                 visited_nodes.add(node)
                 continue
+            print(self.scene.graph.transforms.children.get(node, []))
             object_nodes, new_object_notes = self._grouping_similar_meshes(node)
             node_fusion_mesh = self._fusion_meshes(object_nodes)
             world_elements[node] = node_fusion_mesh
-            truly_new_nodes = [n for n in new_object_notes if n not in visited_nodes]
-            to_visit_new_object.update(truly_new_nodes)
+            connection[node] = new_object_notes.difference(visited_nodes)
+            visited_nodes.union(object_nodes)
             visited_nodes.add(node)
-            connection[node] = truly_new_nodes
+            to_visit_new_node.union(new_object_notes).difference(visited_nodes)
+
         return self._build_world_from_elements(world_elements, connection, world)
 
     #Wolrd is empty complet overwrite???
@@ -104,4 +113,5 @@ class GLTFLoader(Step):
         if self.scene is None:
             raise ValueError("Failed to load scene from file.")
         return self._create_world_objects(world)
+
 
