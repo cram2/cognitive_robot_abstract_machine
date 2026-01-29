@@ -22,6 +22,7 @@ import semantic_digital_twin.datastructures.prefixed_name
 import semantic_digital_twin.orm.model
 import semantic_digital_twin.reasoning.predicates
 import semantic_digital_twin.robots.abstract_robot
+import semantic_digital_twin.robots.hsrb
 import semantic_digital_twin.semantic_annotations.mixins
 import semantic_digital_twin.semantic_annotations.semantic_annotations
 import semantic_digital_twin.world
@@ -201,6 +202,12 @@ abstractrobotdao_sensor_chains_association = Table(
     Base.metadata,
     Column("source_abstractrobotdao_id", ForeignKey("AbstractRobotDAO.database_id")),
     Column("target_kinematicchaindao_id", ForeignKey("KinematicChainDAO.database_id")),
+)
+hsrbdao_arms_association = Table(
+    "hsrbdao_arms_association",
+    Base.metadata,
+    Column("source_hsrbdao_id", ForeignKey("HSRBDAO.database_id")),
+    Column("target_armdao_id", ForeignKey("ArmDAO.database_id")),
 )
 kinematicchaindao_sensors_association = Table(
     "kinematicchaindao_sensors_association",
@@ -4187,6 +4194,41 @@ class AbstractRobotDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AbstractRobotDAO",
         "inherit_condition": database_id == AgentDAO.database_id,
+    }
+
+
+class HSRBDAO(
+    AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRB]
+):
+
+    __tablename__ = "HSRBDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(AbstractRobotDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    neck_id: Mapped[int] = mapped_column(
+        ForeignKey("NeckDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    neck: Mapped[NeckDAO] = relationship(
+        "NeckDAO", uselist=False, foreign_keys=[neck_id], post_update=True
+    )
+    arms: Mapped[builtins.list[ArmDAO]] = relationship(
+        "ArmDAO",
+        secondary="hsrbdao_arms_association",
+        primaryjoin="HSRBDAO.database_id == hsrbdao_arms_association.c.source_hsrbdao_id",
+        secondaryjoin="ArmDAO.database_id == hsrbdao_arms_association.c.target_armdao_id",
+        cascade="save-update, merge",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HSRBDAO",
+        "inherit_condition": database_id == AbstractRobotDAO.database_id,
     }
 
 

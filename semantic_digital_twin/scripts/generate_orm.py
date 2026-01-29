@@ -52,6 +52,8 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.world_modification import (
     AttributeUpdateModification,
 )
+import semantic_digital_twin.robots.hsrb
+
 
 all_classes = set(
     classes_of_module(semantic_digital_twin.world_description.world_entity)
@@ -75,6 +77,7 @@ all_classes |= set(
     classes_of_module(semantic_digital_twin.world_description.degree_of_freedom)
 )
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.abstract_robot))
+all_classes |= set(classes_of_module(semantic_digital_twin.robots.hsrb))
 # classes |= set(recursive_subclasses(ViewFactory))
 all_classes |= set([HasRootBody] + recursive_subclasses(HasRootBody))
 all_classes |= set(classes_of_module(semantic_digital_twin.reasoning.predicates))
