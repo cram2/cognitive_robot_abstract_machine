@@ -758,18 +758,72 @@ class MujocoCamera(SimulatorAdditionalProperty):
     """
 
     name: str = ""
+    """
+    Name of the camera.
+    """
+
     mode: mujoco.mjtCamLight = mujoco.mjtCamLight.mjCAMLIGHT_FIXED
+    """
+    This attribute specifies how the camera position and orientation in world coordinates are computed in forward kinematics 
+    (which in turn determine what the camera sees).
+    """
+
     orthographic: bool = False
+    """
+    Whether the camera uses a perspective projection (the default) or an orthographic projection.
+    Setting this attribute changes the semantic of the fovy attribute.
+    """
+
     fovy: float = 45.0
-    resolution: list = field(default_factory=lambda: [1, 1])
-    focal_length: list = field(default_factory=lambda: [0, 0])
-    focal_pixel: list = field(default_factory=lambda: [0, 0])
-    principal_length: list = field(default_factory=lambda: [0, 0])
-    principal_pixel: list = field(default_factory=lambda: [0, 0])
-    sensor_size: list = field(default_factory=lambda: [0, 0])
-    ipd: float = 0.068
-    pos: list = field(default_factory=lambda: [0, 0, 0])
-    quat: list = field(default_factory=lambda: [1, 0, 0, 0])
+    """
+    Vertical field-of-view of the camera.
+    """
+
+    resolution: List[float] = field(default_factory=lambda: [1, 1])
+    """
+    Resolution of the camera in pixels [width height].
+    """
+
+    focal_length: List[float] = field(default_factory=lambda: [0, 0])
+    """
+    Focal length of the camera in length units. It is mutually exclusive with fovy.
+    """
+
+    focal_pixel: List[float] = field(default_factory=lambda: [0, 0])
+    """
+    Focal length of the camera in pixel units. If both focal and focalpixel are specified, the former is ignored.
+    """
+
+    principal_length: List[float] = field(default_factory=lambda: [0, 0])
+    """
+    Offset of the principal point of the camera with respect to the camera center in length units. It is mutually exclusive with fovy.
+    """
+
+    principal_pixel: List[float] = field(default_factory=lambda: [0, 0])
+    """
+    Offset of the principal point of the camera with respect to the camera center in pixel units. 
+    If both principal and principalpixel are specified, the former is ignored.
+    """
+
+    sensor_size: List[float] = field(default_factory=lambda: [0, 0])
+    """
+    Size of the camera sensor in length units. It is mutually exclusive with fovy.
+    """
+
+    inter_pupilary_distance: float = 0.068
+    """
+    Inter-pupilary distance. This attribute only has an effect during stereoscopic rendering.
+    """
+
+    position: List[float] = field(default_factory=lambda: [0, 0, 0])
+    """
+    Position of the camera frame.
+    """
+
+    quaternion: List[float] = field(default_factory=lambda: [1, 0, 0, 0])
+    """
+    Orientation of the camera frame.
+    """
 
 
 @dataclass
@@ -840,6 +894,13 @@ class MujocoJoint(SimulatorAdditionalProperty):
     stiffness: float = 0.0
     """
     The stiffness of the joint.
+    """
+
+    actuator_force_range: List[float] = field(default_factory=lambda: [0.0, 0.0])
+    """
+    Range for clamping total actuator forces acting on this joint. 
+    It is available only for scalar joints (hinge and slider) and ignored for ball and free joints.
+    The compiler expects the first value to be smaller than the second value.
     """
 
 
@@ -1079,9 +1140,9 @@ class MujocoCameraConverter(CameraConverter, ABC):
         camera_props["principal_length"] = entity.principal_length
         camera_props["principal_pixel"] = entity.principal_pixel
         camera_props["sensor_size"] = entity.sensor_size
-        camera_props["ipd"] = entity.ipd
-        camera_props["pos"] = entity.pos
-        camera_props["quat"] = entity.quat
+        camera_props["ipd"] = entity.inter_pupilary_distance
+        camera_props["pos"] = entity.position
+        camera_props["quat"] = entity.quaternion
         return camera_props
 
 
@@ -1466,6 +1527,7 @@ class MujocoBuilder(MultiSimBuilder):
         for mujoco_joint in connection.simulator_additional_properties:
             if isinstance(mujoco_joint, MujocoJoint):
                 joint_props["stiffness"] = mujoco_joint.stiffness
+                joint_props["actfrcrange"] = mujoco_joint.actuator_force_range
                 break
 
         child_body_name = connection.child.name.name

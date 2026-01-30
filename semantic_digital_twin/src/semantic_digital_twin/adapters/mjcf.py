@@ -11,7 +11,10 @@ from .multi_sim import (
     MujocoActuator,
     GeomVisibilityAndCollisionType,
     MujocoCamera,
-    MujocoEquality, MujocoGeom, MujocoBody, MujocoJoint,
+    MujocoEquality,
+    MujocoGeom,
+    MujocoBody,
+    MujocoJoint,
 )
 from ..datastructures.prefixed_name import PrefixedName
 from ..exceptions import WorldEntityNotFoundError
@@ -138,7 +141,7 @@ class MJCFParser:
         body.simulator_additional_properties.append(
             MujocoBody(
                 gravitation_compensation_factor=mujoco_body.gravcomp,
-                motion_capture=mujoco_body.mocap
+                motion_capture=mujoco_body.mocap,
             )
         )
         self.world.add_kinematic_structure_entity(body)
@@ -423,6 +426,7 @@ class MJCFParser:
                 connection.simulator_additional_properties.append(
                     MujocoJoint(
                         stiffness=mujoco_joint.stiffness,
+                        actuator_force_range=mujoco_joint.actfrcrange.tolist(),
                     )
                 )
         self.world.add_connection(connection)
@@ -480,7 +484,7 @@ class MJCFParser:
         assert (
             len(dofs) == 1
         ), f"Actuator {actuator_name} is associated with joint {joint_name} which has {len(connection.dofs)} DOFs, but only single-DOF joints are supported for actuators."
-        actuator = Actuator()
+        actuator = Actuator(name=PrefixedName(actuator_name))
         actuator.add_dof(dofs[0])
         actuator.simulator_additional_properties.append(
             MujocoActuator(
@@ -557,9 +561,9 @@ class MJCFParser:
                 principal_length=principal_length,
                 principal_pixel=principal_pixel,
                 sensor_size=sensor_size,
-                ipd=mujoco_camera.ipd,
-                pos=pos,
-                quat=quat,
+                inter_pupilary_distance=mujoco_camera.ipd,
+                position=pos,
+                quaternion=quat,
             )
         )
 
