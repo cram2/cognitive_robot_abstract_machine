@@ -1391,8 +1391,6 @@ class World:
             callback.update_previous_world_state()
 
         self.validate()
-        self._collision_pair_manager.disable_non_robot_collisions()
-        self._collision_pair_manager.disable_collisions_for_adjacent_bodies()
 
     def delete_orphaned_dofs(self):
         actual_dofs = {

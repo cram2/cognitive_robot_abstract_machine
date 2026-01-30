@@ -3,8 +3,6 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from itertools import product
-from typing import Dict, Any
 
 from typing_extensions import (
     Iterable,
@@ -13,11 +11,8 @@ from typing_extensions import (
     Optional,
     Self,
     DefaultDict,
-    List,
 )
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer
-from ..collision_checking.collision_detector import CollisionCheck
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import (
     Vector3,
@@ -558,22 +553,3 @@ class AbstractRobot(Agent, ABC):
             self.sensor_chains.add(kinematic_chain)
         self._semantic_annotations.add(kinematic_chain)
         kinematic_chain.assign_to_robot(self)
-
-    def create_collision_matrix_for_env(self) -> List[CollisionCheck]:
-        """
-        Cretaes a collision matrix between the bodies of the robot and the bodies of the environment (environment is
-        everything that is not the robot). Only bodes with collision will be used
-        """
-        all_bodies = self._world.bodies_with_enabled_collision
-        env_bodies = set(all_bodies) - set(self.bodies)
-        collision_matrx = []
-        for body_a, body_b in product(self.bodies, env_bodies):
-            collision_matrx.append(
-                CollisionCheck(
-                    body_a=body_a,
-                    body_b=body_b,
-                    distance=body_a.get_collision_config().buffer_zone_distance,
-                    _world=self._world,
-                )
-            )
-        return collision_matrx

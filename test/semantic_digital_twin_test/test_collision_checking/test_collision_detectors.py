@@ -2,9 +2,9 @@ import itertools
 
 import pytest
 
-from semantic_digital_twin.collision_checking.collision_detector import (
-    CollisionCheck,
+from semantic_digital_twin.collision_checking.collision_matrix import (
     CollisionMatrix,
+    CollisionCheck,
 )
 from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
     BulletCollisionDetector,

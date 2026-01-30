@@ -327,10 +327,6 @@ class CollisionCheckingConfigDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    buffer_zone_distance: Mapped[typing.Optional[builtins.float]] = mapped_column(
-        use_existing_column=True
-    )
-    violated_distance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     disabled: Mapped[typing.Optional[builtins.bool]] = mapped_column(
         use_existing_column=True
     )

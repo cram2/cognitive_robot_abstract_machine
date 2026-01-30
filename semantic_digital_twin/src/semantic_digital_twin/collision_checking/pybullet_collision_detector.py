@@ -7,10 +7,10 @@ import giskardpy_bullet_bindings as bpb
 from .bpb_wrapper import create_shape_from_link
 from .collision_detector import (
     CollisionDetector,
-    CollisionMatrix,
     CollisionCheckingResult,
     Collision,
 )
+from .collision_matrix import CollisionMatrix
 from ..world_description.world_entity import Body
 
 

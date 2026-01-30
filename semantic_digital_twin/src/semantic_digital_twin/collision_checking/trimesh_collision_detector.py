@@ -7,11 +7,10 @@ from trimesh.collision import CollisionManager, mesh_to_BVH
 
 from .collision_detector import (
     CollisionDetector,
-    CollisionCheck,
     Collision,
-    CollisionMatrix,
     CollisionCheckingResult,
 )
+from .collision_matrix import CollisionMatrix
 from ..world_description.world_entity import Body
 
 

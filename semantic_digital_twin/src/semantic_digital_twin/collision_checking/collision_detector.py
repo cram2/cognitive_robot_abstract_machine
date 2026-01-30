@@ -17,6 +17,7 @@ from krrood.symbolic_math.symbolic_math import (
     VariableParameters,
     CompiledFunction,
 )
+from .collision_matrix import CollisionMatrix, CollisionCheck
 from ..adapters.world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
 from ..callbacks.callback import ModelChangeCallback, StateChangeCallback
 from ..world_description.world_entity import Body, CollisionCheckingConfig
