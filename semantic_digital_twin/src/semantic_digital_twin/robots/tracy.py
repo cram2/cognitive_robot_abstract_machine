@@ -4,6 +4,8 @@ from collections import defaultdict
 from dataclasses import field, dataclass
 from typing import Self
 
+from ..datastructures.definitions import StaticJointState, GripperState
+from ..datastructures.joint_state import JointState
 from ..datastructures.prefixed_name import PrefixedName
 from ..robots.abstract_robot import (
     Finger,
@@ -17,24 +19,17 @@ from ..robots.abstract_robot import (
 from .robot_mixins import HasNeck, SpecifiesLeftRightArm
 from ..spatial_types import Quaternion, Vector3
 from ..world import World
+from ..world_description.connections import FixedConnection
 
 
-@dataclass
+@dataclass(eq=False)
 class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
     """
     Represents two UR10e Arms on a table, with a pole between them holding a small camera.
      Example can be found at: https://vib.ai.uni-bremen.de/page/comingsoon/the-tracebot-laboratory/
     """
 
-    def __hash__(self):
-        return hash(
-            tuple(
-                [self.__class__]
-                + sorted([kse.name for kse in self.kinematic_structure_entities])
-            )
-        )
-
-    def setup_collision_config(self): ...
+    def load_srdf(self): ...
 
     @classmethod
     def from_world(cls, world: World) -> Self:
@@ -138,6 +133,76 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             )
 
             robot.add_kinematic_chain(neck)
+
+            # Create states
+            left_arm_park = JointState.from_mapping(
+                name=PrefixedName("left_arm_park", prefix=robot.name.name),
+                mapping=dict(
+                    zip(
+                        [c for c in left_arm.connections if type(c) != FixedConnection],
+                        [3.0, -1.0, 1.2, -0.5, 1.57, 0.0],
+                    )
+                ),
+                state_type=StaticJointState.PARK,
+            )
+
+            left_arm.add_joint_state(left_arm_park)
+
+            right_arm_park = JointState.from_mapping(
+                name=PrefixedName("right_arm_park", prefix=robot.name.name),
+                mapping=dict(
+                    zip(
+                        [c for c in left_arm.connections if type(c) != FixedConnection],
+                        [3.0, -2.1, -1.57, 0.5, 1.57, 0.0],
+                    )
+                ),
+                state_type=StaticJointState.PARK,
+            )
+
+            right_arm.add_joint_state(right_arm_park)
+
+            left_gripper_joints = [
+                c for c in left_gripper.connections if type(c) != FixedConnection
+            ]
+
+            left_gripper_open = JointState.from_mapping(
+                name=PrefixedName("left_gripper_open", prefix=robot.name.name),
+                mapping=dict(zip(left_gripper_joints, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])),
+                state_type=GripperState.OPEN,
+            )
+
+            left_gripper_close = JointState.from_mapping(
+                name=PrefixedName("left_gripper_close", prefix=robot.name.name),
+                mapping=dict(
+                    zip(left_gripper_joints, [0.8, -0.8, -0.8, 0.8, -0.8, 0.8])
+                ),
+                state_type=GripperState.CLOSE,
+            )
+
+            left_gripper.add_joint_state(left_gripper_close)
+            left_gripper.add_joint_state(left_gripper_open)
+
+            right_gripper_joints = [
+                c for c in right_gripper.connections if type(c) != FixedConnection
+            ]
+
+            right_gripper_open = JointState.from_mapping(
+                name=PrefixedName("right_gripper_open", prefix=robot.name.name),
+                mapping=dict(zip(right_gripper_joints, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])),
+                state_type=GripperState.OPEN,
+            )
+
+            right_gripper_close = JointState.from_mapping(
+                name=PrefixedName("right_gripper_close", prefix=robot.name.name),
+                mapping=dict(
+                    zip(right_gripper_joints, [0.8, -0.8, -0.8, 0.8, -0.8, 0.8])
+                ),
+                state_type=GripperState.CLOSE,
+            )
+
+            right_gripper.add_joint_state(right_gripper_close)
+            right_gripper.add_joint_state(right_gripper_open)
+
             world.add_semantic_annotation(robot)
 
             vel_limits = defaultdict(lambda: 0.2)

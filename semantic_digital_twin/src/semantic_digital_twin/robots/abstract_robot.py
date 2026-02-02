@@ -16,8 +16,15 @@ from typing_extensions import (
     List,
 )
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer
+from ..datastructures.definitions import JointStateType
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    DataclassJSONSerializer,
+)
 from ..collision_checking.collision_detector import CollisionCheck
+from ..datastructures.joint_state import GripperState, JointState
+from ..datastructures.prefixed_name import PrefixedName
+from ..exceptions import NoJointStateWithType
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import (
     Vector3,
@@ -58,9 +65,32 @@ class SemanticRobotAnnotation(RootedSemanticAnnotation, ABC):
     The robot this semantic annotation belongs to
     """
 
+    joint_states: List[JointState] = field(default_factory=list)
+    """
+    Fixed joint states that are defined for this manipulator, like open and close. 
+    """
+
     def __post_init__(self):
         if self._world is not None:
             self._world.add_semantic_annotation(self)
+
+    def add_joint_state(self, joint_state: JointState):
+        """
+        Adds a joint state to this semantic annotation.
+        """
+        self.joint_states.append(joint_state)
+        joint_state.assign_to_robot(self._robot)
+
+    def get_joint_state_by_type(self, state_type: JointStateType) -> JointState:
+        """
+        Returns a JointState for a given joint state type.
+        :param state_type: The state type to search for
+        :return: The joint state with the given type
+        """
+        for j in self.joint_states:
+            if j.state_type == state_type:
+                return j
+        raise NoJointStateWithType(state_type)
 
     @abstractmethod
     def assign_to_robot(self, robot: AbstractRobot):
@@ -94,6 +124,11 @@ class KinematicChain(SemanticRobotAnnotation, ABC):
     sensors: Set[Sensor] = field(default_factory=set)
     """
     A collection of sensors in the kinematic chain, such as cameras or other sensors.
+    """
+
+    joint_states: List[JointState] = field(default_factory=list)
+    """
+    A list of pre-defined joint positions that this kinematic chain can perform, for example "park" for an arm.
     """
 
     @property
@@ -392,7 +427,7 @@ class Base(KinematicChain):
 
 
 @dataclass(eq=False)
-class AbstractRobot(Agent, ABC):
+class AbstractRobot(Agent):
     """
     Specification of an abstract robot. A robot consists of:
     - a root body, which is the base of the robot

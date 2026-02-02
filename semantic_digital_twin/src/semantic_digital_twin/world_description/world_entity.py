@@ -40,6 +40,7 @@ from krrood.symbolic_math.symbolic_math import Matrix
 from .geometry import TriangleMesh
 from .inertial_properties import Inertial
 from .shape_collection import ShapeCollection, BoundingBoxCollection
+from ..mixin import HasSimulatorProperties
 from ..adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -61,7 +62,7 @@ id_generator = IDGenerator()
 
 
 @dataclass(eq=False)
-class WorldEntity(Symbol):
+class WorldEntity(Symbol, HasSimulatorProperties):
     """
     A class representing an entity in the world.
 
@@ -587,9 +588,6 @@ class Region(KinematicStructureEntity):
 
     def __post_init__(self):
         self.area.reference_frame = self
-
-    def __hash__(self):
-        return id(self)
 
     @classmethod
     def from_shape_collection(

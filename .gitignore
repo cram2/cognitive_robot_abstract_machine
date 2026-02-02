@@ -29,7 +29,7 @@ tmp/
 /cfg/cpp/
 /cfg/*.py
 
-# Ignore generated docs
+# Ignore generated doc
 *.dox
 *.wikidoc
 

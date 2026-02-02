@@ -24,7 +24,7 @@ class RobotiqMoveGripperReal(DefaultMoveGripperReal):
     def _execute(self, designator: MoveGripperMotion) -> Any:
         value = (
             ur5e_data.gripper_open_cmd_value
-            if designator.motion == GripperState.OPEN
+            if designator.motion == GripperStatePyCRAM.OPEN
             else ur5e_data.gripper_close_cmd_value
         )
         publisher = create_publisher(

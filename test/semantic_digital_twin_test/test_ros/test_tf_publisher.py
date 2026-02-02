@@ -19,7 +19,7 @@ from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     Connection6DoF,
 )
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import Body, Region
 
 
 def test_tf_publisher(rclpy_node, pr2_world_state_reset):
@@ -169,6 +169,26 @@ def test_tf_publisher_kitchen(rclpy_node, pr2_apartment_world):
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
+
+
+def test_tf_publisher_with_Regions(rclpy_node, pr2_world_state_reset):
+    tf_wrapper = TFWrapper(node=rclpy_node)
+    tf_publisher = TFPublisher(
+        node=rclpy_node,
+        world=pr2_world_state_reset,
+    )
+
+    assert tf_wrapper.wait_for_transform(
+        "odom_combined",
+        "pr2/base_footprint",
+        timeout=Duration(seconds=1.0),
+        time=Time(),
+    )
+    region = Region(name=PrefixedName("region"))
+    connection = FixedConnection(parent=pr2_world_state_reset.root, child=region)
+    with pr2_world_state_reset.modify_world():
+        pr2_world_state_reset.add_region(region)
+        pr2_world_state_reset.add_connection(connection)
 
 
 def test_empty_world(rclpy_node):

@@ -6,13 +6,13 @@ from datetime import timedelta
 
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
+from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
 from ...motions.gripper import MoveGripperMotion, MoveTCPMotion
 from ....config.action_conf import ActionConfig
 from ....datastructures.enums import (
     Arms,
-    GripperState,
     MovementType,
     FindBodyInRegionMethod,
 )
@@ -23,7 +23,6 @@ from ....failures import ObjectNotGraspedError
 from ....failures import ObjectNotInGraspingArea
 from ....has_parameters import has_parameters
 from ....language import SequentialPlan
-from ....robot_description import RobotDescription
 from ....robot_description import ViewManager
 from ....robot_plans.actions.base import ActionDescription
 from ....utils import translate_pose_along_local_axis

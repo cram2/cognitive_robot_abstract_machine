@@ -35,6 +35,6 @@ if __name__ == "__main__":
 
     # Perform the plan
     with real_robot:
-        SetGripperAction(robot_arms, [GripperState.CLOSE]).resolve().perform()
+        SetGripperAction(robot_arms, [GripperStatePyCRAM.CLOSE]).resolve().perform()
 
     world.exit()

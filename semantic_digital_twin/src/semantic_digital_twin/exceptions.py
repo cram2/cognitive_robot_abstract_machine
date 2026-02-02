@@ -16,6 +16,7 @@ from typing_extensions import (
 
 from krrood.adapters.exceptions import JSONSerializationError
 from krrood.utils import DataclassException
+from .datastructures.definitions import JointStateType
 from .datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
@@ -26,10 +27,25 @@ if TYPE_CHECKING:
         WorldEntity,
         KinematicStructureEntity,
     )
-    from .spatial_types.spatial_types import FloatVariable, SymbolicMathType
+    from .spatial_types.spatial_types import (
+        FloatVariable,
+        SymbolicMathType,
+        SpatialType,
+    )
     from .spatial_types import Vector3
-    from .semantic_annotations.mixins import HasRootKinematicStructureEntity
     from .world_description.degree_of_freedom import DegreeOfFreedomLimits
+
+
+@dataclass
+class NoJointStateWithType(DataclassException):
+    """
+    Raised when a JointState type is search which is not defined
+    """
+
+    joint_state: JointStateType
+
+    def __post_init__(self):
+        self.message = f"There is no JointState with the type: {self.joint_state}"
 
 
 @dataclass
@@ -273,6 +289,22 @@ class ReferenceFrameMismatchError(SpatialTypesError):
 
     def __post_init__(self):
         self.message = f"Reference frames {self.frame1.name} and {self.frame2.name} are not the same."
+
+
+@dataclass
+class MissingReferenceFrameError(SpatialTypesError):
+    """
+    Represents an error that occurs when a spatial type lacks a reference frame, even though its required for the
+    current operation
+    """
+
+    spatial_type: SpatialType
+    """
+    Spatial type that lacks a reference frame.
+    """
+
+    def __post_init__(self):
+        self.message = f"Spatial type {self.spatial_type} has no reference frame."
 
 
 @dataclass

@@ -6,6 +6,7 @@ from copy import deepcopy
 
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
 )
@@ -17,7 +18,6 @@ from semantic_digital_twin.world_description.connections import OmniDrive
 from .datastructures.dataclasses import Context
 from .datastructures.enums import WorldMode
 from .plan import Plan
-from .robot_descriptions.pr2_states import *
 
 logger = logging.getLogger(__name__)
 

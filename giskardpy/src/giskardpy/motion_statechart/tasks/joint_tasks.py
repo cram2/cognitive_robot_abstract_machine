@@ -10,6 +10,7 @@ from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import NodeArtifacts
 from giskardpy.motion_statechart.graph_node import Task
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world import World
@@ -19,56 +20,6 @@ from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
     ActiveConnection1DOF,
 )
-
-
-@dataclass
-class JointState(SubclassJSONSerializer):
-    mapping: InitVar[Dict[ActiveConnection1DOF, float]]
-
-    _connections: List[ActiveConnection1DOF] = field(init=False, default_factory=list)
-    _target_values: List[float] = field(init=False, default_factory=list)
-
-    def __post_init__(self, mapping: Dict[ActiveConnection1DOF, float]):
-        for connection, target in mapping.items():
-            self._connections.append(connection)
-            self._target_values.append(target)
-
-    def __len__(self):
-        return len(self._connections)
-
-    def items(self):
-        return zip(self._connections, self._target_values)
-
-    @classmethod
-    def from_str_dict(cls, mapping: Dict[str, float], world: World):
-        mapping = {
-            world.get_connection_by_name(connection_name): target
-            for connection_name, target in mapping.items()
-        }
-        return cls(mapping=mapping)
-
-    @classmethod
-    def from_lists(cls, connections: List[ActiveConnection1DOF], targets: List[float]):
-        return cls(mapping=dict(zip(connections, targets)))
-
-    def to_json(self) -> Dict[str, Any]:
-        return {
-            **super().to_json(),
-            "_connections": [
-                to_json(connection.name) for connection in self._connections
-            ],
-            "_target_values": self._target_values,
-        }
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        world: World = kwargs["world"]
-        connections = [
-            world.get_connection_by_name(from_json(name, **kwargs))
-            for name in data["_connections"]
-        ]
-        target_values = data["_target_values"]
-        return cls.from_lists(connections, target_values)
 
 
 @dataclass(eq=False, repr=False)

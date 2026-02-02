@@ -7,17 +7,16 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.world_description.world_entity import Body
 from .base import BaseMotion
 from ...datastructures.enums import (
     Arms,
-    GripperState,
     MovementType,
     WaypointsMovementType,
 )
 from ...datastructures.grasp import GraspDescription
 from ...datastructures.pose import PoseStamped
-from ...joint_state import JointStateManager
 from ...robot_description import ViewManager
 from ...utils import translate_pose_along_local_axis
 
@@ -114,18 +113,10 @@ class MoveGripperMotion(BaseMotion):
 
     @property
     def _motion_chart(self):
-        gripper_state = JointStateManager().get_gripper_state(
-            self.gripper, self.motion, self.robot_view
-        )
+        arm = ViewManager().get_end_effector_view(self.gripper, self.robot_view)
+
         return JointPositionList(
-            goal_state=JointState(
-                mapping={
-                    self.world.get_connection_by_name(joint_name): joint_position
-                    for joint_name, joint_position in zip(
-                        gripper_state.joint_names, gripper_state.joint_positions
-                    )
-                }
-            )
+            goal_state=arm.get_joint_state_by_type(self.motion),
         )
 
 

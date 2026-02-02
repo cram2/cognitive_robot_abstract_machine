@@ -53,10 +53,6 @@ class FindBodyInRegionMethod(Enum):
     """
 
 
-class StaticJointState(Enum):
-    Park = "park"
-
-
 class DescriptionType(Enum):
     URDF = "urdf"
     MJCF = "mjcf"
@@ -218,16 +214,6 @@ class Shape(Enum):
     CAPSULE = 7
 
 
-class TorsoState(IntEnum):
-    """
-    Enum for the different states of the torso.
-    """
-
-    HIGH = auto()
-    MID = auto()
-    LOW = auto()
-
-
 class WorldMode(Enum):
     """
     Enum for the different modes of the world.
@@ -236,21 +222,6 @@ class WorldMode(Enum):
     GUI = "GUI"
     DIRECT = "DIRECT"
 
-
-class GripperState(Enum):
-    """
-    Enum for the different motions of the gripper.
-    """
-
-    OPEN = auto()
-    CLOSE = auto()
-    MEDIUM = auto()
-
-    def __str__(self):
-        return self.name
-
-    def __repr__(self):
-        return self.name
 
 
 class GripperType(Enum):

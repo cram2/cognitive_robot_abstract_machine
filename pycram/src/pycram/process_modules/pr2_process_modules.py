@@ -58,7 +58,9 @@ class Pr2MoveGripperMultiverse(ProcessModule):
             logger.info(f"Gripper Action Feedback: {msg}")
 
         goal = GripperCommandGoal()
-        goal.command.position = 0.0 if designator.motion == GripperState.CLOSE else 0.4
+        goal.command.position = (
+            0.0 if designator.motion == GripperStatePyCRAM.CLOSE else 0.4
+        )
         goal.command.max_effort = 50.0
         if designator.gripper == "right":
             controller_topic = "/real/pr2/right_gripper_controller/gripper_cmd"
@@ -95,9 +97,9 @@ class Pr2MoveGripperReal(ProcessModule):
         goal = Pr2GripperCommandGoal()
 
         position_map = {
-            GripperState.CLOSE: 0.0,
-            GripperState.MEDIUM: 0.015,
-            GripperState.OPEN: 0.1,  # or whatever default fits
+            GripperStatePyCRAM.CLOSE: 0.0,
+            GripperStatePyCRAM.MEDIUM: 0.015,
+            GripperStatePyCRAM.OPEN: 0.1,  # or whatever default fits
         }
         goal.command.position = position_map.get(designator.motion, 0.1)
         goal.command.max_effort = -1

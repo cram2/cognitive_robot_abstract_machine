@@ -52,7 +52,9 @@ class MoveJointsMotion(BaseMotion):
     @property
     def _motion_chart(self):
         dofs = [self.world.get_connection_by_name(name) for name in self.names]
-        return JointPositionList(goal_state=JointState(dict(zip(dofs, self.positions))))
+        return JointPositionList(
+            goal_state=JointState.from_mapping(dict(zip(dofs, self.positions)))
+        )
 
 
 @dataclass

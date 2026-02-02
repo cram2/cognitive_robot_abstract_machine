@@ -11,6 +11,7 @@ from typing_extensions import Optional
 
 from krrood.ormatic.dao import AlternativeMapping
 from ..datastructures.prefixed_name import PrefixedName
+from ..mixin import HasSimulatorProperties
 from ..spatial_types import (
     RotationMatrix,
     Vector3,
@@ -232,25 +233,9 @@ class PoseMapping(AlternativeMapping[Pose]):
 
 
 @dataclass
-class DegreeOfFreedomLimitsMapping(AlternativeMapping[DegreeOfFreedomLimits]):
-    lower: List[float]
-    upper: List[float]
-
-    @classmethod
-    def from_domain_object(cls, obj: DegreeOfFreedomLimits):
-        return cls(
-            lower=obj.lower.data,
-            upper=obj.upper.data,
-        )
-
-    def to_domain_object(self) -> DegreeOfFreedomLimits:
-        return DegreeOfFreedomLimits(
-            lower=DerivativeMap(data=self.lower), upper=DerivativeMap(data=self.upper)
-        )
-
-
-@dataclass
-class DegreeOfFreedomMapping(AlternativeMapping[DegreeOfFreedom]):
+class DegreeOfFreedomMapping(
+    AlternativeMapping[DegreeOfFreedom], HasSimulatorProperties
+):
     name: PrefixedName
     limits: DegreeOfFreedomLimits
     id: UUID

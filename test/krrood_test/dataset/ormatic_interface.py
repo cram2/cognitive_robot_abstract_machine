@@ -17,11 +17,14 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 
 import builtins
 import datetime
+import enum
+import krrood.adapters.json_serializer
 import krrood.entity_query_language.orm.model
 import krrood.entity_query_language.predicate
 import krrood.entity_query_language.symbol_graph
 import krrood.ormatic.alternative_mappings
 import krrood.ormatic.custom_types
+import krrood.ormatic.type_dict
 import sqlalchemy.sql.sqltypes
 import test.krrood_test.dataset.example_classes
 import test.krrood_test.dataset.semantic_world_like_classes
@@ -37,9 +40,10 @@ from krrood.ormatic.custom_types import TypeType
 class Base(DeclarativeBase):
     type_mappings = {
         test.krrood_test.dataset.example_classes.PhysicalObject: test.krrood_test.dataset.example_classes.ConceptType,
-        uuid.UUID: sqlalchemy.sql.sqltypes.UUID,
-        test.krrood_test.dataset.example_classes.JSONSerializableClass: sqlalchemy.sql.sqltypes.JSON,
         typing.Type: krrood.ormatic.custom_types.TypeType,
+        enum.Enum: krrood.ormatic.custom_types.PolymorphicEnumType,
+        krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
+        uuid.UUID: sqlalchemy.sql.sqltypes.UUID,
     }
 
 
@@ -316,7 +320,9 @@ class JSONWrapperDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    json_serializable_object: Mapped[sqlalchemy.sql.sqltypes.JSON] = mapped_column(
+    json_serializable_object: Mapped[
+        test.krrood_test.dataset.example_classes.JSONSerializableClass
+    ] = mapped_column(
         sqlalchemy.sql.sqltypes.JSON, nullable=False, use_existing_column=True
     )
     more_objects: Mapped[
@@ -450,6 +456,28 @@ class PersonDAO(
         primaryjoin="PersonDAO.database_id == persondao_knows_association.c.source_persondao_id",
         secondaryjoin="PersonDAO.database_id == persondao_knows_association.c.target_persondao_id",
         cascade="save-update, merge",
+    )
+
+
+class PolymorphicEnumAssociationDAO(
+    Base,
+    DataAccessObject[
+        test.krrood_test.dataset.example_classes.PolymorphicEnumAssociation
+    ],
+):
+
+    __tablename__ = "PolymorphicEnumAssociationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    value: Mapped[test.krrood_test.dataset.example_classes.PolymorphicEnum] = (
+        mapped_column(
+            krrood.ormatic.custom_types.PolymorphicEnumType,
+            nullable=False,
+            use_existing_column=True,
+        )
     )
 
 
@@ -603,12 +631,15 @@ class AtomDAO(
         ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
     )
 
-    element: Mapped[test.krrood_test.dataset.example_classes.Element] = mapped_column(
-        use_existing_column=True
-    )
     type: Mapped[builtins.int] = mapped_column(use_existing_column=True)
     charge: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     timestamp: Mapped[datetime.datetime] = mapped_column(use_existing_column=True)
+
+    element: Mapped[test.krrood_test.dataset.example_classes.Element] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
 
     __mapper_args__ = {
         "polymorphic_identity": "AtomDAO",
@@ -1065,7 +1096,7 @@ class OriginalSimulatedObjectDAO(
     placeholder: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
     concept: Mapped[
-        typing.Optional[test.krrood_test.dataset.example_classes.ConceptType]
+        typing.Optional[test.krrood_test.dataset.example_classes.PhysicalObject]
     ] = mapped_column(
         test.krrood_test.dataset.example_classes.ConceptType,
         nullable=True,
@@ -1625,7 +1656,7 @@ class UUIDWrapperDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    identification: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    identification: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
     other_identifications: Mapped[typing.List[uuid.UUID]] = mapped_column(

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import lru_cache
+from inspect import isclass
+from typing import Union, Type
 
 from typing_extensions import TypeVar, Type, List, Optional
 
@@ -53,7 +55,11 @@ def inheritance_path_length(child_class: Type, parent_class: Type) -> Optional[i
     :param parent_class: The parent class.
     :return: The minimum path length between `child_class` and `parent_class` or None if no path exists.
     """
-    if not issubclass(child_class, parent_class):
+    if not (
+        isclass(child_class)
+        and isclass(parent_class)
+        and issubclass(child_class, parent_class)
+    ):
         return None
 
     return _inheritance_path_length(child_class, parent_class, 0)
@@ -79,3 +85,7 @@ def _inheritance_path_length(
             for base in child_class.__bases__
             if issubclass(base, parent_class)
         )
+
+
+def module_and_class_name(t: Union[Type, _SpecialForm]) -> str:
+    return f"{t.__module__}.{t.__name__}"

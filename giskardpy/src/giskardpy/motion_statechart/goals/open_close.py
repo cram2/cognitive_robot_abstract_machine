@@ -51,7 +51,9 @@ class Open(Goal):
             [
                 JointPositionList(
                     name="hinge goal",
-                    goal_state=JointState({self.connection: self.goal_joint_state}),
+                    goal_state=JointState.from_mapping(
+                        {self.connection: self.goal_joint_state}
+                    ),
                     weight=self.weight,
                 ),
                 CartesianPose(
@@ -109,7 +111,9 @@ class Close(Open):
             [
                 JointPositionList(
                     name="hinge goal",
-                    goal_state=JointState({self.connection: self.goal_joint_state}),
+                    goal_state=JointState.from_mapping(
+                        {self.connection: self.goal_joint_state}
+                    ),
                     weight=self.weight,
                 ),
                 CartesianPose(
