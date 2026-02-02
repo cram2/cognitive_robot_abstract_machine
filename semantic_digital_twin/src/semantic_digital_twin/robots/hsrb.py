@@ -33,7 +33,7 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
             )
         )
 
-    def setup_collision_config(self):
+    def setup_collision_rules(self):
         """
         Loads the SRDF file for the PR2 robot, if it exists.
         """

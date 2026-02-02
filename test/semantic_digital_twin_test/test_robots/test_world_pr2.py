@@ -407,7 +407,7 @@ def test_load_collision_config_srdf(pr2_world_state_reset):
         "collision_configs",
         "pr2.srdf",
     )
-    pr2_world_state_reset.load_collision_srdf(path)
+    pr2_world_state_reset.from_collision_srdf(path)
     assert (
         len(
             [

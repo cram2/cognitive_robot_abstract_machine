@@ -10,7 +10,6 @@ from .collision_rules import (
     Updatable,
     AllowCollisionBetweenGroups,
     AllowCollisionForAdjacentPairs,
-    SelfCollisionMatrixRule,
 )
 from ..callbacks.callback import ModelChangeCallback
 
@@ -25,13 +24,13 @@ class CollisionManager(ModelChangeCallback):
         this is usually allow collisions, like the self collision matrix
     """
 
-    default_collision_rules: List[CollisionRule] = field(default_factory=list)
-    temporary_collision_rules: List[CollisionRule] = field(default_factory=list)
-    final_rules: List[CollisionRule] = field(default_factory=list)
+    low_priority_rules: List[CollisionRule] = field(default_factory=list)
+    normal_priority_rules: List[CollisionRule] = field(default_factory=list)
+    high_priority_rules: List[CollisionRule] = field(default_factory=list)
 
     def __post_init__(self):
         super().__post_init__()
-        self.final_rules.extend(
+        self.high_priority_rules.extend(
             [AllowCollisionBetweenGroups(), AllowCollisionForAdjacentPairs()]
         )
         self._notify()
@@ -44,17 +43,17 @@ class CollisionManager(ModelChangeCallback):
     @property
     def rules(self) -> List[CollisionRule]:
         return (
-            self.default_collision_rules
-            + self.temporary_collision_rules
-            + self.final_rules
+            self.low_priority_rules
+            + self.normal_priority_rules
+            + self.high_priority_rules
         )
 
     def create_collision_matrix(self) -> CollisionMatrix:
         collision_matrix = CollisionMatrix()
-        for rule in self.default_collision_rules:
+        for rule in self.low_priority_rules:
             rule.apply_to_collision_matrix(collision_matrix)
-        for rule in self.temporary_collision_rules:
+        for rule in self.normal_priority_rules:
             rule.apply_to_collision_matrix(collision_matrix)
-        for rule in self.final_rules:
+        for rule in self.high_priority_rules:
             rule.apply_to_collision_matrix(collision_matrix)
         return collision_matrix

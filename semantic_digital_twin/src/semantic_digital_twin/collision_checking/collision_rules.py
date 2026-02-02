@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from itertools import combinations_with_replacement, combinations
+from itertools import combinations
 
 from lxml import etree
-from typing_extensions import List, Protocol, Tuple, TYPE_CHECKING, runtime_checkable
+from typing_extensions import List, Protocol, TYPE_CHECKING, runtime_checkable, Self
 
-from .collision_matrix import CollisionRule, CollisionMatrix, CollisionCheck
+from .collision_matrix import (
+    CollisionRule,
+    CollisionMatrix,
+    CollisionCheck,
+)
 from ..robots.abstract_robot import AbstractRobot
 from ..world import World
 from ..world_description.world_entity import Body, CollisionCheckingConfig
@@ -21,13 +25,13 @@ class HasBodies(Protocol):
 
 @dataclass
 class AvoidCollisionRule(CollisionRule):
-    buffer_zone_distance: float
+    buffer_zone_distance: float = field(default=0.05)
     """
     Distance defining a buffer zone around the entity. The buffer zone represents a soft boundary where
     proximity should be monitored but minor violations are acceptable.
     """
 
-    violated_distance: float = 0.0
+    violated_distance: float = field(default=0.0)
     """
     Critical distance threshold that must not be violated. Any proximity below this threshold represents
     a severe collision risk requiring immediate attention.
@@ -91,11 +95,21 @@ class Updatable(Protocol):
 
 
 @dataclass
-class AllowNonRobotCollisions(CollisionRule):
+class HighPriorityAllowCollisionRule(CollisionRule):
     allowed_collision_pairs: set[CollisionCheck] = field(default_factory=set)
+    allowed_collision_bodies: set[Body] = field(default_factory=set)
 
     def apply_to_collision_matrix(self, collision_matrix: CollisionMatrix):
         collision_matrix.remove_collision_checks(self.allowed_collision_pairs)
+        collision_matrix.collision_checks = {
+            collision_check
+            for collision_check in collision_matrix.collision_checks
+            if collision_check not in self.allowed_collision_bodies
+        }
+
+
+@dataclass
+class AllowNonRobotCollisions(HighPriorityAllowCollisionRule):
 
     def update(self, world: World):
         """
@@ -123,11 +137,7 @@ class AllowNonRobotCollisions(CollisionRule):
 
 
 @dataclass
-class AllowCollisionForAdjacentPairs(CollisionRule):
-    allowed_collision_pairs: set[CollisionCheck] = field(default_factory=set)
-
-    def apply_to_collision_matrix(self, collision_matrix: CollisionMatrix):
-        collision_matrix.remove_collision_checks(self.allowed_collision_pairs)
+class AllowCollisionForAdjacentPairs(HighPriorityAllowCollisionRule):
 
     def update(self, world: World):
         for body_a, body_b in combinations(world.bodies_with_collision, 2):
@@ -138,10 +148,9 @@ class AllowCollisionForAdjacentPairs(CollisionRule):
 
 
 @dataclass
-class SelfCollisionMatrixRule(CollisionRule):
-    pairs: List[Tuple[Body, Body]] = field(default_factory=list)
+class SelfCollisionMatrixRule(HighPriorityAllowCollisionRule):
 
-    def compute_collision_matrix(self) -> set[CollisionCheck]:
+    def compute_collision_matrix(self, world: World) -> set[CollisionCheck]:
         """
         Parses the collision requrests and (temporary) collision configs in the world
         to create a set of collision checks.
@@ -149,18 +158,18 @@ class SelfCollisionMatrixRule(CollisionRule):
         collision_matrix: set[CollisionCheck] = set()
         for collision_request in self.collision_requests:
             if collision_request.all_bodies_for_group1():
-                view_1_bodies = self.world.bodies_with_enabled_collision
+                view_1_bodies = world.bodies_with_enabled_collision
             else:
                 view_1_bodies = collision_request.body_group1
             if collision_request.all_bodies_for_group2():
-                view2_bodies = self.world.bodies_with_enabled_collision
+                view2_bodies = world.bodies_with_enabled_collision
             else:
                 view2_bodies = collision_request.body_group2
-            disabled_pairs = self.world._collision_pair_manager.disabled_collision_pairs
+            disabled_pairs = world._collision_pair_manager.disabled_collision_pairs
             for body1 in view_1_bodies:
                 for body2 in view2_bodies:
                     collision_check = CollisionCheck(
-                        body_a=body1, body_b=body2, distance=0, _world=self.world
+                        body_a=body1, body_b=body2, distance=0
                     )
                     (robot_body, env_body) = collision_check.bodies()
                     if (robot_body, env_body) in disabled_pairs:
@@ -186,7 +195,8 @@ class SelfCollisionMatrixRule(CollisionRule):
                             collision_matrix.add(collision_check)
         return collision_matrix
 
-    def load_collision_srdf(self, file_path: str):
+    @classmethod
+    def from_collision_srdf(cls, file_path: str, world: World) -> Self:
         """
         Creates a CollisionConfig instance from an SRDF file.
 
@@ -197,6 +207,7 @@ class SelfCollisionMatrixRule(CollisionRule):
 
         :param file_path: The path to the SRDF file used for collision configuration.
         """
+        self = cls()
         SRDF_DISABLE_ALL_COLLISIONS: str = "disable_all_collisions"
         SRDF_DISABLE_SELF_COLLISION: str = "disable_self_collision"
         SRDF_MOVEIT_DISABLE_COLLISIONS: str = "disable_collisions"
@@ -211,8 +222,8 @@ class SelfCollisionMatrixRule(CollisionRule):
         ]
 
         for c in child_disable_collisions:
-            body = self.world.get_body_by_name(c.attrib["link"])
-            body.set_static_collision_config(CollisionCheckingConfig(disabled=True))
+            body = world.get_body_by_name(c.attrib["link"])
+            self.allowed_collision_bodies.add(body)
 
         child_disable_moveit_and_self_collision = [
             c
@@ -223,13 +234,12 @@ class SelfCollisionMatrixRule(CollisionRule):
         disabled_collision_pairs = [
             (body_a, body_b)
             for child in child_disable_moveit_and_self_collision
-            if (
-                body_a := self.world.get_body_by_name(child.attrib["link1"])
-            ).has_collision()
+            if (body_a := world.get_body_by_name(child.attrib["link1"])).has_collision()
             and (
-                body_b := self.world.get_body_by_name(child.attrib["link2"])
+                body_b := world.get_body_by_name(child.attrib["link2"])
             ).has_collision()
         ]
 
         for body_a, body_b in disabled_collision_pairs:
-            self.add_disabled_collision_pair(body_a, body_b)
+            self.allowed_collision_pairs.add(CollisionCheck(body_a, body_b))
+        return self

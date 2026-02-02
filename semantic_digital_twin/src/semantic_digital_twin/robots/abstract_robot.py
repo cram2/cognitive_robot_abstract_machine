@@ -13,6 +13,7 @@ from typing_extensions import (
     DefaultDict,
 )
 
+from ..collision_checking.collision_matrix import CollisionRule
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import (
     Vector3,
@@ -428,10 +429,12 @@ class AbstractRobot(Agent, ABC):
     A collection of all kinematic chains containing a sensor, such as a camera.
     """
 
+    default_collision_rules: list[CollisionRule] = field(default_factory=list)
+
     @abstractmethod
-    def setup_collision_config(self):
+    def setup_collision_rules(self):
         """
-        Loads the SRDF file for the robot, if it exists. This method is expected to be implemented in subclasses.
+        Loads the SRDF file for the robot, if it exists.
         """
         ...
 

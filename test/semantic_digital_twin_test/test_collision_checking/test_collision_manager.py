@@ -1,3 +1,4 @@
+from semantic_digital_twin.collision_checking.collision_manager import CollisionManager
 from semantic_digital_twin.collision_checking.collision_matrix import (
     CollisionMatrix,
     CollisionCheck,
@@ -87,3 +88,10 @@ class TestCollisionRules:
             CollisionCheck(body_a=pr2_body1, body_b=pr2_body2, distance=0.0)
             in collision_matrix.collision_checks
         )
+
+    def test_pr2_collision_config(self, pr2_world_state_reset):
+        pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+        collision_manager = CollisionManager(pr2_world_state_reset)
+        collision_manager.low_priority_rules.extend(pr2.default_collision_rules)
+        collision_matrix = collision_manager.create_collision_matrix()
+        pass

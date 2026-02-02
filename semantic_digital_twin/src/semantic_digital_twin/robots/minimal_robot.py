@@ -27,7 +27,7 @@ class MinimalRobot(AbstractRobot):
             )
         )
 
-    def setup_collision_config(self):
+    def setup_collision_rules(self):
         pass
 
     @classmethod

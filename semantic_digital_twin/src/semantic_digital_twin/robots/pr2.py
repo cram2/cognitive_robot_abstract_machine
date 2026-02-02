@@ -5,7 +5,16 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Self
 
+from pkg_resources import resource_filename
+
 from .robot_mixins import HasNeck, SpecifiesLeftRightArm
+from ..collision_checking.collision_matrix import CollisionRulePriority
+from ..collision_checking.collision_rules import (
+    SelfCollisionMatrixRule,
+    AvoidAllCollisions,
+    AvoidCollisionRule,
+    AvoidCollisionBetweenGroups,
+)
 from ..datastructures.prefixed_name import PrefixedName
 from ..robots.abstract_robot import (
     Neck,
@@ -31,78 +40,54 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
     The PR2 robot consists of two arms, each with a parallel gripper, a head with a camera, and a prismatic torso
     """
 
-    def setup_collision_config(self):
+    def setup_collision_rules(self):
         """
         Loads the SRDF file for the PR2 robot, if it exists.
         """
         srdf_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..",
-            "..",
-            "..",
+            resource_filename("semantic_digital_twin", "../../"),
             "resources",
             "collision_configs",
             "pr2.srdf",
         )
-        self._world.load_collision_srdf(srdf_path)
+        self.default_collision_rules.append(
+            SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
+        )
 
         frozen_joints = ["r_gripper_l_finger_joint", "l_gripper_l_finger_joint"]
         for joint_name in frozen_joints:
             c: ActiveConnection = self._world.get_connection_by_name(joint_name)
             c.frozen_for_collision_avoidance = True
 
-        for body in self.bodies_with_collisions:
-            collision_config = CollisionCheckingConfig(
-                buffer_zone_distance=0.1, violated_distance=0.0
+        self.default_collision_rules.append(
+            AvoidAllCollisions(
+                buffer_zone_distance=0.1,
+                violated_distance=0.0,
+                bodies=self.bodies_with_collisions,
             )
-            body.set_static_collision_config(collision_config)
-
-        for joint_name in ["r_wrist_roll_joint", "l_wrist_roll_joint"]:
-            connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
-            )
-            collision_config = CollisionCheckingConfig(
-                buffer_zone_distance=0.05, violated_distance=0.0, max_avoided_bodies=4
-            )
-            connection.set_static_collision_config_for_direct_child_bodies(
-                collision_config
-            )
-
-        for joint_name in ["r_wrist_flex_joint", "l_wrist_flex_joint"]:
-            connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
-            )
-            collision_config = CollisionCheckingConfig(
-                buffer_zone_distance=0.05, violated_distance=0.0, max_avoided_bodies=2
-            )
-            connection.set_static_collision_config_for_direct_child_bodies(
-                collision_config
-            )
-        for joint_name in ["r_elbow_flex_joint", "l_elbow_flex_joint"]:
-            connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
-            )
-            collision_config = CollisionCheckingConfig(
-                buffer_zone_distance=0.05, violated_distance=0.0, max_avoided_bodies=1
-            )
-            connection.set_static_collision_config_for_direct_child_bodies(
-                collision_config
-            )
-        for joint_name in ["r_forearm_roll_joint", "l_forearm_roll_joint"]:
-            connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
-            )
-            collision_config = CollisionCheckingConfig(
-                buffer_zone_distance=0.025, violated_distance=0.0, max_avoided_bodies=1
-            )
-            connection.set_static_collision_config_for_direct_child_bodies(
-                collision_config
-            )
-
-        collision_config = CollisionCheckingConfig(
-            buffer_zone_distance=0.2, violated_distance=0.1, max_avoided_bodies=2
         )
-        self.drive.set_static_collision_config_for_direct_child_bodies(collision_config)
+
+        self.default_collision_rules.append(
+            AvoidAllCollisions(
+                buffer_zone_distance=0.05,
+                violated_distance=0.0,
+                bodies=[self.left_arm.bodies_with_collisions],
+            )
+        )
+        self.default_collision_rules.append(
+            AvoidAllCollisions(
+                buffer_zone_distance=0.05,
+                violated_distance=0.0,
+                bodies=[self.right_arm.bodies_with_collisions],
+            )
+        )
+        self.default_collision_rules.append(
+            AvoidAllCollisions(
+                buffer_zone_distance=0.2,
+                violated_distance=0.05,
+                bodies=[self._world.get_body_by_name("base_link")],
+            )
+        )
 
     @classmethod
     def from_world(cls, world: World) -> Self:
@@ -245,5 +230,5 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                 },
             )
             robot.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
-
+        robot.setup_collision_rules()
         return robot

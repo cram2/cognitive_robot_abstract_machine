@@ -774,15 +774,21 @@ class RootedSemanticAnnotation(SemanticAnnotation):
     Represents a semantic annotation that is rooted in a specific KinematicStructureEntity.
     """
 
-    root: Body = field(default=None)
+    root: KinematicStructureEntity = field(default=None)
 
     @property
     def connections(self) -> List[Connection]:
         return self._world.get_connections_of_branch(self.root)
 
     @property
-    def bodies(self) -> List[Body]:
+    def kinematic_structure_entities(self) -> List[KinematicStructureEntity]:
         return self._world.get_kinematic_structure_entities_of_branch(self.root)
+
+    @property
+    def bodies(self) -> List[Body]:
+        return [
+            kse for kse in self.kinematic_structure_entities if isinstance(kse, Body)
+        ]
 
     @property
     def bodies_with_collisions(self) -> List[Body]:

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from itertools import combinations
 
 from typing_extensions import Tuple, TYPE_CHECKING, Self
 
+from giskardpy.motion_statechart.data_types import FloatEnum
 from ..world_description.world_entity import Body
 
 if TYPE_CHECKING:
@@ -32,7 +34,7 @@ class CollisionCheck:
         cls, body_a: Body, body_b: Body, distance: float | None = None
     ) -> Self:
         self = cls(body_a=body_a, body_b=body_b, distance=distance)
-        if self.distance < 0:
+        if self.distance is not None and self.distance < 0:
             raise ValueError(f"Distance must be positive, got {self.distance}")
 
         if self.body_a == self.body_b:
@@ -63,6 +65,12 @@ class CollisionCheck:
 
 @dataclass
 class CollisionMatrix:
+    """
+    Describes a matrix in sparse format by storing only unique pairs of bodies with collision checks.
+    This is the input for collision checking algorithms.
+    .. note:: CollisionRule objects are the intended way to modify collision matrices.
+    """
+
     collision_checks: set[CollisionCheck] = field(default_factory=set)
 
     def __post_init__(self):
@@ -91,6 +99,17 @@ class CollisionMatrix:
 
     def remove_collision_checks(self, collision_checks: set[CollisionCheck]):
         self.collision_checks.difference_update(collision_checks)
+
+
+class CollisionRulePriority(FloatEnum):
+    """
+    Priority of collision rules.
+    Rules with higher priority will be applied last, overwriting lower priority rules.
+    """
+
+    LOWEST = 0
+    NORMAL = 0.5
+    HIGHEST = 1
 
 
 @dataclass

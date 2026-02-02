@@ -34,7 +34,7 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             )
         )
 
-    def setup_collision_config(self): ...
+    def setup_collision_rules(self): ...
 
     @classmethod
     def from_world(cls, world: World) -> Self:

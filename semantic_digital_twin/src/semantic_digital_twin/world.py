@@ -1253,17 +1253,15 @@ class World:
             self.kinematic_structure[index] for index in descendants_indices
         ]
 
-    def get_direct_child_bodies_with_collision(
-        self, connection: Connection
-    ) -> Set[Body]:
+    def get_direct_child_bodies_with_collision(self, start_body: Body) -> Set[Body]:
         """
         Collect all child Bodies until a movable connection is found.
 
-        :param connection: The connection from the kinematic structure whose child bodies will be traversed.
+        :param start_body: The starting body of the branch
         :return: A set of Bodies that are moved directly by only this connection.
         """
         visitor = CollisionBodyCollector(self)
-        self._travel_branch(connection.child, visitor)
+        self._travel_branch(start_body, visitor)
         return visitor.bodies
 
     def _travel_branch(
