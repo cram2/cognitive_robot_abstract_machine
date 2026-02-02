@@ -102,17 +102,6 @@ class CollisionMatrix:
         self.collision_checks -= collision_checks
 
 
-class CollisionRulePriority(FloatEnum):
-    """
-    Priority of collision rules.
-    Rules with higher priority will be applied last, overwriting lower priority rules.
-    """
-
-    LOWEST = 0
-    NORMAL = 0.5
-    HIGHEST = 1
-
-
 @dataclass
 class CollisionRule(ABC):
     """
@@ -123,3 +112,26 @@ class CollisionRule(ABC):
     @abstractmethod
     def apply_to_collision_matrix(self, collision_matrix: CollisionMatrix):
         pass
+
+
+@dataclass
+class MaxAvoidedCollisionsRule(ABC):
+    @abstractmethod
+    def get_max_avoided_collisions(self, body: Body) -> int | None: ...
+
+
+@dataclass
+class DefaultMaxAvoidedCollisions(MaxAvoidedCollisionsRule):
+    def get_max_avoided_collisions(self, body: Body) -> int | None:
+        return 1
+
+
+@dataclass
+class MaxAvoidedCollisionsOverride(MaxAvoidedCollisionsRule):
+    value: int
+    bodies: set[Body]
+
+    def get_max_avoided_collisions(self, body: Body) -> int | None:
+        if body in self.bodies:
+            return self.value
+        return None

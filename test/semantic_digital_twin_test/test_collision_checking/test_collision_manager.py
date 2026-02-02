@@ -95,6 +95,7 @@ class TestCollisionRules:
         collision_manager = CollisionManager(pr2_world_state_reset)
         collision_manager.low_priority_rules.extend(pr2.default_collision_rules)
         collision_manager.high_priority_rules.extend(pr2.high_priority_collision_rules)
+        collision_manager.max_avoided_bodies_rules.extend(pr2.max_avoided_bodies_rules)
         collision_matrix = collision_manager.create_collision_matrix()
         rule: HighPriorityAllowCollisionRule
         for rule in collision_manager.high_priority_rules:
@@ -107,6 +108,24 @@ class TestCollisionRules:
                 assert check.body_b not in rule.allowed_collision_bodies
 
         assert len(collision_matrix.collision_checks) > 0
+        assert (
+            collision_manager.get_max_avoided_bodies(
+                pr2_world_state_reset.get_body_by_name("base_link")
+            )
+            == 2
+        )
+        assert (
+            collision_manager.get_max_avoided_bodies(
+                pr2_world_state_reset.get_body_by_name("torso_lift_link")
+            )
+            == 1
+        )
+        assert (
+            collision_manager.get_max_avoided_bodies(
+                pr2_world_state_reset.get_body_by_name("r_gripper_palm_link")
+            )
+            == 4
+        )
 
     def test_AllowCollisionForAdjacentPairs(self, pr2_world_state_reset):
         pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]

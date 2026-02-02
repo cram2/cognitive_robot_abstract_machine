@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pkg_resources import resource_filename
 
 from .robot_mixins import HasNeck, SpecifiesLeftRightArm
+from ..collision_checking.collision_matrix import MaxAvoidedCollisionsOverride
 from ..collision_checking.collision_rules import (
     SelfCollisionMatrixRule,
     AvoidAllCollisions,
@@ -75,6 +76,26 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                 buffer_zone_distance=0.2,
                 violated_distance=0.05,
                 bodies=[self._world.get_body_by_name("base_link")],
+            )
+        )
+        self.max_avoided_bodies_rules.append(
+            MaxAvoidedCollisionsOverride(
+                2, bodies={self._world.get_body_by_name("base_link")}
+            )
+        )
+        self.max_avoided_bodies_rules.append(
+            MaxAvoidedCollisionsOverride(
+                4,
+                bodies=set(
+                    self._world.get_direct_child_bodies_with_collision(
+                        self._world.get_body_by_name("r_wrist_roll_link")
+                    )
+                )
+                | set(
+                    self._world.get_direct_child_bodies_with_collision(
+                        self._world.get_body_by_name("l_wrist_roll_link")
+                    )
+                ),
             )
         )
 

@@ -13,7 +13,10 @@ from typing_extensions import (
     DefaultDict,
 )
 
-from ..collision_checking.collision_matrix import CollisionRule
+from ..collision_checking.collision_matrix import (
+    CollisionRule,
+    MaxAvoidedCollisionsRule,
+)
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import (
@@ -431,6 +434,9 @@ class AbstractRobot(Agent, ABC):
 
     default_collision_rules: list[CollisionRule] = field(default_factory=list)
     high_priority_collision_rules: list[CollisionRule] = field(default_factory=list)
+    max_avoided_bodies_rules: list[MaxAvoidedCollisionsRule] = field(
+        default_factory=list
+    )
 
     @property
     def controlled_connections(self) -> Set[ActiveConnection]:
