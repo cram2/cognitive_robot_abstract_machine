@@ -22,10 +22,6 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 
 
-# class TestActionDesignatorGrounding(ApartmentWorldTestCase):
-#    """Testcase for the grounding methods of action designators."""
-
-
 def test_move_torso(immutable_model_world):
     world, pr2, context = immutable_model_world
     description = MoveTorsoActionDescription([TorsoState.HIGH])
