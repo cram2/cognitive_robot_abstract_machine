@@ -19,7 +19,7 @@ from pycram.costmaps import (
 from pycram.probabilistic_costmap import ProbabilisticCostmap
 from pycram.units import centimeter
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 
 
 # ---- Occupancy costmap tests ----
@@ -293,18 +293,18 @@ def test_orientation_generation(immutable_model_world):
     world, robot_view, context = immutable_model_world
 
     orientation = OrientationGenerator.generate_origin_orientation(
-        [0, 1, 0],
+        Point3(0, 1, 0),
         origin=Pose.from_xyz_quaternion(0, 0, 0, 0, 0, 0, 1, world.root),
     )
 
-    assert orientation == pytest.approx([0, 0, 0.707, -0.707], abs=0.001)
+    assert orientation.to_list() == pytest.approx([0, 0, 0.707, -0.707], abs=0.001)
 
     orientation = OrientationGenerator.generate_origin_orientation(
-        [0, -1, 0],
+        Point3(0, -1, 0),
         origin=Pose.from_xyz_quaternion(0, 0, 0, 0, 0, 0, 1, world.root),
     )
 
-    assert orientation == pytest.approx([0, 0, 0.707, 0.707], abs=0.001)
+    assert orientation.to_list() == pytest.approx([0, 0, 0.707, 0.707], abs=0.001)
 
 
 def test_sample_x_axis(immutable_model_world):

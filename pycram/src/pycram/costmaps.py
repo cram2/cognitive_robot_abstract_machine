@@ -47,7 +47,7 @@ class OrientationGenerator:
     """
 
     @staticmethod
-    def generate_origin_orientation(position: List[float], origin: Pose) -> List[float]:
+    def generate_origin_orientation(position: Point3, origin: Pose) -> Quaternion:
         """
         Generates an orientation such that the robot faces the origin of the costmap.
 
@@ -62,8 +62,7 @@ class OrientationGenerator:
             )
             + np.pi
         )
-        quaternion = list(quaternion_from_euler(0, 0, angle, axes="sxyz"))
-        return quaternion
+        return Quaternion.from_rpy(0, 0, angle)
 
     @staticmethod
     def generate_random_orientation(
@@ -321,9 +320,12 @@ class Costmap:
         if self.width != other_cm.width or self.height != other_cm.height:
             raise ValueError("You can only merge costmaps of the same size.")
         elif (
-            self.origin.to_position().x != other_cm.origin.to_position().x
-            or self.origin.to_position().y != other_cm.origin.to_position().y
-            or self.origin.to_quaternion() != other_cm.origin.to_quaternion()
+            self.origin.to_position().x.to_np()[0]
+            != other_cm.origin.to_position().x.to_np()[0]
+            or self.origin.to_position().y.to_np()[0]
+            != other_cm.origin.to_position().y.to_np()[0]
+            or self.origin.to_quaternion().to_np()[0]
+            != other_cm.origin.to_quaternion().to_np()[0]
         ):
             raise ValueError(
                 "To merge costmaps, the x and y coordinate as well as the orientation must be equal."
