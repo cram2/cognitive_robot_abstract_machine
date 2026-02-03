@@ -14,6 +14,7 @@ from krrood.symbolic_math.symbolic_math import (
 )
 from .collision_matrix import CollisionMatrix, CollisionCheck
 from ..callbacks.callback import ModelChangeCallback, StateChangeCallback
+from ..spatial_types import HomogeneousTransformationMatrix
 from ..world_description.world_entity import Body
 
 if TYPE_CHECKING:
@@ -187,6 +188,8 @@ class CollisionDetectorModelUpdater(ModelChangeCallback):
         super().__post_init__()
 
     def _notify(self):
+        if self.world.is_empty():
+            return
         self.collision_detector.sync_world_model()
         self.compile_collision_fks()
 
@@ -195,6 +198,8 @@ class CollisionDetectorModelUpdater(ModelChangeCallback):
         world_root = self.world.root
         for body in self.world.bodies_with_collision:
             if body == world_root:
+                if body.has_collision():
+                    collision_fks.append(HomogeneousTransformationMatrix())
                 continue
             collision_fks.append(
                 self.world.compose_forward_kinematics_expression(world_root, body)
@@ -224,6 +229,8 @@ class CollisionDetectorStateUpdater(StateChangeCallback):
         super().__post_init__()
 
     def _notify(self):
+        if self.world.is_empty():
+            return
         self.collision_detector.world_model_updater.compiled_collision_fks.evaluate()
         self.collision_detector.sync_world_state()
 

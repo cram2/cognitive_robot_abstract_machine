@@ -1,6 +1,13 @@
+from dataclasses import dataclass
 from itertools import combinations
 
-from semantic_digital_twin.collision_checking.collision_manager import CollisionManager
+from semantic_digital_twin.collision_checking.collision_detector import (
+    CollisionCheckingResult,
+)
+from semantic_digital_twin.collision_checking.collision_manager import (
+    CollisionManager,
+    CollisionGroupConsumer,
+)
 from semantic_digital_twin.collision_checking.collision_matrix import (
     CollisionMatrix,
     CollisionCheck,
@@ -158,28 +165,44 @@ class TestCollisionRules:
 
 class TestCollisionGroups:
     def test_collision_groups(self, pr2_world_state_reset):
+        @dataclass
+        class MochCollisionGroupConsumer(CollisionGroupConsumer):
+            def on_reset(self): ...
+            def on_compute_collisions(
+                self, collision_results: CollisionCheckingResult
+            ): ...
+            def on_collision_matrix_update(self): ...
+
         pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
         collision_manager = pr2_world_state_reset.collision_manager
+        collision_manager.collision_consumers = [
+            collision_group_consumer := MochCollisionGroupConsumer()
+        ]
+        pr2_world_state_reset._notify_model_change()
 
         # there should be groups
-        assert len(collision_manager.collision_groups) > 0
+        assert len(collision_group_consumer.collision_groups) > 0
 
         # there should be fewer groups than bodies with collisions
-        assert len(collision_manager.collision_groups) < len(pr2.bodies_with_collision)
+        assert len(collision_group_consumer.collision_groups) < len(
+            pr2.bodies_with_collision
+        )
 
         # no group should be in the bodies of another group
-        for group1, group2 in combinations(collision_manager.collision_groups, 2):
+        for group1, group2 in combinations(
+            collision_group_consumer.collision_groups, 2
+        ):
             assert group1.root not in group2.bodies
             assert group2.root not in group1.bodies
 
         # no group should be empty if the root has no collision
-        for group in collision_manager.collision_groups:
+        for group in collision_group_consumer.collision_groups:
             try:
                 assert len(group.bodies) > 0 or group.root in pr2.bodies_with_collision
             except AssertionError:
                 pass
 
-        for group in collision_manager.collision_groups:
+        for group in collision_group_consumer.collision_groups:
             if group.root == pr2_world_state_reset.root:
                 continue
             assert (
@@ -189,11 +212,13 @@ class TestCollisionGroups:
                 assert not body.parent_connection.is_controlled
 
         # no group body should be in another group body
-        for group1, group2 in combinations(collision_manager.collision_groups, 2):
+        for group1, group2 in combinations(
+            collision_group_consumer.collision_groups, 2
+        ):
             for body1 in group1.bodies:
                 for body2 in group2.bodies:
                     assert body1 != body2
 
         # ever body with a collision should be in a group
         for body in pr2.bodies_with_collision:
-            collision_manager.get_collision_group(body)
+            collision_group_consumer.get_collision_group(body)

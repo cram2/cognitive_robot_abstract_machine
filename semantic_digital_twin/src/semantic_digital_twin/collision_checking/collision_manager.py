@@ -2,19 +2,15 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import lru_cache
 
-import numpy as np
 from rustworkx import rustworkx
 from typing_extensions import List, TYPE_CHECKING
 
-from giskardpy.motion_statechart.auxilary_variable_manager import (
-    create_vector3,
-    create_point,
-    AuxiliaryVariable,
+from .collision_detector import (
+    CollisionMatrix,
+    CollisionCheckingResult,
+    CollisionDetector,
 )
-from krrood.symbolic_math.symbolic_math import FloatVariable
-from .collision_detector import CollisionMatrix, CollisionCheckingResult, Collision
 from .collision_matrix import (
     CollisionRule,
     MaxAvoidedCollisionsRule,
@@ -26,13 +22,10 @@ from .collision_rules import (
     AllowNonRobotCollisions,
 )
 from ..callbacks.callback import ModelChangeCallback
-from ..datastructures.prefixed_name import PrefixedName
-from ..exceptions import YouFoundABugError
-from ..spatial_types import Vector3, Point3
 from ..world_description.world_entity import Body, KinematicStructureEntity
 
 if TYPE_CHECKING:
-    pass
+    from ..world import World
 
 
 @dataclass(repr=False, eq=False)
@@ -54,17 +47,63 @@ class CollisionGroup:
 @dataclass
 class CollisionConsumer(ABC):
     @abstractmethod
-    def clear(self):
+    def on_reset(self):
         """
         Called when the collision matrix changes.
         """
 
     @abstractmethod
-    def process_collision_results(self, collision_results: CollisionCheckingResult):
+    def on_compute_collisions(self, collision_results: CollisionCheckingResult):
         """
         Called when collision checking is finished.
         :param collision_results:
         """
+
+    @abstractmethod
+    def on_world_model_update(self, world: World): ...
+
+    @abstractmethod
+    def on_collision_matrix_update(self): ...
+
+
+@dataclass
+class CollisionGroupConsumer(CollisionConsumer, ABC):
+    collision_groups: list[CollisionGroup] = field(default_factory=list, init=False)
+
+    def on_world_model_update(self, world: World):
+        self.update_collision_groups(world)
+
+    def update_collision_groups(self, world: World):
+        self.collision_groups = []
+        for parent, childs in rustworkx.bfs_successors(
+            world.kinematic_structure, world.root.index
+        ):
+            try:
+                collision_group = self.get_collision_group(parent)
+            except Exception:
+                collision_group = CollisionGroup(parent)
+                self.collision_groups.append(collision_group)
+            for child in childs:
+                parent_C_child = world.get_connection(parent, child)
+                if not parent_C_child.is_controlled:
+                    collision_group.bodies.add(child)
+
+        for group in self.collision_groups:
+            group.bodies = set(
+                b for b in group.bodies if b in world.bodies_with_collision
+            )
+
+        self.collision_groups = [
+            group
+            for group in self.collision_groups
+            if len(group.bodies) > 0 or group.root in world.bodies_with_collision
+        ]
+
+    def get_collision_group(self, body: Body) -> CollisionGroup:
+        for group in self.collision_groups:
+            if body in group.bodies or body == group.root:
+                return group
+        raise Exception(f"No collision group found for {body}")
 
 
 @dataclass
@@ -77,6 +116,9 @@ class CollisionManager(ModelChangeCallback):
         this is usually allow collisions, like the self collision matrix
     """
 
+    collision_checker: CollisionDetector
+    collision_matrix: CollisionMatrix = field(init=False)
+
     low_priority_rules: List[CollisionRule] = field(default_factory=list)
     normal_priority_rules: List[CollisionRule] = field(default_factory=list)
     high_priority_rules: List[CollisionRule] = field(default_factory=list)
@@ -85,7 +127,6 @@ class CollisionManager(ModelChangeCallback):
         default_factory=lambda: [DefaultMaxAvoidedCollisions()]
     )
 
-    collision_groups: list[CollisionGroup] = field(default_factory=list, init=False)
     collision_consumers: list[CollisionConsumer] = field(default_factory=list)
 
     def __post_init__(self):
@@ -101,39 +142,32 @@ class CollisionManager(ModelChangeCallback):
         for rule in self.rules:
             if isinstance(rule, Updatable):
                 rule.update(self.world)
-        self.update_collision_groups()
+        for consumer in self.collision_consumers:
+            consumer.on_world_model_update(self.world)
 
-    def get_collision_group(self, body: Body) -> CollisionGroup:
-        for group in self.collision_groups:
-            if body in group.bodies or body == group.root:
-                return group
-        raise Exception(f"No collision group found for {body}")
+    def reset_consumers(self):
+        for consumer in self.collision_consumers:
+            consumer.on_reset()
 
-    def update_collision_groups(self):
-        self.collision_groups = []
-        for parent, childs in rustworkx.bfs_successors(
-            self.world.kinematic_structure, self.world.root.index
-        ):
-            try:
-                collision_group = self.get_collision_group(parent)
-            except Exception:
-                collision_group = CollisionGroup(parent)
-                self.collision_groups.append(collision_group)
-            for child in childs:
-                parent_C_child = self.world.get_connection(parent, child)
-                if not parent_C_child.is_controlled:
-                    collision_group.bodies.add(child)
+    def update_collision_matrix(self):
+        self.collision_matrix = CollisionMatrix()
+        for rule in self.low_priority_rules:
+            rule.apply_to_collision_matrix(self.collision_matrix)
+        for rule in self.normal_priority_rules:
+            rule.apply_to_collision_matrix(self.collision_matrix)
+        for rule in self.high_priority_rules:
+            rule.apply_to_collision_matrix(self.collision_matrix)
+        for consumer in self.collision_consumers:
+            consumer.on_collision_matrix_update()
 
-        for group in self.collision_groups:
-            group.bodies = set(
-                b for b in group.bodies if b in self.world.bodies_with_collision
-            )
-
-        self.collision_groups = [
-            group
-            for group in self.collision_groups
-            if len(group.bodies) > 0 or group.root in self.world.bodies_with_collision
-        ]
+    def compute_collisions(self) -> CollisionCheckingResult:
+        self.update_collision_matrix()
+        collision_results = self.collision_checker.check_collisions(
+            self.collision_matrix
+        )
+        for consumer in self.collision_consumers:
+            consumer.on_compute_collisions(collision_results)
+        return collision_results
 
     def get_max_avoided_bodies(self, body: Body) -> int:
         for rule in reversed(self.max_avoided_bodies_rules):
@@ -155,45 +189,3 @@ class CollisionManager(ModelChangeCallback):
             + self.normal_priority_rules
             + self.high_priority_rules
         )
-
-    def create_collision_matrix(self) -> CollisionMatrix:
-        collision_matrix = CollisionMatrix()
-        for rule in self.low_priority_rules:
-            rule.apply_to_collision_matrix(collision_matrix)
-        for rule in self.normal_priority_rules:
-            rule.apply_to_collision_matrix(collision_matrix)
-        for rule in self.high_priority_rules:
-            rule.apply_to_collision_matrix(collision_matrix)
-        return collision_matrix
-
-    def transform_to_collision_groups(
-        self, collision_results: CollisionCheckingResult
-    ) -> CollisionGroupResults:
-        result = CollisionGroupResults()
-        for collision in collision_results.contacts:
-            group1 = self.get_collision_group(collision.body_a)
-            group2 = self.get_collision_group(collision.body_b)
-            if group1 == group2:
-                raise YouFoundABugError(
-                    message="Collision between two bodies in the same group."
-                )
-            group1_T_root = group1.root.global_pose.inverse().to_np()
-            group2_T_root = group2.root.global_pose.inverse().to_np()
-            group1_P_pa = group1_T_root @ collision.root_P_pa
-            group2_P_pb = group2_T_root @ collision.root_P_pb
-            data = np.concatenate(
-                (
-                    group1_P_pa,
-                    group2_P_pb,
-                    collision.root_V_n,
-                    collision.contact_distance,
-                    max(
-                        self.get_buffer_zone_distance(collision.body_a),
-                        self.get_buffer_zone_distance(collision.body_b),
-                    ),
-                    max(
-                        self.get_violated_violated_distance(collision.body_a),
-                        self.get_violated_violated_distance(collision.body_b),
-                    ),
-                )
-            )

@@ -31,6 +31,8 @@ class BulletCollisionDetector(CollisionDetector):
     buffer: float = field(default=0.05, init=False)
 
     def sync_world_model(self) -> None:
+        if self.world.is_empty():
+            return
         self.reset_cache()
         self.clear()
         self.body_to_bullet_object = {}

@@ -4,8 +4,6 @@ from functools import lru_cache
 import numpy as np
 
 from giskardpy.motion_statechart.auxilary_variable_manager import (
-    create_vector3,
-    create_point,
     AuxiliaryVariable,
 )
 from krrood.symbolic_math.symbolic_math import FloatVariable
@@ -13,10 +11,11 @@ from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionCheckingResult,
     Collision,
 )
-from semantic_digital_twin.collision_checking.collision_manager import CollisionConsumer
+from semantic_digital_twin.collision_checking.collision_manager import (
+    CollisionGroupConsumer,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import Vector3, Point3
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -33,7 +32,7 @@ class ExternalCollisionResults:
 
 
 @dataclass
-class ExternalCollisionExpressionManager(CollisionConsumer):
+class ExternalCollisionExpressionManager(CollisionGroupConsumer):
     """
     Owns symbols and buffer
     """
@@ -42,10 +41,13 @@ class ExternalCollisionExpressionManager(CollisionConsumer):
 
     collision_data: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=float))
 
-    def clear(self):
+    def on_reset(self):
         pass
 
-    def process_collision_results(self, collision: CollisionCheckingResult):
+    def on_collision_matrix_update(self):
+        pass
+
+    def on_compute_collisions(self, collision: CollisionCheckingResult):
         """
         Takes collisions, checks if they are external and inserts them
         into the buffer at the right place.
@@ -197,3 +199,35 @@ class ExternalCollisionExpressionManager(CollisionConsumer):
             name=str(PrefixedName(f"len(closest_point({body.name}))")),
             provider=provider,
         )
+
+    def transform_to_collision_groups(
+        self, collision_results: CollisionCheckingResult
+    ) -> CollisionGroupResults:
+        result = CollisionGroupResults()
+        for collision in collision_results.contacts:
+            group1 = self.get_collision_group(collision.body_a)
+            group2 = self.get_collision_group(collision.body_b)
+            if group1 == group2:
+                raise YouFoundABugError(
+                    message="Collision between two bodies in the same group."
+                )
+            group1_T_root = group1.root.global_pose.inverse().to_np()
+            group2_T_root = group2.root.global_pose.inverse().to_np()
+            group1_P_pa = group1_T_root @ collision.root_P_pa
+            group2_P_pb = group2_T_root @ collision.root_P_pb
+            data = np.concatenate(
+                (
+                    group1_P_pa,
+                    group2_P_pb,
+                    collision.root_V_n,
+                    collision.contact_distance,
+                    max(
+                        self.get_buffer_zone_distance(collision.body_a),
+                        self.get_buffer_zone_distance(collision.body_b),
+                    ),
+                    max(
+                        self.get_violated_violated_distance(collision.body_a),
+                        self.get_violated_violated_distance(collision.body_b),
+                    ),
+                )
+            )

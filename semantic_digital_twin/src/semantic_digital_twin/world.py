@@ -27,6 +27,7 @@ from typing_extensions import (
 from typing_extensions import List
 from typing_extensions import Type, Set
 
+from .collision_checking.pybullet_collision_detector import BulletCollisionDetector
 from .mixin import HasSimulatorProperties
 from .callbacks.callback import ModelChangeCallback
 from .collision_checking.collision_detector import CollisionDetector
@@ -365,7 +366,9 @@ class World(HasSimulatorProperties):
     def __post_init__(self):
         self.state = WorldState(_world=self)
         self._forward_kinematic_manager = ForwardKinematicsManager(self)
-        self.collision_manager = CollisionManager(self)
+        self.collision_manager = CollisionManager(
+            self, collision_checker=BulletCollisionDetector(self)
+        )
 
     def __hash__(self):
         return hash((id(self), self._model_manager.version))
@@ -1382,7 +1385,6 @@ class World(HasSimulatorProperties):
             self.kinematic_structure.successors(kinematic_structure_entity.index)
         )
 
-
     def compute_parent_connection(
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> Optional[Connection]:
@@ -1401,7 +1403,6 @@ class World(HasSimulatorProperties):
                 parent.index, kinematic_structure_entity.index
             )
         )
-
 
     def compute_parent_kinematic_structure_entity(
         self, kinematic_structure_entity: KinematicStructureEntity
