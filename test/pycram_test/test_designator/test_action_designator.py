@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 import rclpy
 import rustworkx
@@ -87,13 +88,15 @@ def test_park_arms(immutable_model_world):
 def test_navigate(immutable_model_world):
     world, robot_view, context = immutable_model_world
     description = NavigateActionDescription(
-        [PoseStamped.from_list([0.3, 0, 0], [0, 0, 0, 1], world.root)]
+        [Pose.from_xyz_quaternion(0.3, 0, 0, 0, 0, 0, 1, world.root)]
     )
     plan = SequentialPlan(context, description)
     with simulated_robot:
         plan.perform()
-    assert description.resolve().target_location == PoseStamped.from_list(
-        [0.3, 0, 0], [0, 0, 0, 1], world.root
+    assert np.allclose(
+        description.resolve().target_location.to_np(),
+        Pose.from_xyz_quaternion(0.3, 0, 0, 0, 0, 0, 1, world.root).to_np(),
+        atol=0.01,
     )
     expected_pose = np.eye(4)
     expected_pose[:3, 3] = [0.3, 0, 0]
@@ -114,9 +117,7 @@ def test_reach_to_pick_up(immutable_model_world):
         robot_view.left_arm.manipulator,
     )
     performable = ReachActionDescription(
-        target_pose=PoseStamped.from_spatial_type(
-            world.get_body_by_name("milk.stl").global_pose
-        ),
+        target_pose=world.get_body_by_name("milk.stl").global_pose.to_pose(),
         object_designator=world.get_body_by_name("milk.stl"),
         arm=Arms.LEFT,
         grasp_description=grasp_description,
@@ -124,7 +125,7 @@ def test_reach_to_pick_up(immutable_model_world):
     plan = SequentialPlan(
         context,
         NavigateActionDescription(
-            PoseStamped.from_list([1.7, 1.5, 0], [0, 0, 0, 1], world.root),
+            Pose.from_xyz_quaternion(1.7, 1.5, 0, 0, 0, 0, 1, world.root),
             True,
         ),
         ParkArmsActionDescription(Arms.BOTH),
@@ -155,7 +156,7 @@ def test_pick_up(mutable_model_world):
     plan = SequentialPlan(
         context,
         NavigateActionDescription(
-            PoseStamped.from_list([1.7, 1.5, 0], [0, 0, 0, 1], world.root),
+            Pose.from_xyz_quaternion(1.7, 1.5, 0, 0, 0, 0, 1, world.root),
             True,
         ),
         MoveTorsoActionDescription([TorsoState.HIGH]),
@@ -178,13 +179,13 @@ def test_place(mutable_model_world):
     object_description = world.get_body_by_name("milk.stl")
     description = PlaceActionDescription(
         object_description,
-        PoseStamped.from_list([2.4, 2, 1], [0, 0, 0, 1], world.root),
+        Pose.from_xyz_quaternion(2.4, 2, 1, 0, 0, 0, 1, world.root),
         [Arms.LEFT],
     )
     plan = SequentialPlan(
         Context.from_world(world),
         NavigateActionDescription(
-            PoseStamped.from_list([1.7, 1.5, 0], [0, 0, 0, 1], world.root),
+            Pose.from_xyz_quaternion(1.7, 1.5, 0, 0, 0, 0, 1, world.root),
             True,
         ),
         MoveTorsoActionDescription([TorsoState.HIGH]),
@@ -215,10 +216,10 @@ def test_look_at(immutable_model_world):
     world, robot_view, context = immutable_model_world
 
     description = LookAtAction.description(
-        [PoseStamped.from_list([5, 0, 1], frame=world.root)]
+        [Pose.from_xyz_quaternion(5, 0, 1, reference_frame=world.root)]
     )
-    assert description.resolve().target == PoseStamped.from_list(
-        [5, 0, 1], frame=world.root
+    assert description.resolve().target == Pose.from_xyz_quaternion(
+        5, 0, 1, reference_frame=world.root
     )
 
     plan = SequentialPlan(context, description)
@@ -256,7 +257,7 @@ def test_open(immutable_model_world):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            PoseStamped.from_list([1.75, 1.75, 0], [0, 0, 0.5, 1], world.root)
+            Pose.from_xyz_quaternion(1.75, 1.75, 0, 0, 0, 0.5, 1, world.root)
         ),
         OpenActionDescription(world.get_body_by_name("handle_cab10_t"), [Arms.LEFT]),
     )
@@ -279,7 +280,7 @@ def test_close(immutable_model_world):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            PoseStamped.from_list([1.75, 1.75, 0], [0, 0, 0.5, 1], world.root)
+            Pose.from_xyz_quaternion(1.75, 1.75, 0, 0, 0, 0.5, 1, world.root)
         ),
         CloseActionDescription(world.get_body_by_name("handle_cab10_t"), [Arms.LEFT]),
     )
@@ -294,7 +295,7 @@ def test_transport(mutable_model_world):
     world, robot_view, context = mutable_model_world
     description = TransportActionDescription(
         world.get_body_by_name("milk.stl"),
-        [PoseStamped.from_list([3.1, 2.2, 0.95], [0.0, 0.0, 1.0, 0.0], world.root)],
+        [Pose.from_xyz_quaternion(3.1, 2.2, 0.95, 0.0, 0.0, 1.0, 0.0, world.root)],
         [Arms.RIGHT],
     )
     plan = SequentialPlan(
@@ -318,7 +319,7 @@ def test_grasping(immutable_model_world):
     plan = SequentialPlan(
         context,
         NavigateActionDescription(
-            PoseStamped.from_list([1.8, 1.8, 0], frame=world.root), True
+            Pose.from_xyz_quaternion(1.8, 1.8, 0, reference_frame=world.root), True
         ),
         description,
     )
@@ -331,7 +332,7 @@ def test_grasping(immutable_model_world):
 def test_facing(immutable_model_world):
     world, robot_view, context = immutable_model_world
     with simulated_robot:
-        milk_pose = PoseStamped.from_spatial_type(
+        milk_pose = Pose.from_spatial_type(
             world.get_body_by_name("milk.stl").global_pose
         )
         plan = SequentialPlan(context, FaceAtActionDescription(milk_pose, True))
@@ -340,7 +341,7 @@ def test_facing(immutable_model_world):
             world.get_body_by_name("milk.stl").global_pose,
             robot_view.root,
         )
-        milk_in_robot_frame = PoseStamped.from_spatial_type(milk_in_robot_frame)
+        milk_in_robot_frame = Pose.from_spatial_type(milk_in_robot_frame)
         assert milk_in_robot_frame.position.y == pytest.approx(0.0, abs=0.01)
 
 
@@ -352,7 +353,7 @@ def test_move_tcp_waypoints(immutable_model_world):
         ].position = 0.1
     world.notify_state_change()
 
-    gripper_pose = PoseStamped.from_spatial_type(
+    gripper_pose = Pose.from_spatial_type(
         world.get_body_by_name("r_gripper_tool_frame").global_pose
     )
     path = []
@@ -367,7 +368,7 @@ def test_move_tcp_waypoints(immutable_model_world):
     me.construct_msc()
     with simulated_robot:
         me.execute()
-    gripper_position = PoseStamped.from_spatial_type(
+    gripper_position = Pose.from_spatial_type(
         world.get_body_by_name("r_gripper_tool_frame").global_pose
     )
     assert path[-1].position.x == pytest.approx(gripper_position.position.x, abs=0.1)
@@ -394,7 +395,7 @@ def test_search_action(self):
         self.context,
         MoveTorsoActionDescription([TorsoState.HIGH]),
         SearchActionDescription(
-            PoseStamped.from_list([2, 2, 1], self.world.root), Milk
+            Pose.from_xyz_quaternion(2, 2, 1, reference_frame=self.world.root), Milk
         ),
     )
     with simulated_robot:
