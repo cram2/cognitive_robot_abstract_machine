@@ -12,9 +12,9 @@ from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
 )
+from semantic_digital_twin.spatial_types import Vector3
 from ....datastructures.enums import AxisIdentifier, Arms
 from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import Vector3Stamped
 from ....failures import TorsoGoalNotReached, ConfigurationNotReached
 from ....has_parameters import has_parameters
 from ....language import SequentialPlan
@@ -257,14 +257,13 @@ class CarryAction(ActionDescription):
 
     def axis_to_vector3_stamped(
         self, axis: AxisIdentifier, link: str = "base_link"
-    ) -> Vector3Stamped:
+    ) -> Vector3:
         v = {
-            AxisIdentifier.X: Vector3Stamped(x=1.0, y=0.0, z=0.0),
-            AxisIdentifier.Y: Vector3Stamped(x=0.0, y=1.0, z=0.0),
-            AxisIdentifier.Z: Vector3Stamped(x=0.0, y=0.0, z=1.0),
+            AxisIdentifier.X: Vector3(x=1.0, y=0.0, z=0.0),
+            AxisIdentifier.Y: Vector3(x=0.0, y=1.0, z=0.0),
+            AxisIdentifier.Z: Vector3(x=0.0, y=0.0, z=1.0),
         }[axis]
         v.frame_id = link
-        v.header.stamp = datetime.datetime.now()
         return v
 
     def validate(

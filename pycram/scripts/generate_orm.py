@@ -16,7 +16,6 @@ from semantic_digital_twin.world_description.world_modification import (
     WorldModelModification,
 )
 
-import pycram.datastructures.pose
 import pycram.language
 from pycram.datastructures import grasp
 from pycram.language import SequentialNode, RepeatNode, LanguageNode

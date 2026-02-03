@@ -6,12 +6,12 @@ from datetime import timedelta
 import numpy as np
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from ..base import ActionDescription
 from ...motions.robot_body import LookingMotion
 from ...motions.navigation import MoveMotion
 from ....config.action_conf import ActionConfig
 from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
 from ....failures import LookAtGoalNotReached
 from ....failures import NavigationGoalNotReachedError
 from ....has_parameters import has_parameters
@@ -26,7 +26,7 @@ class NavigateAction(ActionDescription):
     Navigates the Robot to a position.
     """
 
-    target_location: PoseStamped
+    target_location: Pose
     """
     Location to which the robot should be navigated
     """
@@ -53,7 +53,7 @@ class NavigateAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
+        target_location: Union[Iterable[Pose], Pose],
         keep_joint_states: Union[
             Iterable[bool], bool
         ] = ActionConfig.navigate_keep_joint_states,
@@ -72,7 +72,7 @@ class LookAtAction(ActionDescription):
     Lets the robot look at a position.
     """
 
-    target: PoseStamped
+    target: Pose
     """
     Position at which the robot should look, given as 6D pose
     """
@@ -91,7 +91,7 @@ class LookAtAction(ActionDescription):
 
     @classmethod
     def description(
-        cls, target: Union[Iterable[PoseStamped], PoseStamped]
+        cls, target: Union[Iterable[Pose], Pose]
     ) -> PartialDesignator[LookAtAction]:
         return PartialDesignator[LookAtAction](LookAtAction, target=target)
 

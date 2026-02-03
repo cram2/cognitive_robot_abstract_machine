@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 
 from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Union, Optional, Type, Any, Iterable
@@ -18,7 +19,6 @@ from ....datastructures.enums import (
 )
 from ....datastructures.grasp import GraspDescription
 from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
 from ....failures import ObjectNotPlacedAtTargetLocation, ObjectStillInContact
 from ....has_parameters import has_parameters
 from ....language import SequentialPlan
@@ -40,7 +40,7 @@ class PlaceAction(ActionDescription):
     """
     Object designator_description describing the object that should be place
     """
-    target_location: PoseStamped
+    target_location: Pose
     """
     Pose in the world at which the object should be placed
     """
@@ -146,7 +146,7 @@ class PlaceAction(ActionDescription):
     def description(
         cls,
         object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
+        target_location: Union[Iterable[Pose], Pose],
         arm: Union[Iterable[Arms], Arms],
     ) -> PartialDesignator[PlaceAction]:
         return PartialDesignator[PlaceAction](

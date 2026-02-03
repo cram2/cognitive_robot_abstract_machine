@@ -2,7 +2,6 @@ import os
 import time
 import pytest
 
-from pycram.datastructures.pose import PyCramPose, PyCramQuaternion, PyCramVector3, Header
 from random_events.product_algebra import SimpleEvent, Event
 from krrood.probabilistic_knowledge.parameterizer import Parameterizer
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -13,6 +12,7 @@ from pycram.robot_plans import *
 from pycram.language import SequentialPlan, ParallelPlan, CodeNode
 from pycram.plan import PlanNode, Plan, ActionDescriptionNode, ActionNode, MotionNode
 from pycram.process_module import simulated_robot
+from semantic_digital_twin.spatial_types import Quaternion
 
 
 @pytest.fixture(scope="session")
@@ -682,20 +682,23 @@ def test_algebra_sequentialplan(immutable_model_world):
         MoveTorsoActionDescription(None),
     )
 
-    plan_classes = [
-        MoveTorsoAction, NavigateAction, PyCramPose, PyCramVector3, PyCramQuaternion, Header,
-        PoseStamped
-    ]
+    plan_classes = [MoveTorsoAction, NavigateAction, Pose, Vector3, Quaternion]
 
     variables = sp.parameterize_plan(classes=plan_classes)
     variables_map = {v.name: v for v in variables}
 
-    probabilistic_circuit = Parameterizer().create_fully_factorized_distribution(variables)
+    probabilistic_circuit = Parameterizer().create_fully_factorized_distribution(
+        variables
+    )
 
     torso_1 = variables_map["MoveTorsoAction_0.torso_state"]
     torso_2 = variables_map["MoveTorsoAction_2.torso_state"]
-    consistency_events = [SimpleEvent({torso_1: [state], torso_2: [state]}) for state in TorsoState]
-    restricted_distribution, _ = probabilistic_circuit.truncated(Event(*consistency_events))
+    consistency_events = [
+        SimpleEvent({torso_1: [state], torso_2: [state]}) for state in TorsoState
+    ]
+    restricted_distribution, _ = probabilistic_circuit.truncated(
+        Event(*consistency_events)
+    )
     restricted_distribution.normalize()
 
     navigate_action_constraints = {
@@ -705,29 +708,36 @@ def test_algebra_sequentialplan(immutable_model_world):
         variables_map["NavigateAction_1.target_location.pose.orientation.z"]: 0,
         variables_map["NavigateAction_1.target_location.pose.orientation.w"]: 1,
     }
-    final_distribution, _ = restricted_distribution.conditional(navigate_action_constraints)
+    final_distribution, _ = restricted_distribution.conditional(
+        navigate_action_constraints
+    )
     final_distribution.normalize()
 
     nav_x = variables_map["NavigateAction_1.target_location.pose.position.x"]
     nav_y = variables_map["NavigateAction_1.target_location.pose.position.y"]
     nav_z = next(
-        v for v in final_distribution.variables
+        v
+        for v in final_distribution.variables
         if v.name == "NavigateAction_1.target_location.pose.position.z"
     )
     nav_ox_var = next(
-        v for v in final_distribution.variables
+        v
+        for v in final_distribution.variables
         if v.name == "NavigateAction_1.target_location.pose.orientation.x"
     )
     nav_oy_var = next(
-        v for v in final_distribution.variables
+        v
+        for v in final_distribution.variables
         if v.name == "NavigateAction_1.target_location.pose.orientation.y"
     )
     nav_oz_var = next(
-        v for v in final_distribution.variables
+        v
+        for v in final_distribution.variables
         if v.name == "NavigateAction_1.target_location.pose.orientation.z"
     )
     nav_ow_var = next(
-        v for v in final_distribution.variables
+        v
+        for v in final_distribution.variables
         if v.name == "NavigateAction_1.target_location.pose.orientation.w"
     )
 
@@ -740,7 +750,6 @@ def test_algebra_sequentialplan(immutable_model_world):
         assert sample[nav_oy_var] == 0.0
         assert sample[nav_oz_var] == 0.0
         assert sample[nav_ow_var] == 1.0
-
 
 
 def test_algebra_parallelplan(immutable_model_world):
@@ -756,10 +765,7 @@ def test_algebra_parallelplan(immutable_model_world):
         ParkArmsActionDescription(None),
     )
 
-    plan_classes = [
-        MoveTorsoAction, ParkArmsAction, PoseStamped, PyCramPose,
-        PyCramVector3, PyCramQuaternion, Header
-    ]
+    plan_classes = [MoveTorsoAction, ParkArmsAction, Pose, Vector3, Quaternion]
 
     variables = sp.parameterize_plan(classes=plan_classes)
     variables_map = {v.name: v for v in variables}
@@ -768,13 +774,17 @@ def test_algebra_parallelplan(immutable_model_world):
     assert "MoveTorsoAction_0.torso_state" in variables_map
     assert "ParkArmsAction_1.arm" in variables_map
 
-    probabilistic_circuit = Parameterizer().create_fully_factorized_distribution(variables)
+    probabilistic_circuit = Parameterizer().create_fully_factorized_distribution(
+        variables
+    )
 
     arm_var = variables_map["ParkArmsAction_1.arm"]
     torso_var = variables_map["MoveTorsoAction_0.torso_state"]
 
     # Truncate distribution to force arm == Arms.BOTH
-    restricted_dist, _ = probabilistic_circuit.truncated(Event(SimpleEvent({arm_var: [Arms.BOTH]})))
+    restricted_dist, _ = probabilistic_circuit.truncated(
+        Event(SimpleEvent({arm_var: [Arms.BOTH]}))
+    )
     restricted_dist.normalize()
 
     for sample_values in restricted_dist.sample(5):

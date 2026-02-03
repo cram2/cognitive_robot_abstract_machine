@@ -6,6 +6,7 @@ from krrood.ormatic.utils import create_engine
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from krrood_test.dataset.ormatic_interface import PoseDAO
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     ApproachDirection,
@@ -13,7 +14,6 @@ from pycram.datastructures.enums import (
     VerticalAlignment,
 )
 from pycram.datastructures.grasp import GraspDescription
-from pycram.datastructures.pose import PyCramPose, PoseStamped
 from pycram.language import SequentialPlan, ParallelPlan
 from pycram.orm.ormatic_interface import *
 from pycram.process_module import simulated_robot
@@ -34,6 +34,7 @@ from pycram.robot_plans import (
     PlaceAction,
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState, GripperState
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 engine = create_engine("sqlite:///:memory:")
 
@@ -56,7 +57,7 @@ def test_simple_plan(immutable_model_world):
         plan = SequentialPlan(
             Context.from_world(world),
             NavigateActionDescription(
-                PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
+                Pose.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
                 True,
             ),
             MoveTorsoActionDescription(TorsoState.HIGH),
@@ -71,7 +72,7 @@ def test_simple_plan(immutable_model_world):
             # PlaceActionDescription(
             #     NamedObject("milk.stl"),
             #     [
-            #         PoseStamped.from_list(
+            #         Pose.from_list(
             #             [2.3, 2.2, 1], [0, 0, 0, 1], world.root
             #         )
             #     ],
@@ -88,7 +89,7 @@ def test_pose(database, test_simple_plan):
     dao = to_dao(plan)
     session.add(dao)
     session.commit()
-    result = session.scalars(select(PyCramPoseDAO)).all()
+    result = session.scalars(select(PoseDAO)).all()
     assert len(result) > 0
     assert all([r.position is not None and r.orientation is not None for r in result])
 
@@ -120,11 +121,11 @@ def test_pose_vs_pose_stamped(database, test_simple_plan):
     dao = to_dao(plan)
     session.add(dao)
     session.commit()
-    pose_stamped_result = session.scalars(select(PoseStampedDAO)).all()
-    pose_result = session.scalars(select(PyCramPoseDAO)).all()
+    pose_stamped_result = session.scalars(select(PoseDAO)).all()
+    pose_result = session.scalars(select(PoseDAO)).all()
     poses_from_pose_stamped_results = session.scalars(
-        select(PyCramPoseDAO).where(
-            PyCramPoseDAO.database_id.in_([r.pose_id for r in pose_stamped_result])
+        select(PoseDAO).where(
+            PoseDAO.database_id.in_([r.pose_id for r in pose_stamped_result])
         )
     ).all()
     assert all([r.pose is not None for r in pose_stamped_result])
@@ -138,7 +139,7 @@ def test_pose_vs_pose_stamped(database, test_simple_plan):
 def test_pose_creation(database, test_simple_plan):
     session = database
     plan = test_simple_plan
-    pose = PyCramPose()
+    pose = Pose()
     pose.position.x = 1.0
     pose.position.y = 2.0
     pose.position.z = 3.0
@@ -155,9 +156,9 @@ def test_pose_creation(database, test_simple_plan):
     session.commit()
 
     with session.bind.connect() as conn:
-        raw_pose = conn.execute(text("SELECT * FROM PyCramPoseDAO")).fetchall()
+        raw_pose = conn.execute(text("SELECT * FROM PoseDAO")).fetchall()
 
-    pose_result = session.scalars(select(PyCramPoseDAO)).first()
+    pose_result = session.scalars(select(PoseDAO)).first()
     assert pose_result.position.x == 1.0
     assert pose_result.position.y == 2.0
     assert pose_result.position.z == 3.0
@@ -173,7 +174,7 @@ def test_code_designator_type(database, mutable_model_world):
     action = SequentialPlan(
         context,
         NavigateActionDescription(
-            PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
+            Pose.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
             True,
         ),
     )
@@ -197,7 +198,7 @@ def test_inheritance(database, mutable_model_world):
         sp = SequentialPlan(
             Context.from_world(world),
             NavigateActionDescription(
-                PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
+                Pose.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
                 True,
             ),
             ParkArmsActionDescription(Arms.BOTH),
@@ -211,12 +212,12 @@ def test_inheritance(database, mutable_model_world):
                 ),
             ),
             NavigateActionDescription(
-                PoseStamped.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
+                Pose.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
                 True,
             ),
             PlaceActionDescription(
                 world.get_body_by_name("milk.stl"),
-                PoseStamped.from_list([2.3, 2.5, 1.0], [0, 0, 0, 1], world.root),
+                Pose.from_list([2.3, 2.5, 1.0], [0, 0, 0, 1], world.root),
                 Arms.LEFT,
             ),
         )
@@ -250,7 +251,7 @@ def test_transportAction(database, mutable_simple_pr2_world):
         Context.from_world(world),
         TransportActionDescription(
             world.get_body_by_name("milk.stl"),
-            PoseStamped.from_list([1.7, 0.0, 1.07], [0, 0, 0, 1], world.root),
+            Pose.from_list([1.7, 0.0, 1.07], [0, 0, 0, 1], world.root),
             Arms.LEFT,
         ),
     )
@@ -275,7 +276,7 @@ def test_pickUpAction(database, mutable_model_world):
         sp = SequentialPlan(
             Context.from_world(world),
             NavigateActionDescription(
-                PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
+                Pose.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
                 True,
             ),
             ParkArmsActionDescription(Arms.BOTH),
@@ -289,12 +290,12 @@ def test_pickUpAction(database, mutable_model_world):
                 ),
             ),
             NavigateActionDescription(
-                PoseStamped.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
+                Pose.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
                 True,
             ),
             PlaceActionDescription(
                 world.get_body_by_name("milk.stl"),
-                PoseStamped.from_list([2.3, 2.5, 1.0], [0, 0, 0, 1], world.root),
+                Pose.from_list([2.3, 2.5, 1.0], [0, 0, 0, 1], world.root),
                 Arms.LEFT,
             ),
         )
@@ -329,9 +330,7 @@ def test_open_and_closeAction(database, mutable_model_world):
             Context.from_world(world),
             ParkArmsActionDescription(Arms.BOTH),
             NavigateActionDescription(
-                PoseStamped.from_list(
-                    [1.81, 1.73, 0.0], [0.0, 0.0, 0.594, 0.804], world.root
-                ),
+                Pose.from_list([1.81, 1.73, 0.0], [0.0, 0.0, 0.594, 0.804], world.root),
                 True,
             ),
             OpenActionDescription(
@@ -392,7 +391,7 @@ def complex_plan(mutable_model_world):
         sp = SequentialPlan(
             Context.from_world(world),
             NavigateActionDescription(
-                PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
+                Pose.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
                 True,
             ),
             ParkArmsActionDescription(Arms.BOTH),
@@ -406,13 +405,13 @@ def complex_plan(mutable_model_world):
                 ),
             ),
             NavigateActionDescription(
-                PoseStamped.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
+                Pose.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
                 True,
             ),
             MoveTorsoActionDescription(TorsoState.HIGH),
             PlaceActionDescription(
                 world.get_body_by_name("milk.stl"),
-                PoseStamped.from_list([2.3, 2.5, 1], [0, 0, 0, 1], world.root),
+                Pose.from_list([2.3, 2.5, 1], [0, 0, 0, 1], world.root),
                 Arms.LEFT,
             ),
         )
@@ -427,7 +426,7 @@ def test_exec_creation(database, immutable_model_world):
     plan = SequentialPlan(
         context,
         NavigateActionDescription(
-            PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
+            Pose.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
             True,
         ),
     )
@@ -447,7 +446,7 @@ def test_exec_data_pose(database, immutable_model_world):
     plan = SequentialPlan(
         context,
         NavigateActionDescription(
-            PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
+            Pose.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
             True,
         ),
     )
@@ -500,16 +499,16 @@ def test_manipulated_body_pose(database, complex_plan):
     # place = session.scalars(select(PlaceActionDAO)).all()[0]
     assert (pick_up_node.execution_data.manipulated_body_pose_start) is not None
     assert (pick_up_node.execution_data.manipulated_body_pose_end) is not None
-    start_pose_pick = PoseStampedDAO.from_dao(
+    start_pose_pick = PoseDAO.from_dao(
         pick_up_node.execution_data.manipulated_body_pose_start
     )
-    end_pose_pick = PoseStampedDAO.from_dao(
+    end_pose_pick = PoseDAO.from_dao(
         pick_up_node.execution_data.manipulated_body_pose_end
     )
-    start_pose_place = PoseStampedDAO.from_dao(
+    start_pose_place = PoseDAO.from_dao(
         place_node.execution_data.manipulated_body_pose_start
     )
-    end_pose_place = PoseStampedDAO.from_dao(
+    end_pose_place = PoseDAO.from_dao(
         place_node.execution_data.manipulated_body_pose_end
     )
 
@@ -551,7 +550,7 @@ def test_state(database, immutable_model_world):
     plan = SequentialPlan(
         context,
         NavigateActionDescription(
-            PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
+            Pose.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
             True,
         ),
     )
@@ -578,7 +577,7 @@ def test_filtering(database, mutable_model_world):
         sp = SequentialPlan(
             context,
             NavigateActionDescription(
-                PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
+                Pose.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
                 True,
             ),
             ParkArmsActionDescription(Arms.BOTH),
@@ -592,12 +591,12 @@ def test_filtering(database, mutable_model_world):
                 ),
             ),
             NavigateActionDescription(
-                PoseStamped.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
+                Pose.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
                 True,
             ),
             PlaceActionDescription(
                 world.get_body_by_name("milk.stl"),
-                PoseStamped.from_list([2.3, 2.5, 1], [0, 0, 0, 1], world.root),
+                Pose.from_list([2.3, 2.5, 1], [0, 0, 0, 1], world.root),
                 Arms.LEFT,
             ),
         )

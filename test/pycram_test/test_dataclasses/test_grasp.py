@@ -6,12 +6,12 @@ import pytest
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
-from pycram.datastructures.pose import PoseStamped
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
 )
@@ -354,7 +354,7 @@ def test_grasp_sequence_reverse(immutable_simple_pr2_holding_world):
     )
 
     sequence = grasp_desc.place_pose_sequence(
-        PoseStamped.from_list(frame=world.get_body_by_name("milk.stl"))
+        Pose.from_list(frame=world.get_body_by_name("milk.stl"))
     )
 
     assert sequence[2].orientation.to_list() == pytest.approx([0, 0, 0, 1], abs=0.001)
@@ -433,7 +433,7 @@ def test_place_sequence(immutable_simple_pr2_holding_world):
     )
 
     sequence = grasp_desc._pose_sequence(
-        PoseStamped.from_list([1, 1, 1], [0, 0, 0, 1], world.root),
+        Pose.from_list([1, 1, 1], [0, 0, 0, 1], world.root),
         world.get_body_by_name("milk.stl"),
         reverse=True,
     )
@@ -454,7 +454,7 @@ def test_place_sequence_right_tracy(tracy_milk_world):
     )
 
     sequence = grasp_desc._pose_sequence(
-        PoseStamped.from_list([1, 1, 1], [0, 0, 0, 1], world.root),
+        Pose.from_list([1, 1, 1], [0, 0, 0, 1], world.root),
         world.get_body_by_name("milk.stl"),
         reverse=True,
     )
@@ -541,7 +541,7 @@ def test_pose_sequence_top_tracy_box(tracy_milk_world):
         man,
     )
     sequence = grasp_desc._pose_sequence(
-        PoseStamped.from_list([1, 0, 1], frame=world.root),
+        Pose.from_list([1, 0, 1], frame=world.root),
         world.get_body_by_name("box"),
     )
 
@@ -572,7 +572,7 @@ def test_pose_sequence_180_flip(immutable_simple_pr2_world):
         man,
     )
     sequence = grasp_desc._pose_sequence(
-        PoseStamped.from_list([1, 0, 1], [0, 0, 1, 0], frame=world.root),
+        Pose.from_list([1, 0, 1], [0, 0, 1, 0], frame=world.root),
         world.get_body_by_name("milk.stl"),
     )
 

@@ -8,6 +8,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 from .base import BaseMotion
 from ...datastructures.enums import (
@@ -16,7 +17,6 @@ from ...datastructures.enums import (
     WaypointsMovementType,
 )
 from ...datastructures.grasp import GraspDescription
-from ...datastructures.pose import PoseStamped
 from ...robot_description import ViewManager
 from ...utils import translate_pose_along_local_axis
 
@@ -46,7 +46,7 @@ class ReachMotion(BaseMotion):
     Reverses the sequence of poses, i.e., moves away from the object instead of towards it. Used for placing objects.
     """
 
-    def _calculate_pose_sequence(self) -> List[PoseStamped]:
+    def _calculate_pose_sequence(self) -> List[Pose]:
         end_effector = ViewManager.get_end_effector_view(self.arm, self.robot_view)
 
         target_pose = GraspDescription.get_grasp_pose(
@@ -64,7 +64,7 @@ class ReachMotion(BaseMotion):
             -0.05,  # TODO: Maybe put these values in the semantic annotates
         )
 
-        pose = PoseStamped.from_spatial_type(
+        pose = Pose.from_spatial_type(
             self.world.transform(target_pre_pose.to_spatial_type(), self.world.root)
         )
 
@@ -126,7 +126,7 @@ class MoveTCPMotion(BaseMotion):
     Moves the Tool center point (TCP) of the robot
     """
 
-    target: PoseStamped
+    target: Pose
     """
     Target pose to which the TCP should be moved
     """
@@ -172,7 +172,7 @@ class MoveTCPWaypointsMotion(BaseMotion):
     Moves the Tool center point (TCP) of the robot
     """
 
-    waypoints: List[PoseStamped]
+    waypoints: List[Pose]
     """
     Waypoints the TCP should move along 
     """

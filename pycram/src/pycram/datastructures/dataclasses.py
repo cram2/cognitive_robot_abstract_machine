@@ -7,6 +7,7 @@ from enum import Enum
 
 import numpy as np
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3
 from semantic_digital_twin.world import World
 
 from semantic_digital_twin.world_description.world_entity import Body
@@ -33,7 +34,6 @@ from .enums import (
     ApproachDirection,
     VerticalAlignment,
 )
-from .pose import PoseStamped, Point
 
 if TYPE_CHECKING:
     from ..plan import Plan
@@ -99,7 +99,7 @@ class ExecutionData:
     execution. An execution is a Robot with a virtual mobile base that can be used to move the robot in the environment.
     """
 
-    execution_start_pose: PoseStamped
+    execution_start_pose: Pose
     """
     Start of the robot at the start of execution of an action designator
     """
@@ -109,7 +109,7 @@ class ExecutionData:
     The world state at the start of execution of an action designator
     """
 
-    execution_end_pose: Optional[PoseStamped] = None
+    execution_end_pose: Optional[Pose] = None
     """
     The pose of the robot at the end of executing an action designator
     """
@@ -126,12 +126,12 @@ class ExecutionData:
     A list of World modification blocks that were added during the execution of the action designator
     """
 
-    manipulated_body_pose_start: Optional[PoseStamped] = None
+    manipulated_body_pose_start: Optional[Pose] = None
     """
     Start pose of the manipulated Body if there was one
     """
 
-    manipulated_body_pose_end: Optional[PoseStamped] = None
+    manipulated_body_pose_end: Optional[Pose] = None
     """
     End pose of the manipulated Body if there was one
     """
@@ -223,16 +223,6 @@ class ManipulatorData:
     Relative directory of the gripper description file in the resources directory if it has one and is not part of the
      manipulator description file.
     """
-
-
-def get_point_as_list(point: Point) -> List[float]:
-    """
-    Return the point as a list.
-
-    :param point: The point.
-    :return: The point as a list
-    """
-    return [point.x, point.y, point.z]
 
 
 @dataclass
@@ -368,7 +358,7 @@ class VirtualJoint:
 
     name: str
     type_: JointType
-    axes: Optional[Point] = None
+    axes: Optional[Vector3] = None
 
     @property
     def type(self):
@@ -422,17 +412,17 @@ class VirtualMobileBaseJoints:
     translation_x: Optional[VirtualJoint] = VirtualJoint(
         VirtualMobileBaseJointName.LINEAR_X.value,
         JointType.PRISMATIC,
-        Point(x=1.0, y=0.0, z=0.0),
+        Vector3(x=1.0, y=0.0, z=0.0),
     )
     translation_y: Optional[VirtualJoint] = VirtualJoint(
         VirtualMobileBaseJointName.LINEAR_Y.value,
         JointType.PRISMATIC,
-        Point(x=0.0, y=1.0, z=0.0),
+        Vector3(x=0.0, y=1.0, z=0.0),
     )
     angular_z: Optional[VirtualJoint] = VirtualJoint(
         VirtualMobileBaseJointName.ANGULAR_Z.value,
         JointType.REVOLUTE,
-        Point(x=0.0, y=0.0, z=1.0),
+        Vector3(x=0.0, y=0.0, z=1.0),
     )
 
     @property
@@ -451,7 +441,7 @@ class VirtualMobileBaseJoints:
             for field in fields(self)
         }
 
-    def get_axes(self) -> Dict[str, Point]:
+    def get_axes(self) -> Dict[str, Vector3]:
         """
         Return the axes (i.e. The axis on which the joint moves) of the virtual mobile base joints.
         """

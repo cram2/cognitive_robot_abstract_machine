@@ -2,9 +2,10 @@ from dataclasses import dataclass
 from typing import Optional
 
 from giskardpy.motion_statechart.tasks.pointing import Pointing
+from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 from .base import BaseMotion
-from ...datastructures.pose import Vector3Stamped, PoseStamped
 from ...process_module import ProcessModuleManager
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 
@@ -33,7 +34,7 @@ class MoveJointsMotion(BaseMotion):
     """
     Name of the tip link to align with, e.g the object (optional).
     """
-    tip_normal: Optional[Vector3Stamped] = None
+    tip_normal: Optional[Vector3] = None
     """
     Normalized vector representing the current orientation axis of the end-effector (optional).
     """
@@ -41,7 +42,7 @@ class MoveJointsMotion(BaseMotion):
     """
     Base link of the robot; typically set to the torso (optional).
     """
-    root_normal: Optional[Vector3Stamped] = None
+    root_normal: Optional[Vector3] = None
     """
     Normalized vector representing the desired orientation axis to align with (optional).
     """
@@ -63,7 +64,7 @@ class LookingMotion(BaseMotion):
     Lets the robot look at a point
     """
 
-    target: PoseStamped
+    target: Pose
     """
     Target pose to look at
     """

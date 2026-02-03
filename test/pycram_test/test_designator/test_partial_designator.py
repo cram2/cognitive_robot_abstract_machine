@@ -3,7 +3,6 @@ import numpy as np
 
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.datastructures.pose import PoseStamped
 from pycram.language import SequentialPlan
 from pycram.robot_plans import (
     PickUpAction,
@@ -25,6 +24,7 @@ from pycram.datastructures.enums import (
 from pycram.utils import is_iterable, lazy_product
 from pycram.process_module import simulated_robot
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
 def test_partial_desig_construction():
@@ -157,9 +157,7 @@ def test_partial_navigate_action_perform(immutable_model_world):
     with simulated_robot:
         move1 = SequentialPlan(
             context,
-            NavigateActionDescription(
-                PoseStamped.from_list([1, 0, 0], frame=world.root)
-            ),
+            NavigateActionDescription(Pose.from_list([1, 0, 0], frame=world.root)),
         )
         move1.perform()
         np.testing.assert_almost_equal(
@@ -173,9 +171,9 @@ def test_partial_navigate_action_multiple(immutable_model_world):
     world, robot_view, context = immutable_model_world
     nav = NavigateActionDescription(
         [
-            PoseStamped.from_list([1, 0, 0], frame=world.root),
-            PoseStamped.from_list([2, 0, 0], frame=world.root),
-            PoseStamped.from_list([3, 0, 0], frame=world.root),
+            Pose.from_list([1, 0, 0], frame=world.root),
+            Pose.from_list([2, 0, 0], frame=world.root),
+            Pose.from_list([3, 0, 0], frame=world.root),
         ]
     )
     nav_goals = [[1, 0, 0], [2, 0, 0], [3, 0, 0]]

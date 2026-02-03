@@ -39,7 +39,7 @@ from krrood.ormatic.custom_types import TypeType
 
 class Base(DeclarativeBase):
     type_mappings = {
-        test.krrood_test.dataset.example_classes.PhysicalObject: test.krrood_test.dataset.example_classes.ConceptType,
+        test.krrood_test.dataset.example_classes.KRROODPhysicalObject: test.krrood_test.dataset.example_classes.ConceptType,
         typing.Type: krrood.ormatic.custom_types.TypeType,
         enum.Enum: krrood.ormatic.custom_types.PolymorphicEnumType,
         krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
@@ -705,7 +705,9 @@ class ContainerGenerationDAO(
 
 class DoublePositionAggregatorDAO(
     SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.DoublePositionAggregator],
+    DataAccessObject[
+        test.krrood_test.dataset.example_classes.DoubleKKROODPositionAggregator
+    ],
 ):
 
     __tablename__ = "DoublePositionAggregatorDAO"

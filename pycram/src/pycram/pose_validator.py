@@ -22,6 +22,7 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
     MaxIterationsException,
     UnreachableException,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
@@ -34,7 +35,6 @@ from semantic_digital_twin.world_description.world_entity import (
 from typing_extensions import List, Union, Dict, Iterable, Optional, Iterator, Callable
 
 from .costmaps import Costmap
-from .datastructures.pose import PoseStamped, TransformStamped
 from .failures import IKError, RobotInCollision
 from .tf_transformations import quaternion_from_euler
 
@@ -42,7 +42,7 @@ logger = logging.getLogger("pycram")
 
 
 def visibility_validator(
-    robot: AbstractRobot, object_or_pose: Union[Body, PoseStamped], world: World
+    robot: AbstractRobot, object_or_pose: Union[Body, Pose], world: World
 ) -> bool:
     """
     This method validates if the robot can see the target position from a given
@@ -56,7 +56,7 @@ def visibility_validator(
     :param world: The world in which the visibility should be validated.
     :return: True if the target is visible for the robot, None in any other case.
     """
-    if isinstance(object_or_pose, PoseStamped):
+    if isinstance(object_or_pose, Pose):
         gen_body = Body(
             name=PrefixedName("vist_test_obj", "pycram"),
             collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
@@ -80,7 +80,7 @@ def visibility_validator(
 
     hit_bodies = [b for b in ray[2] if not b in robot.bodies]
 
-    if isinstance(object_or_pose, PoseStamped):
+    if isinstance(object_or_pose, Pose):
         with world.modify_world():
             world.remove_connection(gen_body.parent_connection)
             world.remove_kinematic_structure_entity(gen_body)
@@ -89,7 +89,7 @@ def visibility_validator(
 
 
 def reachability_validator(
-    target_pose: PoseStamped,
+    target_pose: Pose,
     tip_link: KinematicStructureEntity,
     robot_view: AbstractRobot,
     world: World,
@@ -111,7 +111,7 @@ def reachability_validator(
 
 
 def pose_sequence_reachability_validator(
-    target_sequence: List[PoseStamped],
+    target_sequence: List[Pose],
     tip_link: KinematicStructureEntity,
     robot_view: AbstractRobot,
     world: World,

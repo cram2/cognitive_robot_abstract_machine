@@ -18,6 +18,8 @@ from typing import Union, Iterator
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
+
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 from .tf_transformations import (
@@ -36,15 +38,11 @@ from typing_extensions import (
     Iterable,
 )
 
-from .datastructures.pose import PoseStamped
-
 if TYPE_CHECKING:
     from .robot_description import CameraDescription
 
 
-def link_pose_for_joint_config(
-    obj: Body, joint_config: Dict[str, float]
-) -> PoseStamped:
+def link_pose_for_joint_config(obj: Body, joint_config: Dict[str, float]) -> Pose:
     """
     Get the pose a link would be in if the given joint configuration would be applied to the object.
     This is done by using the respective object in the prospection world and applying the joint configuration
@@ -61,7 +59,7 @@ def link_pose_for_joint_config(
         ].position = joint_pose
     reasoning_world.notify_state_change()
     pose = reasoning_world.get_body_by_name(obj.name).global_pose
-    return PoseStamped.from_spatial_type(pose)
+    return Pose.from_spatial_type(pose)
 
 
 def get_rays_from_min_max(
@@ -262,10 +260,10 @@ class suppress_stdout_stderr(object):
 
 
 def adjust_camera_pose_based_on_target(
-    cam_pose: PoseStamped,
-    target_pose: PoseStamped,
+    cam_pose: Pose,
+    target_pose: Pose,
     camera_description: CameraDescription,
-) -> PoseStamped:
+) -> Pose:
     """
     Adjust the given cam_pose orientation such that it is facing the target_pose, which partly depends on the
      front_facing_axis of the that is defined in the camera_description.
@@ -283,8 +281,8 @@ def adjust_camera_pose_based_on_target(
 
 
 def get_quaternion_between_camera_and_target(
-    cam_pose: PoseStamped,
-    target_pose: PoseStamped,
+    cam_pose: Pose,
+    target_pose: Pose,
     camera_description: "CameraDescription",
 ) -> np.ndarray:
     """
@@ -324,7 +322,7 @@ def transform_vector_using_pose(vector: Sequence, pose) -> np.ndarray:
     )
 
 
-def apply_quaternion_to_pose(pose: PoseStamped, quaternion: np.ndarray) -> PoseStamped:
+def apply_quaternion_to_pose(pose: Pose, quaternion: np.ndarray) -> Pose:
     """
     Apply a quaternion to a pose.
 
@@ -334,7 +332,7 @@ def apply_quaternion_to_pose(pose: PoseStamped, quaternion: np.ndarray) -> PoseS
     """
     pose_quaternion = np.array(pose.orientation.to_list())
     new_quaternion = quaternion_multiply(quaternion, pose_quaternion)
-    return PoseStamped(pose.position.to_list(), new_quaternion.tolist())
+    return Pose(pose.position.to_list(), new_quaternion.tolist())
 
 
 def get_quaternion_between_two_vectors(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
@@ -497,8 +495,8 @@ def lazy_product(*iterables: Iterable, iter_names: List[str] = None) -> Iterable
 
 
 def translate_pose_along_local_axis(
-    pose: PoseStamped, axis: Union[List, np.ndarray], distance: float
-) -> PoseStamped:
+    pose: Pose, axis: Union[List, np.ndarray], distance: float
+) -> Pose:
     """
     Translate a pose along a given 3d vector (axis) by a given distance. The axis is given in the local coordinate
     frame of the pose. The axis is normalized and then scaled by the distance.
@@ -517,6 +515,6 @@ def translate_pose_along_local_axis(
         np.array(pose.position.to_list()) + translation_in_world * distance
     )
 
-    return PoseStamped.from_list(
+    return Pose.from_list(
         list(scaled_translation_vector), pose.orientation.to_list(), pose.frame_id
     )

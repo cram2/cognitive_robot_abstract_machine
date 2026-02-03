@@ -4,6 +4,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import timedelta
 
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
@@ -11,7 +12,6 @@ from ..core.misc import DetectActionDescription
 from ..core.navigation import LookAtActionDescription, NavigateActionDescription
 from ....datastructures.enums import DetectionTechnique
 from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
 from ....designators.location_designator import CostmapLocation
 from ....failures import PerceptionObjectNotFound
 from ....has_parameters import has_parameters
@@ -26,7 +26,7 @@ class SearchAction(ActionDescription):
     Searches for a target object around the given location.
     """
 
-    target_location: PoseStamped
+    target_location: Pose
     """
     Location around which to look for a target object.
     """
@@ -46,7 +46,7 @@ class SearchAction(ActionDescription):
             ),
         ).perform()
 
-        target_base = PoseStamped.from_spatial_type(
+        target_base = Pose.from_spatial_type(
             self.world.transform(
                 self.target_location.to_spatial_type(), self.world.root
             )
@@ -101,7 +101,7 @@ class SearchAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
+        target_location: Union[Iterable[Pose], Pose],
         object_type: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
     ) -> PartialDesignator[Type[SearchAction]]:
         return PartialDesignator(
