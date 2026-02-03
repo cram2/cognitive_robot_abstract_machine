@@ -9,24 +9,13 @@ GeneratorList -- implementation of generator list wrappers.
 
 from __future__ import annotations
 
+import math
+import os
 from copy import deepcopy
 from inspect import isgeneratorfunction
-import os
-import math
 from typing import Union, Iterator
 
 import numpy as np
-from matplotlib import pyplot as plt
-import matplotlib.colors as mcolors
-
-from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.world_description.world_entity import Body
-
-from .tf_transformations import (
-    quaternion_about_axis,
-    quaternion_multiply,
-    quaternion_matrix,
-)
 from typing_extensions import (
     Tuple,
     Callable,
@@ -36,6 +25,19 @@ from typing_extensions import (
     Sequence,
     Any,
     Iterable,
+)
+
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Pose,
+    Quaternion,
+    HomogeneousTransformationMatrix,
+    Point3,
+)
+from semantic_digital_twin.world_description.world_entity import Body
+from .tf_transformations import (
+    quaternion_about_axis,
+    quaternion_multiply,
+    quaternion_matrix,
 )
 
 if TYPE_CHECKING:
@@ -509,12 +511,33 @@ def translate_pose_along_local_axis(
     """
     normalized_translation_vector = np.array(axis) / np.linalg.norm(axis)
 
-    rot_matrix = quaternion_matrix(pose.orientation.to_list())[:3, :3]
+    rot_matrix = pose.to_rotation_matrix().to_np()[:3, :3]
     translation_in_world = rot_matrix @ normalized_translation_vector
     scaled_translation_vector = (
-        np.array(pose.position.to_list()) + translation_in_world * distance
+        np.array(pose.to_position().to_list()[:3]) + translation_in_world * distance
     )
 
-    return Pose.from_list(
-        list(scaled_translation_vector), pose.orientation.to_list(), pose.frame_id
+    return Pose(
+        Point3.from_iterable(scaled_translation_vector),
+        pose.to_quaternion(),
+        reference_frame=pose.reference_frame,
+    )
+
+
+def rotate_pose_by_quaternion(pose: Pose, quaternion: Quaternion):
+    """
+    Rotates a given pose by a specified quaternion. The function takes the pose and converts it into a
+    homogeneous transformation matrix. It applies the rotation specified by the quaternion and
+    returns the resulting transformation matrix.
+
+    :param pose: The original pose to be rotated.
+    :param quaternion: The quaternion specifying the rotation.
+
+    :return: The rotated pose.
+    """
+    return (
+        pose.to_homogeneous_matrix()
+        @ HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            rotation_matrix=quaternion.to_rotation_matrix()
+        )
     )

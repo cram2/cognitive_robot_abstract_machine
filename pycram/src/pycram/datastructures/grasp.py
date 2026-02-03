@@ -10,14 +10,14 @@ from scipy.spatial.transform import Rotation as R
 from typing_extensions import Optional, Union, List
 
 from semantic_digital_twin.robots.abstract_robot import Manipulator, AbstractRobot
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Quaternion
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 from semantic_digital_twin.world_description.world_entity import Body
 from .dataclasses import Rotations
 from .enums import Grasp, AxisIdentifier, ApproachDirection, VerticalAlignment, Arms
 from ..has_parameters import HasParameters
 from ..tf_transformations import quaternion_multiply
-from ..utils import translate_pose_along_local_axis
+from ..utils import translate_pose_along_local_axis, rotate_pose_by_quaternion
 
 
 @dataclass
@@ -65,7 +65,7 @@ class GraspDescription:
         :param reverse: If the sequence should be reversed.
         :return: The pose sequence.
         """
-        pose_frame = pose.frame_id
+        pose_frame = pose.reference_frame
 
         world = pose_frame._world
 
@@ -86,27 +86,21 @@ class GraspDescription:
         else:
             offset = 0
 
-        pre_pose = Pose.from_list(
-            pose.position.to_list(), pose.orientation.to_list(), frame=pose_frame
-        )
-        pre_pose.rotate_by_quaternion(grasp_orientation)
+        pre_pose = deepcopy(pose)
+        pre_pose = rotate_pose_by_quaternion(pre_pose, grasp_orientation)
         pre_pose = translate_pose_along_local_axis(
-            pre_pose, self.manipulation_axis(), -offset
+            pre_pose.to_pose(), self.manipulation_axis(), -offset
         )
 
         grasp_pose = deepcopy(pose)
-        grasp_pose.rotate_by_quaternion(grasp_orientation)
+        grasp_pose = rotate_pose_by_quaternion(grasp_pose, grasp_orientation)
 
         # Lift pose calculation
-        lift_pose_map = Pose.from_spatial_type(
-            world.transform(pose.to_spatial_type(), world.root)
-        )
-        lift_pose_map.position.z += self.manipulation_offset
-
-        lift_pose = Pose.from_spatial_type(
-            world.transform(lift_pose_map.to_spatial_type(), pose_frame)
-        )
-        lift_pose.rotate_by_quaternion(grasp_orientation)
+        map_T_grasp = world.transform(pose.to_homogeneous_matrix(), world.root)
+        grasp_T_lift = HomogeneousTransformationMatrix.from_xyz_rpy(z=self.manipulation_offset)
+        map_T_lift = map_T_grasp @ grasp_T_lift
+        pose_frame_T_lift = world.transform(map_T_lift, pose_frame)
+        lift_pose = rotate_pose_by_quaternion(pose_frame_T_lift.to_pose(), grasp_orientation)
 
         sequence = [pre_pose, grasp_pose, lift_pose]
 
@@ -122,7 +116,7 @@ class GraspDescription:
         :param body: The body of the grasp.
         :return: The pose sequence.
         """
-        return self._pose_sequence(Pose.from_list(frame=body), body)
+        return self._pose_sequence(Pose.from_xyz_rpy(reference_frame=body), body)
 
     def place_pose_sequence(self, pose: Pose) -> List[Pose]:
         """
@@ -182,7 +176,7 @@ class GraspDescription:
 
         return t[:3, 3].astype(int).tolist()
 
-    def grasp_orientation(self):
+    def grasp_orientation(self) -> Quaternion:
         """
         The orientation of the grasp. Takes into account the approach direction and vertical
         alignment.
@@ -202,7 +196,7 @@ class GraspDescription:
         norm = math.sqrt(sum(comp**2 for comp in orientation))
         orientation = [comp / norm for comp in orientation]
 
-        return orientation
+        return Quaternion(*orientation)
 
     def edge_offset(self, body: Body) -> float:
         """
@@ -231,7 +225,7 @@ class GraspDescription:
         """
         edge_offset = -self.edge_offset(body) if grasp_edge else 0
         orientation = self.grasp_orientation()
-        grasp_pose = Pose().from_list([edge_offset, 0, 0], orientation, frame=body)
+        grasp_pose = Pose(Point3(edge_offset, 0, 0), orientation, reference_frame=body)
 
         return grasp_pose
 
