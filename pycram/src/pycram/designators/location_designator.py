@@ -69,7 +69,7 @@ from ..datastructures.enums import (
     ApproachDirection,
     VerticalAlignment,
 )
-from ..datastructures.grasp import GraspDescription
+from ..datastructures.grasp import GraspDescription, GraspPose
 from ..datastructures.partial_designator import PartialDesignator
 from ..designator import LocationDesignatorDescription
 from ..failures import RobotInCollision
@@ -82,8 +82,6 @@ from ..robot_description import ViewManager
 from ..utils import link_pose_for_joint_config
 
 logger = logging.getLogger("pycram")
-
-GraspPose = "Dont forget to re-add this class"
 
 
 class Location(LocationDesignatorDescription):

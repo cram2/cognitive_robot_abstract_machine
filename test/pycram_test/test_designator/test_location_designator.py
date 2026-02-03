@@ -1,6 +1,5 @@
 from pycram.designators.location_designator import *
 from pycram.language import SequentialPlan
-from pycram.datastructures.pose import PoseStamped
 from pycram.robot_plans import NavigateActionDescription
 
 arm_park = {
@@ -50,7 +49,7 @@ def test_reachability_pose_costmap_location(immutable_simple_pr2_world):
         world.state[world.get_degree_of_freedom_by_name(name).id].position = state
     world.notify_state_change()
     location_desig = CostmapLocation(
-        PoseStamped.from_list([-2.2, 0, 1], [0, 0, 0, 1], world.root),
+        Pose.from_list([-2.2, 0, 1], [0, 0, 0, 1], world.root),
         reachable_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
@@ -79,7 +78,7 @@ def test_visibility_pose_costmap_location(immutable_simple_pr2_world):
         world.state[world.get_degree_of_freedom_by_name(name).id].position = state
     world.notify_state_change()
     location_desig = CostmapLocation(
-        PoseStamped.from_list([-1, 0, 1.2], frame=world.root),
+        Pose.from_list([-1, 0, 1.2], frame=world.root),
         visible_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
@@ -130,7 +129,7 @@ def test_reachability_pose_probabilistic_costmap_location(immutable_simple_pr2_w
     for name, state in arm_park.items():
         world.state[world.get_degree_of_freedom_by_name(name).id].position = state
     location_desig = ProbabilisticCostmapLocation(
-        PoseStamped.from_list([0.4, 0.6, 0.9], [0, 0, 0, 1], frame=world.root),
+        Pose.from_list([0.4, 0.6, 0.9], [0, 0, 0, 1], frame=world.root),
         reachable_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
@@ -158,7 +157,7 @@ def test_visibility_pose_probabilistic_costmap_location(immutable_simple_pr2_wor
     for name, state in arm_park.items():
         world.state[world.get_degree_of_freedom_by_name(name).id].position = state
     location_desig = ProbabilisticCostmapLocation(
-        PoseStamped.from_list([-1, 0, 1.2], frame=world.root),
+        Pose.from_list([-1, 0, 1.2], frame=world.root),
         visible_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
@@ -244,7 +243,7 @@ def test_accessing_location(immutable_model_world):
 def test_giskard_location_pose(immutable_model_world):
     world, robot_view, context = immutable_model_world
     location_desig = GiskardLocation(
-        PoseStamped.from_list([2.1, 2, 1], frame=world.root), Arms.RIGHT
+        Pose.from_list([2.1, 2, 1], frame=world.root), Arms.RIGHT
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
 
@@ -259,7 +258,7 @@ def test_costmap_location_last_result(immutable_simple_pr2_world):
         world.state[world.get_degree_of_freedom_by_name(name).id].position = state
     world.notify_state_change()
     location_desig = CostmapLocation(
-        PoseStamped.from_list([-2.2, 0, 1], [0, 0, 0, 1], world.root),
+        Pose.from_list([-2.2, 0, 1], [0, 0, 0, 1], world.root),
         reachable_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))

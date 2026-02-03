@@ -15,9 +15,9 @@ def test_class_diagram_visualization():
     assert len(diagram._dependency_graph.edges()) > 0
     associations = diagram.associations
 
-    wrapped_pose = diagram.get_wrapped_class(example_classes.Pose)
-    wrapped_position = diagram.get_wrapped_class(example_classes.Position)
-    wrapped_positions = diagram.get_wrapped_class(example_classes.Positions)
+    wrapped_pose = diagram.get_wrapped_class(example_classes.KRROODPose)
+    wrapped_position = diagram.get_wrapped_class(example_classes.KRROODPosition)
+    wrapped_positions = diagram.get_wrapped_class(example_classes.KRROODPositions)
 
     assert (
         len(
@@ -42,7 +42,7 @@ def test_class_diagram_visualization():
     )
 
     wrapped_positions_subclass = diagram.get_wrapped_class(
-        example_classes.PositionsSubclassWithAnotherPosition
+        example_classes.KRROODPositionsSubclassWithAnotherKRROODPosition
     )
     inheritances = diagram.inheritance_relations
 

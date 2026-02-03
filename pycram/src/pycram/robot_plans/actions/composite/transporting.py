@@ -8,6 +8,7 @@ import numpy as np
 
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
@@ -23,7 +24,6 @@ from ....config.action_conf import ActionConfig
 from ....datastructures.enums import Arms, Grasp, VerticalAlignment
 from ....datastructures.grasp import GraspDescription
 from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
 from ....designators.location_designator import (
     ProbabilisticCostmapLocation,
     CostmapLocation,
@@ -47,7 +47,7 @@ class TransportAction(ActionDescription):
     """
     Object designator_description describing the object that should be transported.
     """
-    target_location: PoseStamped
+    target_location: Pose
     """
     Target Location to which the object should be transported
     """
@@ -88,7 +88,7 @@ class TransportAction(ActionDescription):
                     ).perform()
         SequentialPlan(self.context, ParkArmsActionDescription(Arms.BOTH)).perform()
         pickup_loc = CostmapLocation(
-            target=PoseStamped.from_spatial_type(self.object_designator.global_pose),
+            target=Pose.from_spatial_type(self.object_designator.global_pose),
             reachable_arm=self.arm,
             reachable_for=self.robot_view,
         )
@@ -158,7 +158,7 @@ class TransportAction(ActionDescription):
     def description(
         cls,
         object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
+        target_location: Union[Iterable[Pose], Pose],
         arm: Union[Iterable[Arms], Arms] = None,
         place_rotation_agnostic: Optional[bool] = False,
     ) -> PartialDesignator[TransportAction]:
@@ -182,7 +182,7 @@ class PickAndPlaceAction(ActionDescription):
     """
     Object designator_description describing the object that should be transported.
     """
-    target_location: PoseStamped
+    target_location: Pose
     """
     Target Location to which the object should be transported
     """
@@ -230,7 +230,7 @@ class PickAndPlaceAction(ActionDescription):
     def description(
         cls,
         object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
+        target_location: Union[Iterable[Pose], Pose],
         arm: Union[Iterable[Arms], Arms] = None,
         grasp_description=GraspDescription,
     ) -> PartialDesignator[PickAndPlaceAction]:
@@ -250,7 +250,7 @@ class MoveAndPlaceAction(ActionDescription):
     Navigate to `standing_position`, then turn towards the object and pick it up.
     """
 
-    standing_position: PoseStamped
+    standing_position: Pose
     """
     The pose to stand before trying to pick up the object
     """
@@ -260,7 +260,7 @@ class MoveAndPlaceAction(ActionDescription):
     The object to pick up
     """
 
-    target_location: PoseStamped
+    target_location: Pose
     """
     The location to place the object.
     """
@@ -294,9 +294,9 @@ class MoveAndPlaceAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        standing_position: Union[Iterable[PoseStamped], PoseStamped],
+        standing_position: Union[Iterable[Pose], Pose],
         object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
+        target_location: Union[Iterable[Pose], Pose],
         arm: Union[Iterable[Arms], Arms] = None,
         keep_joint_states: Union[
             Iterable[bool], bool
@@ -318,7 +318,7 @@ class MoveAndPickUpAction(ActionDescription):
     Navigate to `standing_position`, then turn towards the object and pick it up.
     """
 
-    standing_position: PoseStamped
+    standing_position: Pose
     """
     The pose to stand before trying to pick up the object
     """
@@ -352,7 +352,7 @@ class MoveAndPickUpAction(ActionDescription):
         super().__post_init__()
 
     def execute(self):
-        obj_pose = PoseStamped.from_spatial_type(self.object_designator.global_pose)
+        obj_pose = Pose.from_spatial_type(self.object_designator.global_pose)
         SequentialPlan(
             self.context,
             NavigateActionDescription(self.standing_position, self.keep_joint_states),
@@ -371,8 +371,8 @@ class MoveAndPickUpAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        standing_position: Union[Iterable[PoseStamped], PoseStamped],
-        object_designator: Union[Iterable[PoseStamped], PoseStamped],
+        standing_position: Union[Iterable[Pose], Pose],
+        object_designator: Union[Iterable[Pose], Pose],
         arm: Union[Iterable[Arms], Arms] = None,
         grasp_description: Union[Iterable[Grasp], Grasp] = None,
         keep_joint_states: Union[
@@ -398,7 +398,7 @@ class EfficientTransportAction(ActionDescription):
     """
 
     object_designator: Body
-    target_location: PoseStamped
+    target_location: Pose
 
     def _choose_best_arm(self, robot: Body, obj: Body) -> Arms:
         """
@@ -478,7 +478,7 @@ class EfficientTransportAction(ActionDescription):
     def description(
         cls,
         object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
+        target_location: Union[Iterable[Pose], Pose],
     ) -> PartialDesignator[Type["EfficientTransportAction"]]:
         return PartialDesignator(
             cls, object_designator=object_designator, target_location=target_location

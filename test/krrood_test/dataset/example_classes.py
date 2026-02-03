@@ -316,28 +316,28 @@ class RotationMapped(AlternativeMapping[Rotation]):
 
 
 @dataclass
-class Transformation(Symbol):
+class KRROODTransformation(Symbol):
     vector: KRROODVector
     rotation: Rotation
 
 
 @dataclass
-class TransformationMapped(AlternativeMapping[Transformation]):
+class KRROODTransformationMapped(AlternativeMapping[KRROODTransformation]):
     vector: KRROODVector
     rotation: Rotation
 
     @classmethod
     def from_domain_object(cls, obj: T):
-        return TransformationMapped(obj.vector, obj.rotation)
+        return KRROODTransformationMapped(obj.vector, obj.rotation)
 
     def to_domain_object(self) -> T:
-        return Transformation(self.vector, self.rotation)
+        return KRROODTransformation(self.vector, self.rotation)
 
 
 @dataclass
 class Shape(Symbol):
     name: str
-    origin: Transformation
+    origin: KRROODTransformation
 
 
 @dataclass

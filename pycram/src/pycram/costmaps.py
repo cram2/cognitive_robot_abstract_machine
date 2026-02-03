@@ -29,8 +29,8 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
-from .datastructures.dataclasses import Color
 from .tf_transformations import quaternion_from_euler
 
 try:

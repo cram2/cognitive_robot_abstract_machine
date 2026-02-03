@@ -6,7 +6,7 @@ from krrood.ormatic.utils import create_engine
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from krrood_test.dataset.ormatic_interface import PoseDAO
+from krrood_test.dataset.ormatic_interface import KRROODPoseDAO
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     ApproachDirection,
@@ -89,7 +89,7 @@ def test_pose(database, test_simple_plan):
     dao = to_dao(plan)
     session.add(dao)
     session.commit()
-    result = session.scalars(select(PoseDAO)).all()
+    result = session.scalars(select(KRROODPoseDAO)).all()
     assert len(result) > 0
     assert all([r.position is not None and r.orientation is not None for r in result])
 
@@ -121,11 +121,11 @@ def test_pose_vs_pose_stamped(database, test_simple_plan):
     dao = to_dao(plan)
     session.add(dao)
     session.commit()
-    pose_stamped_result = session.scalars(select(PoseDAO)).all()
-    pose_result = session.scalars(select(PoseDAO)).all()
+    pose_stamped_result = session.scalars(select(KRROODPoseDAO)).all()
+    pose_result = session.scalars(select(KRROODPoseDAO)).all()
     poses_from_pose_stamped_results = session.scalars(
-        select(PoseDAO).where(
-            PoseDAO.database_id.in_([r.pose_id for r in pose_stamped_result])
+        select(KRROODPoseDAO).where(
+            KRROODPoseDAO.database_id.in_([r.pose_id for r in pose_stamped_result])
         )
     ).all()
     assert all([r.pose is not None for r in pose_stamped_result])
@@ -156,9 +156,9 @@ def test_pose_creation(database, test_simple_plan):
     session.commit()
 
     with session.bind.connect() as conn:
-        raw_pose = conn.execute(text("SELECT * FROM PoseDAO")).fetchall()
+        raw_pose = conn.execute(text("SELECT * FROM KRROODPoseDAO")).fetchall()
 
-    pose_result = session.scalars(select(PoseDAO)).first()
+    pose_result = session.scalars(select(KRROODPoseDAO)).first()
     assert pose_result.position.x == 1.0
     assert pose_result.position.y == 2.0
     assert pose_result.position.z == 3.0
@@ -499,16 +499,16 @@ def test_manipulated_body_pose(database, complex_plan):
     # place = session.scalars(select(PlaceActionDAO)).all()[0]
     assert (pick_up_node.execution_data.manipulated_body_pose_start) is not None
     assert (pick_up_node.execution_data.manipulated_body_pose_end) is not None
-    start_pose_pick = PoseDAO.from_dao(
+    start_pose_pick = KRROODPoseDAO.from_dao(
         pick_up_node.execution_data.manipulated_body_pose_start
     )
-    end_pose_pick = PoseDAO.from_dao(
+    end_pose_pick = KRROODPoseDAO.from_dao(
         pick_up_node.execution_data.manipulated_body_pose_end
     )
-    start_pose_place = PoseDAO.from_dao(
+    start_pose_place = KRROODPoseDAO.from_dao(
         place_node.execution_data.manipulated_body_pose_start
     )
-    end_pose_place = PoseDAO.from_dao(
+    end_pose_place = KRROODPoseDAO.from_dao(
         place_node.execution_data.manipulated_body_pose_end
     )
 

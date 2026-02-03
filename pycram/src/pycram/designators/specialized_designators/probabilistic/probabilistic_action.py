@@ -20,9 +20,12 @@ from sortedcontainers import SortedSet
 
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import BoundingBox
-from semantic_digital_twin.world_description.graph_of_convex_sets import GraphOfConvexSets
+from semantic_digital_twin.world_description.graph_of_convex_sets import (
+    GraphOfConvexSets,
+)
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
@@ -34,7 +37,6 @@ from ....robot_plans import MoveAndPickUpAction
 from ....datastructures.enums import Arms, Grasp, VerticalAlignment, ApproachDirection
 from ....datastructures.grasp import GraspDescription
 from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
 
 
 class Variables(enum.Enum):
@@ -105,7 +107,7 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
 
     def collision_free_condition_for_object(self, obj: Body):
         search_space_size = 1.0
-        obj_pose = PoseStamped.from_spatial_type(obj.global_pose)
+        obj_pose = Pose.from_spatial_type(obj.global_pose)
         search_space = BoundingBox(
             min_x=obj_pose.pose.position.x - search_space_size,
             min_y=obj_pose.pose.position.y - search_space_size,
@@ -122,7 +124,7 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
         return navigate_conditions
 
     def collision_free_event(
-            world: World, search_space: Optional[BoundingBoxCollection] = None
+        world: World, search_space: Optional[BoundingBoxCollection] = None
     ) -> Event:
         """
         Create an event that describes the free space of the world.
@@ -144,7 +146,9 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
                         np.inf,
                         np.inf,
                         np.inf,
-                        origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+                        origin=HomogeneousTransformationMatrix(
+                            reference_frame=world.root
+                        ),
                     )
                 ],
             )
@@ -159,7 +163,9 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
         free_space = free_space.marginal(xy)
 
         # create floor level
-        z_event = SimpleEvent({SpatialVariables.z.value: singleton(0.0)}).as_composite_set()
+        z_event = SimpleEvent(
+            {SpatialVariables.z.value: singleton(0.0)}
+        ).as_composite_set()
         z_event.fill_missing_variables(xy)
         free_space.fill_missing_variables(SortedSet([SpatialVariables.z.value]))
         free_space &= z_event
@@ -181,7 +187,7 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
         new_root.add_subcircuit(root)
 
         # move model to position of the object
-        obj_pose = PoseStamped.from_spatial_type(obj.global_pose)
+        obj_pose = Pose.from_spatial_type(obj.global_pose)
         model.translate(
             {
                 self.variables.x.value: obj_pose.pose.position.x,
@@ -267,7 +273,7 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
         }
         obj = self.world.kinematic_structure[int(sample_dict[self.object_variable])]
 
-        standing_position = PoseStamped.from_list(
+        standing_position = Pose.from_list(
             [
                 sample_dict[self.variables.x.value],
                 sample_dict[self.variables.y.value],

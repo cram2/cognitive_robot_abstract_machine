@@ -14,7 +14,7 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 from .dataclasses import Rotations
-from .enums import Grasp, AxisIdentifier, ApproachDirection, VerticalAlignment
+from .enums import Grasp, AxisIdentifier, ApproachDirection, VerticalAlignment, Arms
 from ..has_parameters import HasParameters
 from ..tf_transformations import quaternion_multiply
 from ..utils import translate_pose_along_local_axis
@@ -396,4 +396,19 @@ class PreferredGraspAlignment:
     with_rotated_gripper: bool
     """
     Indicates if the gripper should be rotated by 90° around X.
+    """
+
+@dataclass(eq=False, init=False)
+class GraspPose(Pose):
+    """
+    A pose from which a grasp can be performed along with the respective arm and grasp description.
+    """
+
+    arm: Arms = None
+    """
+    Arm corresponding to the grasp pose.
+    """
+    grasp_description: GraspDescription = None
+    """
+    Grasp description corresponding to the grasp pose.
     """
