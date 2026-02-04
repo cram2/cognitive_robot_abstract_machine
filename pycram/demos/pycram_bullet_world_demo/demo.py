@@ -44,7 +44,9 @@ try:
     import rclpy
 
     rclpy.init()
-    from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+    from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+        VizMarkerPublisher,
+    )
 
     v = VizMarkerPublisher(world, rclpy.create_node("viz_marker"))
 except ImportError:
@@ -56,7 +58,9 @@ try:
     import rclpy
 
     rclpy.init()
-    from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+    from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+        VizMarkerPublisher,
+    )
 
     v = VizMarkerPublisher(world, rclpy.create_node("viz_marker"))
 except ImportError:

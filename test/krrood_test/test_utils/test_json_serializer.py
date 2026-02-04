@@ -1,23 +1,25 @@
-import json
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Any, Self
 
+import numpy as np
 import pytest
 
-
-from krrood.adapters.json_serializer import (
-    SubclassJSONSerializer,
-    to_json,
-    from_json,
-)
 from krrood.adapters.exceptions import (
     MissingTypeError,
     InvalidTypeFormatError,
     UnknownModuleError,
     ClassNotFoundError,
     JSON_TYPE_NAME,
+)
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    to_json,
+    from_json,
+    JSONAttributeDiff,
+    shallow_diff_json,
+    DataclassJSONSerializer,
 )
 from krrood.utils import get_full_class_name
 
@@ -30,6 +32,7 @@ class Animal(SubclassJSONSerializer):
 
     name: str
     age: int
+    owners: list[str] = field(default_factory=list)
 
     def to_json(self):
         data = super().to_json()
@@ -37,6 +40,7 @@ class Animal(SubclassJSONSerializer):
             {
                 "name": self.name,
                 "age": self.age,
+                "owners": self.owners,
             }
         )
         return data
@@ -46,6 +50,7 @@ class Animal(SubclassJSONSerializer):
         return cls(
             name=(data["name"]),
             age=(data["age"]),
+            owners=(data["owners"]),
         )
 
 
@@ -72,6 +77,7 @@ class Dog(Animal):
             name=(data["name"]),
             age=(data["age"]),
             breed=(data["breed"]),
+            owners=(data["owners"]),
         )
 
 
@@ -139,6 +145,11 @@ class ClassThatNeedsKWARGS(SubclassJSONSerializer):
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(a=(data["a"]), b=(kwargs["b"]))
+
+
+@dataclass
+class ClassWithDict(DataclassJSONSerializer):
+    a: Dict[str, int]
 
 
 class CustomEnum(str, Enum):
@@ -241,3 +252,113 @@ def test_classes():
     data = to_json(obj)
     result = from_json(data)
     assert result == obj
+
+
+def test_json_attribute_diff_roundtrip():
+    diff = JSONAttributeDiff(
+        attribute_name="test", added_values=[1, 2], removed_values=[3]
+    )
+    data = diff.to_json()
+    result = from_json(data)
+    assert isinstance(result, JSONAttributeDiff)
+    assert diff == result
+
+
+def test_json_attribute_diff_empty():
+    diff = JSONAttributeDiff(attribute_name="test")
+    assert diff.added_values == []
+    assert diff.removed_values == []
+    data = diff.to_json()
+    result = from_json(data)
+    assert diff == result
+
+
+def test_shallow_diff_json():
+    orig = {"a": 1, "b": [1, 2], "c": "foo"}
+    new = {"a": 2, "b": [2, 3], "c": "bar"}
+    diffs = shallow_diff_json(orig, new)
+
+    diff_dict = {d.attribute_name: d for d in diffs}
+
+    assert "a" in diff_dict
+    assert diff_dict["a"].added_values == [2]
+
+    assert "b" in diff_dict
+    assert set(diff_dict["b"].added_values) == {3}
+    assert set(diff_dict["b"].removed_values) == {1}
+
+    assert "c" in diff_dict
+    assert diff_dict["c"].added_values == ["bar"]
+
+
+def test_update_from_json_diff():
+    dog = Dog(
+        name="Rex",
+        age=5,
+        breed="Shepherd",
+        owners=["Alice", "Bob"],
+    )
+    orig_json = dog.to_json()
+    new_json = orig_json.copy()
+    new_json["name"] = "Max"
+    new_json["age"] = 6
+    new_json["owners"] = ["Alice", "Charlie"]
+
+    diffs = shallow_diff_json(orig_json, new_json)
+
+    dog.update_from_json_diff(diffs)
+
+    assert dog.name == "Max"
+    assert dog.age == 6
+    assert dog.owners == ["Alice", "Charlie"]
+
+
+def test_shallow_diff_json_nested():
+    dog1 = Dog(name="Rex", age=5)
+    dog2 = Dog(name="Max", age=6)
+
+    orig = {"pet": dog1.to_json()}
+    new = {"pet": dog2.to_json()}
+
+    diffs = shallow_diff_json(orig, new)
+    assert len(diffs) == 1
+    assert diffs[0].attribute_name == "pet"
+    assert isinstance(diffs[0].added_values[0], Dog)
+    assert diffs[0].added_values[0].name == "Max"
+
+
+def test_nparray():
+    obj = np.array([1, 2, 3])
+    data = to_json(obj)
+    result = from_json(data)
+    assert np.allclose(result, obj)
+
+    obj = np.array([1, 2, 3], dtype=np.float64)
+    data = to_json(obj)
+    result = from_json(data)
+    assert np.allclose(result, obj)
+
+    obj = np.array([1.3, 2, 3], dtype=np.float64)
+    data = to_json(obj)
+    result = from_json(data)
+    assert np.allclose(result, obj)
+
+
+@dataclass
+class Foo:
+    bar: str = "baz"
+    muh: int = field(default_factory=lambda: 42)
+
+
+def test_dataclass_with_default_factory():
+    foo = Foo()
+    data = to_json(foo)
+    result = from_json(data)
+    assert result == foo
+
+
+def test_dataclass_dict():
+    cls = ClassWithDict({"foo": 1})
+    data = to_json(cls)
+    result = from_json(data)
+    assert result == cls

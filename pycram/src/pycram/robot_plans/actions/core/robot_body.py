@@ -7,15 +7,18 @@ from typing import Tuple, List
 
 from typing_extensions import Union, Optional, Type, Dict, Any, Iterable
 
-from ....datastructures.enums import AxisIdentifier
+from semantic_digital_twin.datastructures.definitions import (
+    TorsoState,
+    GripperState,
+    StaticJointState,
+)
+from ....datastructures.enums import AxisIdentifier, Arms
 from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import Vector3Stamped
 from ....failures import TorsoGoalNotReached, ConfigurationNotReached
 from ....has_parameters import has_parameters
 from ....language import SequentialPlan
-from ....robot_description import RobotDescription
-from ....robot_descriptions.pr2_states import *
-from ....robot_descriptions.hsrb_states import *
+from ....robot_description import ViewManager
 from ....robot_plans.actions.base import ActionDescription
 from ....robot_plans.motions.gripper import MoveGripperMotion
 from ....robot_plans.motions.robot_body import MoveJointsMotion
@@ -35,12 +38,14 @@ class MoveTorsoAction(ActionDescription):
     """
 
     def execute(self) -> None:
-        jm = JointStateManager()
-        joint_state = jm.get_joint_state(self.torso_state, self.robot_view)[0]
+        joint_state = self.robot_view.torso.get_joint_state_by_type(self.torso_state)
 
         SequentialPlan(
             self.context,
-            MoveJointsMotion(joint_state.joint_names, joint_state.joint_positions),
+            MoveJointsMotion(
+                [c.name.name for c in joint_state.connections],
+                joint_state.target_values,
+            ),
         ).perform()
 
     def validate(
@@ -69,8 +74,10 @@ class MoveTorsoAction(ActionDescription):
     @classmethod
     def description(
         cls, torso_state: Union[Iterable[TorsoState], TorsoState]
-    ) -> PartialDesignator[Type[MoveTorsoAction]]:
-        return PartialDesignator(MoveTorsoAction, torso_state=torso_state)
+    ) -> PartialDesignator[MoveTorsoAction]:
+        return PartialDesignator[MoveTorsoAction](
+            MoveTorsoAction, torso_state=torso_state
+        )
 
 
 @has_parameters
@@ -84,7 +91,7 @@ class SetGripperAction(ActionDescription):
     """
     The gripper that should be set 
     """
-    motion: GripperStateEnum
+    motion: GripperState
     """
     The motion that should be set on the gripper
     """
@@ -111,8 +118,10 @@ class SetGripperAction(ActionDescription):
         cls,
         gripper: Union[Iterable[Arms], Arms],
         motion: Union[Iterable[GripperState], GripperState] = None,
-    ) -> PartialDesignator[Type[SetGripperAction]]:
-        return PartialDesignator(SetGripperAction, gripper=gripper, motion=motion)
+    ) -> PartialDesignator[SetGripperAction]:
+        return PartialDesignator[SetGripperAction](
+            SetGripperAction, gripper=gripper, motion=motion
+        )
 
 
 @has_parameters
@@ -138,9 +147,14 @@ class ParkArmsAction(ActionDescription):
         """
         :return: The joint positions that should be set for the arm to be in the park position.
         """
-        jm = JointStateManager()
-        park_state = jm.get_arm_state(self.arm, StaticJointState.Park, self.robot_view)
-        return park_state.joint_names, park_state.joint_positions
+        arm_chain = ViewManager().get_arm_view(self.arm, self.robot_view)
+        names = []
+        values = []
+        for arm in arm_chain:
+            joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
+            names.extend([c.name.name for c in joint_state.connections])
+            values.extend(joint_state.target_values)
+        return names, values
 
     def validate(
         self,
@@ -165,8 +179,8 @@ class ParkArmsAction(ActionDescription):
     @classmethod
     def description(
         cls, arm: Union[Iterable[Arms], Arms]
-    ) -> PartialDesignator[Type[ParkArmsAction]]:
-        return PartialDesignator(cls, arm=arm)
+    ) -> PartialDesignator[ParkArmsAction]:
+        return PartialDesignator[ParkArmsAction](cls, arm=arm)
 
 
 @has_parameters
@@ -282,8 +296,8 @@ class CarryAction(ActionDescription):
         tip_axis: Optional[AxisIdentifier] = None,
         root_link: Optional[str] = None,
         root_axis: Optional[AxisIdentifier] = None,
-    ) -> PartialDesignator[Type[CarryAction]]:
-        return PartialDesignator(
+    ) -> PartialDesignator[CarryAction]:
+        return PartialDesignator[CarryAction](
             cls,
             arm=arm,
             align=align,

@@ -5,8 +5,10 @@ from dataclasses import is_dataclass
 import semantic_digital_twin.orm.ormatic_interface
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
+from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import get_classes_of_ormatic_interface, classes_of_module
 from krrood.utils import recursive_subclasses
+from pycram.plan import BaseActionNode
 from semantic_digital_twin.world import WorldModelManager
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
@@ -89,10 +91,11 @@ classes |= {
     PlanNode,
     SequentialNode,
     RepeatNode,
-    ResolvedActionNode,
+    ActionNode,
     Plan,
     PlanEdge,
     LanguageNode,
+    BaseActionNode,
 }
 classes |= set(classes_of_module(pycram.language))
 classes -= {WorldModelManager}
@@ -126,7 +129,7 @@ def generate_orm():
     # Create an ORMatic object with the classes to be mapped
     ormatic = ORMatic(
         class_diagram,
-        type_mappings=type_mappings,
+        type_mappings=TypeDict(type_mappings),
         alternative_mappings=alternative_mappings,
     )
     logging.getLogger("krrood").setLevel(logging.DEBUG)

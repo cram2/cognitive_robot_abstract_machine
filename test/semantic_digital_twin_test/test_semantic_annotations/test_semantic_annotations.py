@@ -1,4 +1,5 @@
 import logging
+from dataclasses import field
 
 from krrood.entity_query_language.entity_result_processors import an
 from krrood.entity_query_language.entity import entity, variable, in_, inference
@@ -78,14 +79,14 @@ class TestSemanticAnnotation(SemanticAnnotation):
 
 
 def test_semantic_annotation_hash(apartment_world_setup):
-    semantic_annotation1 = Handle(body=apartment_world_setup.bodies[0])
+    semantic_annotation1 = Handle(root=apartment_world_setup.bodies[0])
     with apartment_world_setup.modify_world():
         apartment_world_setup.add_semantic_annotation(semantic_annotation1)
     assert hash(semantic_annotation1) == hash(
         (Handle, apartment_world_setup.bodies[0].id)
     )
 
-    semantic_annotation2 = Handle(body=apartment_world_setup.bodies[0])
+    semantic_annotation2 = Handle(root=apartment_world_setup.bodies[0])
     assert semantic_annotation1 == semantic_annotation2
 
 
@@ -142,7 +143,7 @@ def test_aggregate_bodies(kitchen_world):
 def test_handle_semantic_annotation_eql(apartment_world_setup):
     body = variable(type_=Body, domain=apartment_world_setup.bodies)
     query = an(
-        entity(inference(Handle)(body=body)).where(
+        entity(inference(Handle)(root=body)).where(
             in_("handle", body.name.name.lower())
         )
     )
@@ -155,9 +156,8 @@ def test_handle_semantic_annotation_eql(apartment_world_setup):
     "semantic_annotation_type, update_existing_semantic_annotations, scenario",
     [
         (Handle, False, None),
-        (Container, False, None),
         (Drawer, False, None),
-        (Cabinet, False, None),
+        (Wardrobe, False, None),
         (Door, False, None),
     ],
 )
@@ -181,25 +181,29 @@ def test_generated_semantic_annotations(kitchen_world):
         "semantic_annotations"
     ]
     drawer_container_names = [
-        v.body.name.name for v in found_semantic_annotations if isinstance(v, Container)
+        v.root.name.name
+        for v in found_semantic_annotations
+        if isinstance(v, HasCaseAsRootBody)
     ]
-    assert len(drawer_container_names) == 14
+    assert len(drawer_container_names) == 19
 
 
 @pytest.mark.order("second_to_last")
 def test_apartment_semantic_annotations(apartment_world_setup):
     world_reasoner = WorldReasoner(apartment_world_setup)
     world_reasoner.fit_semantic_annotations(
-        [Handle, Container, Drawer, Cabinet],
+        [Handle, Drawer, Wardrobe],
         world_factory=lambda: apartment_world_setup,
         scenario=None,
     )
 
     found_semantic_annotations = world_reasoner.infer_semantic_annotations()
     drawer_container_names = [
-        v.body.name.name for v in found_semantic_annotations if isinstance(v, Container)
+        v.root.name.name
+        for v in found_semantic_annotations
+        if isinstance(v, HasCaseAsRootBody)
     ]
-    assert len(drawer_container_names) == 19
+    assert len(drawer_container_names) == 27
 
 
 def fit_rules_and_assert_semantic_annotations(
@@ -223,8 +227,8 @@ def test_semantic_annotation_serialization_deserialization_once(apartment_world_
     handle_body = apartment_world_setup.bodies[0]
     door_body = apartment_world_setup.bodies[1]
 
-    handle = Handle(body=handle_body)
-    door = Door(body=door_body, handle=handle)
+    handle = Handle(root=handle_body)
+    door = Door(root=door_body, handle=handle)
     with apartment_world_setup.modify_world():
         apartment_world_setup.add_semantic_annotation(handle)
         apartment_world_setup.add_semantic_annotation(door)
@@ -241,7 +245,7 @@ def test_semantic_annotation_serialization_deserialization_once(apartment_world_
 
     assert door == door_de
     assert type(door.handle) == type(door_de.handle)
-    assert type(door.body) == type(door_de.body)
+    assert type(door.root) == type(door_de.root)
 
 
 def test_minimal_robot_annotation(pr2_world_state_reset):

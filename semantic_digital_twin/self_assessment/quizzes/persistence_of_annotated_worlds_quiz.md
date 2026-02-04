@@ -25,10 +25,10 @@ from jupyterquiz import display_quiz
 
 questions = [
     {
-      "question": "What is the role of the ORM in the semantic world?",
+      "question": "What is the role of the ORM in the semantic digital twin?",
       "type": "multiple_choice",
       "answers": [
-        {"answer": "Serialize and reconstruct worlds (including views) to/from SQL", "correct": True},
+        {"answer": "Serialize and reconstruct worlds (including semantic annotations, robot limits, actuators, ...) to/from SQL", "correct": True},
         {"answer": "Render worlds in notebooks", "correct": False},
         {"answer": "Plan robot trajectories", "correct": False},
         {"answer": "Load URDF files", "correct": False}
@@ -55,7 +55,7 @@ questions = [
       ],
     },
     {
-      "question": "What happens to semantic annotations (views) when persisting and reconstructing?",
+      "question": "What happens to semantic annotations when persisting and reconstructing?",
       "type": "multiple_choice",
       "answers": [
         {"answer": "They are stored and available after reconstruction", "correct": True},

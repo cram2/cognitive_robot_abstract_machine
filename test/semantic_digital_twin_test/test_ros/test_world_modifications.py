@@ -3,11 +3,12 @@ import unittest
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+    Door,
+)
 from semantic_digital_twin.spatial_types.spatial_types import Vector3
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Door
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -15,6 +16,7 @@ from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
     RevoluteConnection,
 )
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import Body, Actuator
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
@@ -141,8 +143,8 @@ class ConnectionModificationTestCase(unittest.TestCase):
     def test_semantic_annotation_modifications(self):
         w = World()
         b1 = Body(name=PrefixedName("b1"))
-        v1 = Handle(body=b1)
-        v2 = Door(body=b1, handle=v1)
+        v1 = Handle(root=b1)
+        v2 = Door(root=b1, handle=v1)
 
         add_v1 = AddSemanticAnnotationModification(v1)
         add_v2 = AddSemanticAnnotationModification(v2)

@@ -35,13 +35,13 @@ questions = [
       ],
     },
     {
-      "question": "Which helper locates packaged resources (e.g., URDFs) in this repository?",
+      "question": "Which helper locates packaged resources (e.g., URDFs) in the semantic digital twin?",
       "type": "multiple_choice",
       "answers": [
-        {"answer": "get_semantic_world_directory_root()", "correct": True},
-        {"answer": "find_repo_root()", "correct": False},
-        {"answer": "locate_resources()", "correct": False},
-        {"answer": "get_data_dir()", "correct": False}
+        {"answer": "resource_filename('semantic_digital_twin')", "correct": True},
+        {"answer": "find_repo_root('semantic_digital_twin')", "correct": False},
+        {"answer": "locate_resources('semantic_digital_twin')", "correct": False},
+        {"answer": "get_data_dir('semantic_digital_twin')", "correct": False}
       ],
     },
     {

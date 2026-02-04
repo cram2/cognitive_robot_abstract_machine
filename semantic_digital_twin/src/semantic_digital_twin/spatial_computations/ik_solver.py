@@ -388,7 +388,7 @@ class QPProblem:
     def _setup_weights(self):
         """Setup quadratic and linear weights for the QP problem."""
         dof_weights = [
-            0.001 * (1.0 / min(1.0, dof.upper_limits.velocity)) ** 2
+            0.001 * (1.0 / min(1.0, dof.limits.upper.velocity)) ** 2
             for dof in self.active_dofs
         ]
         slack_weights = [2500 * (1.0 / 0.2) ** 2] * 6
@@ -474,15 +474,15 @@ class ConstraintBuilder:
         upper_constraints = []
 
         for dof in active_dofs:
-            ll = max(-self.maximum_velocity, dof.lower_limits.velocity)
-            ul = min(self.maximum_velocity, dof.upper_limits.velocity)
+            ll = max(-self.maximum_velocity, dof.limits.lower.velocity)
+            ul = min(self.maximum_velocity, dof.limits.upper.velocity)
 
             if dof.has_position_limits():
                 ll = sm.max(
-                    dof.lower_limits.position - dof.variables.position, Scalar(ll)
+                    dof.limits.lower.position - dof.variables.position, Scalar(ll)
                 )
                 ul = sm.min(
-                    dof.upper_limits.position - dof.variables.position, Scalar(ul)
+                    dof.limits.upper.position - dof.variables.position, Scalar(ul)
                 )
 
             lower_constraints.append(ll)

@@ -45,7 +45,7 @@ class LocalMinimumReached(MotionStatechartNode):
         ref = []
         symbols = []
         for dof in context.world.active_degrees_of_freedom:
-            velocity_limit = dof.upper_limits.velocity
+            velocity_limit = dof.limits.upper.velocity
             velocity_limit *= self.joint_convergence_threshold
             velocity_limit = min(
                 max(self.min_cut_off, velocity_limit), self.max_cut_off

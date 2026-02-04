@@ -7,11 +7,10 @@ from .world_semantic_annotations_mcrdr_defs import *
 attribute_name = "semantic_annotations"
 conclusion_type = (
     Drawer,
-    Container,
     Handle,
     Door,
     Fridge,
-    Cabinet,
+    Wardrobe,
 )
 mutually_exclusive = False
 name = "semantic_annotations"
@@ -21,7 +20,7 @@ case_name = "World"
 
 def classify(
     case: World, **kwargs
-) -> Set[Union[Drawer, Container, Handle, Door, Fridge, Cabinet]]:
+) -> Set[Union[Drawer, Handle, Door, Fridge, Wardrobe]]:
     if not isinstance(case, Case):
         case = create_case(case, max_recursion_idx=3)
     conclusions = set()
@@ -29,11 +28,6 @@ def classify(
     if conditions_90574698325129464513441443063592862114(case):
         conclusions.update(
             make_set(conclusion_90574698325129464513441443063592862114(case))
-        )
-
-    if conditions_14920098271685635920637692283091167284(case):
-        conclusions.update(
-            make_set(conclusion_14920098271685635920637692283091167284(case))
         )
 
     if conditions_331345798360792447350644865254855982739(case):

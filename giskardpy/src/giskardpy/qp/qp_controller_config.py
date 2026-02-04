@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Optional, Dict, Type
 
-from giskardpy.middleware import get_middleware
 from giskardpy.qp.exceptions import QPSolverException
 from giskardpy.qp.qp_formulation import QPFormulation
 from giskardpy.qp.solvers.qp_solver import QPSolver
@@ -191,9 +190,7 @@ class QPControllerConfig:
             else:
                 raise QPSolverException(f"No qp solver found")
             self.qp_solver_id = self.qp_solver_class.solver_id
-        get_middleware().loginfo(
-            f'QP Solver set to "{self.qp_solver_class.solver_id.name}"'
-        )
+        logger.debug(f'QP Solver set to "{self.qp_solver_class.solver_id.name}"')
 
     def set_dof_weight(
         self, dof_name: PrefixedName, derivative: Derivatives, weight: float

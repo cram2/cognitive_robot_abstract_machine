@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from uuid import UUID
 
-from typing_extensions import Dict, Optional, TYPE_CHECKING, Self, ClassVar, Any
+from typing_extensions import Dict, Any
+from typing_extensions import Optional, TYPE_CHECKING, Self, ClassVar
 
 from ..exceptions import (
     WorldEntityWithIDNotInKwargs,
-    WorldEntityNotFoundError,
     WorldEntityWithIDNotFoundError,
 )
 
@@ -91,7 +92,11 @@ class WorldEntityWithIDKwargsTracker:
         self._world_entities_with_id[world_entity_with_id.id] = world_entity_with_id
 
     def has_world_entity_with_id(self, id: UUID) -> bool:
-        return id in self._world_entities_with_id
+        try:
+            self.get_world_entity_with_id(id)
+            return True
+        except WorldEntityWithIDNotInKwargs:
+            return False
 
     def get_world_entity_with_id(self, id: UUID) -> WorldEntityWithID:
         """

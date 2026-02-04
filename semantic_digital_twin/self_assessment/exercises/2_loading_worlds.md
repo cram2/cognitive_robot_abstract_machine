@@ -27,9 +27,9 @@ Just execute this cell without changing anything.
 :tags: [remove-input]
 import logging
 import os
-
+from pkg_resources import resource_filename
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.utils import get_semantic_digital_twin_directory_root
+
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 
 logging.disable(logging.CRITICAL)
@@ -42,7 +42,8 @@ Your goal:
 
 ```{code-cell} ipython3
 :tags: [exercise]
-root = get_semantic_digital_twin_directory_root(os.getcwd())
+
+root = resource_filename("semantic_digital_twin", "../../")
 table_urdf = os.path.join(root, "resources", "urdf", "table.urdf")
 
 # TODO: parse the URDF into a World
@@ -52,7 +53,7 @@ world = ...
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-root = get_semantic_digital_twin_directory_root(os.getcwd())
+root = resource_filename("semantic_digital_twin", "../../")
 table_urdf = os.path.join(root, "resources", "urdf", "table.urdf")
 
 world = URDFParser.from_file(table_urdf).parse()

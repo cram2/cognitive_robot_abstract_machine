@@ -18,13 +18,15 @@ sg = SymbolGraph()
 
 from semantic_digital_twin.adapters.fbx import FBXParser
 from semantic_digital_twin.adapters.procthor.procthor_pipelines import (
-    dresser_factory_from_body,
+    dresser_from_body_in_world,
 )
 from semantic_digital_twin.orm.ormatic_interface import *
 from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
 )
-from semantic_digital_twin.semantic_annotations.mixins import HasBody
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasRootBody,
+)
 from semantic_digital_twin.pipeline.pipeline import (
     Pipeline,
     BodyFilter,
@@ -73,18 +75,18 @@ def replace_dresser_meshes_with_factories(
     :param dresser_pattern: A compiled regex pattern to identify dresser bodies.
     :return: List of World objects with dresser meshes replaced by factories.
     """
-    procthor_factory_replace_pipeline = Pipeline(
+    procthor_replace_pipeline = Pipeline(
         [
             BodyFactoryReplace(
                 body_condition=lambda b: bool(dresser_pattern.fullmatch(b.name.name))
                 and not (
                     "drawer" in b.name.name.lower() or "door" in b.name.name.lower()
                 ),
-                factory_creator=dresser_factory_from_body,
+                annotation_creator=dresser_from_body_in_world,
             )
         ]
     )
-    worlds = [procthor_factory_replace_pipeline.apply(w) for w in worlds]
+    worlds = [procthor_replace_pipeline.apply(w) for w in worlds]
     return worlds
 
 
@@ -109,7 +111,7 @@ def parse_fbx_file_to_world_mapping_daos(fbx_file_path: str) -> List[WorldMappin
     worlds = remove_root_and_move_children_into_new_worlds(world)
 
     worlds = replace_dresser_meshes_with_factories(worlds, dresser_pattern)
-    resolver = ProcthorResolver(*[recursive_subclasses(HasBody)])
+    resolver = ProcthorResolver(*[recursive_subclasses(HasRootBody)])
     for world in worlds:
         resolved = resolver.resolve(world.name)
         if resolved:

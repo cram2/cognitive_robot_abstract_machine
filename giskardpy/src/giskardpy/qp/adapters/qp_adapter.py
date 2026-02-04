@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import logging
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -10,16 +11,16 @@ import numpy as np
 from line_profiler import profile
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.qp.exceptions import (
-    InfeasibleException,
-    VelocityLimitUnreachableException,
-)
 from giskardpy.middleware import get_middleware
 from giskardpy.qp.constraint import (
     DerivativeInequalityConstraint,
     DerivativeEqualityConstraint,
 )
 from giskardpy.qp.constraint_collection import ConstraintCollection
+from giskardpy.qp.exceptions import (
+    InfeasibleException,
+    VelocityLimitUnreachableException,
+)
 from giskardpy.qp.pos_in_vel_limits import b_profile
 from giskardpy.qp.qp_data import QPData
 from giskardpy.qp.solvers.qp_solver import QPSolver
@@ -28,6 +29,8 @@ from giskardpy.utils.decorators import memoize
 from giskardpy.utils.math import mpc
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import scipy.sparse as sp
@@ -101,7 +104,7 @@ def find_best_jerk_limit(
         else:
             lower_bound = jerk_limit
             jerk_limit = round((jerk_limit + upper_bound) / 2, 4)
-    print(
+    logger.debug(
         f"best velocity limit: {best_vel_limit} "
         f"(target = {target_vel_limit}) with jerk limit: {best_jerk_limit} after {i + 1} iterations"
     )
@@ -221,26 +224,26 @@ class ProblemDataPart(ABC):
         if not v.has_position_limits():
             lower_limits.position = upper_limits.position = None
         else:
-            lower_limits.position = v.lower_limits.position
-            upper_limits.position = v.upper_limits.position
+            lower_limits.position = v.limits.lower.position
+            upper_limits.position = v.limits.upper.position
 
         # %% vel limits
-        lower_limits.velocity = v.lower_limits.velocity
-        upper_limits.velocity = v.upper_limits.velocity
+        lower_limits.velocity = v.limits.lower.velocity
+        upper_limits.velocity = v.limits.upper.velocity
         if self.config.prediction_horizon == 1:
             return sm.Vector([lower_limits.velocity]), sm.Vector(
                 [upper_limits.velocity]
             )
 
         # %% acc limits
-        if v.lower_limits.acceleration is None:
+        if v.limits.lower.acceleration is None:
             lower_limits.acceleration = -np.inf
         else:
-            lower_limits.acceleration = v.lower_limits.acceleration
-        if v.upper_limits.acceleration is None:
+            lower_limits.acceleration = v.limits.lower.acceleration
+        if v.limits.upper.acceleration is None:
             upper_limits.acceleration = np.inf
         else:
-            upper_limits.acceleration = v.upper_limits.acceleration
+            upper_limits.acceleration = v.limits.upper.acceleration
 
         # %% jerk limits
         if upper_limits.jerk is None:
@@ -252,8 +255,8 @@ class ProblemDataPart(ABC):
             )
             lower_limits.jerk = -upper_limits.jerk
         else:
-            upper_limits.jerk = v.upper_limits.jerk
-            lower_limits.jerk = v.lower_limits.jerk
+            upper_limits.jerk = v.limits.upper.jerk
+            lower_limits.jerk = v.limits.lower.jerk
 
         try:
             lb, ub = b_profile(
@@ -377,7 +380,7 @@ class Weights(ProblemDataPart):
                     ):
                         continue
                     normalized_weight = self.normalize_dof_weight(
-                        limit=v.upper_limits.data[derivative],
+                        limit=v.limits.upper.data[derivative],
                         base_weight=self.config.get_dof_weight(v.name, derivative),
                         t=t,
                         derivative=derivative,

@@ -30,6 +30,9 @@ def test_simplify_tree(immutable_model_world):
     assert len(plan.root.children) == 3
     assert plan.root.children[0].children == []
 
+    assert len(plan.nodes) == len(plan.all_nodes)
+    assert len(plan.edges) == len(plan.all_nodes) - 1
+
 
 def test_sequential_construction(immutable_model_world):
     world, robot_view, context = immutable_model_world
@@ -62,6 +65,9 @@ def test_try_in_order_construction(immutable_model_world):
     plan = TryInOrderPlan(context, act, act2, act3)
     assert isinstance(plan, TryInOrderPlan)
     assert len(plan.root.children) == 3
+
+    assert len(plan.nodes) == len(plan.all_nodes)
+    assert len(plan.edges) == len(plan.all_nodes) - 1
 
 
 def test_try_all_construction(immutable_model_world):
@@ -118,6 +124,9 @@ def test_monitor_construction(immutable_model_world):
     plan = MonitorPlan(monitor_func, context, SequentialPlan(context, act, act2))
     assert len(plan.root.children) == 1
     assert isinstance(plan.root, MonitorNode)
+
+    assert len(plan.nodes) == len(plan.all_nodes)
+    assert len(plan.edges) == len(plan.all_nodes) - 1
 
 
 def test_retry_monitor_construction(immutable_model_world):
@@ -238,6 +247,24 @@ def test_perform_desig(immutable_model_world):
         world.get_degree_of_freedom_by_name("torso_lift_joint").id
     ].position == pytest.approx(0.3, abs=0.1)
 
+    assert len(plan.nodes) == len(plan.all_nodes)
+    assert len(plan.edges) == len(plan.all_nodes) - 1
+
+
+def test_perform_single_designator(immutable_model_world):
+    world, robot_view, context = immutable_model_world
+
+    plan = SequentialPlan(context, MoveTorsoActionDescription([TorsoState.HIGH]))
+    with simulated_robot:
+        plan.perform()
+
+    assert world.state[
+        world.get_degree_of_freedom_by_name("torso_lift_joint").id
+    ].position == pytest.approx(0.3, abs=0.1)
+
+    assert len(plan.nodes) == len(plan.all_nodes)
+    assert len(plan.edges) == len(plan.all_nodes) - 1
+
 
 def test_perform_parallel(immutable_model_world):
     world, robot_view, context = immutable_model_world
@@ -265,6 +292,9 @@ def test_perform_repeat(immutable_model_world):
     with simulated_robot:
         plan.perform()
     assert test_var.get_value() == 10
+
+    assert len(plan.nodes) == len(plan.all_nodes)
+    assert len(plan.edges) == len(plan.all_nodes) - 1
 
 
 def test_exception_sequential(immutable_model_world):

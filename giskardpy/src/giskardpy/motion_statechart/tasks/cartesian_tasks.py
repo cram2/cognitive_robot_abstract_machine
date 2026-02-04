@@ -32,7 +32,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class CartesianPosition(Task):
     """
     Move a tip link to a goal position in 3D space.
@@ -119,7 +119,7 @@ class CartesianPosition(Task):
             self._fk_binding.bind(context.world)
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class CartesianPositionStraight(Task):
     """
     Move a tip link to a goal position along a straight line.
@@ -248,7 +248,7 @@ class CartesianPositionStraight(Task):
             self._fk_binding.bind(context.world)
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class CartesianOrientation(Task):
     """
     Rotate a tip link to match a goal orientation.
@@ -643,7 +643,7 @@ class CartesianVelocityLimit(Parallel):
         self.nodes.append(rotational)
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class CartesianPositionVelocityTarget(Task):
     root_link: Body = field(kw_only=True)
     tip_link: Body = field(kw_only=True)
@@ -685,7 +685,7 @@ class CartesianPositionVelocityTarget(Task):
         )
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class JustinTorsoLimitCart(Task):
     root_link: Body = field(kw_only=True)
     tip_link: Body = field(kw_only=True)

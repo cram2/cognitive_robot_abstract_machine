@@ -1,19 +1,25 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import dataclass, field
+from enum import Enum
 
 import rustworkx as rx
+import sqlalchemy
 from sortedcontainers import SortedSet
-from sqlalchemy import TypeDecorator
+from sqlalchemy import JSON
 from typing_extensions import List, Type, Dict
 from typing_extensions import Optional, TextIO
 
-from .custom_types import TypeType
+from .custom_types import TypeType, PolymorphicEnumType
 from .dao import AlternativeMapping
 from .sqlalchemy_generator import SQLAlchemyGenerator
-from .utils import InheritanceStrategy, module_and_class_name
+from .type_dict import TypeDict
+from .utils import InheritanceStrategy
+from ..utils import module_and_class_name
 from .wrapped_table import WrappedTable, AssociationTable
+from ..adapters.json_serializer import SubclassJSONSerializer
 from ..class_diagrams.class_diagram import (
     ClassDiagram,
     ClassRelation,
@@ -22,8 +28,6 @@ from ..class_diagrams.class_diagram import (
 from ..class_diagrams.wrapped_field import WrappedField
 
 logger = logging.getLogger(__name__)
-
-TypeMappingsType = Dict[Type, Type[TypeDecorator]]
 
 
 class AlternativelyMaps(ClassRelation):
@@ -49,7 +53,7 @@ class ORMatic:
     List of alternative mappings that should be used to map classes.
     """
 
-    type_mappings: TypeMappingsType = field(default_factory=dict)
+    type_mappings: TypeDict = field(default_factory=TypeDict)
     """
     A dict that maps classes to custom types that should be used to save the classes.
     They keys of the type mappings must be disjoint with the classes given..
@@ -93,8 +97,8 @@ class ORMatic:
     """
 
     def __post_init__(self):
-        self.type_mappings[Type] = TypeType
-        self.imported_modules.add(Type.__module__)
+        self.imported_modules.add(TypeDict.__module__)
+        self._fill_type_mappings()
         self._create_inheritance_graph()
         self._add_alternative_mappings_to_class_diagram()
         self._create_wrapped_tables()
@@ -102,6 +106,18 @@ class ORMatic:
 
         for wrapped_table in self.wrapped_tables.values():
             self.imported_modules.add(wrapped_table.wrapped_clazz.clazz.__module__)
+
+    def _fill_type_mappings(self):
+        """
+        Fill the type mappings of this with needed defaults
+        """
+        self.type_mappings[Type] = TypeType
+        self.type_mappings[Enum] = PolymorphicEnumType
+        self.type_mappings[SubclassJSONSerializer] = JSON
+        self.type_mappings[uuid.UUID] = sqlalchemy.UUID
+
+        for key in self.type_mappings.keys():
+            self.imported_modules.add(key.__module__)
 
     def _create_wrapped_tables(self):
         for wrapped_clazz in self.wrapped_classes_in_topological_order:

@@ -5,9 +5,9 @@ import time
 from dataclasses import field, dataclass
 from datetime import datetime
 from enum import IntEnum
+from itertools import chain
 from typing import ClassVar
 
-import networkx as nx
 import numpy as np
 import rustworkx as rx
 import rustworkx.visualization
@@ -23,13 +23,18 @@ from typing_extensions import (
     Tuple,
     Iterator,
     Union,
+    Generic,
+    TypeVar,
 )
 
 from giskardpy.motion_statechart.graph_node import Task
+from krrood.class_diagrams.failures import ClassIsUnMappedInClassDiagram
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
 )
+from krrood.class_diagrams.class_diagram import ClassDiagram
+from krrood.probabilistic_knowledge.parameterizer import Parameterizer
 from .datastructures.dataclasses import ExecutionData, Context
 from .datastructures.enums import TaskStatus
 from .datastructures.pose import PoseStamped
@@ -39,14 +44,25 @@ from .has_parameters import leaf_types
 from .motion_executor import MotionExecutor
 
 if TYPE_CHECKING:
-    from .robot_plans import BaseMotion, ActionDescription
-    from .designator import DesignatorDescription
+    from .robot_plans import ActionDescription
+    from .designator import DesignatorDescription, DesignatorType
+    from .datastructures.partial_designator import PartialDesignator
+    from .robot_plans.actions.base import ActionType
+    from .robot_plans.motions.base import MotionType
+else:
+    ActionType = TypeVar("ActionType")
+    MotionType = TypeVar("MotionType")
+    DesignatorType = TypeVar("DesignatorType")
+
 logger = logging.getLogger(__name__)
 
 
 class PlotAlignment(IntEnum):
     HORIZONTAL = 0
     VERTICAL = 1
+
+
+T = TypeVar("T")
 
 
 @dataclass
@@ -79,9 +95,7 @@ class Plan:
     Callbacks to be called when a node of the given type is ended.
     """
 
-    def __init__(
-        self, root: PlanNode, context: Context
-    ):  # world: World, robot: AbstractRobot, super_plan: Plan = None):
+    def __init__(self, root: PlanNode, context: Context):
         super().__init__()
         self.plan_graph = rx.PyDiGraph()
         self.node_indices = {}
@@ -94,13 +108,27 @@ class Plan:
 
         self.add_node(self.root)
         self.current_node: PlanNode = self.root
-        self.on_start_callback = {}
-        self.on_end_callback = {}
         if self.super_plan:
             self.super_plan.add_edge(self.super_plan.current_node, self.root)
 
     @property
-    def nodes(self):
+    def nodes(self) -> List[PlanNode]:
+        """
+        All nodes of the plan in depth first order.
+
+        .. info::
+            This will only return nodes that have a path from the root node. Nodes that are part of the plan but do not
+            have a path from the root node will not be returned. In that case use all_nodes
+
+        :return: All nodes under the root node in depth first order
+        """
+        return [self.root] + self.root.recursive_children
+
+    @property
+    def all_nodes(self) -> List[PlanNode]:
+        """
+        All nodes that are part of this plan
+        """
         return self.plan_graph.nodes()
 
     @property
@@ -115,9 +143,8 @@ class Plan:
         :param mount_node: A node of this plan to which the other plan will be mounted. If None, the root of this plan will be used.
         """
         mount_node = mount_node or self.root
-        self.add_nodes_from(other.nodes)
-        self.add_edges_from(other.edges)
         self.add_edge(mount_node, other.root)
+        self.add_edges_from(other.edges)
         for node in self.nodes:
             node.execute = self
             node.world = self.world
@@ -168,10 +195,12 @@ class Plan:
         :param v_of_edge: Target node of the edge
         :param attr: Additional attributes to be added to the edge
         """
-        if u_of_edge not in self.nodes:
+        if u_of_edge not in self.all_nodes:
             self.add_node(u_of_edge)
-        if v_of_edge not in self.nodes:
+        if v_of_edge not in self.all_nodes:
             self.add_node(v_of_edge)
+        self._set_layer_indices(u_of_edge, v_of_edge)
+
         self.plan_graph.add_edge(
             self.node_indices[u_of_edge],
             self.node_indices[v_of_edge],
@@ -179,6 +208,62 @@ class Plan:
         )
         if self.super_plan:
             self.super_plan.add_edge(u_of_edge, v_of_edge)
+
+    def _set_layer_indices(
+        self,
+        parent_node: PlanNode,
+        child_node: PlanNode,
+        node_to_insert_after: PlanNode = None,
+        node_to_insert_before: PlanNode = None,
+    ):
+        """
+        Shifts the layer indices of nodes in the layer such that the index for the child node is free and does not collide
+        with another index.
+        If a node_to_insert_after is given the index of all nodes after the given node will be shifted by one.
+        if an node_to_insert_before is given the index of all nodes after the given node will be shifted by one plus the
+        index of the node_to_insert_before.
+        If none is given the child node will be inserted after the last child of the parent node and all indices will
+        be shifter accordingly.
+
+        :param parent_node: The parent node under which the new node will be inserted.
+        :param child_node: The node that will be inserted.
+        :param node_to_insert_after: The node after which the new node will be inserted.
+        :param node_to_insert_before: The node before which the new node will be inserted.
+        """
+        if node_to_insert_after:
+            child_node.layer_index = node_to_insert_after.layer_index + 1
+            for node in self.get_following_nodes(node_to_insert_after, on_layer=True):
+                node.layer_index += 1
+        elif node_to_insert_before:
+            child_node.layer_index = node_to_insert_before.layer_index
+            for node in self.get_following_nodes(
+                node_to_insert_before, on_layer=True
+            ) + [node_to_insert_before]:
+                node.layer_index += 1
+        else:
+            new_position, nodes_to_shift = self._find_nodes_to_shift_index(parent_node)
+            child_node.layer_index = new_position
+            for node in nodes_to_shift:
+                node.layer_index += 1
+
+    def _find_nodes_to_shift_index(
+        self, parent_node: PlanNode
+    ) -> Tuple[int, List[PlanNode]]:
+
+        parent_prev_nodes = self.get_previous_nodes(parent_node, on_layer=True)
+        parent_follow_nodes = self.get_following_nodes(parent_node, on_layer=True)
+
+        prev_nodes_child_layer = (
+            list(chain(*[p.children for p in parent_prev_nodes])) + parent_node.children
+        )
+        follow_nodes_child_layer = list(
+            chain(*[p.children for p in parent_follow_nodes])
+        )
+
+        return (
+            max([n.layer_index for n in prev_nodes_child_layer] + [-1]) + 1,
+            follow_nodes_child_layer,
+        )
 
     def add_edges_from(
         self, ebunch_to_add: Iterable[Tuple[PlanNode, PlanNode]], **attr
@@ -267,17 +352,143 @@ class Plan:
                 child.perform()
 
     @property
-    def actions(self) -> List[ActionNode]:
-        return list(
-            filter(
-                None,
-                [node if type(node) is ActionNode else None for node in self.nodes],
-            )
-        )
+    def actions(self) -> List[ActionDescriptionNode]:
+        return [node for node in self.nodes if type(node) is ActionDescriptionNode]
 
     @property
     def layers(self) -> List[List[PlanNode]]:
-        return rx.layers(self.plan_graph, [self.root.index], index_output=False)
+        """
+        Returns the nodes of the plan layer by layer starting from the root node.
+
+        :return: A list of lists where each list represents a layer
+        """
+        layer = rx.layers(
+            self.plan_graph, [self.node_indices[self.root]], index_output=False
+        )
+        return [sorted(l, key=lambda x: x.layer_index) for l in layer]
+
+    def get_layer_by_node(self, node: PlanNode) -> List[PlanNode]:
+        """
+        Returns the layer this node is on
+
+        :param node: The node to get layer for
+        :return: The layer as a list of nodes
+        """
+        return [l for l in self.layers if node in l][0]
+
+    def get_previous_nodes(
+        self, node: PlanNode, on_layer: bool = False
+    ) -> List[PlanNode]:
+        """
+        Gets the previous nodes to the given node. Previous meaning the nodes that are before the given one in
+        depth first order of nodes.
+
+        :param node: The node to get previous nodes for
+        :param on_layer: Returns the previous nodes from the same layer as the given node
+        :return: The previous nodes as a list of nodes
+        """
+        search_space = self.get_layer_by_node(node) if on_layer else self.nodes
+        previous_nodes = []
+        for search_node in search_space:
+            if search_node == node:
+                break
+            previous_nodes.append(search_node)
+        return previous_nodes
+
+    def get_following_nodes(self, node: PlanNode, on_layer: bool = False):
+        """
+        Gets the nodes that come after the given node. Following meaning the nodes that are after the given node
+        for all nodes in depth first order of nodes.
+
+        :param node: The node to get following nodes for
+        :param on_layer: Returns the following nodes from the same layer as the given node
+        :return: The following nodes as a list of nodes
+        """
+        search_space = self.get_layer_by_node(node) if on_layer else self.nodes
+        for i, search_node in enumerate(search_space):
+            if search_node == node:
+                return search_space[i + 1 :]
+        return []
+
+    def get_previous_node_by_type(
+        self, origin_node: PlanNode, node_type: Type[T], on_layer: bool = False
+    ) -> T:
+        """
+        Returns the Plan Node that precedes the given node on the same level
+
+        :param origin_node: The node to be preceded, also determines the layer of the plan
+        :param node_type: The type of the plan node
+        :param on_layer: Whether the returned node should be on the same layer as the given one
+        :return: The Plan Node that precedes the given node
+        """
+        search_space = self.get_previous_nodes(origin_node, on_layer)
+        search_space.reverse()
+
+        return [node for node in search_space if type(node) == node_type]
+
+    def get_previous_node_by_designator_type(
+        self,
+        node: PlanNode,
+        action_type: Type[ActionType] | Type[MotionType],
+        on_layer: bool = False,
+    ) -> (
+        ActionNode[ActionType]
+        | ActionDescriptionNode[ActionType]
+        | MotionNode[MotionType]
+    ):
+        """
+        Returns the Action Node that precedes the given node on the same level and contains the designator of the given
+        type.
+
+        :param node: The node to be preceded, also determines the layer of the plan
+        :param action_type: The type of the plan node
+        :param on_layer: Whether the returned node should be on the same layer as the given one
+        :return: The Plan Node that precedes the given node
+        """
+        search_space = self.get_previous_nodes(node, on_layer)
+        search_space.reverse()
+        return [
+            node
+            for node in search_space
+            if issubclass(type(node), DesignatorNode)
+            and node.designator_type == action_type
+        ][0]
+
+    def get_nodes_by_designator_type(
+        self, designator_type: Type[T]
+    ) -> List[DesignatorNode[T]]:
+        """
+        Returns all Action nodes that have the same designator type as the given one.
+
+        :param designator_type: The designator type of the node that should be returned
+        :return: A list of Action nodes that have the same designator type as the given one
+        """
+        return [
+            node
+            for node in self.nodes
+            if isinstance(node, DesignatorNode)
+            and node.designator_type == designator_type
+        ]
+
+    def get_node_by_designator_type(
+        self, designator_type: Type[T]
+    ) -> DesignatorNode[T]:
+        """
+        Returns the first Action node that has the same designator type as the given one.
+
+        :param designator_type: The designator type of the node that should be returned
+        :return: The first Action node that has the same designator type as the given one
+        """
+        return self.get_nodes_by_designator_type(designator_type)[0]
+
+    def get_nodes_by_type(self, node_type: Type[T]) -> List[T]:
+        """
+        Returns a list of nodes that match the given type.
+
+        :param node_type: The type of the node that should be returned
+        :return: A list of nodes that match the given type
+        """
+        return [node for node in self.nodes if type(node) is node_type]
 
     def bfs_layout(
         self, scale: float = 1.0, align: PlotAlignment = PlotAlignment.VERTICAL
@@ -408,6 +619,49 @@ class Plan:
             cls.on_end_callback[action_type].remove(callback)
 
 
+    def parameterize_plan(self, classes: Optional[List[type]] = None) -> List[Any]:
+        """
+        Parameterize all parameters of a plan using the krrood parameterizer.
+
+        :param classes: List of classes to include in the ClassDiagram
+                        (including classes found on the plan nodes).
+        :return: List of random event variables created by the parameterizer.
+        """
+
+        ordered_nodes = [self.root] + self.root.recursive_children
+        designator_nodes = []
+        all_classes = set(classes)
+
+        for node in ordered_nodes:
+            if not (isinstance(node, DesignatorNode) and node.designator_type):
+                continue
+
+            designator_nodes.append(node)
+            all_classes.add(node.designator_type)
+
+        class_diagram = ClassDiagram(list(all_classes))
+        parameterizer = Parameterizer()
+
+        all_variables = []
+
+        for index, node in enumerate(designator_nodes):
+            try:
+                wrapped_class = class_diagram.get_wrapped_class(node.designator_type)
+            except ClassIsUnMappedInClassDiagram as e:
+                logger.error(
+                    f"Unmapped designator class for node {getattr(node, 'name', repr(node))} "
+                    f"(designator_index={index}, node_index={node.index}, {node.__class__.__name__}): {e}"
+                )
+                raise
+
+            prefix = f"{node.designator_type.__name__}_{index}"
+            variables = parameterizer.parameterize(wrapped_class, prefix=prefix)
+
+            all_variables.extend(variables)
+
+        return all_variables
+
+
 def managed_node(func: Callable) -> Callable:
     """
     Decorator which manages the state of a node, including the start and end time, status and reason of failure as well
@@ -470,7 +724,7 @@ def managed_node(func: Callable) -> Callable:
     return wrapper
 
 
-@dataclass
+@dataclass(eq=False)
 class PlanNode:
     status: TaskStatus = TaskStatus.CREATED
     """
@@ -498,6 +752,11 @@ class PlanNode:
     plan: Optional[Plan] = None
     """
     Reference to the plan to which this node belongs
+    """
+
+    layer_index: int = field(default=0, init=False, repr=False)
+    """
+    The position of this node in the plan graph, as tuple of layer and index in layer
     """
 
     @property
@@ -532,8 +791,7 @@ class PlanNode:
         :return:  A list of child nodes
         """
         children = self.plan.plan_graph.successors(self.index)
-        children.reverse()
-        return children
+        return sorted(children, key=lambda node: node.layer_index)
 
     @property
     def recursive_children(self) -> List[PlanNode]:
@@ -542,10 +800,12 @@ class PlanNode:
 
         :return: A list of all nodes below this node
         """
-        return [
-            self.plan.plan_graph[i]
-            for i in rx.descendants(self.plan.plan_graph, self.index)
-        ]
+        rec_children = []
+        for child in self.children:
+            rec_children.append(child)
+            rec_children.extend(child.recursive_children)
+
+        return rec_children
 
     @property
     def subtree(self) -> Plan:
@@ -583,6 +843,28 @@ class PlanNode:
         """
         return self.children == []
 
+    @property
+    def layer(self) -> List[PlanNode]:
+        return self.plan.get_layer_by_node(self)
+
+    @property
+    def left_neighbour(self) -> Optional[PlanNode]:
+        left_node = [
+            node
+            for node in self.layer
+            if node.layer_index[1] == self.layer_index[1] - 1
+        ]
+        return left_node[0] if left_node else None
+
+    @property
+    def right_neighbour(self) -> Optional[PlanNode]:
+        right_node = [
+            node
+            for node in self.layer
+            if node.layer_index[1] == self.layer_index[1] + 1
+        ]
+        return right_node[0] if right_node else None
+
     def flattened_parameters(self):
         """
         The core types pf this node as dict
@@ -619,14 +901,14 @@ class PlanNode:
         self.status = TaskStatus.SLEEPING
 
 
-@dataclass
-class DesignatorNode(PlanNode):
-    designator_ref: DesignatorDescription = None
+@dataclass(eq=False)
+class DesignatorNode(PlanNode, Generic[DesignatorType]):
+    designator_ref: DesignatorType = None
     """
     Reference to the Designator in this node
     """
 
-    designator_type: Optional[Any] = None
+    designator_type: Type[DesignatorType] = None
     """
     The action and that is performed or None if nothing was performed
     """
@@ -663,20 +945,26 @@ class DesignatorNode(PlanNode):
         return self.designator_ref.flatten()
 
 
-@dataclass
-class ActionNode(DesignatorNode):
+@dataclass(eq=False)
+class BaseActionNode(DesignatorNode, Generic[ActionType]):
+
+    designator_type: Type[ActionType] = None
+    """
+    Class of the ActionDesignator
+    """
+
+
+@dataclass(eq=False)
+class ActionDescriptionNode(BaseActionNode, Generic[ActionType]):
     """
     A node in the plan representing an ActionDesignator description
     """
 
-    action_iter: Iterator[ActionDescription] = None
+    designator_ref: PartialDesignator[ActionType] = None
+
+    action_iter: Iterator[ActionType] = None
     """
     Iterator over the current evaluation state of the ActionDesignator Description
-    """
-
-    designator_type: Type[ActionDescription] = None
-    """
-    Class of the ActionDesignator
     """
 
     def __hash__(self):
@@ -697,9 +985,9 @@ class ActionNode(DesignatorNode):
             key: resolved_action.__getattribute__(key)
             for key in self.designator_ref.kwargs.keys()
         }
-        resolved_action_node = ResolvedActionNode(
+        resolved_action_node = ActionNode(
             designator_ref=resolved_action,
-            designator_type=resolved_action.__class__,
+            designator_type=self.designator_type,
             kwargs=kwargs,
         )
         self.plan.add_edge(self, resolved_action_node)
@@ -710,21 +998,13 @@ class ActionNode(DesignatorNode):
         return f"<{self.designator_ref.performable.__name__}>"
 
 
-@dataclass
-class ResolvedActionNode(DesignatorNode):
+@dataclass(eq=False)
+class ActionNode(BaseActionNode, Generic[ActionType]):
     """
     A node representing a resolved ActionDesignator with fully specified parameters
     """
 
-    designator_ref: ActionDescription = None
-    """
-    Reference to the ActionDesignator in this node
-    """
-
-    designator_type: Type[ActionDescription] = None
-    """
-    Class of the ActionDesignator
-    """
+    designator_ref: ActionType = None
 
     execution_data: ExecutionData = None
     """
@@ -842,16 +1122,18 @@ class ResolvedActionNode(DesignatorNode):
         return f"<Resolved {self.designator_ref.__class__.__name__}>"
 
 
-@dataclass
-class MotionNode(DesignatorNode):
+@dataclass(eq=False)
+class MotionNode(DesignatorNode, Generic[MotionType]):
     """
     A node in the plan representing a MotionDesignator
     """
 
-    designator_ref: Type[BaseMotion] = None
+    designator_ref: MotionType = None
     """
     Reference to the MotionDesignator
     """
+
+    designator_type: Type[MotionType] = None
 
     def __hash__(self):
         return id(self)
@@ -880,6 +1162,4 @@ class MotionNode(DesignatorNode):
         """
         Returns the next resolved action node in the plan above this motion node.
         """
-        return list(
-            filter(lambda x: isinstance(x, ResolvedActionNode), self.all_parents)
-        )[0]
+        return list(filter(lambda x: isinstance(x, ActionNode), self.all_parents))[0]

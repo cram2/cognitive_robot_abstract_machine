@@ -2,30 +2,35 @@ from __future__ import annotations
 
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
+from functools import wraps
+from typing import Any
 from uuid import UUID
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from typing_extensions import (
     List,
     Dict,
     Any,
     Self,
-    Callable,
     TYPE_CHECKING,
 )
 
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    to_json,
+    from_json,
+    JSONAttributeDiff,
+    list_like_classes,
+    shallow_diff_json,
+)
 from .degree_of_freedom import DegreeOfFreedom
 from .world_entity import (
     KinematicStructureEntity,
     SemanticAnnotation,
     Connection,
-    WorldEntity,
     Actuator,
+    WorldEntityWithID,
 )
-from ..adapters.world_entity_kwargs_tracker import (
-    WorldEntityWithIDKwargsTracker,
-)
-from ..datastructures.prefixed_name import PrefixedName
+from ..exceptions import MissingWorldModificationContextError
 
 if TYPE_CHECKING:
     from ..world import World
@@ -62,6 +67,70 @@ class WorldModelModification(SubclassJSONSerializer, ABC):
         :return: A new instance.
         """
         raise NotImplementedError
+
+
+@dataclass
+class AttributeUpdateModification(WorldModelModification):
+    """
+    An update to one or more attributes of an entity in the world.
+    This is used when decorating a method with  @synchronized_attribute_modification
+    """
+
+    entity_id: UUID
+    """
+    The UUID of the entity that was updated.
+    """
+
+    updated_kwargs: List[JSONAttributeDiff]
+    """
+    The list of attribute names and their new values.
+    """
+
+    @classmethod
+    def from_kwargs(cls, kwargs: Dict[str, Any]):
+        return cls(from_json(kwargs["entity_id"]), from_json(kwargs["updated_kwargs"]))
+
+    def apply(self, world: World):
+        entity = world.get_world_entity_with_id_by_id(self.entity_id)
+        for diff in self.updated_kwargs:
+            current_value = getattr(entity, diff.attribute_name)
+            if isinstance(current_value, list_like_classes):
+                self._apply_to_list(world, current_value, diff)
+            else:
+                obj = self._resolve_item(world, diff.added_values[0])
+                setattr(entity, diff.attribute_name, obj)
+
+    def _apply_to_list(
+        self, world: World, current_value: List[Any], diff: JSONAttributeDiff
+    ):
+        for raw in diff.removed_values:
+            obj = self._resolve_item(world, raw)
+            if obj in current_value:
+                current_value.remove(obj)
+
+        for raw in diff.added_values:
+            obj = self._resolve_item(world, raw)
+            if obj not in current_value:
+                current_value.append(obj)
+
+    def _resolve_item(self, world: World, item: Any):
+        if isinstance(item, UUID):
+            return world.get_world_entity_with_id_by_id(item)
+        return item
+
+    def to_json(self):
+        return {
+            **super().to_json(),
+            "entity_id": to_json(self.entity_id),
+            "updated_kwargs": to_json(self.updated_kwargs),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(
+            entity_id=from_json(data["entity_id"]),
+            updated_kwargs=from_json(data["updated_kwargs"]),
+        )
 
 
 @dataclass
@@ -365,6 +434,7 @@ class WorldModelModificationBlock(SubclassJSONSerializer):
     """
 
     def apply(self, world: World):
+        ...
         with world.modify_world():
             for modification in self.modifications:
                 modification.apply(world)
@@ -431,3 +501,43 @@ class SetDofHasHardwareInterface(WorldModelModification):
             ],
             value=data["value"],
         )
+
+
+def synchronized_attribute_modification(func):
+    """
+    Decorator to synchronize attribute modifications.
+
+    Ensures that any modifications to the attributes of an instance of WorldEntityWithID are properly recorded and any
+    resultant changes are appended to the current model modification block in the world model manager. Keeps track of
+    the pre- and post-modification states of the object to compute the differences and maintain a log of updates.
+
+    ..warning::
+        This only works for WorldEntityWithID which are also completely JSONSerializable without any many-to-many/one objects
+        out side of other WorldEntityWithID
+    """
+
+    @wraps(func)
+    def wrapper(self: WorldEntityWithID, *args: Any, **kwargs: Any) -> Any:
+
+        object_before_change = to_json(self)
+        result = func(self, *args, **kwargs)
+        object_after_change = to_json(self)
+        diff = shallow_diff_json(object_before_change, object_after_change)
+
+        current_model_modification_block = (
+            self._world.get_world_model_manager().current_model_modification_block
+        )
+        if current_model_modification_block is None:
+            raise MissingWorldModificationContextError(func)
+
+        current_model_modification_block.append(
+            AttributeUpdateModification.from_kwargs(
+                {
+                    "entity_id": object_after_change["id"],
+                    "updated_kwargs": to_json(diff),
+                }
+            )
+        )
+        return result
+
+    return wrapper

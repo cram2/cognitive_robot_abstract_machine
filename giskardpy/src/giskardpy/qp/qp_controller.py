@@ -399,7 +399,7 @@ class QPController:
             config=self.config,
         )
 
-        get_middleware().loginfo("Done compiling controller:")
+        # get_middleware().loginfo("Done compiling controller:")
         # get_middleware().loginfo(f'  #free variables: {self.num_free_variables}')
         # get_middleware().loginfo(f'  #equality constraints: {self.num_eq_constraints}')
         # get_middleware().loginfo(f'  #inequality constraints: {self.num_ineq_constraints}')

@@ -41,7 +41,7 @@ class Open(Goal):
             ActiveConnection1DOF
         )
 
-        max_position = self.connection.dof.upper_limits.position
+        max_position = self.connection.dof.limits.upper.position
         if self.goal_joint_state is None:
             self.goal_joint_state = max_position
         else:
@@ -51,7 +51,9 @@ class Open(Goal):
             [
                 JointPositionList(
                     name="hinge goal",
-                    goal_state=JointState({self.connection: self.goal_joint_state}),
+                    goal_state=JointState.from_mapping(
+                        {self.connection: self.goal_joint_state}
+                    ),
                     weight=self.weight,
                 ),
                 CartesianPose(
@@ -99,7 +101,7 @@ class Close(Open):
             ActiveConnection1DOF
         )
 
-        min_position = self.connection.dof.lower_limits.position
+        min_position = self.connection.dof.limits.lower.position
         if self.goal_joint_state is None:
             self.goal_joint_state = min_position
         else:
@@ -109,7 +111,9 @@ class Close(Open):
             [
                 JointPositionList(
                     name="hinge goal",
-                    goal_state=JointState({self.connection: self.goal_joint_state}),
+                    goal_state=JointState.from_mapping(
+                        {self.connection: self.goal_joint_state}
+                    ),
                     weight=self.weight,
                 ),
                 CartesianPose(

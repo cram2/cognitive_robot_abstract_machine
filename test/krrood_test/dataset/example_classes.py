@@ -4,8 +4,9 @@ import importlib
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import Enum, auto
 from types import FunctionType
+from typing import Set
 
 from sqlalchemy import types, TypeDecorator, JSON
 from typing_extensions import Dict, Any, Sequence, Self
@@ -31,9 +32,7 @@ class PositionTypeWrapper(Symbol):
 
 
 # check that flat classes work
-
-
-@dataclass
+@dataclass(unsafe_hash=True)
 class Position(Symbol):
     x: float
     y: float
@@ -41,8 +40,6 @@ class Position(Symbol):
 
 
 # check that classes with optional values work
-
-
 @dataclass
 class Orientation(Symbol):
     x: float
@@ -52,17 +49,13 @@ class Orientation(Symbol):
 
 
 # check that one to one relationship work
-
-
 @dataclass
 class Pose(Symbol):
     position: Position
     orientation: Orientation
 
 
-# check that one to many relationship to built in types and non built in types work
-
-
+# check that many to many relationship to built in types and non built in types work
 @dataclass
 class Positions(Symbol):
     positions: List[Position]
@@ -75,8 +68,6 @@ class PositionsSubclassWithAnotherPosition(Positions):
 
 
 # check that one to many relationships work where the many side is of the same type
-
-
 @dataclass
 class DoublePositionAggregator(Symbol):
     positions1: List[Position]
@@ -660,3 +651,26 @@ class Person:
 class UnderspecifiedTypesContainer:
     any_list: List[Any] = field(default_factory=list)
     any_field: Any = None
+
+
+@dataclass
+class TestPositionSet:
+    positions: Set[Position] = field(default_factory=set)
+
+
+class PolymorphicEnum(Enum): ...
+
+
+class ChildEnum1(PolymorphicEnum):
+    A = auto()
+    B = auto()
+
+
+class ChildEnum2(PolymorphicEnum):
+    B = auto()
+    C = auto()
+
+
+@dataclass
+class PolymorphicEnumAssociation:
+    value: PolymorphicEnum

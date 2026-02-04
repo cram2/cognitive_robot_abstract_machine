@@ -658,3 +658,74 @@ def test_underspecified_types():
     column_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
     assert "any_list" not in column_names
     assert "any_field" not in column_names
+
+
+def test_position_set(session, database):
+    p1, p2 = Position(1, 2, 3), Position(2, 3, 4)
+    obj = TestPositionSet({p1, p2})
+    dao = to_dao(obj)
+    session.add(dao)
+    session.commit()
+
+    r = session.scalars(select(TestPositionSetDAO)).one()
+    reconstructed = r.from_dao()
+    assert reconstructed == obj
+
+
+def test_post_init_and_circular_reference(session, database):
+    """
+    Test the 4-phase from_dao logic with __post_init__ and circular references.
+    """
+    c1_dao = ContainerGenerationDAO()
+    i1_dao = ItemWithBackreferenceDAO(value=10)
+    i2_dao = ItemWithBackreferenceDAO(value=20)
+
+    c1_dao.items = [i1_dao, i2_dao]
+    i1_dao.container = c1_dao
+    i2_dao.container = c1_dao
+
+    session.add(c1_dao)
+    session.commit()
+
+    # Clear session to ensure we are loading from DB
+    session.expunge_all()
+
+    queried_c1_dao = session.scalars(select(ContainerGenerationDAO)).one()
+
+    # Reconstruct domain object
+    c1 = queried_c1_dao.from_dao()
+
+    assert isinstance(c1, ContainerGeneration)
+    assert len(c1.items) == 2
+    assert c1.items[0].value == 10
+    assert c1.items[1].value == 20
+
+    # Check if __post_init__ was called and backreferences are set
+    assert c1.items[0].container is c1
+    assert c1.items[1].container is c1
+
+
+def test_polymorphic_enum(session, database):
+    v1 = PolymorphicEnumAssociation(ChildEnum1.A)
+    v2 = PolymorphicEnumAssociation(ChildEnum1.B)
+    v3 = PolymorphicEnumAssociation(ChildEnum2.B)
+    v4 = PolymorphicEnumAssociation(ChildEnum2.C)
+
+    dao_1, dao_2, dao_3, dao_4 = to_dao(v1), to_dao(v2), to_dao(v3), to_dao(v4)
+
+    session.add_all([dao_1, dao_2, dao_3, dao_4])
+    session.commit()
+
+    statement = select(PolymorphicEnumAssociationDAO)
+    r1, r2, r3, r4 = session.scalars(statement).all()
+
+    assert r1.from_dao() == v1
+    assert r2.from_dao() == v2
+    assert r3.from_dao() == v3
+    assert r4.from_dao() == v4
+
+    statement = select(PolymorphicEnumAssociationDAO).where(
+        PolymorphicEnumAssociationDAO.value == ChildEnum1.B
+    )
+    r = session.scalars(statement).all()
+    assert len(r) == 1

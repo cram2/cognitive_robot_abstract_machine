@@ -56,8 +56,8 @@ class SeenSet:
             return False
 
         # Fast exact-key path when all keys are present
-        if self.exact_contains(assignment):
-            return True
+        if self.keys and all(k in assignment for k in self.keys):
+            return self.exact_contains(assignment)
 
         # Fallback to coverage check using constraints
         for constraint in self.constraints:
@@ -74,10 +74,9 @@ class SeenSet:
         exists in the cache. This is an O(1) membership test and does not consult
         the coverage trie.
         """
-        if self.keys and all(k in assignment for k in self.keys):
-            t = tuple(assignment[k] for k in self.keys)
-            if t in self.exact:
-                return True
+        t = tuple(assignment[k] for k in self.keys)
+        if t in self.exact:
+            return True
         return False
 
     def clear(self):

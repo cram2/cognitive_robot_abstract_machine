@@ -10,23 +10,42 @@ from typing_extensions import (
     Type,
     TYPE_CHECKING,
     Callable,
-    Tuple,
     Union,
     Any,
 )
 
 from krrood.adapters.exceptions import JSONSerializationError
 from krrood.utils import DataclassException
+from .datastructures.definitions import JointStateType
 from .datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
     from .world import World
+    from .world_description.geometry import Scale
     from .world_description.world_entity import (
         SemanticAnnotation,
         WorldEntity,
         KinematicStructureEntity,
     )
-    from .spatial_types.spatial_types import FloatVariable, SymbolicMathType
+    from .spatial_types.spatial_types import (
+        FloatVariable,
+        SymbolicMathType,
+        SpatialType,
+    )
+    from .spatial_types import Vector3
+    from .world_description.degree_of_freedom import DegreeOfFreedomLimits
+
+
+@dataclass
+class NoJointStateWithType(DataclassException):
+    """
+    Raised when a JointState type is search which is not defined
+    """
+
+    joint_state: JointStateType
+
+    def __post_init__(self):
+        self.message = f"There is no JointState with the type: {self.joint_state}"
 
 
 @dataclass
@@ -126,6 +145,107 @@ class UsageError(LogicalError):
 
 
 @dataclass
+class InvalidConnectionLimits(UsageError):
+    """
+    Raised when the lower limit is not less than the upper limit for a degree of freedom.
+    """
+
+    name: PrefixedName
+    """
+    The name of the degree of freedom.
+    """
+
+    limits: DegreeOfFreedomLimits
+    """
+    The invalid limits.
+    """
+
+    def __post_init__(self):
+        self.message = f"Lower limit for {self.name} must be less than upper limit. Given limits: {self.limits}."
+
+
+@dataclass
+class MismatchingWorld(UsageError):
+    """
+    Raised when two entities belong to different worlds.
+    """
+
+    expected_world: World
+    """
+    The expected world.
+    """
+
+    given_world: World
+    """
+    The given world.
+    """
+
+    def __post_init__(self):
+        self.message = f"The two entities have mismatching worlds. Expected world: {self.expected_world}, given world: {self.given_world}"
+
+
+@dataclass
+class MissingSemanticAnnotationError(UsageError):
+    """
+    Raised when a semantic annotation is required but missing.
+    """
+
+    semantic_annotation_class: Type[SemanticAnnotation]
+    """
+    The semantic annotation class that requires another semantic annotation.
+    """
+
+    missing_semantic_annotation_class: Type[SemanticAnnotation]
+    """
+    The missing semantic annotation class.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"The semantic annotation of type {self.missing_semantic_annotation_class.__name__} is required"
+            f" by {self.semantic_annotation_class.__name__}, but is missing."
+        )
+
+
+@dataclass
+class InvalidPlaneDimensions(UsageError):
+    """
+    Raised when the depth of a plane is not less than its width or height.
+    """
+
+    scale: Scale
+    """
+    The scale of the plane.
+    """
+
+    clazz: Type
+    """
+    The class for which the dimensions are invalid.
+    """
+
+    def __post_init__(self):
+        self.message = f"The Dimensions {self.scale} are invalid for the class {self.clazz.__name__}"
+
+
+@dataclass
+class InvalidHingeActiveAxis(UsageError):
+    """
+    Raised when an invalid axis is provided.
+    """
+
+    axis: Vector3
+    """
+    The invalid axis.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Axis {self.axis} provided when trying to calculate the hinge position is invalid. "
+            f"If you think this is incorrect, consider extending Door.calculate_world_T_hinge_based_on_handle"
+        )
+
+
+@dataclass
 class AddingAnExistingSemanticAnnotationError(UsageError):
     semantic_annotation: SemanticAnnotation
 
@@ -169,6 +289,22 @@ class ReferenceFrameMismatchError(SpatialTypesError):
 
     def __post_init__(self):
         self.message = f"Reference frames {self.frame1.name} and {self.frame2.name} are not the same."
+
+
+@dataclass
+class MissingReferenceFrameError(SpatialTypesError):
+    """
+    Represents an error that occurs when a spatial type lacks a reference frame, even though its required for the
+    current operation
+    """
+
+    spatial_type: SpatialType
+    """
+    Spatial type that lacks a reference frame.
+    """
+
+    def __post_init__(self):
+        self.message = f"Spatial type {self.spatial_type} has no reference frame."
 
 
 @dataclass

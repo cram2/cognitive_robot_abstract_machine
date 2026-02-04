@@ -21,7 +21,7 @@ from ..world_description.connections import (
     PrismaticConnection,
     FixedConnection,
 )
-from ..world_description.degree_of_freedom import DegreeOfFreedom
+from ..world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
 from ..world_description.geometry import (
     Box,
     Sphere,
@@ -227,8 +227,7 @@ class URDFParser:
         if dof_name not in [d.name for d in world.degrees_of_freedom]:
             dof = DegreeOfFreedom(
                 name=dof_name,
-                lower_limits=lower_limits,
-                upper_limits=upper_limits,
+                limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
             )
             world.add_degree_of_freedom(dof)
         else:

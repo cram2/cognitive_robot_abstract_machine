@@ -49,7 +49,7 @@ questions = [
       "type": "multiple_choice",
       "answers": [
         {"answer": "Assign a TransformationMatrix via the origin property", "correct": True},
-        {"answer": "Call set_pose(xyzrpy)", "correct": False},
+        {"answer": "Call set_pose(x, y, z, r, p, y)", "correct": False},
         {"answer": "Modify the child's visual color", "correct": False},
         {"answer": "Use WorldState.set_pose(connection)", "correct": False}
       ],

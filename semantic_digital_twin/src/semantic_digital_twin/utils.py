@@ -80,7 +80,7 @@ class suppress_stdout_stderr(object):
 
 
 def hacky_urdf_parser_fix(
-        urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
+    urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
 ) -> str:
     # Parse input string
     root = ET.fromstring(urdf)

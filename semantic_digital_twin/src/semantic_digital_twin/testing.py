@@ -20,7 +20,7 @@ from .world_description.connections import (
     FixedConnection,
     OmniDrive,
 )
-from .world_description.degree_of_freedom import DegreeOfFreedom
+from .world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
 from .world_description.geometry import Box, Scale, Sphere
 from .world_description.shape_collection import ShapeCollection
 from .world_description.world_entity import Body
@@ -51,8 +51,10 @@ def world_setup() -> Tuple[
         upper_limits.velocity = 1
         dof = DegreeOfFreedom(
             name=PrefixedName("dof"),
-            lower_limits=lower_limits,
-            upper_limits=upper_limits,
+            limits=DegreeOfFreedomLimits(
+                lower=lower_limits,
+                upper=upper_limits,
+            ),
         )
         world.add_degree_of_freedom(dof)
 

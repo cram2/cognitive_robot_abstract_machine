@@ -25,7 +25,7 @@ from typing_extensions import (
 
 from .failures import MissingContainedTypeOfContainer
 from .utils import behaves_like_a_built_in_class
-from ..ormatic.utils import module_and_class_name
+from ..utils import module_and_class_name
 
 if TYPE_CHECKING:
     from .class_diagram import WrappedClass

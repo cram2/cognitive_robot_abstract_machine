@@ -5,8 +5,6 @@ from enum import Enum
 from typing import List, Optional, Set, Dict, Any, Self
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
-
-from giskardpy.utils.utils import JsonSerializableEnum
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -16,7 +14,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-class CollisionAvoidanceTypes(JsonSerializableEnum):
+class CollisionAvoidanceTypes(Enum):
     AVOID_COLLISION = 0
     ALLOW_COLLISION = 1
 
@@ -37,7 +35,7 @@ class CollisionRequest(SubclassJSONSerializer):
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
-            "type_": self.type_.to_json(),
+            "type_": to_json(self.type_),
             "distance": self.distance,
             "body_group1_ids": [to_json(body.id) for body in self.body_group1],
             "body_group2_ids": [to_json(body.id) for body in self.body_group2],
@@ -55,7 +53,7 @@ class CollisionRequest(SubclassJSONSerializer):
             for id_ in data["body_group2_ids"]
         ]
         return cls(
-            type_=CollisionAvoidanceTypes.from_json(data["type_"], **kwargs),
+            type_=from_json(data["type_"], **kwargs),
             distance=data["distance"],
             body_group1=body_group1,
             body_group2=body_group2,

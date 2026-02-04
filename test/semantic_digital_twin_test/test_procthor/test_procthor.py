@@ -19,12 +19,18 @@ from semantic_digital_twin.adapters.procthor.procthor_parser import (
 from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
 )
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Bread
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Bread,
+    Floor,
+    Door,
+)
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
-from semantic_digital_twin.world_description.world_entity import Region
+from semantic_digital_twin.world_description.world_entity import Region, Body
 
 
 class ProcTHORTestCase(unittest.TestCase):
@@ -40,6 +46,11 @@ class ProcTHORTestCase(unittest.TestCase):
         cls.file_path = os.path.join(json_dir, "house_test.json")
         with open(cls.file_path) as f:
             cls.house_json = json.load(f)
+
+        cls.world = World(name="TestWorld")
+        world_root = Body(name=PrefixedName("TestWorldRoot"))
+        with cls.world.modify_world():
+            cls.world.add_kinematic_structure_entity(world_root)
 
     def test_unity_to_semantic_digital_twin_transform_identity_matrix(self):
         m = np.eye(4)
@@ -113,20 +124,32 @@ class ProcTHORTestCase(unittest.TestCase):
     def test_room_get_world(self):
         room = self.house_json["rooms"][0]
         procthor_room = ProcthorRoom(room_dict=room)
-        world = procthor_room.get_world()
-        self.assertEqual(world.root.name.name, "Kitchen_4")
-
-        region = world.get_kinematic_structure_entity_by_name(
-            "Kitchen_4_surface_region"
+        procthor_room.add_to_world(self.world)
+        self.assertEqual(
+            self.world.root.child_kinematic_structure_entities[0].name.name,
+            "Kitchen_4_floor",
         )
-        self.assertIsInstance(region, Region)
-        region_area_mesh = region.area[0]
+
+        with self.world.modify_world():
+            supporting_surface = self.world.get_semantic_annotations_by_type(Floor)[
+                0
+            ].calculate_supporting_surface()
+
+        queried_supporting_surface = self.world.get_kinematic_structure_entity_by_name(
+            "Kitchen_4_floor_supporting_surface_region"
+        )
+        self.assertEqual(supporting_surface, queried_supporting_surface)
+        self.assertIsInstance(queried_supporting_surface, Region)
+        region_area_mesh = queried_supporting_surface.area[0]
         self.assertAlmostEqual(region_area_mesh.mesh.area, 18.06)
 
     def test_door_polygon(self):
         door = self.house_json["doors"][0]
         procthor_door = ProcthorDoor(
-            door_dict=door, parent_wall_width=0.05, thickness=0.03
+            door_dict=door,
+            parent_wall_width=0.05,
+            thickness=0.03,
+            world_T_parent_wall=HomogeneousTransformationMatrix(),
         )
 
         bounds = (
@@ -141,7 +164,10 @@ class ProcTHORTestCase(unittest.TestCase):
     def test_door_scale(self):
         door = self.house_json["doors"][0]
         procthor_door = ProcthorDoor(
-            door_dict=door, parent_wall_width=0.05, thickness=0.03
+            door_dict=door,
+            parent_wall_width=0.05,
+            thickness=0.03,
+            world_T_parent_wall=HomogeneousTransformationMatrix(),
         )
 
         scale = procthor_door.scale
@@ -151,7 +177,10 @@ class ProcTHORTestCase(unittest.TestCase):
     def test_wall_T_door(self):
         door = self.house_json["doors"][0]
         procthor_door = ProcthorDoor(
-            door_dict=door, parent_wall_width=0.05, thickness=0.03
+            door_dict=door,
+            parent_wall_width=0.05,
+            thickness=0.03,
+            world_T_parent_wall=HomogeneousTransformationMatrix(),
         )
 
         expected_rotation = np.array(
@@ -169,21 +198,23 @@ class ProcTHORTestCase(unittest.TestCase):
             atol=1e-6,
         )
 
-    def test_door_get_factory(self):
+    def test_door_add_to_world(self):
         door = self.house_json["doors"][0]
         procthor_door = ProcthorDoor(
-            door_dict=door, parent_wall_width=0.05, thickness=0.03
+            door_dict=door,
+            parent_wall_width=0.05,
+            thickness=0.03,
+            world_T_parent_wall=HomogeneousTransformationMatrix(),
         )
 
-        door_factory = procthor_door.get_factory()
+        double_door = procthor_door.add_to_world(self.world)
+        doors = self.world.get_semantic_annotations_by_type(Door)
 
-        self.assertEqual(door_factory.name.name, "Doorway_Double_7_room1_room4")
-        self.assertEqual(len(door_factory.door_factories), 2)
-        self.assertEqual(len(door_factory.door_transforms), 2)
-        self.assertEqual(door_factory.door_factories[0].scale, Scale(0.03, 1.0, 2.1))
+        self.assertEqual(double_door.name.name, "Doorway_Double_7_room1_room4")
+        self.assertEqual(len(doors), 2)
 
     def test_wall_creation(self):
-        parser = ProcTHORParser(self.file_path, None)
+        parser = ProcTHORParser.from_file(self.file_path, None)
         doors = self.house_json["doors"]
         walls = self.house_json["walls"]
 

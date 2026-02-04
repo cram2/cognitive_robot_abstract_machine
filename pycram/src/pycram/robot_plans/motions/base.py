@@ -12,6 +12,8 @@ from giskardpy.motion_statechart.graph_node import Task
 from krrood.ormatic.dao import HasGeneric
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from ...datastructures.enums import ExecutionType
+from typing_extensions import TypeVar
+
 from ...designator import DesignatorDescription
 from ...process_module import ProcessModuleManager
 
@@ -82,3 +84,6 @@ class BaseMotion(DesignatorDescription):
 
     def get_alternative_motion(self) -> Optional[Type[AlternativeMotion]]:
         return AlternativeMotion.check_for_alternative(self.robot_view, self)
+
+
+MotionType = TypeVar("MotionType", bound=BaseMotion)

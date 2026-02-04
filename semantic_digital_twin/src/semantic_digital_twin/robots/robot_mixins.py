@@ -86,8 +86,8 @@ class SpecifiesLeftRightArm(HasArms, ABC):
         pov = self.root.global_pose
         first_arm = self.arms[0]
         second_arm = self.arms[1]
-        first_arm_chain = list(first_arm.bodies)
-        second_arm_chain = list(second_arm.bodies)
+        first_arm_chain = list(first_arm.bodies_with_collisions)
+        second_arm_chain = list(second_arm.bodies_with_collisions)
 
         return (
             first_arm

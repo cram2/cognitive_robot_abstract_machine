@@ -3,16 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import numpy as np
-from typing_extensions import Self, Dict, Type, TypeVar, Optional
+from typing_extensions import Self, Dict, Type, TypeVar, TYPE_CHECKING
 
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-from giskardpy.motion_statechart.auxilary_variable_manager import (
-    AuxiliaryVariableManager,
-    AuxiliaryVariable,
-)
-from giskardpy.motion_statechart.exceptions import MissingContextExtensionError
-from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.world import World
+
+if TYPE_CHECKING:
+    from .auxilary_variable_manager import AuxiliaryVariableManager, AuxiliaryVariable
+    from .exceptions import MissingContextExtensionError
+    from ..qp.qp_controller_config import QPControllerConfig
+    from ..model.collision_world_syncer import CollisionWorldSynchronizer
 
 
 @dataclass

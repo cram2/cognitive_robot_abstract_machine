@@ -14,10 +14,10 @@ from ..designator import DesignatorDescription
 from ..failures import PlanFailure
 from ..language import TryInOrderNode, ParallelNode, TryAllNode, CodeNode, MonitorNode
 from ..plan import (
-    ActionNode,
+    ActionDescriptionNode,
     MotionNode,
     PlanNode,
-    ResolvedActionNode,
+    ActionNode,
     DesignatorNode,
     Plan,
 )
@@ -95,10 +95,12 @@ class DesignatorNodeMapping(PlanNodeMapping, AlternativeMapping[DesignatorNode])
 
 
 @dataclass
-class ActionNodeMapping(DesignatorNodeMapping, AlternativeMapping[ActionNode]):
+class ActionDescriptionNodeMapping(
+    DesignatorNodeMapping, AlternativeMapping[ActionDescriptionNode]
+):
 
     @classmethod
-    def from_domain_object(cls, obj: ActionNode):
+    def from_domain_object(cls, obj: ActionDescriptionNode):
         """
         Convert an ActionNode to an ActionNodeDAO.
         """
@@ -135,14 +137,12 @@ class MotionNodeMapping(DesignatorNodeMapping, AlternativeMapping[MotionNode]):
 
 
 @dataclass
-class ResolvedActionNodeMapping(
-    DesignatorNodeMapping, AlternativeMapping[ResolvedActionNode]
-):
+class ActionNodeMapping(DesignatorNodeMapping, AlternativeMapping[ActionNode]):
     designator_ref: ActionDescription = None
     execution_data: ExecutionData = None
 
     @classmethod
-    def from_domain_object(cls, obj: ResolvedActionNode):
+    def from_domain_object(cls, obj: ActionNode):
         """
         Convert a ResolvedActionNode to a ResolvedActionNodeDAO.
         """

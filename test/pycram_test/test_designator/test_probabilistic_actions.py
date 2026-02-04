@@ -3,23 +3,20 @@ import unittest
 
 import numpy as np
 import sqlalchemy.orm
-from krrood.ormatic.dao import to_dao
 from sqlalchemy import select
 
+from krrood.ormatic.dao import to_dao
 from pycram.datastructures.enums import TaskStatus
-from pycram.datastructures.pose import PoseStamped
-from pycram.designator import ObjectDesignatorDescription
-from pycram.language import SequentialPlan
-from pycram.orm.ormatic_interface import Base, ResolvedActionNodeMappingDAO
-from pycram.robot_plans import MoveAndPickUpActionDescription, MoveAndPickUpAction
 from pycram.designators.specialized_designators.probabilistic.probabilistic_action import (
     MoveAndPickUpParameterizer,
 )
 from pycram.failures import PlanFailure
-from pycram.plan import Plan, ResolvedActionNode, PlanNode
+from pycram.language import SequentialPlan
+from pycram.orm.ormatic_interface import Base, ActionNodeMappingDAO
+from pycram.plan import Plan, ActionNode
 from pycram.process_module import simulated_robot
-from pycram.robot_description import RobotDescriptionManager, RobotDescription
-from pycram.testing import EmptyWorldTestCase, ApartmentWorldTestCase
+from pycram.robot_plans import MoveAndPickUpActionDescription, MoveAndPickUpAction
+from pycram.testing import ApartmentWorldTestCase
 
 
 class MoveAndPickUpTestCase(ApartmentWorldTestCase):
@@ -52,7 +49,7 @@ class MoveAndPickUpTestCase(ApartmentWorldTestCase):
         ).create_action()
 
         plan = Plan(
-            ResolvedActionNode(
+            ActionNode(
                 designator_ref=mpa, kwargs={}, designator_type=MoveAndPickUpAction
             ),
             self.context,
@@ -68,7 +65,7 @@ class MoveAndPickUpTestCase(ApartmentWorldTestCase):
         self.session.add(dao)
         self.session.commit()
 
-        result = self.session.scalars(select(ResolvedActionNodeMappingDAO)).first()
+        result = self.session.scalars(select(ActionNodeMappingDAO)).first()
         self.assertEqual(result.status, TaskStatus.SUCCEEDED)
 
 

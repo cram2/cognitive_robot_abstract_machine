@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
@@ -68,7 +69,7 @@ def test_table_world(session, table_world):
     session.add(world_dao)
     session.commit()
 
-    bodies_from_db = session.scalars(select(BodyDAO)).all()
+    bodies_from_db = session.scalars(select(KinematicStructureEntityDAO)).all()
     assert len(bodies_from_db) == len(table_world.kinematic_structure_entities)
 
     queried_world = session.scalar(select(WorldMappingDAO))
@@ -107,3 +108,12 @@ def test_insert(session):
     result = session.scalar(select(ShapeDAO))
     assert isinstance(result, BoxDAO)
     box = result.from_dao()
+
+
+@pytest.mark.skipif(
+    os.getenv("SEMANTIC_DIGITAL_TWIN_DATABASE_URI") is None,
+    reason="Permanent Database not available",
+)
+def test_sessionmaker():
+    s = semantic_digital_twin_sessionmaker()()
+    assert s is not None

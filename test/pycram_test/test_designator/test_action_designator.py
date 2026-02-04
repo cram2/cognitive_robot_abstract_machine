@@ -1,5 +1,3 @@
-import unittest
-
 import pytest
 import rclpy
 import rustworkx
@@ -10,10 +8,17 @@ from pycram.motion_executor import MotionExecutor
 from pycram.process_module import simulated_robot
 from pycram.robot_plans.actions import *
 from pycram.robot_plans.motions import MoveTCPWaypointsMotion
-from pycram.testing import ApartmentWorldTestCase
-from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
+)
+from semantic_digital_twin.datastructures.definitions import (
+    TorsoState,
+    GripperState,
+    StaticJointState,
 )
 
 
@@ -31,26 +36,21 @@ def test_move_torso(immutable_model_world):
         plan.perform()
     dof = world.get_degree_of_freedom_by_name("torso_lift_joint")
     assert world.state[dof.id].position == pytest.approx(0.29, abs=0.01)
-    # self.assertAlmostEqual(self.world.state[dof.id].position, 0.29, places=2)
 
 
 def test_set_gripper(immutable_model_world):
     world, pr2, context = immutable_model_world
     description = SetGripperActionDescription(
-        [Arms.LEFT], [GripperStateEnum.OPEN, GripperStateEnum.CLOSE]
+        [Arms.LEFT], [GripperState.OPEN, GripperState.CLOSE]
     )
     plan = SequentialPlan(context, description)
     assert description.resolve().gripper == Arms.LEFT
-    assert description.resolve().motion == GripperStateEnum.OPEN
+    assert description.resolve().motion == GripperState.OPEN
     with simulated_robot:
         plan.perform()
-    joint_state = JointStateManager().get_gripper_state(
-        Arms.LEFT, GripperStateEnum.OPEN, pr2
-    )
-    for joint, state in zip(joint_state.joint_names, joint_state.joint_positions):
-        dof = world.get_degree_of_freedom_by_name(joint)
-        assert world.state[dof.id].position == pytest.approx(state, abs=0.01)
-        # self.assertAlmostEqual(self.world.state[dof.id].position, state, places=2)
+    joint_state = pr2.left_arm.manipulator.get_joint_state_by_type(GripperState.OPEN)
+    for connection, value in joint_state.items():
+        assert connection.position == pytest.approx(value, abs=0.01)
 
 
 def test_park_arms(immutable_model_world):
@@ -60,36 +60,28 @@ def test_park_arms(immutable_model_world):
     assert description.resolve().arm == Arms.BOTH
     with simulated_robot:
         plan.perform()
-    joint_states_right = JointStateManager().get_arm_state(
-        Arms.RIGHT, StaticJointState.Park, robot_view
+    joint_state_left = robot_view.left_arm.get_joint_state_by_type(
+        StaticJointState.PARK
     )
-    joint_states_left = JointStateManager().get_arm_state(
-        Arms.LEFT, StaticJointState.Park, robot_view
+    joint_state_right = robot_view.right_arm.get_joint_state_by_type(
+        StaticJointState.PARK
     )
-    for joint_name, joint_state in zip(
-        joint_states_right.joint_names, joint_states_right.joint_positions
-    ):
-        dof = world.get_degree_of_freedom_by_name(joint_name)
+    for connection, value in joint_state_left.items():
         compare_axis_angle(
-            world.state[dof.id].position,
+            connection.position,
             np.array([1, 0, 0]),
-            joint_state,
+            value,
             np.array([1, 0, 0]),
             decimal=1,
         )
-        # self.assertAlmostEqual(self.world.state[dof.id].position, joint_state % (2 * np.pi), places=1)
-    for joint_name, joint_state in zip(
-        joint_states_left.joint_names, joint_states_left.joint_positions
-    ):
-        dof = world.get_degree_of_freedom_by_name(joint_name)
+    for connection, value in joint_state_right.items():
         compare_axis_angle(
-            world.state[dof.id].position,
-            [1, 0, 0],
-            joint_state,
-            [1, 0, 0],
+            connection.position,
+            np.array([1, 0, 0]),
+            value,
+            np.array([1, 0, 0]),
             decimal=1,
         )
-        # self.assertAlmostEqual(self.world.state[dof.id].position, joint_state % (2 * np.pi), places=1)
 
 
 def test_navigate(immutable_model_world):
@@ -117,7 +109,9 @@ def test_navigate(immutable_model_world):
 def test_reach_to_pick_up(immutable_model_world):
     world, robot_view, context = immutable_model_world
     grasp_description = GraspDescription(
-        ApproachDirection.FRONT, VerticalAlignment.NoAlignment, False
+        ApproachDirection.FRONT,
+        VerticalAlignment.NoAlignment,
+        robot_view.left_arm.manipulator,
     )
     performable = ReachActionDescription(
         target_pose=PoseStamped.from_spatial_type(
@@ -135,7 +129,7 @@ def test_reach_to_pick_up(immutable_model_world):
         ),
         ParkArmsActionDescription(Arms.BOTH),
         MoveTorsoActionDescription([TorsoState.HIGH]),
-        SetGripperActionDescription(Arms.LEFT, GripperStateEnum.OPEN),
+        SetGripperActionDescription(Arms.LEFT, GripperState.OPEN),
         performable,
     )
     with simulated_robot:
@@ -150,7 +144,9 @@ def test_pick_up(mutable_model_world):
     world, robot_view, context = mutable_model_world
 
     grasp_description = GraspDescription(
-        ApproachDirection.FRONT, VerticalAlignment.NoAlignment, False
+        ApproachDirection.FRONT,
+        VerticalAlignment.NoAlignment,
+        robot_view.left_arm.manipulator,
     )
     description = PickUpActionDescription(
         world.get_body_by_name("milk.stl"), [Arms.LEFT], [grasp_description]
@@ -182,7 +178,7 @@ def test_place(mutable_model_world):
     object_description = world.get_body_by_name("milk.stl")
     description = PlaceActionDescription(
         object_description,
-        PoseStamped.from_list([2.2, 2, 1], [0, 0, 0, 1], world.root),
+        PoseStamped.from_list([2.4, 2, 1], [0, 0, 0, 1], world.root),
         [Arms.LEFT],
     )
     plan = SequentialPlan(
@@ -196,7 +192,9 @@ def test_place(mutable_model_world):
             object_description,
             Arms.LEFT,
             GraspDescription(
-                ApproachDirection.FRONT, VerticalAlignment.NoAlignment, False
+                ApproachDirection.FRONT,
+                VerticalAlignment.NoAlignment,
+                robot_view.left_arm.manipulator,
             ),
         ),
         description,
@@ -233,7 +231,7 @@ def test_detect(immutable_model_world):
     world, robot_view, context = immutable_model_world
     milk_body = world.get_body_by_name("milk.stl")
     with world.modify_world():
-        world.add_semantic_annotation(Milk(body=milk_body))
+        world.add_semantic_annotation(Milk(root=milk_body))
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         2.5, 2, 1.2, reference_frame=world.root
     )
@@ -294,8 +292,6 @@ def test_close(immutable_model_world):
 
 def test_transport(mutable_model_world):
     world, robot_view, context = mutable_model_world
-    node = rclpy.create_node("test_node")
-    VizMarkerPublisher(world, node, throttle_state_updates=20)
     description = TransportActionDescription(
         world.get_body_by_name("milk.stl"),
         [PoseStamped.from_list([3.1, 2.2, 0.95], [0.0, 0.0, 1.0, 0.0], world.root)],
@@ -309,6 +305,9 @@ def test_transport(mutable_model_world):
     milk_position = world.get_body_by_name("milk.stl").global_pose.to_np()[:3, 3]
     dist = np.linalg.norm(milk_position - np.array([3.1, 2.2, 0.95]))
     assert dist <= 0.01
+
+    assert len(plan.nodes) == len(plan.all_nodes)
+    assert len(plan.edges) == len(plan.all_nodes) - 1
 
 
 def test_grasping(immutable_model_world):

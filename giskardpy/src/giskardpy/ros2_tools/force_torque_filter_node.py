@@ -311,7 +311,9 @@ class LowPassButterworthFilter:
     def __post_init__(self) -> None:
         nyq = 0.5 * float(self.sampling_frequency)
         wn = float(self.cutoff_hz) / nyq
-        self.second_order_sections = butter(int(self.order), wn, btype="low", output="sos")
+        self.second_order_sections = butter(
+            int(self.order), wn, btype="low", output="sos"
+        )
         # zi per SOS section: shape (n_sections, 2)
         self.filter_state = np.zeros((self.second_order_sections.shape[0], 2))
 
@@ -322,7 +324,9 @@ class LowPassButterworthFilter:
         :param x: Input sample.
         :return: Filtered sample.
         """
-        y, self.filter_state = sosfilt(self.second_order_sections, [x], zi=self.filter_state)
+        y, self.filter_state = sosfilt(
+            self.second_order_sections, [x], zi=self.filter_state
+        )
         return float(y[-1])
 
 
@@ -403,12 +407,16 @@ class WrenchProcessor:
             for _ in range(6)
         ]
         self.main = [
-            LowPassButterworthFilter(self.config.cutoff_main_hz, fs, self.config.order_main)
+            LowPassButterworthFilter(
+                self.config.cutoff_main_hz, fs, self.config.order_main
+            )
             for _ in range(6)
         ]
         self.diff = [DerivativeEstimator() for _ in range(6)]
         self.diff_smooth = [
-            LowPassButterworthFilter(self.config.cutoff_diff_hz, fs, self.config.order_diff)
+            LowPassButterworthFilter(
+                self.config.cutoff_diff_hz, fs, self.config.order_diff
+            )
             for _ in range(6)
         ]
 

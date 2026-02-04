@@ -38,6 +38,19 @@ Execution of ORMatic on a set of classes produces a module containing:
 
 ORMatic analyzes the dataclass structure to identify scalar fields, one-to-one, one-to-many, and many-to-many associations. This information is then used to generate a full, decoupled SQLAlchemy declarative layer via a Jinja template.
 
+
+ORMatic Compatible Class Pattern
+--------------------------------
+
+If you want to generally know how to write classes that work out of the box with ORMatic, follow these simple rules:
+ 1. Everything is a dataclass
+ 2. Never write you own ``__init__``.
+ 3. Apply side effects (e. g. setting back references) in the ``__post_init__``
+ 4. Use protected fields, those whose name begins with ``_`` only for computational state that doesnt need persistence (e. g. caching, indexing, ...)
+ 5. Don't use nested containers as public fields
+ 6. Don't use dicts as public fields
+ 7. Never use optional containers, use empty containers by default.
+
 Persisting Objects
 ------------------------
 - :py:func:`krrood.ormatic.dao.to_dao`: Converts a dataclass instance into its corresponding DAO object, including recursive conversion of nested elements.

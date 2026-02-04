@@ -25,10 +25,10 @@ from jupyterquiz import display_quiz
 
 questions = [
     {
-      "question": "What is the main purpose of factories in the semantic world?",
+      "question": "What is the main purpose of semantic annotation factories in the semantic digital twin?",
       "type": "multiple_choice",
       "answers": [
-        {"answer": "Convenience builders that create consistent worlds and views", "correct": True},
+        {"answer": "Classmethods that create a body with simple geometry and the corresponding semantic annotation inside a world ", "correct": True},
         {"answer": "Physics simulation of rigid bodies", "correct": False},
         {"answer": "Rendering visualization in RViz2", "correct": False},
         {"answer": "Parsing URDF files", "correct": False}
@@ -38,30 +38,10 @@ questions = [
       "question": "Which factory combination creates a drawer with a centered handle?",
       "type": "multiple_choice",
       "answers": [
-        {"answer": "DrawerFactory + ContainerFactory + HandleFactory", "correct": True},
-        {"answer": "WorldFactory + MeshFactory", "correct": False},
+        {"answer": "Drawer.create_with_new_body_in_world, Handle.create_with_new_body_in_world, Drawer.add_handle", "correct": True},
+        {"answer": "World.create_new_drawer + World.create_new_handle + World.add_handle_to_drawer", "correct": False},
         {"answer": "URDFFactory only", "correct": False},
         {"answer": "RayTracerFactory", "correct": False}
-      ],
-    },
-    {
-      "question": "How is the handle centered semantically in the example?",
-      "type": "multiple_choice",
-      "answers": [
-        {"answer": "Using SemanticPositionDescription with FULLY_CENTER directions", "correct": True},
-        {"answer": "By setting visual color to center", "correct": False},
-        {"answer": "By passing center=True to HandleFactory", "correct": False},
-        {"answer": "By rotating 180 degrees", "correct": False}
-      ],
-    },
-    {
-      "question": "How can an extra handle be merged into the world at a different pose?",
-      "type": "multiple_choice",
-      "answers": [
-        {"answer": "world.merge_world_at_pose(other_world, TransformationMatrix.from_xyz_rpy(...))", "correct": True},
-        {"answer": "world.add_handle(other_world)", "correct": False},
-        {"answer": "handle.attach_to(world)", "correct": False},
-        {"answer": "URDFParser.merge(world)", "correct": False}
       ],
     },
     {

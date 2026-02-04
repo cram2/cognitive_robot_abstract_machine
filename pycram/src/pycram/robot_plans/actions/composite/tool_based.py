@@ -23,7 +23,6 @@ from ....datastructures.enums import (
     ApproachDirection,
     VerticalAlignment,
 )
-from ....robot_description import RobotDescription
 from ....robot_plans.actions.base import ActionDescription
 
 

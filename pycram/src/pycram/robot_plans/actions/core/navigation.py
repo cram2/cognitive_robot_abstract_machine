@@ -57,8 +57,8 @@ class NavigateAction(ActionDescription):
         keep_joint_states: Union[
             Iterable[bool], bool
         ] = ActionConfig.navigate_keep_joint_states,
-    ) -> PartialDesignator[Type[NavigateAction]]:
-        return PartialDesignator(
+    ) -> PartialDesignator[NavigateAction]:
+        return PartialDesignator[NavigateAction](
             NavigateAction,
             target_location=target_location,
             keep_joint_states=keep_joint_states,
@@ -92,8 +92,8 @@ class LookAtAction(ActionDescription):
     @classmethod
     def description(
         cls, target: Union[Iterable[PoseStamped], PoseStamped]
-    ) -> PartialDesignator[Type[LookAtAction]]:
-        return PartialDesignator(LookAtAction, target=target)
+    ) -> PartialDesignator[LookAtAction]:
+        return PartialDesignator[LookAtAction](LookAtAction, target=target)
 
 
 NavigateActionDescription = NavigateAction.description

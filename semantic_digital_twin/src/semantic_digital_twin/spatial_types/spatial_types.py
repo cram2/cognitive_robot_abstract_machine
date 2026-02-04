@@ -1125,6 +1125,24 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return cls(x=0, y=0, z=1, reference_frame=reference_frame)
 
     @classmethod
+    def NEGATIVE_X(
+        cls, reference_frame: Optional[KinematicStructureEntity] = None
+    ) -> Vector3:
+        return cls(x=-1, y=0, z=0, reference_frame=reference_frame)
+
+    @classmethod
+    def NEGATIVE_Y(
+        cls, reference_frame: Optional[KinematicStructureEntity] = None
+    ) -> Vector3:
+        return cls(x=0, y=-1, z=0, reference_frame=reference_frame)
+
+    @classmethod
+    def NEGATIVE_Z(
+        cls, reference_frame: Optional[KinematicStructureEntity] = None
+    ) -> Vector3:
+        return cls(x=0, y=0, z=-1, reference_frame=reference_frame)
+
+    @classmethod
     def unit_vector(
         cls,
         x: sm.ScalarData = 0,
@@ -1851,7 +1869,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def to_quaternion(self) -> Quaternion:
         return self.to_rotation_matrix().to_quaternion()
 
-    def to_homogeneous_matrix(self) -> Self:
+    def to_homogeneous_matrix(self) -> HomogeneousTransformationMatrix:
         return HomogeneousTransformationMatrix(
             data=self, reference_frame=self.reference_frame
         )

@@ -12,7 +12,7 @@ from trimesh.util import concatenate
 from typing_extensions import Dict, Any, Self, Optional, List, Iterator
 from typing_extensions import TYPE_CHECKING
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from .geometry import Shape, BoundingBox
 from ..datastructures.variables import SpatialVariables
 from ..spatial_types import HomogeneousTransformationMatrix, Point3
@@ -150,12 +150,12 @@ class ShapeCollection(SubclassJSONSerializer):
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
-            "shapes": [shape.to_json() for shape in self.shapes],
+            "shapes": [to_json(shape) for shape in self.shapes],
         }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(shapes=[Shape.from_json(d, **kwargs) for d in data["shapes"]])
+        return cls(shapes=[from_json(d, **kwargs) for d in data["shapes"]])
 
     def center_of_mass_in_world(self) -> Point3:
         """
@@ -180,6 +180,16 @@ class ShapeCollection(SubclassJSONSerializer):
             else None
         )
         return ShapeCollection(new_shapes, new_reference_frame)
+
+    @property
+    def scale(self):
+        return (
+            self.as_bounding_box_collection_at_origin(
+                HomogeneousTransformationMatrix(reference_frame=self.reference_frame)
+            )
+            .bounding_box()
+            .scale
+        )
 
 
 @dataclass

@@ -7,7 +7,7 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer
 
 
 @dataclass
-class PrefixedName(Symbol, SubclassJSONSerializer):
+class PrefixedName(Symbol):
     name: str
     prefix: Optional[str] = None
 
@@ -15,7 +15,7 @@ class PrefixedName(Symbol, SubclassJSONSerializer):
         return hash((self.prefix, self.name))
 
     def __str__(self):
-        if self.prefix is None:
+        if self.prefix is None or self.prefix == "":
             return self.name
         return f"{self.prefix}/{self.name}"
 
@@ -23,13 +23,6 @@ class PrefixedName(Symbol, SubclassJSONSerializer):
         if not isinstance(other, type(self)):
             return False
         return self.prefix == other.prefix and self.name == other.name
-
-    def to_json(self) -> Dict[str, Any]:
-        return {**super().to_json(), "name": self.name, "prefix": self.prefix}
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(name=data["name"], prefix=data["prefix"])
 
     def __lt__(self, other):
         return str(self) < str(other)

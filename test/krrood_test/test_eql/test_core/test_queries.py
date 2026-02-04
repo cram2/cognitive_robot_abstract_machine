@@ -858,7 +858,8 @@ def test_unification_dict(handles_and_containers_world):
     assert results[0][drawer] is results[0][drawer_1]
 
 
-def test_distinct_entity():
+@pytest.fixture
+def distinct_test():
     names = ["Handle1", "Handle1", "Handle2", "Container1", "Container1", "Container3"]
     body_name = variable(str, domain=names)
     query = an(
@@ -868,6 +869,19 @@ def test_distinct_entity():
         )
         .distinct()
     )
+    return query
+
+
+def test_distinct_entity(distinct_test):
+    query = distinct_test
+    results = list(query.evaluate())
+    assert len(results) == 2
+
+
+def test_distinct_reevaluation(distinct_test):
+    query = distinct_test
+    results = list(query.evaluate())
+    assert len(results) == 2
     results = list(query.evaluate())
     assert len(results) == 2
 

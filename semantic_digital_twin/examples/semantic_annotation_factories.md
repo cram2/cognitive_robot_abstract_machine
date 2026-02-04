@@ -14,94 +14,54 @@ kernelspec:
 (semantic_annotation_factories)=
 # Factories
 
-Factories are convenience builders that create consistent worlds and their semantic annotations for you.
-They are ideal for quickly setting up structured environments such as drawers, containers, and handles without
-having to wire all bodies, connections, and semantic annotations manually.
+Factories, used by calling the `create_with_new_body_in_world` method of a semantic annotation inheriting from 
+`HasRootBody`, are convenience builders that usually a create the respective semantic annotation as well as a new body 
+with geometry that was generated based on parameters in the world provided to the factory.
+Factories always spawn bodies relative to the world root. If you for some reason only have a transform relative to some 
+other body, `world.transform(parent_T_your_body, world.root)` to get the correct `root_T_your_body`.
+They are ideal for quickly setting up generic geometries of environments without having to wire all bodies, connections, 
+and semantic annotations manually.
 
 Used Concepts:
 - [](world-structure-manipulation)
-- [Entity Query Language](https://abdelrhmanbassiouny.github.io/entity_query_language/intro.html)
+- [Entity Query Language](https://cram2.github.io/cognitive_robot_abstract_machine/krrood/eql/intro.html)
 - [](semantic_annotations)
 
 ## Create a drawer with a handle
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.entity import entity, variable
-from krrood.entity_query_language.entity_result_processors import an, the
-
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
-from semantic_digital_twin.semantic_annotations.factories import (
-    DrawerFactory,
-    ContainerFactory,
-    HandleFactory,
-    Direction,
-    SemanticPositionDescription,
-    HorizontalSemanticDirection,
-    VerticalSemanticDirection,
-)
+from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world import World
 
 
 # Build a simple drawer with a centered handle
-world = DrawerFactory(
-    name=PrefixedName("drawer"),
-    container_factory=ContainerFactory(name=PrefixedName("container"), direction=Direction.Z, scale=Scale(0.2, 0.4, 0.2),),
-    handle_factory=HandleFactory(name=PrefixedName("handle"), scale=Scale(0.05, 0.1, 0.02)),
-    semantic_position=SemanticPositionDescription(
-        horizontal_direction_chain=[
-            HorizontalSemanticDirection.FULLY_CENTER,
-        ],
-        vertical_direction_chain=[VerticalSemanticDirection.FULLY_CENTER],
-    ),
-).create()
+world = World()
+root = Body(name=PrefixedName("root"))
+
+with world.modify_world():
+    world.add_body(root)
+with world.modify_world():
+    drawer= Drawer.create_with_new_body_in_world(
+        name=PrefixedName("drawer"),
+        scale=Scale(0.2, 0.4, 0.2),
+        world=world,
+        world_root_T_self=HomogeneousTransformationMatrix(),
+    )
+    handle = Handle.create_with_new_body_in_world(
+        name=PrefixedName("drawer_handle"),
+        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.1),
+        world=world,
+        scale=Scale(0.05, 0.1, 0.02)
+    )
+    drawer.add_handle(handle)
 
 print(*world.semantic_annotations, sep="\n")
 rt = RayTracer(world)
 rt.update_scene()
 rt.scene.show("jupyter")
-```
-
-You can query for components of the created furniture using EQL. For example, get all handles:
-
-```{code-cell} ipython3
-
-handles = an(entity(let(Handle, world.semantic_annotations)))
-print(*handles.evaluate(), sep="\n")
-```
-
-## Add another handle and filter by context
-
-```{code-cell} ipython3
-# Create an extra handle world and merge it into the existing world at a different pose
-useless_handle_world = HandleFactory(name=PrefixedName("useless_handle")).create()
-print(useless_handle_world.semantic_annotations)
-
-with world.modify_world():
-    world.merge_world_at_pose(
-        useless_handle_world,
-        TransformationMatrix.from_xyz_rpy(x=1.0, y=1.0),
-    )
-
-rt = RayTracer(world)
-rt.update_scene()
-rt.scene.show("jupyter")
-```
-
-With two handles in the world, the simple handle query yields multiple results:
-
-```{code-cell} ipython3
-handles = an(entity(let(Handle, world.semantic_annotations)))
-print(*handles.evaluate(), sep="\n")
-```
-
-We can refine the query to get only the handle that belongs to a drawer:
-
-```{code-cell} ipython3
-drawer = let(Drawer, world.semantic_annotations)
-handle = let(Handle, world.semantic_annotations)
-result = an(entity(handle, drawer.handle == handle))
-print(*result.evaluate(), sep="\n")
 ```

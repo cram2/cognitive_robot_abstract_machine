@@ -43,7 +43,11 @@ class ConclusionSelector(LogicalBinaryOperator, ABC):
             return
         required_var_ids = set()
         for conclusion in conclusions:
-            vars_ = {v._id_ for v in conclusion._unique_variables_ if not isinstance(v, Literal)}
+            vars_ = {
+                v._id_
+                for v in conclusion._unique_variables_
+                if not isinstance(v, Literal)
+            }
             required_var_ids.update(vars_)
         required_output = {
             k: v for k, v in output.bindings.items() if k in required_var_ids

@@ -6,13 +6,13 @@ from datetime import timedelta
 
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
+from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
 from ...motions.gripper import MoveGripperMotion, MoveTCPMotion
 from ....config.action_conf import ActionConfig
 from ....datastructures.enums import (
     Arms,
-    GripperState,
     MovementType,
     FindBodyInRegionMethod,
 )
@@ -23,7 +23,6 @@ from ....failures import ObjectNotGraspedError
 from ....failures import ObjectNotInGraspingArea
 from ....has_parameters import has_parameters
 from ....language import SequentialPlan
-from ....robot_description import RobotDescription
 from ....robot_description import ViewManager
 from ....robot_plans.actions.base import ActionDescription
 from ....utils import translate_pose_along_local_axis
@@ -58,27 +57,15 @@ class ReachAction(ActionDescription):
     Object designator_description describing the object that should be picked up
     """
 
-    _pre_perform_callbacks = []
-    """
-    List to save the callbacks which should be called before performing the action.
-    """
+    reverse_reach_order: bool = False
 
     def __post_init__(self):
         super().__post_init__()
 
     def execute(self) -> None:
 
-        end_effector = ViewManager.get_end_effector_view(self.arm, self.robot_view)
-
-        target_pose = (
-            self.grasp_description.get_grasp_pose(end_effector, self.object_designator)
-            if self.object_designator
-            else self.target_pose
-        )
-        target_pre_pose = translate_pose_along_local_axis(
-            target_pose,
-            end_effector.front_facing_axis.to_np()[:3],
-            ActionConfig.pick_up_prepose_distance,
+        target_pre_pose, target_pose, _ = self.grasp_description._pose_sequence(
+            self.target_pose, self.object_designator, reverse=self.reverse_reach_order
         )
 
         SequentialPlan(
@@ -123,13 +110,15 @@ class ReachAction(ActionDescription):
         arm: Union[Iterable[Arms], Arms] = None,
         grasp_description: Union[Iterable[GraspDescription], GraspDescription] = None,
         object_designator: Union[Iterable[Body], Body] = None,
-    ) -> PartialDesignator[Type[ReachAction]]:
-        return PartialDesignator(
+        reverse_reach_order: Union[Iterable[bool], bool] = False,
+    ) -> PartialDesignator[ReachAction]:
+        return PartialDesignator[ReachAction](
             ReachAction,
             target_pose=target_pose,
             arm=arm,
             grasp_description=grasp_description,
             object_designator=object_designator,
+            reverse_reach_order=reverse_reach_order,
         )
 
 
@@ -188,10 +177,9 @@ class PickUpAction(ActionDescription):
                 )
             )
 
-        lift_to_pose = PoseStamped().from_spatial_type(
-            end_effector.tool_frame.global_pose
+        _, _, lift_to_pose = self.grasp_description.grasp_pose_sequence(
+            self.object_designator
         )
-        lift_to_pose.pose.position.z += 0.10
         SequentialPlan(
             self.context,
             MoveTCPMotion(
@@ -219,8 +207,8 @@ class PickUpAction(ActionDescription):
         object_designator: Union[Iterable[Body], Body],
         arm: Union[Iterable[Arms], Arms] = None,
         grasp_description: Union[Iterable[GraspDescription], GraspDescription] = None,
-    ) -> PartialDesignator[Type[PickUpAction]]:
-        return PartialDesignator(
+    ) -> PartialDesignator[PickUpAction]:
+        return PartialDesignator[PickUpAction](
             PickUpAction,
             object_designator=object_designator,
             arm=arm,
@@ -292,8 +280,8 @@ class GraspingAction(ActionDescription):
         prepose_distance: Union[
             Iterable[float], float
         ] = ActionConfig.grasping_prepose_distance,
-    ) -> PartialDesignator[Type[GraspingAction]]:
-        return PartialDesignator(
+    ) -> PartialDesignator[GraspingAction]:
+        return PartialDesignator[GraspingAction](
             GraspingAction,
             object_designator=object_designator,
             arm=arm,

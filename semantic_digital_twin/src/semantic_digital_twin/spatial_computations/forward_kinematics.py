@@ -53,13 +53,11 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
         self.child_body_to_fk_expr: Dict[UUID, HomogeneousTransformationMatrix] = {
             self.world.root.id: HomogeneousTransformationMatrix()
         }
-        self.tf: Dict[Tuple[UUID, UUID], Matrix] = OrderedDict()
 
     def recompile(self):
         self.child_body_to_fk_expr: Dict[UUID, HomogeneousTransformationMatrix] = {
             self.world.root.id: HomogeneousTransformationMatrix()
         }
-        self.tf: Dict[Tuple[UUID, UUID], Matrix] = OrderedDict()
         self.world._travel_branch(self.world.root, self)
         self.compile()
 
@@ -71,9 +69,6 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
         map_T_parent = self.child_body_to_fk_expr[connection.parent.id]
         self.child_body_to_fk_expr[connection.child.id] = map_T_parent.dot(
             connection.origin_expression
-        )
-        self.tf[(connection.parent.id, connection.child.id)] = (
-            connection.origin_as_position_quaternion()
         )
 
     tree_edge = connection_call
@@ -88,7 +83,6 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
                 for body in self.world.kinematic_structure_entities
             ]
         )
-        tf = Matrix.vstack([pose for pose in self.tf.values()])
         collision_fks = []
         for body in sorted(
             self.world.bodies_with_enabled_collision, key=lambda b: b.id
@@ -104,7 +98,6 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
         self.compiled_collision_fks = collision_fks.compile(
             parameters=VariableParameters.from_lists(params)
         )
-        self.compiled_tf = tf.compile(parameters=VariableParameters.from_lists(params))
         self.idx_start = {
             body.id: i * 4
             for i, body in enumerate(self.world.kinematic_structure_entities)
@@ -118,17 +111,6 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
         self.subs = self.world.state.positions
         self.forward_kinematics_for_all_bodies = self.compiled_all_fks(self.subs)
         self.collision_fks = self.compiled_collision_fks(self.subs)
-
-    def compute_tf(self) -> np.ndarray:
-        """
-        Computes a (number of bodies) x 7 matrix of forward kinematics in position/quaternion format.
-        The rows are ordered by body id.
-        The first 3 entries are position values, the last 4 entires are quaternion values in x, y, z, w order.
-
-        This is not updated in 'recompute', because this functionality is only used with ROS.
-        :return: A large matrix with all forward kinematics.
-        """
-        return self.compiled_tf(self.subs)
 
     @copy_lru_cache()
     def compose_expression(

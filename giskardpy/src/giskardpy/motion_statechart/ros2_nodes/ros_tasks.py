@@ -5,7 +5,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
-from nav2_msgs.action import NavigateToPose
+
+try:
+    from nav2_msgs.action import NavigateToPose
+except ModuleNotFoundError:
+    NavigateToPose = None
 from rclpy.action import ActionClient
 from std_msgs.msg import Header
 from typing_extensions import Type, TypeVar, Generic

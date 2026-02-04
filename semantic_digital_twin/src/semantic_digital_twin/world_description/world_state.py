@@ -256,8 +256,8 @@ class WorldState(MutableMapping):
         """
         dof.create_variables()
 
-        lower = dof.lower_limits.position
-        upper = dof.upper_limits.position
+        lower = dof.limits.lower.position
+        upper = dof.limits.upper.position
         initial_position = 0
 
         if lower is not None:

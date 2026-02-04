@@ -6,6 +6,7 @@ import unittest
 import mujoco
 import numpy
 
+from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
@@ -19,7 +20,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body, Region
+from semantic_digital_twin.world_description.world_entity import Body, Region, Actuator
 
 try:
     multi_sim_found = True
@@ -231,6 +232,7 @@ class MujocoSimReadWriteTestCase(unittest.TestCase):
 class MujocoSimTestCase(unittest.TestCase):
     test_urdf_1 = os.path.normpath(os.path.join(urdf_dir, "simple_two_arm_robot.urdf"))
     test_urdf_2 = os.path.normpath(os.path.join(urdf_dir, "hsrb.urdf"))
+    test_urdf_tracy = os.path.normpath(os.path.join(urdf_dir, "tracy.urdf"))
     test_mjcf_1 = os.path.normpath(
         os.path.join(mjcf_dir, "mjx_single_cube_no_mesh.xml")
     )
@@ -371,17 +373,19 @@ class MujocoSimTestCase(unittest.TestCase):
         T_const = 0.1
         kp = 100
         kv = 10
-        actuator = MujocoActuator(
-            name=PrefixedName("test_actuator"),
-            dynamics_type=mujoco.mjtDyn.mjDYN_NONE,
-            dynamics_parameters=[T_const] + [0.0] * 9,
-            gain_type=mujoco.mjtGain.mjGAIN_FIXED,
-            gain_parameters=[kp] + [0.0] * 9,
-            bias_type=mujoco.mjtBias.mjBIAS_AFFINE,
-            bias_parameters=[0, -kp, -kv] + [0.0] * 7,
-        )
+        actuator = Actuator()
         dof = self.test_urdf_1_world.get_degree_of_freedom_by_name(name="r_joint_1")
         actuator.add_dof(dof=dof)
+        actuator.simulator_additional_properties.append(
+            MujocoActuator(
+                dynamics_type=mujoco.mjtDyn.mjDYN_NONE,
+                dynamics_parameters=[T_const] + [0.0] * 9,
+                gain_type=mujoco.mjtGain.mjGAIN_FIXED,
+                gain_parameters=[kp] + [0.0] * 9,
+                bias_type=mujoco.mjtBias.mjBIAS_AFFINE,
+                bias_parameters=[0, -kp, -kv] + [0.0] * 7,
+            )
+        )
 
         logger.debug(f"Time before adding new actuator: {time.time() - start_time}s")
         with self.test_urdf_1_world.modify_world():
@@ -577,6 +581,59 @@ class MujocoSimTestCase(unittest.TestCase):
             step_size=self.step_size,
         )
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIs(multi_sim.simulator.headless, headless)
+        self.assertEqual(multi_sim.simulator.step_size, self.step_size)
+        multi_sim.start_simulation()
+        start_time = time.time()
+        time.sleep(5.0)
+        multi_sim.stop_simulation()
+        self.assertGreaterEqual(time.time() - start_time, 5.0)
+
+    def test_mujoco_with_tracy_dae_files(self):
+        # tracy used .dae files for the UR arms and the robotiq grippers
+
+        try:
+            dae_world = URDFParser.from_file(file_path=self.test_urdf_tracy).parse()
+        except ParsingError:
+            self.skipTest("Skipping tracy test due to URDF parsing error.")
+
+        viewer = MultiverseViewer()
+        multi_sim = MujocoSim(viewer=viewer, world=dae_world, headless=headless)
+        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
+        self.assertIs(multi_sim.simulator.headless, headless)
+        self.assertEqual(multi_sim.simulator.step_size, self.step_size)
+        multi_sim.start_simulation()
+        start_time = time.time()
+        time.sleep(5.0)
+        multi_sim.stop_simulation()
+        self.assertGreaterEqual(time.time() - start_time, 5.0)
+
+    def test_mujocosim_world_with_added_objects(self):
+        viewer = MultiverseViewer()
+        milk_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "..",
+            "..",
+            "semantic_digital_twin",
+            "resources",
+            "stl",
+            "milk.stl",
+        )
+        stl_parser = STLParser(milk_path)
+        mesh_world = stl_parser.parse()
+        transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=0.5, reference_frame=self.test_urdf_1_world.root
+        )
+        with self.test_urdf_1_world.modify_world():
+            self.test_urdf_1_world.merge_world_at_pose(mesh_world, transformation)
+
+        multi_sim = MujocoSim(
+            viewer=viewer, world=self.test_urdf_1_world, headless=headless
+        )
+        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()

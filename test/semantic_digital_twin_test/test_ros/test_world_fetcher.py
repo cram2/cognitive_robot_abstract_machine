@@ -153,10 +153,23 @@ def test_world_fetching(rclpy_node):
 
 
 def test_semantic_annotation_modifications(rclpy_node):
+    """
+    If this test does not terminate after calling "client.call(Trigger.Request())" inside "fetch_world_from_service" doublecheck
+    if some fields in semantic annotations are not instantiated.
+    For instance having this field in the door semantic annotation causes the above issue:
+
+    >>> entry_way: EntryWay = field(init=False)
+
+    Changing it to:
+
+    >>> entry_way: Optional[EntryWay] = field(init=False, default=None)
+
+    resolves the issue
+    """
     w1 = World(name="w1")
     b1 = Body(name=PrefixedName("b1"))
-    v1 = Handle(body=b1)
-    v2 = Door(body=b1, handle=v1)
+    v1 = Handle(root=b1)
+    v2 = Door(root=b1, handle=v1)
 
     with w1.modify_world():
         w1.add_body(b1)
@@ -175,7 +188,7 @@ def test_semantic_annotation_modifications(rclpy_node):
 
 
 def test_pr2_semantic_annotation(rclpy_node, pr2_world_state_reset):
-    pr2 = PR2.from_world(pr2_world_state_reset)
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
     fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
 
     pr2_world_copy = fetch_world_from_service(

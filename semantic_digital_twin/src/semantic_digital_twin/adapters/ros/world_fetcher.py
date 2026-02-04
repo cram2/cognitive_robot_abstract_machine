@@ -9,10 +9,6 @@ from std_srvs.srv import Trigger
 
 from ..world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
 from ...world import World
-from ...world_description.world_modification import (
-    WorldModelModification,
-    WorldModelModificationBlock,
-)
 from .messages import WorldModelSnapshot
 
 

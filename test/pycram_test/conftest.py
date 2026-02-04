@@ -1,4 +1,3 @@
-import os
 from copy import deepcopy
 from functools import partial
 
@@ -7,7 +6,9 @@ import rclpy
 
 from pycram.datastructures.dataclasses import Context
 
-from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from semantic_digital_twin.robots.pr2 import PR2
 
 

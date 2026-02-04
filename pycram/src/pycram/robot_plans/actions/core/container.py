@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
+from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.world_description.world_entity import Body, Connection
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
@@ -10,7 +11,7 @@ from .pick_up import GraspingActionDescription
 from ...motions.container import OpeningMotion, ClosingMotion
 from ...motions.gripper import MoveGripperMotion
 from ....config.action_conf import ActionConfig
-from ....datastructures.enums import Arms, GripperState, ContainerManipulationType
+from ....datastructures.enums import Arms, ContainerManipulationType
 from ....datastructures.partial_designator import PartialDesignator
 from ....failures import ContainerManipulationError
 from ....has_parameters import has_parameters
@@ -67,8 +68,8 @@ class OpenAction(ActionDescription):
         grasping_prepose_distance: Union[
             Iterable[float], float
         ] = ActionConfig.grasping_prepose_distance,
-    ) -> PartialDesignator[Type[OpenAction]]:
-        return PartialDesignator(
+    ) -> PartialDesignator[OpenAction]:
+        return PartialDesignator[OpenAction](
             OpenAction,
             object_designator=object_designator_description,
             arm=arm,
@@ -125,8 +126,8 @@ class CloseAction(ActionDescription):
         grasping_prepose_distance: Union[
             Iterable[float], float
         ] = ActionConfig.grasping_prepose_distance,
-    ) -> PartialDesignator[Type[CloseAction]]:
-        return PartialDesignator(
+    ) -> PartialDesignator[CloseAction]:
+        return PartialDesignator[CloseAction](
             CloseAction,
             object_designator=object_designator_description,
             arm=arm,

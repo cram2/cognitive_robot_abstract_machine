@@ -56,7 +56,10 @@ class DataclassOnlyIntrospector(AttributeIntrospector):
             return [
                 DiscoveredAttribute(public_name=f.name, field=f)
                 for f in dc_fields(owner_cls)
-                if not f.name.startswith("_")
+                if not self.skip_field(f)
             ]
         else:
             return []
+
+    def skip_field(self, field_: Field) -> bool:
+        return field_.name.startswith("_") or not field_.init

@@ -185,8 +185,8 @@ class DefaultOpen(ProcessModule):
             )
         )[0]
 
-        lower_limit = container_connection.dof.lower_limits.position
-        upper_limit = container_connection.dof.upper_limits.position
+        lower_limit = container_connection.dof.limits.lower.position
+        upper_limit = container_connection.dof.limits.upper.position
 
         goal_pose = link_pose_for_joint_config(
             desig.object_part,
@@ -219,8 +219,8 @@ class DefaultClose(ProcessModule):
             )
         )[0]
 
-        lower_limit = container_connection.dof.lower_limits.position
-        upper_limit = container_connection.dof.upper_limits.position
+        lower_limit = container_connection.dof.limits.lower.position
+        upper_limit = container_connection.dof.limits.upper.position
 
         goal_pose = link_pose_for_joint_config(
             desig.object_part,

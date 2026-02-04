@@ -94,8 +94,8 @@ class DetectAction(ActionDescription):
             Iterable[Type[SemanticAnnotation]], Type[SemanticAnnotation]
         ] = None,
         region: Union[Iterable[Region], Region] = None,
-    ) -> PartialDesignator[Type[DetectAction]]:
-        return PartialDesignator(
+    ) -> PartialDesignator[DetectAction]:
+        return PartialDesignator[DetectAction](
             DetectAction,
             technique=technique,
             state=state,

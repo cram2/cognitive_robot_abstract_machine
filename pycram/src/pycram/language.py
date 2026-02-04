@@ -29,9 +29,9 @@ from .plan import (
     PlanNode,
     Plan,
     managed_node,
-    ActionNode,
+    ActionDescriptionNode,
     MotionNode,
-    ResolvedActionNode,
+    ActionNode,
 )
 from .ros import sleep
 
@@ -69,14 +69,14 @@ class LanguagePlan(Plan):
             if isinstance(child, Plan):
                 self.mount(child, self.root)
             elif isinstance(child, PartialDesignator):
-                node = ActionNode(
+                node = ActionDescriptionNode(
                     designator_ref=child,
                     designator_type=child.performable,
                     kwargs=child.kwargs,
                 )
                 self.add_edge(self.root, node)
             elif "ActionDescription" in [c.__name__ for c in child.__class__.__mro__]:
-                node = ResolvedActionNode(
+                node = ActionNode(
                     designator_ref=child,
                     designator_type=child.__class__,
                     kwargs=child.__dict__,

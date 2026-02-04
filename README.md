@@ -34,6 +34,7 @@ Install the CRAM package along with its dependencies:
 
 ```bash
 cd cognitive_robot_abstract_machine
+git submodule update --init --recursive
 poetry install
 ```
 

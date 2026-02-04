@@ -10,23 +10,29 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.orm import Session
+from typing_extensions import assert_never
 
 from ...datastructures.prefixed_name import PrefixedName
+from ...datastructures.variables import SpatialVariables
 from ...orm.ormatic_interface import *
-from ...semantic_annotations.factories import (
-    DoorFactory,
-    RoomFactory,
-    WallFactory,
-    HandleFactory,
-    Direction,
-    DoubleDoorFactory,
-    HorizontalSemanticDirection,
+from ...semantic_annotations.position_descriptions import (
     SemanticPositionDescription,
+    HorizontalSemanticDirection,
     VerticalSemanticDirection,
+)
+from ...semantic_annotations.semantic_annotations import (
+    Room,
+    Floor,
+    Handle,
+    Door,
+    Hinge,
+    DoubleDoor,
+    Wall,
 )
 from ...spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
+    Vector3,
 )
 from ...world import World
 from ...world_description.connections import FixedConnection
@@ -49,6 +55,11 @@ class ProcthorDoor:
     parent_wall_width: float
     """
     Width of the parent wall, since we define the door relative to the wall's horizontal center.
+    """
+
+    world_T_parent_wall: HomogeneousTransformationMatrix
+    """
+    Transformation matrix from world root to the parent wall's origin.
     """
 
     thickness: float = 0.02
@@ -131,17 +142,16 @@ class ProcthorDoor:
             Point3(0, -width_origin_center, height_origin_center)
         )
 
-    def _get_double_door_factory(self) -> DoubleDoorFactory:
+    def _add_double_door_to_world(self, world: World) -> DoubleDoor:
         """
         Parses the parameters according to the double door assumptions, and returns a double door factory.
         """
         one_door_scale = Scale(self.thickness, self.scale.y * 0.5, self.scale.z)
         x_direction: float = one_door_scale.x / 2
         y_direction: float = one_door_scale.y / 2
-        handle_directions = [Direction.Y, Direction.NEGATIVE_Y]
+        handle_directions = [Vector3.Y(), Vector3.NEGATIVE_Y()]
 
-        door_factories = []
-        door_transforms = []
+        doors = []
 
         for index, direction in enumerate(handle_directions):
             single_door_name = PrefixedName(
@@ -150,7 +160,7 @@ class ProcthorDoor:
 
             horizontal_direction = (
                 HorizontalSemanticDirection.RIGHT
-                if direction == Direction.Y
+                if np.allclose(direction, Vector3.Y())
                 else HorizontalSemanticDirection.LEFT
             )
             semantic_position = SemanticPositionDescription(
@@ -161,53 +171,95 @@ class ProcthorDoor:
                 vertical_direction_chain=[VerticalSemanticDirection.FULLY_CENTER],
             )
 
-            door_factory = self._get_single_door_factory(
-                semantic_position, single_door_name, one_door_scale
-            )
-
-            door_factories.append(door_factory)
-
-            parent_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(
+            wall_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=x_direction,
-                y=(-y_direction) if direction == Direction.Y else y_direction,
+                y=(
+                    (-y_direction)
+                    if np.allclose(direction, Vector3.Y())
+                    else y_direction
+                ),
             )
-            door_transforms.append(parent_T_door)
+            world_T_door = self.world_T_parent_wall @ wall_T_door
 
-        double_door_factory = DoubleDoorFactory(
+            door = self._add_single_door_to_world(
+                semantic_handle_position=semantic_position,
+                world=world,
+                name=single_door_name,
+                scale=one_door_scale,
+                world_T_door=world_T_door,
+            )
+
+            doors.append(door)
+
+        double_door = DoubleDoor(
             name=self.name,
-            door_factories=door_factories,
-            door_transforms=door_transforms,
+            door_0=doors[0],
+            door_1=doors[1],
         )
-        return double_door_factory
+        with world.modify_world():
+            world.add_semantic_annotation(double_door)
+        return double_door
 
-    def _get_single_door_factory(
+    def _add_single_door_to_world(
         self,
-        semantic_position: SemanticPositionDescription,
+        semantic_handle_position: SemanticPositionDescription,
+        world: World,
         name: Optional[PrefixedName] = None,
         scale: Optional[Scale] = None,
-    ) -> DoorFactory:
+        world_T_door: Optional[HomogeneousTransformationMatrix] = None,
+    ) -> Door:
         """
         Parses the parameters according to the single door assumptions, and returns a single door factory.
         """
         name = self.name if name is None else name
         scale = self.scale if scale is None else scale
-        handle_name = PrefixedName(f"{name.name}_handle", name.prefix)
-        door_factory = DoorFactory(
-            name=name,
-            scale=scale,
-            handle_factory=HandleFactory(name=handle_name),
-            semantic_position=semantic_position,
-        )
-        return door_factory
 
-    def get_factory(self) -> Union[DoorFactory, DoubleDoorFactory]:
+        sampled_2d_point = semantic_handle_position.sample_point_from_event(
+            scale.to_simple_event().as_composite_set().marginal(SpatialVariables.yz)
+        )
+        door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=scale.x / 2, y=sampled_2d_point[0], z=sampled_2d_point[1]
+        )
+
+        world_T_door = world_T_door or self.world_T_parent_wall @ self.wall_T_door
+        world_T_handle = world_T_door @ door_T_handle
+
+        handle_name = PrefixedName(f"{name.name}_handle", name.prefix)
+        with world.modify_world():
+            handle = Handle.create_with_new_body_in_world(
+                name=handle_name,
+                world=world,
+                world_root_T_self=world_T_handle,
+            )
+
+            door = Door.create_with_new_body_in_world(
+                name=name,
+                world=world,
+                scale=scale,
+                world_root_T_self=world_T_door,
+            )
+            door.add_handle(handle)
+
+        with world.modify_world():
+            world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
+            hinge = Hinge.create_with_new_body_in_world(
+                name=PrefixedName(f"{name.name}_hinge", name.prefix),
+                world=world,
+                world_root_T_self=world_T_hinge,
+                active_axis=Vector3.Z(),
+            )
+
+            door.add_hinge(hinge)
+        return door
+
+    def add_to_world(self, world: World) -> Union[Door, DoubleDoor]:
         """
         Returns a Factory for the door, either a DoorFactory or a DoubleDoorFactory,
         depending on its name. If the door's name contains "double", it is treated as a double door.
         """
 
         if "double" in self.name.name.lower():
-            return self._get_double_door_factory()
+            return self._add_double_door_to_world(world)
         else:
             semantic_position = SemanticPositionDescription(
                 horizontal_direction_chain=[
@@ -216,7 +268,9 @@ class ProcthorDoor:
                 ],
                 vertical_direction_chain=[VerticalSemanticDirection.FULLY_CENTER],
             )
-            return self._get_single_door_factory(semantic_position=semantic_position)
+            return self._add_single_door_to_world(
+                semantic_handle_position=semantic_position, world=world
+            )
 
 
 @dataclass
@@ -350,26 +404,35 @@ class ProcthorWall:
 
         return unity_to_semantic_digital_twin_transform(world_T_wall)
 
-    def get_world(self) -> World:
+    def add_to_world(self, world: World) -> Wall:
         """
         Returns a World instance with this wall at its root.
         """
-        door_factories = []
-        list_wall_T_door = []
+        with world.modify_world():
+            wall = Wall.create_with_new_body_in_world(
+                name=self.name,
+                scale=self.scale,
+                world=world,
+                world_root_T_self=self.world_T_wall,
+            )
 
-        for door in self.door_dicts:
-            door = ProcthorDoor(door_dict=door, parent_wall_width=self.scale.y)
-            door_factories.append(door.get_factory())
-            list_wall_T_door.append(door.wall_T_door)
+        for door_dict in self.door_dicts:
+            procthor_door = ProcthorDoor(
+                door_dict=door_dict,
+                parent_wall_width=self.scale.y,
+                world_T_parent_wall=self.world_T_wall,
+            )
+            door = procthor_door.add_to_world(world)
+            with world.modify_world():
+                if isinstance(door, Door):
+                    wall.add_aperture(door.entry_way)
+                elif isinstance(door, DoubleDoor):
+                    wall.add_aperture(door.door_0.entry_way)
+                    wall.add_aperture(door.door_1.entry_way)
+                else:
+                    assert_never(door)
 
-        wall_factory = WallFactory(
-            name=self.name,
-            scale=self.scale,
-            door_factories=door_factories,
-            door_transforms=list_wall_T_door,
-        )
-
-        return wall_factory.create()
+        return wall
 
 
 @dataclass
@@ -428,14 +491,21 @@ class ProcthorRoom:
 
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(world_P_room)
 
-    def get_world(self) -> World:
+    def add_to_world(self, world: World):
         """
         Returns a World instance with this room as a Region at its root.
         """
-
-        return RoomFactory(
-            name=self.name, floor_polytope=self.centered_polytope
-        ).create()
+        floor_name = PrefixedName(f"{self.name.name}_floor", self.name.prefix)
+        with world.modify_world():
+            floor = Floor.create_with_new_body_from_polytope_in_world(
+                name=floor_name,
+                world=world,
+                floor_polytope=self.centered_polytope,
+                world_root_T_self=self.world_T_room,
+            )
+        room = Room(name=self.name, floor=floor)
+        with world.modify_world():
+            world.add_semantic_annotation(room)
 
 
 @dataclass
@@ -585,16 +655,16 @@ class ProcTHORParser:
             world_root = Body(name=PrefixedName(house_name))
             world.add_kinematic_structure_entity(world_root)
 
-            self.import_rooms(world, self.house["rooms"])
+        self.import_rooms(world, self.house["rooms"])
 
-            if self.session is not None:
-                self.import_objects(world, self.house["objects"])
-            else:
-                logging.warning("No database session provided, skipping object import.")
+        if self.session is not None:
+            self.import_objects(world, self.house["objects"])
+        else:
+            logging.warning("No database session provided, skipping object import.")
 
-            self.import_walls_and_doors(world, self.house["walls"], self.house["doors"])
+        self.import_walls_and_doors(world, self.house["walls"], self.house["doors"])
 
-            return world
+        return world
 
     @staticmethod
     def import_rooms(world: World, rooms: List[Dict]):
@@ -606,13 +676,7 @@ class ProcTHORParser:
         """
         for room in rooms:
             procthor_room = ProcthorRoom(room_dict=room)
-            room_world = procthor_room.get_world()
-            room_connection = FixedConnection(
-                parent=world.root,
-                child=room_world.root,
-                parent_T_connection_expression=procthor_room.world_T_room,
-            )
-            world.merge_world(room_world, room_connection)
+            procthor_room.add_to_world(world)
 
     def import_objects(self, world: World, objects: List[Dict]):
         """
@@ -648,13 +712,7 @@ class ProcTHORParser:
         procthor_walls = self._build_procthor_walls(walls, doors)
 
         for procthor_wall in procthor_walls:
-            wall_world = procthor_wall.get_world()
-            wall_connection = FixedConnection(
-                parent=world.root,
-                child=wall_world.root,
-                parent_T_connection_expression=procthor_wall.world_T_wall,
-            )
-            world.merge_world(wall_world, wall_connection)
+            procthor_wall.add_to_world(world)
 
     @staticmethod
     def _build_procthor_wall_from_polygon(

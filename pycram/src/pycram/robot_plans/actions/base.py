@@ -4,7 +4,7 @@ import abc
 import logging
 from dataclasses import dataclass
 
-from typing_extensions import Any, Optional, Callable
+from typing_extensions import Any, Optional, Callable, TypeVar
 
 from ...designator import DesignatorDescription
 from ...failures import PlanFailure
@@ -76,3 +76,6 @@ class ActionDescription(DesignatorDescription, HasParameters):
     def post_perform(cls, func) -> Callable:
         cls._post_perform_callbacks.append(func)
         return func
+
+
+ActionType = TypeVar("ActionType", bound=ActionDescription)
