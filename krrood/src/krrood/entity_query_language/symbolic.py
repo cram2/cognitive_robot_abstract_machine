@@ -31,6 +31,7 @@ from typing_extensions import (
     Callable,
     Self,
     Set,
+    Iterator,
 )
 
 from .cache_data import (
@@ -863,6 +864,10 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
     """
     Parameters for ordering the results of the query object descriptor.
     """
+    _distinct_on: Tuple[Selectable, ...] = field(default=(), init=False)
+    """
+    Parameters for distinct results of the query object descriptor.
+    """
     _results_mapping: List[ResultMapping] = field(init=False, default_factory=list)
     """
     Mapping functions that map the results of the query object descriptor to a new set of results.
@@ -925,8 +930,8 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         return self
 
     def _order(
-        self, results: Iterable[Dict[int, Any]] = None
-    ) -> Iterable[Dict[int, Any]]:
+        self, results: Iterator[OperationResult] = None
+    ) -> List[OperationResult]:
         """
         Order the results by the given order variable.
 
@@ -934,8 +939,8 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         :return: The ordered results.
         """
 
-        def key(result: Dict[int, Any]) -> Any:
-            variable_value = result[self._order_by.variable._var_._id_]
+        def key(result: OperationResult) -> Any:
+            variable_value = result.bindings[self._order_by.variable._var_._id_]
             if self._order_by.key:
                 return self._order_by.key(variable_value)
             else:
@@ -958,49 +963,85 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         :param on: The variables to be used for distinctness.
         :return: This query object descriptor.
         """
-        on_ids = (
-            tuple([v._var_._id_ for v in on])
-            if on
-            else tuple([v._var_._id_ for v in self._selected_variables])
-        )
-        self._seen_results = SeenSet(keys=on_ids)
-
-        def get_distinct_results(
-            results_gen: Iterable[Dict[int, Any]],
-        ) -> Iterable[Dict[int, Any]]:
-            for res in results_gen:
-                for i, id_ in enumerate(on_ids):
-                    if id_ in res:
-                        continue
-                    var_value = on[i]._evaluate__(copy(res), parent=self)
-                    res[id_] = next(var_value).value
-                bindings = (
-                    res if not on else {k: v for k, v in res.items() if k in on_ids}
-                )
-                if self._seen_results.check(bindings):
-                    continue
-                self._seen_results.add(bindings)
-                yield res
-
-        self._results_mapping.append(get_distinct_results)
+        self._distinct_on = on if on else self._selected_variables
+        self._seen_results = SeenSet(keys=self._distinct_on_ids)
+        self._results_mapping.append(self._get_distinct_results__)
         return self
+
+    @cached_property
+    def _distinct_on_ids(self) -> Tuple[int, ...]:
+        """
+        Get the IDs of variables used for distinctness.
+        """
+        return tuple(k._var_._id_ for k in self._distinct_on)
+
+    def _get_distinct_results__(
+        self, results_gen: Iterable[Dict[int, Any]]
+    ) -> Iterable[Dict[int, Any]]:
+        """
+        Apply distinctness constraint to the query object descriptor results.
+
+        :param results_gen: Generator of result dictionaries.
+        :return: Generator of distinct result dictionaries.
+        """
+        for res in results_gen:
+            self._update_res_with_distinct_on_variables__(res)
+            if self._seen_results.check(res):
+                continue
+            self._seen_results.add(res)
+            yield res
+
+    def _update_res_with_distinct_on_variables__(self, res: Dict[int, Any]):
+        """
+        Update the result dictionary with values from distinct-on variables if not already present.
+
+        :param res: The result dictionary to update.
+        """
+        for i, id_ in enumerate(self._distinct_on_ids):
+            if id_ in res:
+                continue
+            var_value = self._distinct_on[i]._evaluate__(copy(res), parent=self)
+            res[id_] = next(var_value).value
 
     def _evaluate__(
         self,
         sources: Optional[Dict[int, Any]] = None,
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
-        sources = sources or {}
+        """
+        Evaluate the query descriptor by constraining values, updating conclusions,
+        and selecting variables.
+        """
         self._eval_parent_ = parent
-        for values in self.get_constrained_values(sources):
-            self.evaluate_conclusions_and_update_bindings(values)
-            if self.any_selected_variable_is_inferred_and_unbound(values):
-                continue
-            selected_vars_bindings = self._evaluate_selected_variables(values.bindings)
-            for result in self._apply_results_mapping(selected_vars_bindings):
-                yield OperationResult({**values.bindings, **result}, False, self)
+        sources = sources or {}
+
+        results_generator = self._generate_results__(sources)
+
+        if self._order_by:
+            yield from self._order(results_generator)
+        else:
+            yield from results_generator
+
         if self._seen_results is not None:
             self._seen_results.clear()
+
+    def _generate_results__(self, sources: Dict[int, Any]) -> Iterator[OperationResult]:
+        """
+        Internal generator to process constrained values and selected variables.
+        """
+        for values in self.get_constrained_values(sources):
+
+            self.evaluate_conclusions_and_update_bindings(values)
+
+            if self.any_selected_variable_is_inferred_and_unbound(values):
+                continue
+
+            selected_vars_bindings = self._evaluate_selected_variables(values.bindings)
+
+            yield from (
+                OperationResult({**values.bindings, **result}, False, self)
+                for result in self._apply_results_mapping(selected_vars_bindings)
+            )
 
     @staticmethod
     def variable_is_inferred(var: CanBehaveLikeAVariable[T]) -> bool:
@@ -1115,8 +1156,6 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         """
         for result_mapping in self._results_mapping:
             results = result_mapping(results)
-        if self._order_by:
-            results = self._order(results)
         return results
 
     @cached_property
