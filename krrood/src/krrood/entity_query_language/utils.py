@@ -259,7 +259,8 @@ def convert_args_and_kwargs_into_a_hashable_key(
 ) -> Tuple[Any, ...]:
     """
     Generates a hashable key from the dictionary. The key is a tuple of sorted (key, value) pairs.
-    If a value is a dictionary, it is converted to a frozenset of its items.
+    If a value is a dictionary or a set, it is converted to a frozenset of its items.
+    If a value is a list, it is converted to a tuple.
 
     :param dictionary: The keyword arguments to generate the key from.
     :return: The generated key as a tuple.
@@ -268,5 +269,9 @@ def convert_args_and_kwargs_into_a_hashable_key(
     for k, v in dictionary.items():
         if isinstance(v, dict):
             v = frozenset(v.items())
+        elif isinstance(v, set):
+            v = frozenset(v)
+        elif isinstance(v, list):
+            v = tuple(v)
         key.append((k, v))
     return tuple(sorted(key))

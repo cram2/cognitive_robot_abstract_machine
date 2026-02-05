@@ -132,7 +132,26 @@ class OperationResult:
 
 def auto_update_eval_parent(func):
     """
-    Decorator that updates the _eval_parent_ of a SymbolicExpression during evaluation.
+    Decorator for ``SymbolicExpression._evaluate__*`` methods that automatically
+    manages the ``_eval_parent_`` attribute during evaluation.
+
+    This decorator wraps evaluation generator methods so that, for the duration
+    of the wrapped call, ``self._eval_parent_`` is set to the ``parent`` argument
+    passed to the evaluation method and then restored to its previous value
+    afterwards. This allows evaluation code to reliably inspect the current
+    parent expression without having to manage this state manually.
+
+    It is intended to be applied from :meth:`SymbolicExpression.__init_subclass__`
+    to every ``_evaluate__*`` method defined on subclasses.
+
+    :param func:
+        An evaluation generator method with the signature
+        ``(self, sources=None, parent=None)`` that yields ``OperationResult``
+        instances or similar evaluation results.
+    :return:
+        A wrapped generator method with the same signature as ``func`` whose
+        body automatically sets and restores ``self._eval_parent_`` around the
+        underlying evaluation logic.
     """
 
     @wraps(func)
