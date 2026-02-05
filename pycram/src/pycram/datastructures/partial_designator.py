@@ -7,7 +7,7 @@ from typing_extensions import List, Tuple, Any, Dict, TypeVar, Iterator, Iterabl
 
 from ..has_parameters import leaf_types, HasParameters
 from ..plan import PlanNode
-from ..utils import is_iterable, lazy_product
+from ..utils import lazy_product
 
 T = TypeVar("T")
 
@@ -106,7 +106,7 @@ class PartialDesignator(Iterable[T]):
         :yields: A list with a possible permutation of the given arguments
         """
         iter_list = [
-            x if is_iterable(x) and not type(x) == str else [x]
+            x if isinstance(x, Iterable) and not type(x) == str else [x]
             for x in self.kwargs.values()
         ]
         for combination in lazy_product(

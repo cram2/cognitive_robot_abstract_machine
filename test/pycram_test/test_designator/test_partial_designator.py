@@ -21,7 +21,7 @@ from pycram.datastructures.enums import (
     ApproachDirection,
     VerticalAlignment,
 )
-from pycram.utils import is_iterable, lazy_product
+from pycram.utils import lazy_product
 from pycram.process_module import simulated_robot
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -75,11 +75,6 @@ def test_partial_desig_missing_params():
     new_partial = partial_desig(grasp_description=grasp_description)
     missing_params = new_partial.missing_parameter()
     assert ["object_designator"] == missing_params
-
-
-def test_is_iterable():
-    assert is_iterable([1, 2, 3])
-    assert not is_iterable(1)
 
 
 def test_partial_desig_permutations():

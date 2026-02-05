@@ -134,7 +134,9 @@ def pose_sequence_reachability_validator(
         cart_sequence := Sequence(
             [
                 CartesianPose(
-                    root_link=root, tip_link=tip_link, goal_pose=pose.to_spatial_type()
+                    root_link=root,
+                    tip_link=tip_link,
+                    goal_pose=pose.to_homogeneous_matrix(),
                 )
                 for pose in target_sequence
             ]

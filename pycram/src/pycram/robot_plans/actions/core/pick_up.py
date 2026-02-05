@@ -7,6 +7,7 @@ from datetime import timedelta
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
 from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -157,7 +158,7 @@ class PickUpAction(ActionDescription):
             self.context,
             MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm),
             ReachActionDescription(
-                target_pose=Pose.from_spatial_type(self.object_designator.global_pose),
+                target_pose=self.object_designator.global_pose.to_pose(),
                 object_designator=self.object_designator,
                 arm=self.arm,
                 grasp_description=self.grasp_description,
@@ -235,7 +236,7 @@ class GraspingAction(ActionDescription):
     """
 
     def execute(self) -> None:
-        object_pose = Pose.from_spatial_type(self.object_designator.global_pose)
+        object_pose = self.object_designator.global_pose.to_pose()
         end_effector = ViewManager.get_end_effector_view(self.arm, self.robot_view)
 
         object_pose_in_gripper = self.world.transform(
@@ -244,13 +245,15 @@ class GraspingAction(ActionDescription):
             ),
             end_effector.tool_frame,
         )
-        object_pose_in_gripper = Pose.from_spatial_type(object_pose_in_gripper)
 
-        object_pose_in_gripper.pose.position.x -= self.prepose_distance
+        object_pose_in_gripper = (
+            object_pose_in_gripper
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(self.prepose_distance)
+        )
 
         SequentialPlan(
             self.context,
-            MoveTCPMotion(object_pose_in_gripper, self.arm),
+            MoveTCPMotion(object_pose_in_gripper.to_pose(), self.arm),
             MoveGripperMotion(GripperState.OPEN, self.arm),
             MoveTCPMotion(object_pose, self.arm, allow_gripper_collision=True),
             MoveGripperMotion(

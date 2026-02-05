@@ -11,8 +11,8 @@ from typing_extensions import Optional, Union, List
 
 from semantic_digital_twin.robots.abstract_robot import Manipulator, AbstractRobot
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Quaternion
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vector3
+from semantic_digital_twin.world_description.world_entity import Body, KinematicStructureEntity
 from .dataclasses import Rotations
 from .enums import Grasp, AxisIdentifier, ApproachDirection, VerticalAlignment, Arms
 from ..has_parameters import HasParameters
@@ -89,7 +89,7 @@ class GraspDescription:
         pre_pose = deepcopy(pose)
         pre_pose = rotate_pose_by_quaternion(pre_pose, grasp_orientation)
         pre_pose = translate_pose_along_local_axis(
-            pre_pose.to_pose(), self.manipulation_axis(), -offset
+            pre_pose, self.manipulation_axis(), -offset
         )
 
         grasp_pose = deepcopy(pose)
@@ -247,11 +247,9 @@ class GraspDescription:
         :return: A sorted list of GraspDescription instances representing all grasp permutations.
         """
         world = manipulator._world
-        objectTmap = Pose.from_spatial_type(
-            world.transform(pose.to_spatial_type(), world.root)
-        )
+        map_T_object = world.transform(pose.to_homogeneous_matrix(), world.root).to_pose()
 
-        robot_pose = Pose.from_spatial_type(manipulator._robot.root.global_pose)
+        map_T_robot = manipulator._robot.root.global_pose.to_pose()
 
         if grasp_alignment:
             side_axis = grasp_alignment.preferred_axis
@@ -264,23 +262,20 @@ class GraspDescription:
                 False,
             )
 
-        object_to_robot_vector_world = objectTmap.position.vector_to_position(
-            robot_pose.position
-        )
-        orientation = objectTmap.orientation.to_list()
+        map_P_object = map_T_object.to_position()
+        map_P_robot = map_T_robot.to_position()
 
-        mapRobject = R.from_quat(orientation).as_matrix()
-        objectRmap = mapRobject.T
+        map_V_robot_to_object = map_P_robot - map_P_object
 
-        object_to_robot_vector_local = objectRmap.dot(
-            object_to_robot_vector_world.to_numpy()
-        )
-        vector_x, vector_y, vector_z = object_to_robot_vector_local
 
-        vector_side = PyCramVector3(vector_x, vector_y, np.nan)
+        object_R_map = map_T_object.to_rotation_matrix().inverse()
+
+        object_V_robot = object_R_map @ map_V_robot_to_object
+
+        vector_side = Vector3(object_V_robot.x, object_V_robot.y, np.nan)
         side_faces = GraspDescription.calculate_closest_faces(vector_side, side_axis)
 
-        vector_vertical = PyCramVector3(np.nan, np.nan, vector_z)
+        vector_vertical = Vector3(np.nan, np.nan, object_V_robot.z)
         if vertical:
             vertical_faces = GraspDescription.calculate_closest_faces(vector_vertical)
         else:
@@ -301,7 +296,7 @@ class GraspDescription:
 
     @staticmethod
     def calculate_closest_faces(
-        pose_to_robot_vector: PyCramVector3,
+        pose_to_robot_vector: Vector3,
         specified_grasp_axis: AxisIdentifier = AxisIdentifier.Undefined,
     ) -> Union[
         Tuple[ApproachDirection, ApproachDirection],
@@ -406,3 +401,19 @@ class GraspPose(Pose):
     """
     Grasp description corresponding to the grasp pose.
     """
+
+    def __init__(
+            self,
+            position: Optional[Point3] = None,
+            orientation: Optional[Quaternion] = None,
+            reference_frame: Optional[KinematicStructureEntity] = None,
+            arm: Arms = None,
+            grasp_description: GraspDescription = None,
+        ):
+        super().__init__(position, orientation, reference_frame)
+        self.arm = arm
+        self.grasp_description = grasp_description
+    @classmethod
+    def from_pose(cls, pose: Pose, arm: Arms, grasp_description: GraspDescription):
+        return cls(position=pose.to_position(), orientation=pose.to_quaternion(), reference_frame=pose.reference_frame,
+                   arm=arm, grasp_description=grasp_description)

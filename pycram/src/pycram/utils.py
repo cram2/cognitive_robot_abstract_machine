@@ -441,20 +441,6 @@ def classproperty(func):
     return ClassPropertyDescriptor(func)
 
 
-def is_iterable(obj: Any) -> bool:
-    """
-    Checks if the given object is iterable.
-
-    :param obj: The object that should be checked
-    :return: True if the object is iterable, False otherwise
-    """
-    try:
-        iter(obj)
-    except TypeError:
-        return False
-    return True
-
-
 def lazy_product(*iterables: Iterable, iter_names: List[str] = None) -> Iterable[Tuple]:
     """
     Lazily generate the cartesian product of the iterables.
@@ -524,7 +510,7 @@ def translate_pose_along_local_axis(
     )
 
 
-def rotate_pose_by_quaternion(pose: Pose, quaternion: Quaternion):
+def rotate_pose_by_quaternion(pose: Pose, quaternion: Quaternion) -> Pose:
     """
     Rotates a given pose by a specified quaternion. The function takes the pose and converts it into a
     homogeneous transformation matrix. It applies the rotation specified by the quaternion and
@@ -539,5 +525,5 @@ def rotate_pose_by_quaternion(pose: Pose, quaternion: Quaternion):
         pose.to_homogeneous_matrix()
         @ HomogeneousTransformationMatrix.from_point_rotation_matrix(
             rotation_matrix=quaternion.to_rotation_matrix()
-        )
+        ).to_pose()
     )

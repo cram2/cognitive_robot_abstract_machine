@@ -6,6 +6,10 @@ from datetime import timedelta
 import numpy as np
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Quaternion,
+)
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from ..core.navigation import LookAtActionDescription, NavigateActionDescription
 from ....config.action_conf import ActionConfig
@@ -34,21 +38,24 @@ class FaceAtAction(ActionDescription):
 
     def execute(self) -> None:
         # get the robot position
-        robot_position = Pose.from_spatial_type(self.robot_view.root.global_pose)
+        robot_position = self.robot_view.root.global_pose
 
         # calculate orientation for robot to face the object
         angle = (
             np.arctan2(
-                robot_position.position.y - self.pose.position.y,
-                robot_position.position.x - self.pose.position.x,
+                robot_position.to_position().y.to_np()[0]
+                - self.pose.to_position().y.to_np()[0],
+                robot_position.to_position().x.to_np()[0]
+                - self.pose.to_position().x.to_np()[0],
             )
             + np.pi
         )
-        orientation = list(quaternion_from_euler(0, 0, angle, axes="sxyz"))
 
         # create new robot pose
-        new_robot_pose = Pose.from_list(
-            robot_position.position.to_list(), orientation, self.world.root
+        new_robot_pose = Pose(
+            robot_position.to_position(),
+            Quaternion.from_rpy(0, 0, angle),
+            reference_frame=self.world.root,
         )
 
         # turn robot

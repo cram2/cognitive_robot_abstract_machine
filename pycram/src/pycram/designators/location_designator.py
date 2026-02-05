@@ -181,8 +181,11 @@ class CostmapLocation(LocationDesignatorDescription):
 
 
         """
-        ground_pose = deepcopy(target)
-        ground_pose.position.z = 0
+        ground_pose = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            Point3(target.x, target.y, 0),
+            target.to_rotation_matrix(),
+            reference_frame=target.reference_frame,
+        ).to_pose()
 
         base_bb = self.robot_view.base.bounding_box
 
@@ -277,10 +280,12 @@ class CostmapLocation(LocationDesignatorDescription):
 
             for pose_candidate in final_map:
                 logger.debug(f"Testing candidate pose at {pose_candidate}")
-                pose_candidate.position.z = 0
-                test_robot.root.parent_connection.origin = (
-                    pose_candidate.to_spatial_type()
+                pose_candidate = Pose(
+                    Point3(pose_candidate.x, pose_candidate.y, 0),
+                    pose_candidate.to_quaternion(),
+                    reference_frame=target.reference_frame,
                 )
+                test_robot.root.parent_connection.origin = pose_candidate
 
                 collisions = collision_check(
                     test_robot,
@@ -333,9 +338,8 @@ class CostmapLocation(LocationDesignatorDescription):
                         test_world,
                     )
                     if is_reachable:
-                        pose = GraspPose(
-                            pose_candidate.pose,
-                            pose_candidate.header,
+                        pose = GraspPose.from_pose(
+                            pose=pose_candidate,
                             arm=params_box.reachable_arm,
                             grasp_description=grasp_desc,
                         )

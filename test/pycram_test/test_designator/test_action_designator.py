@@ -12,6 +12,7 @@ from pycram.robot_plans.motions import MoveTCPWaypointsMotion
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
+    publish_world,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
@@ -218,8 +219,9 @@ def test_look_at(immutable_model_world):
     description = LookAtAction.description(
         [Pose.from_xyz_quaternion(5, 0, 1, reference_frame=world.root)]
     )
-    assert description.resolve().target == Pose.from_xyz_quaternion(
-        5, 0, 1, reference_frame=world.root
+    assert np.allclose(
+        description.resolve().target.to_np(),
+        Pose.from_xyz_quaternion(5, 0, 1, reference_frame=world.root).to_np(),
     )
 
     plan = SequentialPlan(context, description)
@@ -332,35 +334,37 @@ def test_grasping(immutable_model_world):
 def test_facing(immutable_model_world):
     world, robot_view, context = immutable_model_world
     with simulated_robot:
-        milk_pose = Pose.from_spatial_type(
-            world.get_body_by_name("milk.stl").global_pose
-        )
+        milk_pose = world.get_body_by_name("milk.stl").global_pose.to_pose()
         plan = SequentialPlan(context, FaceAtActionDescription(milk_pose, True))
         plan.perform()
         milk_in_robot_frame = world.transform(
             world.get_body_by_name("milk.stl").global_pose,
             robot_view.root,
         )
-        milk_in_robot_frame = Pose.from_spatial_type(milk_in_robot_frame)
-        assert milk_in_robot_frame.position.y == pytest.approx(0.0, abs=0.01)
+        milk_in_robot_frame = milk_in_robot_frame.to_pose()
+        assert milk_in_robot_frame.to_position().y.to_np()[0] == pytest.approx(
+            0.0, abs=0.01
+        )
 
 
 def test_move_tcp_waypoints(immutable_model_world):
     world, robot_view, context = immutable_model_world
+    publish_world(world)
     with world.modify_world():
         world.state[
             world.get_degree_of_freedom_by_name("torso_lift_joint").id
         ].position = 0.1
     world.notify_state_change()
 
-    gripper_pose = Pose.from_spatial_type(
-        world.get_body_by_name("r_gripper_tool_frame").global_pose
-    )
     path = []
     for i in range(1, 5):
-        new_pose = deepcopy(gripper_pose)
-        new_pose.position.z -= 0.05 * i
-        path.append(new_pose)
+        tool_frame = world.get_body_by_name("r_gripper_tool_frame")
+        world_T_tool = deepcopy(tool_frame.global_pose)
+        tool_T_new_z = HomogeneousTransformationMatrix.from_xyz_rpy(
+            z=0.05 * i, reference_frame=tool_frame
+        )
+        world_T_new_z = world_T_tool @ tool_T_new_z
+        path.append(world_T_new_z.to_pose())
     description = MoveTCPWaypointsMotion(path, Arms.RIGHT)
     plan = SequentialPlan(context, description)
 
@@ -368,24 +372,30 @@ def test_move_tcp_waypoints(immutable_model_world):
     me.construct_msc()
     with simulated_robot:
         me.execute()
-    gripper_position = Pose.from_spatial_type(
-        world.get_body_by_name("r_gripper_tool_frame").global_pose
+    gripper_position = world.get_body_by_name(
+        "r_gripper_tool_frame"
+    ).global_pose.to_pose()
+    assert path[-1].to_position().x.to_np()[0] == pytest.approx(
+        gripper_position.to_position().x.to_np()[0], abs=0.1
     )
-    assert path[-1].position.x == pytest.approx(gripper_position.position.x, abs=0.1)
-    assert path[-1].position.y == pytest.approx(gripper_position.position.y, abs=0.1)
-    assert path[-1].position.z == pytest.approx(gripper_position.position.z, abs=0.1)
+    assert path[-1].to_position().y.to_np()[0] == pytest.approx(
+        gripper_position.to_position().y.to_np()[0], abs=0.1
+    )
+    assert path[-1].to_position().z.to_np()[0] == pytest.approx(
+        gripper_position.to_position().z.to_np()[0], abs=0.1
+    )
 
-    assert path[-1].orientation.x == pytest.approx(
-        gripper_position.orientation.x, abs=0.1
+    assert path[-1].to_quaternion().x.to_np() == pytest.approx(
+        gripper_position.to_quaternion().x.to_np(), abs=0.1
     )
-    assert path[-1].orientation.y == pytest.approx(
-        gripper_position.orientation.y, abs=0.1
+    assert path[-1].to_quaternion().y.to_np() == pytest.approx(
+        gripper_position.to_quaternion().y.to_np(), abs=0.1
     )
-    assert path[-1].orientation.z == pytest.approx(
-        gripper_position.orientation.z, abs=0.1
+    assert path[-1].to_quaternion().z.to_np() == pytest.approx(
+        gripper_position.to_quaternion().z.to_np(), abs=0.1
     )
-    assert path[-1].orientation.w == pytest.approx(
-        gripper_position.orientation.w, abs=0.1
+    assert path[-1].to_quaternion().w.to_np() == pytest.approx(
+        gripper_position.to_quaternion().w.to_np(), abs=0.1
     )
 
 

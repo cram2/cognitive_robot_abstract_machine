@@ -64,9 +64,9 @@ class ReachMotion(BaseMotion):
             -0.05,  # TODO: Maybe put these values in the semantic annotates
         )
 
-        pose = Pose.from_spatial_type(
-            self.world.transform(target_pre_pose.to_spatial_type(), self.world.root)
-        )
+        pose = self.world.transform(
+            target_pre_pose.to_homogeneous_matrix(), self.world.root
+        ).to_pose()
 
         sequence = [target_pre_pose, pose]
         return sequence.reverse() if self.reverse_pose_sequence else sequence
@@ -81,7 +81,7 @@ class ReachMotion(BaseMotion):
             CartesianPose(
                 root_link=self.robot_view.root,
                 tip_link=tip,
-                goal_pose=pose.to_spatial_type(),
+                goal_pose=pose.to_homogeneous_matrix(),
                 threshold=0.005,
             )
             for pose in self._calculate_pose_sequence()
@@ -154,13 +154,13 @@ class MoveTCPMotion(BaseMotion):
             task = CartesianPosition(
                 root_link=self.robot_view.root,
                 tip_link=tip,
-                goal_point=self.target.to_spatial_type().to_position(),
+                goal_point=self.target.to_position(),
             )
         else:
             task = CartesianPose(
                 root_link=self.robot_view.root,
                 tip_link=tip,
-                goal_pose=self.target.to_spatial_type(),
+                goal_pose=self.target.to_homogeneous_matrix(),
                 threshold=0.005,
             )
         return task
@@ -201,7 +201,7 @@ class MoveTCPWaypointsMotion(BaseMotion):
             CartesianPose(
                 root_link=self.robot_view.root,
                 tip_link=tip,
-                goal_pose=pose.to_spatial_type(),
+                goal_pose=pose.to_homogeneous_matrix(),
                 # threshold=0.005,
             )
             for pose in self.waypoints
