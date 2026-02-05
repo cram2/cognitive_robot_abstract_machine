@@ -3,6 +3,7 @@ from abc import ABC
 from dataclasses import dataclass
 
 import numpy as np
+import math
 import trimesh.boolean
 from krrood.entity_query_language.predicate import (
     Predicate,
