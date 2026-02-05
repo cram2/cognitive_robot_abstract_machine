@@ -1599,14 +1599,14 @@ class Attribute(DomainMapping):
 
 
 @dataclass(eq=False, repr=False)
-class Index(DomainMapping):
+class Index(DomainMapping[T]):
     """
     A symbolic indexing operation that can be used to access items of symbolic variables via [] operator.
     """
 
     _key_: Any
 
-    def _apply_mapping_(self, value: Any) -> Iterable[Any]:
+    def _apply_mapping_(self, value: Iterable[T]) -> T:
         yield value[self._key_]
 
     @property
