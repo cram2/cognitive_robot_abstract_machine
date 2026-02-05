@@ -364,7 +364,7 @@ class ProcTHORTestCase(unittest.TestCase):
                 resource_filename("semantic_digital_twin", "../../"),
                 "resources",
                 "procthor_json",
-                "house_987654321.json",
+                "house_0.json",
             )
         ).parse()
 

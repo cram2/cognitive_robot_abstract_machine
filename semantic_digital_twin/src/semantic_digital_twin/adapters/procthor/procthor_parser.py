@@ -28,6 +28,10 @@ from ...semantic_annotations.semantic_annotations import (
     Hinge,
     DoubleDoor,
     Wall,
+    Kitchen,
+    Bedroom,
+    Bathroom,
+    LivingRoom,
 )
 from ...spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -503,7 +507,17 @@ class ProcthorRoom:
                 floor_polytope=self.centered_polytope,
                 world_root_T_self=self.world_T_room,
             )
-        room = Room(name=self.name, floor=floor)
+        if "Bedroom" in self.name.name:
+            room = Bedroom(name=self.name, floor=floor)
+        elif "LivingRoom" in self.name.name:
+            room = LivingRoom(name=self.name, floor=floor)
+        elif "Kitchen" in self.name.name:
+            room = Kitchen(name=self.name, floor=floor)
+        elif "Bathroom" in self.name.name:
+            room = Bathroom(name=self.name, floor=floor)
+        else:
+            assert_never(self.name.name)
+
         with world.modify_world():
             world.add_semantic_annotation(room)
 
