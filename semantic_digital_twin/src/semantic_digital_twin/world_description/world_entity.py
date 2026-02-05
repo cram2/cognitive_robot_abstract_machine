@@ -198,9 +198,18 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
 
             current_data = data[k]
             if isinstance(current_data, list):
-                current_result = [
-                    cls._item_from_json(data, **kwargs) for data in current_data
-                ]
+                if isinstance(v.type, str):
+                    type_name = v.type
+                else:
+                    type_name = v.type._name
+                if type_name.startswith("Set"):
+                    container_type = set
+                else:
+                    container_type = list
+
+                current_result = container_type(
+                    [cls._item_from_json(data, **kwargs) for data in current_data]
+                )
             else:
                 current_result = cls._item_from_json(current_data, **kwargs)
             init_args[k] = current_result

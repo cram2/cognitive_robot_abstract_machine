@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 import numpy as np
 from sqlalchemy import select
 
-from krrood.ormatic.utils import create_engine
 from sqlalchemy.orm import sessionmaker
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -179,6 +178,8 @@ class WorldFromDatabaseConfig(WorldConfig):
         pass
 
     def setup_world(self):
+        from krrood.ormatic.utils import create_engine
+
         semantic_digital_twin_database_uri = os.environ.get(
             "SEMANTIC_DIGITAL_TWIN_DATABASE_URI"
         )
