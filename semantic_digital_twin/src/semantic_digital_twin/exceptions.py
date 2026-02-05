@@ -16,6 +16,7 @@ from typing_extensions import (
 
 from krrood.adapters.exceptions import JSONSerializationError
 from krrood.utils import DataclassException
+from .datastructures.definitions import JointStateType
 from .datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
@@ -33,6 +34,18 @@ if TYPE_CHECKING:
     )
     from .spatial_types import Vector3
     from .world_description.degree_of_freedom import DegreeOfFreedomLimits
+
+
+@dataclass
+class NoJointStateWithType(DataclassException):
+    """
+    Raised when a JointState type is search which is not defined
+    """
+
+    joint_state: JointStateType
+
+    def __post_init__(self):
+        self.message = f"There is no JointState with the type: {self.joint_state}"
 
 
 @dataclass

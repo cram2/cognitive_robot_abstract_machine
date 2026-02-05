@@ -69,7 +69,7 @@ def test_table_world(session, table_world):
     session.add(world_dao)
     session.commit()
 
-    bodies_from_db = session.scalars(select(BodyDAO)).all()
+    bodies_from_db = session.scalars(select(KinematicStructureEntityDAO)).all()
     assert len(bodies_from_db) == len(table_world.kinematic_structure_entities)
 
     queried_world = session.scalar(select(WorldMappingDAO))

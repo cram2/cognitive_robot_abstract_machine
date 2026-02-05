@@ -7,7 +7,8 @@ from functools import cached_property, lru_cache
 from typing_extensions import List, Dict, TYPE_CHECKING, Optional, Set, Type
 
 from .dao import AlternativeMapping
-from .utils import InheritanceStrategy, module_and_class_name
+from .utils import InheritanceStrategy
+from ..utils import module_and_class_name
 from ..class_diagrams.class_diagram import (
     WrappedClass,
 )
@@ -444,9 +445,7 @@ class WrappedTable:
             logger.info(f"Parsing as type.")
             self.create_type_type_column(wrapped_field)
 
-        elif (
-            wrapped_field.is_builtin_type or wrapped_field.is_enum
-        ) and not wrapped_field.is_container:
+        elif wrapped_field.is_builtin_type and not wrapped_field.is_container:
             logger.info(f"Parsing as builtin type.")
             self.create_builtin_column(wrapped_field)
 
@@ -457,6 +456,14 @@ class WrappedTable:
         ):
             logger.info(f"Parsing as one to one relationship.")
             self.create_one_to_one_relationship(wrapped_field)
+
+        # handle one to many relationships
+        elif (
+            wrapped_field.is_one_to_many_relationship
+            and wrapped_field.type_endpoint in self.ormatic.mapped_classes
+        ):
+            logger.info(f"Parsing as one to many relationship.")
+            self.create_one_to_many_relationship(wrapped_field)
 
         # handle custom types
         elif (
@@ -476,14 +483,6 @@ class WrappedTable:
         ):
             logger.info(f"Parsing as JSON.")
             self.create_json_column(wrapped_field)
-
-        # handle one to many relationships
-        elif (
-            wrapped_field.is_one_to_many_relationship
-            and wrapped_field.type_endpoint in self.ormatic.mapped_classes
-        ):
-            logger.info(f"Parsing as one to many relationship.")
-            self.create_one_to_many_relationship(wrapped_field)
         else:
             logger.info("Skipping due to not handled type.")
 
@@ -658,14 +657,15 @@ class WrappedTable:
 
     def create_custom_type(self, wrapped_field: WrappedField):
         custom_type = self.ormatic.type_mappings[wrapped_field.type_endpoint]
+        self.ormatic.type_mappings[wrapped_field.type_endpoint] = custom_type
         column_name = wrapped_field.field.name
         column_type = (
-            f"Mapped[{custom_type.__module__}.{custom_type.__name__}]"
+            f"Mapped[{module_and_class_name(wrapped_field.type_endpoint)}]"
             if not wrapped_field.is_optional
-            else f"Mapped[{module_and_class_name(Optional)}[{custom_type.__module__}.{custom_type.__name__}]]"
+            else f"Mapped[{module_and_class_name(Optional)}[{module_and_class_name(wrapped_field.type_endpoint)}]]"
         )
 
-        constructor = f"mapped_column({custom_type.__module__}.{custom_type.__name__}, nullable={wrapped_field.is_optional}, use_existing_column=True)"
+        constructor = f"mapped_column({module_and_class_name(custom_type)}, nullable={wrapped_field.is_optional}, use_existing_column=True)"
 
         self.custom_columns.append(
             ColumnConstructor(column_name, column_type, constructor)

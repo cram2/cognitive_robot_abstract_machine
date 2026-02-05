@@ -858,7 +858,8 @@ def test_unification_dict(handles_and_containers_world):
     assert results[0][drawer] is results[0][drawer_1]
 
 
-def test_distinct_entity():
+@pytest.fixture
+def distinct_test():
     names = ["Handle1", "Handle1", "Handle2", "Container1", "Container1", "Container3"]
     body_name = variable(str, domain=names)
     query = an(
@@ -868,6 +869,19 @@ def test_distinct_entity():
         )
         .distinct()
     )
+    return query
+
+
+def test_distinct_entity(distinct_test):
+    query = distinct_test
+    results = list(query.evaluate())
+    assert len(results) == 2
+
+
+def test_distinct_reevaluation(distinct_test):
+    query = distinct_test
+    results = list(query.evaluate())
+    assert len(results) == 2
     results = list(query.evaluate())
     assert len(results) == 2
 
@@ -993,3 +1007,9 @@ def test_multiple_dependent_selectables(handles_and_containers_world):
         (res[cabinet], res[cabinet_drawers])
         for res in cabinet_drawer_pairs_query.evaluate()
     } == set(cabinet_drawer_pairs_expected)
+
+
+def test_order_by_not_evaluated_variable(handles_and_containers_world):
+    body = variable(Body, domain=handles_and_containers_world.bodies)
+    query = an(entity(body).order_by(variable=body.name, descending=False))
+    assert list(query.evaluate()) == sorted(handles_and_containers_world.bodies, key=lambda b: b.name, reverse=False)

@@ -28,16 +28,17 @@ You will:
 import os
 import logging
 
+from pkg_resources import resource_filename
+
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.utils import get_semantic_digital_twin_directory_root
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection, Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.world_entity import Body, Region
 
 logging.disable(logging.CRITICAL)
-root_path = get_semantic_digital_twin_directory_root(os.getcwd())
+root_path = resource_filename("semantic_digital_twin", "../../")
 table_urdf = os.path.join(root_path, "resources", "urdf", "table.urdf")
 ```
 
@@ -55,7 +56,7 @@ Your goal:
 # world = ...
 # top = ...  # find the body whose name.name == "top"
 # surface_region = Region(name=PrefixedName("table_surface"))
-# surface_shape = Box(origin=TransformationMatrix(reference_frame=surface_region), scale=Scale(1.0, 1.0, 0.001))
+# surface_shape = Box(origin=HomogeneousTransformationMatrix(reference_frame=surface_region), scale=Scale(1.0, 1.0, 0.001))
 # surface_region.area = [surface_shape]
 # with world.modify_world():
 #     world.add_kinematic_structure_entity(surface_region)
@@ -70,7 +71,7 @@ world = URDFParser.from_file(table_urdf).parse()
 top = [b for b in world.bodies if b.name.name == "top"][0]
 # Create a thin region at the table surface and attach it to the body "top"
 surface_region = Region(name=PrefixedName("table_surface"))
-surface_shape = Box(origin=TransformationMatrix(reference_frame=surface_region), scale=Scale(1.0, 1.0, 0.001))
+surface_shape = Box(origin=HomogeneousTransformationMatrix(reference_frame=surface_region), scale=Scale(1.0, 1.0, 0.001))
 surface_region.area = [surface_shape]
 with world.modify_world():
     world.add_kinematic_structure_entity(surface_region)
@@ -82,7 +83,7 @@ before_pos = surface_region.global_pose.to_position().to_np()[:3]
 ## 2. Move the table and check the region
 Your goal:
 - Add a `Connection6DoF` between a new body named `root` and the current root of the table world
-- Move the table by setting the 6DoF connection's `origin` to `TransformationMatrix.from_xyz_rpy(x=1.0, y=2.0, reference_frame=world.root)` inside a modification block
+- Move the table by setting the 6DoF connection's `origin` to `HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0, reference_frame=world.root)` inside a modification block
 
 ```{code-cell} ipython3
 :tags: [exercise]
@@ -92,7 +93,7 @@ Your goal:
 #     root_to_table = Connection6DoF.create_with_dofs(parent=new_root, child=world.root, world=world)
 #     world.add_connection(root_to_table)
 # with world.modify_world():
-#     root_to_table.origin = TransformationMatrix.from_xyz_rpy(x=1.0, y=2.0, reference_frame=world.root)
+#     root_to_table.origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0, reference_frame=world.root)
 ```
 
 ```{code-cell} ipython3
@@ -102,7 +103,7 @@ with world.modify_world():
     root_to_table = Connection6DoF.create_with_dofs(parent=new_root, child=world.root, world=world)
     world.add_connection(root_to_table)
 with world.modify_world():
-    root_to_table.origin = TransformationMatrix.from_xyz_rpy(x=1.0, y=2.0, reference_frame=world.root)
+    root_to_table.origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0, reference_frame=world.root)
 ```
 
 ```{code-cell} ipython3

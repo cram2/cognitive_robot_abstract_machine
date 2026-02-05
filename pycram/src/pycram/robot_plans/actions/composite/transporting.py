@@ -33,7 +33,6 @@ from ....designators.object_designator import BelieveObject
 from ....failures import ObjectUnfetchable, ConfigurationNotReached
 from ....has_parameters import has_parameters
 from ....language import SequentialPlan
-from ....robot_description import RobotDescription
 from ....robot_plans.actions.base import ActionDescription
 
 
@@ -162,7 +161,7 @@ class TransportAction(ActionDescription):
         target_location: Union[Iterable[PoseStamped], PoseStamped],
         arm: Union[Iterable[Arms], Arms] = None,
         place_rotation_agnostic: Optional[bool] = False,
-    ) -> PartialDesignator[Type[TransportAction]]:
+    ) -> PartialDesignator[TransportAction]:
         return PartialDesignator(
             TransportAction,
             object_designator=object_designator,
@@ -234,7 +233,7 @@ class PickAndPlaceAction(ActionDescription):
         target_location: Union[Iterable[PoseStamped], PoseStamped],
         arm: Union[Iterable[Arms], Arms] = None,
         grasp_description=GraspDescription,
-    ) -> PartialDesignator[Type[PickAndPlaceAction]]:
+    ) -> PartialDesignator[PickAndPlaceAction]:
         return PartialDesignator(
             PickAndPlaceAction,
             object_designator=object_designator,
@@ -302,7 +301,7 @@ class MoveAndPlaceAction(ActionDescription):
         keep_joint_states: Union[
             Iterable[bool], bool
         ] = ActionConfig.navigate_keep_joint_states,
-    ) -> PartialDesignator[Type[MoveAndPlaceAction]]:
+    ) -> PartialDesignator[MoveAndPlaceAction]:
         return PartialDesignator(
             MoveAndPlaceAction,
             standing_position=standing_position,
@@ -379,7 +378,7 @@ class MoveAndPickUpAction(ActionDescription):
         keep_joint_states: Union[
             Iterable[bool], bool
         ] = ActionConfig.navigate_keep_joint_states,
-    ) -> PartialDesignator[Type[MoveAndPickUpAction]]:
+    ) -> PartialDesignator[MoveAndPickUpAction]:
         return PartialDesignator(
             MoveAndPickUpAction,
             standing_position=standing_position,

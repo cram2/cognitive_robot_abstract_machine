@@ -29,6 +29,7 @@ from typing_extensions import (
 from typing_extensions import List
 from typing_extensions import Type, Set
 
+from .mixin import HasSimulatorProperties
 from .callbacks.callback import ModelChangeCallback
 from .collision_checking.collision_detector import CollisionDetector
 from .collision_checking.trimesh_collision_detector import TrimeshCollisionDetector
@@ -449,7 +450,7 @@ _LRU_CACHE_SIZE: int = 2048
 
 
 @dataclass
-class World:
+class World(HasSimulatorProperties):
     """
     A class representing the world.
     The world manages a set of kinematic structure entities and connections represented as a tree-like graph.
@@ -1556,7 +1557,7 @@ class World:
             self.kinematic_structure.successors(kinematic_structure_entity.index)
         )
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+
     def compute_parent_connection(
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> Optional[Connection]:
@@ -1576,7 +1577,7 @@ class World:
             )
         )
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+
     def compute_parent_kinematic_structure_entity(
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> Optional[KinematicStructureEntity]:

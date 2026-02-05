@@ -8,11 +8,9 @@ from sqlalchemy.orm import Session
 
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
-    TorsoState,
     ApproachDirection,
     Arms,
     VerticalAlignment,
-    GripperState,
 )
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.pose import PyCramPose, PoseStamped
@@ -35,6 +33,7 @@ from pycram.robot_plans import (
     PickUpAction,
     PlaceAction,
 )
+from semantic_digital_twin.datastructures.definitions import TorsoState, GripperState
 
 engine = create_engine("sqlite:///:memory:")
 

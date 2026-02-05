@@ -468,6 +468,10 @@ class DataclassJSONSerializer(ExternalClassJSONSerializer[None]):
 
             if isinstance(value, (list, set)):
                 current_result = [to_json(item) for item in value]
+            elif isinstance(value, dict):
+                keys = [to_json(k) for k in value.keys()]
+                values = [to_json(v) for v in value.values()]
+                current_result = {"keys": keys, "values": values}
             else:
                 current_result = to_json(value)
             result[field_.public_name] = current_result
@@ -491,6 +495,14 @@ class DataclassJSONSerializer(ExternalClassJSONSerializer[None]):
 
             if isinstance(current_data, list):
                 current_result = [from_json(data, **kwargs) for data in current_data]
+            elif (
+                isinstance(current_data, dict)
+                and "keys" in current_data.keys()
+                and "values" in current_data.keys()
+            ):
+                keys = [from_json(data, **kwargs) for data in current_data["keys"]]
+                values = [from_json(data, **kwargs) for data in current_data["values"]]
+                current_result = dict(zip(keys, values))
             else:
                 current_result = from_json(current_data, **kwargs)
             init_args[k] = current_result

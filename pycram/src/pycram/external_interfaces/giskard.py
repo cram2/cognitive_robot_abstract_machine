@@ -8,7 +8,6 @@ from typing_extensions import List, Dict, Callable, Optional
 
 from ..datastructures.enums import Arms
 from ..datastructures.pose import PoseStamped
-from ..robot_description import RobotDescription
 from ..ros import get_node_names
 
 

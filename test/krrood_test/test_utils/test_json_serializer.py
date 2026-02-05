@@ -19,6 +19,7 @@ from krrood.adapters.json_serializer import (
     from_json,
     JSONAttributeDiff,
     shallow_diff_json,
+    DataclassJSONSerializer,
 )
 from krrood.utils import get_full_class_name
 
@@ -144,6 +145,11 @@ class ClassThatNeedsKWARGS(SubclassJSONSerializer):
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(a=(data["a"]), b=(kwargs["b"]))
+
+
+@dataclass
+class ClassWithDict(DataclassJSONSerializer):
+    a: Dict[str, int]
 
 
 class CustomEnum(str, Enum):
@@ -349,3 +355,10 @@ def test_dataclass_with_default_factory():
     data = to_json(foo)
     result = from_json(data)
     assert result == foo
+
+
+def test_dataclass_dict():
+    cls = ClassWithDict({"foo": 1})
+    data = to_json(cls)
+    result = from_json(data)
+    assert result == cls

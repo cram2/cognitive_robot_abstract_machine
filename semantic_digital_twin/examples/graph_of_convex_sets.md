@@ -20,7 +20,7 @@ Unfortunately, the real world is not like this.
 The semantic digital twin internally represents the objects in the world using some implementation of a scene description format. 
 These formats include collision information for every object. The collision information is often approximated using a set of boxes.
 
-These collision boxes are converted to their algebraic representation using the [random-events](https://github.com/tomsch420/random-events) package.
+These collision boxes are converted to their algebraic representation using the [random-events](https://cram2.github.io/cognitive_robot_abstract_machine/random_events/intro.html) package.
 This allows the free space to be formulated as the complement of the belief state collision boxes.
 The complement itself is a finite collection of (possible infinitely big) boxes that do not intersect.
 These boxes, however, have surfaces that are adjacent.
@@ -39,7 +39,7 @@ from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection, BoundingBoxCollection
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
 box_world = World()
@@ -47,7 +47,7 @@ box_world = World()
 with box_world.modify_world():
     box = Body(name=PrefixedName("box"), collision=ShapeCollection([Box(scale=Scale(0.5, 0.5, 0.5),
                                                         color=Color(1., 1., 1., 1.),
-                                                        origin=TransformationMatrix.from_xyz_rpy(0,0,0,0,0,0),)],
+                                                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(0,0,0,0,0,0),)],
                                                         ))
     box_world.add_kinematic_structure_entity(box)
     
@@ -64,7 +64,7 @@ from semantic_digital_twin.world_description.geometry import BoundingBox
 
 search_space = BoundingBoxCollection([BoundingBox(min_x=-1, max_x=1,
                            min_y=-1, max_y=1,
-                           min_z=0.1, max_z=0.2, origin=TransformationMatrix(reference_frame=box_world.root))], box_world.root)
+                           min_z=0.1, max_z=0.2, origin=HomogeneousTransformationMatrix(reference_frame=box_world.root))], box_world.root)
                            
 gcs = GraphOfConvexSets.free_space_from_world(box_world, search_space=search_space)
 ```
@@ -102,22 +102,19 @@ This minimal example demonstrates a concept that can be applied to the entire be
 
 ```{code-cell} ipython3
 import os
+from pkg_resources import resource_filename
 from pathlib import Path
+import semantic_digital_twin
 from semantic_digital_twin.adapters.urdf import URDFParser
-root = next(
-    parent
-    for parent in [Path.cwd(), *Path.cwd().parents]
-    if (parent / "pyproject.toml").exists()
-)
 
-apartment = os.path.realpath(os.path.join(root, "resources", "urdf", "kitchen.urdf"))
+apartment = os.path.realpath(os.path.join(resource_filename("semantic_digital_twin", "../../"), "resources", "urdf", "kitchen.urdf"))
 
 apartment_parser = URDFParser.from_file(apartment)
 world = apartment_parser.parse()
 
 search_space = BoundingBoxCollection([BoundingBox(min_x=-2, max_x=2,
                            min_y=-2, max_y=2,
-                           min_z=0., max_z=2, origin=TransformationMatrix(reference_frame=world.root))], world.root)
+                           min_z=0., max_z=2, origin=HomogeneousTransformationMatrix(reference_frame=world.root))], world.root)
 gcs = GraphOfConvexSets.free_space_from_world(world, search_space=search_space)
 ```
 

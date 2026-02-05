@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import copy
 import itertools
 import os
 import tempfile
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
-from functools import cached_property, lru_cache
+from functools import cached_property
 
 import numpy as np
 import trimesh
@@ -21,6 +20,7 @@ from typing_extensions import Optional, List, Dict, Any, Self, Tuple, TYPE_CHECK
 from krrood.adapters.exceptions import JSON_TYPE_NAME
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from ..datastructures.variables import SpatialVariables
+from ..mixin import HasSimulatorProperties
 from ..spatial_types import HomogeneousTransformationMatrix, Point3, Vector3
 from ..utils import IDGenerator
 
@@ -170,7 +170,7 @@ class Scale:
 
 
 @dataclass
-class Shape(ABC, SubclassJSONSerializer):
+class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
     """
     Base class for all shapes in the world.
     """

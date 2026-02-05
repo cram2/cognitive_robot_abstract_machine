@@ -1,0 +1,95 @@
+name: Semantic Digital Twin Self Assessment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'semantic_digital_twin/**'
+      - '.github/workflows/sdt_self_assessment.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'semantic_digital_twin/**'
+      - '.github/workflows/sdt_self_assessment.yml'
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'info'
+        type: choice
+        options:
+          - info
+          - warning
+          - debug
+
+jobs:
+  to-lowercase:
+    runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
+    steps:
+      - id: lowercase
+        run: |
+          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
+
+  test-self-assessment:
+    needs: to-lowercase
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.to-lowercase.outputs.repo_lowercase }}
+    
+    defaults:
+      run:
+        shell: bash -ieo pipefail {0}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Initialize submodules explicitly
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
+      - name: Install dependencies
+        run: |
+          source /opt/ros/cram-env/bin/activate
+          pip install -e ./krrood -e ./random_events -e ./probabilistic_model -e ./pycram -e ./semantic_digital_twin -e ./giskardpy
+          poetry install
+          pip install -r semantic_digital_twin/requirements-self-assessment.txt
+          if [ -d "semantic_digital_twin/src/ripple_down_rules_meta" ] && [ -f "semantic_digital_twin/src/ripple_down_rules_meta/setup.py" ] || [ -f "semantic_digital_twin/src/ripple_down_rules_meta/pyproject.toml" ]; then
+            pip install -e ./semantic_digital_twin/src/ripple_down_rules_meta
+          fi
+
+      - name: Build ORM
+        run: |
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/cram-env/bin/activate
+          cd semantic_digital_twin/scripts
+          python generate_orm.py
+
+      - name: Run Notebook Example Tests
+        run: |
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/cram-env/bin/activate
+          cd semantic_digital_twin/scripts
+          /bin/bash test_notebook_examples.sh
+
+      - name: Run Exercise Tests
+        run: |
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/cram-env/bin/activate
+          cd semantic_digital_twin/scripts
+          /bin/bash test_exercises.sh
+
+      - name: Run Quiz Tests
+        run: |
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/cram-env/bin/activate
+          cd semantic_digital_twin/scripts
+          /bin/bash test_quizzes.sh

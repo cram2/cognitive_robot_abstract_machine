@@ -1,0 +1,109 @@
+name: Build Documentation
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-docs:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lib: krrood
+            doc_path: doc
+            artifact_name: krrood-doc
+            use_container: false
+          - lib: pycram
+            doc_path: doc/source
+            artifact_name: pycram-doc
+            use_container: false
+          - lib: semantic_digital_twin
+            doc_path: doc
+            artifact_name: semantic-digital-twin-doc
+            use_container: true
+          - lib: probabilistic_model
+            doc_path: doc
+            artifact_name: probabilistic-model-doc
+            use_container: false
+          - lib: random_events
+            doc_path: doc
+            artifact_name: random-events-doc
+            use_container: false
+    uses: ./.github/workflows/build_doc_reusable.yml
+    with:
+      lib: ${{ matrix.lib }}
+      doc_path: ${{ matrix.doc_path }}
+      artifact_name: ${{ matrix.artifact_name }}
+      use_container: ${{ matrix.use_container }}
+
+  deploy-all-docs:
+    needs: [build-docs]
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Jupyter-Book
+        run: pip install 'jupyter-book<2'
+
+      - name: Build root documentation
+        run: jupyter-book build doc
+
+      - name: Create aggregate directory
+        run: |
+          mkdir -p aggregate
+          cp -r doc/_build/html/* aggregate/
+
+      - name: Download krrood-doc
+        uses: actions/download-artifact@v4
+        with:
+          name: krrood-doc
+          path: aggregate/krrood
+
+      - name: Download pycram-doc
+        uses: actions/download-artifact@v4
+        with:
+          name: pycram-doc
+          path: aggregate/pycram
+
+      - name: Download semantic-digital-twin-doc
+        uses: actions/download-artifact@v4
+        with:
+          name: semantic-digital-twin-doc
+          path: aggregate/semantic_digital_twin
+
+      - name: Download probabilistic-model-doc
+        uses: actions/download-artifact@v4
+        with:
+          name: probabilistic-model-doc
+          path: aggregate/probabilistic_model
+
+      - name: Download random-events-doc
+        uses: actions/download-artifact@v4
+        with:
+          name: random-events-doc
+          path: aggregate/random_events
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: aggregate
+          name: gh-pages-aggregate
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: gh-pages-aggregate

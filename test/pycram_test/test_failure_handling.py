@@ -7,7 +7,6 @@ from pycram.datastructures.enums import ObjectType, Arms, WorldMode
 from pycram.failure_handling import Retry
 from pycram.failures import PlanFailure
 from pycram.process_module import ProcessModule, simulated_robot
-from pycram.robot_description import RobotDescription
 
 
 # start ik_and_description.launch

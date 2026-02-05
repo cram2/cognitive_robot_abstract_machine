@@ -39,6 +39,7 @@ from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
     JSON_TYPE_NAME,
     to_json,
+    DataclassJSONSerializer,
 )
 from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar, trinary_logic_not
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName

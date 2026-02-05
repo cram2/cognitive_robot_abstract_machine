@@ -31,7 +31,10 @@ class TfPublisherModelCallback(ModelChangeCallback):
     """
 
     node: Node
-    """ros2 node used to publish tf messages"""
+    """
+    ros2 node used to publish tf messages
+    """
+
     ignored_kinematic_structure_entities: set[KinematicStructureEntity] = field(
         default_factory=set
     )

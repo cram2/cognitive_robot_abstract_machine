@@ -38,7 +38,7 @@ questions = [
       "question": "How does a SemanticAnnotation set a default name?",
       "type": "multiple_choice",
       "answers": [
-        {"answer": "In __post_init__, if name is None it generates a unique name", "correct": True},
+        {"answer": "In __post_init__, if name is None it generates a name from the class name and an incrementing number", "correct": True},
         {"answer": "It auto-generates a UUID", "correct": False},
         {"answer": "It inherits the world's name", "correct": False},
         {"answer": "It uses getattr to fetch a label", "correct": False}
@@ -68,7 +68,7 @@ questions = [
       "question": "Which factory is used to create a hollow container in the tutorial?",
       "type": "multiple_choice",
       "answers": [
-        {"answer": "ContainerFactory", "correct": True},
+        {"answer": "HasCaseAsRootBody provides a classmethod as a factory", "correct": True},
         {"answer": "DrawerFactory", "correct": False},
         {"answer": "HandleFactory", "correct": False},
         {"answer": "MeshFactory", "correct": False}

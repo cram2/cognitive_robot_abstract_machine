@@ -28,7 +28,7 @@ questions = [
       "question": "What is the purpose of the `PrefixedName` data structure?",
       "type": "multiple_choice",
       "answers": [
-        { "answer": "To give world entities unique names.", "correct": True, "feedback": "Correct! PrefixedNames are assumed to be unique." },
+        { "answer": "To give world entities human readable names.", "correct": True, "feedback": "Correct! PrefixedNames are easy to read but not necessarily unique." },
         { "answer": "To act as unique variable type.", "correct": False, "feedback": "Incorrect! Try again." },
         { "answer": "To identify the world a world entity belongs to.", "correct": False, "feedback": "Incorrect! Try again." },
         { "answer": "To manage ray-tracing parameters.", "correct": False, "feedback": "Incorrect! Try again."   }

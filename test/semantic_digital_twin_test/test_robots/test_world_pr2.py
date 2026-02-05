@@ -22,6 +22,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
+    DiffDrive,
     PrismaticConnection,
     RevoluteConnection,
 )
@@ -298,6 +299,43 @@ def test_apply_control_commands_omni_drive_pr2(pr2_world_state_reset):
     assert pr2_world_state_reset.state[omni_drive.y.id].acceleration == 0.0
     assert pr2_world_state_reset.state[omni_drive.y.id].velocity == 0.0
     assert pr2_world_state_reset.state[omni_drive.y.id].position == 0.1094837581924854
+
+
+def test_apply_control_commands_diff_drive(cylinder_bot_diff_world):
+    diff_drive: DiffDrive = cylinder_bot_diff_world.get_connection_by_name(
+        "map_T_bot"
+    )
+    cmd = np.zeros((len(cylinder_bot_diff_world.degrees_of_freedom)), dtype=float)
+    cmd[cylinder_bot_diff_world.state._index[diff_drive.x_velocity.id]] = 100
+    cmd[cylinder_bot_diff_world.state._index[diff_drive.yaw.id]] = 100
+    dt = 0.1
+    cylinder_bot_diff_world.apply_control_commands(cmd, dt, Derivatives.jerk)
+    assert cylinder_bot_diff_world.state[diff_drive.yaw.id].jerk == 100.0
+    assert cylinder_bot_diff_world.state[diff_drive.yaw.id].acceleration == 100.0 * dt
+    assert cylinder_bot_diff_world.state[diff_drive.yaw.id].velocity == 100.0 * dt * dt
+    assert (
+        cylinder_bot_diff_world.state[diff_drive.yaw.id].position == 100.0 * dt * dt * dt
+    )
+
+    assert cylinder_bot_diff_world.state[diff_drive.x_velocity.id].jerk == 100.0
+    assert (
+        cylinder_bot_diff_world.state[diff_drive.x_velocity.id].acceleration == 100.0 * dt
+    )
+    assert (
+        cylinder_bot_diff_world.state[diff_drive.x_velocity.id].velocity
+        == 100.0 * dt * dt
+    )
+    assert cylinder_bot_diff_world.state[diff_drive.x_velocity.id].position == 0
+
+    assert cylinder_bot_diff_world.state[diff_drive.x.id].jerk == 0.0
+    assert cylinder_bot_diff_world.state[diff_drive.x.id].acceleration == 0.0
+    assert cylinder_bot_diff_world.state[diff_drive.x.id].velocity == 0.0
+    assert np.allclose(cylinder_bot_diff_world.state[diff_drive.x.id].position, 100 * dt ** 3 * np.cos(100 * dt ** 3), atol=1e-3)
+
+    assert cylinder_bot_diff_world.state[diff_drive.y.id].jerk == 0.0
+    assert cylinder_bot_diff_world.state[diff_drive.y.id].acceleration == 0.0
+    assert cylinder_bot_diff_world.state[diff_drive.y.id].velocity == 0.0
+    assert np.allclose(cylinder_bot_diff_world.state[diff_drive.y.id].position, 100 * dt ** 3 * np.sin(100 * dt ** 3), atol=1e-3)
 
 
 def test_search_for_connections_of_type(pr2_world_state_reset: World):

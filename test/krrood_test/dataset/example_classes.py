@@ -4,7 +4,7 @@ import importlib
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import Enum, auto
 from types import FunctionType
 from typing import Set
 
@@ -656,3 +656,21 @@ class UnderspecifiedTypesContainer:
 @dataclass
 class TestPositionSet:
     positions: Set[Position] = field(default_factory=set)
+
+
+class PolymorphicEnum(Enum): ...
+
+
+class ChildEnum1(PolymorphicEnum):
+    A = auto()
+    B = auto()
+
+
+class ChildEnum2(PolymorphicEnum):
+    B = auto()
+    C = auto()
+
+
+@dataclass
+class PolymorphicEnumAssociation:
+    value: PolymorphicEnum

@@ -12,7 +12,9 @@ from .multi_sim import (
     GeomVisibilityAndCollisionType,
     MujocoCamera,
     MujocoEquality,
-    MujocoMocapBody,
+    MujocoGeom,
+    MujocoBody,
+    MujocoJoint,
 )
 from ..datastructures.prefixed_name import PrefixedName
 from ..exceptions import WorldEntityNotFoundError
@@ -48,6 +50,7 @@ from ..world_description.inertial_properties import (
     PrincipalAxes,
 )
 from ..world_description.shape_collection import ShapeCollection
+from ..world_description.world_entity import Actuator
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +121,12 @@ class MJCFParser:
         collisions = []
         for mujoco_geom in mujoco_body.geoms:
             shape = self.parse_geom(mujoco_geom=mujoco_geom)
+            shape.simulator_additional_properties.append(
+                MujocoGeom(
+                    solver_impedance=mujoco_geom.solimp.tolist(),
+                    solver_reference=mujoco_geom.solref.tolist(),
+                )
+            )
             if mujoco_geom.contype != 0 or mujoco_geom.conaffinity != 0:
                 collisions.append(shape)
             if mujoco_geom.group in [
@@ -129,9 +138,13 @@ class MJCFParser:
         body.inertial = self.parse_inertial(mujoco_body=mujoco_body)
         body.visual = ShapeCollection(shapes=visuals, reference_frame=body)
         body.collision = ShapeCollection(shapes=collisions, reference_frame=body)
+        body.simulator_additional_properties.append(
+            MujocoBody(
+                gravitation_compensation_factor=mujoco_body.gravcomp,
+                motion_capture=mujoco_body.mocap,
+            )
+        )
         self.world.add_kinematic_structure_entity(body)
-        if mujoco_body.mocap:
-            self.world.add_semantic_annotation(MujocoMocapBody(body=body))
         for mujoco_child_body in mujoco_body.bodies:
             self.parse_body(mujoco_body=mujoco_child_body)
 
@@ -410,6 +423,12 @@ class MJCFParser:
                     raise NotImplementedError(
                         f"Joint type {mujoco_joint.type} not implemented yet."
                     )
+                connection.simulator_additional_properties.append(
+                    MujocoJoint(
+                        stiffness=mujoco_joint.stiffness,
+                        actuator_force_range=mujoco_joint.actfrcrange.tolist(),
+                    )
+                )
         self.world.add_connection(connection)
 
     def parse_dof(self, mujoco_joint: mujoco.MjsJoint) -> DegreeOfFreedom:
@@ -465,29 +484,28 @@ class MJCFParser:
         assert (
             len(dofs) == 1
         ), f"Actuator {actuator_name} is associated with joint {joint_name} which has {len(connection.dofs)} DOFs, but only single-DOF joints are supported for actuators."
-        dof = dofs[0]
-        actuator = MujocoActuator(
-            name=PrefixedName(actuator_name),
-            activation_limited=mujoco_actuator.actlimited,
-            activation_range=[*mujoco_actuator.actrange],
-            ctrl_limited=mujoco_actuator.ctrllimited,
-            ctrl_range=[*mujoco_actuator.ctrlrange],
-            force_limited=mujoco_actuator.forcelimited,
-            force_range=[*mujoco_actuator.forcerange],
-            bias_parameters=[*mujoco_actuator.biasprm],
-            bias_type=mujoco_actuator.biastype,
-            dynamics_parameters=[*mujoco_actuator.dynprm],
-            dynamics_type=mujoco_actuator.dyntype,
-            gain_parameters=[*mujoco_actuator.gainprm],
-            gain_type=mujoco_actuator.gaintype,
+        actuator = Actuator(name=PrefixedName(actuator_name))
+        actuator.add_dof(dofs[0])
+        actuator.simulator_additional_properties.append(
+            MujocoActuator(
+                activation_limited=mujoco_actuator.actlimited,
+                activation_range=[*mujoco_actuator.actrange],
+                control_limited=mujoco_actuator.ctrllimited,
+                control_range=[*mujoco_actuator.ctrlrange],
+                force_limited=mujoco_actuator.forcelimited,
+                force_range=[*mujoco_actuator.forcerange],
+                bias_parameters=[*mujoco_actuator.biasprm],
+                bias_type=mujoco_actuator.biastype,
+                dynamics_parameters=[*mujoco_actuator.dynprm],
+                dynamics_type=mujoco_actuator.dyntype,
+                gain_parameters=[*mujoco_actuator.gainprm],
+                gain_type=mujoco_actuator.gaintype,
+            )
         )
-        actuator.add_dof(dof)
         self.world.add_actuator(actuator)
 
     def parse_camera(self, mujoco_camera: mujoco.MjsCamera):
-        camera_name = PrefixedName(mujoco_camera.name)
-        body_name = mujoco_camera.parent.name
-        body = self.world.get_body_by_name(body_name)
+        camera_name = mujoco_camera.name
         resolution = (
             [1, 1]
             if numpy.isnan(mujoco_camera.resolution).any()
@@ -529,23 +547,25 @@ class MJCFParser:
             else mujoco_camera.quat.tolist()
         )
 
-        camera = MujocoCamera(
-            name=camera_name,
-            body=body,
-            mode=mujoco_camera.mode,
-            orthographic=mujoco_camera.orthographic,
-            fovy=mujoco_camera.fovy,
-            resolution=resolution,
-            focal_length=focal_length,
-            focal_pixel=focal_pixel,
-            principal_length=principal_length,
-            principal_pixel=principal_pixel,
-            sensor_size=sensor_size,
-            ipd=mujoco_camera.ipd,
-            pos=pos,
-            quat=quat,
+        body_name = mujoco_camera.parent.name
+        body = self.world.get_body_by_name(body_name)
+        body.simulator_additional_properties.append(
+            MujocoCamera(
+                name=camera_name,
+                mode=mujoco_camera.mode,
+                orthographic=mujoco_camera.orthographic,
+                fovy=mujoco_camera.fovy,
+                resolution=resolution,
+                focal_length=focal_length,
+                focal_pixel=focal_pixel,
+                principal_length=principal_length,
+                principal_pixel=principal_pixel,
+                sensor_size=sensor_size,
+                inter_pupilary_distance=mujoco_camera.ipd,
+                position=pos,
+                quaternion=quat,
+            )
         )
-        self.world.add_semantic_annotation(camera)
 
     def parse_equalities(self):
         self.mimic_joints = {}
@@ -555,13 +575,13 @@ class MJCFParser:
                 case mujoco.mjtEq.mjEQ_JOINT:
                     self.mimic_joints[equality.name2] = equality.name1
                 case mujoco.mjtEq.mjEQ_WELD:
-                    self.world.add_semantic_annotation(
+                    self.world.simulator_additional_properties.append(
                         MujocoEquality(
                             type=mujoco.mjtEq.mjEQ_WELD,
-                            obj_type=mujoco.mjtObj.mjOBJ_BODY,
+                            object_type=mujoco.mjtObj.mjOBJ_BODY,
                             name_1=equality.name1,
                             name_2=equality.name2,
-                            data=equality.data,
+                            data=equality.data.tolist(),
                         )
                     )
                 case _:

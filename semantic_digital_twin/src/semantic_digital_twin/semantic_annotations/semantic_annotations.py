@@ -444,6 +444,22 @@ class Room(SemanticAnnotation):
 
 
 @dataclass(eq=False)
+class Kitchen(Room): ...
+
+
+@dataclass(eq=False)
+class Bedroom(Room): ...
+
+
+@dataclass(eq=False)
+class Bathroom(Room): ...
+
+
+@dataclass(eq=False)
+class LivingRoom(Room): ...
+
+
+@dataclass(eq=False)
 class Wall(HasApertures):
     """
     A wall is a physical entity that separates two spaces and can contain apertures. Doors are a computed property.

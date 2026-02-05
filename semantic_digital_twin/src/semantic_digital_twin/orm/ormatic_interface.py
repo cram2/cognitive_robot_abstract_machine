@@ -16,9 +16,14 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 
 import builtins
+import enum
+import krrood.adapters.json_serializer
 import krrood.ormatic.custom_types
+import krrood.ormatic.type_dict
 import semantic_digital_twin.callbacks.callback
+import semantic_digital_twin.datastructures.joint_state
 import semantic_digital_twin.datastructures.prefixed_name
+import semantic_digital_twin.mixin
 import semantic_digital_twin.orm.model
 import semantic_digital_twin.reasoning.predicates
 import semantic_digital_twin.robots.abstract_robot
@@ -46,12 +51,32 @@ from krrood.ormatic.custom_types import TypeType
 class Base(DeclarativeBase):
     type_mappings = {
         trimesh.base.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
-        uuid.UUID: sqlalchemy.sql.sqltypes.UUID,
         typing.Type: krrood.ormatic.custom_types.TypeType,
+        enum.Enum: krrood.ormatic.custom_types.PolymorphicEnumType,
+        krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
+        uuid.UUID: sqlalchemy.sql.sqltypes.UUID,
     }
 
 
 # Association tables for many-to-many relationships
+jointstatedao_connections_association = Table(
+    "jointstatedao_connections_association",
+    Base.metadata,
+    Column("source_jointstatedao_id", ForeignKey("JointStateDAO.database_id")),
+    Column(
+        "target_activeconnection1dofdao_id",
+        ForeignKey("ActiveConnection1DOFDAO.database_id"),
+    ),
+)
+shapedao_simulator_additional_properties_association = Table(
+    "shapedao_simulator_additional_properties_association",
+    Base.metadata,
+    Column("source_shapedao_id", ForeignKey("ShapeDAO.database_id")),
+    Column(
+        "target_simulatoradditionalpropertydao_id",
+        ForeignKey("SimulatorAdditionalPropertyDAO.database_id"),
+    ),
+)
 shapecollectiondao_shapes_association = Table(
     "shapecollectiondao_shapes_association",
     Base.metadata,
@@ -91,6 +116,15 @@ worldmappingdao_degrees_of_freedom_association = Table(
     Column(
         "target_degreeoffreedommappingdao_id",
         ForeignKey("DegreeOfFreedomMappingDAO.database_id"),
+    ),
+)
+worldentitydao_simulator_additional_properties_association = Table(
+    "worldentitydao_simulator_additional_properties_association",
+    Base.metadata,
+    Column("source_worldentitydao_id", ForeignKey("WorldEntityDAO.database_id")),
+    Column(
+        "target_simulatoradditionalpropertydao_id",
+        ForeignKey("SimulatorAdditionalPropertyDAO.database_id"),
     ),
 )
 hasdoorsdao_doors_association = Table(
@@ -208,6 +242,15 @@ hsrbdao_arms_association = Table(
     Base.metadata,
     Column("source_hsrbdao_id", ForeignKey("HSRBDAO.database_id")),
     Column("target_armdao_id", ForeignKey("ArmDAO.database_id")),
+)
+semanticrobotannotationdao_joint_states_association = Table(
+    "semanticrobotannotationdao_joint_states_association",
+    Base.metadata,
+    Column(
+        "source_semanticrobotannotationdao_id",
+        ForeignKey("SemanticRobotAnnotationDAO.database_id"),
+    ),
+    Column("target_jointstatedao_id", ForeignKey("JointStateDAO.database_id")),
 )
 kinematicchaindao_sensors_association = Table(
     "kinematicchaindao_sensors_association",
@@ -381,21 +424,17 @@ class ColorDAO(
     A: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
-class DegreeOfFreedomLimitsMappingDAO(
-    Base, DataAccessObject[semantic_digital_twin.orm.model.DegreeOfFreedomLimitsMapping]
+class DegreeOfFreedomLimitsDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.degree_of_freedom.DegreeOfFreedomLimits
+    ],
 ):
 
-    __tablename__ = "DegreeOfFreedomLimitsMappingDAO"
+    __tablename__ = "DegreeOfFreedomLimitsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    lower: Mapped[typing.List[builtins.float]] = mapped_column(
-        JSON, nullable=False, use_existing_column=True
-    )
-    upper: Mapped[typing.List[builtins.float]] = mapped_column(
-        JSON, nullable=False, use_existing_column=True
     )
 
 
@@ -499,6 +538,45 @@ class JerkVariableDAO(
         uselist=False,
         foreign_keys=[dof_id],
         post_update=True,
+    )
+
+
+class JointStateDAO(
+    Base, DataAccessObject[semantic_digital_twin.datastructures.joint_state.JointState]
+):
+
+    __tablename__ = "JointStateDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    target_values: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+    state_type: Mapped[
+        semantic_digital_twin.datastructures.definitions.JointStateType
+    ] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+
+    name_id: Mapped[int] = mapped_column(
+        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    connections: Mapped[builtins.list[ActiveConnection1DOFDAO]] = relationship(
+        "ActiveConnection1DOFDAO",
+        secondary="jointstatedao_connections_association",
+        primaryjoin="JointStateDAO.database_id == jointstatedao_connections_association.c.source_jointstatedao_id",
+        secondaryjoin="ActiveConnection1DOFDAO.database_id == jointstatedao_connections_association.c.target_activeconnection1dofdao_id",
+        cascade="save-update, merge",
+    )
+    name: Mapped[PrefixedNameDAO] = relationship(
+        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
     )
 
 
@@ -694,6 +772,15 @@ class ShapeDAO(
         use_existing_column=True,
     )
 
+    simulator_additional_properties: Mapped[
+        builtins.list[SimulatorAdditionalPropertyDAO]
+    ] = relationship(
+        "SimulatorAdditionalPropertyDAO",
+        secondary="shapedao_simulator_additional_properties_association",
+        primaryjoin="ShapeDAO.database_id == shapedao_simulator_additional_properties_association.c.source_shapedao_id",
+        secondaryjoin="SimulatorAdditionalPropertyDAO.database_id == shapedao_simulator_additional_properties_association.c.target_simulatoradditionalpropertydao_id",
+        cascade="save-update, merge",
+    )
     origin: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
         "HomogeneousTransformationMatrixMappingDAO",
         uselist=False,
@@ -866,6 +953,17 @@ class BoundingBoxCollectionDAO(
     }
 
 
+class SimulatorAdditionalPropertyDAO(
+    Base, DataAccessObject[semantic_digital_twin.mixin.SimulatorAdditionalProperty]
+):
+
+    __tablename__ = "SimulatorAdditionalPropertyDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
 class SpatialRelationDAO(
     Base, DataAccessObject[semantic_digital_twin.reasoning.predicates.SpatialRelation]
 ):
@@ -977,12 +1075,10 @@ class TriangleMeshDAO(
         ForeignKey(MeshDAO.database_id), primary_key=True, use_existing_column=True
     )
 
-    mesh: Mapped[typing.Optional[semantic_digital_twin.orm.model.TrimeshType]] = (
-        mapped_column(
-            semantic_digital_twin.orm.model.TrimeshType,
-            nullable=True,
-            use_existing_column=True,
-        )
+    mesh: Mapped[typing.Optional[trimesh.base.Trimesh]] = mapped_column(
+        semantic_digital_twin.orm.model.TrimeshType,
+        nullable=True,
+        use_existing_column=True,
     )
 
     __mapper_args__ = {
@@ -1268,6 +1364,15 @@ class WorldEntityDAO(
         use_existing_column=True,
     )
 
+    simulator_additional_properties: Mapped[
+        builtins.list[SimulatorAdditionalPropertyDAO]
+    ] = relationship(
+        "SimulatorAdditionalPropertyDAO",
+        secondary="worldentitydao_simulator_additional_properties_association",
+        primaryjoin="WorldEntityDAO.database_id == worldentitydao_simulator_additional_properties_association.c.source_worldentitydao_id",
+        secondaryjoin="SimulatorAdditionalPropertyDAO.database_id == worldentitydao_simulator_additional_properties_association.c.target_simulatoradditionalpropertydao_id",
+        cascade="save-update, merge",
+    )
     name: Mapped[PrefixedNameDAO] = relationship(
         "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
     )
@@ -1394,7 +1499,7 @@ class ActiveConnection1DOFDAO(
     multiplier: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     offset: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
-    dof_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    dof_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
 
@@ -1456,6 +1561,44 @@ class RevoluteConnectionDAO(
     }
 
 
+class DiffDriveDAO(
+    ActiveConnectionDAO,
+    DataAccessObject[semantic_digital_twin.world_description.connections.DiffDrive],
+):
+
+    __tablename__ = "DiffDriveDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ActiveConnectionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    x_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+    y_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+    roll_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+    pitch_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+    yaw_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+    x_velocity_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "DiffDriveDAO",
+        "inherit_condition": database_id == ActiveConnectionDAO.database_id,
+    }
+
+
 class OmniDriveDAO(
     ActiveConnectionDAO,
     DataAccessObject[semantic_digital_twin.world_description.connections.OmniDrive],
@@ -1469,25 +1612,25 @@ class OmniDriveDAO(
         use_existing_column=True,
     )
 
-    x_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    x_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    y_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    y_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    roll_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    roll_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    pitch_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    pitch_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    yaw_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    yaw_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    x_velocity_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    x_velocity_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    y_velocity_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    y_velocity_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
 
@@ -1512,25 +1655,25 @@ class Connection6DoFDAO(
         use_existing_column=True,
     )
 
-    x_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    x_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    y_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    y_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    z_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    z_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    qx_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    qx_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    qy_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    qy_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    qz_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    qz_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    qw_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    qw_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
 
@@ -1576,7 +1719,7 @@ class WorldEntityWithIDDAO(
         use_existing_column=True,
     )
 
-    id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
 
@@ -1619,13 +1762,13 @@ class DegreeOfFreedomMappingDAO(
     )
 
     limits_id: Mapped[int] = mapped_column(
-        ForeignKey("DegreeOfFreedomLimitsMappingDAO.database_id", use_alter=True),
+        ForeignKey("DegreeOfFreedomLimitsDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    limits: Mapped[DegreeOfFreedomLimitsMappingDAO] = relationship(
-        "DegreeOfFreedomLimitsMappingDAO",
+    limits: Mapped[DegreeOfFreedomLimitsDAO] = relationship(
+        "DegreeOfFreedomLimitsDAO",
         uselist=False,
         foreign_keys=[limits_id],
         post_update=True,
@@ -5494,6 +5637,82 @@ class RoomDAO(
     }
 
 
+class BathroomDAO(
+    RoomDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bathroom
+    ],
+):
+
+    __tablename__ = "BathroomDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoomDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "BathroomDAO",
+        "inherit_condition": database_id == RoomDAO.database_id,
+    }
+
+
+class BedroomDAO(
+    RoomDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bedroom
+    ],
+):
+
+    __tablename__ = "BedroomDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoomDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "BedroomDAO",
+        "inherit_condition": database_id == RoomDAO.database_id,
+    }
+
+
+class KitchenDAO(
+    RoomDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Kitchen
+    ],
+):
+
+    __tablename__ = "KitchenDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoomDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "KitchenDAO",
+        "inherit_condition": database_id == RoomDAO.database_id,
+    }
+
+
+class LivingRoomDAO(
+    RoomDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.LivingRoom
+    ],
+):
+
+    __tablename__ = "LivingRoomDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoomDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "LivingRoomDAO",
+        "inherit_condition": database_id == RoomDAO.database_id,
+    }
+
+
 class RootedSemanticAnnotationDAO(
     SemanticAnnotationDAO,
     DataAccessObject[
@@ -5704,6 +5923,14 @@ class SemanticRobotAnnotationDAO(
         ForeignKey(RootedSemanticAnnotationDAO.database_id),
         primary_key=True,
         use_existing_column=True,
+    )
+
+    joint_states: Mapped[builtins.list[JointStateDAO]] = relationship(
+        "JointStateDAO",
+        secondary="semanticrobotannotationdao_joint_states_association",
+        primaryjoin="SemanticRobotAnnotationDAO.database_id == semanticrobotannotationdao_joint_states_association.c.source_semanticrobotannotationdao_id",
+        secondaryjoin="JointStateDAO.database_id == semanticrobotannotationdao_joint_states_association.c.target_jointstatedao_id",
+        cascade="save-update, merge",
     )
 
     __mapper_args__ = {
@@ -6220,7 +6447,7 @@ class RemoveActuatorModificationDAO(
         use_existing_column=True,
     )
 
-    actuator_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    actuator_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
 
@@ -6245,7 +6472,7 @@ class RemoveBodyModificationDAO(
         use_existing_column=True,
     )
 
-    body_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    body_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
 
@@ -6270,10 +6497,10 @@ class RemoveConnectionModificationDAO(
         use_existing_column=True,
     )
 
-    parent_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    parent_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    child_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    child_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
 
@@ -6298,7 +6525,7 @@ class RemoveDegreeOfFreedomModificationDAO(
         use_existing_column=True,
     )
 
-    dof_id: Mapped[sqlalchemy.sql.sqltypes.UUID] = mapped_column(
+    dof_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
 

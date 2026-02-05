@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
+from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.world_description.world_entity import Body, Connection
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
@@ -10,7 +11,7 @@ from .pick_up import GraspingActionDescription
 from ...motions.container import OpeningMotion, ClosingMotion
 from ...motions.gripper import MoveGripperMotion
 from ....config.action_conf import ActionConfig
-from ....datastructures.enums import Arms, GripperState, ContainerManipulationType
+from ....datastructures.enums import Arms, ContainerManipulationType
 from ....datastructures.partial_designator import PartialDesignator
 from ....failures import ContainerManipulationError
 from ....has_parameters import has_parameters

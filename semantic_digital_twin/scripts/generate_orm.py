@@ -26,9 +26,11 @@ import semantic_digital_twin.world_description.world_entity
 from krrood.adapters.json_serializer import JSONAttributeDiff
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
+from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_module
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.mixin import SimulatorAdditionalProperty
 from semantic_digital_twin.orm.model import *  # type: ignore
 from semantic_digital_twin.reasoning.predicates import ContainsType
 from semantic_digital_twin.semantic_annotations.mixins import (
@@ -54,7 +56,6 @@ from semantic_digital_twin.world_description.world_modification import (
 )
 import semantic_digital_twin.robots.hsrb
 
-
 all_classes = set(
     classes_of_module(semantic_digital_twin.world_description.world_entity)
 )
@@ -66,6 +67,7 @@ all_classes |= set(classes_of_module(semantic_digital_twin.world))
 all_classes |= set(
     classes_of_module(semantic_digital_twin.datastructures.prefixed_name)
 )
+all_classes |= set(classes_of_module(semantic_digital_twin.datastructures.joint_state))
 
 all_classes |= set(
     classes_of_module(semantic_digital_twin.world_description.connections)
@@ -77,9 +79,10 @@ all_classes |= set(
     classes_of_module(semantic_digital_twin.world_description.degree_of_freedom)
 )
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.abstract_robot))
+all_classes |= set(classes_of_module(semantic_digital_twin.datastructures.definitions))
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.hsrb))
 # classes |= set(recursive_subclasses(ViewFactory))
-all_classes |= set([HasRootBody] + recursive_subclasses(HasRootBody))
+all_classes |= {SimulatorAdditionalProperty}
 all_classes |= set(classes_of_module(semantic_digital_twin.reasoning.predicates))
 all_classes |= set(classes_of_module(semantic_digital_twin.semantic_annotations.mixins))
 all_classes |= set(
@@ -126,10 +129,11 @@ def generate_orm():
 
     instance = ORMatic(
         class_dependency_graph=class_diagram,
-        type_mappings={
-            trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
-            uuid.UUID: sqlalchemy.UUID,
-        },
+        type_mappings=TypeDict(
+            {
+                trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
+            }
+        ),
         alternative_mappings=alternative_mappings,
     )
 
