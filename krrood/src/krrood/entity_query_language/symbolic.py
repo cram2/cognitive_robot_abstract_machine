@@ -568,13 +568,20 @@ class DomainMappingCacheItem:
             self.type, self.args, self.kwargs, ignore_first=True
         )
 
-    def __hash__(self):
-        return hash(
-            (self.type,) + convert_args_and_kwargs_into_a_hashable_key(self.all_kwargs)
+    @cached_property
+    def hashable_key(self):
+        return (self.type,) + convert_args_and_kwargs_into_a_hashable_key(
+            self.all_kwargs
         )
 
+    def __hash__(self):
+        return hash(self.hashable_key)
+
     def __eq__(self, other):
-        return hash(self) == hash(other)
+        return (
+            isinstance(other, DomainMappingCacheItem)
+            and self.hashable_key == other.hashable_key
+        )
 
 
 @dataclass(eq=False, repr=False)

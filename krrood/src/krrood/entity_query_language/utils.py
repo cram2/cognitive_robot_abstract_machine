@@ -227,7 +227,7 @@ def merge_args_and_kwargs(
     :param function_or_class: The function/class to get the argument names from
     :param args: The arguments passed to the function
     :param kwargs: The keyword arguments passed to the function
-    :param ignore_first: Rather to ignore the first argument or not.
+    :param ignore_first: Whether to ignore the first argument or not.
     Use this when `function_or_class` contains something like `self`
     :return: The dict of assigned keyword-arguments.
     """
