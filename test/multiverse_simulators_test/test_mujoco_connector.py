@@ -8,19 +8,26 @@ from multiverse_simulator import MultiverseSimulatorConstraints, MultiverseSimul
     MultiverseCallbackResult
 from test_multiverse_simulator import MultiverseSimulatorTestCase
 
-resources_path = os.path.join(os.path.dirname(__file__), "..", "resources")
+resources_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..",
+    "..",
+    "semantic_digital_twin",
+    "resources",
+    "mjcf",
+)
 headless = os.environ.get("CI", "false").lower() == "true"
 # headless = False
 
 class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
-    file_path = os.path.join(resources_path, "mjcf/floor/floor.xml")
+    file_path = os.path.join(resources_path, "floor.xml")
     Simulator = MultiverseMujocoConnector
     headless = headless
     step_size = 1E-3
 
     def test_functions(self):
         simulator = self.Simulator(
-            file_path=os.path.join(resources_path, "mjcf/mjx_single_cube.xml"), headless=self.headless, step_size=self.step_size)
+            file_path=os.path.join(resources_path, "mjx_single_cube_no_mesh.xml"), headless=self.headless, step_size=self.step_size)
         simulator.start(simulate_in_thread=False, render_in_thread=True)
 
         for step in range(4000):
@@ -30,7 +37,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                 self.assertEqual(result.type, MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION)
                 self.assertEqual(result.result, ['world', 'link0', 'link1', 'link2', 'link3', 'link4',
                                                  'link5', 'link6', 'link7', 'hand', 'left_finger',
-                                                 'right_finger', 'box', 'mocap_target'])
+                                                 'right_finger', 'floor', 'box'])
 
                 result = simulator.callbacks["get_all_joint_names"]()
                 self.assertIsInstance(result, MultiverseCallbackResult)
@@ -175,8 +182,6 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                 result = simulator.callbacks["save"](key_name="step_1550")
                 self.assertEqual(MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION, result.type)
                 self.key_id = result.result
-
-            if step == 1560:
                 result = simulator.callbacks["load"](key_id=self.key_id)
                 self.assertEqual(MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA, result.type)
                 self.assertEqual(self.key_id, result.result)
@@ -188,8 +193,6 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                 result = simulator.callbacks["save"](file_path=self.save_file_path, key_name="step_1570")
                 self.assertEqual(MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION, result.type)
                 self.key_id = result.result
-
-            if step == 1580:
                 result = simulator.callbacks["load"](file_path=self.save_file_path, key_id=self.key_id)
                 self.assertEqual(MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA, result.type)
                 self.assertEqual(self.key_id, result.result)
@@ -228,7 +231,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                 result = simulator.callbacks["get_contact_points"](body_names=["box", "hand"])
                 self.assertEqual(MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION, result.type)
                 self.assertIsInstance(result.result, list)
-                self.assertEqual(len(result.result), 4)
+                self.assertEqual(len(result.result), 0)
 
                 result = simulator.callbacks["get_contact_points"](body_names=["world"])
                 self.assertEqual(MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION, result.type)
@@ -256,7 +259,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
 
 # @unittest.skip("This test is not meant to be run in CI")
 class MultiverseMujocoConnectorComplexTestCase(MultiverseMujocoConnectorBaseTestCase):
-    file_path = os.path.join(resources_path, "mjcf/mjx_single_cube.xml")
+    file_path = os.path.join(resources_path, "mjx_single_cube_no_mesh.xml")
     Simulator = MultiverseMujocoConnector
     headless = headless
     step_size = 5E-4

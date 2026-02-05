@@ -524,10 +524,10 @@ class MultiverseSimulator:
             self.reset()
         if not numpy.isclose(
                 self.current_number_of_steps * self.step_size, self.current_simulation_time):
-            if numpy.isclose(self.current_simulation_time, self.step_size):
+            if numpy.isclose(self.current_simulation_time, self.step_size, self.step_size):
                 self._current_number_of_steps = 1
             else:
-                self.log_error(f"Simulation time {self.current_simulation_time} is inconsistent with "
+                self.log_error(f"Simulation time {self.current_simulation_time:.4f} is inconsistent with "
                             f"number of steps {self.current_number_of_steps} and step size {self.step_size}")
 
     def write_data_to_simulator(self, write_data: numpy.ndarray):

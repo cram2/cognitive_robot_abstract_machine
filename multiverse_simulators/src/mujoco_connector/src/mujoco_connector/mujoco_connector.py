@@ -59,8 +59,6 @@ class MultiverseMujocoConnector(MultiverseSimulator):
         if multiverse_params is None:
             self._mj_spec = mujoco.MjSpec.from_file(filename=self.file_path)
         else:
-            with open(self.file_path, 'r') as f:
-                xml_str = f.read()
             root = ET.parse(file_path).getroot()
             extension_element = ET.SubElement(root, "extension")
             plugin_element = ET.SubElement(extension_element, "plugin")
@@ -259,7 +257,7 @@ class MultiverseMujocoConnector(MultiverseSimulator):
         self._mj_model, self._mj_data = self._mj_spec.recompile(self._mj_model, self._mj_data)
         for key in self._mj_spec.keys:
             if key.name != "home":
-                if mujoco.mj_version() < 340:
+                if mujoco.mj_version() < 335:
                     key.delete()
                 else:
                     self._mj_spec.delete(key)
@@ -694,7 +692,7 @@ class MultiverseMujocoConnector(MultiverseSimulator):
         # body_1_spec_new = body_2_frame.attach_body(body_1_spec, dummy_prefix, "")
         # body_1_spec_new.pos = relative_position
         # body_1_spec_new.quat = relative_quaternion
-        if mujoco.mj_version() < 340:
+        if mujoco.mj_version() < 335:
             self._mj_spec.detach_body(body_1_spec)
         else:
             self._mj_spec.delete(body_1_spec)
@@ -758,7 +756,7 @@ class MultiverseMujocoConnector(MultiverseSimulator):
         #     body_1_spec.add_site(site_child)
         if add_freejoint:
             body_spec_new.add_freejoint()
-        if mujoco.mj_version() < 340:
+        if mujoco.mj_version() < 335:
             self._mj_spec.detach_body(body_spec)
         else:
             self._mj_spec.delete(body_spec)
@@ -882,7 +880,7 @@ class MultiverseMujocoConnector(MultiverseSimulator):
             body_B_id = self._mj_model.geom(geom_B_id).bodyid[0]
             body_A_name = self._mj_model.body(body_A_id).name
             body_B_name = self._mj_model.body(body_B_id).name
-            if body_A_name not in body_names and body_B_name not in body_names:
+            if body_A_name not in body_names or body_B_name not in body_names:
                 continue
             contact_bodies.add(body_A_name)
             contact_bodies.add(body_B_name)
