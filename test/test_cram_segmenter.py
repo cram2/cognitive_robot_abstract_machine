@@ -5,14 +5,18 @@ from os.path import dirname
 from typing import Optional
 
 from pycram.datastructures.grasp import GraspDescription
-from pycram.designators.action_designator import MoveTorsoActionDescription, PickUpActionDescription
 from pycram.language import SequentialPlan
-from pycram.datastructures.pose import PoseStamped, Vector3
-from pycram.ros import set_logger_level
+from pycram.datastructures.pose import PoseStamped
+from pycram.robot_plans import PickUpActionDescription, MoveTorsoActionDescription
+from rclpy.logging import set_logger_level
+from semantic_digital_twin.datastructures.definitions import TorsoState
+#from pycram.ros import set_logger_level
+from semantic_digital_twin.spatial_types import Vector3
+
 from segmind.segmenters.cram_segmenter import CRAMSegmenter
 from segmind.detectors.coarse_event_detectors import GeneralPickUpDetector
-from pycram.datastructures.enums import Arms, Grasp, TorsoState, WorldMode, LoggerLevel
-from pycram.datastructures.pose import Pose
+from pycram.datastructures.enums import Arms, Grasp, WorldMode, LoggerLevel
+#from pycram.datastructures.pose import Pose
 from pycram.datastructures.world import UseProspectionWorld
 from pycram.designator import ObjectDesignatorDescription
 from pycram.designators.action_designator import PickUpAction, MoveTorsoAction

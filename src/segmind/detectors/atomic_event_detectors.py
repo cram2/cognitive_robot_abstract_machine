@@ -6,6 +6,9 @@ from math import ceil
 from queue import Queue, Empty, Full
 
 import numpy as np
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body, Agent
 
 from ..datastructures.mixins import HasPrimaryTrackedObject, HasSecondaryTrackedObject, \
     HasPrimaryAndSecondaryTrackedObjects
@@ -19,13 +22,6 @@ except ImportError:
     plt = None
 from pycram.tf_transformations import euler_from_quaternion
 from typing_extensions import Optional, List, Union, Type, Tuple, Callable
-
-from pycram.datastructures.world import World
-from pycram.datastructures.dataclasses import ContactPointsList
-from pycram.datastructures.pose import Pose
-from pycram.datastructures.world_entity import PhysicalBody
-from pycram.world_concepts.world_object import Object
-from pycrap.ontologies import PhysicalObject, Agent
 from ..event_logger import EventLogger
 from ..datastructures.events import Event, ContactEvent, LossOfContactEvent, AgentContactEvent, \
     AgentLossOfContactEvent, TranslationEvent, StopTranslationEvent, NewObjectEvent, \
@@ -188,24 +184,24 @@ class NewObjectDetector(AtomicEventDetector):
     """
 
     def __init__(self, logger: EventLogger, wait_time: Optional[timedelta] = None,
-                 avoid_objects: Optional[Callable[[Object], bool]] = None, *args, **kwargs):
+                 avoid_objects: Optional[Callable[[Body], bool]] = None, *args, **kwargs):
         """
         :param logger: An instance of the EventLogger class that is used to log the events.
         :param wait_time: An optional timedelta value that introduces a delay between calls to the event detector.
         :param avoid_objects: An optional list of strings that represent the names of the objects to avoid.
         """
         super().__init__(logger, wait_time, *args, **kwargs)
-        self.new_object_queue: Queue[Object] = Queue()
+        self.new_object_queue: Queue[Body] = Queue()
         self.queues.append(self.new_object_queue)
         self.avoid_objects = avoid_objects if avoid_objects else lambda obj: False
         self.world.add_callback_on_add_object(self.on_add_object)
 
-    def on_add_object(self, obj: Object):
+    def on_add_object(self, body: Body):
         """
         Callback function that is called when a new object is added to the scene.
         """
-        if not self.avoid_objects(obj):
-            self.new_object_queue.put(obj)
+        if not self.avoid_objects(body):
+            self.new_object_queue.put(body)
 
     def detect_events(self) -> List[Event]:
         """
@@ -242,7 +238,7 @@ class DetectorWithTrackedObject(AtomicEventDetector, HasPrimaryTrackedObject, AB
     A mixin class that provides one tracked object for the event detector.
     """
 
-    def __init__(self, logger: EventLogger, tracked_object: Object, wait_time: Optional[timedelta] = None,
+    def __init__(self, logger: EventLogger, tracked_object: Body, wait_time: Optional[timedelta] = None,
                  *args, **kwargs):
         """
         :param logger: An instance of the EventLogger class that is used to log the events.
@@ -261,7 +257,7 @@ class DetectorWithTwoTrackedObjects(AtomicEventDetector, HasPrimaryAndSecondaryT
     A mixin class that provides two tracked objects for the event detector.
     """
 
-    def __init__(self, logger: EventLogger, tracked_object: Object, with_object: Optional[Object] = None,
+    def __init__(self, logger: EventLogger, tracked_object: Body, with_object: Optional[Body] = None,
                  wait_time: Optional[timedelta] = None, *args, **kwargs):
         """
         :param logger: An instance of the EventLogger class that is used to log the events.
@@ -278,8 +274,8 @@ class DetectorWithTwoTrackedObjects(AtomicEventDetector, HasPrimaryAndSecondaryT
 
 
 class AbstractContactDetector(DetectorWithTwoTrackedObjects, ABC):
-    def __init__(self, logger: EventLogger, tracked_object: Object,
-                 with_object: Optional[Object] = None,
+    def __init__(self, logger: EventLogger, tracked_object: Body,
+                 with_object: Optional[Body] = None,
                  max_closeness_distance: Optional[float] = 0.05,
                  wait_time: Optional[timedelta] = timedelta(milliseconds=500),
                  *args, **kwargs):
@@ -295,7 +291,7 @@ class AbstractContactDetector(DetectorWithTwoTrackedObjects, ABC):
         self.latest_contact_points: Optional[ContactPointsList] = ContactPointsList([])
         self.latest_interference_points: Optional[ContactPointsList] = ContactPointsList([])
 
-    def get_events(self, new_objects_contact: List[Object], new_bodies_interference: List[Object],
+    def get_events(self, new_objects_contact: List[Body], new_bodies_interference: List[Body],
                    contact_points: ContactPointsList, interference_points: ContactPointsList,
                    event_type: Type[AbstractContactEvent]):
         if event_type is ContactEvent:
@@ -333,7 +329,7 @@ class AbstractContactDetector(DetectorWithTwoTrackedObjects, ABC):
         return events
 
     @property
-    def obj_type(self) -> Type[PhysicalObject]:
+    def obj_type(self) -> Type[Body]:
         """
         The object type of the object to track.
         """
@@ -479,7 +475,7 @@ class MotionDetector(DetectorWithTrackedObject, ABC):
     The threshold for the velocity to detect movement.
     """
 
-    def __init__(self, logger: EventLogger, tracked_object: Object,
+    def __init__(self, logger: EventLogger, tracked_object: Body,
                  velocity_threshold: Optional[float] = None,
                  time_between_frames: timedelta = timedelta(milliseconds=200),
                  window_size_in_seconds: int = 0.3,
