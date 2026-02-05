@@ -985,6 +985,12 @@ class FloatVariable(Scalar):
         self._registry[casadi_sx] = self
         super().__init__(casadi_sx)
 
+    @classmethod
+    def create_with_resolver(cls, name: str, resolver: Callable[[], float]):
+        self = cls(name)
+        self.resolve = resolver
+        return self
+
     def __str__(self):
         return str(self.name)
 

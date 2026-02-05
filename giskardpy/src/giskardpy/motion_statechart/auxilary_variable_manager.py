@@ -12,82 +12,67 @@ from semantic_digital_twin.spatial_types import (
 )
 
 
-@dataclass(eq=False, init=False)
-class AuxiliaryVariable(FloatVariable):
-    provider: Callable[[], float] = field(kw_only=True)
-
-    def __init__(self, name: str, provider: Callable[[], float]):
-        super().__init__(str(name))
-        self.provider = provider
-
-    def resolve(self) -> float:
-        return float(self.provider())
-
-    def __repr__(self):
-        return str(self.name)
-
-
 def create_point(name: PrefixedName, provider: Callable[[], List[float]]):
     return Point3(
-        x=AuxiliaryVariable(
+        x=FloatVariable.create_with_resolver(
             name=str(PrefixedName("x", str(name))),
-            provider=lambda: provider()[0],
+            resolver=lambda: provider()[0],
         ),
-        y=AuxiliaryVariable(
+        y=FloatVariable.create_with_resolver(
             name=str(PrefixedName("y", str(name))),
-            provider=lambda: provider()[1],
+            resolver=lambda: provider()[1],
         ),
-        z=AuxiliaryVariable(
+        z=FloatVariable.create_with_resolver(
             name=str(PrefixedName("z", str(name))),
-            provider=lambda: provider()[2],
+            resolver=lambda: provider()[2],
         ),
     )
 
 
 def create_vector3(name: PrefixedName, provider: Callable[[], List[float]]):
     return Vector3(
-        x=AuxiliaryVariable(
+        x=FloatVariable.create_with_resolver(
             name=str(PrefixedName("x", str(name))),
-            provider=lambda: provider()[0],
+            resolver=lambda: provider()[0],
         ),
-        y=AuxiliaryVariable(
+        y=FloatVariable.create_with_resolver(
             name=str(PrefixedName("y", str(name))),
-            provider=lambda: provider()[1],
+            resolver=lambda: provider()[1],
         ),
-        z=AuxiliaryVariable(
+        z=FloatVariable.create_with_resolver(
             name=str(PrefixedName("z", str(name))),
-            provider=lambda: provider()[2],
+            resolver=lambda: provider()[2],
         ),
     )
 
 
 @dataclass
-class AuxiliaryVariableManager:
-    variables: List[AuxiliaryVariable] = field(default_factory=list)
+class FloatVariableManager:
+    variables: List[FloatVariable] = field(default_factory=list)
     data: np.ndarray = field(default_factory=lambda: np.array([], dtype=np.float64))
 
-    def add_variable(self, variable: AuxiliaryVariable):
+    def add_variable(self, variable: FloatVariable):
         self.variables.append(variable)
         self.data = np.append(self.data, 0.0)
 
     def create_float_variable(
         self, name: PrefixedName, provider: Callable[[], float] = None
-    ) -> AuxiliaryVariable:
-        v = AuxiliaryVariable(name=str(name), provider=provider)
+    ) -> FloatVariable:
+        v = FloatVariable.create_with_resolver(name=str(name), resolver=provider)
         self.add_variable(v)
         return v
 
     def create_point3(
         self, name: PrefixedName, provider: Callable[[], List[float]] = None
     ) -> Point3:
-        x = AuxiliaryVariable(
-            name=str(PrefixedName("x", str(name))), provider=lambda: provider()[0]
+        x = FloatVariable.create_with_resolver(
+            name=str(PrefixedName("x", str(name))), resolver=lambda: provider()[0]
         )
-        y = AuxiliaryVariable(
-            name=str(PrefixedName("y", str(name))), provider=lambda: provider()[1]
+        y = FloatVariable.create_with_resolver(
+            name=str(PrefixedName("y", str(name))), resolver=lambda: provider()[1]
         )
-        z = AuxiliaryVariable(
-            name=str(PrefixedName("z", str(name))), provider=lambda: provider()[2]
+        z = FloatVariable.create_with_resolver(
+            name=str(PrefixedName("z", str(name))), resolver=lambda: provider()[2]
         )
         self.add_variable(x)
         self.add_variable(y)
@@ -100,9 +85,9 @@ class AuxiliaryVariableManager:
         transformation_matrix = HomogeneousTransformationMatrix()
         for row in range(3):
             for column in range(4):
-                auxiliary_variable = AuxiliaryVariable(
+                auxiliary_variable = FloatVariable.create_with_resolver(
                     name=str(PrefixedName(f"t[{row},{column}]", str(name))),
-                    provider=lambda r=row, c=column: provider()[r, c],
+                    resolver=lambda r=row, c=column: provider()[r, c],
                 )
                 self.add_variable(auxiliary_variable)
                 transformation_matrix[row, column] = auxiliary_variable

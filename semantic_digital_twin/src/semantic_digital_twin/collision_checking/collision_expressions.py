@@ -66,6 +66,9 @@ class ExternalCollisionExpressionManager(CollisionGroupConsumer):
         violated_distance (1)
     """
 
+    def __hash__(self):
+        return hash(id(self))
+
     def on_reset(self):
         pass
 
@@ -90,6 +93,7 @@ class ExternalCollisionExpressionManager(CollisionGroupConsumer):
             closest_contacts[collision.body_a].append(collision)
 
         for body_a, collisions in closest_contacts.items():
+            collisions = sorted(collisions, key=lambda c: c.contact_distance)
             for i in range(
                 min(
                     len(collisions),
@@ -191,24 +195,24 @@ class ExternalCollisionExpressionManager(CollisionGroupConsumer):
         """
 
     @lru_cache
-    def external_map_V_n_symbol(self, body: Body, idx: int) -> Vector3:
-        return Vector3.create_with_variables(
-            f"closest_point({body.name})[{idx}].map_V_n"
-        )
-
-    @lru_cache
     def external_new_a_P_pa_symbol(self, body: Body, idx: int) -> Point3:
         return Point3.create_with_variables(
             f"closest_point({body.name})[{idx}].new_a_P_pa"
         )
 
     @lru_cache
-    def get_variable_buffer_zone_distance(self, body: Body) -> FloatVariable:
-        return FloatVariable(name=f"buffer_zone_distance({body.name})")
+    def external_map_V_n_symbol(self, body: Body, idx: int) -> Vector3:
+        return Vector3.create_with_variables(
+            f"closest_point({body.name})[{idx}].map_V_n"
+        )
 
     @lru_cache
-    def get_variable_violated_distance(self, body: Body) -> FloatVariable:
-        return FloatVariable(name=f"violated_distance({body.name})")
+    def get_variable_buffer_zone_distance(self, body: Body, idx: int) -> FloatVariable:
+        return FloatVariable(name=f"buffer_zone_distance({body.name}, {idx})")
+
+    @lru_cache
+    def get_variable_violated_distance(self, body: Body, idx: int) -> FloatVariable:
+        return FloatVariable(name=f"violated_distance({body.name}, {idx})")
 
     @lru_cache
     def external_contact_distance_symbol(

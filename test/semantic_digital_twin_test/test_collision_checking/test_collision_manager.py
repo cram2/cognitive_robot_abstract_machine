@@ -334,3 +334,5 @@ class TestExternalCollisionExpressionManager:
             ),
             atol=1e-4,
         )
+        point1 = external_collisions.external_new_a_P_pa_symbol(robot.root, 0)
+        point2 = external_collisions.external_new_a_P_pa_symbol(robot.root, 1)
