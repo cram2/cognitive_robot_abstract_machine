@@ -50,10 +50,16 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Initialize submodules explicitly
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
       - name: Install dependencies
         run: |
           source /opt/ros/cram-env/bin/activate
-          pip install -e ./krrood
+          pip install -e ./krrood -e ./random_events -e ./probabilistic_model -e ./pycram -e ./semantic_digital_twin -e ./giskardpy
           poetry install
           pip install -r semantic_digital_twin/requirements-self-assessment.txt
           if [ -d "semantic_digital_twin/src/ripple_down_rules_meta" ] && [ -f "semantic_digital_twin/src/ripple_down_rules_meta/setup.py" ] || [ -f "semantic_digital_twin/src/ripple_down_rules_meta/pyproject.toml" ]; then

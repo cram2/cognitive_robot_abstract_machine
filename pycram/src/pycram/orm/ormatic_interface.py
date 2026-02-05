@@ -3165,7 +3165,10 @@ class SimulatorAdditionalPropertyDAO(
 
 
 class SpatialRelationDAO(
-    Base, DataAccessObject[semantic_digital_twin.reasoning.predicates.SpatialRelation]
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.reasoning.predicates.KinematicStructureEntitySpatialRelation
+    ],
 ):
 
     __tablename__ = "SpatialRelationDAO"

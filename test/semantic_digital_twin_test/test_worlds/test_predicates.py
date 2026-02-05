@@ -225,40 +225,40 @@ def test_above_and_below(two_block_world):
     center, top = two_block_world
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=-3)
-    assert Above(top, center, pov)()
-    assert Below(center, top, pov)()
+    assert Above(top.center_of_mass, center.center_of_mass, pov)()
+    assert Below(center.center_of_mass, top.center_of_mass, pov)()
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, yaw=np.pi)
-    assert Above(top, center, pov)()
-    assert Below(center, top, pov)()
+    assert Above(top.center_of_mass, center.center_of_mass, pov)()
+    assert Below(center.center_of_mass, top.center_of_mass, pov)()
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, roll=np.pi)
-    assert Above(center, top, pov)()
-    assert Below(top, center, pov)()
+    assert Above(center.center_of_mass, top.center_of_mass, pov)()
+    assert Below(top.center_of_mass, center.center_of_mass, pov)()
 
 
 def test_left_and_right(two_block_world):
     center, top = two_block_world
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, roll=np.pi / 2)
-    assert LeftOf(top, center, pov)()
-    assert RightOf(center, top, pov)()
+    assert LeftOf(top.center_of_mass, center.center_of_mass, pov)()
+    assert RightOf(center.center_of_mass, top.center_of_mass, pov)()
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, roll=-np.pi / 2)
-    assert RightOf(top, center, pov)()
-    assert LeftOf(center, top, pov)()
+    assert RightOf(top.center_of_mass, center.center_of_mass, pov)()
+    assert LeftOf(center.center_of_mass, top.center_of_mass, pov)()
 
 
 def test_behind_and_in_front_of(two_block_world):
     center, top = two_block_world
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(z=-5, pitch=np.pi / 2)
-    assert Behind(top, center, pov)()
-    assert InFrontOf(center, top, pov)()
+    assert Behind(top.center_of_mass, center.center_of_mass, pov)()
+    assert InFrontOf(center.center_of_mass, top.center_of_mass, pov)()
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(z=5, pitch=-np.pi / 2)
-    assert InFrontOf(top, center, pov)()
-    assert Behind(center, top, pov)()
+    assert InFrontOf(top.center_of_mass, center.center_of_mass, pov)()
+    assert Behind(center.center_of_mass, top.center_of_mass, pov)()
 
 
 def test_body_in_region(two_block_world):
@@ -303,7 +303,11 @@ def test_is_body_in_gripper(
 
     left_gripper = (
         gripper[0]
-        if LeftOf(gripper[0].root, gripper[1].root, pr2.root.global_pose)()
+        if LeftOf(
+            gripper[0].root.center_of_mass,
+            gripper[1].root.center_of_mass,
+            pr2.root.global_pose,
+        )()
         else gripper[1]
     )
 

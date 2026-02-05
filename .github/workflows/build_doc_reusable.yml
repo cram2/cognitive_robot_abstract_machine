@@ -36,6 +36,13 @@ jobs:
           path: ${{ inputs.use_container && 'ros/src/semantic_digital_twin' || '.' }}
           submodules: ${{ inputs.use_container && 'false' || 'true' }}
 
+      - name: Initialize submodules explicitly
+        run: |
+          ${{ inputs.use_container && 'cd ros/src/semantic_digital_twin' || '' }}
+          git config --global --add safe.directory "*"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
       - name: Update semantic_digital_twin source files (Container only)
         if: ${{ inputs.use_container }}
         run: |
@@ -58,7 +65,7 @@ jobs:
           node-version: '18'
 
       - name: Install Graphviz
-        if: ${{ inputs.lib == 'pycram' || inputs.lib == 'probabilistic_model' || inputs.lib == 'random_events' }}
+        if: ${{ inputs.lib == 'pycram' || inputs.lib == 'probabilistic_model' || inputs.lib == 'random_events' || inputs.lib == 'krrood' || inputs.lib == 'semantic_digital_twin' }}
         run: |
           sudo apt-get update
           sudo apt-get install graphviz libgraphviz-dev -y
@@ -68,7 +75,8 @@ jobs:
         working-directory: ${{ inputs.lib }}
         run: |
           pip install -U pip setuptools wheel pybind11
-          pip install -e ../krrood
+          pip install pygraphviz
+          pip install -e ../krrood ../random_events ../probabilistic_model ../pycram ../semantic_digital_twin ../giskardpy
           [ -f requirements-dev.txt ] && pip install -r requirements-dev.txt || echo "No requirements-dev.txt"
           [ -f requirements.txt ] && pip install -r requirements.txt || echo "No requirements.txt"
           pip install .
@@ -83,7 +91,13 @@ jobs:
           cd /opt/ros/semantic_digital_twin
           source /opt/ros/semantic_digital_twin-venv/bin/activate
           pip install -U pip 
-          pip install -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/krrood
+          pip install pygraphviz
+          pip install -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/krrood \
+                      -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/random_events \
+                      -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/probabilistic_model \
+                      -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/pycram \
+                      -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/semantic_digital_twin \
+                      -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/giskardpy
           pip install -r requirements.txt && pip install . && pip install -r doc/requirements.txt
 
       - name: Strip exercise-tagged cells (semantic_digital_twin only)
