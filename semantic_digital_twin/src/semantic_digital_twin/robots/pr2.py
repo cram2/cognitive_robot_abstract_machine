@@ -211,7 +211,7 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
 
             neck = Neck(
                 name=PrefixedName("neck", prefix=robot.name.name),
-                sensors={camera},
+                sensors=[camera],
                 root=world.get_body_by_name("head_pan_link"),
                 tip=world.get_body_by_name("head_tilt_link"),
                 pitch_body=world.get_body_by_name("head_tilt_link"),

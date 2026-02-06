@@ -3,6 +3,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 
 import numpy as np
+import rclpy
 import rustworkx as rx
 from box import Box
 from probabilistic_model.distributions import (
@@ -36,6 +37,10 @@ from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types import Point3, Vector3
@@ -277,6 +282,11 @@ class CostmapLocation(LocationDesignatorDescription):
                 target, params_box.visible_for, params_box.reachable_for
             )
             final_map.number_of_samples = 600
+            final_map.orientation_generator = (
+                OrientationGenerator.orientation_generator_for_axis(
+                    list(self.robot_view.base.main_axis.to_np())
+                )
+            )
 
             for pose_candidate in final_map:
                 logger.debug(f"Testing candidate pose at {pose_candidate}")
@@ -317,11 +327,9 @@ class CostmapLocation(LocationDesignatorDescription):
                     [params_box.grasp_descriptions]
                     if params_box.grasp_descriptions
                     else GraspDescription.calculate_grasp_descriptions(
-                        (
-                            test_robot.left_arm.manipulator
-                            if params_box.reachable_arm == Arms.LEFT
-                            else test_robot.right_arm.manipulator
-                        ),
+                        ViewManager.get_arm_view(
+                            params_box.reachable_arm, test_robot
+                        ).manipulator,
                         target,
                     )
                 )
@@ -336,6 +344,7 @@ class CostmapLocation(LocationDesignatorDescription):
                         ee.manipulator.tool_frame,
                         test_robot,
                         test_world,
+                        use_fullbody_ik=test_robot.full_body_controlled,
                     )
                     if is_reachable:
                         pose = GraspPose.from_pose(
@@ -568,6 +577,7 @@ class AccessingLocation(LocationDesignatorDescription):
                         arm_chain.manipulator.tool_frame,
                         test_robot,
                         test_world,
+                        use_fullbody_ik=test_robot.full_body_controlled,
                     )
                     if is_reachable:
                         yield pose_candidate
@@ -1198,8 +1208,8 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
         """
         return next(iter(self))
 
-    @staticmethod
     def _calculate_room_event(
+        self,
         world: World,
         free_space_graph: GraphOfConvexSets,
         target_position: Vector3,
@@ -1228,7 +1238,7 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
             * len(rays_end)
         )
 
-        robot = world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        robot = self.robot_view
         robot_pose = robot.root.global_pose
         robot.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_quaternion(100, 100, 0)
@@ -1267,7 +1277,7 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
         return room_event
 
     def _create_free_space_conditions(
-        self, world: World, target_position: Vector3, search_distance: float = 1.5
+        self, world: World, target_position: Vector3, search_distance: float = 2
     ) -> Tuple[Event, Event, Event]:
         """
         Creates the conditions for the free space around the target position.
@@ -1316,10 +1326,14 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
             )
         )
 
-        all_paths = rx.dijkstra_shortest_paths(
-            free_space.graph, free_space.box_to_index_map[target_node]
+        free_space_graph = free_space.create_subgraph(
+            [
+                i
+                for i in rx.node_connected_component(
+                    free_space.graph, free_space.box_to_index_map[target_node]
+                )
+            ]
         )
-        free_space_graph = free_space.create_subgraph([path for path in all_paths])
 
         room_condition = self._calculate_room_event(
             world, free_space_graph, target_position
@@ -1492,9 +1506,9 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
                     if params_box.grasp_descriptions
                     else GraspDescription.calculate_grasp_descriptions(
                         (
-                            test_robot.left_arm.manipulator
-                            if params_box.reachable_arm == Arms.LEFT
-                            else test_robot.right_arm.manipulator
+                            ViewManager.get_end_effector_view(
+                                params_box.reachable_arm, test_robot
+                            )
                         ),
                         target_pose,
                     )
@@ -1509,6 +1523,7 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
                         ee.manipulator.tool_frame,
                         test_robot,
                         self.test_world,
+                        use_fullbody_ik=test_robot.full_body_controlled,
                     )
                     logger.debug(
                         f"Pose Candidate: {pose_candidate }is_reachable: {is_reachable}"

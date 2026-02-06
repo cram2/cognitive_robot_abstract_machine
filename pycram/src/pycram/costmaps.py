@@ -5,6 +5,7 @@ import logging
 import random
 from copy import deepcopy
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Union
 
 import matplotlib.pyplot as plt
@@ -27,11 +28,11 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Quaternion,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
-from .tf_transformations import quaternion_from_euler
+from .tf_transformations import quaternion_from_euler, quaternion_multiply
 
 try:
     from nav_msgs.msg import OccupancyGrid, MapMetaData
@@ -47,14 +48,18 @@ class OrientationGenerator:
     """
 
     @staticmethod
-    def generate_origin_orientation(position: Point3, origin: Pose) -> Quaternion:
+    def generate_origin_orientation(
+        position: Point3, origin: Pose, rotate_by_angle: float = 0
+    ) -> Quaternion:
         """
         Generates an orientation such that the robot faces the origin of the costmap.
 
         :param position: The position in the costmap, already converted to the world coordinate frame.
         :param origin: The origin of the costmap, the point which the robot should face.
+        :param rotate_by_angle: Angle to rotate the orientation.
         :return: A quaternion of the calculated orientation.
         """
+        rot_quat = quaternion_from_euler(0, 0, rotate_by_angle, axes="sxyz")
         angle = (
             np.arctan2(
                 position[1] - origin.to_position().y.to_np()[0],
@@ -62,7 +67,24 @@ class OrientationGenerator:
             )
             + np.pi
         )
-        return Quaternion.from_rpy(0, 0, angle)
+        quaternion = list(quaternion_from_euler(0, 0, angle, axes="sxyz"))
+        rotated_quaternion = quaternion_multiply(quaternion, rot_quat)
+        return rotated_quaternion
+
+    @staticmethod
+    def orientation_generator_for_axis(
+        axis: Vector3,
+    ) -> Callable[[List[float], Pose], List[float]]:
+        """
+        Creates an orientation generator where the given axis is facing the target.
+
+        :param axis: The axis which should be facing the target
+        :return: A callable orientation generator
+        """
+        rotation = axis[1] * (np.pi / 2) * -1
+        return partial(
+            OrientationGenerator.generate_origin_orientation, rotate_by_angle=rotation
+        )
 
     @staticmethod
     def generate_random_orientation(
@@ -477,6 +499,10 @@ class Costmap:
 
         :return: A list of numpy arrays with one partition per array
         """
+        # In case the map is empty we just return the map
+        if np.sum(self.map) == 0:
+            return [self.map]
+
         discrete_map = np.copy(self.map)
         # Label only works on integer arrays
         discrete_map[discrete_map != 0] = 1
