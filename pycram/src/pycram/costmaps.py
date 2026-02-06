@@ -471,22 +471,14 @@ class Costmap:
             for ind in indices:
                 if seg_map[ind[0]][ind[1]] == 0:
                     continue
-                # The position is calculated by creating a vector from the 2D position in the costmap (given by x and y)
-                # and the center of the costmap (since this is the origin). This vector is then turned into a transformation
-                # and multiplied with the transformation of the origin.
-                vector_T_origin = (center - ind) * self.resolution
-                point_T_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
-                    *vector_T_origin, 0, *self.origin.to_quaternion().to_list()
-                )
-                origin_T_map = self.origin.to_homogeneous_matrix().inverse()
-                point_T_map = point_T_origin @ origin_T_map
-                map_T_point = point_T_map.inverse()
+                # Compute world position independent of origin orientation:
+                # map indices increase with world axes; origin is at the center.
+                offset = (ind - center) * self.resolution
+                position = self.origin.to_position() + Vector3(offset[0], offset[1], 0)
 
-                orientation: Quaternion = ori_gen(
-                    map_T_point.to_position(), self.origin
-                )
+                orientation: Quaternion = ori_gen(position, self.origin)
                 yield Pose(
-                    map_T_point.to_position(),
+                    position,
                     orientation,
                     self.world.root,
                 )
