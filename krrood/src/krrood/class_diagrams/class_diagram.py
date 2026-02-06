@@ -6,6 +6,7 @@ from copy import copy
 from dataclasses import dataclass
 from dataclasses import field, InitVar
 from functools import cached_property, lru_cache
+from typing import get_args
 
 import rustworkx as rx
 
@@ -136,6 +137,13 @@ class WrappedClass:
         init=False, hash=False, default_factory=dict, repr=False
     )
 
+    def _get_introspector(self) -> AttributeIntrospector:
+        if self._class_diagram is None:
+            introspector = DataclassOnlyIntrospector()
+        else:
+            introspector = self._class_diagram.introspector
+        return introspector
+
     @cached_property
     def fields(self) -> List[WrappedField]:
         """Return wrapped fields discovered by the diagram’s attribute introspector.
@@ -144,10 +152,7 @@ class WrappedClass:
         """
         try:
             wrapped_fields: list[WrappedField] = []
-            if self._class_diagram is None:
-                introspector = DataclassOnlyIntrospector()
-            else:
-                introspector = self._class_diagram.introspector
+            introspector = self._get_introspector()
             discovered = introspector.discover(self.clazz)
             for item in discovered:
                 wf = WrappedField(
@@ -172,6 +177,28 @@ class WrappedClass:
     def __hash__(self):
         return hash((self.index, self.clazz))
 
+
+@dataclass
+class WrappedSpecializedGeneric(WrappedClass):
+    """
+    Specialization of WrappedClass for completely parameterized generic types, e.g. Generic[float].
+    """
+
+    @cached_property
+    def fields(self) -> List[WrappedField]:
+        _introspector = self._get_introspector()
+        concrete_type = ...
+
+    @property
+    def type_arguments(self) -> Tuple[Type, ...]:
+        """
+        :return: The type arguments of the generic type.
+        """
+        return  get_args(self.clazz)
+
+    @property
+    def name(self):
+        return f"{self.clazz.__name__}_{'_'.join(map(str, self.type_arguments))}"
 
 @dataclass
 class ClassDiagram:
@@ -665,3 +692,14 @@ class ClassDiagram:
 
     def __eq__(self, other):
         return self is other
+
+    def _create_nodes_for_specialized_generic_type_hints(self):
+        for wrapped_class in self.wrapped_classes:
+            for wrapped_field in wrapped_class.fields:
+                if not wrapped_field.is_instantiation_of_generic_class:
+                    continue
+
+                node = WrappedSpecializedGeneric(wrapped_field.type_endpoint)
+                self.add_node(node)
+
+

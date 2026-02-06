@@ -1,8 +1,9 @@
-from dataclasses import is_dataclass
+from dataclasses import is_dataclass, fields
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.class_diagrams.utils import classes_of_module
 from ..dataset import example_classes
+from ..dataset.example_classes import Position, GenericClassAssociation, GenericClass
 
 
 def test_class_diagram_visualization():
@@ -69,3 +70,12 @@ def test_underspecified_classes():
 
     r = diagram.get_wrapped_class(example_classes.UnderspecifiedTypesContainer)
     assert r.clazz is example_classes.UnderspecifiedTypesContainer
+
+def test_create_nodes_for_specialized_generic():
+    classes = [Position, GenericClassAssociation, GenericClass]
+    diagram = ClassDiagram(classes)
+    diagram._create_nodes_for_specialized_generic_type_hints()
+    wrapped_clazz = diagram.get_wrapped_class(GenericClass[float])
+
+    print(wrapped_clazz.type_arguments)
+

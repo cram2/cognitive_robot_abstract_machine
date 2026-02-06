@@ -63,6 +63,7 @@ def test_one_to_many_relationship():
     assert wrapped_field.container_type is list
     assert wrapped_field.contained_type is Position
     assert not wrapped_field.is_builtin_type
+    assert not wrapped_field.is_instantiation_of_generic_class
 
 
 def test_is_type_type():
