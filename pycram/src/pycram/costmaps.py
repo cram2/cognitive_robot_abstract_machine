@@ -27,6 +27,7 @@ from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Quaternion,
+    RotationMatrix,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vector3
 from semantic_digital_twin.world import World
@@ -59,22 +60,22 @@ class OrientationGenerator:
         :param rotate_by_angle: Angle to rotate the orientation.
         :return: A quaternion of the calculated orientation.
         """
-        rot_quat = quaternion_from_euler(0, 0, rotate_by_angle, axes="sxyz")
+        rotation_R_new_rotation = RotationMatrix.from_rpy(0, 0, rotate_by_angle)
         angle = (
             np.arctan2(
-                position[1] - origin.to_position().y.to_np()[0],
-                position[0] - origin.to_position().x.to_np()[0],
+                position.y - origin.y,
+                position.x - origin.x,
             )
             + np.pi
-        )
-        quaternion = list(quaternion_from_euler(0, 0, angle, axes="sxyz"))
-        rotated_quaternion = quaternion_multiply(quaternion, rot_quat)
-        return rotated_quaternion
+        )[0]
+        world_R_rotation = RotationMatrix.from_rpy(0, 0, angle)
+        world_R_new_rotation = world_R_rotation @ rotation_R_new_rotation
+        return world_R_new_rotation.to_quaternion()
 
     @staticmethod
     def orientation_generator_for_axis(
         axis: Vector3,
-    ) -> Callable[[List[float], Pose], List[float]]:
+    ) -> Callable[[Point3, Pose], Quaternion]:
         """
         Creates an orientation generator where the given axis is facing the target.
 
@@ -89,7 +90,7 @@ class OrientationGenerator:
     @staticmethod
     def generate_random_orientation(
         *_, rng: random.Random = random.Random(42)
-    ) -> List[float]:
+    ) -> Quaternion:
         """
         Generates a random orientation rotated around the z-axis (yaw).
         A random angle is sampled using a provided RNG instance to ensure reproducibility.
@@ -99,9 +100,7 @@ class OrientationGenerator:
 
         :return: A quaternion of the randomly generated orientation.
         """
-        random_yaw = rng.uniform(0, 2 * np.pi)
-        quaternion = list(quaternion_from_euler(0, 0, random_yaw, axes="sxyz"))
-        return quaternion
+        return Quaternion.from_rpy(0, 0, rng.uniform(0, 2 * np.pi))
 
 
 @dataclass

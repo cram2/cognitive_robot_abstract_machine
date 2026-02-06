@@ -16,7 +16,6 @@ from pycram.datastructures.enums import (
     DetectionTechnique,
 )
 from pycram.datastructures.grasp import GraspDescription
-from pycram.datastructures.pose import PoseStamped
 from pycram.language import SequentialPlan
 from pycram.process_module import simulated_robot
 from pycram.robot_description import ViewManager
@@ -54,6 +53,7 @@ from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 
 
@@ -145,7 +145,7 @@ def test_navigate_multi(immutable_multiple_robot_apartment):
     world, view, context = immutable_multiple_robot_apartment
     plan = SequentialPlan(
         context,
-        NavigateActionDescription(PoseStamped.from_list([1, 2, 0], frame=world.root)),
+        NavigateActionDescription(Pose.from_list([1, 2, 0], frame=world.root)),
     )
 
     with simulated_robot:
@@ -233,7 +233,7 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
         context,
         ParkArmsActionDescription(Arms.BOTH),
         ReachActionDescription(
-            target_pose=PoseStamped.from_list([1, -2, 0.8], frame=world.root),
+            target_pose=Pose.from_list([1, -2, 0.8], frame=world.root),
             object_designator=milk_body,
             arm=Arms.LEFT,
             grasp_description=grasp_description,
@@ -357,7 +357,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
         ),
         PlaceActionDescription(
             world.get_body_by_name("milk.stl"),
-            PoseStamped.from_list([1, -2.2, 0.6], frame=world.root),
+            Pose.from_list([1, -2.2, 0.6], frame=world.root),
             Arms.LEFT,
         ),
     )
@@ -381,12 +381,8 @@ def test_place_multi(mutable_multiple_robot_apartment):
 
 def test_look_at(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
-    description = LookAtActionDescription(
-        [PoseStamped.from_list([3, 0, 1], frame=world.root)]
-    )
-    assert description.resolve().target == PoseStamped.from_list(
-        [3, 0, 1], frame=world.root
-    )
+    description = LookAtActionDescription([Pose.from_list([3, 0, 1], frame=world.root)])
+    assert description.resolve().target == Pose.from_list([3, 0, 1], frame=world.root)
 
     plan = SequentialPlan(context, description)
     with simulated_robot:
@@ -426,7 +422,7 @@ def test_open(immutable_multiple_robot_apartment):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            PoseStamped.from_list([1.75, 1.75, 0], [0, 0, 0.5, 1], world.root)
+            Pose.from_list([1.75, 1.75, 0], [0, 0, 0.5, 1], world.root)
         ),
         OpenActionDescription(world.get_body_by_name("handle_cab10_m"), [Arms.LEFT]),
     )
@@ -448,7 +444,7 @@ def test_close(immutable_multiple_robot_apartment):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            PoseStamped.from_list([1.75, 1.75, 0], [0, 0, 0.5, 1], world.root)
+            Pose.from_list([1.75, 1.75, 0], [0, 0, 0.5, 1], world.root)
         ),
         CloseActionDescription(world.get_body_by_name("handle_cab10_m"), [Arms.LEFT]),
     )
@@ -463,7 +459,7 @@ def test_facing(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
 
     with simulated_robot:
-        milk_pose = PoseStamped.from_spatial_type(
+        milk_pose = Pose.from_spatial_type(
             world.get_body_by_name("milk.stl").global_pose
         )
         plan = SequentialPlan(context, FaceAtActionDescription(milk_pose, True))
@@ -472,7 +468,7 @@ def test_facing(immutable_multiple_robot_apartment):
             world.get_body_by_name("milk.stl").global_pose,
             robot_view.root,
         )
-        milk_in_robot_frame = PoseStamped.from_spatial_type(milk_in_robot_frame)
+        milk_in_robot_frame = Pose.from_spatial_type(milk_in_robot_frame)
         assert milk_in_robot_frame.position.y == pytest.approx(0.0, abs=0.01)
 
 
@@ -481,7 +477,7 @@ def test_transport(mutable_multiple_robot_apartment):
 
     description = TransportActionDescription(
         world.get_body_by_name("milk.stl"),
-        [PoseStamped.from_list([3.1, 2.2, 0.95], [0.0, 0.0, 1.0, 0.0], world.root)],
+        [Pose.from_list([3.1, 2.2, 0.95], [0.0, 0.0, 1.0, 0.0], world.root)],
         [Arms.RIGHT],
     )
     plan = SequentialPlan(

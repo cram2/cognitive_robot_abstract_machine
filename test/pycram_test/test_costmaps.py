@@ -18,7 +18,7 @@ from pycram.costmaps import (
 )
 from pycram.probabilistic_costmap import ProbabilisticCostmap
 from pycram.units import centimeter
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 
 
@@ -297,7 +297,7 @@ def test_orientation_generation(immutable_model_world):
         origin=Pose.from_xyz_quaternion(0, 0, 0, 0, 0, 0, 1, world.root),
     )
 
-    assert orientation.to_list() == pytest.approx([0, 0, 0.707, -0.707], abs=0.001)
+    assert orientation.to_list() == pytest.approx([0, 0, -0.707, 0.707], abs=0.001)
 
     orientation = OrientationGenerator.generate_origin_orientation(
         Point3(0, -1, 0),
@@ -516,7 +516,7 @@ def test_segment_empty_map(immutable_model_world):
     np_map = np.zeros((200, 200))
     gaussian_map = GaussianCostmap(
         resolution=0.02,
-        origin=PoseStamped.from_list([0, 0, 0], [0, 0, 0, 1], world.root),
+        origin=Pose(reference_frame=world.root),
         mean=200,
         sigma=15,
         world=world,
@@ -532,40 +532,50 @@ def test_segment_empty_map(immutable_model_world):
 def test_orientation_generator_by_axis_y(immutable_model_world):
     world, robot_view, context = immutable_model_world
 
-    ori_gen = OrientationGenerator.orientation_generator_for_axis([0, 1, 0])
+    ori_gen = OrientationGenerator.orientation_generator_for_axis(
+        Vector3.from_iterable([0, 1, 0])
+    )
 
-    origin_pose = PoseStamped.from_list([0, 0, 0], [0, 0, 0, 1], world.root)
-    target_position = [1, 0, 0]
+    origin_pose = Pose(reference_frame=world.root)
+    target_position = Point3.from_iterable([1, 0, 0])
 
     generated_orientation = ori_gen(target_position, origin_pose)
 
-    assert generated_orientation == pytest.approx([0, 0, 0.7071, 0.7071], abs=0.001)
+    assert generated_orientation.to_list() == pytest.approx(
+        [0, 0, 0.7071, 0.7071], abs=0.001
+    )
 
 
 def test_orientation_generator_by_axis_minus_y(immutable_model_world):
     world, robot_view, context = immutable_model_world
 
-    ori_gen = OrientationGenerator.orientation_generator_for_axis([0, -1, 0])
+    ori_gen = OrientationGenerator.orientation_generator_for_axis(
+        Vector3.from_iterable([0, -1, 0])
+    )
 
-    origin_pose = PoseStamped.from_list([0, 0, 0], [0, 0, 0, 1], world.root)
-    target_position = [1, 0, 0]
+    origin_pose = Pose(reference_frame=world.root)
+    target_position = Point3.from_iterable([1, 0, 0])
 
     generated_orientation = ori_gen(target_position, origin_pose)
 
-    assert generated_orientation == pytest.approx([0, 0, 0.7071, -0.7071], abs=0.001)
+    assert generated_orientation.to_list() == pytest.approx(
+        [0, 0, -0.7071, 0.7071], abs=0.001
+    )
 
 
 def test_orientation_generator_by_axis_x(immutable_model_world):
     world, robot_view, context = immutable_model_world
 
-    ori_gen = OrientationGenerator.orientation_generator_for_axis([1, 0, 0])
+    ori_gen = OrientationGenerator.orientation_generator_for_axis(
+        Vector3.from_iterable([1, 0, 0])
+    )
 
-    origin_pose = PoseStamped.from_list([0, 0, 0], [0, 0, 0, 1], world.root)
-    target_position = [1, 0, 0]
+    origin_pose = Pose(reference_frame=world.root)
+    target_position = Point3.from_iterable([1, 0, 0])
 
     generated_orientation = ori_gen(target_position, origin_pose)
 
-    assert generated_orientation == pytest.approx([0, 0, 1, 0], abs=0.001)
+    assert generated_orientation.to_list() == pytest.approx([0, 0, 1, 0], abs=0.001)
 
 
 # ---- Probabilistic costmap tests (skipped) ----
