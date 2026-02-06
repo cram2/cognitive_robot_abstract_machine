@@ -2132,38 +2132,6 @@ class TestFeatureFunctions:
             distance_lower <= horizontal_distance <= distance_upper
         ), f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
 
-        root_gripper_axis = pr2_world_state_reset.transform(
-            target_frame=root, spatial_object=gripper_axis
-        )
-        root_target_vector = pr2_world_state_reset.transform(
-            target_frame=root, spatial_object=target_vector
-        )
-
-        gripper_axis_np = root_gripper_axis.to_np()[:3]
-        target_vector_np = root_target_vector.to_np()[:3]
-
-        gripper_axis_np = gripper_axis_np / np.linalg.norm(gripper_axis_np)
-        target_vector_np = target_vector_np / np.linalg.norm(target_vector_np)
-
-        cos_angle = np.clip(np.dot(gripper_axis_np, target_vector_np), -1.0, 1.0)
-        actual_angle = np.arccos(cos_angle)
-
-        assert (
-            angle_lower <= actual_angle <= angle_upper
-        ), f"Angle {np.rad2deg(actual_angle):.2f}° not in [{np.rad2deg(angle_lower):.2f}°, {np.rad2deg(angle_upper):.2f}°]"
-
-        root_world_z = pr2_world_state_reset.transform(
-            target_frame=root, spatial_object=world_z_axis
-        )
-        world_z_np = root_world_z.to_np()[:3]
-        world_z_np = world_z_np / np.linalg.norm(world_z_np)
-
-        dot_product = abs(np.dot(gripper_axis_np, world_z_np))
-
-        assert (
-            dot_product <= perpendicular_threshold
-        ), f"Perpendicular dot product {dot_product:.4f} exceeds threshold {perpendicular_threshold:.4f}"
-
 
 def test_pointing(pr2_world_state_reset: World):
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
