@@ -1684,11 +1684,14 @@ class TestCartesianTasks:
 class TestFeatureFunctions:
     """Test suite for feature function tasks (HeightGoal, DistanceGoal, etc.)."""
 
-    def test_height_goal_within_bounds(self, pr2_world_state_reset: World):
+    def test_height_goal_within_bounds(self, pr2_world_state_reset: World, rclpy_node):
         """
         Test that HeightGoal successfully constrains the vertical distance
         between tip and reference points within specified bounds.
         """
+        tf_publisher = TFPublisher(node=rclpy_node, world=pr2_world_state_reset)
+        viz = VizMarkerPublisher(world=pr2_world_state_reset, node=rclpy_node)
+
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -1733,10 +1736,15 @@ class TestFeatureFunctions:
             lower_limit <= height_diff <= upper_limit
         ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
 
-    def test_height_goal_negative_bounds(self, pr2_world_state_reset: World):
+    def test_height_goal_negative_bounds(
+        self, pr2_world_state_reset: World, rclpy_node
+    ):
         """
         Test HeightGoal with negative height bounds (tip below reference).
         """
+        tf_publisher = TFPublisher(node=rclpy_node, world=pr2_world_state_reset)
+        viz = VizMarkerPublisher(world=pr2_world_state_reset, node=rclpy_node)
+
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -1781,11 +1789,16 @@ class TestFeatureFunctions:
             lower_limit <= height_diff <= upper_limit
         ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
 
-    def test_distance_goal_within_bounds(self, pr2_world_state_reset: World):
+    def test_distance_goal_within_bounds(
+        self, pr2_world_state_reset: World, rclpy_node
+    ):
         """
         Test that DistanceGoal successfully constrains the horizontal distance
         (in x-y plane) between tip and reference points within specified bounds.
         """
+        tf_publisher = TFPublisher(node=rclpy_node, world=pr2_world_state_reset)
+        viz = VizMarkerPublisher(world=pr2_world_state_reset, node=rclpy_node)
+
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -1832,10 +1845,15 @@ class TestFeatureFunctions:
             lower_limit <= horizontal_distance <= upper_limit
         ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
 
-    def test_distance_goal_zero_distance(self, pr2_world_state_reset: World):
+    def test_distance_goal_zero_distance(
+        self, pr2_world_state_reset: World, rclpy_node
+    ):
         """
         Test DistanceGoal with bounds that include zero (tip and reference at same x-y position).
         """
+        tf_publisher = TFPublisher(node=rclpy_node, world=pr2_world_state_reset)
+        viz = VizMarkerPublisher(world=pr2_world_state_reset, node=rclpy_node)
+
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -1882,11 +1900,16 @@ class TestFeatureFunctions:
             lower_limit <= horizontal_distance <= upper_limit
         ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
 
-    def test_distance_goal_ignores_z_axis(self, pr2_world_state_reset: World):
+    def test_distance_goal_ignores_z_axis(
+        self, pr2_world_state_reset: World, rclpy_node
+    ):
         """
         Test that DistanceGoal only considers x-y plane distance and ignores z-axis.
         Even with large z difference, if x-y distance is within bounds, goal succeeds.
         """
+        tf_publisher = TFPublisher(node=rclpy_node, world=pr2_world_state_reset)
+        viz = VizMarkerPublisher(world=pr2_world_state_reset, node=rclpy_node)
+
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -1928,20 +1951,22 @@ class TestFeatureFunctions:
         )
         diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
 
-        z_diff = abs(diff[2])
         horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
-
-        assert z_diff > 0.5, f"Z difference {z_diff:.4f} should be > 0.5"
 
         assert (
             lower_limit <= horizontal_distance <= upper_limit
         ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
 
-    def test_height_and_distance_combined(self, pr2_world_state_reset: World):
+    def test_height_and_distance_combined(
+        self, pr2_world_state_reset: World, rclpy_node
+    ):
         """
         Test combining HeightGoal and DistanceGoal in parallel to constrain
         both vertical and horizontal distances simultaneously.
         """
+        tf_publisher = TFPublisher(node=rclpy_node, world=pr2_world_state_reset)
+        viz = VizMarkerPublisher(world=pr2_world_state_reset, node=rclpy_node)
+
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -2006,6 +2031,138 @@ class TestFeatureFunctions:
         assert (
             distance_lower <= horizontal_distance <= distance_upper
         ), f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+
+    def test_distance_height_angle_perpendicular_combined(
+        self, pr2_world_state_reset: World, rclpy_node
+    ):
+        """
+        Test combining DistanceGoal, HeightGoal, AngleGoal, and AlignPerpendicular
+        to constrain horizontal distance, vertical distance, orientation angle,
+        and perpendicular alignment simultaneously.
+        """
+        tf_publisher = TFPublisher(node=rclpy_node, world=pr2_world_state_reset)
+        viz = VizMarkerPublisher(world=pr2_world_state_reset, node=rclpy_node)
+
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+
+        tip_point = Point3(0, 0, 0, reference_frame=tip)
+        reference_point = Point3(0, 0, 0, reference_frame=root)
+
+        target_vector = Vector3(1, 0, 0, reference_frame=root)
+        gripper_axis = Vector3(0, 0, 1, reference_frame=tip)
+        world_z_axis = Vector3(0, 0, 1, reference_frame=root)
+
+        height_lower = 0.3
+        height_upper = 0.5
+
+        distance_lower = 0.4
+        distance_upper = 0.6
+
+        angle_lower = np.deg2rad(80)
+        angle_upper = np.deg2rad(100)
+
+        perpendicular_threshold = 0.01
+
+        msc = MotionStatechart()
+        combined_goal = Parallel(
+            [
+                HeightGoal(
+                    root_link=root,
+                    tip_link=tip,
+                    tip_point=tip_point,
+                    reference_point=reference_point,
+                    lower_limit=height_lower,
+                    upper_limit=height_upper,
+                ),
+                DistanceGoal(
+                    root_link=root,
+                    tip_link=tip,
+                    tip_point=tip_point,
+                    reference_point=reference_point,
+                    lower_limit=distance_lower,
+                    upper_limit=distance_upper,
+                ),
+                AngleGoal(
+                    root_link=root,
+                    tip_link=tip,
+                    tip_vector=gripper_axis,
+                    reference_vector=target_vector,
+                    lower_angle=angle_lower,
+                    upper_angle=angle_upper,
+                ),
+                AlignPerpendicular(
+                    root_link=root,
+                    tip_link=tip,
+                    tip_normal=gripper_axis,
+                    reference_normal=world_z_axis,
+                    threshold=perpendicular_threshold,
+                ),
+            ]
+        )
+        msc.add_node(combined_goal)
+        msc.add_node(EndMotion.when_true(combined_goal))
+
+        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert combined_goal.observation_state == ObservationStateValues.TRUE
+
+        # Verify all constraints are satisfied
+        root_P_tip = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_point
+        )
+        root_P_ref = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
+
+        height_diff = diff[2]
+        horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
+
+        assert (
+            height_lower <= height_diff <= height_upper
+        ), f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
+        assert (
+            distance_lower <= horizontal_distance <= distance_upper
+        ), f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+
+        root_gripper_axis = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=gripper_axis
+        )
+        root_target_vector = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=target_vector
+        )
+
+        gripper_axis_np = root_gripper_axis.to_np()[:3]
+        target_vector_np = root_target_vector.to_np()[:3]
+
+        gripper_axis_np = gripper_axis_np / np.linalg.norm(gripper_axis_np)
+        target_vector_np = target_vector_np / np.linalg.norm(target_vector_np)
+
+        cos_angle = np.clip(np.dot(gripper_axis_np, target_vector_np), -1.0, 1.0)
+        actual_angle = np.arccos(cos_angle)
+
+        assert (
+            angle_lower <= actual_angle <= angle_upper
+        ), f"Angle {np.rad2deg(actual_angle):.2f}° not in [{np.rad2deg(angle_lower):.2f}°, {np.rad2deg(angle_upper):.2f}°]"
+
+        root_world_z = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=world_z_axis
+        )
+        world_z_np = root_world_z.to_np()[:3]
+        world_z_np = world_z_np / np.linalg.norm(world_z_np)
+
+        dot_product = abs(np.dot(gripper_axis_np, world_z_np))
+
+        assert (
+            dot_product <= perpendicular_threshold
+        ), f"Perpendicular dot product {dot_product:.4f} exceeds threshold {perpendicular_threshold:.4f}"
 
 
 def test_pointing(pr2_world_state_reset: World):

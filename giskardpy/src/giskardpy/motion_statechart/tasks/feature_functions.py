@@ -121,14 +121,6 @@ class AlignPerpendicular(FeatureFunctionGoal):
     Completion occurs when |current_angle - π/2| < `threshold`.
     """
 
-    tip_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    The link where the controlled normal vector is attached.
-    """
-    root_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    The reference link defining the fixed coordinate frame.
-    """
     tip_normal: Vector3 = field(kw_only=True)
     """
     The normal vector to be controlled, defined in the tip link frame.
@@ -173,17 +165,10 @@ class AlignPerpendicular(FeatureFunctionGoal):
 @dataclass(eq=False, repr=False)
 class HeightGoal(FeatureFunctionGoal):
     """
-    Moves the tip_point to be the specified distance away from the reference_point along the z-axis of the map frame.
+    Moves the tip_point to be the specified distance away from the reference_point
+    along the z-axis of the map frame.
     """
 
-    tip_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    The link where the controlled point is attached.
-    """
-    root_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    The reference link defining the fixed coordinate frame.
-    """
     tip_point: Point3 = field(kw_only=True)
     """
     Tip point to be controlled.
@@ -239,17 +224,10 @@ class HeightGoal(FeatureFunctionGoal):
 @dataclass(eq=False, repr=False)
 class DistanceGoal(FeatureFunctionGoal):
     """
-    Moves the tip_point to be the specified distance away from the reference_point measured in the x-y-plane of the map frame.
+    Moves the tip_point to be the specified distance away from the reference_point
+    measured in the x-y-plane of the map frame.
     """
 
-    tip_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    The link where the controlled point is attached.
-    """
-    root_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    The reference link defining the fixed coordinate frame.
-    """
     tip_point: Point3 = field(kw_only=True)
     """
     Tip point to be controlled.
@@ -316,17 +294,10 @@ class DistanceGoal(FeatureFunctionGoal):
 @dataclass(eq=False, repr=False)
 class AngleGoal(FeatureFunctionGoal):
     """
-    Controls the angle between the tip_vector and the reference_vector to be between lower_angle and upper_angle.
+    Controls the angle between the tip_vector and the reference_vector to be between
+    lower_angle and upper_angle.
     """
 
-    root_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    Root link of the kinematic chain.
-    """
-    tip_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    Tip link of the kinematic chain.
-    """
     tip_vector: Vector3 = field(kw_only=True)
     """
     Tip vector to be controlled.
