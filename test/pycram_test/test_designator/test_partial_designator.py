@@ -24,7 +24,7 @@ from pycram.datastructures.enums import (
 from pycram.utils import lazy_product
 from pycram.process_module import simulated_robot
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 
 
 def test_partial_desig_construction():
@@ -152,7 +152,9 @@ def test_partial_navigate_action_perform(immutable_model_world):
     with simulated_robot:
         move1 = SequentialPlan(
             context,
-            NavigateActionDescription(Pose.from_list([1, 0, 0], frame=world.root)),
+            NavigateActionDescription(
+                Pose(Point3.from_iterable([1, 0, 0]), reference_frame=world.root)
+            ),
         )
         move1.perform()
         np.testing.assert_almost_equal(
@@ -166,9 +168,9 @@ def test_partial_navigate_action_multiple(immutable_model_world):
     world, robot_view, context = immutable_model_world
     nav = NavigateActionDescription(
         [
-            Pose.from_list([1, 0, 0], frame=world.root),
-            Pose.from_list([2, 0, 0], frame=world.root),
-            Pose.from_list([3, 0, 0], frame=world.root),
+            Pose(Point3.from_iterable([1, 0, 0]), reference_frame=world.root),
+            Pose(Point3.from_iterable([2, 0, 0]), reference_frame=world.root),
+            Pose(Point3.from_iterable([3, 0, 0]), reference_frame=world.root),
         ]
     )
     nav_goals = [[1, 0, 0], [2, 0, 0], [3, 0, 0]]

@@ -23,7 +23,7 @@ class HSRBMoveMotion(MoveMotion, AlternativeMotion[HSRB]):
     @property
     def _motion_chart(self) -> NavigateActionServerTask:
         return NavigateActionServerTask(
-            target_pose=self.target.to_spatial_type(),
+            target_pose=self.target.to_homogeneous_matrix(),
             base_link=self.robot_view.root,
             action_topic="/hsrb/move_base",
             message_type=NavigateToPose,
@@ -43,7 +43,7 @@ class HSRMoveTCPSim(MoveTCPMotion, AlternativeMotion[HSRB]):
         return CartesianPose(
             root_link=self.world.root,
             tip_link=tip,
-            goal_pose=self.target.to_spatial_type(),
+            goal_pose=self.target.to_homogeneous_matrix(),
         )
 
 
@@ -60,5 +60,5 @@ class HSRMoveTCPReal(MoveTCPMotion, AlternativeMotion[HSRB]):
         return CartesianPose(
             root_link=self.world.root,
             tip_link=tip,
-            goal_pose=self.target.to_spatial_type(),
+            goal_pose=self.target.to_homogeneous_matrix(),
         )

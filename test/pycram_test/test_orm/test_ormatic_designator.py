@@ -6,7 +6,6 @@ from krrood.ormatic.utils import create_engine
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from krrood_test.dataset.ormatic_interface import KRROODPoseDAO
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     ApproachDirection,
@@ -34,7 +33,7 @@ from pycram.robot_plans import (
     PlaceAction,
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState, GripperState
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Quaternion
 
 engine = create_engine("sqlite:///:memory:")
 
@@ -57,7 +56,11 @@ def test_simple_plan(immutable_model_world):
         plan = SequentialPlan(
             Context.from_world(world),
             NavigateActionDescription(
-                Pose.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([1.6, 1.9, 0]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 True,
             ),
             MoveTorsoActionDescription(TorsoState.HIGH),
@@ -72,7 +75,7 @@ def test_simple_plan(immutable_model_world):
             # PlaceActionDescription(
             #     NamedObject("milk.stl"),
             #     [
-            #         Pose.from_list(
+            #         Pose(Point)3.frreference_frame=om_iterable(
             #             [2.3, 2.2, 1], [0, 0, 0, 1], world.root
             #         )
             #     ],
@@ -89,9 +92,9 @@ def test_pose(database, test_simple_plan):
     dao = to_dao(plan)
     session.add(dao)
     session.commit()
-    result = session.scalars(select(KRROODPoseDAO)).all()
+    result = session.scalars(select(PoseMappingDAO)).all()
     assert len(result) > 0
-    assert all([r.position is not None and r.orientation is not None for r in result])
+    assert all([r.position is not None and r.rotation is not None for r in result])
 
 
 def test_action_to_pose(database, test_simple_plan):
@@ -115,50 +118,22 @@ def test_action_to_pose(database, test_simple_plan):
     )
 
 
-def test_pose_vs_pose_stamped(database, test_simple_plan):
-    session = database
-    plan = test_simple_plan
-    dao = to_dao(plan)
-    session.add(dao)
-    session.commit()
-    pose_stamped_result = session.scalars(select(KRROODPoseDAO)).all()
-    pose_result = session.scalars(select(KRROODPoseDAO)).all()
-    poses_from_pose_stamped_results = session.scalars(
-        select(KRROODPoseDAO).where(
-            KRROODPoseDAO.database_id.in_([r.pose_id for r in pose_stamped_result])
-        )
-    ).all()
-    assert all([r.pose is not None for r in pose_stamped_result])
-    assert all(
-        [r.position is not None and r.orientation is not None for r in pose_result]
-    )
-    assert len(poses_from_pose_stamped_results) == len(pose_result)
-    assert pose_stamped_result[0].pose_id == pose_result[0].database_id
-
-
 def test_pose_creation(database, test_simple_plan):
     session = database
     plan = test_simple_plan
-    pose = Pose()
-    pose.position.x = 1.0
-    pose.position.y = 2.0
-    pose.position.z = 3.0
-    pose.orientation.x = 4.0
-    pose.orientation.y = 5.0
-    pose.orientation.z = 6.0
-    pose.orientation.w = 7.0
+    pose = Pose(Point3.from_iterable([1, 2, 3]), Quaternion.from_iterable([4, 5, 6, 7]))
 
     pose_dao = to_dao(pose)
 
     session.add(pose_dao.position)
-    session.add(pose_dao.orientation)
+    session.add(pose_dao.rotation)
     session.add(pose_dao)
     session.commit()
 
     with session.bind.connect() as conn:
-        raw_pose = conn.execute(text("SELECT * FROM KRROODPoseDAO")).fetchall()
+        raw_pose = conn.execute(text("SELECT * FROM PoseMappingDAO")).fetchall()
 
-    pose_result = session.scalars(select(KRROODPoseDAO)).first()
+    pose_result = session.scalars(select(PoseMappingDAO)).first()
     assert pose_result.position.x == 1.0
     assert pose_result.position.y == 2.0
     assert pose_result.position.z == 3.0
@@ -174,7 +149,11 @@ def test_code_designator_type(database, mutable_model_world):
     action = SequentialPlan(
         context,
         NavigateActionDescription(
-            Pose.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
+            Pose(
+                Point3.from_iterable([0.6, 0.4, 0]),
+                Quaternion.from_iterable([0, 0, 0, 1]),
+                reference_frame=world.root,
+            ),
             True,
         ),
     )
@@ -198,7 +177,11 @@ def test_inheritance(database, mutable_model_world):
         sp = SequentialPlan(
             Context.from_world(world),
             NavigateActionDescription(
-                Pose.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([1.6, 1.9, 0]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 True,
             ),
             ParkArmsActionDescription(Arms.BOTH),
@@ -212,12 +195,20 @@ def test_inheritance(database, mutable_model_world):
                 ),
             ),
             NavigateActionDescription(
-                Pose.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([1.6, 2.3, 0]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 True,
             ),
             PlaceActionDescription(
                 world.get_body_by_name("milk.stl"),
-                Pose.from_list([2.3, 2.5, 1.0], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([2.3, 2.5, 1.0]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 Arms.LEFT,
             ),
         )
@@ -251,7 +242,11 @@ def test_transportAction(database, mutable_simple_pr2_world):
         Context.from_world(world),
         TransportActionDescription(
             world.get_body_by_name("milk.stl"),
-            Pose.from_list([1.7, 0.0, 1.07], [0, 0, 0, 1], world.root),
+            Pose(
+                Point3.from_iterable([1.7, 0.0, 1.07]),
+                Quaternion.from_iterable([0, 0, 0, 1]),
+                reference_frame=world.root,
+            ),
             Arms.LEFT,
         ),
     )
@@ -276,7 +271,11 @@ def test_pickUpAction(database, mutable_model_world):
         sp = SequentialPlan(
             Context.from_world(world),
             NavigateActionDescription(
-                Pose.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([1.6, 1.9, 0]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 True,
             ),
             ParkArmsActionDescription(Arms.BOTH),
@@ -290,12 +289,20 @@ def test_pickUpAction(database, mutable_model_world):
                 ),
             ),
             NavigateActionDescription(
-                Pose.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([1.6, 2.3, 0]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 True,
             ),
             PlaceActionDescription(
                 world.get_body_by_name("milk.stl"),
-                Pose.from_list([2.3, 2.5, 1.0], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([2.3, 2.5, 1.0]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 Arms.LEFT,
             ),
         )
@@ -330,7 +337,11 @@ def test_open_and_closeAction(database, mutable_model_world):
             Context.from_world(world),
             ParkArmsActionDescription(Arms.BOTH),
             NavigateActionDescription(
-                Pose.from_list([1.81, 1.73, 0.0], [0.0, 0.0, 0.594, 0.804], world.root),
+                Pose(
+                    Point3.from_iterable([1.81, 1.73, 0.0]),
+                    Quaternion.from_iterable([0.0, 0.0, 0.594, 0.804]),
+                    reference_frame=world.root,
+                ),
                 True,
             ),
             OpenActionDescription(
@@ -391,7 +402,11 @@ def complex_plan(mutable_model_world):
         sp = SequentialPlan(
             Context.from_world(world),
             NavigateActionDescription(
-                Pose.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([1.6, 1.9, 0]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 True,
             ),
             ParkArmsActionDescription(Arms.BOTH),
@@ -405,13 +420,21 @@ def complex_plan(mutable_model_world):
                 ),
             ),
             NavigateActionDescription(
-                Pose.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([1.6, 2.3, 0]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 True,
             ),
             MoveTorsoActionDescription(TorsoState.HIGH),
             PlaceActionDescription(
                 world.get_body_by_name("milk.stl"),
-                Pose.from_list([2.3, 2.5, 1], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([2.3, 2.5, 1]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 Arms.LEFT,
             ),
         )
@@ -426,7 +449,11 @@ def test_exec_creation(database, immutable_model_world):
     plan = SequentialPlan(
         context,
         NavigateActionDescription(
-            Pose.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
+            Pose(
+                Point3.from_iterable([0.6, 0.4, 0]),
+                Quaternion.from_iterable([0, 0, 0, 1]),
+                reference_frame=world.root,
+            ),
             True,
         ),
     )
@@ -446,7 +473,11 @@ def test_exec_data_pose(database, immutable_model_world):
     plan = SequentialPlan(
         context,
         NavigateActionDescription(
-            Pose.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
+            Pose(
+                Point3.from_iterable([0.6, 0.4, 0]),
+                Quaternion.from_iterable([0, 0, 0, 1]),
+                reference_frame=world.root,
+            ),
             True,
         ),
     )
@@ -462,17 +493,17 @@ def test_exec_data_pose(database, immutable_model_world):
     assert (
         [1.5, 2.5, 0]
         == [
-            exec_data.execution_start_pose.pose.position.x,
-            exec_data.execution_start_pose.pose.position.y,
-            exec_data.execution_start_pose.pose.position.z,
+            exec_data.execution_start_pose.position.x,
+            exec_data.execution_start_pose.position.y,
+            exec_data.execution_start_pose.position.z,
         ],
     )
     np.testing.assert_almost_equal(
         [0.6, 0.4, 0],
         [
-            exec_data.execution_end_pose.pose.position.x,
-            exec_data.execution_end_pose.pose.position.y,
-            exec_data.execution_end_pose.pose.position.z,
+            exec_data.execution_end_pose.position.x,
+            exec_data.execution_end_pose.position.y,
+            exec_data.execution_end_pose.position.z,
         ],
         decimal=1,
     )
@@ -499,30 +530,31 @@ def test_manipulated_body_pose(database, complex_plan):
     # place = session.scalars(select(PlaceActionDAO)).all()[0]
     assert (pick_up_node.execution_data.manipulated_body_pose_start) is not None
     assert (pick_up_node.execution_data.manipulated_body_pose_end) is not None
-    start_pose_pick = KRROODPoseDAO.from_dao(
+    start_pose_pick = PoseMappingDAO.from_dao(
         pick_up_node.execution_data.manipulated_body_pose_start
     )
-    end_pose_pick = KRROODPoseDAO.from_dao(
+    end_pose_pick = PoseMappingDAO.from_dao(
         pick_up_node.execution_data.manipulated_body_pose_end
     )
-    start_pose_place = KRROODPoseDAO.from_dao(
+    start_pose_place = PoseMappingDAO.from_dao(
         place_node.execution_data.manipulated_body_pose_start
     )
-    end_pose_place = KRROODPoseDAO.from_dao(
+    end_pose_place = PoseMappingDAO.from_dao(
         place_node.execution_data.manipulated_body_pose_end
     )
 
     # assertListEqual([2.37, 2, 1.05], start_pose_pick.position.to_list())
     np.testing.assert_almost_equal(
-        [2.37, 2, 1.05], end_pose_pick.position.to_list(), decimal=1
+        [2.37, 2, 1.05, 1], end_pose_pick.to_position().to_list(), decimal=1
     )
     # Check that the end_pose of pick_up and start pose of place are not equal because of navigate in between
     for pick, place in zip(
-        end_pose_pick.position.to_list(), start_pose_place.position.to_list()
+        end_pose_pick.to_position().to_list()[:3],
+        start_pose_place.to_position().to_list()[:3],
     ):
         assert pick != place
     np.testing.assert_almost_equal(
-        [2.3, 2.5, 1], end_pose_place.position.to_list(), decimal=1
+        [2.3, 2.5, 1, 1], end_pose_place.to_position().to_list(), decimal=1
     )
 
 
@@ -550,7 +582,11 @@ def test_state(database, immutable_model_world):
     plan = SequentialPlan(
         context,
         NavigateActionDescription(
-            Pose.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
+            Pose(
+                Point3.from_iterable([0.6, 0.4, 0]),
+                Quaternion.from_iterable([0, 0, 0, 1]),
+                reference_frame=world.root,
+            ),
             True,
         ),
     )
@@ -577,7 +613,11 @@ def test_filtering(database, mutable_model_world):
         sp = SequentialPlan(
             context,
             NavigateActionDescription(
-                Pose.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([1.6, 1.9, 0]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 True,
             ),
             ParkArmsActionDescription(Arms.BOTH),
@@ -591,12 +631,20 @@ def test_filtering(database, mutable_model_world):
                 ),
             ),
             NavigateActionDescription(
-                Pose.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([1.6, 2.3, 0]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 True,
             ),
             PlaceActionDescription(
                 world.get_body_by_name("milk.stl"),
-                Pose.from_list([2.3, 2.5, 1], [0, 0, 0, 1], world.root),
+                Pose(
+                    Point3.from_iterable([2.3, 2.5, 1]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    reference_frame=world.root,
+                ),
                 Arms.LEFT,
             ),
         )

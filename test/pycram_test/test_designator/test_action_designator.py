@@ -1,6 +1,4 @@
-import numpy as np
 import pytest
-import rclpy
 import rustworkx
 
 from giskardpy.utils.utils_for_tests import compare_axis_angle
@@ -9,18 +7,13 @@ from pycram.motion_executor import MotionExecutor
 from pycram.process_module import simulated_robot
 from pycram.robot_plans.actions import *
 from pycram.robot_plans.motions import MoveTCPWaypointsMotion
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-    publish_world,
-)
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Milk,
-)
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     GripperState,
     StaticJointState,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Milk,
 )
 
 
@@ -349,7 +342,6 @@ def test_facing(immutable_model_world):
 
 def test_move_tcp_waypoints(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    publish_world(world)
     with world.modify_world():
         world.state[
             world.get_degree_of_freedom_by_name("torso_lift_joint").id

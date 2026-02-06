@@ -29,6 +29,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.spatial_types import Point3, Quaternion
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 try:
@@ -57,7 +58,11 @@ class TestActionDesignatorGrounding(ApartmentWorldTestCase):
         plan = plan = SequentialPlan(
             Context.from_world(test_world),
             NavigateActionDescription(
-                Pose.from_list([1.7, 1.5, 0], [0, 0, 0, 1], test_world.root),
+                Pose(
+                    Point3.from_iterable([1.7, 1.5, 0]),
+                    Quaternion.from_iterable([0, 0, 0, 1]),
+                    test_world.root,
+                ),
                 True,
             ),
             MoveTorsoActionDescription([TorsoState.HIGH]),
@@ -80,7 +85,9 @@ class TestActionDesignatorGrounding(ApartmentWorldTestCase):
         self.assertIn(JointPositionList, motion_charts)
 
     def test_move_motion_chart(self):
-        motion = MoveMotion(Pose.from_list([1, 1, 1], frame=self.world.root))
+        motion = MoveMotion(
+            Pose(Point3.from_iterable([1, 1, 1]), reference_frame=self.world.root)
+        )
         SequentialPlan(self.context, motion)
 
         msc = motion.motion_chart
@@ -115,7 +122,9 @@ class TestAlternativeMotionMapping(EmptyWorldTestCase):
         cls.hsr_context = Context(cls.world, cls.hsr_view)
 
     def test_alternative_mapping(self):
-        move_motion = MoveMotion(Pose.from_list([1, 1, 1], frame=self.world.root))
+        move_motion = MoveMotion(
+            Pose(Point3.from_iterable([1, 1, 1]), reference_frame=self.world.root)
+        )
 
         plan = SequentialPlan(self.hsr_context, move_motion)
 
