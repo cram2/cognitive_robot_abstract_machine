@@ -79,13 +79,11 @@ def test_underspecified_classes():
 def test_create_nodes_for_specialized_generic():
     classes = [Position, GenericClassAssociation, GenericClass]
     diagram = ClassDiagram(classes)
-    diagram._create_nodes_for_specialized_generic_type_hints()
     generic_float: WrappedSpecializedGeneric = diagram.get_wrapped_class(
         GenericClass[float]
     )
 
     assert len(generic_float.fields) == 1
-    print(generic_float.fields)
 
     float_field = generic_float.fields[0]
     assert float_field.type_endpoint is float

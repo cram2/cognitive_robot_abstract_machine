@@ -241,7 +241,7 @@ class WrappedTable:
 
     @cached_property
     def tablename(self):
-        result = self.wrapped_clazz.clazz.__name__
+        result = self.wrapped_clazz.name
         result += "DAO"
         return result
 
@@ -290,8 +290,20 @@ class WrappedTable:
         # Get the actual class from wrapped_clazz
         current_class = self.wrapped_clazz.clazz
 
+        # Handle GenericAlias which doesn't have __mro__
+        from typing import get_origin
+
+        origin = get_origin(current_class)
+        if origin is not None and not isinstance(current_class, type):
+            mro = origin.__mro__
+        else:
+            try:
+                mro = current_class.__mro__
+            except AttributeError:
+                return None
+
         # Iterate through MRO, skipping the first element (the class itself)
-        for parent_class in current_class.__mro__[1:]:
+        for parent_class in mro[1:]:
             # Skip object base class
             if parent_class is object:
                 continue
@@ -359,7 +371,21 @@ class WrappedTable:
         ``wrapped_tables`` are keyed by the original class nodes, even if an
         alternative mapping is used. This ensures we always use the correct key.
         """
-        if issubclass(wrapped.clazz, AlternativeMapping):
+        from typing import get_origin
+
+        origin = get_origin(wrapped.clazz)
+        actual_cls = (
+            origin
+            if (origin is not None and not isinstance(wrapped.clazz, type))
+            else wrapped.clazz
+        )
+
+        try:
+            is_alt_mapping = issubclass(actual_cls, AlternativeMapping)
+        except TypeError:
+            is_alt_mapping = False
+
+        if is_alt_mapping:
             for rel in self.ormatic.alternatively_maps_relations:
                 if rel.source == wrapped:
                     return rel.target
@@ -367,7 +393,18 @@ class WrappedTable:
 
     @property
     def is_alternatively_mapped(self):
-        return issubclass(self.wrapped_clazz.clazz, AlternativeMapping)
+        from typing import get_origin
+
+        origin = get_origin(self.wrapped_clazz.clazz)
+        actual_cls = (
+            origin
+            if (origin is not None and not isinstance(self.wrapped_clazz.clazz, type))
+            else self.wrapped_clazz.clazz
+        )
+        try:
+            return issubclass(actual_cls, AlternativeMapping)
+        except TypeError:
+            return False
 
     @cached_property
     def fields(self) -> List[WrappedField]:

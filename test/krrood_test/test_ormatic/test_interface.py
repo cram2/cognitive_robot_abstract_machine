@@ -730,10 +730,16 @@ def test_polymorphic_enum(session, database):
     r = session.scalars(statement).all()
     assert len(r) == 1
 
+
 def test_generic_class(session, database):
     assert GenericClassAssociationDAO.associated_value
-
-    obj = GenericClassAssociation(GenericClass(1))
+    generic_position = GenericClass(Position(1, 2, 3))
+    obj = GenericClassAssociation(
+        GenericClass(1),
+        [GenericClass(2), GenericClass(3)],
+        generic_position,
+        [generic_position],
+    )
     dao: GenericClassAssociationDAO = to_dao(obj)
     assert isinstance(dao.associated_value, GenericClass_floatDAO)
     assert dao.associated_value.value == 1

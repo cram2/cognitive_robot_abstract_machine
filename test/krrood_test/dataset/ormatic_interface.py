@@ -48,6 +48,18 @@ class Base(DeclarativeBase):
 
 
 # Association tables for many-to-many relationships
+genericclassassociationdao_associated_value_list_association = Table(
+    "genericclassassociationdao_associated_value_list_association",
+    Base.metadata,
+    Column(
+        "source_genericclassassociationdao_id",
+        ForeignKey("GenericClassAssociationDAO.database_id"),
+    ),
+    Column(
+        "target_genericclass_positiondao_id",
+        ForeignKey("GenericClass_PositionDAO.database_id"),
+    ),
+)
 genericclassassociationdao_associated_value_not_parametrized_list_association = Table(
     "genericclassassociationdao_associated_value_not_parametrized_list_association",
     Base.metadata,
@@ -217,6 +229,40 @@ cabinetdao_drawers_association = Table(
 )
 
 
+class GenericClass_floatDAO(
+    Base, DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass]
+):
+
+    __tablename__ = "GenericClass_floatDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+
+class GenericClass_PositionDAO(
+    Base, DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass]
+):
+
+    __tablename__ = "GenericClass_PositionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    value_id: Mapped[int] = mapped_column(
+        ForeignKey("PositionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    value: Mapped[PositionDAO] = relationship(
+        "PositionDAO", uselist=False, foreign_keys=[value_id], post_update=True
+    )
+
+
 class CallableWrapperDAO(
     Base, DataAccessObject[test.krrood_test.dataset.example_classes.CallableWrapper]
 ):
@@ -260,12 +306,32 @@ class GenericClassAssociationDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
+    associated_value_id: Mapped[int] = mapped_column(
+        ForeignKey("GenericClass_floatDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
     associated_value_not_parametrized_id: Mapped[int] = mapped_column(
         ForeignKey("GenericClassDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
+    associated_value: Mapped[GenericClass_floatDAO] = relationship(
+        "GenericClass_floatDAO",
+        uselist=False,
+        foreign_keys=[associated_value_id],
+        post_update=True,
+    )
+    associated_value_list: Mapped[builtins.list[GenericClass_PositionDAO]] = (
+        relationship(
+            "GenericClass_PositionDAO",
+            secondary="genericclassassociationdao_associated_value_list_association",
+            primaryjoin="GenericClassAssociationDAO.database_id == genericclassassociationdao_associated_value_list_association.c.source_genericclassassociationdao_id",
+            secondaryjoin="GenericClass_PositionDAO.database_id == genericclassassociationdao_associated_value_list_association.c.target_genericclass_positiondao_id",
+            cascade="save-update, merge",
+        )
+    )
     associated_value_not_parametrized: Mapped[GenericClassDAO] = relationship(
         "GenericClassDAO",
         uselist=False,

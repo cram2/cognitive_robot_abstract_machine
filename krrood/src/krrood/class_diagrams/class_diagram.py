@@ -175,26 +175,35 @@ class WrappedClass:
     @property
     def name(self):
         """Return a unique display name composed of class name and node index."""
-        return self.clazz.__name__ + str(self.index)
+        return self.clazz.__name__
 
     def __hash__(self):
         return hash((self.index, self.clazz))
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class WrappedSpecializedGeneric(WrappedClass):
     """
     Specialization of WrappedClass for completely parameterized generic types, e.g. Generic[float].
     """
 
     @cached_property
+    def specialized_dataclass(self):
+        return make_specialized_dataclass(self.clazz)
+
+    @property
+    def name(self):
+        return self.specialized_dataclass.__name__
+
+    @cached_property
     def fields(self) -> List[WrappedField]:
-        specialized_dataclass = make_specialized_dataclass(self.clazz)
         introspector = self._get_introspector()
         wrapped_fields: list[WrappedField] = []
         try:
-            discovered = introspector.discover(specialized_dataclass)
+            discovered = introspector.discover(self.specialized_dataclass)
             for item in discovered:
+                # We want the WrappedField to point to THIS WrappedSpecializedGeneric
+                # but use the field from the specialized dataclass
                 wf = WrappedField(
                     self,
                     item.field,
@@ -232,7 +241,7 @@ class ClassDiagram:
         self._dependency_graph = rx.PyDiGraph()
         for clazz in classes:
             self.add_node(WrappedClass(clazz=clazz))
-        # self._create_nodes_for_specialized_generic_type_hints()
+        self._create_nodes_for_specialized_generic_type_hints()
         self._create_all_relations()
 
     def get_associations_with_condition(
@@ -555,7 +564,17 @@ class ClassDiagram:
         added to the relations list.
         """
         for clazz in self.wrapped_classes:
-            for superclass in clazz.clazz.__bases__:
+            # Handle GenericAlias which doesn't have __bases__
+            origin = get_origin(clazz.clazz)
+            if origin is not None and not isinstance(clazz.clazz, type):
+                bases = origin.__bases__
+            else:
+                try:
+                    bases = clazz.clazz.__bases__
+                except AttributeError:
+                    continue
+
+            for superclass in bases:
                 try:
                     source = self.get_wrapped_class(superclass)
                 except ClassIsUnMappedInClassDiagram:
@@ -593,8 +612,21 @@ class ClassDiagram:
                     continue
 
                 association_type = Association
-                if wrapped_field.is_role_taker and issubclass(clazz.clazz, Role):
-                    role_taker_type = get_generic_type_param(clazz.clazz, Role)[0]
+                # Handle GenericAlias in issubclass
+                origin = get_origin(clazz.clazz)
+                actual_cls = (
+                    origin
+                    if (origin is not None and not isinstance(clazz.clazz, type))
+                    else clazz.clazz
+                )
+
+                try:
+                    is_role_subclass = issubclass(actual_cls, Role)
+                except TypeError:
+                    is_role_subclass = False
+
+                if wrapped_field.is_role_taker and is_role_subclass:
+                    role_taker_type = get_generic_type_param(actual_cls, Role)[0]
                     if role_taker_type is target_type:
                         association_type = HasRoleTaker
 
@@ -705,13 +737,33 @@ class ClassDiagram:
         return self is other
 
     def _create_nodes_for_specialized_generic_type_hints(self):
+        # Phase 1: Collect all unique specialized generic types referenced in fields
+        to_process = set()
         for wrapped_class in self.wrapped_classes:
             for wrapped_field in wrapped_class.fields:
-                if not wrapped_field.is_instantiation_of_generic_class:
-                    continue
+                if wrapped_field.is_instantiation_of_generic_class:
+                    to_process.add(wrapped_field.type_endpoint)
 
-                node = WrappedSpecializedGeneric(wrapped_field.type_endpoint)
-                self.add_node(node)
+        # Phase 2: Add nodes for discovered types (add_node is idempotent if index is set)
+        while to_process:
+            next_type = to_process.pop()
+            try:
+                self.get_wrapped_class(next_type)
+                # Already wrapped
+                continue
+            except ClassIsUnMappedInClassDiagram:
+                pass
+
+            node = WrappedSpecializedGeneric(next_type)
+            self.add_node(node)
+
+            # Check if the new node has fields that point to other specialized generics
+            for wrapped_field in node.fields:
+                if wrapped_field.is_instantiation_of_generic_class:
+                    try:
+                        self.get_wrapped_class(wrapped_field.type_endpoint)
+                    except ClassIsUnMappedInClassDiagram:
+                        to_process.add(wrapped_field.type_endpoint)
 
 
 @lru_cache()
@@ -736,11 +788,18 @@ def make_specialized_dataclass(alias: _GenericAlias) -> Type:
     args = get_args(alias)
     params: Tuple[TypeVar, ...] = template_class.__parameters__
     substitution = dict(zip(params, args))
+    # Also map by TypeVar name to handle postponed annotations ('T')
+    name_substitution: Dict[str, Type] = {
+        p.__name__: a for p, a in substitution.items()
+    }
 
     def resolve(tp):
-        # Resolve string forward refs if any using origin’s module
+        # Resolve string forward refs and TypeVar names
         if isinstance(tp, str):
-            # Try to resolve later via get_type_hints if resolution fails here
+            # Direct match for a TypeVar name
+            if tp in name_substitution:
+                return name_substitution[tp]
+            # Otherwise, leave as-is; let get_type_hints of the specialized class resolve later if needed
             return tp
 
         if isinstance(tp, TypeVar):

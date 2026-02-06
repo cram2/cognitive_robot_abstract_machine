@@ -10,7 +10,7 @@ from datetime import datetime
 from functools import cached_property, lru_cache
 from types import NoneType, GenericAlias
 from copy import copy
-from typing import Generic, _GenericAlias
+from typing import Generic
 
 from typing_extensions import (
     get_type_hints,
@@ -111,11 +111,17 @@ class WrappedField:
 
         local_namespace = self._build_initial_namespace()
 
+        # If it's a specialized generic, use its origin for get_type_hints
+        clazz = self.clazz.clazz
+        # If the class itself is a specialized generic (typing.GenericAlias),
+        # get_type_hints will fail. We use the origin class instead.
+        origin = get_origin(clazz)
+        if origin is not None and not isinstance(clazz, type):
+            clazz = origin
+
         while True:
             try:
-                return get_type_hints(self.clazz.clazz, localns=local_namespace)[
-                    self.field.name
-                ]
+                return get_type_hints(clazz, localns=local_namespace)[self.field.name]
             except NameError as e:
                 found_class = self._find_class_by_name(e.name)
                 local_namespace[e.name] = found_class
@@ -239,7 +245,16 @@ class WrappedField:
 
         :return: True if the type hint is a full parameterization of a generic class.
         """
-        return (type(self.type_endpoint) is _GenericAlias) and issubclass(self.type_endpoint.__origin__, Generic)
+        origin = get_origin(self.type_endpoint)
+        if origin is None:
+            return False
+        try:
+            if not issubclass(origin, Generic):
+                return False
+        except TypeError:
+            return False
+        return len(get_args(self.type_endpoint)) > 0
+
 
 @lru_cache(maxsize=None)
 def manually_search_for_class_name(target_class_name: str) -> Type:
