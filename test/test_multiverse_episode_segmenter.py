@@ -9,20 +9,18 @@ import pytest
 
 
 import pycram.ros
-from pycram.datastructures.pose import PoseStamped, Pose, Vector3
-from pycram.datastructures.world import World
+from pycram.datastructures.pose import PoseStamped
+
 from pycram.datastructures.enums import WorldMode
-from pycram.robot_description import RobotDescriptionManager
-from pycram.world_concepts.world_object import Object
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.world import World
+
 from segmind.players.csv_player import CSVEpisodePlayer
 from segmind.episode_segmenter import NoAgentEpisodeSegmenter
 from segmind.detectors.coarse_event_detectors import GeneralPickUpDetector
 from segmind.detectors.spatial_relation_detector import InsertionDetector
 from pycram.datastructures.enums import WorldMode
-from pycram.datastructures.world import World
-from pycram.ros_utils.viz_marker_publisher import VizMarkerPublisher
-from pycram.worlds.bullet_world import BulletWorld
-from pycrap.ontologies import Container, Bowl, Cup, Location, PhysicalObject, Robot
+
 
 try:
     from segmind.players.multiverse_player import MultiversePlayer

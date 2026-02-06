@@ -2,21 +2,21 @@ import threading
 import time
 from datetime import timedelta
 
+from pycram.robot_plans import PickUpActionDescription, MoveTorsoActionDescription
+from semantic_digital_twin.datastructures.joint_state import TorsoState
+from semantic_digital_twin.world import World
 from typing_extensions import Optional
 
-from pycram.datastructures.enums import Arms, Grasp, TorsoState, PlanStatus
+from pycram.datastructures.enums import Arms, Grasp
 from pycram.datastructures.grasp import GraspDescription
 from pycram.designator import ObjectDesignatorDescription
-from pycram.designators.action_designator import PickUpActionDescription, MoveTorsoActionDescription
+
 from pycram.language import SequentialPlan
-from pycram.datastructures.pose import Pose
-from pycram.datastructures.world import World
+
 from pycram.plan import Plan
 from pycram.process_module import ProcessModule, simulated_robot
-from pycram.ros import logdebug
-from pycram.worlds.bullet_world import BulletWorld
-from pycrap.ontologies import Robot, Kitchen
-from pycram.world_concepts.world_object import Object
+
+
 from ..episode_player import EpisodePlayer
 
 
@@ -42,15 +42,14 @@ class CRAMPlayer(EpisodePlayer):
         """
         self.world = world if world else World.current_world
         if not self.world:
-            self.world = BulletWorld()
+            self.world = World()
     
     def _pause(self):
-        logdebug("Pausing Plan")
-        Plan.status = PlanStatus.PAUSED
+        print("Pausing Plan")
+
 
     def _resume(self):
-        logdebug("Resuming Plan")
-        Plan.status = PlanStatus.RUNNING
+        print("Resuming Plan")
 
     def _run(self):
         self.ready = True

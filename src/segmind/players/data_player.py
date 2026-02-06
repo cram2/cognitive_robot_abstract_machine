@@ -10,9 +10,7 @@ from threading import RLock
 
 from typing_extensions import Callable, Optional, Dict, Generator, List
 
-from pycram.datastructures.pose import Pose, Vector3
-from pycram.datastructures.world import World
-from pycram.world_concepts.world_object import Object
+
 
 try:
     from pycram.worlds.multiverse import Multiverse

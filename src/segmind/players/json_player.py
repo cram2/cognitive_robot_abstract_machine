@@ -9,13 +9,13 @@ import scipy
 import trimesh
 from pycram.tf_transformations import euler_matrix, quaternion_from_matrix, quaternion_matrix, quaternion_from_euler, \
     euler_from_quaternion
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 from trimesh import Geometry, Trimesh
 from typing_extensions import Type, List, Tuple, Union, Dict, Optional
 
-from pycram.datastructures.world import TransformStamped, World
-from pycram.datastructures.pose import Header, PoseStamped, Vector3, Quaternion, Pose, Transform
-from pycram.world_concepts.world_object import Object
-from pycrap.ontologies import PhysicalObject
+from pycram.datastructures.pose import Header, PoseStamped, Transform
 from ..episode_player import EpisodePlayer
 from .data_player import FilePlayer, FrameData
 from ..utils import calculate_quaternion_difference
@@ -27,7 +27,7 @@ class JSONPlayer(FilePlayer):
                  time_between_frames: datetime.timedelta = datetime.timedelta(milliseconds=50),
                  objects_to_ignore: Optional[List[int]] = None,
                  obj_id_to_name: Optional[Dict[int, str]] = None,
-                 obj_id_to_type: Optional[Dict[int, Type[PhysicalObject]]] = None):
+                 obj_id_to_type: Optional[Dict[int, Type[Body]]] = None):
         """
         Initializes the FAMEEpisodePlayer with the specified json file and scene id.
 
@@ -78,8 +78,8 @@ class JSONPlayer(FilePlayer):
     def _resume(self):
         ...
 
-    def get_objects_poses(self, frame_data: FrameData) -> Dict[Object, Pose]:
-        objects_poses: Dict[Object, Pose] = {}
+    def get_objects_poses(self, frame_data: FrameData) -> Dict[Body, Pose]:
+        objects_poses: Dict[Body, Pose] = {}
         objects_data = frame_data.objects_data
         for object_id, object_poses_data in objects_data.items():
 
@@ -104,7 +104,7 @@ class JSONPlayer(FilePlayer):
                 objects_poses[obj] = self.apply_orientation_correction_to_object_pose(obj, pose)
         return objects_poses
 
-    def apply_orientation_correction_to_object_pose(self, obj: Object, obj_pose: PoseStamped) -> Pose:
+    def apply_orientation_correction_to_object_pose(self, obj: Body, obj_pose: PoseStamped) -> Pose:
         """
         Correct the orientation of an object based on the orientation of the mesh, and return the corrected pose.
 
@@ -128,7 +128,7 @@ class JSONPlayer(FilePlayer):
         u, s, vh = np.linalg.svd(mean_rotation)
         return np.dot(u, vh)
 
-    def estimate_object_mesh_orientation(self, obj: Object) -> np.ndarray:
+    def estimate_object_mesh_orientation(self, obj: Body) -> np.ndarray:
         """
         Estimate the rotation of an object based on the orientation of a plane that is fitted to the base of the mesh
          of the object.
@@ -143,7 +143,7 @@ class JSONPlayer(FilePlayer):
         homogeneous_matrix[:3, :3] = rotation_matrix
         return quaternion_from_matrix(homogeneous_matrix)
 
-    def get_base_points_of_object(self, obj: Object, transform_points: bool = True) -> np.ndarray:
+    def get_base_points_of_object(self, obj: Body, transform_points: bool = True) -> np.ndarray:
         """
         Get the base points of an object.
 
@@ -157,7 +157,7 @@ class JSONPlayer(FilePlayer):
             base_points = np.dot(base_points, quaternion_matrix(obj.get_orientation.to_list())[:3, :3].T)
         return base_points
 
-    def get_relative_base_origin_of_object(self, obj: Object) -> np.ndarray:
+    def get_relative_base_origin_of_object(self, obj: Body) -> np.ndarray:
         """
         Get the origin of the base of the object relative to the origin of the object.
 
@@ -170,7 +170,7 @@ class JSONPlayer(FilePlayer):
         base_origin[2] = min_z
         return base_origin
 
-    def get_mesh_of_object(self, obj: Object, apply_scale: bool = True,
+    def get_mesh_of_object(self, obj: Body, apply_scale: bool = True,
                            apply_transform: bool = True) -> Trimesh:
         """
         Get the mesh of an object.
@@ -183,7 +183,7 @@ W
         return self.object_meshes.get(obj,
                                       self.load_scale_and_transform_mesh_of_object(obj, apply_scale, apply_transform))
 
-    def load_scale_and_transform_mesh_of_object(self, obj: Object, apply_scale: bool = True,
+    def load_scale_and_transform_mesh_of_object(self, obj: Body, apply_scale: bool = True,
                                                 apply_transform: bool = True) -> Geometry:
         """
         Load, scale and transform the mesh of an object.
@@ -303,11 +303,11 @@ W
         else:
             return f"object_{object_id}"
 
-    def get_object_type(self, object_id: int) -> Type[PhysicalObject]:
+    def get_object_type(self, object_id: int) -> Type[Body]:
         if self.obj_id_to_type is not None and object_id in self.obj_id_to_type:
             return self.obj_id_to_type[int(object_id)]
         else:
-            return PhysicalObject
+            return Body
 
     @staticmethod
     def get_mesh_name(object_id: str) -> str:

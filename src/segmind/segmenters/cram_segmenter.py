@@ -1,8 +1,8 @@
+from pycram.robot_plans import ActionDescription
 from typing_extensions import Type, List, Optional
 from queue import Queue
 
-from pycram.designator import ActionDescription
-from pycram.plan import Plan, ResolvedActionNode
+from pycram.plan import Plan, ActionNode
 from ..episode_segmenter import AgentEpisodeSegmenter
 from ..players.cram_player import CRAMPlayer
 
@@ -42,7 +42,7 @@ class CRAMSegmenter(AgentEpisodeSegmenter):
         Plan.add_on_start_callback(self.start_action_callback, action_type=action_type)
         Plan.add_on_end_callback(self.end_action_callback, action_type=action_type)
 
-    def start_action_callback(self, action_node: ResolvedActionNode):
+    def start_action_callback(self, action_node: ActionNode[ActionDescription]):
         """
         The action callback method that is called when an action is performed.
 
@@ -54,7 +54,7 @@ class CRAMSegmenter(AgentEpisodeSegmenter):
         # print(f"Action Started: {action_node}")
         self.start_action_queue.put(action_node)
 
-    def end_action_callback(self, action_node: ResolvedActionNode):
+    def end_action_callback(self, action_node: ActionNode[ActionDescription]):
         """
         The action callback method that is called when an action is performed.
 

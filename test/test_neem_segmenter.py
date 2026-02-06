@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 
 try:
     # from neem_pycram_interface import PyCRAMNEEMInterface
@@ -14,10 +15,6 @@ from segmind.detectors.coarse_event_detectors import PlacingDetector, GeneralPic
 from unittest import TestCase
 
 from pycram.datastructures.enums import WorldMode, LoggerLevel
-from pycram.ros_utils.viz_marker_publisher import VizMarkerPublisher
-from pycram.datastructures.world import World
-from pycram.worlds.bullet_world import BulletWorld
-from pycram.ros import set_logger_level
 
 
 # @pytest.mark.skipif(PyCRAMNEEMInterface is None, reason="PyCRAMNEEMInterface not available")

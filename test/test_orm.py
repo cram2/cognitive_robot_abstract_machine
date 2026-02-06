@@ -6,7 +6,7 @@ from os.path import dirname
 from typing import Optional
 
 from ormatic.ormatic import logger, ORMatic
-from ormatic.utils import recursive_subclasses, ORMaticExplicitMapping
+from ormatic.utils import recursive_subclasses
 from sqlacodegen.generators import TablesGenerator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import registry, Session
@@ -35,7 +35,7 @@ class ChildNotMappedClass(ParentMappedClass):
 
 # create set of classes that should be mapped
 classes = set()
-classes |= set(recursive_subclasses(ORMaticExplicitMapping))
+classes |= set(recursive_subclasses(ORMatic))
 classes |= {ParentMappedClass, ChildMappedClass}
 
 

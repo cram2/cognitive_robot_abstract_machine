@@ -23,20 +23,14 @@ except ImportError:
 import pycram
 from pycram.datastructures.enums import WorldMode, Arms, Grasp
 from pycram.datastructures.grasp import GraspDescription
-from pycram.datastructures.pose import PoseStamped, Pose, Vector3, Quaternion
-from pycram.datastructures.world import World
+from pycram.datastructures.pose import PoseStamped,
 from pycram.designator import ObjectDesignatorDescription
-from pycram.designators.action_designator import PickUpActionDescription, ParkArmsActionDescription, PlaceAction, \
-    PlaceActionDescription
+
 from pycram.external_interfaces import giskard
 from pycram.failures import ObjectNotGraspedError
 from pycram.language import SequentialPlan
 from pycram.process_module import simulated_robot, real_robot
-from pycram.robot_description import RobotDescriptionManager
-from pycram.ros_utils.viz_marker_publisher import VizMarkerPublisher
-from pycram.world_concepts.world_object import Object
-from pycram.worlds.bullet_world import BulletWorld
-from pycrap.ontologies import Location, PhysicalObject, Robot
+
 
 
 @pytest.fixture(scope="module")

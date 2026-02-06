@@ -6,9 +6,10 @@ from threading import RLock
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+
+from semantic_digital_twin.world import World
 from typing_extensions import Callable, Any, Optional, Dict, Generator
-from pycram.ros import logdebug
-from pycram.datastructures.world import World
+
 
 try:
     from pycram.worlds.multiverse import Multiverse
@@ -47,7 +48,7 @@ class EpisodePlayer(PropagatingThread, ABC):
             super().__init__()
             self.rdr_viewer: Optional[RDRCaseViewer] = rdr_viewer
             self.stop_after_ready: bool = stop_after_ready
-            self.world: World = world if world is not None else World.current_world
+            self.world: World = world if world is not None else World
             self._ready: bool = False
             self._status = PlayerStatus.CREATED
             self.time_between_frames: datetime.timedelta = time_between_frames if time_between_frames is not None else datetime.timedelta(seconds=0.01)
@@ -134,11 +135,11 @@ class EpisodePlayer(PropagatingThread, ABC):
         def wrapper(*args, **kwargs) -> Any:
             with cls.pause_resume_lock:
                 if cls._instance.status == PlayerStatus.PLAYING:
-                    logdebug("Pausing player")
+                    print("Pausing player")
                     cls._instance.pause()
                     result = func(*args, **kwargs)
                     cls._instance.resume()
-                    logdebug("Resuming player")
+                    print("Resuming player")
                     return result
                 else:
                     return func(*args, **kwargs)

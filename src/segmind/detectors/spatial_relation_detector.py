@@ -1,13 +1,13 @@
 import time
+from abc import abstractmethod
 from os.path import dirname
 from queue import Queue, Empty
 
 from ripple_down_rules.rdr_decorators import RDRDecorator
+from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Any, Dict, List, Optional, Type, Callable, Union
 
-from pycram.datastructures.world_entity import abstractmethod, PhysicalBody
-from pycram.ros import logdebug, logerr
-from pycram.world_concepts.world_object import Object
+
 from segmind.datastructures.events import PlacingEvent
 from segmind.episode_player import EpisodePlayer
 from .atomic_event_detectors import AtomicEventDetector
@@ -31,7 +31,7 @@ class SpatialRelationDetector(AtomicEventDetector):
         self.event_queue: Queue[EventUnion] = Queue()
         self.queues.append(self.event_queue)
         self.check_on_events = check_on_events if check_on_events is not None else self.check_on_events
-        self.bodies_states: Dict[PhysicalBody, Any] = {}
+        self.bodies_states: Dict[Body, Any] = {}
         self.update_initial_state()
         for event, cond in self.check_on_events.items():
             self.logger.add_callback(event, self.on_event, cond)
@@ -46,7 +46,7 @@ class SpatialRelationDetector(AtomicEventDetector):
             self.update_body_state(body)
 
     @abstractmethod
-    def update_body_state(self, body: PhysicalBody):
+    def update_body_state(self, body: Body):
         """
         Update the state of a body.
         """
@@ -65,15 +65,15 @@ class SpatialRelationDetector(AtomicEventDetector):
         Detect spatial relations between objects.
         """
         try:
-            checked_bodies: List[PhysicalBody] = []
+            checked_bodies: List[Body] = []
             while True:
                 event = self.event_queue.get_nowait()
                 self.event_queue.task_done()
-                logdebug(f"Checking event {event}")
+                print(f"Checking event {event}")
                 involved_bodies = event.involved_bodies
                 bodies_to_check = list(filter(lambda body: body not in checked_bodies, involved_bodies))
                 checked_bodies.extend(self.world.update_containment_for(bodies_to_check))
-                logdebug(f"Checked bodies: {[body.name for body in checked_bodies]}")
+                print(f"Checked bodies: {[body.name for body in checked_bodies]}")
         except Empty:
             pass
 
@@ -87,11 +87,11 @@ class SpatialRelationDetector(AtomicEventDetector):
 class ContainmentDetector(SpatialRelationDetector):
     check_on_events = {PlacingEvent: None}
 
-    def update_body_state(self, body: PhysicalBody):
+    def update_body_state(self, body: Body):
         """
         Update the state of a body.
         """
-        if isinstance(body, Object):
+        if isinstance(body, Body):
             for link in body.links.values():
                 self.bodies_states[link] = link.update_containment(intersection_ratio=0.6)
         self.bodies_states[body] = body.update_containment(intersection_ratio=0.6)
@@ -143,7 +143,7 @@ class InsertionDetector(SpatialRelationDetector):
 
         return event.object_tracker.get_nearest_event_to_event_with_conditions(event, conditions)
 
-    def update_body_state(self, body: PhysicalBody):
+    def update_body_state(self, body: Body):
         ...
 
     def detect_events(self) -> None:
@@ -151,12 +151,12 @@ class InsertionDetector(SpatialRelationDetector):
         Detect Containment relations between objects.
         """
         try:
-            checked_bodies: List[PhysicalBody] = []
+            checked_bodies: List[Body] = []
             while True:
                 event: ContainmentEvent = self.event_queue.get_nowait()
                 self.event_queue.task_done()
                 if event.tracked_object in checked_bodies:
-                    logdebug(f"tracked object {event.tracked_object.name} is already checked")
+                    print(f"tracked object {event.tracked_object.name} is already checked")
                     continue
                 while True:
                     latest_interference_with_hole = self.get_latest_interference_with_hole(event)
@@ -194,7 +194,7 @@ class InsertionDetector(SpatialRelationDetector):
                                                ask_now=ask_now)
 
     @hole_insertion_verifier_rdr.decorator
-    def hole_insertion_verifier(self, hole: PhysicalBody, event: ContainmentEvent) -> bool:
+    def hole_insertion_verifier(self, hole: Body, event: ContainmentEvent) -> bool:
         pass
 
     @classmethod
@@ -210,7 +210,7 @@ class SupportDetector(SpatialRelationDetector):
 
     check_on_events = {StopTranslationEvent: None, LossOfInterferenceEvent: None}
 
-    def update_body_state(self, body: PhysicalBody, with_bodies: Optional[List[PhysicalBody]] = None):
+    def update_body_state(self, body: Body, with_bodies: Optional[List[Body]] = None):
         """
         Update the state of a body.
         """

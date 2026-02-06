@@ -4,15 +4,10 @@ from datetime import timedelta
 from threading import RLock
 from typing import Callable, Tuple
 
+from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Type, Optional, TYPE_CHECKING, Dict, Set
 
 import numpy as np
-
-from pycram.world_concepts.world_object import Object
-from pycram.ros import logwarn
-from pycram.description import RootLink, Link
-from pycram.datastructures.dataclasses import ObjectState
-from pycram.datastructures.world_entity import PhysicalBody
 
 if TYPE_CHECKING:
     from .events import Event, EventUnion
@@ -21,19 +16,19 @@ if TYPE_CHECKING:
 
 class ObjectTracker:
 
-    def __init__(self, obj: PhysicalBody):
+    def __init__(self, obj: Body):
         self.obj = obj
         self._lock: RLock = RLock()
         self._event_history: List[Event] = []
         self._current_detectors: List[DetectorWithStarterEvent] = []
-        self._support: Optional[PhysicalBody] = None
+        self._support: Optional[Body] = None
 
     @property
-    def support(self) -> Optional[PhysicalBody]:
+    def support(self) -> Optional[Body]:
         return self._support
 
     @support.setter
-    def support(self, support: PhysicalBody):
+    def support(self, support: Body):
         with self._lock:
             self._support = support
 
@@ -51,14 +46,14 @@ class ObjectTracker:
         self._event_history = []
 
     @property
-    def current_state(self) -> ObjectState:
+    def current_state(self) -> Body:
         return self.obj.current_state
 
     def add_event(self, event: Event):
         with self._lock:
             self._event_history.append(event)
             self._event_history.sort(key=lambda e: e.timestamp)
-        if isinstance(self.obj, Link):
+        if isinstance(self.obj, Body):
             ObjectTrackerFactory.get_tracker(self.obj.parent_entity).add_event(event)
 
     def get_event_history(self) -> List[Event]:
@@ -172,7 +167,7 @@ class ObjectTracker:
             try:
                 return np.where(time_stamps > timestamp)[0][0]
             except IndexError:
-                logwarn(f"No events after timestamp {timestamp}")
+                print(f"No events after timestamp {timestamp}")
                 return None
 
     def get_index_of_first_event_before(self, timestamp: float) -> Optional[int]:
@@ -181,7 +176,7 @@ class ObjectTracker:
             try:
                 return np.where(time_stamps < timestamp)[0][-1]
             except IndexError:
-                logwarn(f"No events before timestamp {timestamp}")
+                print(f"No events before timestamp {timestamp}")
                 return None
 
     def get_events_between_two_events(self, event1: Event, event2: Event) -> List[Event]:
@@ -198,7 +193,7 @@ class ObjectTracker:
                 events = [self._event_history[i] for i in indices]
                 return events
             except IndexError:
-                logwarn(f"No events between timestamps {timestamp1}, {timestamp2}")
+                print(f"No events between timestamps {timestamp1}, {timestamp2}")
                 return []
 
     def get_event_where(self, conditions: Callable[[Event], bool], events: Optional[List[Event]] = None) -> List[Event]:
@@ -217,7 +212,7 @@ class ObjectTracker:
 
 class ObjectTrackerFactory:
 
-    _trackers: Dict[PhysicalBody, ObjectTracker] = {}
+    _trackers: Dict[Body, ObjectTracker] = {}
     _lock: RLock = RLock()
 
     @classmethod
@@ -226,7 +221,7 @@ class ObjectTrackerFactory:
             return list(cls._trackers.values())
 
     @classmethod
-    def get_tracker(cls, obj: PhysicalBody) -> ObjectTracker:
+    def get_tracker(cls, obj: Body) -> ObjectTracker:
         with cls._lock:
             if obj not in cls._trackers:
                 cls._trackers[obj] = ObjectTracker(obj)

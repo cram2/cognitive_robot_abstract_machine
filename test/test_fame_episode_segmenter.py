@@ -4,17 +4,18 @@ from unittest import TestCase
 from os.path import dirname
 
 import pycram.ros
-from pycram.datastructures.world import World
+
 from pycram.datastructures.enums import WorldMode
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl, Cup
+from semantic_digital_twin.world import World
+
 from segmind.players.json_player import JSONPlayer
 from segmind.episode_segmenter import NoAgentEpisodeSegmenter
 from segmind.players.json_player import JSONPlayer
 from segmind.detectors.coarse_event_detectors import GeneralPickUpDetector
 from pycram.datastructures.enums import WorldMode
-from pycram.datastructures.world import World
-from pycram.ros_utils.viz_marker_publisher import VizMarkerPublisher
-from pycram.worlds.bullet_world import BulletWorld
-from pycrap.ontologies import Container, Bowl, Cup
+
 
 Multiverse = None
 try:

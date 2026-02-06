@@ -8,14 +8,9 @@ from unittest import TestCase
 
 import pycram.ros
 from pycram.datastructures.enums import WorldMode
-from pycram.datastructures.pose import PoseStamped, Pose, Vector3
-from pycram.datastructures.world import World
-from pycram.robot_description import RobotDescriptionManager
-from pycram.ros import logdebug
-from pycram.ros_utils.viz_marker_publisher import VizMarkerPublisher
-from pycram.world_concepts.world_object import Object
-from pycram.worlds.bullet_world import BulletWorld
-from pycrap.ontologies import Location, Robot, PhysicalObject
+from pycram.datastructures.pose import PoseStamped
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.world import World
 from sqlalchemy import create_engine
 from sqlalchemy.orm.session import Session
 

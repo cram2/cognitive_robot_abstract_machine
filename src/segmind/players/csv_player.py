@@ -1,11 +1,11 @@
 from datetime import datetime
 
 import pandas as pd
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3, Quaternion
+from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Dict, Set
 
-from pycram.datastructures.pose import Pose, PoseStamped, Vector3, Quaternion, Header
-from pycram.world_concepts.world_object import Object
-from pycrap.ontologies import PhysicalObject
+from pycram.datastructures.pose import PoseStamped, Header
 from .data_player import FilePlayer, FrameData
 
 
@@ -28,8 +28,8 @@ class CSVEpisodePlayer(FilePlayer):
     def _resume(self):
         ...
 
-    def get_objects_poses(self, frame_data: FrameData) -> Dict[Object, Pose]:
-        objects_poses: Dict[Object, Pose] = {}
+    def get_objects_poses(self, frame_data: FrameData) -> Dict[Body, Pose]:
+        objects_poses: Dict[Body, Pose] = {}
         objects_data = frame_data.objects_data
         current_time = frame_data.time
         for obj_name in self.data_object_names:
@@ -40,11 +40,11 @@ class CSVEpisodePlayer(FilePlayer):
                                    Header(stamp=datetime.fromtimestamp(current_time)))
             if self.position_shift is not None:
                 obj_pose.position += self.position_shift
-            obj_type = PhysicalObject
+            obj_type = Body
 
             # Create the object if it does not exist in the world and set its pose
             if obj_name not in self.world.get_object_names():
-                obj = Object(obj_name, obj_type, pose=obj_pose, path=f"{obj_name}.urdf")
+                obj = Body(obj_name, obj_type, pose=obj_pose, path=f"{obj_name}.urdf")
             else:
                 obj = self.world.get_object_by_name(obj_name)
                 objects_poses[obj] = obj_pose

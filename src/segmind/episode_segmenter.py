@@ -4,7 +4,6 @@ from os.path import dirname
 
 from typing_extensions import List, Optional, Dict
 
-from pycram.ros import logerr
 from .datastructures.events import *
 from .datastructures.object_tracker import ObjectTracker
 from .detectors.coarse_event_detectors import *
@@ -42,7 +41,7 @@ class EpisodeSegmenter(ABC):
         self.objects_to_avoid = ['particle', 'floor', 'kitchen']
         self.starter_event_to_detector_thread_map: Dict[Tuple[Event, Type[DetectorWithStarterEvent]], DetectorWithStarterEvent] = {}
         self.detector_threads_list: List[EventDetectorUnion] = []
-        self.object_trackers: Dict[Object, ObjectTracker] = {}
+        self.object_trackers: Dict[Body, ObjectTracker] = {}
         self.plot_timeline = plot_timeline
         self.show_plots = show_plots
         self.plot_save_path = plot_save_path
@@ -106,7 +105,7 @@ class EpisodeSegmenter(ABC):
                                     if isinstance(detector, DetectorWithStarterEvent)]
         for detector_thread in atomic_detectors + non_atomic_detectors:
             detector_thread.stop()
-            logdebug(f"Joining {detector_thread.thread_id}, {detector_thread.name}")
+            print(f"Joining {detector_thread.thread_id}, {detector_thread.name}")
             detector_thread.join()
 
     def start(self) -> None:
@@ -230,19 +229,19 @@ class EpisodeSegmenter(ABC):
         involved_objects = self.get_involved_bodies(event)
         if not involved_objects:
             return
-        logdebug(f"Involved objects: {[obj.name for obj in involved_objects]}")
+        print(f"Involved objects: {[obj.name for obj in involved_objects]}")
         for obj in involved_objects:
             if self.avoid_object(obj):
                 continue
-            if isinstance(obj, Link) and obj.parent_entity in self.object_trackers.keys():
+            if isinstance(obj, Body) and obj.parent_entity in self.object_trackers.keys():
                 continue
             if obj not in self.object_trackers.keys():
-                logdebug(f"New object {obj.name}")
+                print(f"New object {obj.name}")
                 self.object_trackers[obj] = ObjectTracker(obj)
                 self.start_tracking_threads_for_new_object_and_event(obj, event)
 
     @abstractmethod
-    def start_tracking_threads_for_new_object_and_event(self, new_object: Object, event: EventUnion):
+    def start_tracking_threads_for_new_object_and_event(self, new_object: Body, event: EventUnion):
         """
         Start the tracking threads for the new object, these threads are used to track the object's motion or contacts
          for example.
@@ -252,7 +251,7 @@ class EpisodeSegmenter(ABC):
         """
         pass
 
-    def get_involved_bodies(self, event: EventUnion) -> List[PhysicalBody]:
+    def get_involved_bodies(self, event: EventUnion) -> List[Body]:
         """
         Get the bodies involved in the event.
 
@@ -262,7 +261,7 @@ class EpisodeSegmenter(ABC):
         if isinstance(event, EventWithTrackedObjects):
             return event.involved_bodies
 
-    def avoid_object(self, obj: Object) -> bool:
+    def avoid_object(self, obj: Body) -> bool:
         """
         Check if the object should be avoided.
 
@@ -271,9 +270,9 @@ class EpisodeSegmenter(ABC):
         """
         return ((obj.is_an_environment or issubclass(obj.ontology_concept, (Supporter, Location)) or
                  any([k in obj.name.lower() for k in self.objects_to_avoid])) or
-                (isinstance(obj, Link) and self.avoid_object(obj.parent_entity)))
+                (isinstance(obj, Body) and self.avoid_object(obj.parent_entity)))
 
-    def start_motion_threads_for_object(self, obj: Object, event: Optional[NewObjectEvent] = None) -> None:
+    def start_motion_threads_for_object(self, obj: Body, event: Optional[NewObjectEvent] = None) -> None:
         """
         Start the motion detection threads for the object.
 
@@ -284,7 +283,7 @@ class EpisodeSegmenter(ABC):
             self.create_detector_and_start_it(detector, tracked_object=obj, starter_event=event,
                                               time_between_frames=self.time_between_frames)
 
-    def start_contact_threads_for_object(self, obj: Object,
+    def start_contact_threads_for_object(self, obj: Body,
                                          event: Optional[ContactEvent] = None) -> None:
         """
         Start the contact threads for the object and updates the tracked objects.
@@ -305,7 +304,7 @@ class EpisodeSegmenter(ABC):
         """
         if not self.is_detector_redundant(detector_type, starter_event):
             if detector_type == PlacingDetector:
-                logdebug(f"new placing detector for object {starter_event.tracked_object.name}")
+                print(f"new placing detector for object {starter_event.tracked_object.name}")
             self.create_detector_and_start_it(detector_type, starter_event=starter_event)
 
     @staticmethod
@@ -339,7 +338,7 @@ class EpisodeSegmenter(ABC):
         return False
 
     def create_detector_and_start_it(self, detector_type: TypeEventDetectorUnion,
-                                     tracked_object: Optional[Object] = None,
+                                     tracked_object: Optional[Body] = None,
                                      starter_event: Optional[EventUnion] = None,
                                      *detector_args, **detector_kwargs) -> None:
         """
@@ -367,12 +366,12 @@ class EpisodeSegmenter(ABC):
         """
         detector.start()
         self.detector_threads_list.append(detector)
-        logdebug(f"Created {type(detector).__name__}")
+        print(f"Created {type(detector).__name__}")
         if isinstance(detector, DetectorWithStarterEvent) and detector.starter_event is not None:
-            logdebug(f"For starter event {detector.starter_event}")
+            print(f"For starter event {detector.starter_event}")
 
     @staticmethod
-    def get_detector_args(detector_type: TypeEventDetectorUnion, tracked_object: Optional[Object] = None,
+    def get_detector_args(detector_type: TypeEventDetectorUnion, tracked_object: Optional[Body] = None,
                           starter_event: Optional[EventUnion] = None, **other_detector_kwargs):
         """
         Get the detector arguments from the tracked object and/or the starter event.
@@ -403,7 +402,7 @@ class EpisodeSegmenter(ABC):
         """
         self.logger.print_events()
         self.logger.join()
-        logdebug("All threads joined.")
+        print("All threads joined.")
 
 
 class AgentEpisodeSegmenter(EpisodeSegmenter):
@@ -412,8 +411,8 @@ class AgentEpisodeSegmenter(EpisodeSegmenter):
      events that are relevant to the agent for example contact events of the hands or robot.
     """
 
-    def start_tracking_threads_for_new_object_and_event(self, new_object: Object, event: Optional[ContactEvent] = None):
-        logdebug(f"Creating contact and motion threads for object {new_object.name}")
+    def start_tracking_threads_for_new_object_and_event(self, new_object: Body, event: Optional[ContactEvent] = None):
+        print(f"Creating contact and motion threads for object {new_object.name}")
         self.start_contact_threads_for_object(new_object, event)
         self.start_motion_threads_for_object(new_object, event)
 
@@ -431,7 +430,7 @@ class AgentEpisodeSegmenter(EpisodeSegmenter):
             self.start_contact_threads_for_object(agent)
 
     @staticmethod
-    def get_agents() -> List[Object]:
+    def get_agents() -> List[Body]:
         """
         :return: A list of Object instances that represent the available agents in the world.
         """
@@ -444,10 +443,10 @@ class NoAgentEpisodeSegmenter(EpisodeSegmenter):
      events that are relevant to the objects in the world with the lack of an agent in the episode.
     """
 
-    def start_tracking_threads_for_new_object_and_event(self, new_object: Object, event: EventUnion):
+    def start_tracking_threads_for_new_object_and_event(self, new_object: Body, event: EventUnion):
         pass
 
-    def get_involved_bodies(self, event: EventUnion) -> List[Object]:
+    def get_involved_bodies(self, event: EventUnion) -> List[Body]:
         return []
 
     def _process_event(self, event: EventUnion) -> None:

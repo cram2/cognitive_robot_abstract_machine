@@ -6,26 +6,29 @@ import time
 from abc import ABC, abstractmethod
 
 import numpy as np
+from pycram.designator import ObjectDesignatorDescription
+from semantic_digital_twin.collision_checking.collision_detector import Collision
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
+from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Optional, Tuple
 
 from pycram.datastructures.dataclasses import Color
-from pycram.datastructures.dataclasses import (ContactPointsList, AxisAlignedBoundingBox as AABB, BoxVisualShape)
 from pycram.datastructures.enums import Arms, Grasp, AxisIdentifier
 from pycram.datastructures.grasp import GraspDescription
-from pycram.datastructures.pose import Transform, Vector3
-from pycram.datastructures.world import World, UseProspectionWorld
-from pycram.datastructures.world_entity import PhysicalBody
-from pycram.object_descriptors.generic import ObjectDescription as GenericObjectDescription
-from pycram.ros import logdebug, logwarn
+from pycram.datastructures.pose import Transform
+
+
 from pycram.tf_transformations import quaternion_inverse, quaternion_multiply
-from pycram.world_concepts.world_object import Object
-from pycrap.ontologies import Supporter, Floor
+
 
 try:
     from semantic_world.views import Container
 except ImportError:
     Container = None
-    logwarn("Container view is not available. Some functionalities may not work as expected.")
+    print("Container view is not available. Some functionalities may not work as expected.")
 
 from gtts import gTTS
 import pygame
@@ -65,11 +68,11 @@ def text_to_speech(text: str):
                 time.sleep(0.1)
                 continue
         except pygame.error:
-            logwarn("Audio not available, running in silent mode.")
+            print("Audio not available, running in silent mode.")
 
 
-def is_object_supported_by_container_body(obj: PhysicalBody, distance: float = 0.07,
-                                          bodies_to_check: Optional[List[PhysicalBody]] = None) -> bool:
+def is_object_supported_by_container_body(obj: Body, distance: float = 0.07,
+                                          bodies_to_check: Optional[List[Body]] = None) -> bool:
     if bodies_to_check is None:
         bodies_to_check = obj.contact_points.get_all_bodies()
     if hasattr(obj.world, "views") and obj.world.views is not None:
@@ -90,7 +93,7 @@ def is_object_supported_by_container_body(obj: PhysicalBody, distance: float = 0
             return False
 
 
-def get_arm_and_grasp_description_for_object(obj: Object) -> Tuple[Arms, GraspDescription]:
+def get_arm_and_grasp_description_for_object(obj: Body) -> Tuple[Arms, GraspDescription]:
     obj_pose = obj.pose
     left_arm_pose = World.current_world.robot.get_link_pose("l_gripper_tool_frame")
     right_arm_pose = World.current_world.robot.get_link_pose("r_gripper_tool_frame")
@@ -139,7 +142,7 @@ class PropagatingThread(threading.Thread, ABC):
         pass
 
 
-def check_if_object_is_supported(obj: Object, distance: Optional[float] = 0.03) -> bool:
+def check_if_object_is_supported(obj: Body, distance: Optional[float] = 0.03) -> bool:
     """
     Check if the object is supported by any other object.
 
@@ -158,7 +161,7 @@ def check_if_object_is_supported(obj: Object, distance: Optional[float] = 0.03) 
     return supported
 
 
-def check_if_object_is_supported_using_contact_points(obj: Object, contact_points: ContactPointsList) -> bool:
+def check_if_object_is_supported_using_contact_points(obj: Body, contact_points: Collision) -> bool:
     """
     Check if the object is supported by any other object using the contact points.
 
@@ -171,7 +174,7 @@ def check_if_object_is_supported_using_contact_points(obj: Object, contact_point
             return True
 
 
-def get_support(obj: Object, contact_bodies: Optional[List[PhysicalBody]] = None) -> Optional[PhysicalBody]:
+def get_support(obj: Body, contact_bodies: Optional[List[Body]] = None) -> Optional[Body]:
     """
     Check if the object is in contact with a supporting surface and returns it.
 
@@ -182,8 +185,8 @@ def get_support(obj: Object, contact_bodies: Optional[List[PhysicalBody]] = None
     if not contact_bodies:
         contact_bodies = obj.contact_points.get_all_bodies()
     excluded_bodies = [obj]
-    if isinstance(obj, Object):
-        excluded_bodies.extend(list(obj.links.values()))
+    if isinstance(obj, Body):
+        excluded_bodies.extend(list(obj.child_kinematic_structure_entities))
     for body in contact_bodies:
         if body in excluded_bodies:
             continue
@@ -201,13 +204,13 @@ def get_support(obj: Object, contact_bodies: Optional[List[PhysicalBody]] = None
         tracked_object_base = obj.position
         if tracked_object_base.z + 0.001 >= surface_z and intersection.width >= 0.5 * obj_bbox.width and \
                 intersection.depth >= 0.5 * obj_bbox.depth:
-            logdebug(f"Object {obj.name} IS supported by {body.name}")
+            print(f"Object {obj.name} IS supported by {body.name}")
             return body
-    logdebug(f"Object {obj.name} IS NOT supported")
+    print(f"Object {obj.name} IS NOT supported")
 
 
-def check_if_object_is_supported_by_another_object(obj: Object, support_obj: Object,
-                                                   contact_points: Optional[ContactPointsList] = None) -> bool:
+def check_if_object_is_supported_by_another_object(obj: Body, support_obj: Body,
+                                                   contact_points: Optional[Collision] = None) -> bool:
     """
     Check if the object is supported by another object.
 
@@ -241,11 +244,11 @@ class Imaginator:
     """
     A class that provides methods for imagining objects.
     """
-    surfaces_created: List[Object] = []
+    surfaces_created: List[Body] = []
     latest_surface_idx: int = 0
 
     @classmethod
-    def imagine_support_from_aabb(cls, aabb: AABB) -> Object:
+    def imagine_support_from_aabb(cls, aabb: BoundingBox) -> Body:
         """
         Imagine a support with the size of the axis-aligned bounding box.
 
@@ -255,7 +258,7 @@ class Imaginator:
         return cls._imagine_support(aabb=aabb)
 
     @classmethod
-    def imagine_support_for_object(cls, obj: Object, support_thickness: Optional[float] = 0.005) -> Object:
+    def imagine_support_for_object(cls, obj: Body, support_thickness: Optional[float] = 0.005) -> Body:
         """
         Imagine a support that supports the object and has a specified thickness.
 
@@ -266,9 +269,9 @@ class Imaginator:
         return cls._imagine_support(obj=obj, support_thickness=support_thickness)
 
     @classmethod
-    def _imagine_support(cls, obj: Optional[Object] = None,
-                         aabb: Optional[AABB] = None,
-                         support_thickness: Optional[float] = None) -> Object:
+    def _imagine_support(cls, obj: Optional[Body] = None,
+                         aabb: Optional[BoundingBox] = None,
+                         support_thickness: Optional[float] = None) -> Body:
         """
         Imagine a support for the object or with the size of the axis-aligned bounding box.
 
@@ -286,10 +289,10 @@ class Imaginator:
         print(f"support index: {cls.latest_surface_idx}")
         support_name = f"imagined_support_{cls.latest_surface_idx}"
         support_thickness = obj_aabb.depth if support_thickness is None else support_thickness
-        box_vis_shape = BoxVisualShape(Color(1, 1, 0, 1), Vector3(0, 0, 0),
+        box_vis_shape = BoundingBox(Color(1, 1, 0, 1), Vector3(0, 0, 0),
                                        Vector3(obj_aabb.width, obj_aabb.depth, support_thickness * 0.5))
-        support = GenericObjectDescription(support_name, box_vis_shape)
-        support_obj = Object(support_name, Supporter, None, support, color=support.color)
+        support = ObjectDesignatorDescription(list(support_name))
+        support_obj = Body(support_name, Supporter, None, support, color=support.color)
         support_position = obj_aabb.base_origin
         support_obj.set_position(support_position)
         cp = support_obj.closest_points(0.05)
