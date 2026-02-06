@@ -580,6 +580,75 @@ class JointStateDAO(
     )
 
 
+class KinematicStructureEntitySpatialRelationDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.reasoning.predicates.KinematicStructureEntitySpatialRelation
+    ],
+):
+
+    __tablename__ = "KinematicStructureEntitySpatialRelationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    body_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    other_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    body: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[body_id],
+        post_update=True,
+    )
+    other: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[other_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "KinematicStructureEntitySpatialRelationDAO",
+    }
+
+
+class InsideOfDAO(
+    KinematicStructureEntitySpatialRelationDAO,
+    DataAccessObject[semantic_digital_twin.reasoning.predicates.InsideOf],
+):
+
+    __tablename__ = "InsideOfDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(KinematicStructureEntitySpatialRelationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    containment_ratio: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "InsideOfDAO",
+        "inherit_condition": database_id
+        == KinematicStructureEntitySpatialRelationDAO.database_id,
+    }
+
+
 class ModelChangeCallbackDAO(
     CallbackDAO,
     DataAccessObject[semantic_digital_twin.callbacks.callback.ModelChangeCallback],
@@ -610,6 +679,45 @@ class Point3MappingDAO(
     x: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     y: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     z: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+
+class PointSpatialRelationDAO(
+    Base,
+    DataAccessObject[semantic_digital_twin.reasoning.predicates.PointSpatialRelation],
+):
+
+    __tablename__ = "PointSpatialRelationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    point_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    other_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    point: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO", uselist=False, foreign_keys=[point_id], post_update=True
+    )
+    other: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO", uselist=False, foreign_keys=[other_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "PointSpatialRelationDAO",
+    }
 
 
 class PoseMappingDAO(
@@ -964,71 +1072,6 @@ class SimulatorAdditionalPropertyDAO(
     )
 
 
-class SpatialRelationDAO(
-    Base, DataAccessObject[semantic_digital_twin.reasoning.predicates.SpatialRelation]
-):
-
-    __tablename__ = "SpatialRelationDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    polymorphic_type: Mapped[str] = mapped_column(
-        String(255), nullable=False, use_existing_column=True
-    )
-
-    body_id: Mapped[int] = mapped_column(
-        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    other_id: Mapped[int] = mapped_column(
-        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    body: Mapped[KinematicStructureEntityDAO] = relationship(
-        "KinematicStructureEntityDAO",
-        uselist=False,
-        foreign_keys=[body_id],
-        post_update=True,
-    )
-    other: Mapped[KinematicStructureEntityDAO] = relationship(
-        "KinematicStructureEntityDAO",
-        uselist=False,
-        foreign_keys=[other_id],
-        post_update=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_on": "polymorphic_type",
-        "polymorphic_identity": "SpatialRelationDAO",
-    }
-
-
-class InsideOfDAO(
-    SpatialRelationDAO,
-    DataAccessObject[semantic_digital_twin.reasoning.predicates.InsideOf],
-):
-
-    __tablename__ = "InsideOfDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SpatialRelationDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    containment_ratio: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    __mapper_args__ = {
-        "polymorphic_identity": "InsideOfDAO",
-        "inherit_condition": database_id == SpatialRelationDAO.database_id,
-    }
-
-
 class SphereDAO(
     ShapeDAO, DataAccessObject[semantic_digital_twin.world_description.geometry.Sphere]
 ):
@@ -1132,7 +1175,7 @@ class VelocityVariableDAO(
 
 
 class ViewDependentSpatialRelationDAO(
-    SpatialRelationDAO,
+    PointSpatialRelationDAO,
     DataAccessObject[
         semantic_digital_twin.reasoning.predicates.ViewDependentSpatialRelation
     ],
@@ -1141,7 +1184,7 @@ class ViewDependentSpatialRelationDAO(
     __tablename__ = "ViewDependentSpatialRelationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SpatialRelationDAO.database_id),
+        ForeignKey(PointSpatialRelationDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -1170,7 +1213,7 @@ class ViewDependentSpatialRelationDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "ViewDependentSpatialRelationDAO",
-        "inherit_condition": database_id == SpatialRelationDAO.database_id,
+        "inherit_condition": database_id == PointSpatialRelationDAO.database_id,
     }
 
 

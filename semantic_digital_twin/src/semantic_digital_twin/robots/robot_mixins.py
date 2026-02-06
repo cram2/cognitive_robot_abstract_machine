@@ -86,14 +86,26 @@ class SpecifiesLeftRightArm(HasArms, ABC):
         pov = self.root.global_pose
         first_arm = self.arms[0]
         second_arm = self.arms[1]
-        first_arm_chain = list(first_arm.bodies_with_collisions)
-        second_arm_chain = list(second_arm.bodies_with_collisions)
+        # the arms may share a root, but the first body after the root should be different
+        first_arm_body_after_root = list(first_arm.bodies)[1]
+        world_P_first_body = (
+            first_arm_body_after_root.center_of_mass
+            if first_arm_body_after_root.has_collision()
+            else first_arm_body_after_root.global_pose.to_position()
+        )
+
+        second_arm_body_after_root = list(second_arm.bodies)[1]
+        world_P_second_body = (
+            second_arm_body_after_root.center_of_mass
+            if second_arm_body_after_root.has_collision()
+            else second_arm_body_after_root.global_pose.to_position()
+        )
 
         return (
             first_arm
             if relation(
-                first_arm_chain[1],
-                second_arm_chain[1],
+                world_P_first_body,
+                world_P_second_body,
                 pov,
             )()
             else second_arm
