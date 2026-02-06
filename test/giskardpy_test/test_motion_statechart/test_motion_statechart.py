@@ -2053,9 +2053,10 @@ class TestFeatureFunctions:
         tip_point = Point3(0, 0, 0, reference_frame=tip)
         reference_point = Point3(0, 0, 0, reference_frame=root)
 
-        target_vector = Vector3(1, 0, 0, reference_frame=root)
-        gripper_axis = Vector3(0, 0, 1, reference_frame=tip)
-        world_z_axis = Vector3(0, 0, 1, reference_frame=root)
+        tip_vector = Vector3(0, 1, 0, reference_frame=tip)
+        reference_vector = Vector3(1, 0, 0, reference_frame=root)
+        tip_normal = Vector3(1, 0, 0, reference_frame=tip)
+        reference_normal = Vector3(1, 0, 0, reference_frame=root)
 
         height_lower = 0.3
         height_upper = 0.5
@@ -2063,46 +2064,45 @@ class TestFeatureFunctions:
         distance_lower = 0.4
         distance_upper = 0.6
 
-        angle_lower = np.deg2rad(80)
-        angle_upper = np.deg2rad(100)
+        angle_lower = np.deg2rad(30)
+        angle_upper = np.deg2rad(32)
 
         perpendicular_threshold = 0.01
 
         msc = MotionStatechart()
+        height_goal = HeightGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=height_lower,
+            upper_limit=height_upper,
+        )
+        distance_goal = DistanceGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=distance_lower,
+            upper_limit=distance_upper,
+        )
+        angle_goal = AngleGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_vector=tip_vector,
+            reference_vector=reference_vector,
+            lower_angle=angle_lower,
+            upper_angle=angle_upper,
+        )
+        align_perpendicular = AlignPerpendicular(
+            root_link=root,
+            tip_link=tip,
+            tip_normal=tip_normal,
+            reference_normal=reference_normal,
+        )
+
         combined_goal = Parallel(
-            [
-                HeightGoal(
-                    root_link=root,
-                    tip_link=tip,
-                    tip_point=tip_point,
-                    reference_point=reference_point,
-                    lower_limit=height_lower,
-                    upper_limit=height_upper,
-                ),
-                DistanceGoal(
-                    root_link=root,
-                    tip_link=tip,
-                    tip_point=tip_point,
-                    reference_point=reference_point,
-                    lower_limit=distance_lower,
-                    upper_limit=distance_upper,
-                ),
-                AngleGoal(
-                    root_link=root,
-                    tip_link=tip,
-                    tip_vector=gripper_axis,
-                    reference_vector=target_vector,
-                    lower_angle=angle_lower,
-                    upper_angle=angle_upper,
-                ),
-                AlignPerpendicular(
-                    root_link=root,
-                    tip_link=tip,
-                    tip_normal=gripper_axis,
-                    reference_normal=world_z_axis,
-                    threshold=perpendicular_threshold,
-                ),
-            ]
+            [height_goal, distance_goal, angle_goal, align_perpendicular]
         )
         msc.add_node(combined_goal)
         msc.add_node(EndMotion.when_true(combined_goal))
@@ -2112,6 +2112,73 @@ class TestFeatureFunctions:
         kin_sim.tick_until_end()
 
         assert combined_goal.observation_state == ObservationStateValues.TRUE
+        assert height_goal.observation_state == ObservationStateValues.TRUE
+        assert distance_goal.observation_state == ObservationStateValues.TRUE
+        assert angle_goal.observation_state == ObservationStateValues.TRUE
+        assert align_perpendicular.observation_state == ObservationStateValues.TRUE
+
+        root_P_tip = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_point
+        )
+        root_P_ref = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
+
+        height_diff = diff[2]
+        horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
+
+        assert (
+            height_lower <= height_diff <= height_upper
+        ), f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
+        assert (
+            distance_lower <= horizontal_distance <= distance_upper
+        ), f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+
+        root_V_tip = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_vector
+        )
+        root_V_tip.scale(1)
+        root_V_ref = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=reference_vector
+        )
+        root_V_ref.scale(1)
+
+        v_tip = root_V_tip.to_np()[:3]
+        v_ref = root_V_ref.to_np()[:3]
+
+        eps = 1e-9
+        assert np.linalg.norm(v_tip) > eps, "tip_vector became zero-length"
+        assert np.linalg.norm(v_ref) > eps, "reference_vector became zero-length"
+
+        angle = angle_between_vector(v_tip, v_ref)
+
+        assert (
+            angle_lower <= angle <= angle_upper
+        ), f"Angle {np.rad2deg(angle):.2f}° not in [{np.rad2deg(angle_lower):.2f}°, {np.rad2deg(angle_upper):.2f}°]"
+
+        root_V_tip_normal = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_normal
+        )
+        root_V_tip_normal.scale(1)
+        root_V_ref_normal = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=reference_normal
+        )
+        root_V_ref_normal.scale(1)
+
+        v_tip_normal = root_V_tip_normal.to_np()[:3]
+        v_ref_normal = root_V_ref_normal.to_np()[:3]
+
+        assert np.linalg.norm(v_ref_normal) > eps, "reference normal became zero-length"
+        assert np.linalg.norm(v_tip_normal) > eps, "tip normal became zero-length"
+
+        perp_angle = angle_between_vector(v_tip_normal, v_ref_normal)
+        target = np.pi / 2
+
+        assert abs(perp_angle - target) <= perpendicular_threshold, (
+            f"AlignPerpendicular failed: final angle {perp_angle:.6f} rad, "
+            f"target {target:.6f} rad, threshold {perpendicular_threshold:.6f} rad"
+        )
 
 
 def test_pointing(pr2_world_state_reset: World):
