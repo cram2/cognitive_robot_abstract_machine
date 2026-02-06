@@ -81,3 +81,4 @@ mlartifacts
 **/doc/_build/
 **/.jupyter_cache/
 **/test_tmp/
+semantic_digital_twin/resources/output

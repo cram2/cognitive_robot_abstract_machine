@@ -1,0 +1,29 @@
+[project]
+name = "multiverse_simulators"
+version = "0.0.15"
+authors = [
+  { name="Giang Nguyen", email="hoanggia@uni-bremen.de" },
+]
+description = "A collection of simulators for the Multiverse Framework."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+
+dependencies = [
+    "mujoco>=3.3.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/Multiverse-Framework/Multiverse-Simulators-Connector"
+"Bug Tracker" = "https://github.com/Multiverse-Framework/Multiverse-Simulators-Connector/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.package-data]
+"mujoco_connector" = ["mujoco_plugin/**/*"]
