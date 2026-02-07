@@ -73,5 +73,33 @@ is not affected by any of the query variables, thus doesn't make sense to put as
 if you try to do so.
 ```
 
+## Retrieving Results
+
+EQL provides convenient ways to retrieve query results.
+
+### Using `.tolist()`
+
+The most common way to retrieve results is using the `.tolist()` method, which is available on both `QueryObjectDescriptor` (e.g., `set_of`, `entity`) and `ResultProcessors` (e.g., `count`, `sum`). It evaluates the query and returns the results as a list.
+
+```{code-cell} ipython3
+import krrood.entity_query_language.entity_result_processors as eql
+from krrood.entity_query_language.entity import set_of
+
+# On a ResultProcessor
+total_count = eql.count(body).tolist()[0]
+
+# On a QueryObjectDescriptor
+all_names = set_of(body.name).tolist()
+```
+
+### Using `.evaluate()`
+
+Alternatively, you can use `.evaluate()` to get an iterator over the results. This is useful for processing large result sets lazily.
+
+```{code-cell} ipython3
+for res in query.evaluate():
+    print(res)
+```
+
 
 
