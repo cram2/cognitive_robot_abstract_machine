@@ -33,12 +33,12 @@ class GCSTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        world = World()
-        with world.modify_world():
-            world.add_kinematic_structure_entity(Body())
-        gcs = GraphOfConvexSets(world)
+        cls.world = World()
+        with cls.world.modify_world():
+            cls.world.add_kinematic_structure_entity(Body())
+        gcs = GraphOfConvexSets(cls.world)
 
-        obstacle = BoundingBox(0, 0, 0, 1, 1, 1, world.root)
+        obstacle = BoundingBox(0, 0, 0, 1, 1, 1, cls.world.root)
 
         z_lim = SimpleInterval(0.45, 0.55)
         x_lim = SimpleInterval(-2, 3)
@@ -51,7 +51,7 @@ class GCSTestCase(unittest.TestCase):
             }
         )
         obstacles = BoundingBoxCollection.from_event(
-            world.root,
+            cls.world.root,
             ~obstacle.simple_event.as_composite_set()
             & limiting_event.as_composite_set(),
         )
@@ -60,8 +60,8 @@ class GCSTestCase(unittest.TestCase):
         cls.gcs = gcs
 
     def test_reachability(self):
-        start_point = Point3(-1, -1, 0.5)
-        target_point = Point3(2, 2, 0.5)
+        start_point = Point3(-1, -1, 0.5, reference_frame=self.world.root)
+        target_point = Point3(2, 2, 0.5, reference_frame=self.world.root)
 
         path = self.gcs.path_from_to(start_point, target_point)
         self.assertEqual(len(path), 4)
@@ -119,8 +119,8 @@ class GCSFromWorldTestCase(unittest.TestCase):
         self.assertGreater(len(gcs.graph.nodes()), 0)
         self.assertGreater(len(gcs.graph.edges()), 0)
 
-        start = Point3(-4.5, -0.5, 0.4)
-        target = Point3(-2.5, 1.5, 0.9)
+        start = Point3(-4.5, -0.5, 0.4, reference_frame=self.world.root)
+        target = Point3(-2.5, 1.5, 0.9, reference_frame=self.world.root)
 
         path = gcs.path_from_to(start, target)
 
@@ -128,8 +128,8 @@ class GCSFromWorldTestCase(unittest.TestCase):
         self.assertGreater(len(path), 1)
 
         with self.assertRaises(PoseOccupiedError):
-            start = Point3(-10, -10, -10)
-            target = Point3(10, 10, 10)
+            start = Point3(-10, -10, -10, reference_frame=self.world.root)
+            target = Point3(10, 10, 10, reference_frame=self.world.root)
             gcs.path_from_to(start, target)
 
     def test_navigation_map_from_world(self):

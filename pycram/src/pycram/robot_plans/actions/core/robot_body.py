@@ -147,7 +147,7 @@ class ParkArmsAction(ActionDescription):
         """
         :return: The joint positions that should be set for the arm to be in the park position.
         """
-        arm_chain = ViewManager().get_arm_view(self.arm, self.robot_view)
+        arm_chain = ViewManager().get_all_arm_views(self.arm, self.robot_view)
         names = []
         values = []
         for arm in arm_chain:

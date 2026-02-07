@@ -6,6 +6,7 @@ from rclpy.qos import QoSProfile, DurabilityPolicy
 from visualization_msgs.msg import MarkerArray
 
 from ..msg_converter import SemDTToRos2Converter
+from ..tf_publisher import TFPublisher
 from ....callbacks.callback import ModelChangeCallback
 
 
@@ -54,6 +55,8 @@ class VizMarkerPublisher(ModelChangeCallback):
         )
         time.sleep(0.2)
         self.notify()
+        time.sleep(0.2)
+        TFPublisher(self.world, self.node)
 
     def _notify(self):
         self.markers = MarkerArray()

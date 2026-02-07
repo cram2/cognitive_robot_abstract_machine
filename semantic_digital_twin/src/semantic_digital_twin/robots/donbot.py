@@ -101,7 +101,7 @@ class Donbot(AbstractRobot, HasArms, HasNeck):
 
             neck = Neck(
                 name=PrefixedName("neck", prefix=donbot.name.name),
-                sensors={camera},
+                sensors=[camera],
                 root=world.get_body_by_name("ur5_base_link"),
                 tip=world.get_body_by_name("ur5_base_link"),
                 _world=world,

@@ -126,7 +126,7 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             # Probably should be classified as "Neck", as that implies that i can move.
             neck = Neck(
                 name=PrefixedName("neck", prefix=robot.name.name),
-                sensors={camera},
+                sensors=[camera],
                 root=world.get_body_by_name("camera_pole"),
                 tip=world.get_body_by_name("camera_link"),
                 _world=world,
@@ -140,7 +140,7 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                 mapping=dict(
                     zip(
                         [c for c in left_arm.connections if type(c) != FixedConnection],
-                        [3.0, -1.0, 1.2, -0.5, 1.57, 0.0],
+                        [2.62, -1.035, 1.13, -0.966, -0.88, 2.07],
                     )
                 ),
                 state_type=StaticJointState.PARK,
@@ -152,8 +152,12 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                 name=PrefixedName("right_arm_park", prefix=robot.name.name),
                 mapping=dict(
                     zip(
-                        [c for c in left_arm.connections if type(c) != FixedConnection],
-                        [3.0, -2.1, -1.57, 0.5, 1.57, 0.0],
+                        [
+                            c
+                            for c in right_arm.connections
+                            if type(c) != FixedConnection
+                        ],
+                        [3.72, -2.07, -1.17, 4.0, 0.82, 0.75],
                     )
                 ),
                 state_type=StaticJointState.PARK,
@@ -162,19 +166,26 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             right_arm.add_joint_state(right_arm_park)
 
             left_gripper_joints = [
-                c for c in left_gripper.connections if type(c) != FixedConnection
+                world.get_connection_by_name("left_robotiq_85_left_knuckle_joint"),
+                world.get_connection_by_name("left_robotiq_85_right_knuckle_joint"),
             ]
 
             left_gripper_open = JointState.from_mapping(
                 name=PrefixedName("left_gripper_open", prefix=robot.name.name),
-                mapping=dict(zip(left_gripper_joints, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])),
+                mapping=dict(zip(left_gripper_joints, [0.0, 0.0])),
                 state_type=GripperState.OPEN,
             )
 
             left_gripper_close = JointState.from_mapping(
                 name=PrefixedName("left_gripper_close", prefix=robot.name.name),
                 mapping=dict(
-                    zip(left_gripper_joints, [0.8, -0.8, -0.8, 0.8, -0.8, 0.8])
+                    zip(
+                        left_gripper_joints,
+                        [
+                            0.8,
+                            -0.8,
+                        ],
+                    )
                 ),
                 state_type=GripperState.CLOSE,
             )
@@ -183,20 +194,19 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             left_gripper.add_joint_state(left_gripper_open)
 
             right_gripper_joints = [
-                c for c in right_gripper.connections if type(c) != FixedConnection
+                world.get_connection_by_name("right_robotiq_85_left_knuckle_joint"),
+                world.get_connection_by_name("right_robotiq_85_right_knuckle_joint"),
             ]
 
             right_gripper_open = JointState.from_mapping(
                 name=PrefixedName("right_gripper_open", prefix=robot.name.name),
-                mapping=dict(zip(right_gripper_joints, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])),
+                mapping=dict(zip(right_gripper_joints, [0.0, 0.0])),
                 state_type=GripperState.OPEN,
             )
 
             right_gripper_close = JointState.from_mapping(
                 name=PrefixedName("right_gripper_close", prefix=robot.name.name),
-                mapping=dict(
-                    zip(right_gripper_joints, [0.8, -0.8, -0.8, 0.8, -0.8, 0.8])
-                ),
+                mapping=dict(zip(right_gripper_joints, [0.8, -0.8])),
                 state_type=GripperState.CLOSE,
             )
 

@@ -22,6 +22,8 @@ from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.stretch import Stretch
+from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -196,7 +198,9 @@ def cylinder_bot_diff_world():
 
 
 def world_with_urdf_factory(
-    urdf_path: str, robot_semantic_annotation: Type[AbstractRobot] | None
+    urdf_path: str,
+    robot_semantic_annotation: Type[AbstractRobot] | None,
+    drive_connection_type: Type[OmniDrive],
 ):
     """
     Builds this tree:
@@ -216,9 +220,12 @@ def world_with_urdf_factory(
         )
         world_with_urdf.add_connection(map_C_localization)
 
-        c_root_bf = OmniDrive.create_with_dofs(
-            parent=localization_body, child=world_with_urdf.root, world=world_with_urdf
-        )
+        if drive_connection_type is OmniDrive:
+            c_root_bf = OmniDrive.create_with_dofs(
+                parent=localization_body,
+                child=world_with_urdf.root,
+                world=world_with_urdf,
+            )
         world_with_urdf.add_connection(c_root_bf)
 
     return world_with_urdf
@@ -234,7 +241,7 @@ def pr2_world_setup():
         "robots",
     )
     pr2 = os.path.join(urdf_dir, "pr2_calibrated_with_ft.urdf")
-    return world_with_urdf_factory(pr2, PR2)
+    return world_with_urdf_factory(pr2, PR2, OmniDrive)
 
 
 @pytest.fixture(scope="session")
@@ -247,7 +254,7 @@ def hsr_world_setup():
         "robots",
     )
     hsr = os.path.join(urdf_dir, "hsrb.urdf")
-    return world_with_urdf_factory(hsr, HSRB)
+    return world_with_urdf_factory(hsr, HSRB, OmniDrive)
 
 
 @pytest.fixture(scope="session")
@@ -266,6 +273,32 @@ def tracy_world():
     world_with_tracy = tracy_parser.parse()
     Tracy.from_world(world_with_tracy)
     return world_with_tracy
+
+
+@pytest.fixture(scope="session")
+def stretch_world():
+    urdf_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "pycram",
+        "resources",
+        "robots",
+    )
+    stretch = os.path.join(urdf_dir, "stretch_description.urdf")
+    return world_with_urdf_factory(stretch, Stretch, OmniDrive)
+
+
+@pytest.fixture(scope="session")
+def tiago_world():
+    urdf_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "pycram",
+        "resources",
+        "robots",
+    )
+    tiago = os.path.join(urdf_dir, "tiago_dual.urdf")
+    return world_with_urdf_factory(tiago, Tiago, OmniDrive)
 
 
 @pytest.fixture(scope="session")
@@ -329,11 +362,13 @@ def simple_apartment_setup():
         box = Body(
             name=PrefixedName("box"),
             collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
+            visual=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
         )
 
         box_2 = Body(
             name=PrefixedName("box_2"),
             collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
+            visual=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
         )
 
         box_1_connection = FixedConnection(
@@ -354,18 +389,22 @@ def simple_apartment_setup():
         wall1 = Body(
             name=PrefixedName("wall_1"),
             collision=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
+            visual=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
         )
         wall2 = Body(
             name=PrefixedName("wall_2"),
             collision=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
+            visual=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
         )
         wall3 = Body(
             name=PrefixedName("wall_3"),
             collision=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
+            visual=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
         )
         wall4 = Body(
             name=PrefixedName("wall_4"),
             collision=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
+            visual=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
         )
 
         wall_1_connection = FixedConnection(
@@ -472,11 +511,23 @@ def hsr_apartment_world(hsr_world_setup, apartment_world_setup):
     hsr_copy = deepcopy(hsr_world_setup)
     robot_view = HSRB.from_world(hsr_copy)
 
-    hsr_copy.merge_world_at_pose(
-        apartment_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+    apartment_copy.merge_world_at_pose(
+        hsr_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
     )
 
-    return apartment_copy, robot_view, Context(hsr_copy, robot_view)
+    return apartment_copy, robot_view, Context(apartment_copy, robot_view)
+
+
+@pytest.fixture(scope="session")
+def stretch_apartment_world(stretch_world_setup, apartment_world_setup):
+    apartment_copy = deepcopy(apartment_world_setup)
+    stretch_copy = deepcopy(stretch_world_setup)
+
+    apartment_copy.merge_world_at_pose(
+        stretch_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+    )
+
+    return apartment_copy
 
 
 ###############################

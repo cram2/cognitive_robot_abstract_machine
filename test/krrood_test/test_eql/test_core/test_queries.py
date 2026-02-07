@@ -1012,4 +1012,17 @@ def test_multiple_dependent_selectables(handles_and_containers_world):
 def test_order_by_not_evaluated_variable(handles_and_containers_world):
     body = variable(Body, domain=handles_and_containers_world.bodies)
     query = an(entity(body).order_by(variable=body.name, descending=False))
-    assert list(query.evaluate()) == sorted(handles_and_containers_world.bodies, key=lambda b: b.name, reverse=False)
+    assert list(query.evaluate()) == sorted(
+        handles_and_containers_world.bodies, key=lambda b: b.name, reverse=False
+    )
+
+
+def test_ordering_the_query_by_the_query_itself(handles_and_containers_world):
+    body = variable(Body, domain=handles_and_containers_world.bodies)
+    query = entity(body).where(contains(body.name, "Handle"))
+    ordered_query = query.order_by(query.name[-1])
+    assert list(an(ordered_query).evaluate()) == sorted(
+        [b for b in handles_and_containers_world.bodies if "Handle" in b.name],
+        key=lambda b: b.name[-1],
+        reverse=False,
+    )

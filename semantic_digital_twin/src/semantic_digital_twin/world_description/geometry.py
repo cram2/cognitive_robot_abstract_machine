@@ -502,12 +502,12 @@ class TriangleMesh(Mesh):
         if thickness_padding > 0:
             P_aug = np.vstack(
                 [
-                    points + thickness_padding * unit_vector_normal,
-                    points - thickness_padding * unit_vector_normal,
+                    centered_points + thickness_padding * unit_vector_normal,
+                    centered_points - thickness_padding * unit_vector_normal,
                 ]
             )
         else:
-            P_aug = points
+            P_aug = centered_points
 
         hull = trimesh.points.PointCloud(P_aug).convex_hull
         hull.remove_unreferenced_vertices()
@@ -795,7 +795,10 @@ class BoundingBox:
         """
         Check if the bounding box contains a point.
         """
-        x, y, z = (float(point.x), float(point.y), float(point.z))
+        point_in_bb = point.reference_frame._world.transform(
+            point, self.origin.reference_frame
+        )
+        x, y, z = (float(point_in_bb.x), float(point_in_bb.y), float(point_in_bb.z))
         return self.simple_event.contains((x, y, z))
 
     @classmethod
