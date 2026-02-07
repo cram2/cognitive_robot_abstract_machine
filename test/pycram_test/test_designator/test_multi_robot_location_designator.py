@@ -6,7 +6,6 @@ from typing_extensions import Generator, Tuple
 
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms
-from pycram.datastructures.pose import PoseStamped
 from pycram.designators.location_designator import (
     CostmapLocation,
     ProbabilisticCostmapLocation,
@@ -32,7 +31,12 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+    Quaternion,
+)
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 
 
@@ -141,7 +145,7 @@ def test_reachability_pose_costmap_location(immutable_multiple_robot_simple_apar
     with simulated_robot:
         plan.perform()
     location_desig = CostmapLocation(
-        PoseStamped.from_list([-2.2, 0, 1], [0, 0, 0, 1], world.root),
+        Pose.from_list([-2.2, 0, 1], [0, 0, 0, 1], world.root),
         reachable_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
@@ -178,7 +182,7 @@ def test_visibility_pose_costmap_location(immutable_multiple_robot_simple_apartm
     with simulated_robot:
         plan.perform()
     location_desig = CostmapLocation(
-        PoseStamped.from_list([-1, 0, 1.2], frame=world.root),
+        Pose.from_list([-1, 0, 1.2], frame=world.root),
         visible_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
@@ -245,7 +249,7 @@ def test_reachability_pose_probabilistic_costmap_location(
     with simulated_robot:
         plan.perform()
     location_desig = ProbabilisticCostmapLocation(
-        PoseStamped.from_list([0.4, 0.6, 0.9], [0, 0, 0, 1], frame=world.root),
+        Pose.from_list([0.4, 0.6, 0.9], [0, 0, 0, 1], frame=world.root),
         reachable_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
@@ -287,7 +291,7 @@ def test_visibility_pose_probabilistic_costmap_location(
     with simulated_robot:
         plan.perform()
     location_desig = ProbabilisticCostmapLocation(
-        PoseStamped.from_list([-1, 0, 1.2], frame=world.root),
+        Pose.from_list([-1, 0, 1.2], frame=world.root),
         visible_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
@@ -375,7 +379,7 @@ def test_accessing_location(immutable_model_world):
 def test_giskard_location_pose(immutable_model_world):
     world, robot_view, context = immutable_model_world
     location_desig = GiskardLocation(
-        PoseStamped.from_list([2.1, 2, 1], frame=world.root), Arms.RIGHT
+        Pose.from_list([2.1, 2, 1], frame=world.root), Arms.RIGHT
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
 
@@ -395,7 +399,11 @@ def test_costmap_location_last_result(immutable_multiple_robot_simple_apartment)
         plan.perform()
     world.notify_state_change()
     location_desig = CostmapLocation(
-        PoseStamped.from_list([-2.2, 0, 1], [0, 0, 0, 1], world.root),
+        Pose(
+            Point3.from_iterable([-2.2, 0, 1]),
+            Quaternion.from_iterable([0, 0, 0, 1]),
+            world.root,
+        ),
         reachable_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))

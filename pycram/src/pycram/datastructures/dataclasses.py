@@ -7,6 +7,7 @@ from enum import Enum
 
 import numpy as np
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3
 from semantic_digital_twin.world import World
 
 from semantic_digital_twin.world_description.world_entity import Body
@@ -33,7 +34,6 @@ from .enums import (
     ApproachDirection,
     VerticalAlignment,
 )
-from .pose import PoseStamped, Point
 
 if TYPE_CHECKING:
     from ..plan import Plan
@@ -99,7 +99,7 @@ class ExecutionData:
     execution. An execution is a Robot with a virtual mobile base that can be used to move the robot in the environment.
     """
 
-    execution_start_pose: PoseStamped
+    execution_start_pose: Pose
     """
     Start of the robot at the start of execution of an action designator
     """
@@ -109,7 +109,7 @@ class ExecutionData:
     The world state at the start of execution of an action designator
     """
 
-    execution_end_pose: Optional[PoseStamped] = None
+    execution_end_pose: Optional[Pose] = None
     """
     The pose of the robot at the end of executing an action designator
     """
@@ -126,12 +126,12 @@ class ExecutionData:
     A list of World modification blocks that were added during the execution of the action designator
     """
 
-    manipulated_body_pose_start: Optional[PoseStamped] = None
+    manipulated_body_pose_start: Optional[Pose] = None
     """
     Start pose of the manipulated Body if there was one
     """
 
-    manipulated_body_pose_end: Optional[PoseStamped] = None
+    manipulated_body_pose_end: Optional[Pose] = None
     """
     End pose of the manipulated Body if there was one
     """
@@ -224,108 +224,6 @@ class ManipulatorData:
      manipulator description file.
     """
 
-
-def get_point_as_list(point: Point) -> List[float]:
-    """
-    Return the point as a list.
-
-    :param point: The point.
-    :return: The point as a list
-    """
-    return [point.x, point.y, point.z]
-
-
-@dataclass
-class Color:
-    """
-    Dataclass for storing rgba_color as an RGBA value.
-    The values are stored as floats between 0 and 1.
-    The default rgba_color is white. 'A' stands for the opacity.
-    """
-
-    R: float = 1
-    G: float = 1
-    B: float = 1
-    A: float = 1
-
-    @classmethod
-    def from_list(cls, color: List[float]):
-        """
-        Set the rgba_color from a list of RGBA values.
-
-        :param color: The list of RGBA values
-        """
-        if len(color) == 3:
-            return cls.from_rgb(color)
-        elif len(color) == 4:
-            return cls.from_rgba(color)
-        else:
-            raise ValueError("Color list must have 3 or 4 elements")
-
-    @classmethod
-    def from_rgb(cls, rgb: List[float]):
-        """
-        Set the rgba_color from a list of RGB values.
-
-        :param rgb: The list of RGB values
-        """
-        return cls(rgb[0], rgb[1], rgb[2], 1)
-
-    @classmethod
-    def from_rgba(cls, rgba: List[float]):
-        """
-        Set the rgba_color from a list of RGBA values.
-
-        :param rgba: The list of RGBA values
-        """
-        return cls(rgba[0], rgba[1], rgba[2], rgba[3])
-
-    def get_rgba(self) -> List[float]:
-        """
-        Return the rgba_color as a list of RGBA values.
-
-        :return: The rgba_color as a list of RGBA values
-        """
-        return [self.R, self.G, self.B, self.A]
-
-    def get_rgb(self) -> List[float]:
-        """
-        Return the rgba_color as a list of RGB values.
-
-        :return: The rgba_color as a list of RGB values
-        """
-        return [self.R, self.G, self.B]
-
-
-class Colors(Color, Enum):
-    """
-    Enum for easy access to some common colors.
-    """
-
-    PINK = (1, 0, 1, 1)
-    BLACK = (0, 0, 0, 1)
-    WHITE = (1, 1, 1, 1)
-    RED = (1, 0, 0, 1)
-    GREEN = (0, 1, 0, 1)
-    BLUE = (0, 0, 1, 1)
-    YELLOW = (1, 1, 0, 1)
-    CYAN = (0, 1, 1, 1)
-    MAGENTA = (1, 0, 1, 1)
-    GREY = (0.5, 0.5, 0.5, 1)
-
-    @classmethod
-    def from_string(cls, color: str) -> Color:
-        """
-        Set the rgba_color from a string. If the string is not a valid color, it will return the color WHITE.
-
-        :param color: The string of the color
-        """
-        try:
-            return cls[color.upper()]
-        except KeyError:
-            return cls.WHITE
-
-
 @dataclass
 class CollisionCallbacks:
     """
@@ -368,7 +266,7 @@ class VirtualJoint:
 
     name: str
     type_: JointType
-    axes: Optional[Point] = None
+    axes: Optional[Vector3] = None
 
     @property
     def type(self):
@@ -422,17 +320,17 @@ class VirtualMobileBaseJoints:
     translation_x: Optional[VirtualJoint] = VirtualJoint(
         VirtualMobileBaseJointName.LINEAR_X.value,
         JointType.PRISMATIC,
-        Point(x=1.0, y=0.0, z=0.0),
+        Vector3(x=1.0, y=0.0, z=0.0),
     )
     translation_y: Optional[VirtualJoint] = VirtualJoint(
         VirtualMobileBaseJointName.LINEAR_Y.value,
         JointType.PRISMATIC,
-        Point(x=0.0, y=1.0, z=0.0),
+        Vector3(x=0.0, y=1.0, z=0.0),
     )
     angular_z: Optional[VirtualJoint] = VirtualJoint(
         VirtualMobileBaseJointName.ANGULAR_Z.value,
         JointType.REVOLUTE,
-        Point(x=0.0, y=0.0, z=1.0),
+        Vector3(x=0.0, y=0.0, z=1.0),
     )
 
     @property
@@ -451,7 +349,7 @@ class VirtualMobileBaseJoints:
             for field in fields(self)
         }
 
-    def get_axes(self) -> Dict[str, Point]:
+    def get_axes(self) -> Dict[str, Vector3]:
         """
         Return the axes (i.e. The axis on which the joint moves) of the virtual mobile base joints.
         """

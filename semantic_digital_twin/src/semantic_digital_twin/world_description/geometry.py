@@ -6,6 +6,7 @@ import tempfile
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
+from enum import Enum
 from functools import cached_property
 
 import numpy as np
@@ -72,6 +73,70 @@ class Color:
 
     def to_rgba(self) -> Tuple[float, float, float, float]:
         return (self.R, self.G, self.B, self.A)
+
+    def to_rgb(self) -> Tuple[float, float, float]:
+        return (self.R, self.G, self.B)
+
+    @classmethod
+    def from_list(cls, color: List[float]):
+        """
+        Set the rgba_color from a list of RGBA values.
+
+        :param color: The list of RGBA values
+        """
+        if len(color) == 3:
+            return cls.from_rgb(color)
+        elif len(color) == 4:
+            return cls.from_rgba(color)
+        else:
+            raise ValueError("Color list must have 3 or 4 elements")
+
+    @classmethod
+    def from_rgb(cls, rgb: List[float]):
+        """
+        Set the rgba_color from a list of RGB values.
+
+        :param rgb: The list of RGB values
+        """
+        return cls(rgb[0], rgb[1], rgb[2], 1)
+
+    @classmethod
+    def from_rgba(cls, rgba: List[float]):
+        """
+        Set the rgba_color from a list of RGBA values.
+
+        :param rgba: The list of RGBA values
+        """
+        return cls(rgba[0], rgba[1], rgba[2], rgba[3])
+
+
+class Colors(Color, Enum):
+    """
+    Enum for easy access to some common colors.
+    """
+
+    PINK = (1, 0, 1, 1)
+    BLACK = (0, 0, 0, 1)
+    WHITE = (1, 1, 1, 1)
+    RED = (1, 0, 0, 1)
+    GREEN = (0, 1, 0, 1)
+    BLUE = (0, 0, 1, 1)
+    YELLOW = (1, 1, 0, 1)
+    CYAN = (0, 1, 1, 1)
+    MAGENTA = (1, 0, 1, 1)
+    GREY = (0.5, 0.5, 0.5, 1)
+
+    @classmethod
+    def from_string(cls, color: str) -> Color:
+        """
+        Set the rgba_color from a string. If the string is not a valid color, it will return the color WHITE.
+
+        :param color: The string of the color
+        """
+        try:
+            return cls[color.upper()]
+        except KeyError:
+            return cls.WHITE
 
 
 @dataclass

@@ -3,11 +3,12 @@ import sys
 from threading import Lock, RLock
 
 from geometry_msgs.msg import PointStamped, QuaternionStamped, Vector3Stamped
+
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Dict, Callable, Optional
 
 from ..datastructures.enums import Arms
-from ..datastructures.pose import PoseStamped
 from ..ros import get_node_names
 
 
@@ -115,7 +116,7 @@ def set_joint_goal(goal_poses: Dict[str, float]) -> None:
 @init_giskard_interface
 @thread_safe
 def achieve_cartesian_goal(
-    goal_pose: "PoseStamped",
+    goal_pose: "Pose",
     tip_link: str,
     root_link: str,
     position_threshold: float = 0.02,
@@ -172,7 +173,7 @@ def achieve_cartesian_goal(
 @init_giskard_interface
 @thread_safe
 def achieve_straight_cartesian_goal(
-    goal_pose: "PoseStamped",
+    goal_pose: "Pose",
     tip_link: str,
     root_link: str,
     grippers_that_can_collide: Optional[Arms] = None,
@@ -316,7 +317,7 @@ def achieve_close_container_goal(tip_link: str, environment_link: str):
 
 @init_giskard_interface
 def achieve_cartesian_waypoints_goal(
-    waypoints: List["PoseStamped"],
+    waypoints: List["Pose"],
     tip_link: str,
     root_link: str,
     enforce_final_orientation: bool = True,
@@ -406,7 +407,7 @@ def achieve_cartesian_waypoints_goal(
 
 
 @init_giskard_interface
-def projection_cartesian_goal(goal_pose: "PoseStamped", tip_link: str, root_link: str):
+def projection_cartesian_goal(goal_pose: "Pose", tip_link: str, root_link: str):
     """
     Tries to move the tip_link to the position defined by goal_pose using the chain defined by tip_link and root_link.
     The goal_pose is projected to the closest point on the robot's workspace.
@@ -422,8 +423,8 @@ def projection_cartesian_goal(goal_pose: "PoseStamped", tip_link: str, root_link
 
 @init_giskard_interface
 def projection_cartesian_goal_with_approach(
-    approach_pose: "PoseStamped",
-    goal_pose: "PoseStamped",
+    approach_pose: "Pose",
+    goal_pose: "Pose",
     tip_link: str,
     root_link: str,
     robot_base_link: str,
@@ -610,7 +611,7 @@ def make_vector_stamped(vector: List[float]) -> "Vector3Stamped":
 
 @init_giskard_interface
 def set_straight_cart_goal(
-    goal_pose: PoseStamped,
+    goal_pose: Pose,
     tip_link: str,
     root_link: str,
     tip_group: Optional[str] = "",
@@ -638,7 +639,7 @@ def set_straight_cart_goal(
 
 @init_giskard_interface
 def set_cart_goal(
-    goal_pose: PoseStamped,
+    goal_pose: Pose,
     tip_link: str,
     root_link: str,
     tip_group: Optional[str] = "",

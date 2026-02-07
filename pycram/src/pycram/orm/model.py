@@ -9,7 +9,6 @@ from typing_extensions import Optional
 
 from ..datastructures.dataclasses import ExecutionData
 from ..datastructures.enums import TaskStatus
-from ..datastructures.pose import PyCramQuaternion
 from ..designator import DesignatorDescription
 from ..failures import PlanFailure
 from ..language import TryInOrderNode, ParallelNode, TryAllNode, CodeNode, MonitorNode
@@ -31,21 +30,6 @@ from ..robot_plans import ActionDescription, BaseMotion
 #            Specify the columns(attributes) that are supposed to be tracked in the database.
 #            One attribute equals one column. Please refer to the ORMatic documentation for more information.
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-@dataclass
-class PyCRAMQuaternionMapping(AlternativeMapping[PyCramQuaternion]):
-    x: float = 0
-    y: float = 0
-    z: float = 0
-    w: float = 1
-
-    @classmethod
-    def from_domain_object(cls, obj: T):
-        return PyCramQuaternion(obj.x, obj.y, obj.z, obj.w)
-
-    def to_domain_object(self) -> T:
-        return PyCramQuaternion(self.x, self.y, self.z, self.w)
 
 
 @dataclass

@@ -137,7 +137,7 @@ a_V_v1 = a_R_b @ b_V_v1  # a vector only expresses a direction, it has no fixed 
 You must ensure that the two points are represented relative to the same reference frame, notice that both have "a" on the left.
 Since the last entires for points are 1, the subtraction will automatically have a 0 as 4th entries, which represents a vector.
 ```python
-a_V_error = a_P_p2 - a_P_p1 
+a_V_p2_to_p1 = a_P_p2 - a_P_p1 
 ```
 
 ### Adding points

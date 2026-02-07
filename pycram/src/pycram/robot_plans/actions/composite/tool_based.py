@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from time import sleep
 from typing import Tuple
 
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     SemanticAnnotation,
@@ -13,7 +14,6 @@ from typing_extensions import Union, Optional, Iterable
 
 from ...motions.gripper import MoveTCPMotion
 from .... import utils
-from ....datastructures.pose import PoseStamped
 from ....has_parameters import has_parameters
 from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.enums import (
@@ -275,7 +275,7 @@ class CuttingAction(ActionDescription):
         return 0, 0
 
     @staticmethod
-    def perpendicular_pose(slice_pose, angle) -> PoseStamped:
+    def perpendicular_pose(slice_pose, angle) -> Pose:
         pose_rotated = slice_pose
         rotation_quaternion = utils.axis_angle_to_quaternion([0, 0, 1], angle)
         pose_rotated.rotate_by_quaternion(rotation_quaternion)
@@ -283,7 +283,7 @@ class CuttingAction(ActionDescription):
 
     @staticmethod
     def get_rotation_offset_from_axis_preference(
-        pose_a, pose_b: PoseStamped
+        pose_a, pose_b: Pose
     ) -> Tuple[int, float]:
         """
         Compute a discrete rotation offset (-90 or 90 degrees) to align this pose's local axes with the direction

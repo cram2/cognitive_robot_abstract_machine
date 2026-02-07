@@ -8,7 +8,7 @@ from krrood.entity_query_language.entity import (
     exists,
 )
 from krrood.entity_query_language.entity_result_processors import an, the
-from ..dataset.example_classes import VectorsWithProperty
+from ..dataset.example_classes import KRROODVectorsWithProperty
 from ..dataset.semantic_world_like_classes import View, Drawer, Container, Cabinet
 
 
@@ -120,5 +120,5 @@ def test_property_selection():
     """
     Test that properties can be selected from entities in a query.
     """
-    v = variable(VectorsWithProperty, None)
+    v = variable(KRROODVectorsWithProperty, None)
     q = an(entity(v).where(v.vectors[0].x == 1))

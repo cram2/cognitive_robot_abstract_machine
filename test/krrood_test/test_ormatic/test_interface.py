@@ -14,9 +14,9 @@ from ..dataset.ormatic_interface import *
 
 
 def test_position(session, database):
-    p1 = Position(1, 2, 3)
+    p1 = KRROODPosition(1, 2, 3)
 
-    p1dao: PositionDAO = PositionDAO.to_dao(p1)
+    p1dao: KRROODPositionDAO = KRROODPositionDAO.to_dao(p1)
     assert p1.x == p1dao.x
     assert p1.y == p1dao.y
     assert p1.z == p1dao.z
@@ -25,7 +25,7 @@ def test_position(session, database):
     session.commit()
 
     # krrood_test the content of the database
-    queried_p1 = session.scalars(select(PositionDAO)).one()
+    queried_p1 = session.scalars(select(KRROODPositionDAO)).one()
 
     assert p1.x == queried_p1.x
     assert p1.y == queried_p1.y
@@ -36,9 +36,9 @@ def test_position(session, database):
 
 
 def test_position4d(session, database):
-    p4d = Position4D(1.0, 2.0, 3.0, 4.0)
+    p4d = KRROODPosition4D(1.0, 2.0, 3.0, 4.0)
 
-    p4d_dao = Position4DDAO.to_dao(p4d)
+    p4d_dao = KRROODPosition4DDAO.to_dao(p4d)
     assert p4d.x == p4d_dao.x
     assert p4d.y == p4d_dao.y
     assert p4d.z == p4d_dao.z
@@ -48,8 +48,8 @@ def test_position4d(session, database):
     session.commit()
 
     # krrood_test the content of the database
-    # Note: Polymorphic queries don't work correctly yet, so we query directly for Position4DDAO objects
-    queried_p4d = session.scalars(select(PositionDAO)).one()
+    # Note: Polymorphic queries don't work correctly yet, so we query directly for KRROODPosition4DDAO objects
+    queried_p4d = session.scalars(select(KRROODPositionDAO)).one()
 
     assert p4d.x == queried_p4d.x
     assert p4d.y == queried_p4d.y
@@ -61,9 +61,9 @@ def test_position4d(session, database):
 
 
 def test_orientation(session, database):
-    o1 = Orientation(1.0, 2.0, 3.0, None)
+    o1 = KRROODOrientation(1.0, 2.0, 3.0, None)
 
-    o1dao = OrientationDAO.to_dao(o1)
+    o1dao = KRROODOrientationDAO.to_dao(o1)
     assert o1.x == o1dao.x
     assert o1.y == o1dao.y
     assert o1.z == o1dao.z
@@ -73,7 +73,7 @@ def test_orientation(session, database):
     session.commit()
 
     # krrood_test the content of the database
-    queried_o1 = session.scalars(select(OrientationDAO)).one()
+    queried_o1 = session.scalars(select(KRROODOrientationDAO)).one()
 
     assert o1.x == queried_o1.x
     assert o1.y == queried_o1.y
@@ -85,18 +85,18 @@ def test_orientation(session, database):
 
 
 def test_pose(session, database):
-    p1 = Position(1, 2, 3)
-    o1 = Orientation(1.0, 2.0, 3.0, None)
-    pose = Pose(p1, o1)
+    p1 = KRROODPosition(1, 2, 3)
+    o1 = KRROODOrientation(1.0, 2.0, 3.0, None)
+    pose = KRROODPose(p1, o1)
 
-    posedao = PoseDAO.to_dao(pose)
-    assert isinstance(posedao.position, PositionDAO)
-    assert isinstance(posedao.orientation, OrientationDAO)
+    posedao = KRROODPoseDAO.to_dao(pose)
+    assert isinstance(posedao.position, KRROODPositionDAO)
+    assert isinstance(posedao.orientation, KRROODOrientationDAO)
 
     session.add(posedao)
     session.commit()
 
-    queried = session.scalars(select(PoseDAO)).one()
+    queried = session.scalars(select(KRROODPoseDAO)).one()
     assert queried.position is not None
     assert queried.orientation is not None
     assert queried == posedao
@@ -196,65 +196,69 @@ def test_node(session, database):
 
 
 def test_position_type_wrapper(session, database):
-    wrapper = PositionTypeWrapper(Position)
-    dao = PositionTypeWrapperDAO.to_dao(wrapper)
+    wrapper = KRROODPositionTypeWrapper(KRROODPosition)
+    dao = KRROODPositionTypeWrapperDAO.to_dao(wrapper)
     assert dao.position_type == wrapper.position_type
     session.add(dao)
     session.commit()
 
-    result = session.scalars(select(PositionTypeWrapperDAO)).one()
+    result = session.scalars(select(KRROODPositionTypeWrapperDAO)).one()
     assert result == dao
 
 
 def test_positions(session, database):
-    p1 = Position(1, 2, 3)
-    p2 = Position(2, 3, 4)
-    positions = Positions([p1, p2], ["a", "b", "c"])
-    dao = PositionsDAO.to_dao(positions)
+    p1 = KRROODPosition(1, 2, 3)
+    p2 = KRROODPosition(2, 3, 4)
+    positions = KRROODPositions([p1, p2], ["a", "b", "c"])
+    dao = KRROODPositionsDAO.to_dao(positions)
     assert len(dao.positions) == 2
 
     session.add(dao)
     session.commit()
 
-    positions_results = session.scalars(select(PositionDAO)).all()
+    positions_results = session.scalars(select(KRROODPositionDAO)).all()
     assert len(positions_results) == 2
 
-    result = session.scalars(select(PositionsDAO)).one()
+    result = session.scalars(select(KRROODPositionsDAO)).one()
     assert result.some_strings == positions.some_strings
 
     assert len(result.positions) == 2
 
 
 def test_double_position_aggregator(session, database):
-    p1, p2, p3 = Position(1, 2, 3), Position(2, 3, 4), Position(3, 4, 5)
-    dpa = DoublePositionAggregator([p1, p2], [p1, p3])
-    dpa_dao = DoublePositionAggregatorDAO.to_dao(dpa)
+    p1, p2, p3 = (
+        KRROODPosition(1, 2, 3),
+        KRROODPosition(2, 3, 4),
+        KRROODPosition(3, 4, 5),
+    )
+    dpa = DoubleKRROODPositionAggregator([p1, p2], [p1, p3])
+    dpa_dao = DoubleKRROODPositionAggregatorDAO.to_dao(dpa)
     session.add(dpa_dao)
     session.commit()
 
-    queried_positions = session.scalars(select(PositionDAO)).all()
+    queried_positions = session.scalars(select(KRROODPositionDAO)).all()
     assert len(queried_positions) == 3
 
-    queried = session.scalars(select(DoublePositionAggregatorDAO)).one()
+    queried = session.scalars(select(DoubleKRROODPositionAggregatorDAO)).one()
     assert queried == dpa_dao
     assert queried.positions1[0] in queried_positions
 
 
 def test_kinematic_chain_and_torso(session, database):
-    k1 = KinematicChain("a")
-    k2 = KinematicChain("b")
-    torso = Torso("t", [k1, k2])
-    torso_dao = TorsoDAO.to_dao(torso)
+    k1 = KRROODKinematicChain("a")
+    k2 = KRROODKinematicChain("b")
+    torso = KRROODTorso("t", [k1, k2])
+    torso_dao = KRROODTorsoDAO.to_dao(torso)
 
     session.add(torso_dao)
     session.commit()
 
-    queried_torso = session.scalars(select(TorsoDAO)).one()
+    queried_torso = session.scalars(select(KRROODTorsoDAO)).one()
     assert queried_torso == torso_dao
 
 
 def test_custom_types(session, database):
-    ogs = OriginalSimulatedObject(Bowl(), 1)
+    ogs = OriginalSimulatedObject(KRROODBowl(), 1)
     ogs_dao = OriginalSimulatedObjectDAO.to_dao(ogs)
     assert ogs.concept == ogs_dao.concept
 
@@ -263,7 +267,7 @@ def test_custom_types(session, database):
 
     queried = session.scalars(select(OriginalSimulatedObjectDAO)).one()
     assert ogs_dao == queried
-    assert isinstance(queried.concept, Bowl)
+    assert isinstance(queried.concept, KRROODBowl)
 
 
 def test_inheriting_from_explicit_mapping(session, database):
@@ -308,18 +312,20 @@ def test_assertion(session, database):
         to_dao(p)
 
 
-def test_PositionsSubclassWithAnotherPosition(session, database):
-    position = Position(1, 2, 3)
-    obj = PositionsSubclassWithAnotherPosition([position], ["a", "b", "c"], position)
-    dao: PositionsSubclassWithAnotherPositionDAO = to_dao(obj)
+def test_KRROODPositionsSubclassWithAnotherKRROODPosition(session, database):
+    position = KRROODPosition(1, 2, 3)
+    obj = KRROODPositionsSubclassWithAnotherKRROODPosition(
+        [position], ["a", "b", "c"], position
+    )
+    dao: KRROODPositionsSubclassWithAnotherKRROODPositionDAO = to_dao(obj)
 
     session.add(dao)
     session.commit()
 
 
 def test_inheriting_from_inherited_class(session, database):
-    position_5d = Position5D(1, 2, 3, 4, 5)
-    position_4d = Position4D(1, 2, 3, 4)
+    position_5d = KRROODPosition5D(1, 2, 3, 4, 5)
+    position_4d = KRROODPosition4D(1, 2, 3, 4)
 
     position_4d_dao = to_dao(position_4d)
     position_5d_dao = to_dao(position_5d)
@@ -330,9 +336,9 @@ def test_inheriting_from_inherited_class(session, database):
     session.add(position_5d_dao)
     session.commit()
 
-    queried_position_5d = session.scalars(select(Position5DDAO)).one()
-    queried_position_4d = session.scalars(select(Position4DDAO)).all()
-    queried_position = session.scalars(select(PositionDAO)).all()
+    queried_position_5d = session.scalars(select(KRROODPosition5DDAO)).one()
+    queried_position_4d = session.scalars(select(KRROODPosition4DDAO)).all()
+    queried_position = session.scalars(select(KRROODPositionDAO)).all()
     columns = [
         column
         for column in queried_position_5d.__table__.columns
@@ -401,9 +407,9 @@ def test_container_item(session, database):
 
 
 def test_nested_mappings(session, database):
-    shape_1 = Shape("rectangle", Transformation(Vector(1), Rotation(1)))
-    shape_2 = Shape("circle", Transformation(Vector(2), Rotation(2)))
-    shape_3 = Shape("rectangle", Transformation(Vector(3), Rotation(3)))
+    shape_1 = Shape("rectangle", KRROODTransformation(KRROODVector(1), Rotation(1)))
+    shape_2 = Shape("circle", KRROODTransformation(KRROODVector(2), Rotation(2)))
+    shape_3 = Shape("rectangle", KRROODTransformation(KRROODVector(3), Rotation(3)))
     shapes = Shapes([shape_1, shape_2, shape_3])
     more_shapes = MoreShapes([shapes, shapes])
     dao = to_dao(more_shapes)
@@ -412,14 +418,14 @@ def test_nested_mappings(session, database):
 
 
 def test_vector_mapped(session, database):
-    vector = Vector(1.0)
-    vector_mapped = VectorsWithProperty([vector])
+    vector = KRROODVector(1.0)
+    vector_mapped = KRROODVectorsWithProperty([vector])
     dao = to_dao(vector_mapped)
 
     session.add(dao)
     session.commit()
 
-    queried = session.scalars(select(VectorsWithPropertyMappedDAO)).one()
+    queried = session.scalars(select(KRROODVectorsWithPropertyMappedDAO)).one()
     reconstructed = queried.from_dao()
 
     assert reconstructed.vectors[0].x == vector.x
@@ -457,14 +463,14 @@ def test_private_factories(session, database):
 
 
 def test_relationship_overloading(session, database):
-    obj = RelationshipChild(Position(1, 2, 3))
+    obj = RelationshipChild(KRROODPosition(1, 2, 3))
     dao = to_dao(obj)
     session.add(dao)
     session.commit()
 
     queried = session.scalars(select(RelationshipParentDAO)).one()
     reconstructed = queried.from_dao()
-    assert reconstructed.positions == Position(1, 2, 3)
+    assert reconstructed.positions == KRROODPosition(1, 2, 3)
 
 
 def test_alternative_mapping_inheritance(session, database):
@@ -582,9 +588,9 @@ def test_json_integration(session, database):
 def test_many_to_many_with_same_type(session, database):
 
     state = ToDataAccessObjectState()
-    position = Position(1, 2, 3)
-    ps1 = Positions([position], ["a"])
-    ps2 = Positions([position], ["a"])
+    position = KRROODPosition(1, 2, 3)
+    ps1 = KRROODPositions([position], ["a"])
+    ps2 = KRROODPositions([position], ["a"])
 
     ps1_dao = to_dao(ps1, state)
     ps2_dao = to_dao(ps2, state)
@@ -593,11 +599,11 @@ def test_many_to_many_with_same_type(session, database):
     session.commit()
     session.expunge_all()
 
-    q1 = select(PositionDAO)
+    q1 = select(KRROODPositionDAO)
     r = session.scalars(q1).all()
     assert len(r) == 1
 
-    q = select(PositionsDAO)
+    q = select(KRROODPositionsDAO)
     r_ps1, r_ps2 = session.scalars(q).all()
 
     assert r_ps1.positions[0] is r_ps2.positions[0]
@@ -661,13 +667,13 @@ def test_underspecified_types():
 
 
 def test_position_set(session, database):
-    p1, p2 = Position(1, 2, 3), Position(2, 3, 4)
-    obj = TestPositionSet({p1, p2})
+    p1, p2 = KRROODPosition(1, 2, 3), KRROODPosition(2, 3, 4)
+    obj = TestKRROODPositionSet({p1, p2})
     dao = to_dao(obj)
     session.add(dao)
     session.commit()
 
-    r = session.scalars(select(TestPositionSetDAO)).one()
+    r = session.scalars(select(TestKRROODPositionSetDAO)).one()
     reconstructed = r.from_dao()
     assert reconstructed == obj
 

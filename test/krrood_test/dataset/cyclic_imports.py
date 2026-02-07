@@ -6,10 +6,10 @@ from dataclasses import dataclass, field
 from krrood.entity_query_language.predicate import Symbol
 
 if TYPE_CHECKING:
-    from .example_classes import Pose
+    from .example_classes import KRROODPose
 
 
 @dataclass
 class PoseAnnotation(Symbol):
     name: str
-    pose: Optional["Pose"] = field(default=None, repr=False, kw_only=True)
+    pose: Optional["KRROODPose"] = field(default=None, repr=False, kw_only=True)

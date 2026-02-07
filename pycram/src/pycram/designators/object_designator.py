@@ -9,7 +9,6 @@ from ..datastructures.enums import ObjectType
 from ..datastructures.partial_designator import PartialDesignator
 from ..external_interfaces.robokudo import *
 from ..plan import Plan
-from ..utils import is_iterable
 
 
 if TYPE_CHECKING:
@@ -49,7 +48,7 @@ class ResolutionStrategyObject(ObjectDesignatorDescription):
             def __iter__(self):
                 if callable(self.method):
                     yield self.method()
-                elif is_iterable(self.method()):
+                elif isinstance(self.method(), Iterable):
                     for i in self.method():
                         yield i
 
