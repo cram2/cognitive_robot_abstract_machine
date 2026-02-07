@@ -17,7 +17,7 @@ from ...datastructures.enums import (
 )
 from ...datastructures.grasp import GraspDescription
 from ...datastructures.pose import PoseStamped
-from ...robot_description import ViewManager
+from ...view_manager import ViewManager
 from ...utils import translate_pose_along_local_axis
 
 

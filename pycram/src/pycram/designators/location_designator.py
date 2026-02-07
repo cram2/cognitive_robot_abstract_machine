@@ -83,7 +83,7 @@ from ..pose_validator import (
     collision_check,
     pose_sequence_reachability_validator,
 )
-from ..robot_description import ViewManager
+from ..view_manager import ViewManager
 from ..utils import link_pose_for_joint_config
 
 logger = logging.getLogger("pycram")

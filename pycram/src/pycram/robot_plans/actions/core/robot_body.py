@@ -18,7 +18,7 @@ from ....datastructures.pose import Vector3Stamped
 from ....failures import TorsoGoalNotReached, ConfigurationNotReached
 from ....has_parameters import has_parameters
 from ....language import SequentialPlan
-from ....robot_description import ViewManager
+from ....view_manager import ViewManager
 from ....robot_plans.actions.base import ActionDescription
 from ....robot_plans.motions.gripper import MoveGripperMotion
 from ....robot_plans.motions.robot_body import MoveJointsMotion

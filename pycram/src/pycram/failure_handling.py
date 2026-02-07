@@ -8,7 +8,6 @@ from threading import Lock
 from typing_extensions import Union, Any, List, Optional, Type, Callable, TYPE_CHECKING
 from .language import MonitorNode, MonitorPlan
 from .plan import Plan
-from .process_module import ProcessModule
 
 if TYPE_CHECKING:
     from .robot_plans import BaseMotion

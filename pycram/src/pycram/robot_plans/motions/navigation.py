@@ -5,7 +5,6 @@ from giskardpy.motion_statechart.tasks.pointing import Pointing
 
 from .base import BaseMotion
 from ...datastructures.pose import PoseStamped
-from ...process_module import ProcessModuleManager
 
 
 @dataclass

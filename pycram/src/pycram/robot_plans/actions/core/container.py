@@ -22,7 +22,7 @@ from ....datastructures.partial_designator import PartialDesignator
 from ....failures import ContainerManipulationError
 from ....has_parameters import has_parameters
 from ....language import SequentialPlan
-from ....robot_description import ViewManager
+from ....view_manager import ViewManager
 from ....robot_plans.actions.base import ActionDescription
 
 

@@ -5,7 +5,6 @@ import dataclasses
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import TYPE_CHECKING, Iterable, Iterator, Union
 
-from ..datastructures.enums import ObjectType
 from ..datastructures.partial_designator import PartialDesignator
 from ..external_interfaces.robokudo import *
 from ..plan import Plan

@@ -16,7 +16,7 @@ from pycram.language import (
     CodePlan,
     TryAllNode,
 )
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.robot_plans import *
 
 

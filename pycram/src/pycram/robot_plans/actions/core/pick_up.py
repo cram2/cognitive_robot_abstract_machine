@@ -24,7 +24,7 @@ from ....failures import ObjectNotGraspedError
 from ....failures import ObjectNotInGraspingArea
 from ....has_parameters import has_parameters
 from ....language import SequentialPlan
-from ....robot_description import ViewManager
+from ....view_manager import ViewManager
 from ....robot_plans.actions.base import ActionDescription
 from ....utils import translate_pose_along_local_axis
 

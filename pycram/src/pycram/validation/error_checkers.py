@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
 import numpy as np
+
+from ..datastructures.enums import JointType
 from ..tf_transformations import quaternion_multiply, quaternion_inverse
 from typing_extensions import (
     List,
@@ -14,7 +16,6 @@ from typing_extensions import (
     Tuple,
 )
 
-from ..datastructures.enums import JointType
 
 if TYPE_CHECKING:
     from ..datastructures.pose import PoseStamped

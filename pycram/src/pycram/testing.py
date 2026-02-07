@@ -16,7 +16,6 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
 from .datastructures.dataclasses import Context
-from .datastructures.enums import WorldMode
 from .plan import Plan
 
 logger = logging.getLogger(__name__)
@@ -125,49 +124,3 @@ class SemanticWorldTestCase(unittest.TestCase):
             )
         ).parse()
         cls.apartment_world.merge_world(cls.pr2_sem_world)
-
-
-class EmptyWorldTestCase(unittest.TestCase):
-    """
-    Base class for unit tests that require and ordinary setup and teardown of the empty bullet-world.
-    """
-
-    world: World
-    # viz_marker_publisher: VizMarkerPublisher
-    render_mode = WorldMode.DIRECT
-
-    @classmethod
-    def setUpClass(cls):
-        cls.world = World()
-        # if "ROS_VERSION" in os.environ:
-        #     cls.viz_marker_publisher = VizMarkerPublisher()
-
-    def setUp(self):
-        Plan.current_plan = None
-
-    def tearDown(self):
-        time.sleep(0.05)
-
-
-class ApartmentWorldTestCase(EmptyWorldTestCase):
-    """
-    Class for unit tests that require a bullet-world with a PR2, kitchen, milk and cereal.
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        logger.setLevel(logging.DEBUG)
-        super().setUpClass()
-
-        cls.apartment_world = setup_world()
-
-        cls.robot_view = PR2.from_world(cls.apartment_world)
-
-        cls.context = Context(cls.apartment_world, cls.robot_view, None)
-
-        cls.original_state_data = deepcopy(cls.apartment_world.state.data)
-        cls.world = cls.apartment_world
-
-    def tearDown(self):
-        self.world.state.data = deepcopy(self.original_state_data)
-        self.world.notify_state_change()

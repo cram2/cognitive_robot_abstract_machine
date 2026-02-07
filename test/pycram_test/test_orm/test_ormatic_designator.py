@@ -16,7 +16,7 @@ from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.pose import PyCramPose, PoseStamped
 from pycram.language import SequentialPlan, ParallelPlan
 from pycram.orm.ormatic_interface import *
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.robot_plans import (
     MoveTorsoActionDescription,
     ParkArmsAction,
