@@ -1713,6 +1713,11 @@ class TestCartesianTasks:
             cart_straight.goal_pose.to_np(), goal_pose.to_np(), atol=0.015
         )
 
+        # Verify final position is correct
+        fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
+        expected_final = np.array([0.1, 0, 0])
+        assert np.allclose(fk[:3, 3], expected_final, atol=cart_straight.threshold)
+
 
 class TestDiffDriveBaseGoal:
     @pytest.mark.parametrize(
@@ -1763,11 +1768,6 @@ class TestDiffDriveBaseGoal:
             goal_pose,
             atol=1e-2,
         )
-
-        # Verify final position is correct
-        fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
-        expected_final = np.array([0.1, 0, 0])
-        assert np.allclose(fk[:3, 3], expected_final, atol=cart_straight.threshold)
 
 
 class TestFeatureFunctions:
