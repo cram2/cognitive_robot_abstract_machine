@@ -55,7 +55,5 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
     def _motion_chart(self):
 
         return DiffDriveBaseGoal(
-            root_link=self.world.root,
-            tip_link=self.robot_view.root,
             goal_pose=self.target.to_spatial_type(),
         )

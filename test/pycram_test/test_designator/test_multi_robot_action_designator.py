@@ -58,6 +58,7 @@ from semantic_digital_twin.world import World
 
 # The alternative mapping needs to be imported for the stretch to work properly
 import pycram.alternative_motion_mappings.stretch_motion_mapping
+import pycram.alternative_motion_mappings.tiago_motion_mapping
 
 
 @pytest.fixture(scope="session", params=["hsrb", "stretch", "tiago", "pr2"])
@@ -428,9 +429,6 @@ def test_detect(immutable_multiple_robot_apartment):
 def test_open(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
 
-    node = rclpy.create_node("node")
-    VizMarkerPublisher(world, node)
-
     plan = SequentialPlan(
         context,
         MoveTorsoActionDescription([TorsoState.HIGH]),
@@ -449,6 +447,9 @@ def test_open(immutable_multiple_robot_apartment):
 
 def test_close(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
+
+    node = rclpy.create_node("node")
+    VizMarkerPublisher(world, node)
 
     world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.45
     world.notify_state_change()
