@@ -161,7 +161,7 @@ class GraspDescription:
 
         t = grasp_global.inverse().to_np() @ front_global.to_np()
 
-        return t[:3, 3].astype(int).tolist()
+        return t[:3, 3].astype(float).tolist()
 
     def grasp_orientation(self):
         """

@@ -4,6 +4,7 @@ from __future__ import annotations
 import random
 from copy import deepcopy
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Union
 
 import matplotlib.pyplot as plt
@@ -29,7 +30,7 @@ from typing_extensions import Tuple, List, Optional, Iterator, Callable
 from .datastructures.dataclasses import Color
 from .datastructures.pose import PoseStamped
 from .datastructures.pose import TransformStamped
-from .tf_transformations import quaternion_from_euler
+from .tf_transformations import quaternion_from_euler, quaternion_multiply
 
 try:
     from nav_msgs.msg import OccupancyGrid, MapMetaData
@@ -46,21 +47,39 @@ class OrientationGenerator:
 
     @staticmethod
     def generate_origin_orientation(
-        position: List[float], origin: PoseStamped
+        position: List[float], origin: PoseStamped, rotate_by_angle: float = 0
     ) -> List[float]:
         """
         Generates an orientation such that the robot faces the origin of the costmap.
 
         :param position: The position in the costmap, already converted to the world coordinate frame.
         :param origin: The origin of the costmap, the point which the robot should face.
+        :param rotate_by_angle: Angle to rotate the orientation.
         :return: A quaternion of the calculated orientation.
         """
+        rot_quat = quaternion_from_euler(0, 0, rotate_by_angle, axes="sxyz")
         angle = (
             np.arctan2(position[1] - origin.position.y, position[0] - origin.position.x)
             + np.pi
         )
         quaternion = list(quaternion_from_euler(0, 0, angle, axes="sxyz"))
-        return quaternion
+        rotated_quaternion = quaternion_multiply(quaternion, rot_quat)
+        return rotated_quaternion
+
+    @staticmethod
+    def orientation_generator_for_axis(
+        axis: List[float],
+    ) -> Callable[[List[float], PoseStamped], List[float]]:
+        """
+        Creates an orientation generator where the given axis is facing the target.
+
+        :param axis: The axis which should be facing the target
+        :return: A callable orientation generator
+        """
+        rotation = axis[1] * (np.pi / 2) * -1
+        return partial(
+            OrientationGenerator.generate_origin_orientation, rotate_by_angle=rotation
+        )
 
     @staticmethod
     def generate_random_orientation(
@@ -470,6 +489,10 @@ class Costmap:
 
         :return: A list of numpy arrays with one partition per array
         """
+        # In case the map is empty we just return the map
+        if np.sum(self.map) == 0:
+            return [self.map]
+
         discrete_map = np.copy(self.map)
         # Label only works on integer arrays
         discrete_map[discrete_map != 0] = 1

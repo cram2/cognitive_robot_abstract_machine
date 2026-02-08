@@ -9,6 +9,7 @@ from .abstract_robot import (
     ParallelGripper,
     Camera,
     Torso,
+    Base,
 )
 from .robot_mixins import HasNeck, HasArms
 from ..datastructures.definitions import StaticJointState, GripperState, TorsoState
@@ -45,7 +46,7 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
         with world.modify_world():
             stretch = cls(
                 name=PrefixedName("stretch", prefix=world.name),
-                root=world.get_body_by_name("base_footprint"),
+                root=world.get_body_by_name("base_link"),
                 _world=world,
             )
 
@@ -132,11 +133,11 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
 
             neck = Neck(
                 name=PrefixedName("neck", prefix=stretch.name.name),
-                sensors={camera_color, camera_depth, camera_infra1, camera_infra2},
+                sensors=[camera_color, camera_depth, camera_infra1, camera_infra2],
                 root=world.get_body_by_name("link_head"),
                 tip=world.get_body_by_name("link_head_tilt"),
-                pitch_body=world.get_body_by_name("joint_head_tilt"),
-                yaw_body=world.get_body_by_name("joint_head_pan"),
+                pitch_body=world.get_body_by_name("link_head_tilt"),
+                yaw_body=world.get_body_by_name("link_head_pan"),
                 _world=world,
             )
             stretch.add_neck(neck)
@@ -144,8 +145,8 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
             # Create torso
             torso = Torso(
                 name=PrefixedName("torso", prefix=stretch.name.name),
-                root=world.get_body_by_name("torso_fixed_link"),
-                tip=world.get_body_by_name("torso_lift_link"),
+                root=world.get_body_by_name("link_mast"),
+                tip=world.get_body_by_name("link_lift"),
                 _world=world,
             )
             stretch.add_torso(torso)
@@ -207,6 +208,18 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
             torso.add_joint_state(torso_low)
             torso.add_joint_state(torso_mid)
             torso.add_joint_state(torso_high)
+
+            # Create the robot base
+            base = Base(
+                name=PrefixedName("base", prefix=stretch.name.name),
+                root=world.get_body_by_name("base_link"),
+                tip=world.get_body_by_name("base_link"),
+                _world=world,
+                main_axis=Vector3(0, -1, 0, world.get_body_by_name("base_link")),
+            )
+
+            stretch.add_base(base)
+            stretch.full_body_controlled = True
 
             world.add_semantic_annotation(stretch)
 

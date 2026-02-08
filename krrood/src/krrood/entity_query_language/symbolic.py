@@ -13,7 +13,7 @@ from abc import abstractmethod, ABC
 from collections import UserDict
 from copy import copy
 from dataclasses import dataclass, field, fields, MISSING, is_dataclass
-from functools import lru_cache, cached_property
+from functools import lru_cache, cached_property, wraps
 
 from krrood.entity_query_language.failures import VariableCannotBeEvaluated
 from typing_extensions import (
@@ -66,6 +66,8 @@ from .utils import (
     make_set,
     T,
     chain_stages,
+    merge_args_and_kwargs,
+    convert_args_and_kwargs_into_a_hashable_key,
 )
 from ..class_diagrams import ClassRelation
 from ..class_diagrams.class_diagram import Association, WrappedClass
@@ -106,7 +108,7 @@ class OperationResult:
 
     @property
     def value(self) -> Optional[Any]:
-        return self.bindings.get(self.operand._id_, None)
+        return self.bindings.get(self.operand._binding_id_, None)
 
     def __contains__(self, item):
         return item in self.bindings
@@ -163,7 +165,10 @@ class SymbolicExpression(Generic[T], ABC):
         if hasattr(self, "_child_") and self._child_ is not None:
             self._update_child_()
 
-    def _update_child_(self, child: Optional[SymbolicExpression] = None):
+    def _update_child_(
+        self,
+        child: Optional[SymbolicExpression] = None,
+    ):
         child = child or self._child_
         self._child_ = self._update_children_(child)[0]
 
@@ -193,6 +198,30 @@ class SymbolicExpression(Generic[T], ABC):
         :return: The mapped result.
         """
         raise CannotProcessResultOfGivenChildType(type(self))
+
+
+    def _evaluate_(self, sources: Optional[Dict[int, Any]] = None, parent: Optional[SymbolicExpression] = None):
+        """
+        Wrapper for ``SymbolicExpression._evaluate__*`` methods that automatically
+        manages the ``_eval_parent_`` attribute during evaluation.
+
+        This wraps evaluation generator methods so that, for the duration
+        of the wrapped call, ``self._eval_parent_`` is set to the ``parent`` argument
+        passed to the evaluation method and then restored to its previous value
+        afterwards. This allows evaluation code to reliably inspect the current
+        parent expression without having to manage this state manually.
+
+        :param sources: The current bindings of variables.
+        :return: An Iterator method whose body automatically sets and restores ``self._eval_parent_`` around the
+        underlying evaluation logic.
+        """
+
+        previous_parent = self._eval_parent_
+        self._eval_parent_ = parent
+        try:
+            yield from self._evaluate__(sources, parent)
+        finally:
+            self._eval_parent_ = previous_parent
 
     @abstractmethod
     def _evaluate__(
@@ -354,6 +383,14 @@ class Selectable(SymbolicExpression[T], ABC):
     """
 
     @cached_property
+    def _binding_id_(self) -> int:
+        return (
+            self._var_._binding_id_
+            if self._var_ and self._var_ is not self
+            else self._id_
+        )
+
+    @cached_property
     def _type__(self):
         return self._var_._type_ if self._var_ else None
 
@@ -364,7 +401,7 @@ class Selectable(SymbolicExpression[T], ABC):
         :param result: The result to be mapped.
         :return: The mapped result.
         """
-        return result[result.operand._id_]
+        return result.value
 
     @property
     def _is_iterable_(self):
@@ -378,6 +415,56 @@ class Selectable(SymbolicExpression[T], ABC):
         return False
 
 
+@dataclass
+class DomainMappingCacheItem:
+    """
+    A cache item for domain mapping creation. To prevent recreating same mapping multiple times, mapping instances are
+    stored in a dictionary with a hashable key. This class is used to generate the key for the dictionary that stores
+    the mapping instances.
+    """
+
+    type: Type[DomainMapping]
+    """
+    The type of the domain mapping.
+    """
+    child: CanBehaveLikeAVariable
+    """
+    The child of the domain mapping (i.e. the original variable on which the domain mapping is applied).
+    """
+    args: Tuple[Any, ...] = field(default_factory=tuple)
+    """
+    Positional arguments to pass to the domain mapping constructor.
+    """
+    kwargs: Dict[str, Any] = field(default_factory=dict)
+    """
+    Keyword arguments to pass to the domain mapping constructor.
+    """
+
+    def __post_init__(self):
+        self.args = (self.child,) + self.args
+
+    @cached_property
+    def all_kwargs(self):
+        return merge_args_and_kwargs(
+            self.type, self.args, self.kwargs, ignore_first=True
+        )
+
+    @cached_property
+    def hashable_key(self):
+        return (self.type,) + convert_args_and_kwargs_into_a_hashable_key(
+            self.all_kwargs
+        )
+
+    def __hash__(self):
+        return hash(self.hashable_key)
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, DomainMappingCacheItem)
+            and self.hashable_key == other.hashable_key
+        )
+
+
 @dataclass(eq=False, repr=False)
 class CanBehaveLikeAVariable(Selectable[T], ABC):
     """
@@ -389,10 +476,58 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
     """
     The path of the variable in the symbol graph as a sequence of relation instances.
     """
-    _attributes_: Dict[str, Attribute[T]] = field(init=False, default_factory=dict)
+    _known_mappings_: Dict[DomainMappingCacheItem, DomainMapping] = field(
+        init=False, default_factory=dict
+    )
     """
-    A storage of created symbolic attributes to prevent recreating same attribute multiple times.
+    A storage of created domain mappings to prevent recreating same mapping multiple times.
     """
+
+    def _update_truth_value_(self, current_value: Any) -> None:
+        """
+        Updates the truth value of the variable based on the current value.
+
+        :param current_value: The current value of the variable.
+        """
+        if isinstance(self._parent_, LogicalOperator) or self is self._conditions_root_:
+            is_true = (
+                len(current_value) > 0
+                if is_iterable(current_value)
+                else bool(current_value)
+            )
+            self._is_false_ = not is_true
+
+    def _get_domain_mapping_(
+        self, type_: Type[DomainMapping], *args, **kwargs
+    ) -> DomainMapping:
+        """
+        Retrieves or creates a domain mapping instance based on the provided arguments.
+
+        :param type_: The type of the domain mapping to retrieve or create.
+        :param args: Positional arguments to pass to the domain mapping constructor.
+        :param kwargs: Keyword arguments to pass to the domain mapping constructor.
+        :return: The retrieved or created domain mapping instance.
+        """
+        cache_item = DomainMappingCacheItem(type_, self, args, kwargs)
+        if cache_item in self._known_mappings_:
+            return self._known_mappings_[cache_item]
+        else:
+            instance = type_(**cache_item.all_kwargs)
+            self._known_mappings_[cache_item] = instance
+            return instance
+
+    def _get_domain_mapping_key_(self, type_: Type[DomainMapping], *args, **kwargs):
+        """
+        Generates a hashable key for the given type and arguments.
+
+        :param type_: The type of the domain mapping.
+        :param args: Positional arguments to pass to the domain mapping constructor.
+        :param kwargs: Keyword arguments to pass to the domain mapping constructor.
+        :return: The generated hashable key.
+        """
+        args = (self,) + args
+        all_kwargs = merge_args_and_kwargs(type_, args, kwargs, ignore_first=True)
+        return convert_args_and_kwargs_into_a_hashable_key(all_kwargs)
 
     def __getattr__(self, name: str) -> CanBehaveLikeAVariable[T]:
         # Prevent debugger/private attribute lookups from being interpreted as symbolic attributes
@@ -400,17 +535,13 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
             raise AttributeError(
                 f"{self.__class__.__name__} object has no attribute {name}"
             )
-        if name in self._attributes_:
-            return self._attributes_[name]
-        attr = Attribute(self, name, self._type__)
-        self._attributes_[name] = attr
-        return attr
+        return self._get_domain_mapping_(Attribute, name, self._type__)
 
     def __getitem__(self, key) -> CanBehaveLikeAVariable[T]:
-        return Index(self, key)
+        return self._get_domain_mapping_(Index, key)
 
     def __call__(self, *args, **kwargs) -> CanBehaveLikeAVariable[T]:
-        return Call(self, args, kwargs)
+        return self._get_domain_mapping_(Call, args, kwargs)
 
     def __eq__(self, other) -> Comparator:
         return Comparator(self, other, operator.eq)
@@ -442,6 +573,9 @@ class ResultProcessor(CanBehaveLikeAVariable[T], ABC):
     """
 
     _child_: SymbolicExpression[T]
+    """
+    The child expression of the processor where the results to be processed come from.
+    """
 
     def __post_init__(self):
         super().__post_init__()
@@ -469,7 +603,7 @@ class ResultProcessor(CanBehaveLikeAVariable[T], ABC):
         This is the exposed evaluation method for users.
         """
         SymbolGraph().remove_dead_instances()
-        yield from map(self._child_._process_result_, self._evaluate__())
+        yield from map(self._child_._process_result_, self._evaluate_())
 
     @cached_property
     def _all_variable_instances_(self) -> List[Variable]:
@@ -526,15 +660,17 @@ class Aggregator(ResultProcessor[T], ABC):
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         sources = sources or {}
-        if self._id_ in sources:
+        if self._binding_id_ in sources:
             yield OperationResult(sources, False, self)
             return
 
-        values = self._apply_aggregation_function_(self._child_._evaluate__(sources))
+        values = self._apply_aggregation_function_(self._child_._evaluate_(sources))
         if values:
             yield OperationResult(values, False, self)
         else:
-            yield OperationResult({self._id_: self._default_value_}, False, self)
+            yield OperationResult(
+                {self._binding_id_: self._default_value_}, False, self
+            )
 
     @abstractmethod
     def _apply_aggregation_function_(
@@ -566,7 +702,7 @@ class Count(Aggregator[T]):
     def _apply_aggregation_function_(
         self, child_results: Iterable[OperationResult]
     ) -> Dict[int, Any]:
-        return {self._id_: len(list(child_results))}
+        return {self._binding_id_: len(list(child_results))}
 
 
 @dataclass
@@ -590,7 +726,7 @@ class EntityAggregator(Aggregator[T], ABC):
         Extract the value of the child from the result dictionary.
          In addition, it applies the key function if given.
         """
-        value = result[self._child_._var_._id_]
+        value = result.value
         if self._key_func_:
             return self._key_func_(value)
         return value
@@ -611,7 +747,7 @@ class Sum(EntityAggregator[T]):
             entered = True
             sum_val += val
         if entered:
-            return {self._id_: sum_val}
+            return {self._binding_id_: sum_val}
         return {}
 
 
@@ -631,7 +767,7 @@ class Average(EntityAggregator[T]):
             sum_val += val
             count += 1
         if count:
-            return {self._id_: sum_val / count}
+            return {self._binding_id_: sum_val / count}
         return {}
 
 
@@ -649,8 +785,8 @@ class Extreme(EntityAggregator[T], ABC):
             bindings_with_extreme_val = self._extreme_function_(
                 child_results, key=self._get_child_value_from_result_
             ).bindings
-            bindings_with_extreme_val[self._id_] = bindings_with_extreme_val[
-                self._child_._var_._id_
+            bindings_with_extreme_val[self._binding_id_] = bindings_with_extreme_val[
+                self._child_._binding_id_
             ]
             return bindings_with_extreme_val
         except ValueError:
@@ -714,19 +850,18 @@ class ResultQuantifier(ResultProcessor[T], ABC):
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[T]:
         sources = sources or {}
-        self._eval_parent_ = parent
-        if self._id_ in sources:
+
+        if self._binding_id_ in sources:
             yield OperationResult(sources, False, self)
             return
+
         result_count = 0
-        values = self._child_._evaluate__(sources, parent=self)
+        values = self._child_._evaluate_(sources, parent=self)
         for value in values:
             result_count += 1
             self._assert_satisfaction_of_quantification_constraints_(
                 result_count, done=False
             )
-            if self._var_:
-                value[self._id_] = value[self._var_._id_]
             yield OperationResult(value.bindings, False, self)
         self._assert_satisfaction_of_quantification_constraints_(
             result_count, done=True
@@ -769,7 +904,7 @@ class UnificationDict(UserDict):
     """
 
     def __getitem__(self, key: Selectable[T]) -> T:
-        key = key._id_expression_map_[key._var_._id_]
+        key = key._id_expression_map_[key._binding_id_]
         return super().__getitem__(key)
 
 
@@ -949,9 +1084,9 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
 
         def key(result: OperationResult) -> Any:
             var = self._order_by.variable
-            var_id = var._var_._id_
+            var_id = var._binding_id_
             if var_id not in result:
-                result[var_id] = next(var._evaluate__(result.bindings, self)).value
+                result[var_id] = next(var._evaluate_(result.bindings, self)).value
             variable_value = result.bindings[var_id]
             if self._order_by.key:
                 return self._order_by.key(variable_value)
@@ -985,7 +1120,7 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         """
         Get the IDs of variables used for distinctness.
         """
-        return tuple(k._var_._id_ for k in self._distinct_on)
+        return tuple(k._binding_id_ for k in self._distinct_on)
 
     def _get_distinct_results__(
         self, results_gen: Iterable[Dict[int, Any]]
@@ -1012,7 +1147,7 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         for i, id_ in enumerate(self._distinct_on_ids):
             if id_ in res:
                 continue
-            var_value = self._distinct_on[i]._evaluate__(copy(res), parent=self)
+            var_value = self._distinct_on[i]._evaluate_(copy(res), parent=self)
             res[id_] = next(var_value).value
 
     def _evaluate__(
@@ -1024,8 +1159,12 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         Evaluate the query descriptor by constraining values, updating conclusions,
         and selecting variables.
         """
-        self._eval_parent_ = parent
+
         sources = sources or {}
+
+        if all(var._binding_id_ in sources for var in self._selected_variables):
+            yield OperationResult(sources, False, self)
+            return
 
         results_generator = self._generate_results__(sources)
 
@@ -1091,7 +1230,7 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         :param result: The current result containing the current bindings.
         :return: True if the variable is bound, otherwise False.
         """
-        if var._id_ in result:
+        if var._binding_id_ in result:
             return True
         unique_vars = [uv for uv in var._unique_variables_ if uv is not var]
         if unique_vars and all(
@@ -1112,7 +1251,7 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
             return
         for conclusion in self._child_._conclusion_:
             child_result.bindings = next(
-                iter(conclusion._evaluate__(child_result.bindings, parent=self))
+                iter(conclusion._evaluate_(child_result.bindings, parent=self))
             ).bindings
 
     def get_constrained_values(
@@ -1128,7 +1267,7 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
             # QueryObjectDescriptor does not yield when it's False
             yield from (
                 res
-                for res in self._child_._evaluate__(sources, parent=self)
+                for res in self._child_._evaluate_(sources, parent=self)
                 if res.is_true
             )
         else:
@@ -1146,7 +1285,7 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         var_val_gen = [
             (
                 lambda bindings, var=var: (
-                    v.bindings for v in var._evaluate__(copy(bindings), parent=self)
+                    v.bindings for v in var._evaluate_(copy(bindings), parent=self)
                 )
             )
             for var in self._selected_variables
@@ -1205,14 +1344,13 @@ class SetOf(QueryObjectDescriptor[T]):
         :param result: The result to be mapped.
         :return: The mapped result.
         """
-        selected_variables_ids = [v._id_ for v in self._selected_variables]
         return UnificationDict(
-            {v._var_: result[v._id_] for v in self._selected_variables}
+            {v._var_: result[v._binding_id_] for v in self._selected_variables}
         )
 
 
 @dataclass(eq=False, repr=False)
-class Entity(QueryObjectDescriptor[T], Selectable[T]):
+class Entity(QueryObjectDescriptor[T], CanBehaveLikeAVariable[T]):
     """
     A query over a single variable.
     """
@@ -1321,9 +1459,9 @@ class Variable(CanBehaveLikeAVariable[T]):
         or will yield from current domain if exists,
         or has no domain and will instantiate new values by constructing the type if the type is given.
         """
-        self._eval_parent_ = parent
+
         sources = sources or {}
-        if self._id_ in sources:
+        if self._binding_id_ in sources:
             yield self._build_operation_result_and_update_truth_value_(sources)
         elif self._domain_source_ is not None:
             yield from self._iterator_over_domain_values_(sources)
@@ -1353,9 +1491,9 @@ class Variable(CanBehaveLikeAVariable[T]):
         :param sources: The current bindings.
         :return: An Iterable of OperationResults for each value in the domain.
         """
-        for domain in self._domain_._evaluate__(sources, parent=self):
+        for domain in self._domain_._evaluate_(sources, parent=self):
             for v in domain.value:
-                bindings = {**sources, **domain.bindings, self._id_: v}
+                bindings = {**sources, **domain.bindings, self._binding_id_: v}
                 yield self._build_operation_result_and_update_truth_value_(bindings)
 
     def _iterator_over_iterable_domain_values_(self, sources: Dict[int, Any]):
@@ -1366,7 +1504,7 @@ class Variable(CanBehaveLikeAVariable[T]):
         :return: An Iterable of OperationResults for each value in the domain.
         """
         for v in self._domain_:
-            bindings = {**sources, self._id_: v}
+            bindings = {**sources, self._binding_id_: v}
             yield self._build_operation_result_and_update_truth_value_(bindings)
 
     def _instantiate_using_child_vars_and_yield_results_(
@@ -1377,7 +1515,9 @@ class Variable(CanBehaveLikeAVariable[T]):
         """
         for kwargs in self._generate_combinations_for_child_vars_values_(sources):
             # Build once: unwrapped hashed kwargs for already provided child vars
-            bound_kwargs = {k: v[self._child_vars_[k]._id_] for k, v in kwargs.items()}
+            bound_kwargs = {
+                k: v[self._child_vars_[k]._binding_id_] for k, v in kwargs.items()
+            }
             instance = self._type_(**bound_kwargs)
             yield self._process_output_and_update_values_(instance, kwargs)
 
@@ -1385,7 +1525,7 @@ class Variable(CanBehaveLikeAVariable[T]):
         self, sources: Optional[Dict[int, Any]] = None
     ):
         yield from generate_combinations(
-            {k: var._evaluate__(sources) for k, var in self._child_vars_.items()}
+            {k: var._evaluate_(sources) for k, var in self._child_vars_.items()}
         )
 
     def _process_output_and_update_values_(
@@ -1400,7 +1540,7 @@ class Variable(CanBehaveLikeAVariable[T]):
         """
         # kwargs is a mapping from name -> {var_id: value};
         # we need a single dict {var_id: value}
-        values = {self._id_: instance}
+        values = {self._binding_id_: instance}
         for d in kwargs.values():
             values.update(d.bindings)
         return self._build_operation_result_and_update_truth_value_(values)
@@ -1414,12 +1554,7 @@ class Variable(CanBehaveLikeAVariable[T]):
         :param bindings: The bindings of the result.
         :return: The OperationResult instance with updated truth value.
         """
-        if isinstance(self._parent_, LogicalOperator) or (
-            self is self._conditions_root_
-        ):
-            self._is_false_ = not bool(bindings[self._id_])
-        else:
-            self._is_false_ = False
+        self._update_truth_value_(bindings[self._binding_id_])
         return OperationResult(bindings, self._is_false_, self)
 
     @property
@@ -1519,9 +1654,7 @@ class DomainMapping(CanBehaveLikeAVariable[T], ABC):
 
         sources = sources or {}
 
-        self._eval_parent_ = parent
-
-        if self._id_ in sources:
+        if self._binding_id_ in sources:
             yield OperationResult(sources, self._is_false_, self)
             return
 
@@ -1529,7 +1662,7 @@ class DomainMapping(CanBehaveLikeAVariable[T], ABC):
             self._build_operation_result_and_update_truth_value_(
                 child_result, mapped_value
             )
-            for child_result in self._child_._evaluate__(sources, parent=self)
+            for child_result in self._child_._evaluate_(sources, parent=self)
             for mapped_value in self._apply_mapping_(child_result.value)
         )
 
@@ -1543,10 +1676,9 @@ class DomainMapping(CanBehaveLikeAVariable[T], ABC):
         :param current_value: The current value of this operation that is derived from the child result.
         :return: The operation result.
         """
-        if isinstance(self._parent_, LogicalOperator) or self is self._conditions_root_:
-            self._is_false_ = not bool(current_value)
+        self._update_truth_value_(current_value)
         return OperationResult(
-            {**child_result.bindings, self._id_: current_value},
+            {**child_result.bindings, self._binding_id_: current_value},
             self._is_false_,
             self,
         )
@@ -1789,7 +1921,6 @@ class Comparator(BinaryOperator):
         Compares the left and right symbolic variables using the "operation".
         """
         sources = sources or {}
-        self._eval_parent_ = parent
 
         if self._id_ in sources:
             yield OperationResult(sources, self._is_false_, self)
@@ -1801,9 +1932,9 @@ class Comparator(BinaryOperator):
             OperationResult(
                 second_val.bindings, not self.apply_operation(second_val), self
             )
-            for first_val in first_operand._evaluate__(sources, parent=self)
+            for first_val in first_operand._evaluate_(sources, parent=self)
             if first_val.is_true
-            for second_val in second_operand._evaluate__(
+            for second_val in second_operand._evaluate_(
                 first_val.bindings, parent=self
             )
             if second_val.is_true
@@ -1811,8 +1942,8 @@ class Comparator(BinaryOperator):
 
     def apply_operation(self, operand_values: OperationResult) -> bool:
         left_value, right_value = (
-            operand_values.bindings[self.left._id_],
-            operand_values.bindings[self.right._id_],
+            operand_values[self.left._binding_id_],
+            operand_values[self.right._binding_id_],
         )
         if (
             self.operation in [operator.eq, operator.ne]
@@ -1836,7 +1967,7 @@ class Comparator(BinaryOperator):
         elif not left_has_the and right_has_the:
             return self.right, self.left
         if sources and any(
-            v._var_._id_ in sources for v in self.right._unique_variables_
+            v._binding_id_ in sources for v in self.right._unique_variables_
         ):
             return self.right, self.left
         else:
@@ -1884,8 +2015,8 @@ class Not(LogicalOperator[T]):
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         sources = sources or {}
-        self._eval_parent_ = parent
-        for v in self._child_._evaluate__(sources, parent=self):
+
+        for v in self._child_._evaluate_(sources, parent=self):
             self._is_false_ = v.is_true
             yield OperationResult(v.bindings, self._is_false_, self)
 
@@ -1916,8 +2047,8 @@ class AND(LogicalBinaryOperator):
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         sources = sources or {}
-        self._eval_parent_ = parent
-        left_values = self.left._evaluate__(sources, parent=self)
+
+        left_values = self.left._evaluate_(sources, parent=self)
         for left_value in left_values:
             self._is_false_ = left_value.is_false
             if self._is_false_:
@@ -1926,7 +2057,7 @@ class AND(LogicalBinaryOperator):
                 yield from self.evaluate_right(left_value)
 
     def evaluate_right(self, left_value: OperationResult) -> Iterable[OperationResult]:
-        right_values = self.right._evaluate__(left_value.bindings, parent=self)
+        right_values = self.right._evaluate_(left_value.bindings, parent=self)
         for right_value in right_values:
             self._is_false_ = right_value.is_false
             yield OperationResult(right_value.bindings, self._is_false_, self)
@@ -1951,7 +2082,7 @@ class OR(LogicalBinaryOperator, ABC):
         :param sources: The current bindings to use for evaluation.
         :return: The new bindings after evaluating the left operand (and possibly right operand).
         """
-        left_values = self.left._evaluate__(sources, parent=self)
+        left_values = self.left._evaluate_(sources, parent=self)
 
         for left_value in left_values:
             self.left_evaluated = True
@@ -1972,7 +2103,7 @@ class OR(LogicalBinaryOperator, ABC):
 
         self.left_evaluated = False
 
-        right_values = self.right._evaluate__(sources, parent=self)
+        right_values = self.right._evaluate_(sources, parent=self)
 
         for right_value in right_values:
             self._is_false_ = right_value.is_false
@@ -1994,7 +2125,6 @@ class Union(OR):
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         sources = sources or {}
-        self._eval_parent_ = parent
 
         yield from self.evaluate_left(sources)
         yield from self.evaluate_right(sources)
@@ -2016,7 +2146,7 @@ class ElseIf(OR):
         This method overrides the base class method to handle ElseIf logic.
         """
         sources = sources or {}
-        self._eval_parent_ = parent
+
         yield from self.evaluate_left(sources)
 
 
@@ -2054,7 +2184,7 @@ class ForAll(QuantifiedConditional):
     @cached_property
     def condition_unique_variable_ids(self) -> List[int]:
         return [
-            v._id_
+            v._binding_id_
             for v in self.condition._unique_variables_.difference(
                 self.left._unique_variables_
             )
@@ -2066,11 +2196,10 @@ class ForAll(QuantifiedConditional):
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         sources = sources or {}
-        self._eval_parent_ = parent
 
         solution_set = None
 
-        for var_val in self.variable._evaluate__(sources, parent=self):
+        for var_val in self.variable._evaluate_(sources, parent=self):
             if solution_set is None:
                 solution_set = self.get_all_candidate_solutions(var_val.bindings)
             else:
@@ -2091,7 +2220,7 @@ class ForAll(QuantifiedConditional):
     def get_all_candidate_solutions(self, sources: Dict[int, Any]):
         values_that_satisfy_condition = []
         # Evaluate the condition under this particular universal value
-        for condition_val in self.condition._evaluate__(sources, parent=self):
+        for condition_val in self.condition._evaluate_(sources, parent=self):
             if condition_val.is_false:
                 continue
             condition_val_bindings = {
@@ -2103,7 +2232,7 @@ class ForAll(QuantifiedConditional):
         return values_that_satisfy_condition
 
     def evaluate_condition(self, sources: Dict[int, Any]) -> bool:
-        for condition_val in self.condition._evaluate__(sources, parent=self):
+        for condition_val in self.condition._evaluate_(sources, parent=self):
             return condition_val.is_true
         return False
 
@@ -2125,10 +2254,10 @@ class Exists(QuantifiedConditional):
         parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         sources = sources or {}
-        self._eval_parent_ = parent
+
         seen_var_values = []
-        for val in self.condition._evaluate__(sources, parent=self):
-            var_val = val[self.variable._id_]
+        for val in self.condition._evaluate_(sources, parent=self):
+            var_val = val[self.variable._binding_id_]
             if val.is_true and var_val not in seen_var_values:
                 seen_var_values.append(var_val)
                 yield OperationResult(val.bindings, False, self)

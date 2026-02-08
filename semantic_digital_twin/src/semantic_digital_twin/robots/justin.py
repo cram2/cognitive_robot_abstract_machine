@@ -177,7 +177,7 @@ class Justin(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
 
             neck = Neck(
                 name=PrefixedName("neck", prefix=justin.name.name),
-                sensors={camera},
+                sensors=[camera],
                 root=world.get_body_by_name("torso4"),
                 tip=world.get_body_by_name("head2"),
                 pitch_body=world.get_body_by_name("head1"),

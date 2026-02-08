@@ -134,7 +134,7 @@ class Armar(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
 
             neck = Neck(
                 name=PrefixedName("neck", prefix=armar.name.name),
-                sensors={camera},
+                sensors=[camera],
                 root=world.get_body_by_name("lower_neck_link"),
                 tip=world.get_body_by_name("upper_neck_link"),
                 pitch_body=world.get_body_by_name("neck_2_pitch_link"),

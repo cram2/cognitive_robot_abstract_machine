@@ -25,6 +25,10 @@ from giskardpy.motion_statechart.exceptions import (
     NonObservationVariableError,
     NodeAlreadyBelongsToDifferentNodeError,
 )
+from giskardpy.motion_statechart.goals.cartesian_goals import (
+    DiffDriveBaseGoal,
+    CartesianPoseStraight,
+)
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     CollisionAvoidance,
 )
@@ -1648,6 +1652,91 @@ class TestCartesianTasks:
 
         # Verify task detected completion
         assert cart_straight.observation_state == ObservationStateValues.TRUE
+
+    def test_cartesian_pose_straight(self, pr2_world_state_reset: World):
+        """Test CartesianPositionStraight basic functionality."""
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
+
+        goal_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+            0.1, 2, 0, reference_frame=tip
+        )
+
+        msc = MotionStatechart()
+        cart_straight = CartesianPoseStraight(
+            root_link=root,
+            tip_link=tip,
+            goal_pose=goal_pose,
+            binding_policy=GoalBindingPolicy.Bind_on_start,
+        )
+        msc.add_node(cart_straight)
+        msc.add_node(EndMotion.when_true(cart_straight))
+
+        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        # Verify task detected completion
+        assert cart_straight.observation_state == ObservationStateValues.TRUE
+
+        assert np.allclose(
+            cart_straight.goal_pose.to_np(), goal_pose.to_np(), atol=0.015
+        )
+
+
+class TestDiffDriveBaseGoal:
+    @pytest.mark.parametrize(
+        "goal_pose",
+        [
+            HomogeneousTransformationMatrix.from_xyz_rpy(x=0.489, y=-0.598, z=0.000),
+            HomogeneousTransformationMatrix.from_xyz_quaternion(
+                pos_x=-0.026,
+                pos_y=0.569,
+                pos_z=0.0,
+                quat_x=0.0,
+                quat_y=0.0,
+                quat_z=0.916530200374776,
+                quat_w=0.3999654882623912,
+            ),
+            HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, yaw=np.pi / 4),
+            HomogeneousTransformationMatrix.from_xyz_rpy(x=2, y=0, yaw=-np.pi / 4),
+            HomogeneousTransformationMatrix.from_xyz_rpy(yaw=-np.pi / 4),
+            HomogeneousTransformationMatrix.from_xyz_rpy(x=-1, y=-1, yaw=np.pi / 4),
+            HomogeneousTransformationMatrix.from_xyz_rpy(x=-2, y=-1, yaw=-np.pi / 4),
+            HomogeneousTransformationMatrix.from_xyz_rpy(x=0.01, y=0.5, yaw=np.pi / 8),
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=-0.01, y=-0.5, yaw=np.pi / 5
+            ),
+            HomogeneousTransformationMatrix.from_xyz_rpy(x=1.1, y=2.0, yaw=-np.pi),
+            HomogeneousTransformationMatrix.from_xyz_rpy(y=1),
+        ],
+    )
+    def test_drive(
+        self,
+        cylinder_bot_diff_world,
+        goal_pose: HomogeneousTransformationMatrix,
+    ):
+        bot = cylinder_bot_diff_world.get_body_by_name("bot")
+        msc = MotionStatechart()
+        goal_pose.reference_frame = cylinder_bot_diff_world.root
+        msc.add_node(goal := DiffDriveBaseGoal(goal_pose=goal_pose))
+        msc.add_node(EndMotion.when_true(goal))
+
+        kin_sim = Executor(world=cylinder_bot_diff_world)
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert np.allclose(
+            cylinder_bot_diff_world.compute_forward_kinematics(
+                cylinder_bot_diff_world.root, bot
+            ),
+            goal_pose,
+            atol=1e-2,
+        )
 
 
 def test_pointing(pr2_world_state_reset: World):

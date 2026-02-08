@@ -121,7 +121,7 @@ class KinematicChain(SemanticRobotAnnotation, ABC):
     The manipulator of the kinematic chain, if it exists. This is usually a gripper or similar device.
     """
 
-    sensors: Set[Sensor] = field(default_factory=set)
+    sensors: List[Sensor] = field(default_factory=list)
     """
     A collection of sensors in the kinematic chain, such as cameras or other sensors.
     """
@@ -339,6 +339,7 @@ class Camera(Sensor):
     field_of_view: FieldOfView = field(default=None)
     minimal_height: float = 0.0
     maximal_height: float = 1.0
+    default_camera: bool = False
 
     def __hash__(self):
         """
@@ -406,6 +407,11 @@ class Base(KinematicChain):
     The base of a robot
     """
 
+    main_axis: Vector3 = field(default=Vector3(1, 0, 0), kw_only=True)
+    """
+    Axis along which the robot manipulates
+    """
+
     @property
     def bounding_box(self) -> BoundingBox:
         bounding_boxes = [
@@ -448,22 +454,22 @@ class AbstractRobot(Agent):
     The base of the robot, the part closes to the floor
     """
 
-    manipulators: Set[Manipulator] = field(default_factory=set)
+    manipulators: List[Manipulator] = field(default_factory=list)
     """
     A collection of manipulators in the robot, such as grippers.
     """
 
-    sensors: Set[Sensor] = field(default_factory=set)
+    sensors: List[Sensor] = field(default_factory=list)
     """
     A collection of sensors in the robot, such as cameras.
     """
 
-    manipulator_chains: Set[KinematicChain] = field(default_factory=set)
+    manipulator_chains: List[KinematicChain] = field(default_factory=list)
     """
     A collection of all kinematic chains containing a manipulator, such as a gripper.
     """
 
-    sensor_chains: Set[KinematicChain] = field(default_factory=set)
+    sensor_chains: List[KinematicChain] = field(default_factory=list)
     """
     A collection of all kinematic chains containing a sensor, such as a camera.
     """
@@ -472,6 +478,11 @@ class AbstractRobot(Agent):
         kw_only=True,
         default_factory=lambda: CollisionCheckingConfig(buffer_zone_distance=0.05),
     )
+
+    full_body_controlled: bool = field(default=False, kw_only=True)
+    """
+    Whether this robots needs full-body control to be able to operate effectively 
+    """
 
     @abstractmethod
     def setup_collision_config(self):
@@ -543,7 +554,7 @@ class AbstractRobot(Agent):
         """
         Adds a manipulator to the robot's collection of manipulators.
         """
-        self.manipulators.add(manipulator)
+        self.manipulators.append(manipulator)
         self._semantic_annotations.add(manipulator)
         manipulator.assign_to_robot(self)
 
@@ -551,7 +562,7 @@ class AbstractRobot(Agent):
         """
         Adds a sensor to the robot's collection of sensors.
         """
-        self.sensors.add(sensor)
+        self.sensors.append(sensor)
         self._semantic_annotations.add(sensor)
         sensor.assign_to_robot(self)
 
@@ -588,9 +599,9 @@ class AbstractRobot(Agent):
             )
             return
         if kinematic_chain.manipulator is not None:
-            self.manipulator_chains.add(kinematic_chain)
+            self.manipulator_chains.append(kinematic_chain)
         if kinematic_chain.sensors:
-            self.sensor_chains.add(kinematic_chain)
+            self.sensor_chains.append(kinematic_chain)
         self._semantic_annotations.add(kinematic_chain)
         kinematic_chain.assign_to_robot(self)
 
@@ -612,3 +623,9 @@ class AbstractRobot(Agent):
                 )
             )
         return collision_matrx
+
+    def get_default_camera(self) -> Camera:
+        for sensor in self.sensors:
+            if isinstance(sensor, Camera) and sensor.default_camera:
+                return sensor
+        return [s for s in self.sensors if isinstance(s, Camera)][0]

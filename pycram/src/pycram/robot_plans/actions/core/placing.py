@@ -57,11 +57,8 @@ class PlaceAction(ActionDescription):
         super().__post_init__()
 
     def execute(self) -> None:
-        manipulator = (
-            self.robot_view.left_arm.manipulator
-            if self.arm == Arms.LEFT
-            else self.robot_view.right_arm.manipulator
-        )
+        arm = ViewManager.get_arm_view(self.arm, self.robot_view)
+        manipulator = arm.manipulator
 
         previous_pick = self.plan.get_previous_node_by_designator_type(
             self.plan_node, PickUpAction

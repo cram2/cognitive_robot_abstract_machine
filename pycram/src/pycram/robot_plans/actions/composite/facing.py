@@ -72,7 +72,7 @@ class FaceAtAction(ActionDescription):
         keep_joint_states: Union[
             Iterable[bool], bool
         ] = ActionConfig.face_at_keep_joint_states,
-    ) -> PartialDesignator[Type[FaceAtAction]]:
+    ) -> PartialDesignator[FaceAtAction]:
         return PartialDesignator(
             FaceAtAction, pose=pose, keep_joint_states=keep_joint_states
         )

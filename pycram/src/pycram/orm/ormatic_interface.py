@@ -999,8 +999,6 @@ class GraspingActionDAO(
         use_existing_column=True,
     )
 
-    prepose_distance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
     arm: Mapped[pycram.datastructures.enums.Arms] = mapped_column(
         krrood.ormatic.custom_types.PolymorphicEnumType,
         nullable=False,
@@ -1012,9 +1010,20 @@ class GraspingActionDAO(
         nullable=True,
         use_existing_column=True,
     )
+    grasp_description_id: Mapped[int] = mapped_column(
+        ForeignKey("GraspDescriptionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
 
     object_designator: Mapped[BodyDAO] = relationship(
         "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
+    )
+    grasp_description: Mapped[GraspDescriptionDAO] = relationship(
+        "GraspDescriptionDAO",
+        uselist=False,
+        foreign_keys=[grasp_description_id],
+        post_update=True,
     )
 
     __mapper_args__ = {
@@ -1152,9 +1161,17 @@ class LookAtActionDAO(
         nullable=True,
         use_existing_column=True,
     )
+    camera_id: Mapped[int] = mapped_column(
+        ForeignKey("CameraDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
 
     target: Mapped[PoseStampedDAO] = relationship(
         "PoseStampedDAO", uselist=False, foreign_keys=[target_id], post_update=True
+    )
+    camera: Mapped[CameraDAO] = relationship(
+        "CameraDAO", uselist=False, foreign_keys=[camera_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -1180,9 +1197,17 @@ class LookingMotionDAO(
         nullable=True,
         use_existing_column=True,
     )
+    camera_id: Mapped[int] = mapped_column(
+        ForeignKey("CameraDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
 
     target: Mapped[PoseStampedDAO] = relationship(
         "PoseStampedDAO", uselist=False, foreign_keys=[target_id], post_update=True
+    )
+    camera: Mapped[CameraDAO] = relationship(
+        "CameraDAO", uselist=False, foreign_keys=[camera_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -6552,6 +6577,10 @@ class AbstractRobotDAO(
         ForeignKey(AgentDAO.database_id), primary_key=True, use_existing_column=True
     )
 
+    full_body_controlled: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
+
     torso_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
         ForeignKey("TorsoDAO.database_id", use_alter=True),
         nullable=True,
@@ -6788,6 +6817,19 @@ class BaseDAO(
         use_existing_column=True,
     )
 
+    main_axis_id: Mapped[int] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    main_axis: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO",
+        uselist=False,
+        foreign_keys=[main_axis_id],
+        post_update=True,
+    )
+
     __mapper_args__ = {
         "polymorphic_identity": "BaseDAO",
         "inherit_condition": database_id == KinematicChainDAO.database_id,
@@ -6988,6 +7030,7 @@ class CameraDAO(
 
     minimal_height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     maximal_height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    default_camera: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
 
     forward_facing_axis_id: Mapped[int] = mapped_column(
         ForeignKey("Vector3MappingDAO.database_id", use_alter=True),

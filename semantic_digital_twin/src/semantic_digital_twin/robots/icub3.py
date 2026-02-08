@@ -180,7 +180,7 @@ class ICub3(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
 
             neck = Neck(
                 name=PrefixedName("neck", prefix=icub3.name.name),
-                sensors={camera},
+                sensors=[camera],
                 root=world.get_body_by_name("chest"),
                 tip=world.get_body_by_name("head"),
                 pitch_body=world.get_body_by_name("neck_pitch"),

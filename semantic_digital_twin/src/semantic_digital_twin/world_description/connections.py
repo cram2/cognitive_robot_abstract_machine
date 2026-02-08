@@ -1129,9 +1129,9 @@ class DiffDrive(ActiveConnection, HasUpdateState):
         self.x_velocity.has_hardware_interface = value
         self.yaw.has_hardware_interface = value
 
-    def copy_for_world(self, world: World) -> OmniDrive:
+    def copy_for_world(self, world: World) -> DiffDrive:
         """
-        Copies this OmniDriveConnection for the provided world. This finds the references for the parent and child in
+        Copies this DiffDriveConnection for the provided world. This finds the references for the parent and child in
         the new world and returns a new connection with references to the new parent and child.
         :param world: The world where the connection is copied.
         :return: The connection with references to the new parent and child.
@@ -1143,7 +1143,7 @@ class DiffDrive(ActiveConnection, HasUpdateState):
             connection_T_child_expression,
         ) = self._find_references_in_world(world)
 
-        return OmniDrive(
+        return DiffDrive(
             name=deepcopy(self.name),
             parent=other_parent,
             child=other_child,
