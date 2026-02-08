@@ -54,6 +54,14 @@ class ExternalCollisionVariableManager(CollisionGroupConsumer):
     _buffer_distance_offset: int = field(init=False, default=7)
     _violated_distance_offset: int = field(init=False, default=8)
 
+    _collision_data_start_index: int = field(init=False, default=None)
+    _single_reset_block: np.ndarray = field(init=False)
+    _reset_data: np.ndarray = field(init=False, default_factory=lambda: np.array([]))
+
+    def __post_init__(self):
+        self._single_reset_block = np.zeros(self.block_size)
+        self._single_reset_block[self._contact_distance_offset] = 100
+
     def __hash__(self):
         return hash(id(self))
 
@@ -68,6 +76,7 @@ class ExternalCollisionVariableManager(CollisionGroupConsumer):
         Takes collisions, checks if they are external, and inserts them
         into the buffer at the right place.
         """
+        self.reset_collision_data()
         closest_contacts: dict[Body, list[Collision]] = defaultdict(list)
         for collision in collision.contacts:
             # 1. check if collision is external
@@ -135,17 +144,25 @@ class ExternalCollisionVariableManager(CollisionGroupConsumer):
             violated_distance
         )
 
+    def reset_collision_data(self):
+        start_index = self._collision_data_start_index
+        end_index = start_index + self._reset_data.size
+        self.float_variable_data.data[start_index:end_index] = self._reset_data
+
     def register_body(self, body: Body):
         """
         Register a body
         """
         self.registered_bodies[body] = len(self.float_variable_data.data)
+        if self._collision_data_start_index is None:
+            self._collision_data_start_index = self.registered_bodies[body]
         for index in range(self.collision_manager.get_max_avoided_bodies(body)):
             self.get_group1_P_point_on_a_symbol(body, index)
             self.get_group1_V_contact_normal_symbol(body, index)
             self.get_contact_distance_symbol(body, index)
             self.get_buffer_distance_symbol(body, index)
             self.get_violated_distance_symbol(body, index)
+            self._reset_data = np.append(self._reset_data, self._single_reset_block)
 
         for group in self.collision_groups:
             if body in group:
