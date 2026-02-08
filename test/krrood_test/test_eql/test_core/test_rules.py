@@ -76,7 +76,7 @@ def test_add_conclusion(handles_and_containers_world):
     assert all_solutions[0].container.name == "Container3"
     assert all_solutions[1].handle.name == "Handle1"
     assert all_solutions[1].container.name == "Container1"
-    # all_drawers = list(drawers._evaluate__())
+    # all_drawers = list(drawers._evaluate_())
     # assert len(all_drawers) == 2, "Should generate components for two possible drawer."
 
 
@@ -177,7 +177,7 @@ def test_rule_tree_with_an_alternative(doors_and_drawers_world):
         ):
             Add(views, inference(Door)(handle=handle, body=body))
 
-    # query._render_tree_()
+    query.visualize()
 
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 4, "Should generate 3 drawers, 1 door"

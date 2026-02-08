@@ -674,3 +674,12 @@ class ChildEnum2(PolymorphicEnum):
 @dataclass
 class PolymorphicEnumAssociation:
     value: PolymorphicEnum
+
+
+@dataclass(frozen=True)
+class NamedNumbers:
+    name: str
+    numbers: List[int] = field(default_factory=list)
+
+    def __hash__(self):
+        return hash(self.name)

@@ -14,6 +14,7 @@ from .symbolic import (
     OperationResult,
     ResultQuantifier,
     Selectable,
+    Bindings,
 )
 from .utils import T
 
@@ -73,8 +74,7 @@ class Set(Conclusion[T]):
 
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, Any]] = None,
-        parent: Optional[SymbolicExpression] = None,
+        sources: Bindings,
     ) -> Iterable[OperationResult]:
 
         self._yield_when_false_ = False
@@ -95,8 +95,7 @@ class Add(Conclusion[T]):
 
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, Any]] = None,
-        parent: Optional[SymbolicExpression] = None,
+        sources: Bindings,
     ) -> Iterable[OperationResult]:
 
         self._yield_when_false_ = False

@@ -13,10 +13,11 @@ kernelspec:
 # Domain Mapping
 
 Domain mapping transforms iterable attributes or nested collections into element-wise bindings while preserving existing
-variable bindings. This page covers two common patterns:
+variable bindings. This page covers three common patterns:
 
 - Flattening an iterable attribute (`flatten`)
 - Indexing into container attributes (capturing `__getitem__` symbolically)
+- Concatenating multiple variables (`concatenate`)
 
 ## Setup
 
@@ -32,6 +33,7 @@ from krrood.entity_query_language.entity import (
     variable,
     flatten,
     Symbol,
+    concatenate
 )
 from krrood.entity_query_language.entity_result_processors import an
 
@@ -142,4 +144,21 @@ query = an(entity(b).where(b.props["score"] == 2))
 results = list(query.evaluate())
 assert len(results) == 1 and results[0].name == "Body2"
 print(*results, sep="\n")
+```
+
+## concatenate
+
+The `concatenate` function allows combining multiple variables or iterables into a single selectable.
+
+```{code-cell} ipython3
+# Create two variables with different domains
+handles = variable(Handle, world.bodies)
+containers = variable(Container, world.bodies)
+
+# Concatenate them into a single variable
+handles_and_containers = concatenate(handles, containers)
+results = list(an(entity(handles_and_containers)).evaluate())
+
+assert len(results) == len(world.bodies)
+print(len(results))
 ```
