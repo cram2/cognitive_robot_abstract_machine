@@ -130,16 +130,28 @@ class CollisionManager(ModelChangeCallback):
     Manages collision rules and turn them into collision matrices.
     1. apply default rules
     2. apply temporary rules
-    3. apply final rules
+    3. apply ignore-collision rules
         this is usually allow collisions, like the self collision matrix
     """
 
     collision_checker: CollisionDetector
     collision_matrix: CollisionMatrix = field(init=False)
 
-    low_priority_rules: List[CollisionRule] = field(default_factory=list)
-    normal_priority_rules: List[CollisionRule] = field(default_factory=list)
-    high_priority_rules: List[CollisionRule] = field(default_factory=list)
+    default_rules: List[CollisionRule] = field(default_factory=list)
+    """
+    Rules that are applied to the collision matrix before temporary rules.
+    Any other rules will overwrite these.
+    """
+    temporary_rules: List[CollisionRule] = field(default_factory=list)
+    """
+    Rules that are applied to the collision matrix after default rules.
+    These are intended for task specific rules.
+    """
+    ignore_collision_rules: List[CollisionRule] = field(default_factory=list)
+    """
+    Rules that are applied to the collision matrix to ignore collisions.
+    The permanently allow collisions and cannot be overwritten by other rules.
+    """
 
     max_avoided_bodies_rules: List[MaxAvoidedCollisionsRule] = field(
         default_factory=lambda: [DefaultMaxAvoidedCollisions()]
@@ -149,7 +161,7 @@ class CollisionManager(ModelChangeCallback):
 
     def __post_init__(self):
         super().__post_init__()
-        self.high_priority_rules.extend(
+        self.ignore_collision_rules.extend(
             [AllowNonRobotCollisions(), AllowCollisionForAdjacentPairs()]
         )
         self._notify()
@@ -163,6 +175,9 @@ class CollisionManager(ModelChangeCallback):
         for consumer in self.collision_consumers:
             consumer.on_world_model_update(self.world)
 
+    def reset_temporary_rules(self):
+        self.temporary_rules = []
+
     def add_collision_consumer(self, consumer: CollisionConsumer):
         self.collision_consumers.append(consumer)
         consumer.collision_manager = self
@@ -174,11 +189,11 @@ class CollisionManager(ModelChangeCallback):
 
     def update_collision_matrix(self, buffer: float = 0.05):
         self.collision_matrix = CollisionMatrix()
-        for rule in self.low_priority_rules:
+        for rule in self.default_rules:
             rule.apply_to_collision_matrix(self.collision_matrix)
-        for rule in self.normal_priority_rules:
+        for rule in self.temporary_rules:
             rule.apply_to_collision_matrix(self.collision_matrix)
-        for rule in self.high_priority_rules:
+        for rule in self.ignore_collision_rules:
             rule.apply_to_collision_matrix(self.collision_matrix)
         for consumer in self.collision_consumers:
             consumer.on_collision_matrix_update()
@@ -225,8 +240,4 @@ class CollisionManager(ModelChangeCallback):
 
     @property
     def rules(self) -> List[CollisionRule]:
-        return (
-            self.low_priority_rules
-            + self.normal_priority_rules
-            + self.high_priority_rules
-        )
+        return self.default_rules + self.temporary_rules + self.ignore_collision_rules

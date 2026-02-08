@@ -81,7 +81,7 @@ class BulletCollisionDetector(CollisionDetector):
         )
         return CollisionCheckingResult(
             [
-                Collision.from_parts(
+                Collision(
                     body_a=self.world.get_kinematic_structure_entity_by_id(
                         collision.obj_a.name
                     ),

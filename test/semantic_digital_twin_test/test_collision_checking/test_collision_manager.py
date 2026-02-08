@@ -52,7 +52,7 @@ class TestCollisionRules:
         override_rule = AvoidAllCollisions(
             buffer_zone_distance=0.5, violated_distance=0.1, bodies=[body]
         )
-        collision_manager.high_priority_rules.append(override_rule)
+        collision_manager.ignore_collision_rules.append(override_rule)
 
         assert collision_manager.get_buffer_zone_distance(body) == 0.5
         assert collision_manager.get_violated_distance(body) == 0.1
@@ -66,9 +66,9 @@ class TestCollisionRules:
         # if they are not explicitly added.
         # Let's see if there is any rule.
         # Clear rules to be sure
-        collision_manager.low_priority_rules = []
-        collision_manager.normal_priority_rules = []
-        collision_manager.high_priority_rules = []
+        collision_manager.default_rules = []
+        collision_manager.temporary_rules = []
+        collision_manager.ignore_collision_rules = []
 
         with pytest.raises(ValueError):
             collision_manager.get_buffer_zone_distance(body)
@@ -98,7 +98,7 @@ class TestCollisionRules:
         robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
 
         collision_manager = cylinder_bot_world.collision_manager
-        collision_manager.normal_priority_rules.extend(
+        collision_manager.temporary_rules.extend(
             [
                 AvoidCollisionBetweenGroups(
                     buffer_zone_distance=10,
@@ -191,7 +191,7 @@ class TestCollisionRules:
         collision_manager.update_collision_matrix()
         collision_matrix = collision_manager.collision_matrix
         rule: HighPriorityAllowCollisionRule
-        for rule in collision_manager.high_priority_rules:
+        for rule in collision_manager.ignore_collision_rules:
             assert (
                 rule.allowed_collision_pairs & collision_matrix.collision_checks
                 == set()

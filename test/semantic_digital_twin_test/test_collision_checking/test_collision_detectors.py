@@ -50,16 +50,9 @@ def test_contact_distance(world_setup_simple, collision_detector):
         assert collision.body_b == cylinder
         assert collision.body_a == sphere
 
-    assert np.isclose(map_P_cylinder[0], 0.75, atol=1e-5)
-    assert np.isclose(map_P_cylinder[1], 0.0, atol=1e-5)
-    assert np.isclose(map_P_cylinder[2], 0.0, atol=1e-5)
-
-    assert np.isclose(map_P_sphere[0], 0.1, atol=1e-5)
-    assert np.isclose(map_P_sphere[1], 0.0, atol=1e-5)
-    assert np.isclose(map_P_sphere[2], 0.0, atol=1e-5)
-
+    assert np.allclose(map_P_cylinder, [0.75, 0, 0, 1], atol=1e-5)
+    assert np.allclose(map_P_sphere, [0.1, 0, 0, 1], atol=1e-5)
     assert np.allclose(map_V_contact_normal, [-1, 0, 0, 0], atol=1e-5)
-
     assert np.isclose(collision.contact_distance, 0.65)
 
 

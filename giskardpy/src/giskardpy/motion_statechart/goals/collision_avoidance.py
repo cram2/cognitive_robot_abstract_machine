@@ -399,7 +399,7 @@ class CollisionAvoidance(Goal):
     collision_rules: List[CollisionRule] = field(default_factory=list)
 
     def expand(self, context: BuildContext) -> None:
-        context.collision_manager.normal_priority_rules.extend(self.collision_rules)
+        context.collision_manager.temporary_rules.extend(self.collision_rules)
         context.collision_manager.add_collision_consumer(
             ExternalCollisionVariableManager()
         )

@@ -57,11 +57,11 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             "collision_configs",
             "pr2.srdf",
         )
-        self._world.collision_manager.high_priority_rules.append(
+        self._world.collision_manager.ignore_collision_rules.append(
             SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
         )
 
-        self._world.collision_manager.low_priority_rules.append(
+        self._world.collision_manager.default_rules.append(
             AvoidAllCollisions(
                 buffer_zone_distance=0.1,
                 violated_distance=0.0,
@@ -69,21 +69,21 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             )
         )
 
-        self._world.collision_manager.low_priority_rules.append(
+        self._world.collision_manager.default_rules.append(
             AvoidAllCollisions(
                 buffer_zone_distance=0.05,
                 violated_distance=0.0,
                 bodies=[self.left_arm.bodies_with_collision],
             )
         )
-        self._world.collision_manager.low_priority_rules.append(
+        self._world.collision_manager.default_rules.append(
             AvoidAllCollisions(
                 buffer_zone_distance=0.05,
                 violated_distance=0.0,
                 bodies=[self.right_arm.bodies_with_collision],
             )
         )
-        self._world.collision_manager.low_priority_rules.append(
+        self._world.collision_manager.default_rules.append(
             AvoidAllCollisions(
                 buffer_zone_distance=0.2,
                 violated_distance=0.05,

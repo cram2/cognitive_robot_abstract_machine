@@ -31,126 +31,19 @@ class CollisionCheckingResult:
 
 @dataclass
 class Collision:
-    body_a: Body = field(default=None)
+    body_a: Body
     """
     First body in the collision.
     """
-    body_b: Body = field(default=None)
+    body_b: Body
     """
     Second body in the collision.
     """
-    data: np.ndarray = field(init=False)
 
-    _hash_idx: int = field(default=0, init=False)
-
-    _contact_distance_idx: int = field(default=1, init=False)
-
-    _root_V_n_idx: int = field(default=2, init=False)
-    _root_V_n_slice: slice = field(default=slice(2, 5), init=False)
-
-    _root_P_pa_idx: int = field(default=5, init=False)
-    _root_P_pa_slice: slice = field(default=slice(5, 8), init=False)
-
-    _root_P_pb_idx: int = field(default=8, init=False)
-    _root_P_pb_slice: slice = field(default=slice(8, 11), init=False)
-
-    _self_data_slice: slice = field(default=slice(4, 14), init=False)
-    _external_data_slice: slice = field(default=slice(0, 8), init=False)
-
-    def __post_init__(self):
-        self.data = np.array(
-            [
-                self.body_b.__hash__(),  # hash
-                0,  # contact distance
-                0,
-                0,
-                1,  # root_V_n
-                0,
-                0,
-                0,  # root_P_pa
-                0,
-                0,
-                0,  # root_P_pb
-            ],
-            dtype=float,
-        )
-
-    @classmethod
-    def from_parts(
-        cls,
-        body_a: Body,
-        body_b: Body,
-        contact_distance: float,
-        root_P_pa: np.ndarray,
-        root_P_pb: np.ndarray,
-        root_V_n: np.ndarray,
-    ) -> Self:
-        self = cls(body_a=body_a, body_b=body_b)
-        self.contact_distance = contact_distance
-        self.root_P_pa = root_P_pa
-        self.root_P_pb = root_P_pb
-        self.root_V_n = root_V_n
-        return self
-
-    @property
-    def external_data(self) -> np.ndarray:
-        return self.data[: self._b_V_n_idx]
-
-    @property
-    def self_data(self) -> np.ndarray:
-        return self.data[self._self_data_slice]
-
-    @property
-    def external_and_self_data(self) -> np.ndarray:
-        return self.data[self._external_data_slice]
-
-    @property
-    def contact_distance(self) -> float:
-        return self.data[self._contact_distance_idx]
-
-    @contact_distance.setter
-    def contact_distance(self, value: float):
-        self.data[self._contact_distance_idx] = value
-
-    @property
-    def link_b_hash(self) -> float:
-        return self.data[self._hash_idx]
-
-    @property
-    def root_P_pa(self) -> np.ndarray:
-        """
-        Contact point on body A with respect to the world root frame.
-        """
-        a = self.data[self._root_P_pa_slice]
-        return np.array([a[0], a[1], a[2], 1])
-
-    @root_P_pa.setter
-    def root_P_pa(self, value: np.ndarray):
-        self.data[self._root_P_pa_slice] = value[:3]
-
-    @property
-    def root_P_pb(self) -> np.ndarray:
-        """
-        Contact point on body B with respect to the world root frame.
-        """
-        a = self.data[self._root_P_pb_slice]
-        return np.array([a[0], a[1], a[2], 1])
-
-    @root_P_pb.setter
-    def root_P_pb(self, value: np.ndarray):
-        self.data[self._root_P_pb_slice] = value[:3]
-
-    @property
-    def root_V_n(self) -> np.ndarray:
-        """
-        Contact normal vector in the world root frame.
-        """
-        a = self.data[self._root_V_n_slice]
-        return np.array([a[0], a[1], a[2], 0])
-
-    @root_V_n.setter
-    def root_V_n(self, value: np.ndarray):
-        self.data[self._root_V_n_slice] = value[:3]
+    contact_distance: float
+    root_P_pa: np.ndarray
+    root_P_pb: np.ndarray
+    root_V_n: np.ndarray
 
     def __str__(self):
         return (
@@ -167,7 +60,7 @@ class Collision:
         return self.body_a == other.body_a and self.body_b == other.body_b
 
     def reverse(self):
-        return Collision.from_parts(
+        return Collision(
             body_a=self.body_b,
             body_b=self.body_a,
             root_P_pa=self.root_P_pb,

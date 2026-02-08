@@ -113,13 +113,13 @@ class TrimeshCollisionDetector(CollisionDetector):
                 )
                 contact_normal /= np.linalg.norm(contact_normal)
                 result.append(
-                    Collision.from_parts(
+                    Collision(
                         contact_distance=distance_result.min_distance,
                         body_a=body_a,
                         body_b=body_b,
-                        root_P_pa=distance_result.nearest_points[0],
-                        root_P_pb=distance_result.nearest_points[1],
-                        root_V_n=contact_normal,
+                        root_P_pa=np.append(distance_result.nearest_points[0], 1),
+                        root_P_pb=np.append(distance_result.nearest_points[1], 1),
+                        root_V_n=np.append(contact_normal, 0),
                     )
                 )
 

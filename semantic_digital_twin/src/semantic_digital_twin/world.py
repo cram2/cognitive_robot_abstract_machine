@@ -367,7 +367,7 @@ class World(HasSimulatorProperties):
         self.state = WorldState(_world=self)
         self._forward_kinematic_manager = ForwardKinematicsManager(self)
         self.collision_manager = CollisionManager(
-            self, collision_checker=BulletCollisionDetector(self)
+            self, collision_checker=TrimeshCollisionDetector(self)
         )
 
     def __hash__(self):

@@ -25,7 +25,7 @@ class TestExternalCollisionExpressionManager:
         env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
         robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
         collision_manager = cylinder_bot_world.collision_manager
-        collision_manager.normal_priority_rules.extend(
+        collision_manager.temporary_rules.extend(
             [
                 AvoidCollisionBetweenGroups(
                     buffer_zone_distance=10,
