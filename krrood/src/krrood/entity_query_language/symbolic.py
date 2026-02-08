@@ -473,6 +473,10 @@ A function that maps the results of a query object descriptor to a new set of re
 
 @dataclass(eq=False, repr=False)
 class ConstraintSpecifier(SymbolicExpression[T], ABC):
+    """
+    A constraint specifier is a symbolic expression that specifies the conditions that must be satisfied by the results
+    produced by a query.
+    """
 
     _child_: SymbolicExpression[T]
     """
@@ -2646,6 +2650,10 @@ class Having(ConstraintSpecifier[T]):
     """
 
     group_by: GroupBy
+    """
+    The group by expression that is used to group the results of the query. This is a child of the Having expression.
+    As the results need to be grouped before filtering.
+    """
 
     def __post_init__(self):
         super().__post_init__()
@@ -2679,7 +2687,7 @@ class Having(ConstraintSpecifier[T]):
         return result.is_false
 
     @cached_property
-    def _all_variable_instances_(self) -> List[Variable]:
+    def _all_variable_instances_(self) -> List[Selectable]:
         return self.group_by._all_variable_instances_ + super()._all_variable_instances_
 
 

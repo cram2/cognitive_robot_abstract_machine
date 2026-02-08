@@ -125,9 +125,9 @@ def variable_from(
 
 
 def distinct(
-    expression: Union[Selectable[T], QueryObjectDescriptor[T], ResultQuantifier[T], T],
-    *on: Union[Selectable, Any],
-) -> Union[Selectable[T], QueryObjectDescriptor[T], ResultQuantifier[T], T]:
+    expression: T,
+    *on: Any,
+) -> T:
     """
     Indicate that the result of the expression should be distinct.
     """
