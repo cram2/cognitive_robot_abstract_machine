@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+import copy
+import dataclasses
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, Field, is_dataclass
 from dataclasses import fields as dc_fields
 
-from typing_extensions import List, Type, Optional, TYPE_CHECKING
+from typing_extensions import (
+    List,
+    Type,
+    Optional,
+    TYPE_CHECKING,
+    get_origin,
+    get_args,
+    TypeVar,
+)
 
 if TYPE_CHECKING:
     from ..ontomatic.property_descriptor import PropertyDescriptor

@@ -210,6 +210,8 @@ def test_equal(session, database):
         PrismaticConnectionDAO,
         onclause=PrismaticConnectionDAO.child_id == FixedConnectionDAO.parent_id,
     )
+
+    assert len(session.scalars(query_by_hand).all()) == 1
     assert str(translator.sql_query) == str(query_by_hand)
 
     result = translator.evaluate()

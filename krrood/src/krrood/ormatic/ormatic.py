@@ -18,7 +18,7 @@ from .sqlalchemy_generator import SQLAlchemyGenerator
 from .type_dict import TypeDict
 from .utils import InheritanceStrategy
 from ..utils import module_and_class_name
-from .wrapped_table import WrappedTable, AssociationTable
+from .wrapped_table import WrappedTable, AssociationObject
 from ..adapters.json_serializer import SubclassJSONSerializer
 from ..class_diagrams.class_diagram import (
     ClassDiagram,
@@ -91,7 +91,9 @@ class ORMatic:
     The wrapped tables instances for the SQLAlchemy conversion.
     """
 
-    association_tables: List[AssociationTable] = field(default_factory=list, init=False)
+    association_objects: List[AssociationObject] = field(
+        default_factory=list, init=False
+    )
     """
     List of association tables for many-to-many relationships.
     """

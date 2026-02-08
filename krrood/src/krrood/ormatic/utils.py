@@ -6,6 +6,7 @@ import json
 import types
 from contextlib import suppress
 from enum import Enum
+from inspect import isclass
 from types import ModuleType
 
 import sqlalchemy
@@ -167,7 +168,8 @@ def get_classes_of_ormatic_interface(
     type_mappings = {}
 
     for cls in filter(
-        lambda x: issubclass(x, DataAccessObject), classes_of_ormatic_interface
+        lambda x: issubclass(x, DataAccessObject) and isclass(x.original_class()),
+        classes_of_ormatic_interface,
     ):
         original_class = cls.original_class()
 
