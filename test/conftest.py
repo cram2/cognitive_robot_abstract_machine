@@ -200,7 +200,7 @@ def cylinder_bot_diff_world():
 def world_with_urdf_factory(
     urdf_path: str,
     robot_semantic_annotation: Type[AbstractRobot] | None,
-    drive_connection_type: Type[OmniDrive],
+    drive_connection_type: Type[OmniDrive | DiffDrive],
 ):
     """
     Builds this tree:
@@ -220,12 +220,11 @@ def world_with_urdf_factory(
         )
         world_with_urdf.add_connection(map_C_localization)
 
-        if drive_connection_type is OmniDrive:
-            c_root_bf = OmniDrive.create_with_dofs(
-                parent=localization_body,
-                child=world_with_urdf.root,
-                world=world_with_urdf,
-            )
+        c_root_bf = drive_connection_type.create_with_dofs(
+            parent=localization_body,
+            child=world_with_urdf.root,
+            world=world_with_urdf,
+        )
         world_with_urdf.add_connection(c_root_bf)
 
     return world_with_urdf
@@ -285,7 +284,7 @@ def stretch_world():
         "robots",
     )
     stretch = os.path.join(urdf_dir, "stretch_description.urdf")
-    return world_with_urdf_factory(stretch, Stretch, OmniDrive)
+    return world_with_urdf_factory(stretch, Stretch, DiffDrive)
 
 
 @pytest.fixture(scope="session")
@@ -298,7 +297,7 @@ def tiago_world():
         "robots",
     )
     tiago = os.path.join(urdf_dir, "tiago_dual.urdf")
-    return world_with_urdf_factory(tiago, Tiago, OmniDrive)
+    return world_with_urdf_factory(tiago, Tiago, DiffDrive)
 
 
 @pytest.fixture(scope="session")

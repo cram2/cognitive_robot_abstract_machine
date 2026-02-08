@@ -56,6 +56,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
+# The alternative mapping needs to be imported for the stretch to work properly
+import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
+import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
+
 
 @pytest.fixture(scope="session", params=["hsrb", "stretch", "tiago", "pr2"])
 def setup_multi_robot_apartment(
@@ -213,6 +217,7 @@ def test_park_arms_multi(immutable_multiple_robot_apartment):
 
 def test_reach_action_multi(immutable_multiple_robot_apartment):
     world, view, context = immutable_multiple_robot_apartment
+
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
 
     grasp_description = GraspDescription(
@@ -225,7 +230,7 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
         1, -2, 0.8, reference_frame=world.root
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        0.3, -2.5, 0, reference_frame=world.root
+        0.3, -2.4, 0, reference_frame=world.root
     )
     world.notify_state_change()
 
@@ -257,6 +262,9 @@ def test_grasping(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
     left_arm = ViewManager.get_arm_view(Arms.LEFT, robot_view)
 
+    node = rclpy.create_node("grasping_node")
+    VizMarkerPublisher(world, node)
+
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
@@ -272,7 +280,7 @@ def test_grasping(immutable_multiple_robot_apartment):
     )
     robot_view.root.parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(
-            0.3, -2.5, 0, reference_frame=world.root
+            0.3, -2.4, 0, reference_frame=world.root
         )
     )
     world.notify_state_change()
@@ -303,7 +311,7 @@ def test_pick_up_multi(mutable_multiple_robot_apartment):
         1, -2, 0.6, reference_frame=world.root
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        0.3, -2.5, 0, reference_frame=world.root
+        0.3, -2.4, 0, reference_frame=world.root
     )
     world.notify_state_change()
 
@@ -345,7 +353,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
         1, -2, 0.6, reference_frame=world.root
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        0.3, -2.5, 0, reference_frame=world.root
+        0.3, -2.4, 0, reference_frame=world.root
     )
     world.notify_state_change()
 
@@ -439,6 +447,9 @@ def test_open(immutable_multiple_robot_apartment):
 
 def test_close(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
+
+    node = rclpy.create_node("node")
+    VizMarkerPublisher(world, node)
 
     world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.45
     world.notify_state_change()

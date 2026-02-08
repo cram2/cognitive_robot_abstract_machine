@@ -35,6 +35,10 @@ from pycram.robot_plans import (
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState, GripperState
 
+# The alternative mapping needs to be imported for the stretch to work properly
+import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
+import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
+
 engine = create_engine("sqlite:///:memory:")
 
 

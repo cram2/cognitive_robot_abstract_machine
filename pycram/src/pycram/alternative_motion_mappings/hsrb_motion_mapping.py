@@ -17,6 +17,10 @@ from ..robot_plans.motions.base import AlternativeMotion
 
 
 class HSRBMoveMotion(MoveMotion, AlternativeMotion[HSRB]):
+    """
+    Uses a Nav2 action server to move the base of the real HSRB
+    """
+
     execution_type = ExecutionType.REAL
 
     def perform(self):
