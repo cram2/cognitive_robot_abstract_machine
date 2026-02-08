@@ -2545,7 +2545,7 @@ class TestCollisionAvoidance:
                         x=1, reference_frame=cylinder_bot_world.root
                     ),
                 ),
-                # ExternalCollisionAvoidance(robot=robot),
+                ExternalCollisionAvoidance(robot=robot),
                 local_min := LocalMinimumReached(),
             ]
         )
@@ -2567,12 +2567,8 @@ class TestCollisionAvoidance:
         msc_copy.draw("muh.pdf")
         kin_sim.tick_until_end(500)
         collisions = kin_sim.context.world.collision_manager.compute_collisions()
-        contact_distance = (
-            kin_sim.collision_scene.closest_points.external_collisions[tip]
-            .data[0]
-            .contact_distance
-        )
-        assert contact_distance > 0.049
+        assert len(collisions.contacts) == 1
+        assert collisions.contacts[0].contact_distance > 0.049
 
     def test_hard_constraints_violated(self, cylinder_bot_world: World):
         root = cylinder_bot_world.root

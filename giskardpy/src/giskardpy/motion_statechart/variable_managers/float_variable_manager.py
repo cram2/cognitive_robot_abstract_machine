@@ -32,3 +32,7 @@ class FloatVariableData:
 
     def set_value(self, variable_index: int, value: float):
         self.data[variable_index] = value
+
+    @property
+    def mapping(self) -> dict[FloatVariable, float]:
+        return {variable: data for variable, data in zip(self.variables, self.data)}
