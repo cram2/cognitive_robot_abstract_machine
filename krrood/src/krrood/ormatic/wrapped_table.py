@@ -9,14 +9,13 @@ from typing_extensions import List, Dict, TYPE_CHECKING, Optional, Set, Type, ge
 
 from .dao import AlternativeMapping
 from .utils import InheritanceStrategy
-from ..utils import module_and_class_name
 from ..class_diagrams.class_diagram import (
     WrappedClass,
-    WrappedSpecializedGeneric,
     Inheritance,
 )
 from ..class_diagrams.failures import ClassIsUnMappedInClassDiagram
 from ..class_diagrams.wrapped_field import WrappedField
+from ..utils import module_and_class_name
 
 if TYPE_CHECKING:
     from .ormatic import ORMatic
@@ -404,7 +403,6 @@ class WrappedTable:
         ``wrapped_tables`` are keyed by the original class nodes, even if an
         alternative mapping is used. This ensures we always use the correct key.
         """
-        from typing import get_origin
 
         origin = get_origin(wrapped.clazz)
         actual_cls = (

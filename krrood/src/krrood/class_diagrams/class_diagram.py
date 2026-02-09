@@ -175,8 +175,10 @@ class WrappedClass:
             raise ParseError(e) from e
 
     @property
-    def name(self):
-        """Return a unique display name composed of class name and node index."""
+    def name(self) -> str:
+        """
+        :return: The name of the class that is wrapped.
+        """
         return self.clazz.__name__
 
     def __hash__(self):
@@ -747,6 +749,15 @@ class ClassDiagram:
         return self is other
 
     def _create_nodes_for_specialized_generic_type_hints(self):
+        """
+        Creates nodes for specialized generic type hints utilized in the wrapped classes. This process involves
+        analyzing fields for references to specialized generic types, creating corresponding nodes, and establishing
+        inheritance relations as appropriate. The method ensures that all unique specialized generics referenced
+        are represented as nodes. This is similar to C++ template resolving.
+
+        :raises ClassIsUnMappedInClassDiagram: If a class referenced by a field or origin type is not mapped
+            in the class diagram, it will skip further processing for that type.
+        """
         # Phase 1: Collect all unique specialized generic types referenced in fields
         to_process = set()
         for wrapped_class in self.wrapped_classes:
@@ -754,9 +765,11 @@ class ClassDiagram:
                 if wrapped_field.is_instantiation_of_generic_class:
                     to_process.add(wrapped_field.type_endpoint)
 
-        # Phase 2: Add nodes for discovered types (add_node is idempotent if index is set)
+        # Phase 2: Add nodes for discovered types that do not already exists
         while to_process:
             next_type = to_process.pop()
+
+            # skip existing nodes
             try:
                 self.get_wrapped_class(next_type)
                 # Already wrapped
@@ -764,6 +777,7 @@ class ClassDiagram:
             except ClassIsUnMappedInClassDiagram:
                 pass
 
+            # skip non dataclass generics
             if not is_dataclass(get_origin(next_type)):
                 continue
 
@@ -788,7 +802,7 @@ class ClassDiagram:
                         to_process.add(wrapped_field.type_endpoint)
 
 
-@lru_cache()
+@lru_cache
 def make_specialized_dataclass(alias: _GenericAlias) -> Type:
     """
     Build a concrete dataclass for a fully specialized generic alias, e.g., GenericClass[float].
