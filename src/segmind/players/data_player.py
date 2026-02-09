@@ -10,7 +10,10 @@ from threading import RLock
 
 from typing_extensions import Callable, Optional, Dict, Generator, List
 
-
+from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
 try:
     from pycram.worlds.multiverse import Multiverse
@@ -143,7 +146,7 @@ class DataPlayer(EpisodePlayer, ABC):
             self.world.robot.set_multiple_joint_positions(joint_states)
 
     @abstractmethod
-    def get_objects_poses(self, frame_data: FrameData) -> Dict[Object, Pose]:
+    def get_objects_poses(self, frame_data: FrameData) -> Dict[Body, Pose]:
         """
         Get the poses of the objects.
 
@@ -188,4 +191,4 @@ class FilePlayer(DataPlayer, ABC):
         Copy the model files to the world data directory.
         """
         # Copy the entire folder and its contents
-        shutil.copytree(self.models_dir, self.world.conf.cache_dir + "/objects", dirs_exist_ok=True)
+        #shutil.copytree(self.models_dir, self.world.conf.cache_dir + "/objects", dirs_exist_ok=True)
