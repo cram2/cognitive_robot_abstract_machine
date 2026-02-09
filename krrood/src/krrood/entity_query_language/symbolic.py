@@ -79,7 +79,6 @@ from .utils import (
     convert_args_and_kwargs_into_a_hashable_key,
     ensure_hashable,
 )
-from ..class_diagrams import ClassRelation
 from ..class_diagrams.class_diagram import WrappedClass
 from ..class_diagrams.failures import ClassIsUnMappedInClassDiagram
 from ..class_diagrams.wrapped_field import WrappedField
@@ -189,7 +188,7 @@ class SymbolicExpression(ABC):
     """
     The current stack of symbolic expressions that has been entered using the ``with`` statement.
     """
-    _is_false_: bool = field(init=False, repr=False, default=False)
+    _is_false__: bool = field(init=False, repr=False, default=False)
     """
     Internal flag indicating current truth value of evaluation result for this expression.
     """
@@ -210,6 +209,20 @@ class SymbolicExpression(ABC):
             self._id_ = id_generator(self)
             self._create_node_()
             self._id_expression_map_[self._id_] = self
+
+    @property
+    def _is_false_(self) -> bool:
+        """
+        :return: The current truth value of evaluation result for this expression.
+        """
+        return self._is_false__
+
+    @_is_false_.setter
+    def _is_false_(self, value: bool):
+        """
+        Set the current truth value of evaluation result for this expression.
+        """
+        self._is_false__ = value
 
     def tolist(self):
         """
@@ -559,9 +572,9 @@ class ConstraintSpecifier(SymbolicExpression, ABC):
         """
         ...
 
-    def get_and_update_truth_value(self) -> bool:
-        self._is_false_ = self.conditions._is_false_
-        return self._is_false_
+    @property
+    def _is_false_(self) -> bool:
+        return self.conditions._is_false_
 
 
 @dataclass(eq=False, repr=False)
@@ -579,13 +592,7 @@ class Where(UnaryExpression, ConstraintSpecifier):
         self,
         sources: Bindings,
     ) -> Iterator[OperationResult]:
-
-        yield from (
-            OperationResult(
-                child_result.bindings, self.get_and_update_truth_value(), self
-            )
-            for child_result in self.conditions._evaluate_(sources, self)
-        )
+        return self.conditions._evaluate_(sources, self)
 
 
 @dataclass(eq=False, repr=False)
@@ -627,7 +634,7 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
         :param result: The result to be mapped.
         :return: The mapped result.
         """
-        return result[self._binding_id_]
+        return result.value
 
     @property
     def _is_iterable_(self):
@@ -1037,6 +1044,10 @@ class ResultQuantifier(UnaryExpression, ABC):
 
     def _process_result_(self, result: OperationResult) -> Any:
         return self._child_._process_result_(result)
+
+    @cached_property
+    def _binding_id_(self) -> int:
+        return self._child_._binding_id_
 
     def _evaluate__(
         self,
