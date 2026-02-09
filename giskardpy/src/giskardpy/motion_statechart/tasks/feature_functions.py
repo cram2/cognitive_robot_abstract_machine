@@ -133,7 +133,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
     """
     Priority weight for the alignment constraint in the optimization problem.
     """
-    max_vel: float = field(default=0.2, kw_only=True)
+    maximum_velocity: float = field(default=0.2, kw_only=True)
     """
     Maximum allowed angular velocity for the alignment motion in radians per second.
     """
@@ -152,7 +152,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
         expr = self.root_V_reference_feature @ self.root_V_controlled_feature
 
         artifacts.constraints.add_equality_constraint(
-            reference_velocity=self.max_vel,
+            reference_velocity=self.maximum_velocity,
             equality_bound=0 - expr,
             weight=self.weight,
             task_expression=expr,
@@ -165,7 +165,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
 @dataclass(eq=False, repr=False)
 class HeightGoal(FeatureFunctionGoal):
     """
-    Moves the tip_point to be the specified distance away from the reference_point
+    Moves the `tip_point` to be the specified distance away from the `reference_point`
     along the z-axis of the map frame.
     """
 
@@ -179,17 +179,17 @@ class HeightGoal(FeatureFunctionGoal):
     """
     lower_limit: float = field(kw_only=True)
     """
-    Lower limit to control the distance away from the reference_point.
+    Lower limit to control the distance away from the `reference_point`.
     """
     upper_limit: float = field(kw_only=True)
     """
-    Upper limit to control the distance away from the reference_point.
+    Upper limit to control the distance away from the `reference_point`.
     """
     weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
     """
     Priority weight for the height constraint in the optimization problem.
     """
-    max_vel: float = field(default=0.2, kw_only=True)
+    maximum_velocity: float = field(default=0.2, kw_only=True)
     """
     Maximum allowed velocity for the height motion in meters per second.
     """
@@ -205,7 +205,7 @@ class HeightGoal(FeatureFunctionGoal):
         ) @ Vector3.Z()
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.max_vel,
+            reference_velocity=self.maximum_velocity,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
             weight=self.weight,
@@ -224,7 +224,7 @@ class HeightGoal(FeatureFunctionGoal):
 @dataclass(eq=False, repr=False)
 class DistanceGoal(FeatureFunctionGoal):
     """
-    Moves the tip_point to be the specified distance away from the reference_point
+    Moves the `tip_point` to be the specified distance away from the `reference_point`
     measured in the x-y-plane of the map frame.
     """
 
@@ -238,17 +238,17 @@ class DistanceGoal(FeatureFunctionGoal):
     """
     lower_limit: float = field(kw_only=True)
     """
-    Lower limit to control the distance away from the reference_point.
+    Lower limit to control the distance away from the `reference_point`.
     """
     upper_limit: float = field(kw_only=True)
     """
-    Upper limit to control the distance away from the reference_point.
+    Upper limit to control the distance away from the `reference_point`.
     """
     weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
     """
     Priority weight for the distance constraint in the optimization problem.
     """
-    max_vel: float = field(default=0.2, kw_only=True)
+    maximum_velocity: float = field(default=0.2, kw_only=True)
     """
     Maximum allowed velocity for the distance motion in meters per second.
     """
@@ -264,7 +264,7 @@ class DistanceGoal(FeatureFunctionGoal):
         expr = root_V_diff.norm()
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.max_vel,
+            reference_velocity=self.maximum_velocity,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
             weight=self.weight,
@@ -275,7 +275,7 @@ class DistanceGoal(FeatureFunctionGoal):
         # An extra constraint that makes the execution more stable
         for i, axis_name in enumerate(["x", "y", "z"]):
             artifacts.constraints.add_inequality_constraint(
-                reference_velocity=self.max_vel,
+                reference_velocity=self.maximum_velocity,
                 lower_error=0,
                 upper_error=0,
                 weight=self.weight,
@@ -294,8 +294,8 @@ class DistanceGoal(FeatureFunctionGoal):
 @dataclass(eq=False, repr=False)
 class AngleGoal(FeatureFunctionGoal):
     """
-    Controls the angle between the tip_vector and the reference_vector to be between
-    lower_angle and upper_angle.
+    Controls the angle between the `tip_vector` and the `reference_vector` to be between
+    `lower_angle` and `upper_angle`.
     """
 
     tip_vector: Vector3 = field(kw_only=True)
@@ -308,14 +308,20 @@ class AngleGoal(FeatureFunctionGoal):
     """
     lower_angle: float = field(kw_only=True)
     """
-    Lower limit to control the angle between the tip_vector and the reference_vector.
+    Lower limit to control the angle between the `tip_vector` and the `reference_vector`.
     """
     upper_angle: float = field(kw_only=True)
     """
-    Upper limit to control the angle between the tip_vector and the reference_vector.
+    Upper limit to control the angle between the `tip_vector` and the `reference_vector`.
     """
     weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
-    max_vel: float = field(default=0.2, kw_only=True)
+    """
+    Priority weight for the angle constraint in the optimization problem.
+    """
+    maximum_velocity: float = field(default=0.2, kw_only=True)
+    """
+    Maximum allowed angular velocity for the angle motion in radians per second.
+    """
 
     def get_controlled_and_reference_features(self):
         return self.tip_vector, self.reference_vector
@@ -328,7 +334,7 @@ class AngleGoal(FeatureFunctionGoal):
         )
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.max_vel,
+            reference_velocity=self.maximum_velocity,
             upper_error=self.upper_angle - expr,
             lower_error=self.lower_angle - expr,
             weight=self.weight,
