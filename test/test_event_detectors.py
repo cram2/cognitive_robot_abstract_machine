@@ -39,6 +39,7 @@ class TestEventDetectors():
 
         try:
             translation_detector.update_with_latest_motion_data()
+            time.sleep(2)
             self.fridge = self.world.get_body_by_name("cabinet1")
             root_T_milk_connection = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x = self.fridge.global_pose.x, y=self.fridge.global_pose.y, z=self.fridge.global_pose.z
@@ -52,14 +53,10 @@ class TestEventDetectors():
                 self.world.add_connection(milk_conn)
 
             # update twice to detect two displacements between three poses, since window size is 2
-            time.sleep(5)
             translation_detector.update_with_latest_motion_data()
-            time.sleep(5)
             translation_detector.update_with_latest_motion_data()
-            time.sleep(5)
             # wait one timestep to detect that it is moving
             time.sleep(translation_detector.get_n_changes_wait_time(1))
-            time.sleep(5)
             translation_event = milk_tracker.get_latest_event_of_type(TranslationEvent)
             assert(translation_event is not None)
 
@@ -68,7 +65,6 @@ class TestEventDetectors():
 
             # wait one timestep to detect that it is not moving
             time.sleep(translation_detector.get_n_changes_wait_time(1))
-
             assert(milk_tracker.get_first_event_of_type_after_event(StopTranslationEvent, translation_event)
                             is not None)
         except Exception as e:

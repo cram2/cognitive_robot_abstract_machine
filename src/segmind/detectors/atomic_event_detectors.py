@@ -6,6 +6,8 @@ from math import ceil
 from queue import Queue, Empty, Full
 
 import numpy as np
+
+from pycram.datastructures.pose import PoseStamped
 from semantic_digital_twin.collision_checking.collision_detector import Collision
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
@@ -134,7 +136,8 @@ class AtomicEventDetector(PropagatingThread):
         """
         events = self.detect_events()
         if events:
-            [self.log_event(event) for event in events]
+            for event in events:
+                self.log_event(event)
 
     def _wait_if_paused(self):
         """
@@ -595,11 +598,14 @@ class MotionDetector(DetectorWithTrackedObject, ABC):
                 except Empty:
                     pass
 
+        return latest_pose, latest_time
+
     def get_current_pose_and_time(self) -> Tuple[Pose, float]:
         """
         Get the current pose and time of the object.
         """
         pose = self.tracked_object.global_pose.to_pose()
+
         return pose, time.time()  # pose.header.stamp.timestamp()
 
     def detect_events(self) -> Optional[List[MotionEvent]]:
@@ -610,17 +616,22 @@ class MotionDetector(DetectorWithTrackedObject, ABC):
         """
         try:
             # latest_pose, latest_time = self.update_with_latest_motion_data()
-            _, _ = self.data_queue.get_nowait()
-            self.data_queue.task_done()
-            latest_pose, latest_time = self.get_current_pose_and_time()
-            self.poses.append(latest_pose)
-            self.times.append(latest_time)
+            try:
+                _, _ = self.data_queue.get_nowait()
+                self.data_queue.task_done()
+            except Empty:
+                pass
+            
+            self.latest_pose, self.latest_time = self.get_current_pose_and_time()
+            self.poses.append(self.latest_pose)
+            self.times.append(self.latest_time)
             if len(self.poses) > 1:
                 self.calculate_and_update_latest_distance()
                 self._crop_distances_and_times_to_window_size()
 
             if not self.window_size_reached:
                 return
+
             events: Optional[List[MotionEvent]] = None
             if self.motion_sate_changed:
                 self.last_state_change_idx = len(self.all_distances) - 1
@@ -630,8 +641,11 @@ class MotionDetector(DetectorWithTrackedObject, ABC):
                 self.keep_track_of_history()
 
             return events
-        except Empty:
-            return
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.exc = e
+            raise e
 
     def update_motion_state_and_create_event(self) -> MotionEvent:
         """
@@ -735,7 +749,9 @@ class MotionDetector(DetectorWithTrackedObject, ABC):
         """
         current_pose, current_time = self.get_current_pose_and_time()
         event_type = self.get_event_type()
-        event = event_type(self.tracked_object, self.start_pose, current_pose, timestamp=self.event_time)
+        start_pose_stamped = PoseStamped.from_spatial_type(self.start_pose)
+        current_pose_stamped = PoseStamped.from_spatial_type(current_pose)
+        event = event_type(self.tracked_object, start_pose_stamped, current_pose_stamped, timestamp=self.event_time)
         return event
 
     @abstractmethod
@@ -841,7 +857,9 @@ class TranslationDetector(MotionDetector):
         Calculate the Euclidean distance between the latest and current positions of the object.
         """
         # return calculate_euclidean_distance(self.latest_pose.position.to_list(), current_pose.position.to_list())
-        translation = calculate_translation(self.poses[-2].position.to_list(), self.poses[-1].position.to_list())
+        pos1 = [float(self.poses[-2].x), float(self.poses[-2].y), float(self.poses[-2].z)]
+        pos2 = [float(self.poses[-1].x), float(self.poses[-1].y), float(self.poses[-1].z)]
+        translation = calculate_translation(pos1, pos2)
         return translation
 
     def get_event_type(self):
@@ -862,8 +880,11 @@ class RotationDetector(MotionDetector):
         """
         Calculate the angle between the latest and current quaternions of the object
         """
-        quat_diff = calculate_quaternion_difference(self.poses[-2].orientation.to_list(),
-                                                    self.poses[-1].orientation.to_list())
+        quat_1 = [float(self.poses[-2].orientation.x), float(self.poses[-2].orientation.y),
+                  float(self.poses[-2].orientation.z), float(self.poses[-2].orientation.w)]
+        quat_2 = [float(self.poses[-1].orientation.x), float(self.poses[-1].orientation.y),
+                  float(self.poses[-1].orientation.z), float(self.poses[-1].orientation.w)]
+        quat_diff = calculate_quaternion_difference(quat_1, quat_2)
         # angle = 2 * np.arccos(quat_diff[0])
         euler_diff = list(euler_from_quaternion(quat_diff))
         euler_diff[2] = 0

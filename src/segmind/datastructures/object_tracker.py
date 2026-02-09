@@ -53,7 +53,7 @@ class ObjectTracker:
         with self._lock:
             self._event_history.append(event)
             self._event_history.sort(key=lambda e: e.timestamp)
-        if isinstance(self.obj, Body):
+        if isinstance(self.obj, Body) and hasattr(self.obj, "parent_entity") and self.obj.parent_entity:
             ObjectTrackerFactory.get_tracker(self.obj.parent_entity).add_event(event)
 
     def get_event_history(self) -> List[Event]:
