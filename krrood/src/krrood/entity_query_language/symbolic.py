@@ -519,6 +519,29 @@ class SymbolicExpression(ABC):
 
 
 @dataclass(eq=False, repr=False)
+class DerivedExpression(SymbolicExpression, ABC):
+    """
+    A symbolic expression that has its results derived from another symbolic expression, and thus it's value is the
+    value of the child expression.
+    """
+
+    @property
+    @abstractmethod
+    def _original_expression_(self) -> SymbolicExpression: ...
+
+    @property
+    def _binding_id_(self) -> int:
+        return self._original_expression_._binding_id_
+
+    @property
+    def _is_false_(self) -> bool:
+        return self._original_expression_._is_false_
+
+    def _process_result_(self, result: OperationResult) -> Any:
+        return self._original_expression_._process_result_(result)
+
+
+@dataclass(eq=False, repr=False)
 class UnaryExpression(SymbolicExpression, ABC):
     """
     A unary expression is a symbolic expression that takes a single argument (i.e., has a single child expression).
@@ -557,12 +580,16 @@ class UnaryExpression(SymbolicExpression, ABC):
 
 
 @dataclass(eq=False, repr=False)
-class ConstraintSpecifier(SymbolicExpression, ABC):
+class ConstraintSpecifier(DerivedExpression, ABC):
     """
     A constraint specifier is a symbolic expression that specifies the conditions that must be satisfied by the results
     produced by a query. The truth value of the constraint specifier is derived from the truth value of the conditions
     expression.
     """
+
+    @property
+    def _original_expression_(self) -> SymbolicExpression:
+        return self.conditions
 
     @property
     @abstractmethod
@@ -571,10 +598,6 @@ class ConstraintSpecifier(SymbolicExpression, ABC):
         The conditions expression which generate the valid bindings that satisfy the constraints.
         """
         ...
-
-    @property
-    def _is_false_(self) -> bool:
-        return self.conditions._is_false_
 
 
 @dataclass(eq=False, repr=False)
@@ -593,6 +616,81 @@ class Where(UnaryExpression, ConstraintSpecifier):
         sources: Bindings,
     ) -> Iterator[OperationResult]:
         return self.conditions._evaluate_(sources, self)
+
+
+@dataclass(eq=False, repr=False)
+class BinaryExpression(SymbolicExpression, ABC):
+    """
+    A base class for binary operators that can be used to combine symbolic expressions.
+    """
+
+    left: SymbolicExpression
+    """
+    The left operand of the binary operator.
+    """
+    right: SymbolicExpression
+    """
+    The right operand of the binary operator.
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.left, self.right = self._update_children_(self.left, self.right)
+
+    @cached_property
+    def _all_variable_instances_(self) -> List[Selectable]:
+        """
+        Get the leaf instances of the symbolic expression.
+        This is useful for accessing the leaves of the symbolic expression tree.
+        """
+        return self.left._all_variable_instances_ + self.right._all_variable_instances_
+
+
+@dataclass(eq=False, repr=False)
+class Having(BinaryExpression, ConstraintSpecifier):
+    """
+    A symbolic having expression that can be used to filter the grouped results of a query. Is constructed through
+    the `QueryObjectDescriptor` using the `having()` method.
+    """
+
+    left: GroupBy
+    """
+    The group by expression that is used to group the results of the query. This is a child of the Having expression.
+    As the results need to be grouped before filtering.
+    """
+    right: SymbolicExpression
+    """
+    The constraint expression that is used to filter the grouped results of the query.
+    """
+
+    @property
+    def conditions(self) -> SymbolicExpression:
+        return self.right
+
+    @property
+    def group_by(self) -> GroupBy:
+        return self.left
+
+    def _evaluate__(
+        self,
+        sources: Bindings,
+    ) -> Iterable[OperationResult]:
+
+        yield from (
+            OperationResult(
+                filtered_result.bindings,
+                self.get_and_update_truth_value(),
+                self,
+            )
+            for grouping_result in self.group_by._evaluate_(sources, parent=self)
+            for filtered_result in self.conditions._evaluate_(
+                grouping_result.bindings, parent=self
+            )
+        )
+
+    @property
+    def _name_(self):
+        return self.__class__.__name__
 
 
 @dataclass(eq=False, repr=False)
@@ -839,21 +937,25 @@ class Aggregator(UnaryExpression, Selectable[T], ABC):
         sources: Bindings,
     ) -> Iterable[OperationResult]:
 
-        child_results = self._child_._evaluate_(sources, parent=self)
-        values = self._apply_aggregation_function_and_yield_bindings_(child_results)
-
-        for value in values:
-            yield OperationResult({**sources, **value}, False, self)
+        yield from (
+            OperationResult(
+                sources
+                | self._apply_aggregation_function_and_get_bindings_(child_result),
+                False,
+                self,
+            )
+            for child_result in self._child_._evaluate_(sources, parent=self)
+        )
 
     @abstractmethod
-    def _apply_aggregation_function_and_yield_bindings_(
-        self, child_results: Iterable[OperationResult]
-    ) -> Iterator[Bindings]:
+    def _apply_aggregation_function_and_get_bindings_(
+        self, child_result: OperationResult
+    ) -> Bindings:
         """
         Apply the aggregation function to the results of the child.
 
-        :param child_results: The results of the child.
-        :return: An iterator of bindings containing the aggregated results.
+        :param child_result: The result of the child.
+        :return: Bindings containing the aggregated result.
         """
         ...
 
@@ -879,14 +981,13 @@ class Count(Aggregator[T]):
      is returned.
     """
 
-    def _apply_aggregation_function_and_yield_bindings_(
-        self, child_results: Iterable[OperationResult]
-    ) -> Iterator[Bindings]:
-        for res in child_results:
-            if self._distinct_:
-                yield {self._binding_id_: len(set(res.value))}
-            else:
-                yield {self._binding_id_: len(res.value)}
+    def _apply_aggregation_function_and_get_bindings_(
+        self, child_result: OperationResult
+    ) -> Bindings:
+        if self._distinct_:
+            return {self._binding_id_: len(set(child_result.value))}
+        else:
+            return {self._binding_id_: len(child_result.value)}
 
 
 @dataclass(eq=False, repr=False)
@@ -952,13 +1053,14 @@ class Sum(EntityAggregator[Number]):
     Calculate the sum of the child results.
     """
 
-    def _apply_aggregation_function_and_yield_bindings_(
-        self, child_results: Iterable[OperationResult]
-    ) -> Iterator[Dict[int, Optional[Number]]]:
-        for result in child_results:
-            yield {
-                self._binding_id_: self.get_aggregation_result_from_child_result(result)
-            }
+    def _apply_aggregation_function_and_get_bindings_(
+        self, child_result: OperationResult
+    ) -> Dict[int, Optional[Number]]:
+        return {
+            self._binding_id_: self.get_aggregation_result_from_child_result(
+                child_result
+            )
+        }
 
     def aggregation_function(self, result: Collection[Number]) -> Number:
         return sum(result)
@@ -988,14 +1090,13 @@ class Extreme(EntityAggregator[T], CanBehaveLikeAVariable[T], ABC):
         )
         super().__post_init__()
 
-    def _apply_aggregation_function_and_yield_bindings_(
-        self, child_results: Iterable[OperationResult]
-    ) -> Iterator[Bindings]:
-        for res in child_results:
-            extreme_val = self.get_aggregation_result_from_child_result(res)
-            bindings = res.bindings.copy()
-            bindings[self._binding_id_] = extreme_val
-            yield bindings
+    def _apply_aggregation_function_and_get_bindings_(
+        self, child_result: OperationResult
+    ) -> Bindings:
+        extreme_val = self.get_aggregation_result_from_child_result(child_result)
+        bindings = child_result.bindings.copy()
+        bindings[self._binding_id_] = extreme_val
+        return bindings
 
 
 @dataclass(eq=False, repr=False)
@@ -1021,7 +1122,7 @@ class Min(Extreme[T]):
 
 
 @dataclass(eq=False)
-class ResultQuantifier(UnaryExpression, ABC):
+class ResultQuantifier(UnaryExpression, DerivedExpression, ABC):
     """
     Base for quantifiers that return concrete results from entity/set queries
     (e.g., An, The).
@@ -1042,12 +1143,9 @@ class ResultQuantifier(UnaryExpression, ABC):
         super().__post_init__()
         self._node_.wrap_subtree = True
 
-    def _process_result_(self, result: OperationResult) -> Any:
-        return self._child_._process_result_(result)
-
-    @cached_property
-    def _binding_id_(self) -> int:
-        return self._child_._binding_id_
+    @property
+    def _original_expression_(self) -> SymbolicExpression:
+        return self._child_
 
     def _evaluate__(
         self,
@@ -1287,7 +1385,173 @@ A function that maps the results of a query object descriptor to a new set of re
 
 
 @dataclass
-class QuantifierBuilder:
+class ExpressionBuilder(ABC):
+    """
+    Base class for builder classes of symbolic expressions. This class collects meta-data about expressions to finally
+    build the expression.
+    """
+
+    query_descriptor: QueryObjectDescriptor
+    """
+    The query object descriptor that the expression is being built for.
+    """
+
+    @abstractmethod
+    @cached_property
+    def expression(self) -> SymbolicExpression:
+        """
+        The expression that is built from the metadata.
+        """
+
+
+@dataclass
+class ConstraintSpecifierBuilder(ExpressionBuilder, ABC):
+    """
+    Metadata for constraint specifiers.
+    """
+
+    conditions: Tuple[ConditionType, ...]
+    """
+    The conditions that must be satisfied.
+    """
+
+    def __post_init__(self):
+        self.assert_correct_conditions()
+
+    def assert_correct_conditions(self):
+        """
+        :raises NoConditionsProvidedToWhereStatementOfDescriptor: If no conditions are provided.
+        :raises LiteralConditionError: If any of the conditions is a literal expression.
+        """
+        # If there are no conditions raise error.
+        if len(self.conditions) == 0:
+            raise NoConditionsProvided(self.query_descriptor)
+
+        # If there's a constant condition raise error.
+        literal_expressions = [
+            exp for exp in self.conditions if not isinstance(exp, SymbolicExpression)
+        ]
+        if literal_expressions:
+            raise LiteralConditionError(self.query_descriptor, literal_expressions)
+
+    @cached_property
+    def aggregators_and_non_aggregators_in_conditions(
+        self,
+    ) -> Tuple[Tuple[Aggregator, ...], Tuple[Selectable, ...]]:
+        """
+        :return: A tuple containing the aggregators and non-aggregators in the conditions.
+        """
+        aggregators, non_aggregators = [], []
+        for cond in self.conditions:
+            if isinstance(cond, Aggregator):
+                aggregators.append(cond)
+            elif isinstance(cond, Selectable) and not isinstance(cond, Literal):
+                non_aggregators.append(cond)
+            for var in cond._children_:
+                if isinstance(var, Aggregator):
+                    aggregators.append(var)
+                elif isinstance(var, DomainMapping) and any(
+                    isinstance(v, Aggregator) for v in var._descendants_
+                ):
+                    aggregators.append(var)
+                elif isinstance(var, Selectable) and not isinstance(var, Literal):
+                    non_aggregators.append(var)
+        return tuple(aggregators), tuple(non_aggregators)
+
+    @cached_property
+    def conditions_expression(self) -> SymbolicExpression:
+        """
+        :return: The expression representing the conditions of the constraint specifier.
+        """
+        return chained_logic(AND, *self.conditions)
+
+
+@dataclass
+class WhereBuilder(ConstraintSpecifierBuilder):
+    """
+    Metadata for the `Where` constraint specifier.
+    """
+
+    def assert_correct_conditions(self):
+        """
+        Assert that the where conditions are correct.
+
+        :raises AggregatorInWhereConditionsError: If the where conditions contain any aggregators.
+        """
+        super().assert_correct_conditions()
+        aggregators, non_aggregators = (
+            self.aggregators_and_non_aggregators_in_conditions
+        )
+        if aggregators:
+            raise AggregatorInWhereConditionsError(self.query_descriptor, aggregators)
+
+    @cached_property
+    def expression(self) -> Where:
+        return Where(self.conditions_expression)
+
+
+@dataclass
+class HavingBuilder(ConstraintSpecifierBuilder):
+    """
+    Metadata for the `Having` constraint specifier.
+    """
+
+    group_by: GroupBy = field(kw_only=True, default=None)
+    """
+    The group by expression associated with the having constraint specifier, as the having conditions are applied on
+     the aggregations of grouped results.
+    """
+
+    def assert_correct_conditions(self):
+        """
+        Assert that the having conditions are correct.
+
+        :raises NonAggregatorInHavingConditionsError: If the having conditions contain any non-aggregator expressions.
+        """
+        super().assert_correct_conditions()
+        aggregators, non_aggregators = (
+            self.aggregators_and_non_aggregators_in_conditions
+        )
+        if non_aggregators:
+            raise NonAggregatorInHavingConditionsError(
+                self.query_descriptor, non_aggregators
+            )
+
+    @cached_property
+    def expression(self) -> Having:
+        return Having(self.group_by, self.conditions_expression)
+
+
+@dataclass
+class GroupByBuilder(ExpressionBuilder):
+    """
+    Metadata for the group by operation.
+    """
+
+    variables_to_group_by: Tuple[Selectable, ...] = ()
+    """
+    The variables to group the results by their values.
+    """
+
+    @cached_property
+    def expression(self) -> GroupBy:
+        aggregated_variables, non_aggregated_variables = (
+            self._aggregated_and_non_aggregated_variables_in_selection_
+        )
+        group_by_entity_selected_variables = non_aggregated_variables + [
+            var._child_ for var in aggregated_variables if var._child_ is not None
+        ]
+        return GroupBy(
+            SetOf(
+                _selected_variables=tuple(group_by_entity_selected_variables),
+                _child_=self.query_descriptor._where_builder_.expression,
+            ),
+            self.variables_to_group_by,
+        )
+
+
+@dataclass
+class QuantifierBuilder(ExpressionBuilder):
     type: Type[ResultQuantifier] = An
     """
     The type of the quantifier to be built.
@@ -1297,18 +1561,18 @@ class QuantifierBuilder:
     The quantification constraint that must be satisfied by the result quantifier if present.
     """
 
-    def __call__(self, child: QueryObjectDescriptor) -> ResultQuantifier:
+    @cached_property
+    def expression(self) -> ResultQuantifier:
         """
         Builds a result quantifier of the specified type with the given child and quantification constraint.
-
-        :param child: The child of the result quantifier.
         """
-        if self.quantification_constraint:
+        if self.type is An:
             return self.type(
-                child, _quantification_constraint_=self.quantification_constraint
+                self.query_descriptor,
+                _quantification_constraint_=self.quantification_constraint,
             )
         else:
-            return self.type(child)
+            return self.type(self.query_descriptor)
 
 
 @dataclass(eq=False, repr=False)
@@ -1326,11 +1590,6 @@ class QueryObjectDescriptor(SymbolicExpression, ABC):
     """
     The child of the query object descriptor is the root of the conditions in the query/sub-query graph.
     """
-    _group_by_: Optional[GroupBy] = field(default=None, init=False)
-    """
-    The group-by operation of the query object descriptor if the results are grouped by specific variables.
-     It is built in the `_build_()` method when `grouped_by()` is called or aggregations are selected.
-    """
     _order_by: Optional[OrderByParams] = field(default=None, init=False)
     """
     Parameters for ordering the results of the query object descriptor.
@@ -1347,33 +1606,26 @@ class QueryObjectDescriptor(SymbolicExpression, ABC):
     """
     A set of seen results, used when distinct is called in the query object descriptor.
     """
-    _where_conditions_: Tuple[ConditionType, ...] = field(default=(), init=False)
+    _where_builder_: Optional[WhereBuilder] = field(init=False, default=None)
     """
-    The condition list of the query object descriptor.
+    The metadata for the where constraint specifier of the query object descriptor.
     """
-    _where_expression_: Optional[Where] = field(default=None, init=False)
+    _group_by_builder_: Optional[GroupByBuilder] = field(init=False, default=None)
     """
-    The where expression of the query object descriptor.
+    The metadata for the group by operation of the query object descriptor.
     """
-    _having_conditions_: Tuple[ConditionType, ...] = field(default=(), init=False)
+    _having_builder: Optional[HavingBuilder] = field(init=False, default=None)
     """
-    The condition list of the query object descriptor.
+    The builder for the having constraint specifier of the query object descriptor.
     """
-    _having_conditions_expression_: Optional[SymbolicExpression] = field(
-        default=None, init=False
-    )
+    _quantifier_builder_: QuantifierBuilder = field(default=None, init=False)
     """
-    The having expression of the query object descriptor.
-    """
-    _quantifier_builder_: QuantifierBuilder = field(
-        default_factory=QuantifierBuilder, init=False
-    )
-    """
-    The quantifier of the query object descriptor. The default quantifier is `An` which yields all results.
+    The quantifier builder for the query object descriptor. The default quantifier is `An` which yields all results.
     """
 
     def __post_init__(self):
         super().__post_init__()
+        self._quantifier_builder_ = QuantifierBuilder(self)
         self._enclose_plotted_nodes_of_selected_variables_()
 
     def tolist(self) -> List:
@@ -1389,7 +1641,8 @@ class QueryObjectDescriptor(SymbolicExpression, ABC):
         Wrap the query object descriptor in a ResultQuantifier expression and evaluate it,
          returning an iterator over the results.
         """
-        return self._quantifier_builder_(self).evaluate(limit)
+
+        return self._quantifier_builder_.expression.evaluate(limit)
 
     def where(self, *conditions: ConditionType) -> Self:
         """
@@ -1398,15 +1651,9 @@ class QueryObjectDescriptor(SymbolicExpression, ABC):
         :param conditions: The conditions that describe the query object.
         :return: This query object descriptor.
         """
-
-        self._where_conditions_ = conditions
-
-        self._assert_correct_where_conditions_()
-
-        # Build the expression from the conditions
-        expression = chained_logic(AND, *self._where_conditions_)
-
-        self._where_expression_ = Where(expression)
+        self._where_builder_ = WhereBuilder(
+            conditions=conditions, query_descriptor=self
+        )
         return self
 
     def having(self, *conditions: ConditionType) -> Self:
@@ -1416,13 +1663,9 @@ class QueryObjectDescriptor(SymbolicExpression, ABC):
         :param conditions: The conditions that describe the query object.
         :return: This query object descriptor.
         """
-        self._having_conditions_ = conditions
-
-        self._assert_correct_having_conditions_()
-
-        # Build the expression from the conditions
-        expression = chained_logic(AND, *self._having_conditions_)
-        self._having_conditions_expression_ = expression
+        self._having_builder = HavingBuilder(
+            conditions=conditions, query_descriptor=self
+        )
         return self
 
     def order_by(
@@ -1457,15 +1700,15 @@ class QueryObjectDescriptor(SymbolicExpression, ABC):
         return self
 
     def grouped_by(
-        self, *variables: TypingUnion[Selectable, Any]
+        self, *variables_to_group_by: TypingUnion[Selectable, Any]
     ) -> TypingUnion[Self, T]:
         """
         Specify the variables to group the results by.
 
-        :param variables: The variables to group the results by.
+        :param variables_to_group_by: The variables to group the results by.
         :return: This query object descriptor.
         """
-        self._variables_to_group_by_ = tuple(variables)
+        self._group_by_builder_ = GroupByBuilder(self, variables_to_group_by)
         return self
 
     def _quantify_(
@@ -1480,41 +1723,23 @@ class QueryObjectDescriptor(SymbolicExpression, ABC):
         :param quantification_constraint: The constraint to apply to the quantifier.
         """
         self._build_()
-        self._quantifier_builder_ = QuantifierBuilder(
-            quantifier_type, quantification_constraint
-        )
+        self._quantifier_builder_.type = quantifier_type
+        self._quantifier_builder_.quantification_constraint = quantification_constraint
         return self
 
     def _build_(self):
         """
         Build the query object descriptor by wiring the nodes together in the correct order of evaluation.
         """
-        group_by = None
-        having = None
-        if self._group_:
-            aggregated_variables, non_aggregated_variables = (
-                self._aggregated_and_non_aggregated_variables_in_selection_
-            )
-            group_by_entity_selected_variables = non_aggregated_variables + [
-                var._child_ for var in aggregated_variables if var._child_ is not None
-            ]
-            group_by = GroupBy(
-                SetOf(
-                    _selected_variables=tuple(group_by_entity_selected_variables),
-                    _child_=self._where_expression_,
-                ),
-                self._variables_to_group_by_,
-            )
-            if self._having_conditions_expression_:
-                having = Having(
-                    left=group_by, right=self._having_conditions_expression_
-                )
-        if having:
-            self._child_ = self._update_children_(having)[0]
-        elif group_by:
-            self._child_ = self._update_children_(group_by)[0]
-        elif self._where_expression_ is not None:
-            self._child_ = self._update_children_(self._where_expression_)[0]
+        if self._group_ and self._group_by_builder_ is None:
+            self._group_by_builder_ = GroupByBuilder(self)
+        if self._having_builder is not None:
+            self._having_builder.group_by = self._group_by_builder_.expression
+            self._child_ = self._update_children_(self._having_builder.expression)[0]
+        elif self._group_by_builder_ is not None:
+            self._child_ = self._update_children_(self._group_by_builder_.expression)[0]
+        elif self._where_builder_ is not None:
+            self._child_ = self._update_children_(self._where_builder_.expression)[0]
 
     def _evaluate__(
         self,
@@ -1718,42 +1943,7 @@ class QueryObjectDescriptor(SymbolicExpression, ABC):
         """
         :return: Whether the results should be grouped or not. Is true when an aggregator is selected.
         """
-        return (
-            len(self._aggregated_and_non_aggregated_variables_in_selection_[0]) > 0
-            or self._group_by_ is not None
-        )
-
-    def _assert_correct_conditions_(self, conditions: Tuple[ConditionType, ...]):
-        """
-        :param conditions: The conditions that describe the query object.
-        :raises NoConditionsProvidedToWhereStatementOfDescriptor: If no conditions are provided.
-        :raises LiteralConditionError: If any of the conditions is a literal expression.
-        """
-        # If there are no conditions raise error.
-        if len(conditions) == 0:
-            raise NoConditionsProvided(self)
-
-        # If there's a constant condition raise error.
-        literal_expressions = [
-            exp for exp in conditions if not isinstance(exp, SymbolicExpression)
-        ]
-        if literal_expressions:
-            raise LiteralConditionError(self, literal_expressions)
-
-    def _assert_correct_where_conditions_(self):
-        """
-        Assert that the where conditions are correct.
-
-        :raises UsageError: If the where conditions are not valid.
-        """
-        self._assert_correct_conditions_(self._where_conditions_)
-        aggregators, non_aggregators = (
-            self._aggregators_and_non_aggregators_in_conditions_(
-                tuple(self._where_conditions_)
-            )
-        )
-        if aggregators:
-            raise AggregatorInWhereConditionsError(self, aggregators)
+        return len(self._aggregated_and_non_aggregated_variables_in_selection_[0]) > 0
 
     def _assert_correct_having_conditions_(self):
         """
@@ -1761,39 +1951,14 @@ class QueryObjectDescriptor(SymbolicExpression, ABC):
 
         :raises UsageError: If the having conditions are not valid.
         """
-        self._assert_correct_conditions_(self._having_conditions_)
+        self._assert_correct_conditions_(self._having_meta_data__)
         aggregators, non_aggregators = (
             self._aggregators_and_non_aggregators_in_conditions_(
-                tuple(self._having_conditions_)
+                tuple(self._having_meta_data__)
             )
         )
         if non_aggregators:
             raise NonAggregatorInHavingConditionsError(self, non_aggregators)
-
-    @lru_cache
-    def _aggregators_and_non_aggregators_in_conditions_(
-        self, conditions: Tuple[ConditionType, ...]
-    ) -> Tuple[Tuple[Aggregator, ...], Tuple[Selectable, ...]]:
-        """
-        :param conditions: The conditions that describe the query object.
-        :return: A tuple containing the aggregators and non-aggregators in the where condition.
-        """
-        aggregators, non_aggregators = [], []
-        for cond in conditions:
-            if isinstance(cond, Aggregator):
-                aggregators.append(cond)
-            elif isinstance(cond, Selectable) and not isinstance(cond, Literal):
-                non_aggregators.append(cond)
-            for var in cond._children_:
-                if isinstance(var, Aggregator):
-                    aggregators.append(var)
-                elif isinstance(var, DomainMapping) and any(
-                    isinstance(v, Aggregator) for v in var._descendants_
-                ):
-                    aggregators.append(var)
-                elif isinstance(var, Selectable) and not isinstance(var, Literal):
-                    non_aggregators.append(var)
-        return tuple(aggregators), tuple(non_aggregators)
 
     @staticmethod
     def _variable_is_inferred_(var: Selectable[T]) -> bool:
@@ -2598,81 +2763,6 @@ class Flatten(DomainMapping):
         :return: False as Flatten does not preserve the original iterable structure.
         """
         return False
-
-
-@dataclass(eq=False, repr=False)
-class BinaryExpression(SymbolicExpression, ABC):
-    """
-    A base class for binary operators that can be used to combine symbolic expressions.
-    """
-
-    left: SymbolicExpression
-    """
-    The left operand of the binary operator.
-    """
-    right: SymbolicExpression
-    """
-    The right operand of the binary operator.
-    """
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.left, self.right = self._update_children_(self.left, self.right)
-
-    @cached_property
-    def _all_variable_instances_(self) -> List[Selectable]:
-        """
-        Get the leaf instances of the symbolic expression.
-        This is useful for accessing the leaves of the symbolic expression tree.
-        """
-        return self.left._all_variable_instances_ + self.right._all_variable_instances_
-
-
-@dataclass(eq=False, repr=False)
-class Having(BinaryExpression, ConstraintSpecifier):
-    """
-    A symbolic having expression that can be used to filter the grouped results of a query. Is constructed through
-    the `QueryObjectDescriptor` using the `having()` method.
-    """
-
-    left: GroupBy
-    """
-    The group by expression that is used to group the results of the query. This is a child of the Having expression.
-    As the results need to be grouped before filtering.
-    """
-    right: SymbolicExpression
-    """
-    The constraint expression that is used to filter the grouped results of the query.
-    """
-
-    @property
-    def conditions(self) -> SymbolicExpression:
-        return self.right
-
-    @property
-    def group_by(self) -> GroupBy:
-        return self.left
-
-    def _evaluate__(
-        self,
-        sources: Bindings,
-    ) -> Iterable[OperationResult]:
-
-        yield from (
-            OperationResult(
-                filtered_result.bindings,
-                self.get_and_update_truth_value(),
-                self,
-            )
-            for grouping_result in self.group_by._evaluate_(sources, parent=self)
-            for filtered_result in self.conditions._evaluate_(
-                grouping_result.bindings, parent=self
-            )
-        )
-
-    @property
-    def _name_(self):
-        return self.__class__.__name__
 
 
 def not_contains(container, item) -> bool:
