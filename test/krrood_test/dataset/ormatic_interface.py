@@ -352,6 +352,23 @@ class MixinDAO(Base, DataAccessObject[test.krrood_test.dataset.example_classes.M
     }
 
 
+class NamedNumbersDAO(
+    Base, DataAccessObject[test.krrood_test.dataset.example_classes.NamedNumbers]
+):
+
+    __tablename__ = "NamedNumbersDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+
+    numbers: Mapped[typing.List[builtins.int]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+
 class ParentAlternativelyMappedMappingDAO(
     Base,
     DataAccessObject[

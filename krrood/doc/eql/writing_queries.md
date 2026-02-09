@@ -48,6 +48,11 @@ from krrood.entity_query_language.entity_result_processors import an
 @dataclass
 class Body(Symbol):
     name: str
+    
+    
+@dataclass
+class Handle(Body):
+    pass
 
 
 @dataclass
@@ -56,7 +61,7 @@ class World:
     bodies: List[Body]
 
 
-world = World(1, [Body("Body1"), Body("Body2")])
+world = World(1, [Body("Body1"), Body("Body2"), Handle("Handle1"), Handle("Handle2"), Handle("Handle2")])
 
 body = variable(Body, domain=world.bodies)
 query = an(
@@ -72,6 +77,77 @@ Conditions must be symbolic expressions not constants/literals because they are 
 is not affected by any of the query variables, thus doesn't make sense to put as a condition. An error will be raised
 if you try to do so.
 ```
+
+## Retrieving Results
+
+EQL provides convenient ways to retrieve query results.
+
+### Using `.evaluate()`
+
+The most general way to retrieve results is using `.evaluate()` (must use a result processor like an/the) to get an
+iterator over the results. This is recommended when processing large result sets lazily.
+
+```{code-cell} ipython3
+query = an(entity(body).where(body.name.startswith("B")))
+for res in query.evaluate():
+    print(res)
+```
+
+### Using `.tolist()`
+
+A common way to retrieve all results is using the `.tolist()` method, which is available on both `QueryObjectDescriptor`
+(e.g., `set_of`, `entity`) and `ResultProcessors` (e.g., `count`, `sum`). It evaluates the query and returns the results
+as a list.
+
+```{code-cell} ipython3
+import krrood.entity_query_language.entity_result_processors as eql
+from krrood.entity_query_language.entity import set_of
+
+# On a ResultProcessor
+first_body = an(entity(body)).tolist()[0]
+print(first_body)
+
+# On a QueryObjectDescriptor
+all_names = entity(body.name).tolist()
+print(all_names)
+```
+
+### Ordering with `.order_by()`
+
+Query objects now support ordering of results.
+
+```{code-cell} ipython3
+# Order bodies by height in descending order
+query = entity(body).order_by(body.name[-1], descending=True)
+sorted_bodies = query.tolist()
+for b in sorted_bodies:
+    print(b)
+```
+
+### Distinct with `distinct()`
+
+The `distinct()` function (or the `.distinct()` method) is used to remove duplicate results from a query. 
+
+```{code-cell} ipython3
+from krrood.entity_query_language.entity import distinct
+
+# Using the functional form
+distinct_bodies = distinct(entity(body)).tolist()
+
+# Using the method form
+distinct_bodies = entity(body).distinct().tolist()
+```
+
+#### Distinct on specific attributes
+
+You can specify specific attributes to determine distinctness by passing them as additional arguments to the `distinct()` function or method. This is useful when you want to retrieve unique entities based on a subset of their properties.
+
+```{code-cell} ipython3
+# Get unique bodies based on their name attribute
+# If multiple bodies have the same name, only the first one encountered is returned
+distinct_bodies_by_name = distinct(entity(body), body.name).tolist()
+```
+
 
 
 

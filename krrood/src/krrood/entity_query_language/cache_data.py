@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .utils import T
+from .utils import T, ensure_hashable
 
 """
 Cache utilities.
@@ -44,7 +44,7 @@ class SeenSet:
 
         # Maintain exact-match set only when all keys are present
         if self.keys and all(k in assignment for k in self.keys):
-            self.exact.add(tuple(assignment[k] for k in self.keys))
+            self.exact.add(tuple(ensure_hashable(assignment[k]) for k in self.keys))
 
         self.constraints.append(assignment)
 
@@ -81,7 +81,7 @@ class SeenSet:
         exists in the cache. This is an O(1) membership test and does not consult
         the coverage trie.
         """
-        t = tuple(assignment[k] for k in self.keys)
+        t = tuple(ensure_hashable(assignment[k]) for k in self.keys)
         if t in self.exact:
             return True
         return False
