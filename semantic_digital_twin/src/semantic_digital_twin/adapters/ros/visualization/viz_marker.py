@@ -67,7 +67,7 @@ class VizMarkerPublisher(ModelChangeCallback):
         self.markers = MarkerArray()
         for body in self.world.bodies:
             marker_ns = str(body.name)
-            if self.use_visuals:
+            if self.use_visuals and len(body.visual) > 0:
                 shapes = body.visual.shapes
             else:
                 shapes = body.collision.shapes
