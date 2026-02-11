@@ -10,13 +10,11 @@ from ..core.navigation import LookAtActionDescription, NavigateActionDescription
 from ....config.action_conf import ActionConfig
 from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import PoseStamped
-from ....has_parameters import has_parameters
 from ....language import SequentialPlan
 from ....robot_plans.actions.base import ActionDescription
 from ....tf_transformations import quaternion_from_euler
 
 
-@has_parameters
 @dataclass
 class FaceAtAction(ActionDescription):
     """

@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 from ...perception import PerceptionQuery
 from .base import BaseMotion
-from ...process_module import ProcessModuleManager
 
 
 @dataclass
@@ -19,9 +18,7 @@ class DetectingMotion(BaseMotion):
     """
 
     def perform(self):
-        pm_manager = ProcessModuleManager().get_manager(self.robot_view)
-        obj_dict = pm_manager.detecting().execute(self)
-        return obj_dict
+        return
 
     @property
     def _motion_chart(self):

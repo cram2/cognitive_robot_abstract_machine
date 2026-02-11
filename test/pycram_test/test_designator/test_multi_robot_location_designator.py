@@ -16,7 +16,7 @@ from pycram.designators.location_designator import (
     AccessingLocation,
 )
 from pycram.language import SequentialPlan
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.robot_plans import (
     NavigateActionDescription,
     MoveTorsoActionDescription,

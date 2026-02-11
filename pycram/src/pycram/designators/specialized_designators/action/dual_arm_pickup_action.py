@@ -8,7 +8,7 @@ from owlready2 import Thing
 from ....robot_plans import PickUpAction, PickUpAction
 from ....datastructures.pose import PoseStamped, TransformStamped
 from ....datastructures.enums import Arms, Grasp
-from ....robot_description import RobotDescription, KinematicChainDescription
+from ....view_manager import RobotDescription, KinematicChainDescription
 from ....designator import ObjectDesignatorDescription
 from ....logging import info
 

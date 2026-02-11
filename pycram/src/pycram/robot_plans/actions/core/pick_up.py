@@ -22,16 +22,14 @@ from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import PoseStamped
 from ....failures import ObjectNotGraspedError
 from ....failures import ObjectNotInGraspingArea
-from ....has_parameters import has_parameters
 from ....language import SequentialPlan
-from ....robot_description import ViewManager
+from ....view_manager import ViewManager
 from ....robot_plans.actions.base import ActionDescription
 from ....utils import translate_pose_along_local_axis
 
 logger = logging.getLogger(__name__)
 
 
-@has_parameters
 @dataclass
 class ReachAction(ActionDescription):
     """
@@ -123,7 +121,6 @@ class ReachAction(ActionDescription):
         )
 
 
-@has_parameters
 @dataclass
 class PickUpAction(ActionDescription):
     """
@@ -214,7 +211,6 @@ class PickUpAction(ActionDescription):
         )
 
 
-@has_parameters
 @dataclass
 class GraspingAction(ActionDescription):
     """

@@ -18,8 +18,8 @@ from pycram.datastructures.enums import (
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.pose import PoseStamped
 from pycram.language import SequentialPlan
-from pycram.process_module import simulated_robot
-from pycram.robot_description import ViewManager
+from pycram.motion_executor import simulated_robot
+from pycram.view_manager import ViewManager
 from pycram.robot_plans import (
     MoveTorsoAction,
     MoveTorsoActionDescription,
@@ -55,6 +55,10 @@ from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
+
+# The alternative mapping needs to be imported for the stretch to work properly
+import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
+import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 
 
 @pytest.fixture(scope="session", params=["hsrb", "stretch", "tiago", "pr2"])
@@ -213,6 +217,7 @@ def test_park_arms_multi(immutable_multiple_robot_apartment):
 
 def test_reach_action_multi(immutable_multiple_robot_apartment):
     world, view, context = immutable_multiple_robot_apartment
+
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
 
     grasp_description = GraspDescription(
@@ -225,7 +230,7 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
         1, -2, 0.8, reference_frame=world.root
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        0.3, -2.5, 0, reference_frame=world.root
+        0.3, -2.4, 0, reference_frame=world.root
     )
     world.notify_state_change()
 
@@ -272,7 +277,7 @@ def test_grasping(immutable_multiple_robot_apartment):
     )
     robot_view.root.parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(
-            0.3, -2.5, 0, reference_frame=world.root
+            0.3, -2.4, 0, reference_frame=world.root
         )
     )
     world.notify_state_change()
@@ -303,7 +308,7 @@ def test_pick_up_multi(mutable_multiple_robot_apartment):
         1, -2, 0.6, reference_frame=world.root
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        0.3, -2.5, 0, reference_frame=world.root
+        0.3, -2.4, 0, reference_frame=world.root
     )
     world.notify_state_change()
 
@@ -345,7 +350,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
         1, -2, 0.6, reference_frame=world.root
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        0.3, -2.5, 0, reference_frame=world.root
+        0.3, -2.4, 0, reference_frame=world.root
     )
     world.notify_state_change()
 
@@ -426,7 +431,7 @@ def test_open(immutable_multiple_robot_apartment):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            PoseStamped.from_list([1.75, 1.75, 0], [0, 0, 0.5, 1], world.root)
+            PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0.3, 1], world.root)
         ),
         OpenActionDescription(world.get_body_by_name("handle_cab10_m"), [Arms.LEFT]),
     )
@@ -440,7 +445,7 @@ def test_open(immutable_multiple_robot_apartment):
 def test_close(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
 
-    world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.45
+    world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.3
     world.notify_state_change()
 
     plan = SequentialPlan(
@@ -448,7 +453,7 @@ def test_close(immutable_multiple_robot_apartment):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            PoseStamped.from_list([1.75, 1.75, 0], [0, 0, 0.5, 1], world.root)
+            PoseStamped.from_list([1.46, 2.0, 0], [0, 0, 0.4, 1], world.root)
         ),
         CloseActionDescription(world.get_body_by_name("handle_cab10_m"), [Arms.LEFT]),
     )

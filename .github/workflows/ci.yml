@@ -22,6 +22,7 @@ jobs:
           - lib: pycram
           - lib: random_events
           - lib: probabilistic_model
+          - lib: multiverse_simulators
     uses: ./.github/workflows/ci_reusable.yml
     with:
       lib: ${{ matrix.lib }}

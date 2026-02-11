@@ -15,7 +15,6 @@ from semantic_digital_twin.world_description.world_entity import Body
 from .dataclasses import Rotations
 from .enums import Grasp, AxisIdentifier, ApproachDirection, VerticalAlignment
 from .pose import PoseStamped, PyCramVector3
-from ..has_parameters import HasParameters
 from ..tf_transformations import quaternion_multiply
 from ..utils import translate_pose_along_local_axis
 

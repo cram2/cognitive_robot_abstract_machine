@@ -39,7 +39,7 @@ from typing_extensions import (
 from .datastructures.pose import PoseStamped
 
 if TYPE_CHECKING:
-    from .robot_description import CameraDescription
+    from .view_manager import CameraDescription
 
 
 def link_pose_for_joint_config(

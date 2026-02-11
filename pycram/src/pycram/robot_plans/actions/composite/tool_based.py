@@ -14,7 +14,6 @@ from typing_extensions import Union, Optional, Iterable
 from ...motions.gripper import MoveTCPMotion
 from .... import utils
 from ....datastructures.pose import PoseStamped
-from ....has_parameters import has_parameters
 from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.enums import (
     Arms,
@@ -26,7 +25,6 @@ from ....datastructures.enums import (
 from ....robot_plans.actions.base import ActionDescription
 
 
-@has_parameters
 @dataclass
 class MixingAction(ActionDescription):
     """

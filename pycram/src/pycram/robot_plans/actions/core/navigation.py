@@ -15,12 +15,10 @@ from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import PoseStamped
 from ....failures import LookAtGoalNotReached
 from ....failures import NavigationGoalNotReachedError
-from ....has_parameters import has_parameters
 from ....language import SequentialPlan
 from ....validation.error_checkers import PoseErrorChecker
 
 
-@has_parameters
 @dataclass
 class NavigateAction(ActionDescription):
     """
@@ -66,7 +64,6 @@ class NavigateAction(ActionDescription):
         )
 
 
-@has_parameters
 @dataclass
 class LookAtAction(ActionDescription):
     """

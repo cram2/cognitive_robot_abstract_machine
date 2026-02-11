@@ -29,6 +29,7 @@ from typing_extensions import (
 
 from giskardpy.motion_statechart.graph_node import Task
 from krrood.class_diagrams.failures import ClassIsUnMappedInClassDiagram
+from krrood.ormatic.utils import leaf_types
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
@@ -38,9 +39,7 @@ from krrood.probabilistic_knowledge.parameterizer import Parameterizer
 from .datastructures.dataclasses import ExecutionData, Context
 from .datastructures.enums import TaskStatus
 from .datastructures.pose import PoseStamped
-from .external_interfaces import giskard
 from .failures import PlanFailure
-from .has_parameters import leaf_types
 from .motion_executor import MotionExecutor
 
 if TYPE_CHECKING:
@@ -618,7 +617,6 @@ class Plan:
         if cls.on_end_callback and action_type in cls.on_end_callback:
             cls.on_end_callback[action_type].remove(callback)
 
-
     def parameterize_plan(self, classes: Optional[List[type]] = None) -> List[Any]:
         """
         Parameterize all parameters of a plan using the krrood parameterizer.
@@ -885,8 +883,7 @@ class PlanNode:
         """
         self.status = TaskStatus.INTERRUPTED
         logger.info(f"Interrupted node: {str(self)}")
-        if giskard.giskard_wrapper:
-            giskard.giskard_wrapper.interrupt()
+        # TODO: cancel giskard execution
 
     def resume(self):
         """
