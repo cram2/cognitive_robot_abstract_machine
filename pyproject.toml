@@ -17,6 +17,7 @@ dependencies = [
   "giskardpy",
   "semantic_digital_twin",
   "krrood",
+  "random-events",
   "probabilistic_model",
 ]
 
@@ -26,6 +27,7 @@ members = [
   "giskardpy",
   "semantic_digital_twin",
   "krrood",
+  "random_events",
   "probabilistic_model",
 ]
 
@@ -35,6 +37,19 @@ giskardpy             = { workspace = true }
 semantic_digital_twin = { workspace = true }
 krrood                = { workspace = true }
 probabilistic_model   = { workspace = true }
+random_events         = { workspace = true }
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.dependencies]
+pycram-robotics = { path = "pycram", develop = true }
+giskardpy = { path = "giskardpy", develop = true }
+semantic_digital_twin = { path = "semantic_digital_twin", develop = true }
+krrood = { path = "krrood", develop = true }
+random_events = { path = "random_events", develop = true }
+probabilistic_model = { path = "probabilistic_model", develop = true }
+multiverse_simulators = { path = "multiverse_simulators", develop = true }
 
 [tool.setuptools]
 packages = []
