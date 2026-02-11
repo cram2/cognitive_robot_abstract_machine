@@ -23,14 +23,18 @@ if TYPE_CHECKING:
 
 @dataclass
 class CollisionCheckingResult:
-    contacts: list[Collision] = field(default_factory=list)
+    contacts: list[ClosestPoints] = field(default_factory=list)
 
     def any(self) -> bool:
         return len(self.contacts) > 0
 
 
 @dataclass
-class Collision:
+class ClosestPoints:
+    """
+    Encapsulates the closest points data between two bodies returned by the collision detector.
+    """
+
     body_a: Body
     """
     First body in the collision.
@@ -40,13 +44,26 @@ class Collision:
     Second body in the collision.
     """
 
-    contact_distance: float
-    root_P_pa: np.ndarray
-    root_P_pb: np.ndarray
-    root_V_n: np.ndarray
+    distance: float
+    """
+    Closest distance between the two bodies.
+    """
+    root_P_point_on_body_a: np.ndarray
+    """
+    Closest point on body_a with respect to the worlds root.
+    """
+    root_P_point_on_body_b: np.ndarray
+    """
+    Closest point on body_b with respect to the worlds root.
+    """
+    root_V_contact_normal_from_b_to_a: np.ndarray
+    """
+    Normal vector of the contact plane from body_b to body_a with respect to the worlds root.
+    The contact normal points from body_a to body_b.
+    """
 
     def __str__(self):
-        return f"{self.body_a}|-|{self.body_b}: {self.contact_distance}"
+        return f"{self.body_a}|-|{self.body_b}: {self.distance}"
 
     def __repr__(self):
         return str(self)
@@ -58,13 +75,16 @@ class Collision:
         return self.body_a == other.body_a and self.body_b == other.body_b
 
     def reverse(self):
-        return Collision(
+        """
+        Returns a new ClosestPoints object with the same data but with body_a and body_b swapped.
+        """
+        return ClosestPoints(
             body_a=self.body_b,
             body_b=self.body_a,
-            root_P_pa=self.root_P_pb,
-            root_P_pb=self.root_P_pa,
-            root_V_n=-self.root_V_n,
-            contact_distance=self.contact_distance,
+            root_P_point_on_body_a=self.root_P_point_on_body_b,
+            root_P_point_on_body_b=self.root_P_point_on_body_a,
+            root_V_contact_normal_from_b_to_a=-self.root_V_contact_normal_from_b_to_a,
+            distance=self.distance,
         )
 
 
@@ -178,7 +198,7 @@ class CollisionDetector(abc.ABC):
 
     def check_collision_between_bodies(
         self, body_a: Body, body_b: Body, distance: float = 0.0
-    ) -> Collision | None:
+    ) -> ClosestPoints | None:
         collision = self.check_collisions(
             CollisionMatrix(
                 {CollisionCheck.create_and_validate(body_a, body_b, distance)}

@@ -37,14 +37,6 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
     Class that describes the Human Support Robot variant B (https://upmroboticclub.wordpress.com/robot/).
     """
 
-    def __hash__(self):
-        return hash(
-            tuple(
-                [self.__class__]
-                + sorted([kse.name for kse in self.kinematic_structure_entities])
-            )
-        )
-
     @classmethod
     def _init_empty_robot(cls, world: World) -> Self:
         return cls(

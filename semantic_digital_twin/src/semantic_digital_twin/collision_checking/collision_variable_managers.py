@@ -7,7 +7,7 @@ import numpy as np
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionCheckingResult,
-    Collision,
+    ClosestPoints,
 )
 from semantic_digital_twin.collision_checking.collision_manager import (
     CollisionGroupConsumer,
@@ -79,7 +79,7 @@ class ExternalCollisionVariableManager(CollisionGroupConsumer):
         into the buffer at the right place.
         """
         self.reset_collision_data()
-        closest_contacts: dict[Body, list[Collision]] = defaultdict(list)
+        closest_contacts: dict[Body, list[ClosestPoints]] = defaultdict(list)
         for collision in collision.contacts:
             # 1. check if collision is external
             if (
@@ -92,7 +92,7 @@ class ExternalCollisionVariableManager(CollisionGroupConsumer):
             closest_contacts[collision.body_a].append(collision)
 
         for body_a, collisions in closest_contacts.items():
-            collisions = sorted(collisions, key=lambda c: c.contact_distance)
+            collisions = sorted(collisions, key=lambda c: c.distance)
             for i in range(
                 min(
                     len(collisions),
@@ -102,13 +102,13 @@ class ExternalCollisionVariableManager(CollisionGroupConsumer):
                 collision = collisions[i]
                 group_a = self.get_collision_group(collision.body_a)
                 group_a_T_root = group_a.root.global_pose.inverse().to_np()
-                group_a_P_pa = group_a_T_root @ collision.root_P_pa
+                group_a_P_pa = group_a_T_root @ collision.root_P_point_on_body_a
                 self.insert_data_block(
                     body=group_a.root,
                     idx=i,
                     group_a_P_point_on_a=group_a_P_pa,
-                    root_V_contact_normal=collision.root_V_n,
-                    contact_distance=collision.contact_distance,
+                    root_V_contact_normal=collision.root_V_contact_normal_from_b_to_a,
+                    contact_distance=collision.distance,
                     buffer_distance=self.collision_manager.get_buffer_zone_distance(
                         collision.body_a, collision.body_b
                     ),
@@ -276,7 +276,7 @@ class SelfCollisionVariableManager(CollisionGroupConsumer):
         """
         self.reset_collision_data()
         closest_contacts: dict[
-            tuple[CollisionGroup, CollisionGroup], list[Collision]
+            tuple[CollisionGroup, CollisionGroup], list[ClosestPoints]
         ] = defaultdict(list)
         for collision in collision_result.contacts:
             key = (
@@ -293,14 +293,16 @@ class SelfCollisionVariableManager(CollisionGroupConsumer):
             closest_contacts[key].append(collision)
 
         for (group_a, group_b), collisions in closest_contacts.items():
-            closest_contact = sorted(collisions, key=lambda c: c.contact_distance)[0]
+            closest_contact = sorted(collisions, key=lambda c: c.distance)[0]
             group_a_T_root = group_a.root.global_pose.inverse().to_np()
-            group_a_P_pa = group_a_T_root @ closest_contact.root_P_pa
+            group_a_P_pa = group_a_T_root @ closest_contact.root_P_point_on_body_a
 
             group_b_T_root = group_b.root.global_pose.inverse().to_np()
-            group_b_P_pb = group_b_T_root @ closest_contact.root_P_pb
+            group_b_P_pb = group_b_T_root @ closest_contact.root_P_point_on_body_b
 
-            group_b_V_contact_normal = group_b_T_root @ closest_contact.root_V_n
+            group_b_V_contact_normal = (
+                group_b_T_root @ closest_contact.root_V_contact_normal_from_b_to_a
+            )
 
             self.insert_data_block(
                 group_a=group_a,
@@ -308,7 +310,7 @@ class SelfCollisionVariableManager(CollisionGroupConsumer):
                 group_a_P_point_on_a=group_a_P_pa,
                 group_b_P_point_on_b=group_b_P_pb,
                 group_b_V_contact_normal=group_b_V_contact_normal,
-                contact_distance=closest_contact.contact_distance,
+                contact_distance=closest_contact.distance,
                 buffer_distance=self.collision_manager.get_buffer_zone_distance(
                     closest_contact.body_a, closest_contact.body_b
                 ),

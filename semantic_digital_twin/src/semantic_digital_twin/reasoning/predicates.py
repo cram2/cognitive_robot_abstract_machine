@@ -63,7 +63,7 @@ def contact(
 
     if result is None:
         return False
-    return result.contact_distance < threshold
+    return result.distance < threshold
 
 
 def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:

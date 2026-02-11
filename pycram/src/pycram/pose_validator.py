@@ -14,7 +14,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionCheck,
-    Collision,
+    ClosestPoints,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
@@ -165,7 +165,7 @@ def pose_sequence_reachability_validator(
 
 def collision_check(
     robot: AbstractRobot, allowed_collision: List[Body], world: World
-) -> List[Collision]:
+) -> List[ClosestPoints]:
     """
     This method checks if a given robot collides with any object within the world
     which it is not allowed to collide with.

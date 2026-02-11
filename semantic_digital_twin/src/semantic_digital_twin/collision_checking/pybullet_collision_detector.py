@@ -8,7 +8,7 @@ from .bpb_wrapper import create_shape_from_link
 from .collision_detector import (
     CollisionDetector,
     CollisionCheckingResult,
-    Collision,
+    ClosestPoints,
 )
 from .collision_matrix import CollisionMatrix
 from ..world_description.world_entity import Body
@@ -82,17 +82,17 @@ class BulletCollisionDetector(CollisionDetector):
         )
         return CollisionCheckingResult(
             [
-                Collision(
+                ClosestPoints(
                     body_a=self.world.get_kinematic_structure_entity_by_id(
                         collision.obj_a.name
                     ),
                     body_b=self.world.get_kinematic_structure_entity_by_id(
                         collision.obj_b.name
                     ),
-                    contact_distance=collision.contact_distance,
-                    root_P_pa=collision.map_P_pa,
-                    root_P_pb=collision.map_P_pb,
-                    root_V_n=collision.world_V_n,
+                    distance=collision.contact_distance,
+                    root_P_point_on_body_a=collision.map_P_pa,
+                    root_P_point_on_body_b=collision.map_P_pb,
+                    root_V_contact_normal_from_b_to_a=collision.world_V_n,
                 )
                 for collision in result
             ]

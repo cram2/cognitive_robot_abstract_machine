@@ -2662,7 +2662,7 @@ class TestCollisionAvoidance:
         kin_sim.tick_until_end(500)
         collisions = kin_sim.context.world.collision_manager.compute_collisions()
         assert len(collisions.contacts) == 1
-        assert collisions.contacts[0].contact_distance > 0.049
+        assert collisions.contacts[0].distance > 0.049
 
     def test_self_collision_avoidance(
         self, self_collision_bot_world: World, rclpy_node
@@ -2726,7 +2726,7 @@ class TestCollisionAvoidance:
         collisions = kin_sim.context.world.collision_manager.compute_collisions()
         assert len(collisions.contacts) == 1
         for contact in collisions.contacts:
-            assert contact.contact_distance > 0.249
+            assert contact.distance > 0.249
 
     def test_hard_constraints_violated(self, cylinder_bot_world: World):
         root = cylinder_bot_world.root

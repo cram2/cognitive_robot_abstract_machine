@@ -7,7 +7,7 @@ from typing_extensions import Optional, Dict
 
 from .collision_detector import (
     CollisionDetector,
-    Collision,
+    ClosestPoints,
     CollisionCheckingResult,
 )
 from .collision_matrix import CollisionMatrix
@@ -113,13 +113,17 @@ class TrimeshCollisionDetector(CollisionDetector):
                 )
                 contact_normal /= np.linalg.norm(contact_normal)
                 result.append(
-                    Collision(
-                        contact_distance=distance_result.min_distance,
+                    ClosestPoints(
+                        distance=distance_result.min_distance,
                         body_a=body_a,
                         body_b=body_b,
-                        root_P_pa=np.append(distance_result.nearest_points[0], 1),
-                        root_P_pb=np.append(distance_result.nearest_points[1], 1),
-                        root_V_n=np.append(contact_normal, 0),
+                        root_P_point_on_body_a=np.append(
+                            distance_result.nearest_points[0], 1
+                        ),
+                        root_P_point_on_body_b=np.append(
+                            distance_result.nearest_points[1], 1
+                        ),
+                        root_V_contact_normal_from_b_to_a=np.append(contact_normal, 0),
                     )
                 )
 

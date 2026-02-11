@@ -14,7 +14,7 @@ from krrood.entity_query_language.entity import (
 )
 from krrood.entity_query_language.entity_result_processors import an, the
 
-from ..collision_checking.collision_detector import Collision, CollisionCheck
+from ..collision_checking.collision_detector import ClosestPoints, CollisionCheck
 from ..collision_checking.collision_matrix import CollisionMatrix
 from ..collision_checking.collision_rules import (
     AllowCollisionBetweenGroups,
@@ -31,7 +31,7 @@ def robot_in_collision(
     robot: AbstractRobot,
     ignore_collision_with: Optional[List[Body]] = None,
     threshold: float = 0.001,
-) -> List[Collision]:
+) -> List[ClosestPoints]:
     """
     Check if the robot collides with any object in the world at the given pose.
 
@@ -87,7 +87,7 @@ def blocking(
     pose: HomogeneousTransformationMatrix,
     root: Body,
     tip: Body,
-) -> List[Collision]:
+) -> List[ClosestPoints]:
     """
     Get the bodies that are blocking the robot from reaching a given position.
     The blocking are all bodies that are in collision with the robot when reaching for the pose.
