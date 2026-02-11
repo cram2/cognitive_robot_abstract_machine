@@ -28,6 +28,28 @@ krrood = { path = "krrood", develop = true }
 random_events = { path = "random_events", develop = true }
 probabilistic_model = { path = "probabilistic_model", develop = true }
 
+# Workspace configuration: install members in editable mode during `uv sync`
+[tool.uv.workspace]
+members = [
+  "pycram",
+  "giskardpy",
+  "semantic_digital_twin",
+  "krrood",
+  "random_events",
+  "probabilistic_model",
+]
+
+# Map distribution names (as declared in each member's [project.name])
+# to their workspace implementations. Adjust keys if your subprojects
+# use different distribution names.
+[tool.uv.sources]
+pycram-robotics     = { workspace = true }
+giskardpy           = { workspace = true }
+semantic-digital-twin = { workspace = true }
+krrood              = { workspace = true }
+random-events       = { workspace = true }
+probabilistic-model = { workspace = true }
+
 
 [tool.setuptools]
 # Make the root distribution package-less (no auto-discovery)
