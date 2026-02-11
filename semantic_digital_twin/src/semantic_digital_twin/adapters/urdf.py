@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 import os
-from dataclasses import dataclass
 
 from typing_extensions import Optional, Tuple, Union, List, Dict
 from urdf_parser_py import urdf as urdfpy
@@ -104,6 +105,174 @@ def urdf_joint_to_limits(
     return lower_limits, upper_limits
 
 
+class PackageLocator(ABC):
+    """
+    Abstract base class for package locators.
+    """
+
+    @abstractmethod
+    def resolve(self, package_name: str) -> str:
+        """
+        Resolves a package name to its local filesystem path.
+        """
+
+
+@dataclass
+class AmentPackageLocator(PackageLocator):
+    """
+    Resolves packages using ament.
+    """
+
+    def resolve(self, package_name: str) -> str:
+        try:
+            from ament_index_python.packages import get_package_share_directory
+
+            return get_package_share_directory(package_name)
+        except (ImportError, LookupError) as error:
+            raise ParsingError(
+                message=f"Ament could not resolve package '{package_name}': {error}"
+            )
+
+
+@dataclass
+class ROSPackagePathLocator(PackageLocator):
+    """
+    Resolves packages using ROS_PACKAGE_PATH.
+    """
+
+    def resolve(self, package_name: str) -> str:
+        for root in os.environ.get("ROS_PACKAGE_PATH", "").split(":"):
+            if not root:
+                continue
+            candidate = os.path.join(root, package_name)
+            if os.path.isdir(candidate):
+                return candidate
+        raise ParsingError(
+            message=f"Package '{package_name}' not found in ROS_PACKAGE_PATH."
+        )
+
+
+@dataclass
+class ROSPackageLocator(PackageLocator):
+    """
+    Tries multiple package locators in order.
+    """
+
+    locators: List[PackageLocator] = field(
+        default_factory=lambda: [AmentPackageLocator(), ROSPackagePathLocator()]
+    )
+
+    def resolve(self, package_name: str) -> str:
+        errors = []
+        for locator in self.locators:
+            try:
+                return locator.resolve(package_name)
+            except ParsingError as error:
+                errors.append(str(error))
+        raise ParsingError(
+            message=f"Could not resolve package '{package_name}'. Details: {'; '.join(errors)}"
+        )
+
+
+class PathResolver(ABC):
+    """
+    Abstract base class for path resolvers.
+    """
+
+    @abstractmethod
+    def supports(self, uri: str) -> bool:
+        """
+        Checks if the URI is supported by this resolver.
+        """
+
+    @abstractmethod
+    def resolve(self, uri: str) -> str:
+        """
+        Resolves a URI to an absolute local file path.
+        """
+
+
+@dataclass
+class PackageUriResolver(PathResolver):
+    """
+    Resolves package:// URIs.
+    """
+
+    locator: PackageLocator = field(default_factory=ROSPackageLocator)
+
+    def supports(self, uri: str) -> bool:
+        return uri.startswith("package://")
+
+    def resolve(self, uri: str) -> str:
+        rest = uri[len("package://") :]
+        if "/" not in rest:
+            package_name, relative_path = rest, ""
+        else:
+            package_name, relative_path = rest.split("/", 1)
+        base = self.locator.resolve(package_name)
+        return os.path.join(base, relative_path)
+
+
+@dataclass
+class FileUriResolver(PathResolver):
+    """
+    Resolves file:// URIs and plain filesystem paths.
+    """
+
+    def supports(self, uri: str) -> bool:
+        return uri.startswith("file://") or uri.startswith("/") or "://" not in uri
+
+    def resolve(self, uri: str) -> str:
+        path = uri
+        if uri.startswith("file://"):
+            path = (
+                uri.replace("file://", "./", 1)
+                if not uri.startswith("file:///")
+                else uri[len("file://") :]
+            )
+        return path
+
+
+@dataclass
+class CompositePathResolver(PathResolver):
+    """
+    Tries multiple path resolvers in order.
+    """
+
+    resolvers: List[PathResolver] = field(
+        default_factory=lambda: [
+            FileUriResolver(),
+            PackageUriResolver(),
+        ]
+    )
+
+    def supports(self, uri: str) -> bool:
+        """
+        Checks if the URI is supported by any of the resolvers.
+        """
+        return any(resolver.supports(uri) for resolver in self.resolvers)
+
+    def resolve(self, uri: str) -> str:
+        """
+        Resolves a URI to an absolute local file path.
+        """
+        errors = []
+        for resolver in self.resolvers:
+            if not resolver.supports(uri):
+                continue
+            try:
+                return resolver.resolve(uri)
+            except ParsingError as error:
+                errors.append(str(error))
+
+        for resolver in self.resolvers:
+            if isinstance(resolver, FileUriResolver):
+                return resolver.resolve(uri)
+        raise ParsingError(
+            message=f"Could not resolve path '{uri}'. Details: {'; '.join(errors)}"
+        )
+
+
 @dataclass
 class URDFParser:
     """
@@ -121,12 +290,9 @@ class URDFParser:
     The prefix for every name used in this world.
     """
 
-    package_resolver: Optional[Dict[str, str]] = None
+    path_resolver: PathResolver = field(default_factory=CompositePathResolver)
     """
-    The package resolver to use for resolving package paths in the URDF file. If ROS is installed, ROS will be used
-     to resolve the paths, otherwise the package_resolver must be provided if the URDF file contains package paths.
-     The key is the package name and the value is the path to the package. You can also set the environment variable
-     `ROS_PACKAGE_PATH` to a colon-separated list of package paths, which will be used as the package resolver.
+    The path resolver to use for resolving URIs in the URDF file.
     """
 
     def __post_init__(self):
@@ -134,21 +300,24 @@ class URDFParser:
         self.parsed = urdfpy.URDF.from_xml_string(self.urdf)
         if self.prefix is None:
             self.prefix = robot_name_from_urdf_string(self.urdf)
-        if self.package_resolver is None:
-            package_paths = os.environ.get("ROS_PACKAGE_PATH", "").split(":")
-            self.package_resolver = {
-                os.path.basename(path): path
-                for path in package_paths
-                if os.path.exists(path)
-            }
 
     @classmethod
     def from_file(cls, file_path: str, prefix: Optional[str] = None) -> URDFParser:
+        if file_path.endswith(".xacro"):
+            return cls.from_xacro(file_path, prefix)
         if file_path is not None:
             with open(file_path, "r") as file:
                 # Since parsing URDF causes a lot of warning messages which can't be deactivated, we suppress them
                 with suppress_stdout_stderr():
                     urdf = file.read()
+        return URDFParser(urdf=urdf, prefix=prefix)
+
+    @classmethod
+    def from_xacro(cls, xacro_path: str, prefix: Optional[str] = None) -> URDFParser:
+        from xacro import process_file
+
+        xacro_path = CompositePathResolver().resolve(xacro_path)
+        urdf = process_file(xacro_path).toxml()
         return URDFParser(urdf=urdf, prefix=prefix)
 
     def parse(self) -> World:
@@ -341,35 +510,9 @@ class URDFParser:
 
     def parse_file_path(self, file_path: str) -> str:
         """
-        Parses a file path which contains a ros package to a path in the local file system.
+        Parses a file path to a path in the local file system.
 
         :param file_path: The path to the URDF file.
         :return: The parsed and processed file path.
         """
-        if "package://" in file_path:
-            # Splits the file path at '//' to get the package  and the rest of the path
-            package_split = file_path.split("//")
-            # Splits the path after the // to get the package name and the rest of the path
-            package_name = package_split[1].split("/")[0]
-            try:
-                from ament_index_python.packages import get_package_share_directory
-
-                package_path = get_package_share_directory(package_name)
-            except (ImportError, LookupError):
-                if self.package_resolver:
-                    if package_name in self.package_resolver:
-                        package_path = self.package_resolver[package_name]
-                    else:
-                        raise ParsingError(
-                            message=f"Package '{package_name}' not found in package resolver and "
-                            f"ROS is not installed."
-                        )
-                else:
-                    raise ParsingError(
-                        message="No ROS install found while the URDF file contains references to "
-                        "ROS packages."
-                    )
-            file_path = file_path.replace("package://" + package_name, package_path)
-        if "file://" in file_path:
-            file_path = file_path.replace("file://", "./")
-        return file_path
+        return self.path_resolver.resolve(file_path)

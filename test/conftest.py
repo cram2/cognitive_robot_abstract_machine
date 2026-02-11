@@ -355,15 +355,8 @@ def world_with_urdf_factory(
 
 @pytest.fixture(scope="session")
 def pr2_world_setup():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "pycram",
-        "resources",
-        "robots",
-    )
-    pr2 = os.path.join(urdf_dir, "pr2_calibrated_with_ft.urdf")
-    return world_with_urdf_factory(pr2, PR2, OmniDrive)
+    urdf_dir = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+    return world_with_urdf_factory(urdf_dir, PR2, OmniDrive)
 
 
 @pytest.fixture(scope="session")
