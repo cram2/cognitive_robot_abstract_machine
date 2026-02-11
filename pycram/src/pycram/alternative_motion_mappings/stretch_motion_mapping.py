@@ -7,7 +7,7 @@ from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from pycram.datastructures.enums import ExecutionType
-from pycram.robot_description import ViewManager
+from pycram.view_manager import ViewManager
 from pycram.robot_plans import MoveTCPMotion, MoveMotion, ClosingMotion
 from pycram.robot_plans.motions.base import AlternativeMotion
 from semantic_digital_twin.robots.stretch import Stretch
