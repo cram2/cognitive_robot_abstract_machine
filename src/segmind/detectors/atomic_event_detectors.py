@@ -7,16 +7,12 @@ from queue import Queue, Empty, Full
 
 import numpy as np
 
-from pycram.datastructures.pose import PoseStamped
-from semantic_digital_twin.collision_checking.collision_detector import Collision, CollisionCheck
-from semantic_digital_twin.collision_checking.trimesh_collision_detector import TrimeshCollisionDetector
+from semantic_digital_twin.collision_checking.collision_detector import Collision
+from semantic_digital_twin.reasoning.predicates import contact
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body, Agent
-
-from .. import logger, set_logger_level, LogLevel
-from ..datastructures.mixins import HasPrimaryTrackedObject, HasSecondaryTrackedObject, \
-    HasPrimaryAndSecondaryTrackedObjects
+from ..datastructures.mixins import HasPrimaryTrackedObject,HasPrimaryAndSecondaryTrackedObjects
 from ..detectors.motion_detection_helpers import is_displaced, is_stopped, \
     ExponentialMovingAverage
 from ..episode_player import EpisodePlayer
@@ -36,7 +32,7 @@ from .motion_detection_helpers import DataFilter
 from ..utils import calculate_quaternion_difference, \
     calculate_translation, PropagatingThread
 
-set_logger_level(LogLevel.DEBUG)
+
 class AtomicEventDetector(PropagatingThread):
     """
     A thread that detects events in another thread and logs them. The event detector is a function that has no arguments
@@ -62,7 +58,7 @@ class AtomicEventDetector(PropagatingThread):
         self.logger: EventLogger = logger if logger else EventLogger.current_logger
         self.world: World = world
         self.wait_time = wait_time if wait_time is not None else timedelta(milliseconds=50)
-        self.tcd = TrimeshCollisionDetector(self.world)
+
         self.queues: List[Queue] = []
 
         self.run_once = False
@@ -138,8 +134,7 @@ class AtomicEventDetector(PropagatingThread):
         """
         events = self.detect_events()
         if events:
-            for event in events:
-                self.log_event(event)
+            [self.log_event(event) for event in events]
 
     def _wait_if_paused(self):
         """
@@ -202,12 +197,12 @@ class NewObjectDetector(AtomicEventDetector):
         self.avoid_objects = avoid_objects if avoid_objects else lambda obj: False
         #self.world.add_callback_on_add_object(self.on_add_object)
 
-    def on_add_object(self, body: Body):
+    def on_add_object(self, obj: Body):
         """
         Callback function that is called when a new object is added to the scene.
         """
-        if not self.avoid_objects(body):
-            self.new_object_queue.put(body)
+        if not self.avoid_objects(obj):
+            self.new_object_queue.put(obj)
 
     def detect_events(self) -> List[Event]:
         """
@@ -228,8 +223,8 @@ class NewObjectDetector(AtomicEventDetector):
         """
         Remove the callback on the add object event and resume the thread to be able to join.
         """
-        if self.world is not None:
-            self.world.remove_callback_on_add_object(self.on_add_object)
+        #if self.world is not None:
+        #    self.world.remove_callback_on_add_object(self.on_add_object)
         super().stop()
 
     def _join(self, timeout=None):
@@ -248,7 +243,7 @@ class DetectorWithTrackedObject(AtomicEventDetector, HasPrimaryTrackedObject, AB
                  *args, **kwargs):
         """
         :param logger: An instance of the EventLogger class that is used to log the events.
-        :param tracked_object: An Object instance that represents the object to track.
+        :param tracked_object: An Body instance that represents the object to track.
         :param wait_time: An optional timedelta value that introduces a delay between calls to the event detector.
         """
         HasPrimaryTrackedObject.__init__(self, tracked_object=tracked_object)
@@ -267,8 +262,8 @@ class DetectorWithTwoTrackedObjects(AtomicEventDetector, HasPrimaryAndSecondaryT
                  wait_time: Optional[timedelta] = None, *args, **kwargs):
         """
         :param logger: An instance of the EventLogger class that is used to log the events.
-        :param tracked_object: An Object instance that represents the object to track.
-        :param with_object: An optional Object instance that represents the object to track.
+        :param tracked_object: An Body instance that represents the object to track.
+        :param with_object: An optional Body instance that represents the object to track.
         :param wait_time: An optional timedelta value that introduces a delay between calls to the event detector.
         """
         HasPrimaryAndSecondaryTrackedObjects.__init__(self, tracked_object=tracked_object, with_object=with_object)
@@ -294,44 +289,32 @@ class AbstractContactDetector(DetectorWithTwoTrackedObjects, ABC):
         DetectorWithTwoTrackedObjects.__init__(self, logger, tracked_object, with_object, wait_time,
                                                *args, **kwargs)
         self.max_closeness_distance = max_closeness_distance
-        self.latest_contact_points: List[Collision] = []
-        self.latest_interference_points: List[Collision] = []
+        self.latest_contact_bodies: Optional[list[Body]]
+        self.latest_interference_bodies: Optional[list[Body]]
 
-    def get_events(self, new_objects_contact: List[Body], new_bodies_interference: List[Body],
-                   contact_points: list[Collision], interference_points: list[Collision],
-                   event_type: Type[AbstractContactEvent]):
+    def get_events(self, new_objects_contact: List[Body], contact_bodies: list[Body], event_type: Type[AbstractContactEvent]):
         if event_type is ContactEvent:
             contact_event_type = ContactEvent
             agent_contact_event_type = AgentContactEvent
-            interference_event_type = InterferenceEvent
-            agent_interference_event_type = AgentInterferenceEvent
         elif event_type is LossOfContactEvent:
             contact_event_type = LossOfContactEvent
             agent_contact_event_type = AgentLossOfContactEvent
-            interference_event_type = LossOfInterferenceEvent
-            agent_interference_event_type = AgentLossOfInterferenceEvent
         else:
             raise NotImplementedError(f"Invalid event type {event_type}")
         events = []
-        for body in new_bodies_interference:
-            if issubclass(self.obj_type, Agent):
-                event_type = agent_interference_event_type
-            else:
-                event_type = interference_event_type
-            events.append(event_type(contact_points=self.get_points_of_body(interference_points, body),
-                                     latest_contact_points=self.latest_interference_points,
-                                     of_object=self.tracked_object, with_object=body))
         for obj in new_objects_contact:
-            if obj in new_bodies_interference:
-                continue
+            if issubclass(self.obj_type, Agent):
+                event_type = agent_contact_event_type
             else:
-                if issubclass(self.obj_type, Agent):
-                    event_type = agent_contact_event_type
-                else:
-                    event_type = contact_event_type
-                events.append(event_type(contact_points=self.get_points_of_object(contact_points, obj),
-                                         latest_contact_points=self.latest_contact_points,
-                                         of_object=self.tracked_object, with_object=obj))
+                event_type = contact_event_type
+
+            contact_bodies = []
+            for i in self.world.bodies_with_enabled_collision:
+                if contact(obj, i):
+                    contact_bodies.append(i)
+            events.append(event_type(contact_points=contact_bodies,
+                                     latest_contact_points=self.latest_contact_bodies,
+                                     of_object=self.tracked_object, with_object=obj))
         return events
 
     @property
@@ -346,77 +329,29 @@ class AbstractContactDetector(DetectorWithTwoTrackedObjects, ABC):
         Detects the closest points between the object to track and another object in the scene if the with_object
         attribute is set, else, between the object to track and all other objects in the scene.
         """
-        #logger.debug("Getting contact points...")
-        contact_points, interference_points = self.get_contact_points()
-        #logger.debug(f"Contact points: {contact_points=}, {interference_points=}")
-        events = self.trigger_events(contact_points, interference_points)
+        contact_bodies = self.get_contact_bodies()
 
-        self.latest_contact_points = contact_points
-        self.latest_interference_points = interference_points
+        events = self.trigger_events(contact_bodies)
+
+        self.latest_contact_bodies = contact_bodies
 
         return events
 
-    def get_contact_points(self) -> Tuple[list[Collision], list[Collision]]:
-        return self.get_contact_points_for_body(self.tracked_object, self.max_closeness_distance, self.with_object)
+    def get_contact_bodies(self) -> list[Body]:
+        contact_bodies = []
+        if self.with_object:
+            if contact(self.tracked_object, self.with_object):
+                contact_bodies.append(self.with_object)
 
-    @staticmethod
-    def get_contact_points_for_body(tracked_object: Body, max_closeness_distance: float,
-                                   with_object: Optional[Body] = None) -> Tuple[list[Collision], list[Collision]]:
-        world = tracked_object._world
-        collision_detector = TrimeshCollisionDetector(world)
-        collision_matrix = []
-        if with_object is not None:
-            try:
-                collision_matrix.append(
-                    CollisionCheck(tracked_object, with_object, max_closeness_distance, world))
-            except ValueError:
-                pass
         else:
-            for body in world.bodies_with_enabled_collision:
-                if body == tracked_object:
-                    continue
-                try:
-                    collision_matrix.append(
-                        CollisionCheck(tracked_object, body, max_closeness_distance, world))
-                except ValueError:
-                    continue
+            for obj in self.world.bodies_with_enabled_collision:
+                if contact(self.tracked_object, obj):
+                    contact_bodies.append(obj)
 
-        if not collision_matrix:
-            return [], []
-
-        logger.debug(f"Collision matrix: {collision_matrix=}")
-        all_collisions = collision_detector.check_collisions(collision_matrix)
-        contact_points = [c for c in all_collisions if c.contact_distance <= max_closeness_distance]
-        interference_points = [c for c in all_collisions if c.contact_distance <= 0]
-
-        # For contact/interference, body_a should always be the tracked object for consistency in detectors
-        for cp in contact_points:
-            if cp.body_b == tracked_object:
-                cp.body_a, cp.body_b = cp.body_b, cp.body_a
-        for ip in interference_points:
-            if ip.body_b == tracked_object:
-                ip.body_a, ip.body_b = ip.body_b, ip.body_a
-
-        return contact_points, interference_points
-
-    @staticmethod
-    def get_points_of_object(collisions: list[Collision], obj: Body) -> list[Collision]:
-        return [c for c in collisions if c.body_a == obj or c.body_b == obj]
-
-    @staticmethod
-    def get_points_of_body(collisions: list[Collision], body: Body) -> list[Collision]:
-        return [c for c in collisions if c.body_a == body or c.body_b == body]
-
-    @staticmethod
-    def get_bodies_in_contact(collisions: list[Collision]) -> list[Body]:
-        bodies = set()
-        for c in collisions:
-            bodies.add(c.body_a)
-            bodies.add(c.body_b)
-        return list(bodies)
+        return contact_bodies
 
     @abstractmethod
-    def trigger_events(self, contact_points: list[Collision], interference_points: list[Collision]) -> List[Event]:
+    def trigger_events(self, contact_bodies: list[Body]) -> List[Event]:
         """
         Checks if the detection condition is met, (e.g., the object is in contact with another object),
         and returns an object that represents the event.
@@ -435,7 +370,7 @@ class ContactDetector(AbstractContactDetector):
     A thread that detects if the object got into contact with another object.
     """
 
-    def trigger_events(self, contact_points: list[Collision], interference_points: list[Collision]) \
+    def trigger_events(self, contact_objects: list[Body]) \
             -> Union[List[ContactEvent], List[AgentContactEvent]]:
         """
         Check if the object got into contact with another object.
@@ -445,41 +380,18 @@ class ContactDetector(AbstractContactDetector):
         :return: An instance of the ContactEvent/AgentContactEvent class that represents the event if the object got
          into contact, else None.
         """
-        #logger.debug(f"ContactDetector: {contact_points=}, {interference_points=}")
-        prev_contacts = {
-            (cp.body_a, cp.body_b) for cp in self.latest_contact_points
-        }
-        curr_contacts = {(cp.body_a, cp.body_b) for cp in contact_points}
-
-        new_contact_pairs = curr_contacts - prev_contacts
-        new_objects_in_contact = [
-            cp.body_b
-            for cp in contact_points
-            if (cp.body_a, cp.body_b) in new_contact_pairs
-        ]
-
-        prev_interference = {c.body_b for c in self.latest_interference_points}
-        curr_interference = {c.body_b for c in interference_points}
-
-        new_bodies_in_interference = list(curr_interference - prev_interference)
+        #new_objects_in_contact = contact_objects.get_new_objects(self.latest_contact_points)
+        new_objects_in_contact = []
+        for obj in contact_objects:
+            if obj not in self.latest_contact_bodies:
+                new_objects_in_contact.append(obj)
 
         if self.with_object is not None:
-            new_objects_in_contact = [
-                obj for obj in new_objects_in_contact if obj == self.with_object
-            ]
-            new_bodies_in_interference = [
-                body for body in new_bodies_in_interference if body == self.with_object
-            ]
+            new_objects_in_contact = [obj for obj in new_objects_in_contact if obj == self.with_object]
 
-        events = self.get_events(
-            new_objects_contact=new_objects_in_contact,
-            new_bodies_interference=new_bodies_in_interference,
-            contact_points=contact_points,
-            interference_points=interference_points,
-            event_type=ContactEvent,
-        )
-
-        return events
+        if len(new_objects_in_contact) == 0:
+            return []
+        return self.get_events(new_objects_in_contact, contact_objects, ContactEvent)
 
 
 class LossOfContactDetector(AbstractContactDetector):
@@ -487,7 +399,7 @@ class LossOfContactDetector(AbstractContactDetector):
     A thread that detects if the object lost contact with another object.
     """
 
-    def trigger_events(self, contact_points: list[Collision], interference_points: list[Collision]) \
+    def trigger_events(self, contact_bodies: list[Body]) \
             -> List[LossOfContactEvent]:
         """
         Check if the object lost contact with another object.
@@ -497,47 +409,30 @@ class LossOfContactDetector(AbstractContactDetector):
         :return: An instance of the LossOfContactEvent/AgentLossOfContactEvent class that represents the event if the
          object lost contact, else None.
         """
-        #logger.debug(f"LossOfContactDetector: {contact_points=}, {interference_points=}")
-        objects_that_lost_contact, bodies_that_lost_interference = self.get_bodies_that_lost_contact(contact_points,
-                                                                                                     interference_points)
-        if len(objects_that_lost_contact) == 0 and len(bodies_that_lost_interference) == 0:
+        objects_that_lost_contact = self.get_bodies_that_lost_contact(contact_bodies)
+        if objects_that_lost_contact:
             return []
-        return self.get_events(objects_that_lost_contact, bodies_that_lost_interference,
-                               contact_points, interference_points, LossOfContactEvent)
+        return self.get_events(objects_that_lost_contact,
+                               contact_bodies, LossOfContactEvent)
 
-    def get_bodies_that_lost_contact(self, contact_points: list[Collision], interference_points: list[Collision]) \
-            -> Tuple[List[Body], List[Body]]:
+    def get_bodies_that_lost_contact(self, contact_bodies: list[Body]) -> List[Body]:
         """
-        Get the objects that lost contact or interference with the tracked object.
+        Get the objects that lost contact with the object to track.
+
+        :param contact_points: The current contact points.
+        :param interference_points: The current interference points.
+        :return: A list of Body instances that represent the objects that lost contact with the object to track.
         """
-        #logger.debug(f"LossOfContactDetector: {contact_points=}, {interference_points=}")
-        prev_contacts = {
-            (cp.body_a, cp.body_b) for cp in self.latest_contact_points
-        }
-        curr_contacts = {(cp.body_a, cp.body_b) for cp in contact_points}
-
-        lost_contact_pairs = prev_contacts - curr_contacts
-        objects_that_lost_contact = [
-            b for (a, b) in lost_contact_pairs if a == self.tracked_object
-        ]
-
-        prev_interference = {c.body_b for c in self.latest_interference_points}
-        curr_interference = {c.body_b for c in interference_points}
-
-        bodies_that_lost_interference = list(prev_interference - curr_interference)
+        objects_that_lost_contact = []
+        for body in contact_bodies:
+            if body not in self.latest_contact_bodies:
+                objects_that_lost_contact.append(body)
 
         if self.with_object is not None:
-            objects_that_lost_contact = [
-                obj for obj in objects_that_lost_contact if obj == self.with_object
-            ]
-            bodies_that_lost_interference = [
-                body
-                for body in bodies_that_lost_interference
-                if body == self.with_object
-            ]
+            objects_that_lost_contact = [obj for obj in objects_that_lost_contact
+                                         if obj == self.with_object]
 
-        return objects_that_lost_contact, bodies_that_lost_interference
-
+        return objects_that_lost_contact
 
 
 class MotionDetector(DetectorWithTrackedObject, ABC):
@@ -584,7 +479,7 @@ class MotionDetector(DetectorWithTrackedObject, ABC):
         """
         :param logger: An instance of the EventLogger class that is used to log the events.
         :param starter_event: An instance of the NewObjectEvent class that represents the event to start the event.
-        :param tracked_object: An optional Object instance that represents the object to track.
+        :param tracked_object: An optional Body instance that represents the object to track.
         :param velocity_threshold: The threshold for the velocity to detect movement.
         :param time_between_frames: The time between frames of episode player.
         :param window_size: The size of the window that is used to calculate the distances (must be > 1).
@@ -700,7 +595,6 @@ class MotionDetector(DetectorWithTrackedObject, ABC):
         Get the current pose and time of the object.
         """
         pose = self.tracked_object.global_pose.to_pose()
-
         return pose, time.time()  # pose.header.stamp.timestamp()
 
     def detect_events(self) -> Optional[List[MotionEvent]]:
@@ -711,22 +605,17 @@ class MotionDetector(DetectorWithTrackedObject, ABC):
         """
         try:
             # latest_pose, latest_time = self.update_with_latest_motion_data()
-            try:
-                _, _ = self.data_queue.get_nowait()
-                self.data_queue.task_done()
-            except Empty:
-                pass
-            
-            self.latest_pose, self.latest_time = self.get_current_pose_and_time()
-            self.poses.append(self.latest_pose)
-            self.times.append(self.latest_time)
+            _, _ = self.data_queue.get_nowait()
+            self.data_queue.task_done()
+            latest_pose, latest_time = self.get_current_pose_and_time()
+            self.poses.append(latest_pose)
+            self.times.append(latest_time)
             if len(self.poses) > 1:
                 self.calculate_and_update_latest_distance()
                 self._crop_distances_and_times_to_window_size()
 
             if not self.window_size_reached:
                 return
-
             events: Optional[List[MotionEvent]] = None
             if self.motion_sate_changed:
                 self.last_state_change_idx = len(self.all_distances) - 1
@@ -736,11 +625,8 @@ class MotionDetector(DetectorWithTrackedObject, ABC):
                 self.keep_track_of_history()
 
             return events
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            self.exc = e
-            raise e
+        except Empty:
+            return
 
     def update_motion_state_and_create_event(self) -> MotionEvent:
         """
@@ -844,9 +730,7 @@ class MotionDetector(DetectorWithTrackedObject, ABC):
         """
         current_pose, current_time = self.get_current_pose_and_time()
         event_type = self.get_event_type()
-        start_pose_stamped = PoseStamped.from_spatial_type(self.start_pose)
-        current_pose_stamped = PoseStamped.from_spatial_type(current_pose)
-        event = event_type(self.tracked_object, start_pose_stamped, current_pose_stamped, timestamp=self.event_time)
+        event = event_type(self.tracked_object, self.start_pose, current_pose, timestamp=self.event_time)
         return event
 
     @abstractmethod
@@ -975,11 +859,8 @@ class RotationDetector(MotionDetector):
         """
         Calculate the angle between the latest and current quaternions of the object
         """
-        quat_1 = [float(self.poses[-2].orientation.x), float(self.poses[-2].orientation.y),
-                  float(self.poses[-2].orientation.z), float(self.poses[-2].orientation.w)]
-        quat_2 = [float(self.poses[-1].orientation.x), float(self.poses[-1].orientation.y),
-                  float(self.poses[-1].orientation.z), float(self.poses[-1].orientation.w)]
-        quat_diff = calculate_quaternion_difference(quat_1, quat_2)
+        quat_diff = calculate_quaternion_difference(self.poses[-2].to_quaternion().to_list(),
+                                                    self.poses[-1].to_quaternion().to_list())
         # angle = 2 * np.arccos(quat_diff[0])
         euler_diff = list(euler_from_quaternion(quat_diff))
         euler_diff[2] = 0
