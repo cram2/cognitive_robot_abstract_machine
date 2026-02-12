@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import copy
 import itertools
 import os
 import tempfile
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
-from functools import cached_property, lru_cache
+from functools import cached_property
 
 import numpy as np
 import trimesh
@@ -21,6 +20,7 @@ from typing_extensions import Optional, List, Dict, Any, Self, Tuple, TYPE_CHECK
 from krrood.adapters.exceptions import JSON_TYPE_NAME
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from ..datastructures.variables import SpatialVariables
+from ..mixin import HasSimulatorProperties
 from ..spatial_types import HomogeneousTransformationMatrix, Point3, Vector3
 from ..utils import IDGenerator
 
@@ -170,7 +170,7 @@ class Scale:
 
 
 @dataclass
-class Shape(ABC, SubclassJSONSerializer):
+class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
     """
     Base class for all shapes in the world.
     """
@@ -327,6 +327,11 @@ class FileMesh(Mesh):
         mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
         return mesh
 
+    def to_triangle_mesh(self) -> TriangleMesh:
+        return TriangleMesh(
+            mesh=self.mesh, origin=self.origin, color=self.color, scale=self.scale
+        )
+
     def to_json(self) -> Dict[str, Any]:
         json = {
             **super().to_json(),
@@ -373,10 +378,14 @@ class TriangleMesh(Mesh):
     The loaded mesh object.
     """
 
+    @property
+    def file_name(self) -> str:
+        return self.file.name
+
     @cached_property
     def file(
         self, dirname: str = "/tmp", file_type: str = "obj"
-    ) -> tempfile.NamedTemporaryFile:
+    ) -> tempfile._TemporaryFileWrapper:
         f = tempfile.NamedTemporaryFile(dir=dirname, delete=False)
         if file_type == "obj":
             self.mesh.export(f.name, file_type="obj")
@@ -493,12 +502,12 @@ class TriangleMesh(Mesh):
         if thickness_padding > 0:
             P_aug = np.vstack(
                 [
-                    points + thickness_padding * unit_vector_normal,
-                    points - thickness_padding * unit_vector_normal,
+                    centered_points + thickness_padding * unit_vector_normal,
+                    centered_points - thickness_padding * unit_vector_normal,
                 ]
             )
         else:
-            P_aug = points
+            P_aug = centered_points
 
         hull = trimesh.points.PointCloud(P_aug).convex_hull
         hull.remove_unreferenced_vertices()
@@ -757,9 +766,9 @@ class BoundingBox:
     @property
     def dimensions(self) -> List[float]:
         """
-        :return: The dimensions of the bounding box as a list [width, height, depth].
+        :return: The dimensions of the bounding box as a list [width, depth, height].
         """
-        return [self.width, self.height, self.depth]
+        return [self.depth, self.width, self.height]
 
     def bloat(
         self, x_amount: float = 0.0, y_amount: float = 0, z_amount: float = 0
@@ -786,7 +795,10 @@ class BoundingBox:
         """
         Check if the bounding box contains a point.
         """
-        x, y, z = (float(point.x), float(point.y), float(point.z))
+        point_in_bb = point.reference_frame._world.transform(
+            point, self.origin.reference_frame
+        )
+        x, y, z = (float(point_in_bb.x), float(point_in_bb.y), float(point_in_bb.z))
         return self.simple_event.contains((x, y, z))
 
     @classmethod

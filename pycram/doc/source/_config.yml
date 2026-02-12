@@ -28,7 +28,7 @@ bibtex_bibfiles:
 # Information about where the doc exists on the web
 repository:
   url: https://github.com/cram2/pycram  # Online location of your doc
-  path_to_book: docs  # Optional path to your doc, relative to the repository root
+  path_to_book: doc  # Optional path to your doc, relative to the repository root
   branch: dev  # Which branch of the repository should be used when creating links (optional)
 
 # Add GitHub buttons to your doc

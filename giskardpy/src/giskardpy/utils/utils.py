@@ -9,12 +9,8 @@ import pkgutil
 import re
 import sys
 from contextlib import contextmanager
-from enum import Enum
 from functools import cached_property
 from typing import Type, Optional, Dict, Any
-
-from krrood.adapters.json_serializer import SubclassJSONSerializer
-from typing_extensions import Self
 
 from giskardpy.middleware import get_middleware
 
@@ -279,12 +275,3 @@ def quote_node_names(condition: str) -> str:
                 trailing = token[len(token.rstrip()) :]
                 result.append(f'{leading}"{stripped}"{trailing}')
     return "".join(result)
-
-
-class JsonSerializableEnum(SubclassJSONSerializer, Enum):
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(data["value"])
-
-    def to_json(self) -> Dict[str, Any]:
-        return {**super().to_json(), "value": self.value}

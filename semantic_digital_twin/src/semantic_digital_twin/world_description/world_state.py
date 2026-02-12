@@ -73,7 +73,7 @@ class WorldStateEntryView:
 
 
 @dataclass
-class WorldState(MutableMapping):
+class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     """
     Tracks the state of all DOF in the world.
     Data is stored in a 4xN numpy array, such that it can be used as input for compiled functions without copying.

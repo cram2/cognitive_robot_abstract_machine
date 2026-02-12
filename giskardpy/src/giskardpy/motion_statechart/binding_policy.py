@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field, InitVar
+from enum import Enum
 
 import numpy as np
 
@@ -6,7 +7,6 @@ from giskardpy.motion_statechart.auxilary_variable_manager import (
     AuxiliaryVariableManager,
 )
 from giskardpy.motion_statechart.context import BuildContext
-from giskardpy.utils.utils import JsonSerializableEnum
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
@@ -15,7 +15,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-class GoalBindingPolicy(JsonSerializableEnum):
+class GoalBindingPolicy(Enum):
     """
     This policy should be used together with ForwardKinematicsBinding.
     """

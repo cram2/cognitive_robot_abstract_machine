@@ -19,6 +19,7 @@ from krrood.entity_query_language.predicate import (
 from krrood.entity_query_language.symbol_graph import SymbolGraph
 from krrood.ormatic.alternative_mappings import *  # type: ignore
 from krrood.ormatic.ormatic import ORMatic
+from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_module, create_engine
 from krrood.ormatic.utils import drop_database
 from krrood.utils import recursive_subclasses
@@ -71,18 +72,19 @@ def generate_sqlalchemy_interface():
     }
 
     all_classes |= {FunctionType}
-
+    logging.basicConfig(level=logging.DEBUG)
+    logging.getLogger("krrood").setLevel(logging.DEBUG)
     class_diagram = ClassDiagram(
         list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
     )
 
     instance = ORMatic(
         class_dependency_graph=class_diagram,
-        type_mappings={
-            PhysicalObject: ConceptType,
-            uuid.UUID: sqlalchemy.UUID,
-            JSONSerializableClass: JSON,
-        },
+        type_mappings=TypeDict(
+            {
+                PhysicalObject: ConceptType,
+            }
+        ),
         alternative_mappings=recursive_subclasses(AlternativeMapping),
     )
 
@@ -105,6 +107,7 @@ def pytest_configure(config):
     This hook runs before pytest collects tests and imports modules,
     ensuring the generated file exists before any module-level imports.
     """
+
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
     logging.getLogger("numpy").setLevel(logging.WARNING)
 
@@ -112,6 +115,7 @@ def pytest_configure(config):
 def pytest_sessionstart(session):
     try:
         generate_sqlalchemy_interface()
+
     except Exception as e:
         import warnings
 

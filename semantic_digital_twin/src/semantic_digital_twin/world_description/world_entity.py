@@ -40,6 +40,7 @@ from krrood.symbolic_math.symbolic_math import Matrix
 from .geometry import TriangleMesh
 from .inertial_properties import Inertial
 from .shape_collection import ShapeCollection, BoundingBoxCollection
+from ..mixin import HasSimulatorProperties
 from ..adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -61,7 +62,7 @@ id_generator = IDGenerator()
 
 
 @dataclass(eq=False)
-class WorldEntity(Symbol):
+class WorldEntity(Symbol, HasSimulatorProperties):
     """
     A class representing an entity in the world.
 
@@ -197,9 +198,18 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
 
             current_data = data[k]
             if isinstance(current_data, list):
-                current_result = [
-                    cls._item_from_json(data, **kwargs) for data in current_data
-                ]
+                if isinstance(v.type, str):
+                    type_name = v.type
+                else:
+                    type_name = v.type._name
+                if type_name.startswith("Set"):
+                    container_type = set
+                else:
+                    container_type = list
+
+                current_result = container_type(
+                    [cls._item_from_json(data, **kwargs) for data in current_data]
+                )
             else:
                 current_result = cls._item_from_json(current_data, **kwargs)
             init_args[k] = current_result
@@ -588,9 +598,6 @@ class Region(KinematicStructureEntity):
     def __post_init__(self):
         self.area.reference_frame = self
 
-    def __hash__(self):
-        return id(self)
-
     @classmethod
     def from_shape_collection(
         cls, name: PrefixedName, shape_collection: ShapeCollection
@@ -605,17 +612,15 @@ class Region(KinematicStructureEntity):
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
-        result["name"] = self.name.to_json()
-        result["area"] = self.area.to_json()
+        result["name"] = to_json(self.name)
+        result["area"] = to_json(self.area)
         return result
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        result = cls(
-            name=PrefixedName.from_json(data["name"]), id=from_json(data["id"])
-        )
+        result = cls(name=from_json(data["name"]), id=from_json(data["id"]))
         result._track_object_in_from_json(kwargs)
-        area = ShapeCollection.from_json(data["area"], **kwargs)
+        area = from_json(data["area"], **kwargs)
         for shape in area:
             shape.origin.reference_frame = result
         result.area = area
@@ -937,11 +942,11 @@ class Connection(WorldEntity, SubclassJSONSerializer):
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
-        result["name"] = self.name.to_json()
+        result["name"] = to_json(self.name)
         result["parent_id"] = to_json(self.parent.id)
         result["child_id"] = to_json(self.child.id)
-        result["parent_T_connection_expression"] = (
-            self.parent_T_connection_expression.to_json()
+        result["parent_T_connection_expression"] = to_json(
+            self.parent_T_connection_expression
         )
         return result
 
@@ -951,10 +956,10 @@ class Connection(WorldEntity, SubclassJSONSerializer):
         parent = tracker.get_world_entity_with_id(id=from_json(data["parent_id"]))
         child = tracker.get_world_entity_with_id(id=from_json(data["child_id"]))
         return cls(
-            name=PrefixedName.from_json(data["name"]),
+            name=from_json(data["name"]),
             parent=parent,
             child=child,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_json(
+            parent_T_connection_expression=from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),
         )

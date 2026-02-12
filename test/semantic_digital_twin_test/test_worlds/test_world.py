@@ -32,6 +32,7 @@ from semantic_digital_twin.spatial_types.derivatives import Derivatives, Derivat
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
+    Point3,
 )
 from semantic_digital_twin.testing import world_setup
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
@@ -834,7 +835,7 @@ def test_overwrite_dof_limits(world_setup):
     assert connection.dof.limits.lower.velocity == -1
     assert connection.dof.limits.upper.velocity == 1
 
-    new_limits = DerivativeMap([0.69, 0.42, 1337, 23])
+    new_limits = DerivativeMap(0.69, 0.42, 1337, 23)
 
     connection.raw_dof._overwrite_dof_limits(
         new_lower_limits=new_limits * -1, new_upper_limits=new_limits
@@ -848,7 +849,7 @@ def test_overwrite_dof_limits(world_setup):
     assert connection.dof.limits.lower.jerk == -new_limits.jerk
     assert connection.dof.limits.upper.jerk == new_limits.jerk
 
-    new_limits2 = DerivativeMap([3333, 3333, 3333, 3333])
+    new_limits2 = DerivativeMap(3333, 3333, 3333, 3333)
 
     connection.raw_dof._overwrite_dof_limits(
         new_lower_limits=new_limits2 * -1, new_upper_limits=new_limits2
@@ -891,7 +892,7 @@ def test_overwrite_dof_limits_mimic(world_setup):
         connection.dof.limits.upper.velocity * 2,
     )
 
-    new_limits = DerivativeMap([0.69, 0.42, 1337, 23])
+    new_limits = DerivativeMap(0.69, 0.42, 1337, 23)
 
     with pytest.raises(UsageError):
         mimic_connection.dof._overwrite_dof_limits(
@@ -934,7 +935,7 @@ def test_overwrite_dof_limits_mimic(world_setup):
     assert np.isclose(mimic_connection.dof.limits.upper.jerk, new_limits.jerk * 2)
 
     # limits are only applied if the new ones are lower
-    new_limits2 = DerivativeMap([3333, 3333, 3333, 3333])
+    new_limits2 = DerivativeMap(3333, 3333, 3333, 3333)
 
     mimic_connection.raw_dof._overwrite_dof_limits(
         new_lower_limits=new_limits2 * -1, new_upper_limits=new_limits2
@@ -1127,3 +1128,29 @@ def test_world_state_trajectory(world_setup):
     world._notify_model_change()
     with pytest.raises(WrongWorldModelVersion):
         traj.append(world.state, time + dt)
+
+
+def test_merge_into_empty_world(world_setup):
+    world, _, _, _, _, _ = world_setup
+    world2 = deepcopy(world)
+    world2.clear()
+    world2.merge_world(world)
+
+
+def test_reattach_child_to_new_parent(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    # Initial state: l2 is child of l1 via PrismaticConnection
+    old_child_global_pose = l2.global_pose
+    assert l2.parent_connection.parent == l1
+    assert isinstance(l2.parent_connection, PrismaticConnection)
+
+    with world.modify_world():
+        world.move_branch_with_fixed_connection(new_parent=bf, branch_root=l2)
+
+    # New state: l2 is child of bf via FixedConnection
+    assert l2.parent_connection.parent == bf
+    assert isinstance(l2.parent_connection, FixedConnection)
+    assert l2 in world.compute_child_kinematic_structure_entities(bf)
+    assert l2 not in world.compute_child_kinematic_structure_entities(l1)
+    new_child_global_pose = l2.global_pose
+    assert np.allclose(old_child_global_pose, new_child_global_pose)

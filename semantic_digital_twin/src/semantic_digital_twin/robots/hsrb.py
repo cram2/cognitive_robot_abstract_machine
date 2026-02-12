@@ -1,5 +1,5 @@
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Self
 
 from .abstract_robot import (
@@ -11,29 +11,25 @@ from .abstract_robot import (
     Camera,
     Torso,
     FieldOfView,
+    Base,
 )
 from .robot_mixins import HasNeck, HasArms
+from ..datastructures.definitions import StaticJointState, GripperState, TorsoState
+from ..datastructures.joint_state import JointState
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import Quaternion
 from ..spatial_types.spatial_types import Vector3
 from ..world import World
+from ..world_description.connections import FixedConnection
 
 
-@dataclass
+@dataclass(eq=False)
 class HSRB(AbstractRobot, HasArms, HasNeck):
     """
     Class that describes the Human Support Robot variant B (https://upmroboticclub.wordpress.com/robot/).
     """
 
-    def __hash__(self):
-        return hash(
-            tuple(
-                [self.__class__]
-                + sorted([kse.name for kse in self.kinematic_structure_entities])
-            )
-        )
-
-    def setup_collision_config(self):
+    def load_srdf(self):
         """
         Loads the SRDF file for the PR2 robot, if it exists.
         """
@@ -86,7 +82,7 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
             hand_camera = Camera(
                 name=PrefixedName("hand_camera", prefix=hsrb.name.name),
                 root=world.get_body_by_name("hand_camera_frame"),
-                forward_facing_axis=Vector3(1, 0, 0),
+                forward_facing_axis=Vector3(0, 0, 1),
                 field_of_view=FieldOfView(
                     horizontal_angle=0.99483, vertical_angle=0.75049
                 ),
@@ -97,7 +93,7 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
 
             arm = Arm(
                 name=PrefixedName("arm", prefix=hsrb.name.name),
-                root=world.get_body_by_name("torso_lift_link"),
+                root=world.get_body_by_name("arm_lift_link"),
                 tip=world.get_body_by_name("hand_palm_link"),
                 manipulator=gripper,
                 sensors={hand_camera},
@@ -109,19 +105,20 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
             head_center_camera = Camera(
                 name=PrefixedName("head_center_camera", prefix=hsrb.name.name),
                 root=world.get_body_by_name("head_center_camera_frame"),
-                forward_facing_axis=Vector3(1, 0, 0),
+                forward_facing_axis=Vector3(0, 0, 1),
                 field_of_view=FieldOfView(
                     horizontal_angle=0.99483, vertical_angle=0.75049
                 ),
                 minimal_height=0.75049,
                 maximal_height=0.99483,
                 _world=world,
+                default_camera=True,
             )
 
             head_r_camera = Camera(
                 name=PrefixedName("head_right_camera", prefix=hsrb.name.name),
                 root=world.get_body_by_name("head_r_stereo_camera_link"),
-                forward_facing_axis=Vector3(1, 0, 0),
+                forward_facing_axis=Vector3(0, 0, 1),
                 field_of_view=FieldOfView(
                     horizontal_angle=0.99483, vertical_angle=0.75049
                 ),
@@ -133,7 +130,7 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
             head_l_camera = Camera(
                 name=PrefixedName("head_left_camera", prefix=hsrb.name.name),
                 root=world.get_body_by_name("head_l_stereo_camera_link"),
-                forward_facing_axis=Vector3(1, 0, 0),
+                forward_facing_axis=Vector3(0, 0, 1),
                 field_of_view=FieldOfView(
                     horizontal_angle=0.99483, vertical_angle=0.75049
                 ),
@@ -145,7 +142,7 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
             head_rgbd_camera = Camera(
                 name=PrefixedName("head_rgbd_camera", prefix=hsrb.name.name),
                 root=world.get_body_by_name("head_rgbd_sensor_link"),
-                forward_facing_axis=Vector3(1, 0, 0),
+                forward_facing_axis=Vector3(0, 0, 1),
                 field_of_view=FieldOfView(
                     horizontal_angle=0.99483, vertical_angle=0.75049
                 ),
@@ -156,12 +153,12 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
 
             neck = Neck(
                 name=PrefixedName("neck", prefix=hsrb.name.name),
-                sensors={
+                sensors=[
                     head_center_camera,
                     head_r_camera,
                     head_l_camera,
                     head_rgbd_camera,
-                },
+                ],
                 root=world.get_body_by_name("head_pan_link"),
                 tip=world.get_body_by_name("head_tilt_link"),
                 _world=world,
@@ -176,6 +173,76 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
                 _world=world,
             )
             hsrb.add_torso(torso)
+
+            # Create states
+            arm_park = JointState.from_mapping(
+                name=PrefixedName("arm_park", prefix=hsrb.name.name),
+                mapping=dict(
+                    zip(
+                        [c for c in arm.connections if type(c) != FixedConnection],
+                        [0.0, 1.5, -1.85, 0.0],
+                    )
+                ),
+                state_type=StaticJointState.PARK,
+            )
+
+            arm.add_joint_state(arm_park)
+
+            gripper_joints = [
+                world.get_connection_by_name("hand_l_proximal_joint"),
+                world.get_connection_by_name("hand_r_proximal_joint"),
+                world.get_connection_by_name("hand_motor_joint"),
+            ]
+
+            gripper_open = JointState.from_mapping(
+                name=PrefixedName("gripper_open", prefix=hsrb.name.name),
+                mapping=dict(zip(gripper_joints, [0.3, 0.3, 0.3])),
+                state_type=GripperState.OPEN,
+            )
+
+            gripper_close = JointState.from_mapping(
+                name=PrefixedName("gripper_close", prefix=hsrb.name.name),
+                mapping=dict(zip(gripper_joints, [0.0, 0.0, 0.0])),
+                state_type=GripperState.CLOSE,
+            )
+
+            gripper.add_joint_state(gripper_close)
+            gripper.add_joint_state(gripper_open)
+
+            torso_joint = [world.get_connection_by_name("torso_lift_joint")]
+
+            torso_low = JointState.from_mapping(
+                name=PrefixedName("torso_low", prefix=hsrb.name.name),
+                mapping=dict(zip(torso_joint, [0.0])),
+                state_type=TorsoState.LOW,
+            )
+
+            torso_mid = JointState.from_mapping(
+                name=PrefixedName("torso_mid", prefix=hsrb.name.name),
+                mapping=dict(zip(torso_joint, [0.17])),
+                state_type=TorsoState.MID,
+            )
+
+            torso_high = JointState.from_mapping(
+                name=PrefixedName("torso_high", prefix=hsrb.name.name),
+                mapping=dict(zip(torso_joint, [0.32])),
+                state_type=TorsoState.HIGH,
+            )
+
+            torso.add_joint_state(torso_low)
+            torso.add_joint_state(torso_mid)
+            torso.add_joint_state(torso_high)
+
+            # Create the robot base
+            base = Base(
+                name=PrefixedName("base", prefix=hsrb.name.name),
+                root=world.get_body_by_name("base_link"),
+                tip=world.get_body_by_name("base_link"),
+                _world=world,
+            )
+
+            hsrb.add_base(base)
+            hsrb.full_body_controlled = True
 
             world.add_semantic_annotation(hsrb)
 

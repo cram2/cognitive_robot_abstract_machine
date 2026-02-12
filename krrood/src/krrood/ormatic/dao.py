@@ -199,8 +199,12 @@ class ToDataAccessObjectState(DataAccessObjectState[ToDataAccessObjectWorkItem])
         :param source_object: The object being converted.
         :return: The source object or the result of alternative mapping.
         """
-        if issubclass(dao_clazz.original_class(), AlternativeMapping):
-            return dao_clazz.original_class().to_dao(source_object, state=self)
+        original_class = dao_clazz.original_class()
+        # Handle GenericAlias which cannot be used with issubclass in some python versions
+        # or might not be what we want to check for AlternativeMapping anyway.
+        origin = get_origin(original_class) or original_class
+        if inspect.isclass(origin) and issubclass(origin, AlternativeMapping):
+            return original_class.to_dao(source_object, state=self)
         return source_object
 
     def register(self, source_object: Any, dao_instance: DataAccessObject) -> None:
@@ -292,6 +296,7 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         :param original_clazz: The domain class to instantiate.
         :return: The uninitialized domain object instance.
         """
+
         result = original_clazz.__new__(original_clazz)
         if is_dataclass(original_clazz):
             for f in fields(original_clazz):
@@ -323,6 +328,19 @@ class HasGeneric(Generic[T]):
         return tp
 
     @classmethod
+    @lru_cache(maxsize=None)
+    def constructable_original_class(cls) -> T:
+        """
+        Return the constructable original class. Use this for object allocation in from_dao cycles, as Generic Aliases
+        cannot be constructed directly.
+        """
+        original_class = cls.original_class()
+        if type(original_class) is _GenericAlias:
+            return get_origin(original_class)
+        else:
+            return original_class
+
+    @classmethod
     def _dao_like_argument(cls) -> Optional[Type]:
         """
         Extract the generic argument from the class hierarchy.
@@ -338,6 +356,29 @@ class HasGeneric(Generic[T]):
 
         # No acceptable base found
         return None
+
+
+class AssociationDataAccessObject:
+    """
+    Base class for association objects in the Data Access Object layer.
+    Association objects are used to map many-to-many relationships that
+    require additional information or identity for each association,
+    such as when duplicates are allowed in a collection.
+    """
+
+    @property
+    def target(self) -> DataAccessObject:
+        """
+        :return: The target Data Access Object of this association.
+        """
+        raise NotImplementedError
+
+    @target.setter
+    def target(self, value: DataAccessObject) -> None:
+        """
+        :param value: The target Data Access Object of this association.
+        """
+        raise NotImplementedError
 
 
 class DataAccessObject(HasGeneric[T]):
@@ -641,7 +682,8 @@ class DataAccessObject(HasGeneric[T]):
             setattr(self, relationship.key, None)
             return
 
-        dao_instance = self._get_or_queue_dao(value, state)
+        expected_type = relationship.mapper.class_.original_class()
+        dao_instance = self._get_or_queue_dao(value, state, expected_type)
         setattr(self, relationship.key, dao_instance)
 
     def _extract_collection_relationship(
@@ -658,17 +700,42 @@ class DataAccessObject(HasGeneric[T]):
         :param state: The conversion state.
         """
         source_collection = getattr(source_object, relationship.key)
-        dao_collection = [self._get_or_queue_dao(v, state) for v in source_collection]
+        target_dao_clazz = relationship.mapper.class_
+
+        if issubclass(target_dao_clazz, AssociationDataAccessObject):
+            # Target is an Association Object
+            # We need to find the target DAO class of the association
+            target_rel = sqlalchemy.inspection.inspect(target_dao_clazz).relationships[
+                "target"
+            ]
+            expected_type = target_rel.mapper.class_.original_class()
+
+            dao_collection = []
+            for v in source_collection:
+                assoc_dao = target_dao_clazz()
+                assoc_dao.target = self._get_or_queue_dao(v, state, expected_type)
+                dao_collection.append(assoc_dao)
+        else:
+            expected_type = target_dao_clazz.original_class()
+            dao_collection = [
+                self._get_or_queue_dao(v, state, expected_type)
+                for v in source_collection
+            ]
+
         setattr(self, relationship.key, type(source_collection)(dao_collection))
 
     def _get_or_queue_dao(
-        self, source_object: Any, state: ToDataAccessObjectState
+        self,
+        source_object: Any,
+        state: ToDataAccessObjectState,
+        expected_type: Optional[Type] = None,
     ) -> DataAccessObject:
         """
         Resolve a source object to a DAO, queuing it if necessary.
 
         :param source_object: The object to resolve.
         :param state: The conversion state.
+        :param expected_type: The expected domain type.
         :return: The corresponding DAO instance.
         """
         # Check if already built
@@ -676,7 +743,7 @@ class DataAccessObject(HasGeneric[T]):
         if existing is not None:
             return existing
 
-        dao_clazz = get_dao_class(type(source_object))
+        dao_clazz = get_dao_class(type(source_object), expected_type)
         if dao_clazz is None:
             raise NoDAOFoundDuringParsingError(source_object, type(self), None)
 
@@ -730,7 +797,7 @@ class DataAccessObject(HasGeneric[T]):
         state.is_processing = True
         discovery_order = []
         if not state.has(self):
-            state.allocate_and_memoize(self, self.original_class())
+            state.allocate_and_memoize(self, self.constructable_original_class())
         state.push_work_item(self, state.get(self))
 
         self._discover_dependencies(state, discovery_order)
@@ -823,7 +890,10 @@ class DataAccessObject(HasGeneric[T]):
             # Skip post_init for objects that were created via AlternativeMapping
             # because they are created via their constructor, which already
             # calls __post_init__.
-            if issubclass(work_item.dao_instance.original_class(), AlternativeMapping):
+            if issubclass(
+                work_item.dao_instance.constructable_original_class(),
+                AlternativeMapping,
+            ):
                 continue
 
             domain_object = state.get(work_item.dao_instance)
@@ -840,7 +910,9 @@ class DataAccessObject(HasGeneric[T]):
         :return: The uninitialized domain object.
         """
         if not state.has(self):
-            domain_object = state.allocate_and_memoize(self, self.original_class())
+            domain_object = state.allocate_and_memoize(
+                self, self.constructable_original_class()
+            )
             state.push_work_item(self, domain_object)
         return state.get(self)
 
@@ -875,11 +947,22 @@ class DataAccessObject(HasGeneric[T]):
         """
         for relationship in mapper.relationships:
             value = getattr(self, relationship.key)
-            if self._is_single_relationship(relationship) and value is not None:
+            if value is None:
+                continue
+
+            if self._is_single_relationship(relationship):
                 value.from_dao(state=state)
             elif relationship.direction in (ONETOMANY, MANYTOMANY):
-                for item in value:
-                    item.from_dao(state=state)
+                target_dao_clazz = relationship.mapper.class_
+                if issubclass(target_dao_clazz, AssociationDataAccessObject):
+                    # Collection of Association Objects
+                    [
+                        item.target.from_dao(state=state)
+                        for item in value
+                        if item.target is not None
+                    ]
+                else:
+                    [item.from_dao(state=state) for item in value]
 
         self._build_base_keyword_arguments_for_alternative_parent(domain_object, state)
         return domain_object
@@ -985,7 +1068,18 @@ class DataAccessObject(HasGeneric[T]):
         if not value:
             object.__setattr__(domain_object, key, value)
             return
-        instances = [self._get_or_allocate_domain_object(v, state) for v in value]
+
+        relationship = sqlalchemy.inspection.inspect(type(self)).relationships[key]
+        target_dao_clazz = relationship.mapper.class_
+
+        if issubclass(target_dao_clazz, AssociationDataAccessObject):
+            dao_collection = [item.target for item in value if item.target is not None]
+        else:
+            dao_collection = value
+
+        instances = [
+            self._get_or_allocate_domain_object(v, state) for v in dao_collection
+        ]
         object.__setattr__(domain_object, key, list(instances))
 
     def _get_or_allocate_domain_object(
@@ -1008,7 +1102,9 @@ class DataAccessObject(HasGeneric[T]):
         :return: The uninitialized domain object.
         """
         if not state.has(self):
-            domain_object = state.allocate_and_memoize(self, self.original_class())
+            domain_object = state.allocate_and_memoize(
+                self, self.constructable_original_class()
+            )
             state.push_work_item(self, domain_object)
         return state.get(self)
 
@@ -1022,7 +1118,7 @@ class DataAccessObject(HasGeneric[T]):
         state.is_processing = True
         discovery_order = []
         if not state.has(self):
-            state.allocate_and_memoize(self, self.original_class())
+            state.allocate_and_memoize(self, self.constructable_original_class())
         state.push_work_item(self, state.get(self))
 
         self._discover_dependencies(state, discovery_order)
@@ -1186,18 +1282,41 @@ def _get_clazz_by_original_clazz(
 
 
 @lru_cache(maxsize=None)
-def get_dao_class(original_clazz: Type) -> Optional[Type[DataAccessObject]]:
+def get_dao_class(
+    original_clazz: Type, expected_type: Optional[Type] = None
+) -> Optional[Type[DataAccessObject]]:
     """
     Retrieve the DAO class for a domain class.
 
     :param original_clazz: The domain class.
+    :param expected_type: The expected domain type (from relationship).
     :return: The corresponding DAO class or None.
     """
     alternative_mapping = get_alternative_mapping(original_clazz)
     if alternative_mapping is not None:
         original_clazz = alternative_mapping
 
-    return _get_clazz_by_original_clazz(DataAccessObject, original_clazz)
+    # If the actual class is the same as the origin of the expected type,
+    # the expected type is more specific (likely a parametrized generic)
+    # and we should prefer it.
+    if expected_type is not None and original_clazz == get_origin(expected_type):
+        dao = _get_clazz_by_original_clazz(DataAccessObject, expected_type)
+        if dao is not None:
+            return dao
+
+    # Try the actual class first.
+    # This is important for polymorphic inheritance to get the most specific DAO.
+    dao = _get_clazz_by_original_clazz(DataAccessObject, original_clazz)
+    if dao is not None:
+        return dao
+
+    # Fallback to the expected type if provided.
+    if expected_type is not None:
+        dao = _get_clazz_by_original_clazz(DataAccessObject, expected_type)
+        if dao is not None:
+            return dao
+
+    return None
 
 
 @lru_cache(maxsize=None)

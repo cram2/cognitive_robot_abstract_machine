@@ -25,8 +25,10 @@ You will:
 
 ```{code-cell} ipython3
 :tags: [remove-input]
+
+from pkg_resources import resource_filename
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.utils import get_semantic_digital_twin_directory_root
+
 from multiverse_simulator import MultiverseViewer
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 import os
@@ -34,7 +36,7 @@ import time
 import logging
 
 logging.disable(logging.CRITICAL)
-root_path = get_semantic_digital_twin_directory_root(os.getcwd())
+root_path = resource_filename("semantic_digital_twin", "../../")
 table_urdf = os.path.join(root_path, "resources", "urdf", "table.urdf")
 ```
 

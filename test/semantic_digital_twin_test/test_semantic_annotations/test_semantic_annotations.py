@@ -1,4 +1,5 @@
 import logging
+from copy import deepcopy
 from dataclasses import field
 
 from krrood.entity_query_language.entity_result_processors import an
@@ -249,29 +250,19 @@ def test_semantic_annotation_serialization_deserialization_once(apartment_world_
 
 
 def test_minimal_robot_annotation(pr2_world_state_reset):
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "urdf",
-    )
-    pr2 = os.path.join(urdf_dir, "pr2_kinematic_tree.urdf")
-    pr2_parser = URDFParser.from_file(file_path=pr2)
-    world_with_pr2 = pr2_parser.parse()
-    with world_with_pr2.modify_world():
-        MinimalRobot.from_world(world_with_pr2)
-        pr2_root = world_with_pr2.root
+    urdf_path = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+    world_copy = URDFParser.from_xacro(urdf_path).parse()
+    with world_copy.modify_world():
+        MinimalRobot.from_world(world_copy)
+        pr2_root = world_copy.root
         localization_body = Body(name=PrefixedName("odom_combined"))
-        world_with_pr2.add_kinematic_structure_entity(localization_body)
+        world_copy.add_kinematic_structure_entity(localization_body)
         c_root_bf = OmniDrive.create_with_dofs(
-            parent=localization_body, child=pr2_root, world=world_with_pr2
+            parent=localization_body, child=pr2_root, world=world_copy
         )
-        world_with_pr2.add_connection(c_root_bf)
+        world_copy.add_connection(c_root_bf)
 
-    robot = world_with_pr2.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = world_copy.get_semantic_annotations_by_type(MinimalRobot)[0]
     pr2 = PR2.from_world(pr2_world_state_reset)
     assert len(robot.bodies) == len(pr2.bodies)
     assert len(robot.connections) == len(pr2.connections)

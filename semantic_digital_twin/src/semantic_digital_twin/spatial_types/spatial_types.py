@@ -1869,7 +1869,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def to_quaternion(self) -> Quaternion:
         return self.to_rotation_matrix().to_quaternion()
 
-    def to_homogeneous_matrix(self) -> Self:
+    def to_homogeneous_matrix(self) -> HomogeneousTransformationMatrix:
         return HomogeneousTransformationMatrix(
             data=self, reference_frame=self.reference_frame
         )

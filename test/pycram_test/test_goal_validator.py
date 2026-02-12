@@ -6,10 +6,8 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from pycram.tf_transformations import quaternion_from_euler
 from typing_extensions import Optional, List
 
-from pycram.testing import ApartmentWorldTestCase
 from pycram.datastructures.enums import JointType
 from pycram.datastructures.pose import PoseStamped
-from pycram.robot_description import RobotDescription
 from pycram.validation.error_checkers import (
     PoseErrorChecker,
     PositionErrorChecker,

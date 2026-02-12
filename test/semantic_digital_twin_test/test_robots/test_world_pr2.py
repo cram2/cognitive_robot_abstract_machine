@@ -1,32 +1,31 @@
 import os
 from collections import defaultdict
 
-from typing_extensions import List
-
 import numpy as np
 import pytest
-from rustworkx import NoPathFound
+from typing_extensions import List
 
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.reasoning.predicates import LeftOf
+from semantic_digital_twin.robots.abstract_robot import KinematicChain
 from semantic_digital_twin.robots.hsrb import HSRB
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
-from semantic_digital_twin.world_description.connections import (
-    OmniDrive,
-    PrismaticConnection,
-    RevoluteConnection,
-)
+from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_computations.ik_solver import (
     MaxIterationsException,
     UnreachableException,
 )
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import KinematicChain
-from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
+    OmniDrive,
+    DiffDrive,
+    PrismaticConnection,
+    RevoluteConnection,
+)
 
 
 def test_compute_chain_of_bodies_pr2(pr2_world_state_reset):
@@ -302,6 +301,51 @@ def test_apply_control_commands_omni_drive_pr2(pr2_world_state_reset):
     assert pr2_world_state_reset.state[omni_drive.y.id].position == 0.1094837581924854
 
 
+def test_apply_control_commands_diff_drive(cylinder_bot_diff_world):
+    diff_drive: DiffDrive = cylinder_bot_diff_world.get_connection_by_name("map_T_bot")
+    cmd = np.zeros((len(cylinder_bot_diff_world.degrees_of_freedom)), dtype=float)
+    cmd[cylinder_bot_diff_world.state._index[diff_drive.x_velocity.id]] = 100
+    cmd[cylinder_bot_diff_world.state._index[diff_drive.yaw.id]] = 100
+    dt = 0.1
+    cylinder_bot_diff_world.apply_control_commands(cmd, dt, Derivatives.jerk)
+    assert cylinder_bot_diff_world.state[diff_drive.yaw.id].jerk == 100.0
+    assert cylinder_bot_diff_world.state[diff_drive.yaw.id].acceleration == 100.0 * dt
+    assert cylinder_bot_diff_world.state[diff_drive.yaw.id].velocity == 100.0 * dt * dt
+    assert (
+        cylinder_bot_diff_world.state[diff_drive.yaw.id].position
+        == 100.0 * dt * dt * dt
+    )
+
+    assert cylinder_bot_diff_world.state[diff_drive.x_velocity.id].jerk == 100.0
+    assert (
+        cylinder_bot_diff_world.state[diff_drive.x_velocity.id].acceleration
+        == 100.0 * dt
+    )
+    assert (
+        cylinder_bot_diff_world.state[diff_drive.x_velocity.id].velocity
+        == 100.0 * dt * dt
+    )
+    assert cylinder_bot_diff_world.state[diff_drive.x_velocity.id].position == 0
+
+    assert cylinder_bot_diff_world.state[diff_drive.x.id].jerk == 0.0
+    assert cylinder_bot_diff_world.state[diff_drive.x.id].acceleration == 0.0
+    assert cylinder_bot_diff_world.state[diff_drive.x.id].velocity == 0.0
+    assert np.allclose(
+        cylinder_bot_diff_world.state[diff_drive.x.id].position,
+        100 * dt**3 * np.cos(100 * dt**3),
+        atol=1e-3,
+    )
+
+    assert cylinder_bot_diff_world.state[diff_drive.y.id].jerk == 0.0
+    assert cylinder_bot_diff_world.state[diff_drive.y.id].acceleration == 0.0
+    assert cylinder_bot_diff_world.state[diff_drive.y.id].velocity == 0.0
+    assert np.allclose(
+        cylinder_bot_diff_world.state[diff_drive.y.id].position,
+        100 * dt**3 * np.sin(100 * dt**3),
+        atol=1e-3,
+    )
+
+
 def test_search_for_connections_of_type(pr2_world_state_reset: World):
 
     connections = pr2_world_state_reset.get_connections_by_type(OmniDrive)
@@ -309,7 +353,10 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
     assert connections[0].name == PrefixedName(
         name="odom_combined_T_base_footprint", prefix="pr2"
     )
-    assert connections[0].parent == pr2_world_state_reset.root
+    assert (
+        connections[0].parent
+        == pr2_world_state_reset.root.child_kinematic_structure_entities[0]
+    )
     assert connections[
         0
     ].child == pr2_world_state_reset.get_kinematic_structure_entity_by_name(
@@ -359,8 +406,7 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
 
 
 def test_pr2_semantic_annotation(pr2_world_state_reset):
-    pr2 = PR2.from_world(pr2_world_state_reset)
-
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
     # Ensure there are no loose bodies
     pr2_world_state_reset._notify_model_change()
 
@@ -377,18 +423,17 @@ def test_pr2_semantic_annotation(pr2_world_state_reset):
 
 
 def test_specifies_left_right_arm_mixin(pr2_world_state_reset):
-    pr2 = PR2.from_world(pr2_world_state_reset)
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
     left_arm_chain = list(pr2.left_arm.bodies)
     right_arm_chain = list(pr2.right_arm.bodies)
     assert LeftOf(
-        left_arm_chain[1],
-        right_arm_chain[1],
+        left_arm_chain[1].center_of_mass,
+        right_arm_chain[1].center_of_mass,
         pr2.root.global_pose,
     )()
 
 
 def test_kinematic_chains(pr2_world_state_reset):
-    pr2 = PR2.from_world(pr2_world_state_reset)
     semantic_kinematic_chain_annotation: List[KinematicChain] = (
         pr2_world_state_reset.get_semantic_annotations_by_type(KinematicChain)
     )
@@ -421,12 +466,12 @@ def test_load_collision_config_srdf(pr2_world_state_reset):
     )
     assert (
         len(pr2_world_state_reset._collision_pair_manager.disabled_collision_pairs)
-        == 1485
+        == 1431
     )
 
 
 def test_tracy_semantic_annotation(tracy_world):
-    tracy = Tracy.from_world(tracy_world)
+    tracy = tracy_world.get_semantic_annotations_by_type(Tracy)[0]
 
     tracy_world._notify_model_change()
 
@@ -453,7 +498,7 @@ def test_hsrb_semantic_annotation(hsr_world_setup):
 
 
 def test_pr2_tighten_dof_velocity_limits_of_1dof_connections(pr2_world_state_reset):
-    pr2 = PR2.from_world(pr2_world_state_reset)
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
 
     # set all joints to vel limit 1
     pr2.tighten_dof_velocity_limits_of_1dof_connections(defaultdict(lambda: 1))

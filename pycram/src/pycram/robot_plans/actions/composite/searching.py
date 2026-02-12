@@ -14,12 +14,10 @@ from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import PoseStamped
 from ....designators.location_designator import CostmapLocation
 from ....failures import PerceptionObjectNotFound
-from ....has_parameters import has_parameters
 from ....language import TryInOrderPlan, SequentialPlan
 from ....robot_plans.actions.base import ActionDescription
 
 
-@has_parameters
 @dataclass
 class SearchAction(ActionDescription):
     """
@@ -103,7 +101,7 @@ class SearchAction(ActionDescription):
         cls,
         target_location: Union[Iterable[PoseStamped], PoseStamped],
         object_type: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
-    ) -> PartialDesignator[Type[SearchAction]]:
+    ) -> PartialDesignator[SearchAction]:
         return PartialDesignator(
             SearchAction, target_location=target_location, object_type=object_type
         )

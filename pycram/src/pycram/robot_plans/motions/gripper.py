@@ -7,18 +7,17 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.world_description.world_entity import Body
 from .base import BaseMotion
 from ...datastructures.enums import (
     Arms,
-    GripperState,
     MovementType,
     WaypointsMovementType,
 )
 from ...datastructures.grasp import GraspDescription
 from ...datastructures.pose import PoseStamped
-from ...joint_state import JointStateManager
-from ...robot_description import ViewManager
+from ...view_manager import ViewManager
 from ...utils import translate_pose_along_local_axis
 
 
@@ -84,6 +83,7 @@ class ReachMotion(BaseMotion):
                 tip_link=tip,
                 goal_pose=pose.to_spatial_type(),
                 threshold=0.005,
+                name="Reach",
             )
             for pose in self._calculate_pose_sequence()
         ]
@@ -114,18 +114,13 @@ class MoveGripperMotion(BaseMotion):
 
     @property
     def _motion_chart(self):
-        gripper_state = JointStateManager().get_gripper_state(
-            self.gripper, self.motion, self.robot_view
-        )
+        arm = ViewManager().get_end_effector_view(self.gripper, self.robot_view)
+
         return JointPositionList(
-            goal_state=JointState(
-                mapping={
-                    self.world.get_connection_by_name(joint_name): joint_position
-                    for joint_name, joint_position in zip(
-                        gripper_state.joint_names, gripper_state.joint_positions
-                    )
-                }
-            )
+            goal_state=arm.get_joint_state_by_type(self.motion),
+            name=(
+                "OpenGripper" if self.motion == GripperState.OPEN else "CloseGripper"
+            ),
         )
 
 
@@ -158,19 +153,25 @@ class MoveTCPMotion(BaseMotion):
     @property
     def _motion_chart(self):
         tip = ViewManager().get_end_effector_view(self.arm, self.robot_view).tool_frame
+        root = (
+            self.world.root
+            if self.robot_view.full_body_controlled
+            else self.robot_view.root
+        )
         task = None
         if self.movement_type == MovementType.TRANSLATION:
             task = CartesianPosition(
-                root_link=self.robot_view.root,
+                root_link=root,
                 tip_link=tip,
                 goal_point=self.target.to_spatial_type().to_position(),
+                name="MoveTCP",
             )
         else:
             task = CartesianPose(
-                root_link=self.robot_view.root,
+                root_link=root,
                 tip_link=tip,
                 goal_pose=self.target.to_spatial_type(),
-                threshold=0.005,
+                name="MoveTCP",
             )
         return task
 

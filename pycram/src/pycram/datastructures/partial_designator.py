@@ -3,9 +3,8 @@ from __future__ import annotations
 
 from inspect import signature
 
-from typing_extensions import List, Tuple, Any, Dict, TypeVar, Iterator, Iterable
+from typing_extensions import List, Tuple, Any, Dict, TypeVar, Iterator, Iterable, Type
 
-from ..has_parameters import leaf_types, HasParameters
 from ..plan import PlanNode
 from ..utils import is_iterable, lazy_product
 
@@ -30,7 +29,7 @@ class PartialDesignator(Iterable[T]):
                 performable.perform()
     """
 
-    performable: T = None
+    performable: Type[T] = None
     """
     Reference to the performable class that should be initialized
     """
@@ -48,7 +47,7 @@ class PartialDesignator(Iterable[T]):
     Reference to the PlanNode that is used to execute the performable
     """
 
-    def __init__(self, performable: T, *args, **kwargs):
+    def __init__(self, performable: Type[T], *args, **kwargs):
         self.performable = performable
         # We use the init of the performable class since typing for the whole class messes up the signature of the class.
         # This is not optimal since "self" needs to be filtered from the parameter list but it works.

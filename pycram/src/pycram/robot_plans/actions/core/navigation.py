@@ -6,6 +6,7 @@ from datetime import timedelta
 import numpy as np
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
+from semantic_digital_twin.robots.abstract_robot import Camera
 from ..base import ActionDescription
 from ...motions.robot_body import LookingMotion
 from ...motions.navigation import MoveMotion
@@ -14,12 +15,10 @@ from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import PoseStamped
 from ....failures import LookAtGoalNotReached
 from ....failures import NavigationGoalNotReachedError
-from ....has_parameters import has_parameters
 from ....language import SequentialPlan
 from ....validation.error_checkers import PoseErrorChecker
 
 
-@has_parameters
 @dataclass
 class NavigateAction(ActionDescription):
     """
@@ -57,15 +56,14 @@ class NavigateAction(ActionDescription):
         keep_joint_states: Union[
             Iterable[bool], bool
         ] = ActionConfig.navigate_keep_joint_states,
-    ) -> PartialDesignator[Type[NavigateAction]]:
-        return PartialDesignator(
+    ) -> PartialDesignator[NavigateAction]:
+        return PartialDesignator[NavigateAction](
             NavigateAction,
             target_location=target_location,
             keep_joint_states=keep_joint_states,
         )
 
 
-@has_parameters
 @dataclass
 class LookAtAction(ActionDescription):
     """
@@ -77,8 +75,16 @@ class LookAtAction(ActionDescription):
     Position at which the robot should look, given as 6D pose
     """
 
+    camera: Camera = None
+    """
+    Camera that should be looking at the target
+    """
+
     def execute(self) -> None:
-        SequentialPlan(self.context, LookingMotion(target=self.target)).perform()
+        camera = self.camera or self.robot_view.get_default_camera()
+        SequentialPlan(
+            self.context, LookingMotion(target=self.target, camera=camera)
+        ).perform()
 
     def validate(
         self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
@@ -91,9 +97,13 @@ class LookAtAction(ActionDescription):
 
     @classmethod
     def description(
-        cls, target: Union[Iterable[PoseStamped], PoseStamped]
-    ) -> PartialDesignator[Type[LookAtAction]]:
-        return PartialDesignator(LookAtAction, target=target)
+        cls,
+        target: Union[Iterable[PoseStamped], PoseStamped],
+        camera: Optional[Union[Iterable[Camera], Camera]] = None,
+    ) -> PartialDesignator[LookAtAction]:
+        return PartialDesignator[LookAtAction](
+            LookAtAction, target=target, camera=camera
+        )
 
 
 NavigateActionDescription = NavigateAction.description

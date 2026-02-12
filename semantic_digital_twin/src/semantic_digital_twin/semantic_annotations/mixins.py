@@ -283,6 +283,7 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
         active_axis: Optional[Vector3] = None,
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
+        scale: Scale = None,
         **kwargs,
     ) -> Self:
         """
@@ -295,9 +296,17 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
         :param active_axis: The active axis for the connection.
         :param connection_multiplier: The multiplier for the connection.
         :param connection_offset: The offset for the connection.
+        :param scale: The scale used to generate the geometry of the body.
         :return: The created semantic annotation instance.
         """
         body = Body(name=name)
+
+        if scale is not None:
+            collision_shapes = BoundingBoxCollection.from_event(
+                body, scale.to_simple_event().as_composite_set()
+            ).as_shapes()
+            body.collision = collision_shapes
+            body.visual = collision_shapes
 
         return cls._create_with_connection_in_world(
             name=name,
@@ -708,8 +717,8 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
         active_axis: Optional[Vector3] = None,
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
-        *,
         scale: Scale = Scale(),
+        *,
         wall_thickness: float = 0.01,
     ) -> Self:
         """

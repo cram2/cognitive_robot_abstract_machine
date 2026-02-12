@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Optional, Dict, Type
 
-from giskardpy.middleware import get_middleware
 from giskardpy.qp.exceptions import QPSolverException
 from giskardpy.qp.qp_formulation import QPFormulation
 from giskardpy.qp.solvers.qp_solver import QPSolver
@@ -86,7 +85,7 @@ class QPControllerConfig:
 
     dof_weights: Dict[PrefixedName, DerivativeMap[float]] = field(
         default_factory=lambda: defaultdict(
-            lambda: DerivativeMap([None, 0.01, None, None])
+            lambda: DerivativeMap(None, 0.01, None, None)
         )
     )
     """
@@ -191,15 +190,13 @@ class QPControllerConfig:
             else:
                 raise QPSolverException(f"No qp solver found")
             self.qp_solver_id = self.qp_solver_class.solver_id
-        get_middleware().loginfo(
-            f'QP Solver set to "{self.qp_solver_class.solver_id.name}"'
-        )
+        logger.debug(f'QP Solver set to "{self.qp_solver_class.solver_id.name}"')
 
     def set_dof_weight(
         self, dof_name: PrefixedName, derivative: Derivatives, weight: float
     ):
         """Set weight for a specific DOF derivative."""
-        self.dof_weights[dof_name].data[derivative] = weight
+        self.dof_weights[dof_name][derivative] = weight
 
     def set_dof_weights(self, dof_name: PrefixedName, weight_map: DerivativeMap[float]):
         """Set multiple weights for a DOF."""
@@ -207,4 +204,4 @@ class QPControllerConfig:
 
     def get_dof_weight(self, dof_name: PrefixedName, derivative: Derivatives) -> float:
         """Get weight for a specific DOF derivative."""
-        return self.dof_weights[dof_name].data[derivative]
+        return self.dof_weights[dof_name][derivative]

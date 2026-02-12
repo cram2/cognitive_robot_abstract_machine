@@ -16,8 +16,15 @@ from typing_extensions import (
     List,
 )
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer
+from ..datastructures.definitions import JointStateType
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    DataclassJSONSerializer,
+)
 from ..collision_checking.collision_detector import CollisionCheck
+from ..datastructures.joint_state import GripperState, JointState
+from ..datastructures.prefixed_name import PrefixedName
+from ..exceptions import NoJointStateWithType
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import (
     Vector3,
@@ -58,9 +65,32 @@ class SemanticRobotAnnotation(RootedSemanticAnnotation, ABC):
     The robot this semantic annotation belongs to
     """
 
+    joint_states: List[JointState] = field(default_factory=list)
+    """
+    Fixed joint states that are defined for this manipulator, like open and close. 
+    """
+
     def __post_init__(self):
         if self._world is not None:
             self._world.add_semantic_annotation(self)
+
+    def add_joint_state(self, joint_state: JointState):
+        """
+        Adds a joint state to this semantic annotation.
+        """
+        self.joint_states.append(joint_state)
+        joint_state.assign_to_robot(self._robot)
+
+    def get_joint_state_by_type(self, state_type: JointStateType) -> JointState:
+        """
+        Returns a JointState for a given joint state type.
+        :param state_type: The state type to search for
+        :return: The joint state with the given type
+        """
+        for j in self.joint_states:
+            if j.state_type == state_type:
+                return j
+        raise NoJointStateWithType(state_type)
 
     @abstractmethod
     def assign_to_robot(self, robot: AbstractRobot):
@@ -91,9 +121,14 @@ class KinematicChain(SemanticRobotAnnotation, ABC):
     The manipulator of the kinematic chain, if it exists. This is usually a gripper or similar device.
     """
 
-    sensors: Set[Sensor] = field(default_factory=set)
+    sensors: List[Sensor] = field(default_factory=list)
     """
     A collection of sensors in the kinematic chain, such as cameras or other sensors.
+    """
+
+    joint_states: List[JointState] = field(default_factory=list)
+    """
+    A list of pre-defined joint positions that this kinematic chain can perform, for example "park" for an arm.
     """
 
     @property
@@ -304,6 +339,7 @@ class Camera(Sensor):
     field_of_view: FieldOfView = field(default=None)
     minimal_height: float = 0.0
     maximal_height: float = 1.0
+    default_camera: bool = False
 
     def __hash__(self):
         """
@@ -371,6 +407,11 @@ class Base(KinematicChain):
     The base of a robot
     """
 
+    main_axis: Vector3 = field(default=Vector3(1, 0, 0), kw_only=True)
+    """
+    Axis along which the robot manipulates
+    """
+
     @property
     def bounding_box(self) -> BoundingBox:
         bounding_boxes = [
@@ -392,7 +433,7 @@ class Base(KinematicChain):
 
 
 @dataclass(eq=False)
-class AbstractRobot(Agent, ABC):
+class AbstractRobot(Agent):
     """
     Specification of an abstract robot. A robot consists of:
     - a root body, which is the base of the robot
@@ -413,22 +454,22 @@ class AbstractRobot(Agent, ABC):
     The base of the robot, the part closes to the floor
     """
 
-    manipulators: Set[Manipulator] = field(default_factory=set)
+    manipulators: List[Manipulator] = field(default_factory=list)
     """
     A collection of manipulators in the robot, such as grippers.
     """
 
-    sensors: Set[Sensor] = field(default_factory=set)
+    sensors: List[Sensor] = field(default_factory=list)
     """
     A collection of sensors in the robot, such as cameras.
     """
 
-    manipulator_chains: Set[KinematicChain] = field(default_factory=set)
+    manipulator_chains: List[KinematicChain] = field(default_factory=list)
     """
     A collection of all kinematic chains containing a manipulator, such as a gripper.
     """
 
-    sensor_chains: Set[KinematicChain] = field(default_factory=set)
+    sensor_chains: List[KinematicChain] = field(default_factory=list)
     """
     A collection of all kinematic chains containing a sensor, such as a camera.
     """
@@ -437,6 +478,11 @@ class AbstractRobot(Agent, ABC):
         kw_only=True,
         default_factory=lambda: CollisionCheckingConfig(buffer_zone_distance=0.05),
     )
+
+    full_body_controlled: bool = field(default=False, kw_only=True)
+    """
+    Whether this robots needs full-body control to be able to operate effectively 
+    """
 
     @abstractmethod
     def setup_collision_config(self):
@@ -497,10 +543,10 @@ class AbstractRobot(Agent, ABC):
         for connection in self._world.get_connections_by_type(ActiveConnection1DOF):
             connection.raw_dof._overwrite_dof_limits(
                 new_lower_limits=DerivativeMap(
-                    [None, -new_limits[connection], None, None]
+                    None, -new_limits[connection], None, None
                 ),
                 new_upper_limits=DerivativeMap(
-                    [None, new_limits[connection], None, None]
+                    None, new_limits[connection], None, None
                 ),
             )
 
@@ -508,7 +554,7 @@ class AbstractRobot(Agent, ABC):
         """
         Adds a manipulator to the robot's collection of manipulators.
         """
-        self.manipulators.add(manipulator)
+        self.manipulators.append(manipulator)
         self._semantic_annotations.add(manipulator)
         manipulator.assign_to_robot(self)
 
@@ -516,7 +562,7 @@ class AbstractRobot(Agent, ABC):
         """
         Adds a sensor to the robot's collection of sensors.
         """
-        self.sensors.add(sensor)
+        self.sensors.append(sensor)
         self._semantic_annotations.add(sensor)
         sensor.assign_to_robot(self)
 
@@ -553,9 +599,9 @@ class AbstractRobot(Agent, ABC):
             )
             return
         if kinematic_chain.manipulator is not None:
-            self.manipulator_chains.add(kinematic_chain)
+            self.manipulator_chains.append(kinematic_chain)
         if kinematic_chain.sensors:
-            self.sensor_chains.add(kinematic_chain)
+            self.sensor_chains.append(kinematic_chain)
         self._semantic_annotations.add(kinematic_chain)
         kinematic_chain.assign_to_robot(self)
 
@@ -577,3 +623,9 @@ class AbstractRobot(Agent, ABC):
                 )
             )
         return collision_matrx
+
+    def get_default_camera(self) -> Camera:
+        for sensor in self.sensors:
+            if isinstance(sensor, Camera) and sensor.default_camera:
+                return sensor
+        return [s for s in self.sensors if isinstance(s, Camera)][0]

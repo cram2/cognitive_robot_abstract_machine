@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
 from uuid import UUID
@@ -6,6 +6,7 @@ from uuid import UUID
 from typing_extensions import Dict, Any, Self, List
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
+from ...world import World
 
 from ...world_description.world_modification import (
     WorldModelModificationBlock,
@@ -195,3 +196,37 @@ class WorldModelSnapshot(SubclassJSONSerializer):
             ids=from_json(state["ids"]),
             states=state.get("states", []),
         )
+
+    @staticmethod
+    def apply_to_json_snapshot_to_world(
+        world: World, json_data: Dict[str, Any], **kwargs
+    ):
+        """
+        1. deserialize modifications from json and apply them to the world, block by block
+        2. deserialize state from json and apply it to the world
+        """
+        with world.modify_world():
+            for modification in json_data.get("modifications", []):
+                WorldModelModificationBlock.apply_from_json(
+                    world, modification, **kwargs
+                )
+
+        state = json_data.get("state", {})
+        ids = from_json(state["ids"])
+        states = state.get("states", [])
+        WorldModelSnapshot._apply_json_state(world, ids, states)
+
+    @staticmethod
+    def _apply_json_state(world: World, ids: list[float], states: list[UUID]):
+        """
+        Apply the state contained in the json snapshot to the world.
+        """
+        if not (ids or states):
+            return
+        indices = [world.state._index.get(_id) for _id in ids]
+        assign_pairs = [(i, float(s)) for i, s in zip(indices, states) if i is not None]
+        if not assign_pairs:
+            return
+        for i, s in assign_pairs:
+            world.state.data[0, i] = s
+        world.notify_state_change()

@@ -249,7 +249,7 @@ class CompiledFunction:
 
         self._setup_compiled_function()
         self._layout.setup_output()
-        if len(self.variable_parameters) == 0:
+        if len(self.variable_parameters.flatten()) == 0:
             self._setup_constant_result()
 
     def _validate_variables(self):
@@ -284,6 +284,9 @@ class CompiledFunction:
         else:
             self._out = np.empty(self.expression.shape)
         self._is_constant = True
+
+    def is_result_empty(self) -> bool:
+        return self._out.size == 0
 
     def _setup_compiled_function(self) -> None:
         """

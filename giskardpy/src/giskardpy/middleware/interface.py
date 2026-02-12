@@ -1,4 +1,7 @@
 import abc
+import logging
+
+logger = logging.getLogger("giskardpy")
 
 
 class MiddlewareWrapper(abc.ABC):
@@ -25,19 +28,19 @@ class MiddlewareWrapper(abc.ABC):
 class NoMiddleware(MiddlewareWrapper):
 
     def loginfo(self, msg: str):
-        print(f"[INFO]: {msg}")
+        logger.info(msg)
 
     def logwarn(self, msg: str):
-        print(f"[WARN]: {msg}")
+        logger.warning(msg)
 
     def logerr(self, msg: str):
-        print(f"[ERROR]: {msg}")
+        logger.error(msg)
 
     def logdebug(self, msg: str):
-        print(f"[DEBUG]: {msg}")
+        logger.debug(msg)
 
     def logfatal(self, msg: str):
-        print(f"[FATAL]: {msg}")
+        logger.fatal(msg)
 
     def resolve_iri(cls, path: str) -> str:
         return path

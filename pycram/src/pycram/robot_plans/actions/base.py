@@ -4,17 +4,16 @@ import abc
 import logging
 from dataclasses import dataclass
 
-from typing_extensions import Any, Optional, Callable
+from typing_extensions import Any, Optional, Callable, TypeVar
 
 from ...designator import DesignatorDescription
 from ...failures import PlanFailure
-from ...has_parameters import HasParameters
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ActionDescription(DesignatorDescription, HasParameters):
+class ActionDescription(DesignatorDescription):
     _pre_perform_callbacks = []
     _post_perform_callbacks = []
 
@@ -76,3 +75,6 @@ class ActionDescription(DesignatorDescription, HasParameters):
     def post_perform(cls, func) -> Callable:
         cls._post_perform_callbacks.append(func)
         return func
+
+
+ActionType = TypeVar("ActionType", bound=ActionDescription)
