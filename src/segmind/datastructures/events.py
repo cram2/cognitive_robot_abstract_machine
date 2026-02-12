@@ -263,33 +263,39 @@ class StopRotationEvent(StopMotionEvent):
 
 @dataclass(init=False, unsafe_hash=True)
 class AbstractContactEvent(EventWithTwoTrackedObjects, ABC):
-    contact_points: Collision = field(init=False, default_factory=Collision)
-    latest_contact_points: Collision = field(init=False, default_factory=Collision)
+    contact_points: list[Collision] = field(init=False, default_factory=list)
+    latest_contact_points: list[Collision] = field(init=False, default_factory=list)
     bounding_box: BoundingBox = field(init=False)
     pose: PoseStamped = field(init=False)
     with_object_bounding_box: Optional[BoundingBox] = field(init=False, default=None)
     with_object_pose: Optional[PoseStamped] = field(init=False, default=None)
 
     def __init__(self,
-                 contact_points: Collision,
+                 contact_points: list[Collision],
                  of_object: Body,
-                 latest_contact_points: Optional[Collision] = None,
+                 latest_contact_points: Optional[list[Collision]] = None,
                  with_object: Optional[Body] = None,
                  timestamp: Optional[float] = None):
         EventWithTwoTrackedObjects.__init__(self,
                                             tracked_object=of_object,
                                             with_object=with_object,
                                             timestamp=timestamp if timestamp is not None else time.time())
-        self.contact_points: TrimeshCollisionDetector = contact_points
-        self.latest_contact_points: TrimeshCollisionDetector = latest_contact_points
+        self.contact_points: list[Collision] = contact_points
+        self.latest_contact_points: list[Collision] = latest_contact_points if latest_contact_points is not None else []
         self.bounding_box: BoundingBox = BoundingBox.from_mesh(
             of_object.collision.combined_mesh,
             origin=of_object.global_pose
         )
         self.pose: Pose = of_object.global_pose.to_pose()
-        self.with_object_bounding_box: Optional[BoundingBox] = with_object.get_axis_aligned_bounding_box() \
-            if with_object is not None else None
-        self.with_object_pose: Optional[PoseStamped] = with_object.pose if with_object is not None else None
+        self.with_object_bounding_box: Optional[BoundingBox] = (
+            BoundingBox.from_mesh(
+                with_object.collision.combined_mesh,
+                origin=with_object.global_pose.from_xyz_rpy(),
+            )
+            if with_object is not None
+            else None
+        )
+        self.with_object_pose: Optional[Pose] = with_object.global_pose.to_pose() if with_object is not None else None
 
     @property
     def involved_bodies(self) -> List[Body]:
@@ -332,18 +338,20 @@ class ContactEvent(AbstractContactEvent):
 
     @property
     def objects(self):
-        return self.contact_points.get_objects_that_have_points()
+        from segmind.detectors.atomic_event_detectors import AbstractContactDetector
+        return AbstractContactDetector.get_bodies_in_contact(self.contact_points)
 
     @property
     def main_link(self):
         if len(self.contact_points) > 0:
-            return self.contact_points[0].link_a
+            return self.contact_points[0].body_a
         else:
             print(f"No contact points found for {self.tracked_object.name} in {self.__class__.__name__}")
 
     @property
     def links(self):
-        return self.contact_points.get_all_bodies()
+        from segmind.detectors.atomic_event_detectors import AbstractContactDetector
+        return AbstractContactDetector.get_bodies_in_contact(self.contact_points)
 
 
 @dataclass(init=False, unsafe_hash=True)
@@ -356,10 +364,12 @@ class LossOfContactEvent(AbstractContactEvent):
 
     @property
     def latest_objects_that_got_removed(self):
-        return self.get_objects_that_got_removed(self.latest_contact_points)
-
-    def get_objects_that_got_removed(self, contact_points: TrimeshCollisionDetector):
-        return self.contact_points.get_objects_that_got_removed(contact_points)
+        prev_contacts = {
+            (cp.body_a, cp.body_b) for cp in self.latest_contact_points
+        }
+        curr_contacts = {(cp.body_a, cp.body_b) for cp in self.contact_points}
+        lost_contact_pairs = prev_contacts - curr_contacts
+        return list({b for (a, b) in lost_contact_pairs if a == self.tracked_object})
 
     @property
     def color(self) -> Color:
@@ -367,15 +377,17 @@ class LossOfContactEvent(AbstractContactEvent):
 
     @property
     def main_link(self) -> Body:
-        return self.latest_contact_points[0].link_a
+        if len(self.latest_contact_points) > 0:
+            return self.latest_contact_points[0].body_a
+        return self.tracked_object
 
     @property
     def links(self) -> List[Body]:
-        return self.contact_points.get_bodies_that_got_removed(self.latest_contact_points)
+        return self.latest_objects_that_got_removed
 
     @property
-    def objects(self):
-        return self.contact_points.get_objects_that_got_removed(self.latest_contact_points)
+    def objects(self) -> List[Body]:
+        return self.latest_objects_that_got_removed
 
 
 @dataclass(init=False, unsafe_hash=True)

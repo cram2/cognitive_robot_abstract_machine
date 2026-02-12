@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from pycram.orm.ormatic_interface import BodyDAO
+import semantic_digital_twin
+from krrood.ormatic.dao import to_dao, DataAccessObjectState, DataAccessObject
+from semantic_digital_twin.orm.ormatic_interface import BodyDAO
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Optional, TYPE_CHECKING
 
@@ -52,11 +54,11 @@ class HasSecondaryTrackedObject:
     A mixin class that provides the tracked objects for the event.
     """
     with_object: Optional[Body] = None
-    with_object_frozen_cp: Optional[BodyDAO] = field(init=False, default=None, repr=False, hash=False)
+    with_object_frozen_cp: Optional[DataAccessObject[Body]] = field(init=False, default=None, repr=False, hash=False)
 
     def __post_init__(self):
         if self.with_object is not None:
-            self.with_object_frozen_cp = self.with_object.frozen_copy()
+            self.with_object_frozen_cp = to_dao(self.with_object)
 
 
     @cached_property

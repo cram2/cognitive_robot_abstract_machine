@@ -4,6 +4,8 @@ from os.path import dirname
 from queue import Queue, Empty
 
 from ripple_down_rules.rdr_decorators import RDRDecorator
+from segmind import logger, set_logger_level, LogLevel
+from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Any, Dict, List, Optional, Type, Callable, Union
 
@@ -16,7 +18,7 @@ from ..datastructures.events import MotionEvent, EventUnion, StopMotionEvent, Ne
     LossOfSupportEvent, SupportEvent
 from ..datastructures.object_tracker import ObjectTrackerFactory
 from ..utils import get_support
-
+set_logger_level(LogLevel.DEBUG)
 EventCondition = Callable[[EventUnion], bool]
 
 
@@ -69,11 +71,11 @@ class SpatialRelationDetector(AtomicEventDetector):
             while True:
                 event = self.event_queue.get_nowait()
                 self.event_queue.task_done()
-                print(f"Checking event {event}")
+                logger.debug(f"Checking event {event}")
                 involved_bodies = event.involved_bodies
                 bodies_to_check = list(filter(lambda body: body not in checked_bodies, involved_bodies))
                 checked_bodies.extend(self.world.update_containment_for(bodies_to_check))
-                print(f"Checked bodies: {[body.name for body in checked_bodies]}")
+                logger.debug(f"Checked bodies: {[body.name for body in checked_bodies]}")
         except Empty:
             pass
 
@@ -91,10 +93,14 @@ class ContainmentDetector(SpatialRelationDetector):
         """
         Update the state of a body.
         """
-        if isinstance(body, Body):
-            for link in body.links.values():
-                self.bodies_states[link] = link.update_containment(intersection_ratio=0.6)
-        self.bodies_states[body] = body.update_containment(intersection_ratio=0.6)
+        for b in self.world.bodies:
+            if InsideOf(b, body) and b not in self.bodies_states:
+                self.bodies_states[b] = body
+
+        # if isinstance(body, Body):
+        #     for link in body.links.values():
+        #         self.bodies_states[link] = link.update_containment(intersection_ratio=0.6)
+        # self.bodies_states[body] = body.update_containment(intersection_ratio=0.6)
 
     def detect_events(self) -> None:
         """
@@ -156,7 +162,7 @@ class InsertionDetector(SpatialRelationDetector):
                 event: ContainmentEvent = self.event_queue.get_nowait()
                 self.event_queue.task_done()
                 if event.tracked_object in checked_bodies:
-                    print(f"tracked object {event.tracked_object.name} is already checked")
+                    logger.debug(f"tracked object {event.tracked_object.name} is already checked")
                     continue
                 while True:
                     latest_interference_with_hole = self.get_latest_interference_with_hole(event)

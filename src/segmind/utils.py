@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from pycram.designator import ObjectDesignatorDescription
 from semantic_digital_twin.collision_checking.collision_detector import Collision
+from semantic_digital_twin.reasoning.predicates import is_supported_by, contact
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world import World
@@ -155,13 +156,15 @@ def check_if_object_is_supported(obj: Body, distance: Optional[float] = 0.03) ->
         prospection_obj = World.current_world.get_prospection_object_for_object(obj)
         dt = math.sqrt(2 * distance / 9.81) + 0.01  # time to fall distance
         World.current_world.simulate(dt)
-        cp = prospection_obj.contact_points
-        if get_support(prospection_obj, cp.get_all_bodies()) is None:
+        # cp = prospection_obj.contact_points
+        from .detectors.atomic_event_detectors import AbstractContactDetector
+        contact_points, _ = AbstractContactDetector.get_contact_points_for_body(prospection_obj, 0.05)
+        if get_support(prospection_obj, AbstractContactDetector.get_bodies_in_contact(contact_points)) is None:
             return False
     return supported
 
 
-def check_if_object_is_supported_using_contact_points(obj: Body, contact_points: Collision) -> bool:
+def check_if_object_is_supported_using_contact_points(obj: Body, contact_points: list[Collision]) -> bool:
     """
     Check if the object is supported by any other object using the contact points.
 
@@ -169,8 +172,9 @@ def check_if_object_is_supported_using_contact_points(obj: Body, contact_points:
     :param contact_points: The contact points of the object.
     :return: True if the object is supported, False otherwise.
     """
-    for body in contact_points.get_bodies_in_contact():
-        if check_if_object_is_supported_by_another_object(obj, body, contact_points.get_points_of_body(body)):
+    from .detectors.atomic_event_detectors import AbstractContactDetector
+    for body in AbstractContactDetector.get_bodies_in_contact(contact_points):
+        if check_if_object_is_supported_by_another_object(obj, body, AbstractContactDetector.get_points_of_body(contact_points, body)):
             return True
 
 
@@ -182,35 +186,54 @@ def get_support(obj: Body, contact_bodies: Optional[List[Body]] = None) -> Optio
     :param contact_bodies: The bodies in contact with the object.
     :return: The supporting surface if it exists, None otherwise.
     """
-    if not contact_bodies:
-        contact_bodies = obj.contact_points.get_all_bodies()
-    excluded_bodies = [obj]
-    if isinstance(obj, Body):
-        excluded_bodies.extend(list(obj.child_kinematic_structure_entities))
-    for body in contact_bodies:
-        if body in excluded_bodies:
-            continue
-        # if isinstance(body, Link):
-        #     parent_obj = body.parent_entity
-        # else:
-        #     parent_obj = body
-        # if issubclass(obj.obj_type, (Supporter, Location)):
-        if is_object_supported_by_container_body(obj, bodies_to_check=[body]):
-            return body
-        body_aabb = body.get_axis_aligned_bounding_box()
-        surface_z = body_aabb.max_z - 0.001
-        obj_bbox = obj.get_axis_aligned_bounding_box()
-        intersection = obj_bbox.intersection_with(body_aabb, axis_to_use=[AxisIdentifier.X, AxisIdentifier.Y])
-        tracked_object_base = obj.position
-        if tracked_object_base.z + 0.001 >= surface_z and intersection.width >= 0.5 * obj_bbox.width and \
-                intersection.depth >= 0.5 * obj_bbox.depth:
-            print(f"Object {obj.name} IS supported by {body.name}")
-            return body
-    print(f"Object {obj.name} IS NOT supported")
+    if contact_bodies is None:
+        contact_bodies = []
+        for i in obj._world.bodies_with_enabled_collision:
+            if not obj.has_collision():
+                continue
+            if obj.name.name == "root":
+                continue
+            if obj.name.name == "iCub":
+                continue
+            if i == obj:
+                continue
+            if contact(i, obj):
+                contact_bodies.append(i)
+
+    for cb in contact_bodies:
+        if is_supported_by(obj, cb):
+            return cb
+
+    return None
+    # if not contact_bodies:
+    #     contact_bodies = obj.contact_points.get_all_bodies()
+    # excluded_bodies = [obj]
+    # if isinstance(obj, Body):
+    #     excluded_bodies.extend(list(obj.child_kinematic_structure_entities))
+    # for body in contact_bodies:
+    #     if body in excluded_bodies:
+    #         continue
+    #     # if isinstance(body, Link):
+    #     #     parent_obj = body.parent_entity
+    #     # else:
+    #     #     parent_obj = body
+    #     # if issubclass(obj.obj_type, (Supporter, Location)):
+    #     if is_object_supported_by_container_body(obj, bodies_to_check=[body]):
+    #         return body
+    #     body_aabb = body.get_axis_aligned_bounding_box()
+    #     surface_z = body_aabb.max_z - 0.001
+    #     obj_bbox = obj.get_axis_aligned_bounding_box()
+    #     intersection = obj_bbox.intersection_with(body_aabb, axis_to_use=[AxisIdentifier.X, AxisIdentifier.Y])
+    #     tracked_object_base = obj.position
+    #     if tracked_object_base.z + 0.001 >= surface_z and intersection.width >= 0.5 * obj_bbox.width and \
+    #             intersection.depth >= 0.5 * obj_bbox.depth:
+    #         print(f"Object {obj.name} IS supported by {body.name}")
+    #         return body
+    # print(f"Object {obj.name} IS NOT supported")
 
 
 def check_if_object_is_supported_by_another_object(obj: Body, support_obj: Body,
-                                                   contact_points: Optional[Collision] = None) -> bool:
+                                                   contact_points: Optional[list[Collision]] = None) -> bool:
     """
     Check if the object is supported by another object.
 
@@ -220,8 +243,23 @@ def check_if_object_is_supported_by_another_object(obj: Body, support_obj: Body,
     :return: True if the object is supported by the support object, False otherwise.
     """
     if contact_points is None:
-        contact_points = obj.get_contact_points_with_body(support_obj)
-    normals = [cp.normal.to_list() for cp in contact_points if any(cp.normal.to_list())]
+        from .detectors.atomic_event_detectors import AbstractContactDetector
+        all_contact_points, _ = AbstractContactDetector.get_contact_points_for_body(obj, 0.05, support_obj)
+        contact_points = all_contact_points
+    
+    normals = []
+    for cp in contact_points:
+        # Use the normal from the collision if available
+        # In TrimeshCollisionDetector, map_V_n_input is a-b
+        if cp.map_V_n_input is not None and any(cp.map_V_n_input):
+            # If body_a is obj, the normal points from obj to support_obj.
+            # For support, we want the normal pointing UP (against gravity).
+            # If body_a is support_obj, then map_V_n_input points support -> obj, which is what we want.
+            normal = cp.map_V_n_input
+            if cp.body_a == obj:
+                normal = -normal
+            normals.append(normal)
+            
     if len(normals) > 0:
         average_normal = np.mean(normals, axis=0)
         return is_vector_opposite_to_gravity(average_normal)
@@ -295,8 +333,11 @@ class Imaginator:
         support_obj = Body(support_name, Supporter, None, support, color=support.color)
         support_position = obj_aabb.base_origin
         support_obj.set_position(support_position)
-        cp = support_obj.closest_points(0.05)
-        contacted_objects = cp.get_objects_that_have_points()
+        # cp = support_obj.closest_points(0.05)
+        # contacted_objects = cp.get_objects_that_have_points()
+        from .detectors.atomic_event_detectors import AbstractContactDetector
+        contact_points, _ = AbstractContactDetector.get_contact_points_for_body(support_obj, 0.05)
+        contacted_objects = AbstractContactDetector.get_bodies_in_contact(contact_points)
         contacted_surfaces = [obj for obj in contacted_objects if obj in cls.surfaces_created and obj != support_obj]
         for obj in contacted_surfaces:
             support_obj = support_obj.merge(obj)

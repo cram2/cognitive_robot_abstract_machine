@@ -11,7 +11,7 @@ from threading import RLock
 from typing_extensions import Callable, Optional, Dict, Generator, List
 
 from semantic_digital_twin.spatial_types import Vector3
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -141,7 +141,21 @@ class DataPlayer(EpisodePlayer, ABC):
         if len(objects_poses):
             if self.sync_robot_only:
                 objects_poses = {self.world.robot: objects_poses[self.world.robot]}
-            self.world.reset_multiple_objects_base_poses(objects_poses)
+            for obj in self.world.bodies:
+                # check in the dictionary if obj is the key and set its pose accordingly
+                if obj in objects_poses:
+                    with self.world.modify_world():
+                        new_pose = type(obj.parent_connection)(
+                            parent=obj.parent_connection.parent,
+                            child=obj,
+                            parent_T_connection_expression= HomogeneousTransformationMatrix.from_xyz_rpy(
+                                x=objects_poses[obj].x, y=objects_poses[obj].y, z=objects_poses[obj].z,
+                                roll=objects_poses[obj].to_quaternion().x, pitch=objects_poses[obj].to_quaternion().y,
+                                yaw=objects_poses[obj].to_quaternion().z,
+                            )
+                        )
+                        self.world.add_connection(new_pose)
+            #self.world.reset_multiple_objects_base_poses(objects_poses)
         if len(joint_states):
             self.world.robot.set_multiple_joint_positions(joint_states)
 

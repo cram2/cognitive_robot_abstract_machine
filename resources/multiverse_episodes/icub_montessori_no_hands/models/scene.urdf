@@ -267,7 +267,7 @@
     <visual name="MontessoriBox">
       <origin xyz="0.00525750732049346 1.4678077604912687e-05 -0.0003088224621023983" rpy="-1.586214303970337 -1.5560582876205444 -3.1267335414886475"/>
       <geometry>
-        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriBox.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="/home/sorin/dev/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/models/scene/meshes/stl/montessori_box_MontessoriBox.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="MontessoriBox_material">
         <color rgba="0.89 0.67 0.57 1.0"/>
@@ -330,7 +330,7 @@
     <collision name="MontessoriObject2">
       <origin xyz="-0.005819993559271097 1.2720914664890083e-19 3.725290298461914e-09" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="file://montessori_object_1/meshes/stl/montessori_object_2_MontessoriObject_002.stl" scale="0.8 0.8 0.02"/>
+        <mesh filename="/home/sorin/dev/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/models/scene/meshes/stl/montessori_object_2_MontessoriObject_002.stl" scale="0.8 0.8 0.02"/>
       </geometry>
     </collision>
   </link>
@@ -437,7 +437,7 @@
     <visual name="MontessoriDrawer1">
       <origin xyz="0.00039275470771826804 -9.528518252199802e-11 -0.004749107174575329" rpy="0.0 -1.5696903467178345 3.1415927410125732"/>
       <geometry>
-        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriDrawer.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="/home/sorin/dev/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/models/scene/meshes/stl/montessori_box_MontessoriDrawer.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="MontessoriDrawer1_material">
         <color rgba="1.0 0.83 0.67 1.0"/>
@@ -470,7 +470,7 @@
     <visual name="MontessoriDrawer1Handle">
       <origin xyz="0.0039155809208750725 7.543388136355134e-09 -2.279017252693194e-11" rpy="1.5707963705062866 -1.3322676295501878e-15 1.5707963705062866"/>
       <geometry>
-        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriDrawerHandle.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="/home/sorin/dev/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/models/scene/meshes/stl/montessori_box_MontessoriDrawerHandle.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="MontessoriDrawer1Handle_material">
         <color rgba="0.89 0.67 0.57 1.0"/>
@@ -523,7 +523,7 @@
     <visual name="MontessoriDrawer2">
       <origin xyz="0.00039275470771826804 -9.528518252199802e-11 -0.004749107174575329" rpy="0.0 -1.5696903467178345 3.1415927410125732"/>
       <geometry>
-        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriDrawer.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="/home/sorin/dev/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/models/scene/meshes/stl/montessori_box_MontessoriDrawer.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="MontessoriDrawer2_material">
         <color rgba="0.99 0.73 0.55 1.0"/>
@@ -556,7 +556,7 @@
     <visual name="MontessoriDrawer2Handle">
       <origin xyz="0.0039155809208750725 7.543388136355134e-09 -2.279017252693194e-11" rpy="1.5707963705062866 -1.3322676295501878e-15 1.5707963705062866"/>
       <geometry>
-        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriDrawerHandle.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="/home/sorin/dev/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/models/scene/meshes/stl/montessori_box_MontessoriDrawerHandle.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="MontessoriDrawer2Handle_material">
         <color rgba="0.89 0.67 0.57 1.0"/>
@@ -609,7 +609,7 @@
     <visual name="MontessoriDrawer3">
       <origin xyz="0.00039275470771826804 -9.528518252199802e-11 -0.004749107174575329" rpy="0.0 -1.5696903467178345 3.1415927410125732"/>
       <geometry>
-        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriDrawer.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="/home/sorin/dev/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/models/scene/meshes/stl/montessori_box_MontessoriDrawer.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="MontessoriDrawer3_material">
         <color rgba="0.87 0.94 0.98 1.0"/>
@@ -642,7 +642,7 @@
     <visual name="MontessoriDrawer3Handle">
       <origin xyz="0.0039155809208750725 7.543388136355134e-09 -2.279017252693194e-11" rpy="1.5707963705062866 -1.3322676295501878e-15 1.5707963705062866"/>
       <geometry>
-        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriDrawerHandle.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="/home/sorin/dev/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/models/scene/meshes/stl/montessori_box_MontessoriDrawerHandle.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="MontessoriDrawer3Handle_material">
         <color rgba="0.89 0.67 0.57 1.0"/>

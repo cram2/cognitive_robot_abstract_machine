@@ -2,6 +2,8 @@ import datetime
 import threading
 from os.path import dirname
 
+from semantic_digital_twin.world_description.world_entity import Body
+from segmind import logger, set_logger_level, LogLevel
 from typing_extensions import List, Optional, Dict
 
 from .datastructures.events import *
@@ -11,7 +13,7 @@ from .detectors.spatial_relation_detector import SpatialRelationDetector
 from .episode_player import EpisodePlayer
 from .event_logger import EventLogger
 from .utils import check_if_object_is_supported, Imaginator
-
+set_logger_level(LogLevel.DEBUG)
 
 class EpisodeSegmenter(ABC):
 
@@ -105,13 +107,14 @@ class EpisodeSegmenter(ABC):
                                     if isinstance(detector, DetectorWithStarterEvent)]
         for detector_thread in atomic_detectors + non_atomic_detectors:
             detector_thread.stop()
-            print(f"Joining {detector_thread.thread_id}, {detector_thread.name}")
+            logger.debug(f"Joining {detector_thread.thread_id}, {detector_thread.name}")
             detector_thread.join()
 
     def start(self) -> None:
         """
         Start the episode player and the event detectors.
         """
+        logger.debug(f"Starting episode segmenter with detectors {self.detectors_to_start} and initial detectors {self.initial_detectors}.")
         self.start_episode_player_and_wait_till_ready()
         self.run_event_detectors()
 
@@ -123,9 +126,12 @@ class EpisodeSegmenter(ABC):
         Start the Episode player thread, and waits until the thread signals that it is
         ready (e.g., the replay environment is initialized with all objects in starting poses).
         """
+        logger.debug("Starting episode player thread.")
         if not self.episode_player.is_alive():
+            logger.debug("Episode player thread not alive, starting it.")
             self.episode_player.start()
         while not self.episode_player.ready:
+            logger.debug("Waiting for episode player thread to be ready.")
             time.sleep(0.1)
 
     def run_event_detectors(self) -> None:
@@ -206,7 +212,7 @@ class EpisodeSegmenter(ABC):
         """
         self.episode_player.pause()
         set_of_objects = set()
-        for obj in World.current_world.objects:
+        for obj in self.episode_player.world.bodies:
             if not self.avoid_object(obj):
                 set_of_objects.add(obj)
                 # if not check_if_object_is_supported(obj):
@@ -229,14 +235,14 @@ class EpisodeSegmenter(ABC):
         involved_objects = self.get_involved_bodies(event)
         if not involved_objects:
             return
-        print(f"Involved objects: {[obj.name for obj in involved_objects]}")
+        logger.debug(f"Involved objects: {[obj.name for obj in involved_objects]}")
         for obj in involved_objects:
             if self.avoid_object(obj):
                 continue
             if isinstance(obj, Body) and obj.parent_entity in self.object_trackers.keys():
                 continue
             if obj not in self.object_trackers.keys():
-                print(f"New object {obj.name}")
+                logger.debug(f"New object {obj.name}")
                 self.object_trackers[obj] = ObjectTracker(obj)
                 self.start_tracking_threads_for_new_object_and_event(obj, event)
 
@@ -251,7 +257,7 @@ class EpisodeSegmenter(ABC):
         """
         pass
 
-    def get_involved_bodies(self, event: EventUnion) -> List[Body]:
+    def get_involved_bodies(self, event: EventUnion) -> list[Body] | None:
         """
         Get the bodies involved in the event.
 
@@ -268,9 +274,11 @@ class EpisodeSegmenter(ABC):
         :param obj: The object to check.
         :return: True if the object should be avoided, False otherwise.
         """
-        return ((obj.is_an_environment or issubclass(obj.ontology_concept, (Supporter, Location)) or
-                 any([k in obj.name.lower() for k in self.objects_to_avoid])) or
-                (isinstance(obj, Body) and self.avoid_object(obj.parent_entity)))
+        logger.debug(f"Checking if object {obj.name} should be avoided.")
+        return not obj.has_collision()
+        #return ((obj.is_an_environment or issubclass(obj.ontology_concept, (Supporter, Location)) or
+        #         any([k in obj.name.lower() for k in self.objects_to_avoid])) or
+        #        (isinstance(obj, Body) and self.avoid_object(obj.parent_entity)))
 
     def start_motion_threads_for_object(self, obj: Body, event: Optional[NewObjectEvent] = None) -> None:
         """
@@ -304,7 +312,7 @@ class EpisodeSegmenter(ABC):
         """
         if not self.is_detector_redundant(detector_type, starter_event):
             if detector_type == PlacingDetector:
-                print(f"new placing detector for object {starter_event.tracked_object.name}")
+                logger.debug(f"new placing detector for object {starter_event.tracked_object.name}")
             self.create_detector_and_start_it(detector_type, starter_event=starter_event)
 
     @staticmethod
@@ -353,6 +361,7 @@ class EpisodeSegmenter(ABC):
         detector_kwargs = self.get_detector_args(detector_type, tracked_object=tracked_object,
                                                starter_event=starter_event, **detector_kwargs)
         detector_kwargs['episode_player'] = self.episode_player
+        detector_kwargs['world'] = self.episode_player.world
         detector_kwargs['logger'] = self.logger
         detector = detector_type(**detector_kwargs)
         self.starter_event_to_detector_thread_map[(starter_event, detector_type)] = detector
@@ -366,9 +375,9 @@ class EpisodeSegmenter(ABC):
         """
         detector.start()
         self.detector_threads_list.append(detector)
-        print(f"Created {type(detector).__name__}")
+        logger.debug(f"Created {type(detector).__name__}")
         if isinstance(detector, DetectorWithStarterEvent) and detector.starter_event is not None:
-            print(f"For starter event {detector.starter_event}")
+            logger.debug(f"For starter event {detector.starter_event}")
 
     @staticmethod
     def get_detector_args(detector_type: TypeEventDetectorUnion, tracked_object: Optional[Body] = None,
@@ -400,9 +409,9 @@ class EpisodeSegmenter(ABC):
         """
         Join all the threads.
         """
-        self.logger.print_events()
+        self.logger.logger.debug_events()
         self.logger.join()
-        print("All threads joined.")
+        logger.debug("All threads joined.")
 
 
 class AgentEpisodeSegmenter(EpisodeSegmenter):
@@ -412,7 +421,7 @@ class AgentEpisodeSegmenter(EpisodeSegmenter):
     """
 
     def start_tracking_threads_for_new_object_and_event(self, new_object: Body, event: Optional[ContactEvent] = None):
-        print(f"Creating contact and motion threads for object {new_object.name}")
+        logger.debug(f"Creating contact and motion threads for object {new_object.name}")
         self.start_contact_threads_for_object(new_object, event)
         self.start_motion_threads_for_object(new_object, event)
 

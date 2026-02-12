@@ -6,16 +6,17 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3, Quaternion
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Dict, Set
-
+from segmind import logger, set_logger_level, LogLevel
 from pycram.datastructures.pose import PoseStamped, Header
 from .data_player import FilePlayer, FrameData
 
-
+set_logger_level(LogLevel.DEBUG)
 class CSVEpisodePlayer(FilePlayer):
     data_frames: pd.DataFrame
     data_object_names: Set[str]
 
     def get_frame_data_generator(self):
+        logger.debug(f"Reading CSV file {self.file_path}")
         self.data_frames = pd.read_csv(self.file_path)
         self.data_object_names = {v.split(':')[0] for v in self.data_frames.columns if ':' in v}
         for i, (frame_id, objects_data) in enumerate(self.data_frames.iterrows()):
