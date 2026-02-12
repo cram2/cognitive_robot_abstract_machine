@@ -834,5 +834,30 @@ def test_nested_modify_world_publish_changes_true_false(rclpy_node):
     synchronizer_2.close()
 
 
+def test_dont_publish_changes(rclpy_node):
+    w1 = World(name="w1")
+    w2 = World(name="w2")
+
+    synchronizer_1 = ModelSynchronizer(
+        node=rclpy_node,
+        world=w1,
+    )
+    synchronizer_2 = ModelSynchronizer(
+        node=rclpy_node,
+        world=w2,
+    )
+
+    with w1.modify_world(publish_changes=False):
+        b1 = Body(name=PrefixedName("b1"))
+        w1.add_body(b1)
+
+    assert len(w1.kinematic_structure_entities) - 1 == len(
+        w2.kinematic_structure_entities
+    )
+
+    synchronizer_1.close()
+    synchronizer_2.close()
+
+
 if __name__ == "__main__":
     unittest.main()
