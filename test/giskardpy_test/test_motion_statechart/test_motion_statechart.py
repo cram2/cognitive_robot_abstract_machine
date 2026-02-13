@@ -105,6 +105,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
 )
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidCollisionBetweenGroups,
+    AvoidExternalCollisions,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import Manipulator, AbstractRobot
@@ -2723,11 +2724,13 @@ class TestCollisionAvoidance:
         for contact in collisions.contacts:
             assert contact.distance > 0.249
 
-    def test_hard_constraints_violated(self, cylinder_bot_world: World):
+    def test_hard_constraints_violated(self, cylinder_bot_world: World, rclpy_node):
+        TFPublisher(world=cylinder_bot_world, node=rclpy_node)
+        VizMarkerPublisher(world=cylinder_bot_world, node=rclpy_node, use_visuals=False)
         root = cylinder_bot_world.root
         with cylinder_bot_world.modify_world():
             env2 = Body(
-                name=PrefixedName("environment2"),
+                name=PrefixedName("environment21234"),
                 collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
             )
             env_connection = FixedConnection(
@@ -2740,7 +2743,7 @@ class TestCollisionAvoidance:
             cylinder_bot_world.add_connection(env_connection)
 
             env3 = Body(
-                name=PrefixedName("environment3"),
+                name=PrefixedName("environment31234"),
                 collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
             )
             env_connection = FixedConnection(
@@ -2752,7 +2755,7 @@ class TestCollisionAvoidance:
             )
             cylinder_bot_world.add_connection(env_connection)
             env4 = Body(
-                name=PrefixedName("environment4"),
+                name=PrefixedName("environment41234"),
                 collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
             )
             env_connection = FixedConnection(
@@ -2764,7 +2767,7 @@ class TestCollisionAvoidance:
             )
             cylinder_bot_world.add_connection(env_connection)
             env5 = Body(
-                name=PrefixedName("environment5"),
+                name=PrefixedName("environment52134"),
                 collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
             )
             env_connection = FixedConnection(
@@ -2778,6 +2781,21 @@ class TestCollisionAvoidance:
 
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+
+        collision_manager = cylinder_bot_world.collision_manager
+        collision_manager.temporary_rules.extend(
+            [
+                AvoidExternalCollisions(
+                    buffer_zone_distance=0.05,
+                    violated_distance=0.0,
+                    bodies=robot.bodies_with_collision,
+                    world=cylinder_bot_world,
+                ),
+            ]
+        )
+        collision_manager.max_avoided_bodies_rules.append(
+            MaxAvoidedCollisionsOverride(2, {robot.root})
+        )
 
         msc = MotionStatechart()
         msc.add_node(
@@ -2794,10 +2812,11 @@ class TestCollisionAvoidance:
                                 root_link=cylinder_bot_world.root,
                                 tip_link=tip,
                                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
-                                    x=1, reference_frame=cylinder_bot_world.root
+                                    x=0, reference_frame=cylinder_bot_world.root
                                 ),
                             ),
                             ExternalCollisionAvoidance(robot=robot),
+                            # ConstTrueNode(),
                         ]
                     ),
                 ]
