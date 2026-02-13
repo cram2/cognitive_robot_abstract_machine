@@ -1,8 +1,14 @@
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 import trimesh
 from .pipeline import Step
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.geometry import TriangleMesh, Scale
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 import re
 
 class GLTFLoader(Step):
@@ -19,6 +25,27 @@ class GLTFLoader(Step):
         if len(root_children) > 1 or len(root_children) == 0:
             raise ValueError("More than one root node found in the scene, or no root node found.")
         return root_children[0]
+
+    def _trimesh_to_body(self, mesh: trimesh.Trimesh, name: str) -> Body:
+        """Convert a trimesh.Trimesh to a Body object."""
+        # Create TriangleMesh geometry from trimesh
+        triangle_mesh = TriangleMesh(
+            mesh=mesh,
+            origin=HomogeneousTransformationMatrix.from_xyz_rpy(),  # Identity transform
+            scale=Scale(1.0, 1.0, 1.0)  # No scaling
+        )
+
+        # Create ShapeCollection for collision and visual
+        shape_collection = ShapeCollection([triangle_mesh])
+
+        # Create Body
+        body = Body(
+            name=PrefixedName(name),
+            collision=shape_collection,
+            visual=shape_collection  # Use same for both collision and visual
+        )
+
+        return body
 
     def _grouping_similar_meshes(self, base_node) -> Tuple[set, set]:
         base_name_pattern = re.compile(r"^(.*?)(_[A-Za-z0-9]+)?$")#could be diffrent systems but freeCAD export always this
@@ -54,26 +81,39 @@ class GLTFLoader(Step):
             return trimesh.util.concatenate(meshes)
         return trimesh.Trimesh() # should not happen but just in case
 
-    def _build_world_from_elements(self, world_elements, connection, world) -> World:
+    def _build_world_from_elements(self, world_elements: Dict[str, Body], connection: Dict[str, List[str]], world: World) -> World:
         object_root = self._get_root_node()
         if world.root is None:
             # Set object_root as the root
-            world.add_kinematic_structure_entity(None, world_elements[object_root], [])
-            world.root = object_root
+            object_root_body = world_elements[object_root]
+            world.add_kinematic_structure_entity(object_root_body)
         else:
-            # Add object_root as a child of the existing root
-            world.add_kinematic_structure_entity(world.root, world_elements[object_root], [])
-            connection[world.root] = [object_root]
+            object_root_body = world_elements[object_root]
+            conn = FixedConnection(
+                parent=world.root,
+                child=object_root_body,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                name=PrefixedName(f"object_root_{object_root}")
+            )
+            world.add_connection(conn)
+
         to_add_nodes = [object_root]
         while to_add_nodes:
             node = to_add_nodes.pop()
             children = connection.get(node, [])
             for child in children:
-                mesh = world_elements.get(child)
-                if mesh is None:
-                    continue
-                world.add_kinematic_structure_entity(node, mesh, [])
                 to_add_nodes.append(child)
+                if child not in world_elements:
+                    continue
+                parent_body = world_elements[node]
+                child_body = world_elements[child]
+                conn = FixedConnection(
+                    parent=parent_body,
+                    child=child_body,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                    name=PrefixedName(f"{node}_{child}")
+                )
+                world.add_connection(conn)
         return world
 
     def _create_world_objects(self, world) -> World:
@@ -83,27 +123,47 @@ class GLTFLoader(Step):
         visited_nodes = set()
         to_visit_new_node = set()
         to_visit_new_node.add(root)
-        while to_visit_new_node:
+        # Root is special case, no geometry cant be ingnored.
+        _, root_geometry = self.scene.graph.get(root)
+        if root_geometry is None:
+            root_body = Body(
+                name=PrefixedName(root),
+                collision=ShapeCollection([]),  # Empty collision
+                visual=ShapeCollection([])  # Empty visual
+            )
+            world_elements[root] = root_body
+            root_children = self.scene.graph.transforms.children.get(root, [])
+            connection[root] = root_children
+            to_visit_new_node.update(root_children)
+            visited_nodes.add(root)
 
+        while to_visit_new_node:
             node = to_visit_new_node.pop()
             print(node)
             print(to_visit_new_node)
             _, geometry_name = self.scene.graph.get(node)
+
             if geometry_name is None:
+                # Non-geometry node, just track connections
                 new_nodes = self.scene.graph.transforms.children.get(node, [])
                 new_nodes = [n for n in new_nodes if n not in visited_nodes]
                 connection[node] = new_nodes
                 to_visit_new_node.update(new_nodes)
                 visited_nodes.add(node)
                 continue
+
             print(self.scene.graph.transforms.children.get(node, []))
             object_nodes, new_object_notes = self._grouping_similar_meshes(node)
             node_fusion_mesh = self._fusion_meshes(object_nodes)
-            world_elements[node] = node_fusion_mesh
-            connection[node] = new_object_notes.difference(visited_nodes)
-            visited_nodes.union(object_nodes)
+
+            # Convert trimesh to Body object
+            body = self._trimesh_to_body(node_fusion_mesh, node)
+            world_elements[node] = body
+
+            connection[node] = list(new_object_notes.difference(visited_nodes))
+            visited_nodes = visited_nodes.union(object_nodes)
             visited_nodes.add(node)
-            to_visit_new_node.union(new_object_notes).difference(visited_nodes)
+            to_visit_new_node = to_visit_new_node.union(new_object_notes).difference(visited_nodes)
 
         return self._build_world_from_elements(world_elements, connection, world)
 
