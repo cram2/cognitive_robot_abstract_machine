@@ -55,6 +55,7 @@ class TestExternalCollisionExpressionManager:
             external_collisions := ExternalCollisionVariableManager(float_variable_data)
         )
         external_collisions.register_body(robot.root)
+        collision_manager.update_collision_matrix()
         collisions = collision_manager.compute_collisions()
 
         # test point on a
@@ -165,6 +166,7 @@ class TestSelfCollisionExpressionManager:
         assert len(self_collisions.active_groups) == 1
         group_a, group_b = list(self_collisions.active_groups)[0]
 
+        collision_manager.update_collision_matrix()
         collisions = collision_manager.compute_collisions()
 
         expected_l_tip_point = np.array([0.0, -0.15, 0.1, 1.0])

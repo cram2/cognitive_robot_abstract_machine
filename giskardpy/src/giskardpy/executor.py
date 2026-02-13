@@ -159,6 +159,7 @@ class Executor:
         self.world_state_trajectory = WorldStateTrajectory.from_world_state(
             self.context.world.state, time=self.time
         )
+        self.context.collision_manager.update_collision_matrix()
 
     @property
     def execution_context(self) -> ExecutionContext:

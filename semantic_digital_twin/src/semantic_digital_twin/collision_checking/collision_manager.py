@@ -183,14 +183,11 @@ class CollisionManager(ModelChangeCallback):
         if buffer is not None:
             self.collision_matrix.apply_buffer(buffer)
 
-    def compute_collisions(self, buffer: float = 0.05) -> CollisionCheckingResult:
+    def compute_collisions(self) -> CollisionCheckingResult:
         """
         Computes collisions based on the current collision matrix.
-        :param buffer: A buffer is added to the collision matrix distance thresholds.
-            This is useful when you want to react to collisions before they go below the threshold.
         :return: Result of the collision checking.
         """
-        self.update_collision_matrix(buffer)
         collision_results = self.collision_detector.check_collisions(
             self.collision_matrix
         )
