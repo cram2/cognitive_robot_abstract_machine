@@ -227,7 +227,7 @@ class ExternalCollisionAvoidance(Goal):
             max_avoided_bodies = group.get_max_avoided_bodies(context.collision_manager)
             for index in range(max_avoided_bodies):
                 distance_monitor = ExternalCollisionDistanceMonitor(
-                    name=f"{self.name}/monitor{index}",
+                    name=f"{self.name}/monitor({group.root.name.name, index})",
                     collision_group=group,
                     collision_index=index,
                     external_collision_manager=external_collision_manager,
@@ -235,7 +235,7 @@ class ExternalCollisionAvoidance(Goal):
                 self.add_node(distance_monitor)
 
                 task = ExternalCollisionAvoidanceTask(
-                    name=f"{self.name}/task{index}",
+                    name=f"{self.name}/task({group.root.name.name, index})",
                     collision_group=group,
                     max_velocity=self.max_velocity,
                     collision_index=index,

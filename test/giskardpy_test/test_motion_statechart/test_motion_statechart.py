@@ -1245,9 +1245,7 @@ class TestCartesianTasks:
         )
         msc.add_node(EndMotion.when_true(goal))
 
-        kin_sim = Executor.create_from_parts(
-            world=cylinder_bot_world, pacer=SimulationPacer(real_time_factor=1.0)
-        )
+        kin_sim = Executor.create_from_parts(world=cylinder_bot_world)
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
@@ -2285,7 +2283,6 @@ def test_counting():
 
     kin_sim = Executor.create_from_parts(
         world=World(),
-        pacer=SimulationPacer(real_time_factor=None),
     )
     kin_sim.compile(motion_statechart=msc)
 
@@ -2647,9 +2644,7 @@ class TestCollisionAvoidance:
         kwargs = tracker.create_kwargs()
         msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
 
-        kin_sim = Executor.create_from_parts(
-            world=cylinder_bot_world, pacer=SimulationPacer(real_time_factor=1.0)
-        )
+        kin_sim = Executor.create_from_parts(world=cylinder_bot_world)
         kin_sim.compile(motion_statechart=msc_copy)
 
         msc_copy.draw("muh.pdf")
@@ -2704,9 +2699,7 @@ class TestCollisionAvoidance:
         kwargs = tracker.create_kwargs()
         msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
 
-        kin_sim = Executor.create_from_parts(
-            world=self_collision_bot_world, pacer=SimulationPacer(real_time_factor=1.0)
-        )
+        kin_sim = Executor.create_from_parts(world=self_collision_bot_world)
         kin_sim.compile(motion_statechart=msc_copy)
 
         msc_copy.draw("muh.pdf")
@@ -2854,6 +2847,15 @@ class TestCollisionAvoidance:
                 ),
             )
             pr2_world_state_reset.add_connection(root_C_box)
+
+        pr2_world_state_reset.collision_manager.add_temporary_rule(
+            AvoidExternalCollisions(
+                buffer_zone_distance=0.1,
+                violated_distance=0.0,
+                bodies=robot.bodies_with_collision,
+                world=pr2_world_state_reset,
+            )
+        )
 
         msc = MotionStatechart()
         msc.add_node(

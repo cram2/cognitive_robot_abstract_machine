@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from functools import lru_cache
 
+from line_profiler.explicit_profiler import profile
 from typing_extensions import List, TYPE_CHECKING
 
 from .collision_detector import (
@@ -122,6 +124,9 @@ class CollisionManager(ModelChangeCallback):
     Objects that are notified about changes in the collision matrix.
     """
 
+    def __hash__(self):
+        return hash(id(self))
+
     def __post_init__(self):
         super().__post_init__()
         self._notify()
@@ -134,6 +139,9 @@ class CollisionManager(ModelChangeCallback):
                 rule.update(self.world)
         for consumer in self.collision_consumers:
             consumer.on_world_model_update(self.world)
+
+    def has_consumers(self) -> bool:
+        return len(self.collision_consumers) > 0
 
     def add_default_rule(self, rule: CollisionRule):
         self.default_rules.append(rule)
@@ -182,7 +190,10 @@ class CollisionManager(ModelChangeCallback):
             consumer.on_collision_matrix_update()
         if buffer is not None:
             self.collision_matrix.apply_buffer(buffer)
+        self.get_buffer_zone_distance.cache_clear()
+        self.get_violated_distance.cache_clear()
 
+    @profile
     def compute_collisions(self) -> CollisionCheckingResult:
         """
         Computes collisions based on the current collision matrix.
@@ -207,6 +218,7 @@ class CollisionManager(ModelChangeCallback):
                 return max_avoided_bodies
         raise Exception(f"No rule found for {body}")
 
+    @lru_cache
     def get_buffer_zone_distance(self, body_a: Body, body_b: Body) -> float:
         """
         Returns the buffer-zone distance for the body pair by scanning rules from highest to lowest priority.
@@ -218,6 +230,7 @@ class CollisionManager(ModelChangeCallback):
                     return value
         raise ValueError(f"No buffer-zone rule found for {body_a, body_b}")
 
+    @lru_cache
     def get_violated_distance(self, body_a: Body, body_b: Body) -> float:
         """
         Returns the violated distance for the body pair by scanning rules from highest to lowest priority.

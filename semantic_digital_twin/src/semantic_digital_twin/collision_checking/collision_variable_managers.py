@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 
 import numpy as np
+from line_profiler.explicit_profiler import profile
 
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.collision_checking.collision_detector import (
@@ -70,6 +71,7 @@ class ExternalCollisionVariableManager(CollisionGroupConsumer):
     def on_collision_matrix_update(self):
         pass
 
+    @profile
     def on_compute_collisions(self, collision: CollisionCheckingResult):
         """
         Takes collisions, checks if they are external, and inserts them
@@ -114,6 +116,7 @@ class ExternalCollisionVariableManager(CollisionGroupConsumer):
                     ),
                 )
 
+    @profile
     def insert_data_block(
         self,
         body: KinematicStructureEntity,
@@ -148,6 +151,7 @@ class ExternalCollisionVariableManager(CollisionGroupConsumer):
         end_index = start_index + self._reset_data.size
         self.float_variable_data.data[start_index:end_index] = self._reset_data
 
+    @profile
     def register_body(self, body: Body):
         """
         Register a body
