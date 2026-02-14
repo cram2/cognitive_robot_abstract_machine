@@ -2145,6 +2145,12 @@ class QueryObjectDescriptor(UnaryExpression, ABC):
             self._grouped_by_builder_.expression if self._grouped_by_builder_ else None
         )
 
+    @property
+    def _quantifier_expression_(self) -> Optional[ResultQuantifier]:
+        return (
+            self._quantifier_builder_.expression if self._quantifier_builder_ else None
+        )
+
     def _generate_results_(self, sources: Dict[int, Any]) -> Iterator[OperationResult]:
         """
         Internal generator to process constrained values and selected variables.

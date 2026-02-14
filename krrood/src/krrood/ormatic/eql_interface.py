@@ -19,6 +19,8 @@ from ..entity_query_language.symbolic import (
     Variable,
     Literal,
     Where,
+    QueryObjectDescriptor,
+    ResultQuantifier,
 )
 
 from .dao import get_dao_class
@@ -89,7 +91,7 @@ class AttributeChainResolver:
         extractor = VariableTypeExtractor()
         node = attribute
         while isinstance(node, Attribute):
-            node = node._child__
+            node = node._child_
         var, _ = extractor.extract(node)
         return var or node
 
@@ -103,7 +105,7 @@ class AttributeChainResolver:
         extractor = VariableTypeExtractor()
         node = attribute
         while isinstance(node, Attribute):
-            node = node._child__
+            node = node._child_
         _, node_type = extractor.extract(node)
         return get_dao_class(node_type) if node_type is not None else None
 
@@ -372,26 +374,26 @@ class EQLTranslator:
 
     """
 
-    eql_query: SymbolicExpression
+    eql_query: QueryObjectDescriptor
     session: Session
 
     sql_query: Optional[Select] = None
     join_manager: JoinManager = field(default_factory=JoinManager)
 
     @property
-    def quantifier(self) -> SymbolicExpression:
+    def quantifier(self) -> ResultQuantifier:
         """Get the quantifier from the query."""
-        return self.eql_query
+        return self.eql_query._quantifier_expression_
 
     @property
-    def select_like(self) -> Any:
+    def select_like(self) -> QueryObjectDescriptor:
         """Get the select-like expression from the query."""
-        return self.eql_query._child_
+        return self.eql_query
 
     @property
     def root_condition(self) -> SymbolicExpression:
         """Get the root condition from the query."""
-        return self.eql_query._child_._child__
+        return self.eql_query._conditions_root_
 
     def translate(self) -> None:
         """Translate the EQL query to SQL."""
@@ -683,7 +685,7 @@ class EQLTranslator:
         node = query
         while isinstance(node, Attribute):
             names.append(node._attribute_name_)
-            node = node._child__
+            node = node._child_
         return list(reversed(names))
 
     def _extract_base_class(self, query: Attribute) -> Optional[type]:
@@ -695,7 +697,7 @@ class EQLTranslator:
         """
         node = query
         while isinstance(node, Attribute):
-            node = node._child__
+            node = node._child_
 
         base_class = node._type_
         if base_class is None:
@@ -785,7 +787,7 @@ class EQLTranslator:
         return aliased_target
 
 
-def eql_to_sql(query: SymbolicExpression, session: Session) -> EQLTranslator:
+def eql_to_sql(query: QueryObjectDescriptor, session: Session) -> EQLTranslator:
     """
     Translate an EQL query to SQL.
 
@@ -793,6 +795,7 @@ def eql_to_sql(query: SymbolicExpression, session: Session) -> EQLTranslator:
     :param session: The SQLAlchemy session
     :return: The translator instance
     """
+    query.build()
     result = EQLTranslator(query, session)
     result.translate()
     return result

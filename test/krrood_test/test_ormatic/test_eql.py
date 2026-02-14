@@ -159,7 +159,7 @@ def test_the_quantifier(session, database):
         return query
 
     with pytest.raises(MultipleSolutionFound):
-        result = get_query(positions).evaluate()
+        result = get_query(positions).tolist()
 
     translator = eql_to_sql(get_query(), session)
     query_by_hand = select(PositionDAO).where(PositionDAO.y == 2)
