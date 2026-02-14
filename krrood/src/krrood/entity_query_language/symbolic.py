@@ -331,7 +331,8 @@ class SymbolicExpression(ABC):
         :param old_child: The old child expression.
         :param new_child: The new child expression.
         """
-        child_idx = self._children_.index(old_child)
+        _children_ids_ = [v._id_ for v in self._children_]
+        child_idx = _children_ids_.index(old_child._id_)
         self._children_[child_idx] = new_child
         new_child._parent_ = self
         old_child._remove_parent_(self)
