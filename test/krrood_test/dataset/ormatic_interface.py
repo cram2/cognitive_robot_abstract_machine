@@ -243,6 +243,25 @@ class MoreShapesDAO_shapes_association(Base, AssociationDataAccessObject):
     )
 
 
+class OptionalTestCaseDAO_list_of_orientations_association(
+    Base, AssociationDataAccessObject
+):
+
+    __tablename__ = "OptionalTestCaseDAO_list_of_orientations_association"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_optionaltestcasedao_id: Mapped[int] = mapped_column(
+        ForeignKey("OptionalTestCaseDAO.database_id")
+    )
+    target_orientationdao_id: Mapped[int] = mapped_column(
+        ForeignKey("OrientationDAO.database_id")
+    )
+
+    target: Mapped[OrientationDAO] = relationship(
+        "OrientationDAO", foreign_keys=[target_orientationdao_id]
+    )
+
+
 class PositionsDAO_positions_association(Base, AssociationDataAccessObject):
 
     __tablename__ = "PositionsDAO_positions_association"
@@ -1414,6 +1433,50 @@ class ObjectAnnotationDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "ObjectAnnotationDAO",
+        "inherit_condition": database_id == SymbolDAO.database_id,
+    }
+
+
+class OptionalTestCaseDAO(
+    SymbolDAO,
+    DataAccessObject[test.krrood_test.dataset.example_classes.OptionalTestCase],
+):
+
+    __tablename__ = "OptionalTestCaseDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    value: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    list_of_values: Mapped[typing.List[builtins.int]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    optional_position_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("PositionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    optional_position: Mapped[PositionDAO] = relationship(
+        "PositionDAO",
+        uselist=False,
+        foreign_keys=[optional_position_id],
+        post_update=True,
+    )
+    list_of_orientations: Mapped[
+        builtins.list[OptionalTestCaseDAO_list_of_orientations_association]
+    ] = relationship(
+        "OptionalTestCaseDAO_list_of_orientations_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[OptionalTestCaseDAO_list_of_orientations_association.source_optionaltestcasedao_id]",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "OptionalTestCaseDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
     }
 

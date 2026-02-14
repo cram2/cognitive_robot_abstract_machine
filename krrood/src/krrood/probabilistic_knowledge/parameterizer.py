@@ -180,7 +180,9 @@ class Parameterizer:
         # %% one to many relationships
         if wrapped_field.is_one_to_many_relationship:
             for value in attribute_dao:
-                self.parameterize_dao(dao=value, prefix=f"{prefix}.{attribute_name}")
+                self.parameterize_dao(
+                    dao=value.target, prefix=f"{prefix}.{attribute_name}"
+                )
             return
 
         # %% one to one relationships
