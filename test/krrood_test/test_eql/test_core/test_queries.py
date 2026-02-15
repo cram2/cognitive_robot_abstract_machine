@@ -3,6 +3,7 @@ from math import factorial
 
 import pytest
 
+import krrood.entity_query_language.entity as eql
 from krrood.entity_query_language.entity import (
     and_,
     not_,
@@ -1146,3 +1147,11 @@ def test_chain_evaluate_variables():
         values.append(tuple(val.values()))
     assert values == [(1, 3), (1, 4), (2, 3), (2, 4)]
     assert values == [(v[var1], v[var2]) for v in Product((var1, var2)).evaluate()]
+
+
+def test_subquery_independence():
+    var1 = variable(int, [1, 2, 4, 3])
+    count = entity(eql.count(var1))
+    assert count.tolist() == [4]
+    query = the(entity(var1).where(count == var1))
+    assert query.tolist() == [4]

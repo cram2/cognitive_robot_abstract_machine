@@ -2109,7 +2109,19 @@ class QueryObjectDescriptor(UnaryExpression, ABC):
             yield OperationResult(sources, False, self)
             return
 
-        yield from self._generate_results_(sources)
+        yield from (
+            OperationResult(
+                {
+                    v._binding_id_: result[v._binding_id_]
+                    for v in self._selected_variables_
+                },
+                self._is_false_,
+                self,
+            )
+            for result in self._apply_results_mapping_(
+                self._child_._evaluate_(sources, parent=self)
+            )
+        )
 
         if self._seen_results is not None:
             self._seen_results.clear()
@@ -2141,18 +2153,6 @@ class QueryObjectDescriptor(UnaryExpression, ABC):
     def _quantifier_expression_(self) -> Optional[ResultQuantifier]:
         return (
             self._quantifier_builder_.expression if self._quantifier_builder_ else None
-        )
-
-    def _generate_results_(self, sources: Dict[int, Any]) -> Iterator[OperationResult]:
-        """
-        Internal generator to process constrained values and selected variables.
-        """
-        # First evaluate the constraint (if any) and handle conclusions
-        yield from (
-            OperationResult(result.bindings, self._is_false_, self)
-            for result in self._apply_results_mapping_(
-                self._child_._evaluate_(sources, parent=self)
-            )
         )
 
     @cached_property
@@ -2246,18 +2246,6 @@ class SetOf(QueryObjectDescriptor):
     A query over a set of variables.
     """
 
-    def _process_result_(self, result: OperationResult) -> UnificationDict:
-        """
-        Map the result to the correct output data structure for user usage. This returns the selected variables only.
-        Return a dictionary with the selected variables as keys and the values as values.
-
-        :param result: The result to be mapped.
-        :return: The mapped result.
-        """
-        return UnificationDict(
-            {v._var_: result[v._binding_id_] for v in self._selected_variables_}
-        )
-
     def __getitem__(
         self, selected_variable: TypingUnion[CanBehaveLikeAVariable[T], T]
     ) -> TypingUnion[T, SetOfSelectable[T]]:
@@ -2267,7 +2255,6 @@ class SetOf(QueryObjectDescriptor):
 
         :param selected_variable: The selected variable from the set of variables.
         """
-        self.build()
         return SetOfSelectable(self, selected_variable)
 
 
@@ -2881,19 +2868,27 @@ class Comparator(BinaryExpression):
         first_operand, second_operand = self.get_first_second_operands(sources)
 
         yield from (
-            OperationResult(
-                second_val.bindings, not self.apply_operation(second_val), self
-            )
+            self.get_operation_result(first_val, second_val)
             for first_val in first_operand._evaluate_(sources, parent=self)
             if first_val.is_true
             for second_val in second_operand._evaluate_(first_val.bindings, parent=self)
             if second_val.is_true
         )
 
-    def apply_operation(self, operand_values: OperationResult) -> bool:
+    def get_operation_result(
+        self, first_result: OperationResult, second_result: OperationResult
+    ) -> OperationResult:
+        """
+        Evaluate the comparator operation and return the result.
+
+        :param first_result: The first operand's result.
+        :param second_result: The second operand's result.
+        :return: The result of the operation.
+        """
+        bindings = first_result.bindings | second_result.bindings
         left_value, right_value = (
-            operand_values[self.left._binding_id_],
-            operand_values[self.right._binding_id_],
+            bindings[self.left._binding_id_],
+            bindings[self.right._binding_id_],
         )
         if (
             self.operation in [operator.eq, operator.ne]
@@ -2904,8 +2899,8 @@ class Comparator(BinaryExpression):
             right_value = make_set(right_value)
         res = self.operation(left_value, right_value)
         self._is_false_ = not res
-        operand_values[self._id_] = res
-        return res
+        bindings[self._binding_id_] = res
+        return OperationResult(bindings, self._is_false_, self)
 
     def get_first_second_operands(
         self, sources: Bindings
