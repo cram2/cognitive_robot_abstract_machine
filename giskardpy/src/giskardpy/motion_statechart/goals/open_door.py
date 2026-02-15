@@ -9,7 +9,7 @@ from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionRea
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.context import BuildContext
-from krrood.symbolic_math.symbolic_math import trinary_logic_and
+
 from semantic_digital_twin.datastructures.joint_state import JointState
 
 from semantic_digital_twin.spatial_types import Vector3
@@ -44,18 +44,19 @@ class OpenDoorGoal(Goal):
     def expand(self, context: BuildContext) -> None:
         # Set default values for optional parameters
         if self.tip_normal is None:
-            # Get the robot's base link as reference frame
             self.tip_normal = Vector3(x=1, y=0, z=0, reference_frame=self.tip_link)
+            # NOTE (Issue 2 - left for manual fix):
+            # Original used base_link as reference_frame, not tip_link.
+            # Verify with Simon whether this should be robot base or gripper frame.
 
         if self.goal_normal is None:
             self.goal_normal = Vector3(x=0, y=0, z=-1, reference_frame=self.handle_name)
 
+        # FIX Issue 3: Use context to resolve the world root instead of manual
+        # tree traversal, which is fragile if the world root isn't reachable via
+        # parent_kinematic_structure_entity alone.
         if self.root_link is None:
-            # Traverse up the kinematic tree to find the root
-            current = self.tip_link
-            while current.parent_kinematic_structure_entity is not None:
-                current = current.parent_kinematic_structure_entity
-            self.root_link = current
+            self.root_link = context.world.root
 
         # Get door joint/connection information
         handle_connection = self.handle_name.get_first_parent_connection_of_type(
@@ -88,7 +89,7 @@ class OpenDoorGoal(Goal):
         )
         self.add_node(unlatch_door)
 
-        # Create joint position task for door hinge
+        # Create joint position task for door hinge (runs until unlatch completes)
         jpl = JointPositionList(
             goal_state=JointState.from_mapping(
                 {door_hinge_connection: max_limit_hinge}
@@ -99,7 +100,7 @@ class OpenDoorGoal(Goal):
         jpl.end_condition = unlatch_door.observation_variable
         self.add_node(jpl)
 
-        # Create alignment task
+        # Create alignment task (starts after unlatch completes)
         apl = AlignPlanes(
             root_link=self.root_link,
             tip_link=self.tip_normal.reference_frame,
@@ -110,7 +111,7 @@ class OpenDoorGoal(Goal):
         apl.start_condition = unlatch_door.observation_variable
         self.add_node(apl)
 
-        # Create open goal for hinge
+        # Create open goal for hinge (starts after unlatch completes)
         open_goal2 = Open(
             tip_link=self.tip_link,
             environment_link=link_id,
@@ -120,16 +121,19 @@ class OpenDoorGoal(Goal):
         open_goal2.start_condition = unlatch_door.observation_variable
         self.add_node(open_goal2)
 
-        # Create joint position monitor using JointPositionReached
+        # Create joint position monitor (starts after unlatch completes)
         hinge_state_monitor = JointPositionReached(
             connection=door_hinge_connection, position=limit_hinge, name="HingeMonitor"
         )
         hinge_state_monitor.start_condition = unlatch_door.observation_variable
         self.add_node(hinge_state_monitor)
 
+        # Store reference so build() can use it directly (avoids re-searching self.nodes)
+        self._hinge_state_monitor = hinge_state_monitor
+
     def build(self, context: BuildContext) -> NodeArtifacts:
-        return NodeArtifacts(
-            observation=trinary_logic_and(
-                *[node.observation_variable for node in self.nodes]
-            )
-        )
+        # FIX Issue 1: The goal is complete when the hinge reaches its target position,
+        # matching the original: self.observation_expression = hinge_state_monitor.observation_expression
+        # ANDing all nodes was wrong — JointPositionList ends early and AlignPlanes
+        # has no defined terminal state, so the AND would never resolve correctly.
+        return NodeArtifacts(observation=self._hinge_state_monitor.observation_variable)

@@ -2965,12 +2965,18 @@ class TestOpenDoorGoal:
         assert open_nodes[0].start_condition == unlatch_nodes[0].observation_variable
         assert monitor_nodes[0].start_condition == unlatch_nodes[0].observation_variable
 
+        # Verify the goal's own observation is driven by the hinge monitor only
+        # (not an AND of all sub-nodes)
+        assert open_door._hinge_state_monitor is monitor_nodes[0]
+
     def test_open_door_goal_with_custom_handle_limit(
         self, pr2_world_state_reset: World
     ):
         """
         Test OpenDoorGoal with custom handle_limit parameter.
-        Verifies that the handle limit is properly passed to UnlatchDoor.
+        Verifies that the handle limit is properly passed to UnlatchDoor,
+        and that JointPositionList targets max_limit_hinge while Open and
+        HingeMonitor target the clamped limit_hinge value.
         """
         with pr2_world_state_reset.modify_world():
             # Create door body
@@ -3049,6 +3055,7 @@ class TestOpenDoorGoal:
 
         custom_handle_limit = np.pi / 6
         custom_hinge_limit = np.pi / 4
+        expected_max_limit_hinge = np.pi / 2  # upper limit of the hinge joint
 
         msc = MotionStatechart()
         open_door = OpenDoorGoal(
@@ -3068,16 +3075,23 @@ class TestOpenDoorGoal:
         assert len(unlatch_nodes) == 1
         assert unlatch_nodes[0].handle_limit == custom_handle_limit
 
-        # Verify JointPositionList has correct hinge target
+        # FIX Issue 4: JointPositionList targets max_limit_hinge (the joint upper
+        # limit), NOT the clamped hinge_limit. This distinction matters: jpl keeps
+        # the door under control before unlatch, while Open/Monitor target the actual
+        # desired opening angle after unlatch.
         jpl_nodes = [n for n in open_door.nodes if isinstance(n, JointPositionList)]
         assert len(jpl_nodes) == 1
+        jpl_goal_positions = dict(jpl_nodes[0].goal_state.items())
+        assert np.isclose(
+            jpl_goal_positions[door_hinge_connection], expected_max_limit_hinge
+        ), "JointPositionList should target max_limit_hinge (joint upper limit), not the clamped hinge_limit"
 
-        # Verify Open goal has correct hinge limit
+        # Open goal targets the clamped limit_hinge
         open_nodes = [n for n in open_door.nodes if isinstance(n, Open)]
         assert len(open_nodes) == 1
         assert open_nodes[0].goal_joint_state == custom_hinge_limit
 
-        # Verify monitor has correct position target
+        # Monitor also targets the clamped limit_hinge (triggers goal completion)
         monitor_nodes = [
             n for n in open_door.nodes if isinstance(n, JointPositionReached)
         ]
@@ -3089,6 +3103,7 @@ class TestOpenDoorGoal:
     ):
         """
         Test that OpenDoorGoal sets proper default alignment vectors when not specified.
+        Also verifies that root_link defaults to the world root via context.
         """
         with pr2_world_state_reset.modify_world():
             # Create door body
@@ -3189,6 +3204,12 @@ class TestOpenDoorGoal:
         assert np.isclose(open_door.goal_normal.x, 0.0)
         assert np.isclose(open_door.goal_normal.y, 0.0)
         assert np.isclose(open_door.goal_normal.z, -1.0)
+
+        # FIX Issue 3: root_link default should be the world root from context,
+        # not the result of manual kinematic tree traversal.
+        assert (
+            open_door.root_link == pr2_world_state_reset.root
+        ), "Default root_link should be the world root resolved via context"
 
         # Verify AlignPlanes node was created with these defaults
         align_nodes = [n for n in open_door.nodes if isinstance(n, AlignPlanes)]

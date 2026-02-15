@@ -69,6 +69,8 @@ class _WaypointTask(Task):
     def build(self, context: BuildContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
+        # FIX (issue #3 note): this recomputes FK independently from expand(), which is
+        # intentional — _WaypointTask.build() may be called in a different context scope.
         root_T_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
@@ -153,9 +155,15 @@ class MoveAroundHinge(Goal):
             self.root_link, door_body
         )
 
+        # FIX (issue #2): offset is a Vector3 in an arbitrary frame. To apply it as
+        # a translation on root_T_door_expr, we must first express it in the root frame.
+        # HTM @ Vector3 applies only the rotation (w=0), giving us the rotated direction.
+        # We then build a pure-translation HTM from that root-frame vector and premultiply,
+        # matching the original: root_T_offset.dot(root_T_door_expr).
         if self.offset is not None:
+            root_V_offset = root_T_door_expr @ self.offset
             root_T_offset = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                point=Point3(x=self.offset.x, y=self.offset.y, z=self.offset.z),
+                point=Point3(x=root_V_offset.x, y=root_V_offset.y, z=root_V_offset.z),
                 rotation_matrix=None,
             )
             root_T_door_expr = root_T_offset @ root_T_door_expr
@@ -198,15 +206,12 @@ class MoveAroundHinge(Goal):
             door_body, self.handle_name
         )
 
-        temp_point = np.asarray(
-            [
-                door_P_handle.x.to_np(),
-                door_P_handle.y.to_np(),
-                door_P_handle.z.to_np(),
-            ]
-        )
+        # FIX (issue #4): call .to_np() on the full Point3 (returns shape (4,1)) and
+        # slice+flatten, rather than calling .to_np() on individual sm.Scalar components
+        # (which may return 0-d or shape-(1,) arrays and produce an ambiguous stack shape).
+        temp_point = door_P_handle.to_np()[:3].flatten()
 
-        direction_axis = np.argmax(abs(temp_point[0:3]))
+        direction_axis = int(np.argmax(np.abs(temp_point)))
 
         waypoints = []
 
@@ -238,12 +243,11 @@ class MoveAroundHinge(Goal):
             door_rotated_P_top = (
                 door_T_door_rotated.inverse() @ door_P_intermediate_point
             )
-            root_P_top = (
-                HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                    point=None, rotation_matrix=root_T_door_expr.to_rotation_matrix()
-                )
-                @ door_rotated_P_top
-            )
+
+            # FIX (issue #1): apply the full root_T_door_expr (translation + rotation),
+            # not just its rotation component. The previous code stripped the translation
+            # by extracting only .to_rotation_matrix(), placing all waypoints at the origin.
+            root_P_top = root_T_door_expr @ door_rotated_P_top
 
             waypoints.append((root_P_top, goal_name))
 

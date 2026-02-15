@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from krrood.symbolic_math.symbolic_math import Scalar
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import (
@@ -25,6 +26,7 @@ class PrePushDoor(Goal):
     tip_link: Body
     door_object: Body
     door_handle: Body
+    threshold: float = 0.01
     reference_linear_velocity: float = 0.1
     reference_angular_velocity: float = 0.5
     weight: float = DefaultWeights.WEIGHT_BELOW_CA
@@ -67,10 +69,16 @@ class PrePushDoor(Goal):
             self.door_object, self.tip_link
         )
         door_P_tip = door_Pose_tip.to_position()
-        door_P_nearest, dist = door_P_tip.project_to_plane(door_V_v1, door_V_v2)
+        door_P_nearest, _ = door_P_tip.project_to_plane(door_V_v1, door_V_v2)
 
         # Transform the nearest point back into the root frame
         root_P_nearest_in_rotated_door = root_T_door @ door_P_nearest
+
+        # Compute the completion condition
+        dist = root_T_tip.to_position().euclidean_distance(
+            root_P_nearest_in_rotated_door
+        )
+        self.observation_expression = dist <= Scalar(self.threshold)
 
         # Create and register the task
         push_door_task = _PrePushDoorTask(

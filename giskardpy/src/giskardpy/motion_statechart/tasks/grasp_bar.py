@@ -317,7 +317,7 @@ class GraspBarOffset(Task):
         The bar center position expressed in the handle link frame.
         """
 
-        root_P_bar_center = self._fk_binding_handle.root_T_tip.dot(handle_P_bar_center)
+        root_P_bar_center = self._fk_binding_handle.root_T_tip @ handle_P_bar_center
         """
         The bar center position expressed in the root link frame.
         """
