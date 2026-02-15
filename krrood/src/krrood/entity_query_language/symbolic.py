@@ -1719,20 +1719,15 @@ class GroupedByBuilder(ExpressionBuilder):
 
     @cached_property
     def expression(self) -> GroupedBy:
-        aggregated_variables, non_aggregated_variables = (
-            self.query_descriptor._aggregated_and_non_aggregated_variables_in_selection_
-        )
-        group_by_entity_selected_variables = non_aggregated_variables + [
-            var._child_ for var in aggregated_variables if var._child_ is not None
-        ]
+        aggregators, non_aggregators = self.aggregators_and_non_aggregators
         where = self.query_descriptor._where_expression_
         children = []
         if where:
             children.append(where)
-        children.extend(group_by_entity_selected_variables)
+        children.extend(non_aggregators)
         return GroupedBy(
             _child_=Product(tuple(children)),
-            aggregators=tuple(self.aggregators),
+            aggregators=tuple(aggregators),
             variables_to_group_by=tuple(self.variables_to_group_by),
         )
 
@@ -1792,7 +1787,9 @@ class GroupedByBuilder(ExpressionBuilder):
         :return: A tuple of ids of aggregated variables.
         """
         return tuple(
-            v._child_._binding_id_ for v in self.aggregators if v._child_ is not None
+            v._child_._binding_id_
+            for v in self.aggregators_in_selected_variables
+            if v._child_ is not None
         )
 
     @cached_property
@@ -1803,7 +1800,61 @@ class GroupedByBuilder(ExpressionBuilder):
         return tuple(var._binding_id_ for var in self.variables_to_group_by)
 
     @cached_property
-    def aggregators(self) -> Tuple[Aggregator, ...]:
+    def aggregators_and_non_aggregators(
+        self,
+    ) -> Tuple[List[Aggregator], List[Selectable]]:
+        """
+        :return: A tuple of lists of aggregator and non-aggregator variables used in the query.
+        """
+        aggregated_variables, non_aggregated_variables = (
+            self.query_descriptor._aggregated_and_non_aggregated_variables_in_selection_
+        )
+
+        all_aggregators, non_aggregators = (
+            self.aggregators_and_non_aggregators_in_ordered_by
+        )
+        # Extend aggregators
+        ids_of_aggregators = [v._id_ for v in all_aggregators]
+        all_aggregators.extend(
+            [
+                var
+                for var in self.aggregators_in_selected_variables
+                if var._id_ not in ids_of_aggregators
+            ]
+        )
+
+        # Extend non-aggregators
+        ids_of_non_aggregated_variables = [v._id_ for v in non_aggregated_variables]
+        all_non_aggregators = non_aggregated_variables + [
+            var._child_
+            for var in aggregated_variables
+            if var._child_ is not None
+            and var._child_._id_ not in ids_of_non_aggregated_variables
+        ]
+        ids_of_non_aggregators = [v._id_ for v in all_non_aggregators]
+        all_non_aggregators.extend(
+            [var for var in non_aggregators if var._id_ not in ids_of_non_aggregators]
+        )
+
+        return all_aggregators, all_non_aggregators
+
+    @cached_property
+    def aggregators_and_non_aggregators_in_ordered_by(
+        self,
+    ) -> Tuple[List[Aggregator], List[Selectable]]:
+        non_aggregated_variables, aggregators = [], []
+        if self.query_descriptor._ordered_by_builder_:
+            variable = self.query_descriptor._ordered_by_builder_.variable
+            if isinstance(variable, Aggregator):
+                aggregators.append(variable)
+                if variable._child_ is not None:
+                    non_aggregated_variables.append(variable._child_)
+            else:
+                non_aggregated_variables.append(variable)
+        return aggregators, non_aggregated_variables
+
+    @cached_property
+    def aggregators_in_selected_variables(self) -> Tuple[Aggregator, ...]:
         """
         :return: A tuple of aggregators in the selected variables of the query descriptor.
         """

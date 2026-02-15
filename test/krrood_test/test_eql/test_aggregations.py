@@ -553,3 +553,17 @@ def assert_correct_results_for_complex_aggregation_query(
         result_tuples, expected_result_tuples
     ):
         assert result_tuple == expected_result_tuple
+
+
+def test_order_by_aggregation(handles_and_containers_world):
+    world = handles_and_containers_world
+    cabinet = variable(Cabinet, domain=world.views)
+    drawer = variable_from(cabinet.drawers)
+    query = an(
+        entity(cabinet)
+        .grouped_by(cabinet)
+        .ordered_by(eql.count(drawer), descending=True)
+    )
+    assert query.tolist() == sorted(
+        cabinet.tolist(), key=lambda c: len(c.drawers), reverse=True
+    )
