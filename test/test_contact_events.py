@@ -2,7 +2,7 @@ import time
 
 import rclpy
 
-from Segmind.test.test_worlds import setup_contact_world
+from Segmind.test import setup_contact_world
 from segmind import set_logger_level, LogLevel, logger
 from segmind.datastructures.events import CloseContactEvent, ContactEvent, LossOfCloseContactEvent, LossOfContactEvent
 from segmind.datastructures.object_tracker import ObjectTrackerFactory
@@ -118,7 +118,7 @@ class TestContactEvent:
         logger = EventLogger()
         contact_detector = ContactDetector(logger, obj)
         contact_detector.start()
-        time.sleep(2)
+        #time.sleep(2)
         return contact_detector
 
     @staticmethod
@@ -126,7 +126,7 @@ class TestContactEvent:
         logger = EventLogger()
         loss_contact_detector = LossOfContactDetector(logger, obj)
         loss_contact_detector.start()
-        time.sleep(2)
+        #time.sleep(2)
         return loss_contact_detector
 
     def visualize(self, world):

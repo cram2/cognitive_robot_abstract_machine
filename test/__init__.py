@@ -1,0 +1,1 @@
+from .test_worlds import setup_contact_world
