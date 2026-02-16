@@ -14,7 +14,7 @@ from pycram.designator import ObjectDesignatorDescription
 from pycram.language import SequentialPlan
 
 from pycram.plan import Plan
-from pycram.process_module import ProcessModule, simulated_robot
+#from pycram.process_module import ProcessModule, simulated_robot
 
 
 from ..episode_player import EpisodePlayer
