@@ -4,7 +4,7 @@ import time
 import unittest
 import uuid
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional, List, Set, Tuple
 from uuid import uuid4
 
 import numpy as np
@@ -22,7 +22,10 @@ from semantic_digital_twin.adapters.ros.world_synchronizer import (
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import MissingWorldModificationContextError
+from semantic_digital_twin.exceptions import (
+    MissingWorldModificationContextError,
+    MismatchingPublishChangesAttribute,
+)
 from semantic_digital_twin.orm.ormatic_interface import Base, WorldMappingDAO
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
@@ -99,6 +102,32 @@ def create_dummy_world(w: Optional[World] = None) -> World:
             )
         )
     return w
+
+
+def wait_for_sync_kse_and_return_ids(
+    w1: World, w2: World, timeout: float = 5.0, interval: float = 0.05
+) -> Tuple[Set[uuid.UUID], Set[uuid.UUID]]:
+    """
+    Waits until the sets of kinematic structure entity IDs in both worlds are identical, or until the timeout is reached.
+
+    :param w1: The first world.
+    :param w2: The second world.
+    :param timeout: The maximum time to wait for synchronization, in seconds. Defaults to 5.0.
+    :param interval: The time interval between checks, in seconds. Defaults to 0.05.
+
+    :return: A tuple containing the sets of kinematic structure entity IDs in both worlds.
+    """
+    start = time.time()
+    while time.time() - start < timeout:
+        body_ids_1 = {body.id for body in w1.kinematic_structure_entities}
+        body_ids_2 = {body.id for body in w2.kinematic_structure_entities}
+        if body_ids_1 == body_ids_2:
+            return body_ids_1, body_ids_2
+        time.sleep(interval)
+
+    body_ids_1 = {body.id for body in w1.kinematic_structure_entities}
+    body_ids_2 = {body.id for body in w2.kinematic_structure_entities}
+    return body_ids_1, body_ids_2
 
 
 def test_state_synchronization(rclpy_node):
@@ -510,6 +539,8 @@ def test_compute_state_changes_nan_handling(rclpy_node):
 def test_attribute_updates(rclpy_node):
     world1 = World(name="w1")
     world2 = World(name="w2")
+    world1._id = uuid.UUID(int=1)
+    world2._id = uuid.UUID(int=2)
 
     synchronizer_1 = ModelSynchronizer(
         node=rclpy_node,
@@ -692,6 +723,152 @@ def test_attribute_update_modification_apply_direct():
     )
     mod.apply(w)
     assert b1 not in anno.entities
+
+
+def test_skipping_incorrect_message(rclpy_node):
+    w1 = World(name="w1")
+    w2 = World(name="w2")
+
+    synchronizer_1 = ModelSynchronizer(
+        node=rclpy_node,
+        world=w1,
+    )
+    synchronizer_2 = ModelSynchronizer(
+        node=rclpy_node,
+        world=w2,
+    )
+
+    with w1.modify_world():
+        new_body = Body(name=PrefixedName("b3"))
+        w1.add_kinematic_structure_entity(new_body)
+
+    time.sleep(0.2)
+
+    assert len(w1.kinematic_structure_entities) == len(w2.kinematic_structure_entities)
+
+    with w1.modify_world():
+        synchronizer_1.apply_missed_messages()
+        handle = Handle.create_with_new_body_in_world(PrefixedName("handle"), w1)
+
+    time.sleep(1)
+    assert len(w1.kinematic_structure_entities) == len(w2.kinematic_structure_entities)
+
+    synchronizer_1.close()
+    synchronizer_2.close()
+
+
+@pytest.mark.parametrize("before_w2", [1, 3, 4])
+@pytest.mark.parametrize("in_w2", [2, 4, 6])
+@pytest.mark.parametrize("after_w2", [1, 2, 3])
+def test_world_simultaneous_synchronization_stress_test(
+    rclpy_node, before_w2, in_w2, after_w2
+):
+    w1 = World(name="w1")
+    w2 = World(name="w2")
+
+    synchronizer_1 = ModelSynchronizer(
+        node=rclpy_node,
+        world=w1,
+    )
+    synchronizer_2 = ModelSynchronizer(
+        node=rclpy_node,
+        world=w2,
+    )
+
+    with w1.modify_world():
+        new_body = Body(name=PrefixedName("b3"))
+        w1.add_kinematic_structure_entity(new_body)
+
+    w1_ids, w2_ids = wait_for_sync_kse_and_return_ids(w1, w2)
+
+    with w1.modify_world():
+        # Create handles before nested context
+        for _ in range(before_w2):
+            Handle.create_with_new_body_in_world(PrefixedName("handle"), w1)
+
+        # Nested w2 context
+        with w2.modify_world():
+            for _ in range(in_w2):
+                Handle.create_with_new_body_in_world(PrefixedName("handle2"), w2)
+
+        # Create handles after nested context
+        for _ in range(after_w2):
+            Handle.create_with_new_body_in_world(PrefixedName("handle"), w1)
+
+    w1_ids, w2_ids = wait_for_sync_kse_and_return_ids(w1, w2)
+    assert len(w1.kinematic_structure_entities) == len(w2.kinematic_structure_entities)
+    assert w1_ids == w2_ids
+
+    synchronizer_1.close()
+    synchronizer_2.close()
+
+
+def test_nested_modify_world_publish_changes_true_false(rclpy_node):
+    w1 = World(name="w1")
+    w2 = World(name="w2")
+
+    synchronizer_1 = ModelSynchronizer(
+        node=rclpy_node,
+        world=w1,
+    )
+    synchronizer_2 = ModelSynchronizer(
+        node=rclpy_node,
+        world=w2,
+    )
+
+    with w1.modify_world():
+        new_body = Body(name=PrefixedName("b3"))
+        w1.add_kinematic_structure_entity(new_body)
+
+    time.sleep(0.2)
+
+    assert len(w1.kinematic_structure_entities) == len(w2.kinematic_structure_entities)
+
+    with pytest.raises(MismatchingPublishChangesAttribute):
+        with w1.modify_world():
+            handle = Handle.create_with_new_body_in_world(PrefixedName("handle"), w1)
+
+            with w1.modify_world(publish_changes=False):
+                handle = Handle.create_with_new_body_in_world(
+                    PrefixedName("handle"), w1
+                )
+
+    with pytest.raises(MismatchingPublishChangesAttribute):
+        with w1.modify_world(publish_changes=False):
+            handle = Handle.create_with_new_body_in_world(PrefixedName("handle"), w1)
+
+            with w1.modify_world(publish_changes=True):
+                handle = Handle.create_with_new_body_in_world(
+                    PrefixedName("handle"), w1
+                )
+
+    synchronizer_1.close()
+    synchronizer_2.close()
+
+
+def test_dont_publish_changes(rclpy_node):
+    w1 = World(name="w1")
+    w2 = World(name="w2")
+
+    synchronizer_1 = ModelSynchronizer(
+        node=rclpy_node,
+        world=w1,
+    )
+    synchronizer_2 = ModelSynchronizer(
+        node=rclpy_node,
+        world=w2,
+    )
+
+    with w1.modify_world(publish_changes=False):
+        b1 = Body(name=PrefixedName("b1"))
+        w1.add_body(b1)
+
+    assert len(w1.kinematic_structure_entities) - 1 == len(
+        w2.kinematic_structure_entities
+    )
+
+    synchronizer_1.close()
+    synchronizer_2.close()
 
 
 if __name__ == "__main__":

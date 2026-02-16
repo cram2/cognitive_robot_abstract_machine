@@ -120,7 +120,8 @@ class ConnectionModificationTestCase(unittest.TestCase):
         modifications_copy = WorldModelModificationBlock.from_json(
             modifications.to_json(), **kwargs
         )
-        modifications_copy.apply(w2)
+        with w2.modify_world():
+            modifications_copy.apply(w2)
         self.assertEqual(len(w2.bodies), 3)
         self.assertEqual(len(w2.connections), 2)
 
@@ -136,7 +137,8 @@ class ConnectionModificationTestCase(unittest.TestCase):
         modifications_copy = WorldModelModificationBlock.from_json(
             modifications.to_json()
         )
-        modifications_copy.apply(w2)
+        with w2.modify_world():
+            modifications_copy.apply(w2)
         self.assertEqual(len(w2.bodies), 2)
         self.assertEqual(len(w2.connections), 1)
 

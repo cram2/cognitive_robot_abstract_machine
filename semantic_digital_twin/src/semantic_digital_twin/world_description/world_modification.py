@@ -434,9 +434,8 @@ class WorldModelModificationBlock(SubclassJSONSerializer):
     """
 
     def apply(self, world: World):
-        with world.modify_world():
-            for modification in self.modifications:
-                modification.apply(world)
+        for modification in self.modifications:
+            modification.apply(world)
 
     @classmethod
     def apply_from_json(cls, world: World, data: Dict[str, Any], **kwargs) -> Self:
@@ -536,7 +535,9 @@ def synchronized_attribute_modification(func):
         current_model_modification_block = (
             self._world.get_world_model_manager().current_model_modification_block
         )
-        if current_model_modification_block is None:
+        if (
+            not self._world._model_manager._active_world_model_update_context_manager_ids
+        ):
             raise MissingWorldModificationContextError(func)
 
         current_model_modification_block.append(
