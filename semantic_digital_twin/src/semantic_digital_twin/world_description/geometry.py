@@ -671,32 +671,32 @@ class Box(Shape):
 class BoundingBox:
     min_x: float
     """
-    The minimum x-coordinate of the bounding box.
+    The minimum x-coordinate of the bounding box, relative to the origin.
     """
 
     min_y: float
     """
-    The minimum y-coordinate of the bounding box.
+    The minimum y-coordinate of the bounding box, relative to the origin.
     """
 
     min_z: float
     """
-    The minimum z-coordinate of the bounding box.
+    The minimum z-coordinate of the bounding box, relative to the origin.
     """
 
     max_x: float
     """
-    The maximum x-coordinate of the bounding box.
+    The maximum x-coordinate of the bounding box, relative to the origin.
     """
 
     max_y: float
     """
-    The maximum y-coordinate of the bounding box.
+    The maximum y-coordinate of the bounding box, relative to the origin.
     """
 
     max_z: float
     """
-    The maximum z-coordinate of the bounding box.
+    The maximum z-coordinate of the bounding box, relative to the origin.
     """
 
     origin: HomogeneousTransformationMatrix
@@ -941,17 +941,11 @@ class BoundingBox:
         """
         Transform the bounding box to a different reference frame.
         """
-        origin_T_self = self.origin
-        origin_frame = origin_T_self.reference_frame
-        world = origin_frame._world
-
-        # reference_T_origin = world.compute_forward_kinematics(
-        #     reference_T_new_origin.reference_frame, origin_frame
-        # )
-
-        reference_T_self: HomogeneousTransformationMatrix = (
-            reference_T_new_origin @ origin_T_self
+        new_origin_reference_T_self = self.origin.reference_frame._world.transform(
+            self.origin, reference_T_new_origin.reference_frame
         )
+
+        self_T_new_pose = reference_T_new_origin.inverse() @ new_origin_reference_T_self
 
         # Get all 8 corners of the BB in link-local space
         list_self_T_corner = [
@@ -960,7 +954,7 @@ class BoundingBox:
         ]  # shape (8, 3)
 
         list_reference_T_corner = [
-            reference_T_self @ self_T_corner for self_T_corner in list_self_T_corner
+            self_T_new_pose @ self_T_corner for self_T_corner in list_self_T_corner
         ]
 
         list_reference_P_corner = [
@@ -968,7 +962,7 @@ class BoundingBox:
             for reference_T_corner in list_reference_T_corner
         ]
 
-        # Compute world-space bounding box from transformed corners
+        # Compute new corner points
         min_corner = np.min(list_reference_P_corner, axis=0)
         max_corner = np.max(list_reference_P_corner, axis=0)
 
