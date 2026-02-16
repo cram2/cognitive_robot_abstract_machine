@@ -2672,12 +2672,7 @@ class TestCollisionAvoidance:
         assert len(collisions.contacts) == 1
         assert collisions.contacts[0].distance > 0.049
 
-    def test_self_collision_avoidance(
-        self, self_collision_bot_world: World, rclpy_node
-    ):
-        TFPublisher(world=self_collision_bot_world, node=rclpy_node)
-        VizMarkerPublisher(world=self_collision_bot_world, node=rclpy_node)
-        sleep(10)
+    def test_self_collision_avoidance(self, self_collision_bot_world: World):
         robot = self_collision_bot_world.get_semantic_annotations_by_type(
             AbstractRobot
         )[0]
@@ -2725,7 +2720,6 @@ class TestCollisionAvoidance:
         kin_sim = Executor.create_from_parts(world=self_collision_bot_world)
         kin_sim.compile(motion_statechart=msc_copy)
 
-        msc_copy.draw("muh.pdf")
         kin_sim.tick_until_end(500)
         collisions = kin_sim.context.world.collision_manager.compute_collisions()
         assert len(collisions.contacts) == 1
@@ -2848,9 +2842,7 @@ class TestCollisionAvoidance:
         with pytest.raises(HardConstraintsViolatedException):
             kin_sim.tick_until_end()
 
-    def test_avoid_collision_go_around_corner(self, pr2_with_box, rclpy_node):
-        TFPublisher(world=pr2_with_box, node=rclpy_node)
-        VizMarkerPublisher(world=pr2_with_box, node=rclpy_node)
+    def test_avoid_collision_go_around_corner(self, pr2_with_box):
         r_tip = pr2_with_box.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -2926,29 +2918,7 @@ class TestCollisionAvoidance:
 
         kin_sim.tick_until_end(500)
 
-        # pr2_world_state_reset.check_cpi_geq(
-        #     pr2_world_state_reset.get_l_gripper_links(), 0.05
-        # )
-        # pr2_world_state_reset.check_cpi_leq(
-        #     [
-        #         GiskardBlackboard().executor.world.get_kinematic_structure_entity_by_name(
-        #             "r_gripper_l_finger_tip_link"
-        #         )
-        #     ],
-        #     0.04,
-        # )
-        # pr2_world_state_reset.check_cpi_leq(
-        #     [
-        #         GiskardBlackboard().executor.world.get_kinematic_structure_entity_by_name(
-        #             "r_gripper_r_finger_tip_link"
-        #         )
-        #     ],
-        #     0.04,
-        # )
-
-    def test_avoid_self_collision_with_l_arm(self, pr2_with_box, rclpy_node):
-        TFPublisher(world=pr2_with_box, node=rclpy_node)
-        VizMarkerPublisher(world=pr2_with_box, node=rclpy_node)
+    def test_avoid_self_collision_with_l_arm(self, pr2_with_box):
         r_tip = pr2_with_box.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -2994,9 +2964,7 @@ class TestCollisionAvoidance:
         msc.add_node(local_min := LocalMinimumReached())
         msc.add_node(EndMotion.when_true(local_min))
 
-        kin_sim = Executor.create_from_parts(
-            world=pr2_with_box, pacer=SimulationPacer(real_time_factor=1.0)
-        )
+        kin_sim = Executor.create_from_parts(world=pr2_with_box)
         kin_sim.compile(motion_statechart=msc)
 
         kin_sim.tick_until_end(500)
