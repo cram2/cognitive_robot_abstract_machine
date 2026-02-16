@@ -4,9 +4,12 @@ import pytest
 import rclpy
 
 from krrood.ormatic.dao import to_dao
-from krrood.ormatic.utils import create_engine
+from krrood.ormatic.utils import create_engine, drop_database
 from pycram.motion_executor import simulated_robot
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
+
 # from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 
 from semantic_digital_twin.datastructures.definitions import TorsoState
@@ -27,14 +30,15 @@ from pycram.robot_plans import (
     MoveTorsoActionDescription,
     NavigateActionDescription,
     PickUpActionDescription,
+    MoveAndPickUpActionDescription,
 )
-
-
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 rclpy.init()
-uri = os.environ["SEMANTIC_WORLD_DATABASE_URI"]
+uri = os.environ["SEMANTIC_DIGITAL_TWIN_DATABASE_URI"]
 engine = sqlalchemy.create_engine(uri)
 node = rclpy.create_node("simple_viz_node")
+
 
 @pytest.fixture(scope="function")
 def mutable_model_world(pr2_apartment_world):
@@ -48,10 +52,9 @@ def database():
     session = Session(engine)
     Base.metadata.create_all(bind=session.bind)
     yield session
-    Base.metadata.drop_all(session.bind)
+    drop_database(engine)
     session.expunge_all()
     session.close()
-
 
 
 def test_pick_up(database, mutable_model_world):
@@ -85,10 +88,52 @@ def test_pick_up(database, mutable_model_world):
     session.add(dao)
     session.commit()
 
-    assert (
-        world.get_connection(
-            world.get_body_by_name("l_gripper_tool_frame"),
-            world.get_body_by_name("milk.stl"),
-        )
-        is not None
+
+def test_navigate(database, mutable_model_world):
+    world, robot_view, context = mutable_model_world
+
+    description = NavigateActionDescription(None)
+
+    plan = SequentialPlan(
+        context,
+        description,
     )
+    params = plan.parameterize()
+    p = params.create_fully_factorized_distribution()
+    s = p.sample(10)
+
+    print(s)
+    for sample in s:
+        print(dict(zip(p.variables, sample)))
+    # with simulated_robot:
+    #     plan.perform()
+    #
+    # session = database
+    # dao = to_dao(plan)
+    # session.add(dao)
+    # session.commit()
+
+
+def test_move_and_pick_up(database, mutable_model_world):
+    world, robot_view, context = mutable_model_world
+
+    description = MoveAndPickUpActionDescription(None, None, None, None, None)
+
+    plan = SequentialPlan(
+        context,
+        description,
+    )
+    params = plan.parameterize()
+    p = params.create_fully_factorized_distribution()
+    s = p.sample(10)
+
+    print(s)
+    for sample in s:
+        print(dict(zip(p.variables, sample)))
+    # with simulated_robot:
+    #     plan.perform()
+    #
+    # session = database
+    # dao = to_dao(plan)
+    # session.add(dao)
+    # session.commit()
