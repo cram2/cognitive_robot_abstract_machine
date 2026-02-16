@@ -14,8 +14,6 @@ except ImportError:
 from segmind.detectors.coarse_event_detectors import PlacingDetector, GeneralPickUpDetector
 from unittest import TestCase
 
-from pycram.datastructures.enums import WorldMode, LoggerLevel
-
 
 # @pytest.mark.skipif(PyCRAMNEEMInterface is None, reason="PyCRAMNEEMInterface not available")
 @pytest.mark.skip(reason="PyCRAMNEEMInterface needs to be updated")

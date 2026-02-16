@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from threading import RLock
 
 from typing_extensions import Callable, Optional, Dict, Generator, List
-
+from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.spatial_types import Pose, HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
@@ -138,9 +138,7 @@ class DataPlayer(EpisodePlayer, ABC):
         """
         print(f"Processing frame data{frame_data}")
         objects_poses = self.get_objects_poses(frame_data)
-        print(objects_poses)
         joint_states = self.get_joint_states(frame_data)
-        print(joint_states)
         if len(objects_poses):
             #if self.sync_robot_only:
             #    objects_poses = {self.world.robot: objects_poses[self.world.robot]}
@@ -148,14 +146,19 @@ class DataPlayer(EpisodePlayer, ABC):
                 # check in the dictionary if obj is the key and set its pose accordingly
                 if obj in objects_poses:
                     with self.world.modify_world():
-                        new_pose = type(obj.parent_connection)(
+                        new_pose = FixedConnection(
                             parent=obj.parent_connection.parent,
                             child=obj,
-                            parent_T_connection_expression= HomogeneousTransformationMatrix.from_xyz_rpy(
-                                x=objects_poses[obj].x, y=objects_poses[obj].y, z=objects_poses[obj].z,
-                                roll=objects_poses[obj].to_quaternion().x, pitch=objects_poses[obj].to_quaternion().y,
-                                yaw=objects_poses[obj].to_quaternion().z,
+                            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                                x=objects_poses[obj].x, y=objects_poses[obj].y, z=objects_poses[obj].z
                             )
+                            # parent=obj.parent_connection.parent,
+                            # child=obj,
+                            # = HomogeneousTransformationMatrix.from_xyz_rpy(
+                            #     x=objects_poses[obj].x, y=objects_poses[obj].y, z=objects_poses[obj].z,
+                            #     roll=objects_poses[obj].to_quaternion().x, pitch=objects_poses[obj].to_quaternion().y,
+                            #     yaw=objects_poses[obj].to_quaternion().z,
+                            # )
                         )
                         self.world.add_connection(new_pose)
             #self.world.reset_multiple_objects_base_poses(objects_poses)

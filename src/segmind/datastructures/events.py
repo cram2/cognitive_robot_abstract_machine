@@ -2,7 +2,7 @@ import time
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 
-from pycram.datastructures.dataclasses import Color
+
 from pycram.datastructures.partial_designator import PartialDesignator
 from typing_extensions import Optional, List, Union, Type
 
@@ -13,7 +13,7 @@ from segmind.datastructures.mixins import HasPrimaryTrackedObject, HasPrimaryAnd
 from segmind.datastructures.object_tracker import ObjectTrackerFactory
 from semantic_digital_twin.orm.ormatic_interface import BodyDAO
 from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.geometry import BoundingBox, Color
 from semantic_digital_twin.world_description.world_entity import Body, Agent
 
 
@@ -269,8 +269,8 @@ class AbstractContactEvent(EventWithTwoTrackedObjects, ABC):
     with_object_pose: Optional[PoseStamped] = field(init=False, default=None)
 
     def __init__(self,
-                 close_bodies: list[Body],
                  of_object: Body,
+                 close_bodies: Optional[list[Body]] = None,
                  latest_close_bodies: Optional[list[Body]] = None,
                  with_object: Optional[Body] = None,
                  timestamp: Optional[float] = None):
@@ -328,7 +328,7 @@ class AbstractContactEvent(EventWithTwoTrackedObjects, ABC):
 
 
 @dataclass(init=False, unsafe_hash=True)
-class ContactEvent(AbstractContactEvent):
+class CloseContactEvent(AbstractContactEvent):
 
     @property
     def color(self) -> Color:
@@ -336,12 +336,12 @@ class ContactEvent(AbstractContactEvent):
 
     @property
     def objects(self):
-        return self.close_bodies.get_objects_that_have_points()
+        return self.close_bodies
 
     @property
     def main_link(self):
         if len(self.close_bodies) > 0:
-            return self.close_bodies[0].link_a
+            return self.close_bodies[0]
         else:
             print(f"No contact points found for {self.tracked_object.name} in {self.__class__.__name__}")
 
@@ -351,12 +351,12 @@ class ContactEvent(AbstractContactEvent):
 
 
 @dataclass(init=False, unsafe_hash=True)
-class InterferenceEvent(ContactEvent):
+class ContactEvent(CloseContactEvent):
     ...
 
 
 @dataclass(init=False, unsafe_hash=True)
-class LossOfContactEvent(AbstractContactEvent):
+class LossOfCloseContactEvent(AbstractContactEvent):
 
     @property
     def latest_objects_that_got_removed(self):
@@ -383,7 +383,7 @@ class LossOfContactEvent(AbstractContactEvent):
 
 
 @dataclass(init=False, unsafe_hash=True)
-class LossOfInterferenceEvent(LossOfContactEvent):
+class LossOfContactEvent(LossOfCloseContactEvent):
     ...
 
 
@@ -410,7 +410,7 @@ class AbstractAgentContact(AbstractContactEvent, ABC):
 
 
 @dataclass(init=False, unsafe_hash=True)
-class AgentContactEvent(ContactEvent, AbstractAgentContact):
+class AgentContactEvent(CloseContactEvent, AbstractAgentContact):
 
     @property
     def object_link(self) -> Body:
@@ -421,12 +421,12 @@ class AgentContactEvent(ContactEvent, AbstractAgentContact):
 
 
 @dataclass(init=False, unsafe_hash=True)
-class AgentInterferenceEvent(InterferenceEvent, AgentContactEvent):
+class AgentInterferenceEvent(ContactEvent, AgentContactEvent):
     ...
 
 
 @dataclass(init=False, unsafe_hash=True)
-class AgentLossOfContactEvent(LossOfContactEvent, AbstractAgentContact):
+class AgentLossOfContactEvent(LossOfCloseContactEvent, AbstractAgentContact):
 
     @property
     def object_link(self) -> Body:
@@ -437,7 +437,7 @@ class AgentLossOfContactEvent(LossOfContactEvent, AbstractAgentContact):
 
 
 @dataclass(init=False, unsafe_hash=True)
-class AgentLossOfInterferenceEvent(LossOfInterferenceEvent, AgentLossOfContactEvent):
+class AgentLossOfInterferenceEvent(LossOfContactEvent, AgentLossOfContactEvent):
     ...
 
 
@@ -582,8 +582,8 @@ class ContainmentEvent(DefaultEventWithTwoTrackedObjects):
 EventUnion = Union[NewObjectEvent,
 MotionEvent,
 StopMotionEvent,
-ContactEvent,
-LossOfContactEvent,
+CloseContactEvent,
+LossOfCloseContactEvent,
 AgentContactEvent,
 AgentLossOfContactEvent,
 PickUpEvent,

@@ -4,16 +4,20 @@ from datetime import timedelta
 import numpy as np
 from pycram.testing import SemanticWorldTestCase, setup_world
 from semantic_digital_twin.collision_checking.trimesh_collision_detector import TrimeshCollisionDetector
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import Cylinder, Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Type
 
 from segmind.datastructures.events import TranslationEvent, StopMotionEvent, StopTranslationEvent, \
-    ContactEvent, Event, EventUnion
+    CloseContactEvent, Event, EventUnion
 from segmind.datastructures.object_tracker import ObjectTrackerFactory
-from segmind.detectors.atomic_event_detectors import TranslationDetector, AtomicEventDetector
+from segmind.detectors.atomic_event_detectors import TranslationDetector, AtomicEventDetector, ContactDetector
 from segmind.detectors.coarse_event_detectors import GeneralPickUpDetector
 from segmind.detectors.spatial_relation_detector import InsertionDetector
 from segmind.detectors.motion_detection_helpers import has_consistent_direction, is_displaced
@@ -27,10 +31,9 @@ class TestEventDetectors:
 
     def test_general_pick_up_start_condition_checker(self):
         self.world = setup_world()
-        tcd = TrimeshCollisionDetector(self.world)
         milk = self.world.get_body_by_name("milk.stl")
         robot = self.world.get_body_by_name("base_link")
-        event = ContactEvent(close_bodies=[milk, robot], of_object=robot)
+        event = CloseContactEvent(close_bodies=[milk, robot], of_object=robot)
         GeneralPickUpDetector.start_condition_checker(event)
 
     def test_translation_detector(self):

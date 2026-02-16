@@ -25,10 +25,10 @@ except ImportError:
 from pycram.tf_transformations import euler_from_quaternion
 from typing_extensions import Optional, List, Union, Type, Tuple, Callable
 from ..event_logger import EventLogger
-from ..datastructures.events import Event, ContactEvent, LossOfContactEvent, AgentContactEvent, \
+from ..datastructures.events import Event, CloseContactEvent, LossOfCloseContactEvent, AgentContactEvent, \
     AgentLossOfContactEvent, TranslationEvent, StopTranslationEvent, NewObjectEvent, \
-    RotationEvent, StopRotationEvent, MotionEvent, AgentInterferenceEvent, InterferenceEvent, AbstractContactEvent, \
-    AgentLossOfInterferenceEvent, LossOfInterferenceEvent
+    RotationEvent, StopRotationEvent, MotionEvent, AgentInterferenceEvent, ContactEvent, AbstractContactEvent, \
+    AgentLossOfInterferenceEvent, LossOfContactEvent
 from .motion_detection_helpers import DataFilter
 from ..utils import calculate_quaternion_difference, \
     calculate_translation, PropagatingThread
@@ -290,21 +290,21 @@ class AbstractContactDetector(DetectorWithTwoTrackedObjects, ABC):
         DetectorWithTwoTrackedObjects.__init__(self, logger, tracked_object, with_object, wait_time,
                                                *args, **kwargs)
         self.max_closeness_distance = max_closeness_distance
-        self.latest_close_bodies: Optional[list[Body]]
-        self.latest_contact_bodies: Optional[list[Body]]
+        self.latest_close_bodies: Optional[list[Body]] = []
+        self.latest_contact_bodies: Optional[list[Body]] = []
 
     def get_events(self, new_objects_contact: list[Body], new_bodies_interference: list[Body],
                    close_bodies: list[Body], contact_bodies: list[Body],
                    event_type: Type[AbstractContactEvent]):
-        if event_type is ContactEvent:
-            contact_event_type = ContactEvent
+        if event_type is CloseContactEvent:
+            contact_event_type = CloseContactEvent
             agent_contact_event_type = AgentContactEvent
-            interference_event_type = InterferenceEvent
+            interference_event_type = ContactEvent
             agent_interference_event_type = AgentInterferenceEvent
-        elif event_type is LossOfContactEvent:
-            contact_event_type = LossOfContactEvent
+        elif event_type is LossOfCloseContactEvent:
+            contact_event_type = LossOfCloseContactEvent
             agent_contact_event_type = AgentLossOfContactEvent
-            interference_event_type = LossOfInterferenceEvent
+            interference_event_type = LossOfContactEvent
             agent_interference_event_type = AgentLossOfInterferenceEvent
         else:
             raise NotImplementedError(f"Invalid event type {event_type}")
@@ -314,7 +314,7 @@ class AbstractContactDetector(DetectorWithTwoTrackedObjects, ABC):
                 event_type = agent_interference_event_type
             else:
                 event_type = interference_event_type
-            events.append(event_type(close_bodies=close_bodies,
+            events.append(event_type(close_bodies=contact_bodies,
                                      latest_close_bodies=self.latest_close_bodies,
                                      of_object=self.tracked_object, with_object=body))
         for obj in new_objects_contact:
@@ -355,17 +355,20 @@ class AbstractContactDetector(DetectorWithTwoTrackedObjects, ABC):
         close_bodies = []
         contact_bodies = []
         if self.with_object:
-            if contact(self.tracked_object, self.with_object, self.max_closeness_distance):
-                close_bodies.append(self.with_object)
-            if contact(self.tracked_object, self.with_object, 0.0):
+            if contact(self.tracked_object, self.with_object):
                 contact_bodies.append(self.with_object)
+            if (contact(self.tracked_object, self.with_object, threshold=self.max_closeness_distance)
+                    and self.with_object not in contact_bodies):
+                close_bodies.append(self.with_object)
         else:
-            for obj in self.world.bodies_with_enabled_collision:
-                if contact(self.tracked_object, obj, self.max_closeness_distance):
-                    close_bodies.append(obj)
-                if contact(self.tracked_object, obj, 0.0):
+            for obj in self.tracked_object._world.bodies_with_enabled_collision:
+                if obj is self.tracked_object:
+                    continue
+                if contact(self.tracked_object, obj):
                     contact_bodies.append(obj)
-
+                if (contact(self.tracked_object, obj, threshold=self.max_closeness_distance)
+                        and obj not in contact_bodies):
+                    close_bodies.append(obj)
         return close_bodies, contact_bodies
 
     @abstractmethod
@@ -389,7 +392,7 @@ class ContactDetector(AbstractContactDetector):
     """
 
     def trigger_events(self, close_bodies: list[Body], contact_bodies: list[Body]) \
-            -> Union[List[ContactEvent], List[AgentContactEvent]]:
+            -> Union[List[CloseContactEvent], List[AgentContactEvent]]:
         """
         Check if the object got into contact with another object.
 
@@ -418,7 +421,7 @@ class ContactDetector(AbstractContactDetector):
         if len(new_close_objects) == 0 and len(new_contact_objects) == 0:
             return []
         return self.get_events(new_close_objects, new_contact_objects,
-                               close_bodies, contact_bodies, ContactEvent)
+                               close_bodies, contact_bodies, CloseContactEvent)
 
 
 class LossOfContactDetector(AbstractContactDetector):
@@ -427,7 +430,7 @@ class LossOfContactDetector(AbstractContactDetector):
     """
 
     def trigger_events(self, close_bodies: list[Body], contact_bodies: list[Body]) \
-            -> List[LossOfContactEvent]:
+            -> List[LossOfCloseContactEvent]:
         """
         Check if the object lost contact with another object.
 
@@ -441,7 +444,7 @@ class LossOfContactDetector(AbstractContactDetector):
         if len(objects_that_lost_contact) == 0 and len(bodies_that_lost_interference) == 0:
             return []
         return self.get_events(objects_that_lost_contact, bodies_that_lost_interference,
-                               close_bodies, contact_bodies, LossOfContactEvent)
+                               close_bodies, contact_bodies, LossOfCloseContactEvent)
 
     def get_bodies_that_lost_contact(self, close_bodies: list[Body], contact_bodies: list[Body]) \
             -> Tuple[List[Body], List[Body]]:

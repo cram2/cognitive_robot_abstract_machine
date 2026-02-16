@@ -13,11 +13,10 @@ from semantic_digital_twin.reasoning.predicates import is_supported_by, contact
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.geometry import BoundingBox, Color
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Optional, Tuple
 
-from pycram.datastructures.dataclasses import Color
 from pycram.datastructures.enums import Arms, Grasp, AxisIdentifier
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.pose import Transform

@@ -10,16 +10,12 @@ import pytest
 
 import pycram.ros
 from pycram.datastructures.pose import PoseStamped
-
-from pycram.datastructures.enums import WorldMode
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 from semantic_digital_twin.world import World
-
 from segmind.players.csv_player import CSVEpisodePlayer
 from segmind.episode_segmenter import NoAgentEpisodeSegmenter
 from segmind.detectors.coarse_event_detectors import GeneralPickUpDetector
 from segmind.detectors.spatial_relation_detector import InsertionDetector
-from pycram.datastructures.enums import WorldMode
 
 
 try:

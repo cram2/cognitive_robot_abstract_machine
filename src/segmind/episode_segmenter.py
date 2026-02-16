@@ -291,7 +291,7 @@ class EpisodeSegmenter(ABC):
                                               time_between_frames=self.time_between_frames)
 
     def start_contact_threads_for_object(self, obj: Body,
-                                         event: Optional[ContactEvent] = None) -> None:
+                                         event: Optional[CloseContactEvent] = None) -> None:
         """
         Start the contact threads for the object and updates the tracked objects.
 
@@ -321,7 +321,7 @@ class EpisodeSegmenter(ABC):
         self_ = case_dict['self_']
         output_ = case_dict['output_']
         if issubclass(detector_type, GeneralPickUpDetector):
-            if isinstance(starter_event, LossOfContactEvent):
+            if isinstance(starter_event, LossOfCloseContactEvent):
                 pick_up_detectors = [detector for (_, _), detector in self_.starter_event_to_detector_thread_map.items()
                                      if isinstance(detector, GeneralPickUpDetector)]
                 if len(pick_up_detectors) > 0 and not output_:
@@ -408,7 +408,7 @@ class EpisodeSegmenter(ABC):
         """
         Join all the threads.
         """
-        self.logger.logger.debug_events()
+        #self.logger.debug_events()
         self.logger.join()
         logger.debug("All threads joined.")
 
@@ -419,13 +419,13 @@ class AgentEpisodeSegmenter(EpisodeSegmenter):
      events that are relevant to the agent for example contact events of the hands or robot.
     """
 
-    def start_tracking_threads_for_new_object_and_event(self, new_object: Body, event: Optional[ContactEvent] = None):
+    def start_tracking_threads_for_new_object_and_event(self, new_object: Body, event: Optional[CloseContactEvent] = None):
         logger.debug(f"Creating contact and motion threads for object {new_object.name}")
         self.start_contact_threads_for_object(new_object, event)
         self.start_motion_threads_for_object(new_object, event)
 
     def _process_event(self, event: Event) -> None:
-        if isinstance(event, ContactEvent):
+        if isinstance(event, CloseContactEvent):
             self.update_tracked_objects(event)
 
     def _run_initial_event_detectors(self) -> None:

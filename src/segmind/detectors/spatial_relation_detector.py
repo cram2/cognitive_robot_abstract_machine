@@ -14,7 +14,7 @@ from segmind.datastructures.events import PlacingEvent
 from segmind.episode_player import EpisodePlayer
 from .atomic_event_detectors import AtomicEventDetector
 from ..datastructures.events import MotionEvent, EventUnion, StopMotionEvent, NewObjectEvent, InsertionEvent, Event, \
-    ContainmentEvent, InterferenceEvent, LossOfInterferenceEvent, StopTranslationEvent, \
+    ContainmentEvent, ContactEvent, LossOfContactEvent, StopTranslationEvent, \
     LossOfSupportEvent, SupportEvent
 from ..datastructures.object_tracker import ObjectTrackerFactory
 from ..utils import get_support
@@ -137,13 +137,13 @@ class InsertionDetector(SpatialRelationDetector):
     check_on_events = {ContainmentEvent: event_condition}
 
     @staticmethod
-    def get_latest_interference_with_hole(event: ContainmentEvent) -> Optional[InterferenceEvent]:
+    def get_latest_interference_with_hole(event: ContainmentEvent) -> Optional[ContactEvent]:
         """
         Get the latest interference event with a hole before the given event.
         """
 
         def conditions(event_to_check: EventUnion) -> bool:
-            return (isinstance(event_to_check, InterferenceEvent) and
+            return (isinstance(event_to_check, ContactEvent) and
                     event_to_check.timestamp < event.timestamp and
                     "hole" in event_to_check.with_object.name)
 
@@ -214,7 +214,7 @@ class SupportDetector(SpatialRelationDetector):
     def event_condition(event: StopTranslationEvent) -> bool:
         return len(event.tracked_object.contact_points) > 0
 
-    check_on_events = {StopTranslationEvent: None, LossOfInterferenceEvent: None}
+    check_on_events = {StopTranslationEvent: None, LossOfContactEvent: None}
 
     def update_body_state(self, body: Body, with_bodies: Optional[List[Body]] = None):
         """

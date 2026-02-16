@@ -12,9 +12,6 @@ import re
 
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Optional, Dict, Type, TYPE_CHECKING, Callable, Tuple
-
-from pycram.datastructures.dataclasses import TextAnnotation
-from pycram.datastructures.enums import WorldMode
 from .datastructures.events import Event, EventUnion, EventWithTrackedObjects, EventWithTwoTrackedObjects, PickUpEvent, \
     InsertionEvent
 from .datastructures.mixins import HasPrimaryTrackedObject
@@ -378,7 +375,7 @@ class EventAnnotationThread(threading.Thread):
     def __init__(self, logger: EventLogger):
         super().__init__()
         self.logger = logger
-        self.current_annotations: List[TextAnnotation] = []
+        #self.current_annotations: List[TextAnnotation] = []
         self.kill_event = threading.Event()
 
     def run(self):

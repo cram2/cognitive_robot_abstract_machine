@@ -42,18 +42,12 @@ class CSVEpisodePlayer(FilePlayer):
             obj_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=obj_position[0], y=obj_position[1], z=obj_position[2],
                                                                     roll=obj_orientation[1], pitch=obj_orientation[2], yaw=obj_orientation[3])
 
-            if self.position_shift is not None:
+
+            if self.position_shift:
                 obj_pose.x += self.position_shift.x
                 obj_pose.y += self.position_shift.y
                 obj_pose.z += self.position_shift.z
 
-
-
-            # Create the object if it does not exist in the world and set its pose
-            if obj_name not in self.world.bodies:
-                obj = Body(name=PrefixedName(str(obj_name)))
-            else:
-                obj = self.world.get_body_by_name(obj_name)
-                objects_poses[obj] = obj.global_pose.to_pose()
-
+            obj = self.world.get_body_by_name(obj_name)
+            objects_poses[obj] = obj_pose.to_pose()
         return objects_poses

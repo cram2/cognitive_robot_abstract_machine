@@ -336,7 +336,7 @@ class PlacingDetector(AbstractInteractionDetector):
 
     @classmethod
     @object_to_track_rdr.decorator
-    def get_object_to_track_from_starter_event(cls, starter_event: ContactEvent) -> Body:
+    def get_object_to_track_from_starter_event(cls, starter_event: CloseContactEvent) -> Body:
         pass
 
     @classmethod
@@ -389,7 +389,7 @@ def check_for_supporting_surface(tracked_object: Body,
     return supporting_surface
 
 
-def select_transportable_objects_from_contact_event(event: Union[ContactEvent, AgentContactEvent]) -> List[Body]:
+def select_transportable_objects_from_contact_event(event: Union[CloseContactEvent, AgentContactEvent]) -> List[Body]:
     """
     Select the objects that can be transported from the contact event.
 
@@ -399,7 +399,7 @@ def select_transportable_objects_from_contact_event(event: Union[ContactEvent, A
     return select_transportable_objects(contacted_objects + [event.tracked_object])
 
 
-def select_transportable_objects_from_loss_of_contact_event(event: LossOfContactEvent) -> List[Body]:
+def select_transportable_objects_from_loss_of_contact_event(event: LossOfCloseContactEvent) -> List[Body]:
     """
     Select the objects that can be transported from the loss of contact event.
     """
