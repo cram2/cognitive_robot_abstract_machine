@@ -1000,40 +1000,6 @@ class DataAccessObject(HasGeneric[T]):
         """
         return dao_instance.from_dao(state=state)
 
-    def _register_for_conversion(self, state: FromDataAccessObjectState) -> T:
-        """
-        Register this DAO for conversion if not already present.
-
-        :param state: The conversion state.
-        :return: The uninitialized domain object.
-        """
-        if not state.has(self):
-            domain_object = state.allocate_and_memoize(self, self.original_class())
-            state.push_work_item(self, domain_object)
-        return state.get(self)
-
-    def _perform_from_dao_conversion(self, state: FromDataAccessObjectState) -> T:
-        """
-        Perform the four-phase conversion process.
-
-        :param state: The conversion state.
-        :return: The converted domain object.
-        """
-        state.is_processing = True
-        discovery_order = []
-        if not state.has(self):
-            state.allocate_and_memoize(self, self.original_class())
-        state.push_work_item(self, state.get(self))
-
-        self._discover_dependencies(state, discovery_order)
-        self._fill_domain_objects(state, discovery_order)
-        self._finalize_containers(state, discovery_order)
-        self._call_post_inits(state, discovery_order)
-
-        state.is_processing = False
-
-        return state.get(self)
-
     def _build_base_keyword_arguments_for_alternative_parent(
         self,
         domain_object: T,
