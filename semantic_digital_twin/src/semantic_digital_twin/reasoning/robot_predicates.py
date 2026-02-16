@@ -21,6 +21,7 @@ from ..collision_checking.trimesh_collision_detector import TrimeshCollisionDete
 from ..robots.abstract_robot import AbstractRobot, ParallelGripper, Manipulator
 from ..spatial_computations.raytracer import RayTracer
 from ..spatial_types import HomogeneousTransformationMatrix
+from ..world_description.geometry import BoundingBox
 from ..world_description.world_entity import Body
 
 
@@ -174,8 +175,14 @@ def is_gripper_holding_something(gripper: Manipulator) -> bool:
 def is_pose_free_for_robot(
     robot: AbstractRobot, pose: HomogeneousTransformationMatrix
 ) -> bool:
-    robot_bb = robot.base.bounding_box
-    target_robot_bb = robot_bb.transform_to_origin(pose)
-    return not is_region_occupied(
-        target_robot_bb, robot._world, robot.bodies_with_collisions
+    robot_bb = robot.base.bounding_box.transform_to_origin(robot.root.global_pose)
+    target_bb = BoundingBox(
+        robot_bb.min_x,
+        robot_bb.min_y,
+        robot_bb.min_z,
+        robot_bb.max_x,
+        robot_bb.max_y,
+        robot_bb.max_z,
+        pose,
     )
+    return not is_region_occupied(target_bb, robot._world, robot.bodies_with_collisions)

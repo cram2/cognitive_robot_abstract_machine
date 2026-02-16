@@ -484,12 +484,12 @@ def test_is_pose_free_for_robot(pr2_apartment_state_reset):
     view = pr2_apartment_state_reset.get_semantic_annotations_by_type(PR2)[0]
     node = rclpy.create_node("test_node")
     VizMarkerPublisher(pr2_apartment_state_reset, node).with_tf_publisher()
-    # assert is_pose_free_for_robot(
-    #     view,
-    #     HomogeneousTransformationMatrix.from_xyz_rpy(
-    #         2, -2, 0, reference_frame=pr2_apartment_state_reset.root
-    #     ),
-    # )
+    assert is_pose_free_for_robot(
+        view,
+        HomogeneousTransformationMatrix.from_xyz_rpy(
+            2, -2, 0, reference_frame=pr2_apartment_state_reset.root
+        ),
+    )
 
     assert not is_pose_free_for_robot(
         view,
