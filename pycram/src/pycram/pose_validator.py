@@ -1,42 +1,36 @@
 import logging
-import random
 from copy import deepcopy
 
-import numpy as np
-from numpy.ma import masked_array
-from skimage.measure import label
+from typing_extensions import List, Union
 
 from giskardpy.executor import Executor
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.collision_checking.collision_detector import (
-    CollisionCheck,
     ClosestPoints,
+)
+from semantic_digital_twin.collision_checking.collision_matrix import (
+    CollisionMatrix,
+)
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AvoidExternalCollisions,
+    AllowCollisionBetweenGroups,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.spatial_computations.ik_solver import (
-    MaxIterationsException,
-    UnreachableException,
-)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
 )
-from typing_extensions import List, Union, Dict, Iterable, Optional, Iterator, Callable
-
-from .costmaps import Costmap
-from .datastructures.pose import PoseStamped, TransformStamped
-from .failures import IKError, RobotInCollision
-from .tf_transformations import quaternion_from_euler
+from .datastructures.pose import PoseStamped
 
 logger = logging.getLogger("pycram")
 
@@ -143,9 +137,11 @@ def pose_sequence_reachability_validator(
     msc.add_node(EndMotion.when_true(cart_sequence))
 
     executor = Executor(
-        world,
-        controller_config=QPControllerConfig(
-            target_frequency=50, prediction_horizon=4, verbose=False
+        context=MotionStatechartContext(
+            world=world,
+            qp_controller_config=QPControllerConfig(
+                target_frequency=50, prediction_horizon=4, verbose=False
+            ),
         ),
     )
     executor.compile(msc)
@@ -186,29 +182,32 @@ def collision_check(
 
 def create_collision_matrix(
     ignore_collision_with: List[Body], world: World, robot: AbstractRobot
-) -> List[CollisionCheck]:
+) -> CollisionMatrix:
     """
-    CCreates a list of collision checks that should be performed
+    Creates a collision matrix that should be performed
 
     :param ignore_collision_with: List of objects for which collision should be ignored
     :param world: The world in which the collision check should be performed
     :param robot: The robot for which the collision check should be performed
-    :return: A list of collision checks that should be performed
+    :return: A collision matrix that should be performed
     """
-    collision_checks = []
+
+    collision_matrix = CollisionMatrix()
+    avoid_external = AvoidExternalCollisions(
+        bodies=robot.bodies_with_collision, world=world, buffer_zone_distance=0.01
+    )
+    avoid_external.apply_to_collision_matrix(collision_matrix)
+
     attached_bodies = set(robot.bodies) - set(
         world.get_kinematic_structure_entities_of_branch(robot.root)
     )
     allowed_collision_with = ignore_collision_with + list(attached_bodies)
 
-    for robot_body in robot.bodies_with_collision:
-        for world_body in world.bodies_with_collision:
-            if (
-                world_body in allowed_collision_with
-                or robot_body in allowed_collision_with
-                or world_body in robot.bodies
-            ):
-                continue
-            collision_checks.append(CollisionCheck(robot_body, world_body, 0.01, world))
+    if allowed_collision_with:
+        allow_rule = AllowCollisionBetweenGroups(
+            body_group_a=robot.bodies_with_collision,
+            body_group_b=allowed_collision_with,
+        )
+        allow_rule.apply_to_collision_matrix(collision_matrix)
 
-    return collision_checks
+    return collision_matrix

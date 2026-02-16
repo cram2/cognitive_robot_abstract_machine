@@ -1673,7 +1673,7 @@ class GiskardLocation(LocationDesignatorDescription):
             test_ee = test_world._get_world_entity_by_hash(
                 hash(ee.manipulator.tool_frame)
             )
-            test_robot.setup_collision_rules()
+            test_robot._setup_collision_rules()
 
             for candidate in reachability_map:
 
