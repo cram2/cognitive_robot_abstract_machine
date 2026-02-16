@@ -1,9 +1,7 @@
 import time
 
 import rclpy
-from narwhals import Object
 
-from Segmind.test import test_worlds
 from Segmind.test.test_worlds import setup_contact_world
 from segmind import set_logger_level, LogLevel, logger
 from segmind.datastructures.events import CloseContactEvent, ContactEvent, LossOfCloseContactEvent, LossOfContactEvent
