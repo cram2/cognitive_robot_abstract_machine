@@ -12,14 +12,14 @@ from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
 )
-from ....datastructures.enums import AxisIdentifier, Arms, MovementType
+from ....datastructures.enums import AxisIdentifier, Arms
 from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import Vector3Stamped, PoseStamped
 from ....failures import TorsoGoalNotReached, ConfigurationNotReached
 from ....language import SequentialPlan
 from ....view_manager import ViewManager
 from ....robot_plans.actions.base import ActionDescription
-from ....robot_plans.motions.gripper import MoveGripperMotion, MoveTCPMotion
+from ....robot_plans.motions.gripper import MoveGripperMotion, MoveTCPWaypointsMotion
 from ....robot_plans.motions.robot_body import MoveJointsMotion
 from ....validation.goal_validator import create_multiple_joint_goal_validator
 
@@ -304,16 +304,15 @@ class CarryAction(ActionDescription):
 
 
 @dataclass
-class MoveTCPAction(ActionDescription):
+class FollowTCPPathAction(ActionDescription):
     """
-    Represents an action to move a robotic arm's TCP (Tool Center Point) to a target
-    location. If multiple poses are provided, only the final pose is executed.
+    Represents an action to move a robotic arm's TCP (Tool Center Point) along a
+    path of poses.
     """
 
-    target_location: Union[PoseStamped, Iterable[PoseStamped]]
+    target_location: Iterable[PoseStamped]
     """
-    Target location for the TCP motion as a single PoseStamped or an iterable of
-    PoseStamped objects.
+    Path poses for the TCP motion as an iterable of PoseStamped objects.
     """
 
     arm: Arms
@@ -322,21 +321,15 @@ class MoveTCPAction(ActionDescription):
     """
 
     def execute(self) -> None:
-        if isinstance(self.target_location, PoseStamped):
-            target_locations = [self.target_location]
-        else:
-            target_locations = list(self.target_location)
+        target_locations = list(self.target_location)
 
         if not target_locations:
             raise ValueError("Provide at least one target location.")
 
-        # Some robots cannot reliably execute waypoint-constrained TCP motions.
-        # Use a single TCP goal pose for broad robot compatibility.
-        motion = MoveTCPMotion(
-            target_locations[-1],
+        motion = MoveTCPWaypointsMotion(
+            target_locations,
             self.arm,
             allow_gripper_collision=True,
-            movement_type=MovementType.CARTESIAN,
         )
 
         SequentialPlan(self.context, motion).perform()
@@ -352,21 +345,16 @@ class MoveTCPAction(ActionDescription):
     def description(
         cls,
         arm: Union[Iterable[Arms], Arms],
-        target_location: Union[Iterable[PoseStamped], PoseStamped] = None,
         target_locations: Union[Iterable[PoseStamped], PoseStamped] = None,
-    ) -> PartialDesignator[MoveTCPAction]:
-        resolved_target = (
-            target_location if target_location is not None else target_locations
-        )
-        if resolved_target is None:
-            raise ValueError(
-                "Provide either target_location or target_locations."
-            )
+    ) -> PartialDesignator[FollowTCPPathAction]:
+        if target_locations is None:
+            raise ValueError("Provide target_locations.")
 
-        if isinstance(resolved_target, PoseStamped):
-            target_for_designator = [resolved_target]
-        else:
-            target_for_designator = list(resolved_target)
+        if isinstance(target_locations, PoseStamped):
+            raise ValueError(
+                "Provide an iterable of PoseStamped, e.g. [target_pose]."
+            )
+        target_for_designator = list(target_locations)
 
         if not target_for_designator:
             raise ValueError("Provide at least one target location.")
@@ -384,4 +372,4 @@ MoveTorsoActionDescription = MoveTorsoAction.description
 SetGripperActionDescription = SetGripperAction.description
 ParkArmsActionDescription = ParkArmsAction.description
 CarryActionDescription = CarryAction.description
-MoveTCPActionDescription = MoveTCPAction.description
+FollowTCPPathActionDescription = FollowTCPPathAction.description

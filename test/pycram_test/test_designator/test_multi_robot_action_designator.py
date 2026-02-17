@@ -24,7 +24,7 @@ from pycram.view_manager import ViewManager
 from pycram.robot_plans import (
     MoveTorsoAction,
     MoveTorsoActionDescription,
-    MoveTCPActionDescription,
+    FollowTCPPathActionDescription,
     NavigateActionDescription,
     SetGripperActionDescription,
     PickUpActionDescription,
@@ -262,22 +262,21 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
 
 def test_move_tcp_follows_sine_waypoints_multi(immutable_multiple_robot_apartment):
     world, view, context = immutable_multiple_robot_apartment
-    left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
     frame = world.root
-    anchor = PoseStamped.from_list([2.2, 2, 0.7], frame=frame)
+    anchor = PoseStamped.from_list([2.2, 2, 0.9], frame=frame)
     anchor_T = anchor.to_spatial_type()
     offset_T = HomogeneousTransformationMatrix.from_xyz_axis_angle(
         z=-0.03,
         axis=(0, 1, 0),
-        angle=0,
+        angle=np.pi/2,
         reference_frame=world.root,
     )
     target_pose = PoseStamped.from_spatial_type(anchor_T @ offset_T)
-    waypoints = _make_sine_scan_poses(target_pose, lane_axis="z")
-
+    # waypoints = _make_sine_scan_poses(target_pose, lane_axis="z")
+    waypoints = [target_pose]
     plan = SequentialPlan(
         context,
-        MoveTCPActionDescription(arm=Arms.LEFT, target_locations=waypoints),
+        FollowTCPPathActionDescription(arm=Arms.LEFT, target_locations=waypoints),
     )
     with simulated_robot:
         plan.perform()

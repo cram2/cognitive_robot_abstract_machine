@@ -20,7 +20,7 @@ from pycram.robot_plans import (
     PickUpActionDescription,
     PlaceActionDescription,
     SetGripperActionDescription,
-    MoveTCPActionDescription,
+    FollowTCPPathActionDescription,
 )
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
@@ -286,7 +286,7 @@ def test_move_tcp_follows_sine_waypoints(immutable_tracy_block_world):
 
     plan = SequentialPlan(
         context,
-        MoveTCPActionDescription(target_locations=waypoints, arm=Arms.RIGHT),
+        FollowTCPPathActionDescription(target_locations=waypoints, arm=Arms.RIGHT),
     )
     with simulated_robot:
         plan.perform()
