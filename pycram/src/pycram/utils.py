@@ -61,7 +61,7 @@ def link_pose_for_joint_config(obj: Body, joint_config: Dict[str, float]) -> Pos
         ].position = joint_pose
     reasoning_world.notify_state_change()
     pose = reasoning_world.get_body_by_name(obj.name).global_pose
-    return Pose.from_spatial_type(pose)
+    return pose.to_pose()
 
 
 def get_rays_from_min_max(

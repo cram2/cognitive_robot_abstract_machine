@@ -550,7 +550,7 @@ class AccessingLocation(LocationDesignatorDescription):
                 pose_candidate = Pose(
                     Point3(pose_candidate.x, pose_candidate.y, 0),
                     pose_candidate.to_quaternion(),
-                    reference_frame=params_box.handle.reference_frame,
+                    reference_frame=params_box.handle,
                 )
                 test_robot.root.parent_connection.origin = pose_candidate
                 try:
@@ -564,6 +564,7 @@ class AccessingLocation(LocationDesignatorDescription):
                         VerticalAlignment.NoAlignment,
                         arm_chain.manipulator,
                     ).grasp_orientation()
+                    grasp.reference_frame = test_world.root
                     current_target_sequence = [
                         deepcopy(pose) for pose in target_sequence
                     ]
@@ -667,7 +668,7 @@ class SemanticCostmapLocation(LocationDesignatorDescription):
                 maybe_pose = Pose(
                     Point3(maybe_pose.x, maybe_pose.y, maybe_pose.z + height_offset),
                     maybe_pose.to_quaternion(),
-                    reference_frame=params_box.body.reference_frame,
+                    reference_frame=params_box.body,
                 )
                 yield maybe_pose
 
@@ -1246,7 +1247,7 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
                 [
                     node.origin.to_np()[0, 3],
                     node.origin.to_np()[1, 3],
-                    target_position.z + 0.2,
+                    target_position.z.to_np()[0] + 0.2,
                 ]
                 for node in free_space_graph.graph.nodes()
             ]
