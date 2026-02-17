@@ -226,19 +226,19 @@ def test_positions(session, database):
 
 
 def test_positions_with_duplicated_entry_in_list(session, database):
-    p1 = Position(1, 2, 3)
-    positions = Positions([p1, p1], ["a", "b", "c"])
-    dao: PositionsDAO = to_dao(positions)
+    p1 = KRROODPosition(1, 2, 3)
+    positions = KRROODPositions([p1, p1], ["a", "b", "c"])
+    dao: KRROODPositionsDAO = to_dao(positions)
     assert len(dao.positions) == 2
     session.add(dao)
     session.commit()
 
     associations_in_db = session.execute(
-        select(PositionsDAO_positions_association)
+        select(KRROODPositionsDAO_positions_association)
     ).all()
     assert len(associations_in_db) == 2
 
-    queried = session.scalars(select(PositionsDAO)).one()
+    queried = session.scalars(select(KRROODPositionsDAO)).one()
     assert len(queried.positions) == 2
 
 
@@ -764,13 +764,13 @@ def test_polymorphic_enum(session, database):
 def test_generic_class(session, database):
 
     assert issubclass(GenericClass_floatDAO, GenericClassDAO)
-    assert issubclass(GenericClass_PositionDAO, GenericClassDAO)
-    assert hasattr(GenericClass_PositionDAO, "value")
-    assert hasattr(GenericClass_PositionDAO, "optional_value")
-    assert hasattr(GenericClass_PositionDAO, "container")
+    assert issubclass(GenericClass_KRROODPositionDAO, GenericClassDAO)
+    assert hasattr(GenericClass_KRROODPositionDAO, "value")
+    assert hasattr(GenericClass_KRROODPositionDAO, "optional_value")
+    assert hasattr(GenericClass_KRROODPositionDAO, "container")
 
     assert hasattr(GenericClassAssociationDAO, "associated_value")
-    generic_position = GenericClass[Position](Position(1.0, 2.0, 3.0))
+    generic_position = GenericClass[KRROODPosition](KRROODPosition(1.0, 2.0, 3.0))
     obj = GenericClassAssociation(
         associated_value=GenericClass[float](1.0),
         associated_value_list=[

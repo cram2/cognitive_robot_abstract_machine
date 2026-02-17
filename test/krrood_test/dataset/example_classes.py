@@ -58,8 +58,8 @@ class KRROODPose(Symbol):
 @dataclass
 class OptionalTestCase(Symbol):
     value: int
-    optional_position: Optional[Position] = None
-    list_of_orientations: List[Orientation] = field(default_factory=list)
+    optional_position: Optional[KRROODPosition] = None
+    list_of_orientations: List[KRROODOrientation] = field(default_factory=list)
     list_of_values: List[int] = field(default_factory=list)
 
 
@@ -698,7 +698,7 @@ class GenericClass(Generic[T]):
 @dataclass
 class GenericClassAssociation:
     associated_value: GenericClass[float]
-    associated_value_list: List[GenericClass[Position]]
+    associated_value_list: List[GenericClass[KRROODPosition]]
 
     associated_value_not_parametrized: GenericClass = None
     associated_value_not_parametrized_list: List[GenericClass] = field(
