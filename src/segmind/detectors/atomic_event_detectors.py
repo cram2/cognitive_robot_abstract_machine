@@ -366,8 +366,7 @@ class AbstractContactDetector(DetectorWithTwoTrackedObjects, ABC):
                     continue
                 if contact(self.tracked_object, obj):
                     contact_bodies.append(obj)
-                if (contact(self.tracked_object, obj, threshold=self.max_closeness_distance)
-                        and obj not in contact_bodies):
+                if (contact(self.tracked_object, obj, threshold=self.max_closeness_distance)):
                     close_bodies.append(obj)
         return close_bodies, contact_bodies
 

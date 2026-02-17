@@ -29,9 +29,6 @@ class TestContactEvent:
         loss_contact_detector = self.run_and_get_loss_contact_detector(self.tracked_obj)
 
         try:
-            contact_detector.detect_events()
-            loss_contact_detector.detect_events()
-
             assert (len(contact_detector.latest_contact_bodies)) == 0
             assert (len(contact_detector.latest_close_bodies)) == 0
             assert (len(obj_tracker.get_event_history())) == 0
@@ -49,8 +46,6 @@ class TestContactEvent:
                     self.world.add_connection(cylinder_conn)
 
             time.sleep(1)
-            loss_contact_detector.detect_events()
-            contact_detector.detect_events()
 
             assert (len(contact_detector.latest_close_bodies)) == 2
             assert (len(contact_detector.latest_contact_bodies)) == 0
@@ -71,17 +66,13 @@ class TestContactEvent:
                     self.world.add_connection(cylinder_conn)
 
             time.sleep(1)
-            loss_contact_detector.detect_events()
-            contact_detector.detect_events()
 
             assert (len(contact_detector.latest_contact_bodies)) == 2
-            assert (len(contact_detector.latest_close_bodies)) == 0
+            assert (len(contact_detector.latest_close_bodies)) == 2
 
-            # Some remarks here: Since both events are happening at the same Time, both events can be as last events.
-            assert (len(obj_tracker.get_event_history())) == 6
-            assert type(obj_tracker.get_latest_event()) == LossOfCloseContactEvent or ContactEvent
+            assert (len(obj_tracker.get_event_history())) == 4
+            assert type(obj_tracker.get_latest_event()) == ContactEvent
             assert obj_tracker.get_latest_event_of_type(ContactEvent) is not None
-            assert obj_tracker.get_latest_event_of_type(LossOfCloseContactEvent) is not None
 
             with self.world.modify_world():
                 root_C_cylinder = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -96,13 +87,11 @@ class TestContactEvent:
                     self.world.add_connection(cylinder_conn)
 
             time.sleep(2)
-            loss_contact_detector.detect_events()
-            contact_detector.detect_events()
 
             assert (len(contact_detector.latest_contact_bodies)) == 0
             assert (len(contact_detector.latest_close_bodies)) == 0
 
-            assert (len(obj_tracker.get_event_history())) == 8
+            assert (len(obj_tracker.get_event_history())) == 6
             assert type(obj_tracker.get_latest_event()) == LossOfContactEvent
 
 
