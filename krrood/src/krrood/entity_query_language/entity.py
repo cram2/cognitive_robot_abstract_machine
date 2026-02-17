@@ -117,7 +117,7 @@ def variable(
 
 
 def variable_from(
-    domain: DomainType,
+    domain: Union[Iterable[T], Selectable[T]],
     name: Optional[str] = None,
 ) -> Union[T, Selectable[T]]:
     """
