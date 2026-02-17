@@ -2432,6 +2432,56 @@ class TestParallel:
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
+    def test_parallel_minimum_success(self):
+        """Test that Parallel completes when minimum_success nodes are True"""
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                parallel := Parallel(
+                    [
+                        CountControlCycles(control_cycles=2),
+                        CountControlCycles(control_cycles=4),
+                        CountControlCycles(control_cycles=6),
+                    ],
+                    minimum_success=2,
+                ),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(parallel))
+
+        kin_sim = Executor(
+            world=World(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        # 4 (second ticker completes) + 1 (for parallel to turn True) + 2 (for end to trigger)
+        assert kin_sim.control_cycles == 7
+
+    def test_parallel_minimum_success_zero(self):
+        """Test that Parallel completes when no node is True"""
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                parallel := Parallel(
+                    [
+                        CountControlCycles(control_cycles=3),
+                        CountControlCycles(control_cycles=5),
+                        CountControlCycles(control_cycles=7),
+                    ],
+                    minimum_success=0,
+                ),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(parallel))
+
+        kin_sim = Executor(
+            world=World(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        # 0 (no ticker completes) + 1 (for parallel to turn True) + 2 (for end to trigger)
+        assert kin_sim.control_cycles == 3
+
 
 class TestOpenClose:
     def test_open(self, pr2_world_state_reset):
