@@ -8,6 +8,7 @@ from typing_extensions import Union, Optional, Type, Any, Iterable
 
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
 from ...motions.gripper import MoveGripperMotion, MoveTCPMotion
@@ -19,7 +20,6 @@ from ....datastructures.enums import (
 )
 from ....datastructures.grasp import GraspDescription
 from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
 from ....failures import ObjectNotGraspedError
 from ....failures import ObjectNotInGraspingArea
 from ....language import SequentialPlan
@@ -36,7 +36,7 @@ class ReachAction(ActionDescription):
     Let the robot reach a specific pose.
     """
 
-    target_pose: PoseStamped
+    target_pose: Pose
     """
     Pose that should be reached.
     """
@@ -105,7 +105,7 @@ class ReachAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        target_pose: Union[Iterable[PoseStamped], PoseStamped],
+        target_pose: Union[Iterable[Pose], Pose],
         arm: Union[Iterable[Arms], Arms] = None,
         grasp_description: Union[Iterable[GraspDescription], GraspDescription] = None,
         object_designator: Union[Iterable[Body], Body] = None,
@@ -155,9 +155,7 @@ class PickUpAction(ActionDescription):
             self.context,
             MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm),
             ReachActionDescription(
-                target_pose=PoseStamped.from_spatial_type(
-                    self.object_designator.global_pose
-                ),
+                target_pose=self.object_designator.global_pose.to_pose(),
                 object_designator=self.object_designator,
                 arm=self.arm,
                 grasp_description=self.grasp_description,

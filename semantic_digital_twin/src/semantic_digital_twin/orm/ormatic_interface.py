@@ -870,6 +870,31 @@ class ColorDAO(
     B: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     A: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "ColorDAO",
+    }
+
+
+class ColorsDAO(
+    ColorDAO, DataAccessObject[semantic_digital_twin.world_description.geometry.Colors]
+):
+
+    __tablename__ = "ColorsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ColorDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ColorsDAO",
+        "inherit_condition": database_id == ColorDAO.database_id,
+    }
+
 
 class DegreeOfFreedomLimitsDAO(
     Base,

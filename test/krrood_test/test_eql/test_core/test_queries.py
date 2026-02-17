@@ -4,7 +4,7 @@ from math import factorial
 import pytest
 
 import krrood.entity_query_language.entity_result_processors as eql
-from ...dataset.example_classes import VectorsWithProperty
+from ...dataset.example_classes import KRROODVectorsWithProperty
 from krrood.entity_query_language.entity import (
     and_,
     not_,
@@ -1039,7 +1039,7 @@ def test_property_selection():
     """
     Test that properties can be selected from entities in a query.
     """
-    v = variable(VectorsWithProperty, None)
+    v = variable(KRROODVectorsWithProperty, None)
     q = an(entity(v).where(v.vectors[0].x == 1))
 
 

@@ -12,13 +12,31 @@ from typing_extensions import (
 )
 
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
 )
-from .enums import ApproachDirection, VerticalAlignment, Grasp
-from .pose import PoseStamped
+from typing_extensions import (
+    List,
+    Optional,
+    Callable,
+    Dict,
+    Any,
+    Union,
+    Sequence,
+    deprecated,
+    Type,
+    TYPE_CHECKING,
+)
+
+from .enums import (
+    JointType,
+    Grasp,
+    ApproachDirection,
+    VerticalAlignment,
+)
 
 if TYPE_CHECKING:
     from ..plan import Plan
@@ -84,7 +102,7 @@ class ExecutionData:
     execution. An execution is a Robot with a virtual mobile base that can be used to move the robot in the environment.
     """
 
-    execution_start_pose: PoseStamped
+    execution_start_pose: Pose
     """
     Start of the robot at the start of execution of an action designator
     """
@@ -94,7 +112,7 @@ class ExecutionData:
     The world state at the start of execution of an action designator
     """
 
-    execution_end_pose: Optional[PoseStamped] = None
+    execution_end_pose: Optional[Pose] = None
     """
     The pose of the robot at the end of executing an action designator
     """
@@ -111,12 +129,12 @@ class ExecutionData:
     A list of World modification blocks that were added during the execution of the action designator
     """
 
-    manipulated_body_pose_start: Optional[PoseStamped] = None
+    manipulated_body_pose_start: Optional[Pose] = None
     """
     Start pose of the manipulated Body if there was one
     """
 
-    manipulated_body_pose_end: Optional[PoseStamped] = None
+    manipulated_body_pose_end: Optional[Pose] = None
     """
     End pose of the manipulated Body if there was one
     """

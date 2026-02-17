@@ -8,7 +8,11 @@ from krrood.class_diagrams.class_diagram import (
 )
 from krrood.class_diagrams.utils import classes_of_module
 from ..dataset import example_classes
-from ..dataset.example_classes import Position, GenericClassAssociation, GenericClass
+from ..dataset.example_classes import (
+    KRROODPosition,
+    GenericClassAssociation,
+    GenericClass,
+)
 
 
 def test_class_diagram_visualization():
@@ -21,9 +25,9 @@ def test_class_diagram_visualization():
     assert len(diagram._dependency_graph.edges()) > 0
     associations = diagram.associations
 
-    wrapped_pose = diagram.get_wrapped_class(example_classes.Pose)
-    wrapped_position = diagram.get_wrapped_class(example_classes.Position)
-    wrapped_positions = diagram.get_wrapped_class(example_classes.Positions)
+    wrapped_pose = diagram.get_wrapped_class(example_classes.KRROODPose)
+    wrapped_position = diagram.get_wrapped_class(example_classes.KRROODPosition)
+    wrapped_positions = diagram.get_wrapped_class(example_classes.KRROODPositions)
 
     assert (
         len(
@@ -48,7 +52,7 @@ def test_class_diagram_visualization():
     )
 
     wrapped_positions_subclass = diagram.get_wrapped_class(
-        example_classes.PositionsSubclassWithAnotherPosition
+        example_classes.KRROODPositionsSubclassWithAnotherKRROODPosition
     )
     inheritances = diagram.inheritance_relations
 
@@ -78,7 +82,7 @@ def test_underspecified_classes():
 
 
 def test_create_nodes_for_specialized_generic():
-    classes = [Position, GenericClassAssociation, GenericClass]
+    classes = [KRROODPosition, GenericClassAssociation, GenericClass]
     diagram = ClassDiagram(classes)
 
     wrapped_generic_class = diagram.get_wrapped_class(GenericClass)
@@ -92,10 +96,10 @@ def test_create_nodes_for_specialized_generic():
     float_field = generic_float.fields[0]
     assert float_field.type_endpoint is float
 
-    generic_position = diagram.get_wrapped_class(GenericClass[Position])
+    generic_position = diagram.get_wrapped_class(GenericClass[KRROODPosition])
     assert len(generic_position.fields) == 3
     position_field = generic_position.fields[0]
-    assert position_field.type_endpoint is Position
+    assert position_field.type_endpoint is KRROODPosition
 
     # get the inheritance relations that point to generic_float
     inheritance_relations_for_generic_float = [

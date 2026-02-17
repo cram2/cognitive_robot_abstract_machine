@@ -1,16 +1,24 @@
+from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 from uuid import UUID
 
+import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from visualization_msgs.msg import MarkerArray
 
 from ..msg_converter import SemDTToRos2Converter
 from ..tf_publisher import TFPublisher
+from ..tfwrapper import TFWrapper
 from ....callbacks.callback import ModelChangeCallback
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ....world import World
 
 
 class ShapeSource(Enum):
@@ -112,3 +120,15 @@ class VizMarkerPublisher(ModelChangeCallback):
                 marker.ns = marker_ns
                 self.markers.markers.append(marker)
         self.pub.publish(self.markers)
+
+
+def publish_world(world: World):
+
+    try:
+        rclpy.init()
+    except RuntimeError:
+        pass
+    rclpy_node = rclpy.create_node("viz_marker_node")
+    tf_wrapper = TFWrapper(node=rclpy_node)
+    tf_publisher = TFPublisher(node=rclpy_node, world=world)
+    viz = VizMarkerPublisher(world=world, node=rclpy_node, use_visuals=False)

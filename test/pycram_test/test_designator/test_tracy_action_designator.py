@@ -9,7 +9,6 @@ from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientat
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
-from pycram.datastructures.pose import PoseStamped
 from pycram.language import SequentialPlan
 from pycram.motion_executor import simulated_robot
 from pycram.view_manager import ViewManager
@@ -30,7 +29,8 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -127,7 +127,9 @@ def test_reach_action_multi(immutable_tracy_block_world):
         context,
         ParkArmsActionDescription(Arms.BOTH),
         ReachActionDescription(
-            target_pose=PoseStamped.from_list([0.8, 0.5, 0.93], frame=world.root),
+            target_pose=Pose(
+                Point3.from_iterable([0.8, 0.5, 0.93]), reference_frame=world.root
+            ),
             object_designator=box_body,
             arm=Arms.LEFT,
             grasp_description=grasp_description,
@@ -248,7 +250,7 @@ def test_place_multi(mutable_tracy_block_world):
         ),
         PlaceActionDescription(
             world.get_body_by_name("box1"),
-            PoseStamped.from_list([0.9, 0, 0.93], frame=world.root),
+            Pose(Point3.from_iterable([0.9, 0, 0.93]), reference_frame=world.root),
             Arms.LEFT,
         ),
     )

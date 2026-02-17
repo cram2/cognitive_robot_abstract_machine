@@ -2,9 +2,9 @@ from dataclasses import dataclass
 
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.pointing import Pointing
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 from .base import BaseMotion
-from ...datastructures.pose import PoseStamped
 
 
 @dataclass
@@ -13,7 +13,7 @@ class MoveMotion(BaseMotion):
     Moves the robot to a designated location
     """
 
-    target: PoseStamped
+    target: Pose
     """
     Location to which the robot should be moved
     """
@@ -31,5 +31,5 @@ class MoveMotion(BaseMotion):
         return CartesianPose(
             root_link=self.world.root,
             tip_link=self.robot_view.root,
-            goal_pose=self.target.to_spatial_type(),
+            goal_pose=self.target.to_homogeneous_matrix(),
         )

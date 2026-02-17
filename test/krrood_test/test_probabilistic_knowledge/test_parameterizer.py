@@ -8,37 +8,43 @@ from random_events.product_algebra import SimpleEvent
 from krrood.ormatic.dao import to_dao
 from krrood.probabilistic_knowledge.parameterizer import Parameterizer, Parameterization
 from test.krrood_test.dataset.example_classes import OptionalTestCase
-from test.krrood_test.dataset.example_classes import Position, Pose, Orientation
+from test.krrood_test.dataset.example_classes import (
+    KRROODPosition,
+    KRROODPose,
+    KRROODOrientation,
+)
 
 
 def test_parameterize_position():
     """
-    Test parameterization of the Position class.
+    Test parameterization of the KRROODPosition class.
     """
-    position = Position(None, None, None)
+    position = KRROODPosition(None, None, None)
     parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize_dao(to_dao(position), "Position")
+    parameterization = parameterizer.parameterize_dao(
+        to_dao(position), "KRROODPosition"
+    )
     expected_variables = [
-        Continuous("Position.x"),
-        Continuous("Position.y"),
-        Continuous("Position.z"),
+        Continuous("KRROODPosition.x"),
+        Continuous("KRROODPosition.y"),
+        Continuous("KRROODPosition.z"),
     ]
     assert parameterization.variables == expected_variables
 
 
 def test_parameterize_orientation():
     """
-    Test parameterization of the Orientation class.
+    Test parameterization of the KRROODOrientation class.
     """
-    orientation = Orientation(None, None, None, None)
+    orientation = KRROODOrientation(None, None, None, None)
     parameterizer = Parameterizer()
     parameterization = parameterizer.parameterize_dao(
-        to_dao(orientation), "Orientation"
+        to_dao(orientation), "KRROODOrientation"
     )
     expected_variables = [
-        Continuous("Orientation.x"),
-        Continuous("Orientation.y"),
-        Continuous("Orientation.z"),
+        Continuous("KRROODOrientation.x"),
+        Continuous("KRROODOrientation.y"),
+        Continuous("KRROODOrientation.z"),
     ]
 
     assert parameterization.variables == expected_variables
@@ -46,21 +52,21 @@ def test_parameterize_orientation():
 
 def test_parameterize_pose():
     """
-    Test parameterization of the Pose class.
+    Test parameterization of the KRROODPose class.
     """
-    pose = Pose(
-        position=Position(None, None, None),
-        orientation=Orientation(None, None, None, None),
+    pose = KRROODPose(
+        position=KRROODPosition(None, None, None),
+        orientation=KRROODOrientation(None, None, None, None),
     )
     parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize_dao(to_dao(pose), "Pose")
+    parameterization = parameterizer.parameterize_dao(to_dao(pose), "KRROODPose")
     expected_variables = [
-        Continuous("Pose.position.x"),
-        Continuous("Pose.position.y"),
-        Continuous("Pose.position.z"),
-        Continuous("Pose.orientation.x"),
-        Continuous("Pose.orientation.y"),
-        Continuous("Pose.orientation.z"),
+        Continuous("KRROODPose.position.x"),
+        Continuous("KRROODPose.position.y"),
+        Continuous("KRROODPose.position.z"),
+        Continuous("KRROODPose.orientation.x"),
+        Continuous("KRROODPose.orientation.y"),
+        Continuous("KRROODPose.orientation.z"),
     ]
 
     assert parameterization.variables == expected_variables
@@ -84,10 +90,10 @@ def test_parameterize_object():
     """
     Test parameterization of a single object via parameterize.
     """
-    position = Position(x=1.0, y=2.0, z=3.0)
+    position = KRROODPosition(x=1.0, y=2.0, z=3.0)
     parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(position, "Position")
-    expected_names = {"Position.x", "Position.y", "Position.z"}
+    parameterization = parameterizer.parameterize(position, "KRROODPosition")
+    expected_names = {"KRROODPosition.x", "KRROODPosition.y", "KRROODPosition.z"}
     assert {v.name for v in parameterization.variables} == expected_names
     assert len(parameterization.simple_event.variables) == 3
 
@@ -96,16 +102,19 @@ def test_parameterize_list():
     """
     Test parameterization of a list of objects via parameterize.
     """
-    positions = [Position(x=1.0, y=2.0, z=3.0), Position(x=4.0, y=5.0, z=6.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=2.0, z=3.0),
+        KRROODPosition(x=4.0, y=5.0, z=6.0),
+    ]
     parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(positions, "Positions")
+    parameterization = parameterizer.parameterize(positions, "KRROODPositions")
     expected_names = {
-        "Positions[0].x",
-        "Positions[0].y",
-        "Positions[0].z",
-        "Positions[1].x",
-        "Positions[1].y",
-        "Positions[1].z",
+        "KRROODPositions[0].x",
+        "KRROODPositions[0].y",
+        "KRROODPositions[0].z",
+        "KRROODPositions[1].x",
+        "KRROODPositions[1].y",
+        "KRROODPositions[1].z",
     }
     variables = parameterization.variables
     event = parameterization.simple_event
@@ -113,8 +122,8 @@ def test_parameterize_list():
     assert {v.name for v in variables} == expected_names
     assert len(event.variables) == 6
     # Check some values
-    x0_var = next(v for v in variables if v.name == "Positions[0].x")
-    x1_var = next(v for v in variables if v.name == "Positions[1].x")
+    x0_var = next(v for v in variables if v.name == "KRROODPositions[0].x")
+    x1_var = next(v for v in variables if v.name == "KRROODPositions[1].x")
     assert event[x0_var].simple_sets[0].lower == 1.0
     assert event[x1_var].simple_sets[0].lower == 4.0
 
@@ -123,25 +132,25 @@ def test_parameterize_nested_object():
     """
     Test parameterization of a nested object via parameterize.
     """
-    pose = Pose(
-        position=Position(x=1.0, y=2.0, z=3.0),
-        orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
+    pose = KRROODPose(
+        position=KRROODPosition(x=1.0, y=2.0, z=3.0),
+        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
     parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(pose, "Pose")
+    parameterization = parameterizer.parameterize(pose, "KRROODPose")
 
-    # Position has x, y, z (3)
-    # Orientation has x, y, z, w (4)
+    # KRROODPosition has x, y, z (3)
+    # KRROODOrientation has x, y, z, w (4)
     # Total = 7
     assert len(parameterization.variables) == 7
     expected_names = {
-        "Pose.position.x",
-        "Pose.position.y",
-        "Pose.position.z",
-        "Pose.orientation.x",
-        "Pose.orientation.y",
-        "Pose.orientation.z",
-        "Pose.orientation.w",
+        "KRROODPose.position.x",
+        "KRROODPose.position.y",
+        "KRROODPose.position.z",
+        "KRROODPose.orientation.x",
+        "KRROODPose.orientation.y",
+        "KRROODPose.orientation.z",
+        "KRROODPose.orientation.w",
     }
     assert {v.name for v in parameterization.variables} == expected_names
 
@@ -152,7 +161,7 @@ class TestDAOParameterizer(unittest.TestCase):
         self.parameterizer = Parameterizer()
 
     def test_parameterize_flat_dao(self):
-        pos = Position(x=1.0, y=2.0, z=3.0)
+        pos = KRROODPosition(x=1.0, y=2.0, z=3.0)
         pos_dao = to_dao(pos)
         parameterization = self.parameterizer.parameterize_dao(pos_dao, "pos")
         variables = parameterization.variables
@@ -172,17 +181,17 @@ class TestDAOParameterizer(unittest.TestCase):
             )
 
     def test_parameterize_nested_dao(self):
-        pose = Pose(
-            position=Position(x=1.0, y=2.0, z=3.0),
-            orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
+        pose = KRROODPose(
+            position=KRROODPosition(x=1.0, y=2.0, z=3.0),
+            orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
         )
         pose_dao = to_dao(pose)
         parameterization = self.parameterizer.parameterize_dao(pose_dao, "pose")
         variables = parameterization.variables
         event = parameterization.simple_event
 
-        # Position has x, y, z (3)
-        # Orientation has x, y, z, w (4)
+        # KRROODPosition has x, y, z (3)
+        # KRROODOrientation has x, y, z, w (4)
         # Total = 7
         self.assertEqual(len(variables), 7)
 
@@ -214,14 +223,14 @@ class TestDAOParameterizer(unittest.TestCase):
         self.assertEqual(len(parameterization.variables), 1)
 
     def test_parameterize_dao_set_value_set_optional(self):
-        optional = OptionalTestCase(1, Position(1.0, 2.0, 3.0))
+        optional = OptionalTestCase(1, KRROODPosition(1.0, 2.0, 3.0))
         optional_dao = to_dao(optional)
         parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
 
         self.assertEqual(len(parameterization.variables), 4)
 
     def test_parameterize_dao_none_value_underspecified_optional(self):
-        optional = OptionalTestCase(None, Position(1.0, None, 3.0))
+        optional = OptionalTestCase(None, KRROODPosition(1.0, None, 3.0))
         optional_dao = to_dao(optional)
         parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
 
@@ -229,7 +238,7 @@ class TestDAOParameterizer(unittest.TestCase):
 
     def test_parameterize_dao_set_value_set_relationship(self):
         optional = OptionalTestCase(
-            1, list_of_orientations=[Orientation(0.0, 0.0, 0.0, 1.0)]
+            1, list_of_orientations=[KRROODOrientation(0.0, 0.0, 0.0, 1.0)]
         )
         optional_dao = to_dao(optional)
         parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
@@ -238,7 +247,7 @@ class TestDAOParameterizer(unittest.TestCase):
 
     def test_parameterize_dao_set_value_underspecified_relationship(self):
         optional = OptionalTestCase(
-            1, list_of_orientations=[Orientation(0.0, 0.0, None, 1.0)]
+            1, list_of_orientations=[KRROODOrientation(0.0, 0.0, None, 1.0)]
         )
         optional_dao = to_dao(optional)
         parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
@@ -260,8 +269,8 @@ class TestDAOParameterizer(unittest.TestCase):
         self.assertEqual(len(parameterization.variables), 2)
 
     def test_parameterize_dao_with_optional_filled(self):
-        # Orientation with w=None
-        orient = Orientation(x=0.0, y=0.0, z=None, w=1.0)
+        # KRROODOrientation with w=None
+        orient = KRROODOrientation(x=0.0, y=0.0, z=None, w=1.0)
         orient_dao = to_dao(orient)
         parameterization = self.parameterizer.parameterize_dao(orient_dao, "orient")
         variables = parameterization.variables

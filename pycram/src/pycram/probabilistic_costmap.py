@@ -4,7 +4,10 @@ from functools import cached_property
 import numpy as np
 import logging
 
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.adapters.ros import SemDTToRos2Converter
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Camera
+from semantic_digital_twin.spatial_types import Quaternion
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
@@ -16,7 +19,6 @@ from typing_extensions import Optional, Type
 
 from .costmaps import Costmap, OccupancyCostmap, VisibilityCostmap
 import matplotlib.colorbar
-from .datastructures.pose import PoseStamped
 from .ros import create_publisher, Duration
 from .units import meter
 
@@ -65,7 +67,7 @@ class ProbabilisticCostmap:
     The legacy costmap.
     """
 
-    origin: PoseStamped
+    origin: Pose
     """
     The origin of the costmap.
     """
@@ -82,7 +84,7 @@ class ProbabilisticCostmap:
 
     def __init__(
         self,
-        origin: PoseStamped,
+        origin: Pose,
         size: Quantity = 2 * meter,
         max_cells=10000,
         costmap_type: Type[Costmap] = OccupancyCostmap,
@@ -119,7 +121,7 @@ class ProbabilisticCostmap:
                 robot_view=robot,
             )
         elif costmap_type == VisibilityCostmap:
-            camera = robot.sensors[0]
+            camera: Camera = list(robot.sensors)[0]
             self.costmap = VisibilityCostmap(
                 min_height=camera.minimal_height,
                 max_height=camera.maximal_height,
@@ -142,7 +144,10 @@ class ProbabilisticCostmap:
         """
         area = Event()
         for rectangle in self.costmap.partitioning_rectangles():
-            rectangle.translate(self.origin.position.x, self.origin.position.y)
+            rectangle.translate(
+                self.origin.to_position().x.to_np()[0],
+                self.origin.to_position().y.to_np()[0],
+            )
             area.simple_sets.add(
                 SimpleEvent(
                     {
@@ -159,7 +164,7 @@ class ProbabilisticCostmap:
         """
         self.distribution = uniform_measure_of_event(self.create_event_from_map())
 
-    def sample_to_pose(self, sample: np.ndarray) -> PoseStamped:
+    def sample_to_pose(self, sample: np.ndarray) -> Pose:
         """
         Convert a sample from the costmap to a pose.
 
@@ -168,16 +173,19 @@ class ProbabilisticCostmap:
         """
         x = sample[0]
         y = sample[1]
-        position = [x, y, self.origin.position.z]
+        position = [x, y, self.origin.to_position().z.to_np()[0]]
         angle = (
             np.arctan2(
-                position[1] - self.origin.position.y,
-                position[0] - self.origin.position.x,
+                position[1] - self.origin.to_position().y.to_np()[0],
+                position[0] - self.origin.to_position().x.to_np()[0],
             )
             + np.pi
         )
-        orientation = list(quaternion_from_euler(0, 0, angle, axes="sxyz"))
-        return PoseStamped.from_list(position, orientation, self.origin.frame_id)
+        return Pose(
+            Point3(*position),
+            Quaternion.from_rpy(0, 0, angle),
+            self.origin.reference_frame,
+        )
 
     def visualize(self):
         """
@@ -192,16 +200,16 @@ class ProbabilisticCostmap:
         marker.type = Marker.POINTS
         marker.id = 0
         marker.action = Marker.ADD
-        marker.header.frame_id = self.origin.frame_id
-        marker.pose = PoseStamped().pose
+        marker.header.frame_id = str(self.origin.reference_frame.name)
+        marker.pose = SemDTToRos2Converter.convert(self.origin)
         marker.lifetime = Duration(60)
         marker.scale.x = 0.05
         marker.scale.y = 0.05
 
         for index, (sample, likelihood) in enumerate(zip(samples, likelihoods)):
-            position = self.sample_to_pose(sample).pose.position
+            position = self.sample_to_pose(sample).to_position()
             position.z = 0.1
-            marker.points.append(position)
+            marker.points.append(SemDTToRos2Converter.convert(position))
             marker.colors.append(
                 ColorRGBA(
                     **dict(

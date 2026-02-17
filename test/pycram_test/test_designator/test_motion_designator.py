@@ -1,11 +1,8 @@
-import os
-import unittest
 from copy import deepcopy
 
 import numpy as np
 import pytest
 
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
@@ -14,22 +11,19 @@ from pycram.datastructures.enums import (
     Arms,
 )
 from pycram.datastructures.grasp import GraspDescription
-from pycram.datastructures.pose import PoseStamped
 from pycram.language import SequentialPlan
+from pycram.motion_executor import simulated_robot, real_robot
 from pycram.plan import MotionNode
-from pycram.motion_executor import simulated_robot, no_execution, real_robot
 from pycram.robot_plans import (
-    MoveMotion,
-    BaseMotion,
     PickUpActionDescription,
     NavigateActionDescription,
     MoveTorsoActionDescription,
     PickUpAction,
 )
-from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.spatial_types import Point3, Quaternion
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 try:
     from pycram.alternative_motion_mappings.hsrb_motion_mapping import *
@@ -56,7 +50,11 @@ def test_pick_up_motion(immutable_model_world):
     plan = plan = SequentialPlan(
         Context.from_world(test_world),
         NavigateActionDescription(
-            PoseStamped.from_list([1.7, 1.5, 0], [0, 0, 0, 1], test_world.root),
+            Pose(
+                Point3.from_iterable([1.7, 1.5, 0]),
+                Quaternion.from_iterable([0, 0, 0, 1]),
+                test_world.root,
+            ),
             True,
         ),
         MoveTorsoActionDescription([TorsoState.HIGH]),
@@ -81,7 +79,9 @@ def test_pick_up_motion(immutable_model_world):
 
 def test_move_motion_chart(immutable_model_world):
     world, view, context = immutable_model_world
-    motion = MoveMotion(PoseStamped.from_list([1, 1, 1], frame=world.root))
+    motion = MoveMotion(
+        Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
+    )
     SequentialPlan(context, motion)
 
     msc = motion.motion_chart
@@ -93,7 +93,9 @@ def test_move_motion_chart(immutable_model_world):
 @pytest.mark.skipIf(skip_tests, "Alternative motion mappings not available")
 def test_alternative_mapping(hsr_apartment_world):
     world, view, context = hsr_apartment_world
-    move_motion = MoveMotion(PoseStamped.from_list([1, 1, 1], frame=world.root))
+    move_motion = MoveMotion(
+        Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
+    )
 
     plan = SequentialPlan(context, move_motion)
 

@@ -17,7 +17,6 @@ from semantic_digital_twin.world_description.world_modification import (
     WorldModelModification,
 )
 
-import pycram.datastructures.pose
 import pycram.language
 from pycram.datastructures import grasp
 from pycram.language import SequentialNode, RepeatNode, LanguageNode
@@ -59,7 +58,7 @@ classes, alternative_mappings, type_mappings = get_classes_of_ormatic_interface(
 classes = set(classes)
 
 # create of classes that should be mapped
-classes |= set(classes_of_module(pycram.datastructures.pose))
+classes |= set(classes_of_module(pycram.datastructures.dataclasses))
 classes |= {ExecutionData}
 # classes |= set(classes_of_module(action_designator)) | {ActionDescription}
 classes |= set(classes_of_module(facing))

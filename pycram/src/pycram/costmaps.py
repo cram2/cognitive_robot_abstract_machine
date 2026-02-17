@@ -1,6 +1,7 @@
 # used for delayed evaluation of typing until python 3.11 becomes mainstream
 from __future__ import annotations
 
+import logging
 import random
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -9,11 +10,8 @@ from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
-import psutil
 import random_events
-import logging
 from matplotlib import colors
-from skimage.measure import label
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
@@ -21,14 +19,20 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.interval import Interval, reals, closed_open, closed
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Continuous
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.world_entity import Body
+from skimage.measure import label
 from typing_extensions import Tuple, List, Optional, Iterator, Callable
 
-from .datastructures.pose import PoseStamped
-from .datastructures.pose import TransformStamped
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.spatial_computations.raytracer import RayTracer
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Quaternion,
+    RotationMatrix,
+)
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vector3
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.geometry import Color
+from semantic_digital_twin.world_description.world_entity import Body
 from .tf_transformations import quaternion_from_euler, quaternion_multiply
 
 try:
@@ -46,8 +50,8 @@ class OrientationGenerator:
 
     @staticmethod
     def generate_origin_orientation(
-        position: List[float], origin: PoseStamped, rotate_by_angle: float = 0
-    ) -> List[float]:
+        position: Point3, origin: Pose, rotate_by_angle: float = 0
+    ) -> Quaternion:
         """
         Generates an orientation such that the robot faces the origin of the costmap.
 
@@ -56,19 +60,22 @@ class OrientationGenerator:
         :param rotate_by_angle: Angle to rotate the orientation.
         :return: A quaternion of the calculated orientation.
         """
-        rot_quat = quaternion_from_euler(0, 0, rotate_by_angle, axes="sxyz")
+        rotation_R_new_rotation = RotationMatrix.from_rpy(0, 0, rotate_by_angle)
         angle = (
-            np.arctan2(position[1] - origin.position.y, position[0] - origin.position.x)
+            np.arctan2(
+                position.y - origin.y,
+                position.x - origin.x,
+            )
             + np.pi
-        )
-        quaternion = list(quaternion_from_euler(0, 0, angle, axes="sxyz"))
-        rotated_quaternion = quaternion_multiply(quaternion, rot_quat)
-        return rotated_quaternion
+        )[0]
+        world_R_rotation = RotationMatrix.from_rpy(0, 0, angle)
+        world_R_new_rotation = world_R_rotation @ rotation_R_new_rotation
+        return world_R_new_rotation.to_quaternion()
 
     @staticmethod
     def orientation_generator_for_axis(
-        axis: List[float],
-    ) -> Callable[[List[float], PoseStamped], List[float]]:
+        axis: Vector3,
+    ) -> Callable[[Point3, Pose], Quaternion]:
         """
         Creates an orientation generator where the given axis is facing the target.
 
@@ -83,7 +90,7 @@ class OrientationGenerator:
     @staticmethod
     def generate_random_orientation(
         *_, rng: random.Random = random.Random(42)
-    ) -> List[float]:
+    ) -> Quaternion:
         """
         Generates a random orientation rotated around the z-axis (yaw).
         A random angle is sampled using a provided RNG instance to ensure reproducibility.
@@ -93,9 +100,7 @@ class OrientationGenerator:
 
         :return: A quaternion of the randomly generated orientation.
         """
-        random_yaw = rng.uniform(0, 2 * np.pi)
-        quaternion = list(quaternion_from_euler(0, 0, random_yaw, axes="sxyz"))
-        return quaternion
+        return Quaternion.from_rpy(0, 0, rng.uniform(0, 2 * np.pi))
 
 
 @dataclass
@@ -143,7 +148,7 @@ class Costmap:
     """
     Width of the costmap.
     """
-    origin: PoseStamped = field(kw_only=True, default_factory=lambda: PoseStamped())
+    origin: Pose = field(kw_only=True, default_factory=lambda: Pose())
     """
     Origin pose of the costmap.
     """
@@ -157,7 +162,7 @@ class Costmap:
     system is given by the resolution. 
 
     Furthermore, there is a difference in the origin of the two representations while the numpy arrays start from the top left 
-    corner, the origin given as PoseStamped is placed in the middle of the array. The costmap is build around the origin and 
+    corner, the origin given as Pose is placed in the middle of the array. The costmap is build around the origin and 
     since the array start from 0, 0 in the corner this conversion is necessary. 
 
                 y-axis      0, 10
@@ -186,7 +191,7 @@ class Costmap:
     If the sampling should randomly pick valid entries
     """
 
-    orientation_generator: Callable[PoseStamped, PoseStamped, [float]] = field(
+    orientation_generator: Callable[Pose, Pose, [float]] = field(
         kw_only=True, default=None
     )
     """
@@ -249,7 +254,7 @@ class Costmap:
             )
             offset_transform = TransformStamped.from_list(offset[0], offset[1])
             new_pose_transform = origin_transform * offset_transform
-            new_pose = PoseStamped.from_list(
+            new_pose = Pose.from_list(
                 new_pose_transform.translation.to_list(),
                 new_pose_transform.rotation.to_list(),
             )
@@ -336,9 +341,12 @@ class Costmap:
         if self.width != other_cm.width or self.height != other_cm.height:
             raise ValueError("You can only merge costmaps of the same size.")
         elif (
-            self.origin.position.x != other_cm.origin.position.x
-            or self.origin.position.y != other_cm.origin.position.y
-            or self.origin.orientation != other_cm.origin.orientation
+            self.origin.to_position().x.to_np()[0]
+            != other_cm.origin.to_position().x.to_np()[0]
+            or self.origin.to_position().y.to_np()[0]
+            != other_cm.origin.to_position().y.to_np()[0]
+            or self.origin.to_quaternion().to_np()[0]
+            != other_cm.origin.to_quaternion().to_np()[0]
         ):
             raise ValueError(
                 "To merge costmaps, the x and y coordinate as well as the orientation must be equal."
@@ -421,7 +429,7 @@ class Costmap:
 
         return rectangles
 
-    def __iter__(self) -> Iterator[PoseStamped]:
+    def __iter__(self) -> Iterator[Pose]:
         """
         A generator that crates pose candidates from a given costmap. The generator
         selects the highest 100 values and returns the corresponding positions.
@@ -463,20 +471,14 @@ class Costmap:
             for ind in indices:
                 if seg_map[ind[0]][ind[1]] == 0:
                     continue
-                # The position is calculated by creating a vector from the 2D position in the costmap (given by x and y)
-                # and the center of the costmap (since this is the origin). This vector is then turned into a transformation
-                # and multiplied with the transformation of the origin.
-                vector_to_origin = (center - ind) * self.resolution
-                point_to_origin = TransformStamped.from_list(
-                    [*vector_to_origin, 0], self.origin.orientation.to_list()
-                )
-                origin_to_map = ~self.origin.to_transform_stamped(None)
-                point_to_map = point_to_origin * origin_to_map
-                map_to_point = ~point_to_map
+                # Compute world position independent of origin orientation:
+                # map indices increase with world axes; origin is at the center.
+                offset = (ind - center) * self.resolution
+                position = self.origin.to_position() + Vector3(offset[0], offset[1], 0)
 
-                orientation = ori_gen(map_to_point.translation.to_list(), self.origin)
-                yield PoseStamped.from_list(
-                    map_to_point.translation.to_list(),
+                orientation: Quaternion = ori_gen(position, self.origin)
+                yield Pose(
+                    position,
                     orientation,
                     self.world.root,
                 )
@@ -534,7 +536,7 @@ class OccupancyCostmap(Costmap):
 
         :return: A 2d numpy array of the occupied space
         """
-        origin_position = self.origin.position.to_list()
+        origin_position = self.origin.to_position().to_list()
         # Generate 2d grid with indices
         indices = np.concatenate(
             np.dstack(
@@ -634,11 +636,13 @@ class VisibilityCostmap(Costmap):
 
     max_height: float
 
-    target_object: Optional[Union[Body, PoseStamped]] = None
+    target_object: Optional[Union[Body, Pose]] = None
 
     def __post_init__(self):
-        self.origin: PoseStamped = (
-            PoseStamped.from_list(self.world.root) if not self.origin else self.origin
+        self.origin: Pose = (
+            Pose.from_xyz_quaternion(reference_frame=self.world.root)
+            if not self.origin
+            else self.origin
         )
         self._generate_map()
 
@@ -658,10 +662,20 @@ class VisibilityCostmap(Costmap):
         origin_copy = deepcopy(self.origin)
 
         for _ in range(4):
-            origin_copy.rotate_by_quaternion([0, 0, 1, 1])
+            rotated_origin_copy = (
+                origin_copy.to_homogeneous_matrix()
+                @ HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                    rotation_matrix=Quaternion(0, 0, 1, 1).to_rotation_matrix()
+                )
+            )
             images.append(
                 r_t.create_depth_map(
-                    origin_copy.to_spatial_type(), resolution=self.width
+                    Pose(
+                        rotated_origin_copy.to_position(),
+                        rotated_origin_copy.to_quaternion(),
+                        origin_copy.reference_frame,
+                    ),
+                    resolution=self.width,
                 )
             )
 
@@ -769,11 +783,15 @@ class VisibilityCostmap(Costmap):
         # of the range for every coordinate and r_max contains the end for each
         # coordinate
         r_min = (
-            np.arctan((self.min_height - self.origin.position.z) / distances)
+            np.arctan(
+                (self.min_height - self.origin.to_position().z.to_np()[0]) / distances
+            )
             * self.width
         ) + self.width / 2
         r_max = (
-            np.arctan((self.max_height - self.origin.position.z) / distances)
+            np.arctan(
+                (self.max_height - self.origin.to_position().z.to_np()[0]) / distances
+            )
             * self.width
         ) + self.width / 2
 
@@ -832,7 +850,7 @@ class GaussianCostmap(Costmap):
         sigma: float,
         world: World,
         resolution: Optional[float] = 0.02,
-        origin: Optional[PoseStamped] = None,
+        origin: Optional[Pose] = None,
     ):
         """
         This Costmap creates a 2D gaussian distribution around the origin with
@@ -860,8 +878,10 @@ class GaussianCostmap(Costmap):
         self.height = int(self.size)
         self.resolution: float = resolution
         self.world = world
-        self.origin: PoseStamped = (
-            PoseStamped.from_list(self.world.root) if not origin else origin
+        self.origin: Pose = (
+            Pose.from_xyz_quaternion(reference_frame=self.world.root)
+            if not origin
+            else origin
         )
 
     def _gaussian_window(self, mean: int, std: float) -> np.ndarray:
@@ -928,7 +948,12 @@ class SemanticCostmap(Costmap):
         self.world: World = body._world
         self.body: Body = body
         self.resolution: float = resolution
-        self.origin: PoseStamped = PoseStamped.from_spatial_type(self.body.global_pose)
+        global_transform = self.body.global_pose
+        self.origin: Pose = Pose(
+            global_transform.to_position(),
+            global_transform.to_quaternion(),
+            global_transform.reference_frame,
+        )
         self.height: int = 0
         self.width: int = 0
         self.map: np.ndarray = np.zeros((self.height, self.width))
@@ -1076,7 +1101,7 @@ class AlgebraicSemanticCostmap(SemanticCostmap):
         :return: The left event.
         """
         self.check_valid_area_exists()
-        y_origin = self.origin.position.y
+        y_origin = self.origin.to_position().y.to_np()[0]
         left = self.original_valid_area[self.y].simple_sets[0].lower
         left += margin
         event = SimpleEvent(
@@ -1091,7 +1116,7 @@ class AlgebraicSemanticCostmap(SemanticCostmap):
         :return: The right event.
         """
         self.check_valid_area_exists()
-        y_origin = self.origin.position.y
+        y_origin = self.origin.to_position().y.to_np()[0]
         right = self.original_valid_area[self.y].simple_sets[0].upper
         right -= margin
         event = SimpleEvent(
@@ -1106,7 +1131,7 @@ class AlgebraicSemanticCostmap(SemanticCostmap):
         :return: The top event.
         """
         self.check_valid_area_exists()
-        x_origin = self.origin.position.x
+        x_origin = self.origin.to_position().x.to_np()[0]
         top = self.original_valid_area[self.x].simple_sets[0].upper
         top -= margin
         event = SimpleEvent(
@@ -1121,7 +1146,7 @@ class AlgebraicSemanticCostmap(SemanticCostmap):
         :return: The bottom event.
         """
         self.check_valid_area_exists()
-        x_origin = self.origin.position.x
+        x_origin = self.origin.to_position().x.to_np()[0]
         lower = self.original_valid_area[self.x].simple_sets[0].lower
         lower += margin
         event = SimpleEvent(
@@ -1153,7 +1178,10 @@ class AlgebraicSemanticCostmap(SemanticCostmap):
         valid_area = None
         for rectangle in self.partitioning_rectangles():
             # rectangle.scale(1/self.resolution, 1/self.resolution)
-            rectangle.translate(self.origin.position.x, self.origin.position.y)
+            rectangle.translate(
+                self.origin.to_position().x.to_np()[0],
+                self.origin.to_position().y.to_np()[0],
+            )
             rectangle_event = SimpleEvent(
                 {
                     self.x: closed(rectangle.x_lower, rectangle.x_upper),
@@ -1176,7 +1204,7 @@ class AlgebraicSemanticCostmap(SemanticCostmap):
         model = uniform_measure_of_event(self.valid_area)
         return model
 
-    def sample_to_pose(self, sample: np.ndarray) -> PoseStamped:
+    def sample_to_pose(self, sample: np.ndarray) -> Pose:
         """
         Convert a sample from the costmap to a pose.
 
@@ -1185,18 +1213,19 @@ class AlgebraicSemanticCostmap(SemanticCostmap):
         """
         x = sample[0]
         y = sample[1]
-        position = [x, y, self.origin.position.z]
+        position = [x, y, self.origin.to_position().z.to_np()[0]]
         angle = (
             np.arctan2(
-                position[1] - self.origin.position.y,
-                position[0] - self.origin.position.x,
+                position[1] - self.origin.to_position().y.to_np()[0],
+                position[0] - self.origin.to_position().x.to_np()[0],
             )
             + np.pi
         )
-        orientation = list(quaternion_from_euler(0, 0, angle, axes="sxyz"))
-        return PoseStamped.from_list(position, orientation, self.world.root)
+        return Pose(
+            Point3(*position), Quaternion.from_rpy(0, 0, angle), self.world.root
+        )
 
-    def __iter__(self) -> Iterator[PoseStamped]:
+    def __iter__(self) -> Iterator[Pose]:
         model = self.as_distribution()
         samples = model.sample(self.number_of_samples)
         for sample in samples:

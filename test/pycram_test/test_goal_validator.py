@@ -1,13 +1,9 @@
 import numpy as np
 import pytest
-
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-
-from pycram.tf_transformations import quaternion_from_euler
 from typing_extensions import Optional, List
 
 from pycram.datastructures.enums import JointType
-from pycram.datastructures.pose import PoseStamped
+from pycram.tf_transformations import quaternion_from_euler
 from pycram.validation.error_checkers import (
     PoseErrorChecker,
     PositionErrorChecker,
@@ -27,6 +23,11 @@ from pycram.validation.goal_validator import (
     MultiPositionGoalValidator,
     MultiOrientationGoalValidator,
 )
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Quaternion,
+)
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 
 
 @pytest.fixture
@@ -48,9 +49,7 @@ def goal_validator_world(immutable_model_world):
 def test_single_pose_goal(goal_validator_world):
     world, robot_view, context = goal_validator_world
     pose_goal_validators = PoseGoalValidator(
-        lambda: PoseStamped.from_spatial_type(
-            world.get_body_by_name("milk.stl").global_pose
-        )
+        lambda: (world.get_body_by_name("milk.stl").global_pose.to_pose())
     )
     validate_pose_goal(pose_goal_validators, world)
 
@@ -59,15 +58,15 @@ def test_single_pose_goal_generic(goal_validator_world):
     world, robot_view, context = goal_validator_world
     pose_goal_validators = GoalValidator(
         PoseErrorChecker(),
-        lambda: PoseStamped.from_spatial_type(
-            world.get_body_by_name("milk.stl").global_pose
-        ),
+        lambda: (world.get_body_by_name("milk.stl").global_pose.to_pose()),
     )
     validate_pose_goal(pose_goal_validators, world)
 
 
 def validate_pose_goal(goal_validator, world):
-    milk_goal_pose = PoseStamped.from_list([2.5, 2.4, 1], frame=world.root)
+    milk_goal_pose = Pose(
+        Point3.from_iterable([2.5, 2.4, 1]), reference_frame=world.root
+    )
     goal_validator.register_goal(milk_goal_pose)
     assert not (goal_validator.goal_achieved)
     assert goal_validator.actual_percentage_of_goal_achieved == 0
@@ -79,8 +78,7 @@ def validate_pose_goal(goal_validator, world):
         )
     )
     assert (
-        PoseStamped.from_spatial_type(world.get_body_by_name("milk.stl").global_pose)
-        == milk_goal_pose,
+        (world.get_body_by_name("milk.stl").global_pose.to_pose()) == milk_goal_pose,
     )
     assert goal_validator.goal_achieved
     assert goal_validator.actual_percentage_of_goal_achieved == 1
@@ -92,9 +90,9 @@ def test_single_position_goal_generic(goal_validator_world):
     world, robot_view, context = goal_validator_world
     goal_validator = GoalValidator(
         PositionErrorChecker(),
-        lambda: PoseStamped.from_spatial_type(
-            world.get_body_by_name("breakfast_cereal.stl").global_pose
-        ).position.to_list(),
+        lambda: (world.get_body_by_name("breakfast_cereal.stl").global_pose.to_pose())
+        .to_position()
+        .to_list(),
     )
     validate_position_goal(goal_validator, world)
 
@@ -102,15 +100,15 @@ def test_single_position_goal_generic(goal_validator_world):
 def test_single_position_goal(goal_validator_world):
     world, robot_view, context = goal_validator_world
     goal_validator = PositionGoalValidator(
-        lambda: PoseStamped.from_spatial_type(
-            world.get_body_by_name("breakfast_cereal.stl").global_pose
-        ).position.to_list()
+        lambda: (world.get_body_by_name("breakfast_cereal.stl").global_pose.to_pose())
+        .to_position()
+        .to_list()
     )
     validate_position_goal(goal_validator, world)
 
 
 def validate_position_goal(goal_validator, world):
-    cereal_goal_position = [3, 1.8, 1]
+    cereal_goal_position = [3, 1.8, 1, 1]
     goal_validator.register_goal(cereal_goal_position)
     assert not (goal_validator.goal_achieved)
     assert goal_validator.actual_percentage_of_goal_achieved == 0
@@ -121,9 +119,9 @@ def validate_position_goal(goal_validator, world):
         )
     )
     assert (
-        PoseStamped.from_spatial_type(
-            world.get_body_by_name("breakfast_cereal.stl").global_pose
-        ).position.to_list()
+        (world.get_body_by_name("breakfast_cereal.stl").global_pose.to_pose())
+        .to_position()
+        .to_list()
         == cereal_goal_position,
     )
     assert goal_validator.goal_achieved
@@ -135,9 +133,9 @@ def test_single_orientation_goal_generic(goal_validator_world):
     world, robot_view, context = goal_validator_world
     goal_validator = GoalValidator(
         OrientationErrorChecker(),
-        lambda: PoseStamped.from_spatial_type(
-            world.get_body_by_name("breakfast_cereal.stl").global_pose
-        ).orientation.to_list(),
+        lambda: (world.get_body_by_name("breakfast_cereal.stl").global_pose.to_pose())
+        .to_quaternion()
+        .to_list(),
     )
     validate_orientation_goal(goal_validator, world)
 
@@ -145,9 +143,9 @@ def test_single_orientation_goal_generic(goal_validator_world):
 def test_single_orientation_goal(goal_validator_world):
     world, robot_view, context = goal_validator_world
     goal_validator = OrientationGoalValidator(
-        lambda: PoseStamped.from_spatial_type(
-            world.get_body_by_name("breakfast_cereal.stl").global_pose
-        ).orientation.to_list()
+        lambda: (world.get_body_by_name("breakfast_cereal.stl").global_pose.to_pose())
+        .to_quaternion()
+        .to_list()
     )
     validate_orientation_goal(goal_validator, world)
 
@@ -168,9 +166,9 @@ def validate_orientation_goal(goal_validator, world):
         )
     )
     for v1, v2 in zip(
-        PoseStamped.from_spatial_type(
-            world.get_body_by_name("breakfast_cereal.stl").global_pose
-        ).orientation.to_list(),
+        (world.get_body_by_name("breakfast_cereal.stl").global_pose.to_pose())
+        .to_quaternion()
+        .to_list(),
         cereal_goal_orientation,
     ):
         assert v1 == pytest.approx(v2, abs=0.001)
@@ -369,12 +367,8 @@ def test_list_of_poses_goal_generic(goal_validator_world):
     goal_validator = GoalValidator(
         PoseErrorChecker(is_iterable=True),
         lambda: [
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ),
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose()),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose()),
         ],
     )
     validate_list_of_poses_goal(goal_validator, world)
@@ -384,29 +378,25 @@ def test_list_of_poses_goal(goal_validator_world):
     world, robot_view, context = goal_validator_world
     goal_validator = MultiPoseGoalValidator(
         lambda: [
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ),
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose()),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose()),
         ]
     )
     validate_list_of_poses_goal(goal_validator, world)
 
 
 def validate_list_of_poses_goal(goal_validator, world):
-    position_goal = [0.0, 1.0, 0.0]
+    position_goal = [0.0, 1.0, 0.0, 1]
     orientation_goal = np.array([0, 0, np.pi / 2])
     poses_goal = [
-        PoseStamped.from_list(
-            position_goal,
-            quaternion_from_euler(*orientation_goal.tolist()),
+        Pose(
+            Point3.from_iterable(position_goal),
+            Quaternion.from_iterable(quaternion_from_euler(*orientation_goal.tolist())),
             world.root,
         ),
-        PoseStamped.from_list(
-            position_goal,
-            quaternion_from_euler(*orientation_goal.tolist()),
+        Pose(
+            Point3.from_iterable(position_goal),
+            Quaternion.from_iterable(quaternion_from_euler(*orientation_goal.tolist())),
             world.root,
         ),
     ]
@@ -421,26 +411,28 @@ def validate_list_of_poses_goal(goal_validator, world):
 
     for percent in [0.5, 1]:
         current_orientation_goal = orientation_goal * percent
-        current_pose_goal = PoseStamped.from_list(
-            [0.0, 1.0 * percent, 0.0],
-            quaternion_from_euler(*current_orientation_goal.tolist()),
+        current_pose_goal = Pose(
+            Point3.from_iterable([0.0, 1.0 * percent, 0.0]),
+            Quaternion.from_iterable(
+                quaternion_from_euler(*current_orientation_goal.tolist())
+            ),
             world.root,
         )
         world.get_body_by_name("base_footprint").parent_connection.origin = (
-            current_pose_goal.to_spatial_type()
+            current_pose_goal.to_homogeneous_matrix()
         )
         assert np.allclose(
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ).position.to_list(),
-            current_pose_goal.position.to_list(),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose())
+            .to_position()
+            .to_list(),
+            current_pose_goal.to_position().to_list(),
             atol=0.001,
         )
         assert np.allclose(
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ).orientation.to_list(),
-            current_pose_goal.orientation.to_list(),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose())
+            .to_quaternion()
+            .to_list(),
+            current_pose_goal.to_quaternion().to_list(),
             atol=0.001,
         )
         if percent == 1:
@@ -469,12 +461,12 @@ def test_list_of_positions_goal_generic(goal_validator_world):
     goal_validator = GoalValidator(
         PositionErrorChecker(is_iterable=True),
         lambda: [
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ).position.to_list(),
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ).position.to_list(),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose())
+            .to_position()
+            .to_list(),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose())
+            .to_position()
+            .to_list(),
         ],
     )
     validate_list_of_positions_goal(goal_validator, world)
@@ -484,19 +476,19 @@ def test_list_of_positions_goal(goal_validator_world):
     world, robot_view, context = goal_validator_world
     goal_validator = MultiPositionGoalValidator(
         lambda: [
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ).position.to_list(),
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ).position.to_list(),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose())
+            .to_position()
+            .to_list(),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose())
+            .to_position()
+            .to_list(),
         ]
     )
     validate_list_of_positions_goal(goal_validator, world)
 
 
 def validate_list_of_positions_goal(goal_validator, world):
-    position_goal = [0.0, 1.0, 0.0]
+    position_goal = [0.0, 1.0, 0.0, 1]
     positions_goal = [position_goal, position_goal]
     goal_validator.register_goal(positions_goal)
     assert not (goal_validator.goal_achieved)
@@ -504,14 +496,14 @@ def validate_list_of_positions_goal(goal_validator, world):
     assert np.allclose(goal_validator.current_error, np.array([1.0, 1.0]), atol=0.001)
 
     for percent in [0.5, 1]:
-        current_position_goal = [0.0, 1.0 * percent, 0.0]
+        current_position_goal = [0.0, 1.0 * percent, 0.0, 1]
         world.get_body_by_name("base_footprint").parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(*current_position_goal)
         )
         assert np.allclose(
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ).position.to_list(),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose())
+            .to_position()
+            .to_list(),
             current_position_goal,
             atol=0.001,
         )
@@ -535,12 +527,12 @@ def test_list_of_orientations_goal_generic(goal_validator_world):
     goal_validator = GoalValidator(
         OrientationErrorChecker(is_iterable=True),
         lambda: [
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ).orientation.to_list(),
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ).orientation.to_list(),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose())
+            .to_quaternion()
+            .to_list(),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose())
+            .to_quaternion()
+            .to_list(),
         ],
     )
     validate_list_of_orientations_goal(goal_validator, world)
@@ -550,12 +542,12 @@ def test_list_of_orientations_goal(goal_validator_world):
     world, robot_view, context = goal_validator_world
     goal_validator = MultiOrientationGoalValidator(
         lambda: [
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ).orientation.to_list(),
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ).orientation.to_list(),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose())
+            .to_quaternion()
+            .to_list(),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose())
+            .to_quaternion()
+            .to_list(),
         ]
     )
     validate_list_of_orientations_goal(goal_validator, world)
@@ -586,9 +578,9 @@ def validate_list_of_orientations_goal(goal_validator, world):
             )
         )
         assert np.allclose(
-            PoseStamped.from_spatial_type(
-                world.get_body_by_name("base_footprint").global_pose
-            ).orientation.to_list(),
+            (world.get_body_by_name("base_footprint").global_pose.to_pose())
+            .to_quaternion()
+            .to_list(),
             quaternion_from_euler(*current_orientation_goal.tolist()),
             atol=0.001,
         )

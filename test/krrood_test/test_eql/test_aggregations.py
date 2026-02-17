@@ -14,6 +14,9 @@ from krrood.entity_query_language.entity import (
     contains,
     distinct,
 )
+from krrood.entity_query_language.entity_result_processors import an, the
+from ..dataset.example_classes import KRROODVectorsWithProperty
+from ..dataset.semantic_world_like_classes import View, Drawer, Container, Cabinet
 from krrood.entity_query_language.entity_result_processors import an, a
 from krrood.entity_query_language.failures import (
     NonAggregatedSelectedVariablesError,
@@ -481,6 +484,12 @@ def test_multiple_aggregations_per_group_on_same_variable(departments_and_employ
     ):
         assert result_tuple == expected_result_tuple
 
+def test_property_selection():
+    """
+    Test that properties can be selected from entities in a query.
+    """
+    v = variable(KRROODVectorsWithProperty, None)
+    q = an(entity(v).where(v.vectors[0].x == 1))
 
 def test_having_node_hierarchy(departments_and_employees):
 

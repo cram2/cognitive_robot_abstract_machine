@@ -2,6 +2,7 @@ import os
 import time
 
 import pytest
+
 from random_events.product_algebra import SimpleEvent, Event
 
 from krrood.probabilistic_knowledge.parameterizer import Parameterizer
@@ -11,6 +12,9 @@ from pycram.language import ParallelPlan, CodeNode
 from pycram.plan import PlanNode, Plan, ActionDescriptionNode, ActionNode, MotionNode
 from pycram.motion_executor import simulated_robot
 from pycram.robot_plans import *
+from pycram.language import SequentialPlan, ParallelPlan, CodeNode
+from pycram.plan import PlanNode, Plan, ActionDescriptionNode, ActionNode, MotionNode
+from semantic_digital_twin.spatial_types import Quaternion
 from semantic_digital_twin.adapters.urdf import URDFParser
 from pycram.orm.ormatic_interface import *
 
@@ -699,43 +703,43 @@ def test_algebra_sequentialplan(immutable_model_world):
     restricted_distribution.normalize()
 
     navigate_action_constraints = {
-        variables_map["NavigateAction_1.target_location.pose.position.z"]: 0,
-        variables_map["NavigateAction_1.target_location.pose.orientation.x"]: 0,
-        variables_map["NavigateAction_1.target_location.pose.orientation.y"]: 0,
-        variables_map["NavigateAction_1.target_location.pose.orientation.z"]: 0,
-        variables_map["NavigateAction_1.target_location.pose.orientation.w"]: 1,
+        variables_map["NavigateAction_1.target_location.position.z"]: 0,
+        variables_map["NavigateAction_1.target_location.rotation.x"]: 0,
+        variables_map["NavigateAction_1.target_location.rotation.y"]: 0,
+        variables_map["NavigateAction_1.target_location.rotation.z"]: 0,
+        variables_map["NavigateAction_1.target_location.rotation.w"]: 1,
     }
     final_distribution, _ = restricted_distribution.conditional(
         navigate_action_constraints
     )
     final_distribution.normalize()
 
-    nav_x = variables_map["NavigateAction_1.target_location.pose.position.x"]
-    nav_y = variables_map["NavigateAction_1.target_location.pose.position.y"]
+    nav_x = variables_map["NavigateAction_1.target_location.position.x"]
+    nav_y = variables_map["NavigateAction_1.target_location.position.y"]
     nav_z = next(
         v
         for v in final_distribution.variables
-        if v.name == "NavigateAction_1.target_location.pose.position.z"
+        if v.name == "NavigateAction_1.target_location.position.z"
     )
     nav_ox_var = next(
         v
         for v in final_distribution.variables
-        if v.name == "NavigateAction_1.target_location.pose.orientation.x"
+        if v.name == "NavigateAction_1.target_location.rotation.x"
     )
     nav_oy_var = next(
         v
         for v in final_distribution.variables
-        if v.name == "NavigateAction_1.target_location.pose.orientation.y"
+        if v.name == "NavigateAction_1.target_location.rotation.y"
     )
     nav_oz_var = next(
         v
         for v in final_distribution.variables
-        if v.name == "NavigateAction_1.target_location.pose.orientation.z"
+        if v.name == "NavigateAction_1.target_location.rotation.z"
     )
     nav_ow_var = next(
         v
         for v in final_distribution.variables
-        if v.name == "NavigateAction_1.target_location.pose.orientation.w"
+        if v.name == "NavigateAction_1.target_location.rotation.w"
     )
 
     for sample_values in final_distribution.sample(10):
@@ -811,14 +815,13 @@ def test_parameterize_move_torse_navigate(immutable_model_world):
         "MoveTorsoAction_0.torso_state",
         "MoveTorsoAction_2.torso_state",
         "NavigateAction_1.keep_joint_states",
-        "NavigateAction_1.target_location.header.sequence",
-        "NavigateAction_1.target_location.pose.orientation.w",
-        "NavigateAction_1.target_location.pose.orientation.x",
-        "NavigateAction_1.target_location.pose.orientation.y",
-        "NavigateAction_1.target_location.pose.orientation.z",
-        "NavigateAction_1.target_location.pose.position.x",
-        "NavigateAction_1.target_location.pose.position.y",
-        "NavigateAction_1.target_location.pose.position.z",
+        "NavigateAction_1.target_location.position.x",
+        "NavigateAction_1.target_location.position.y",
+        "NavigateAction_1.target_location.position.z",
+        "NavigateAction_1.target_location.rotation.w",
+        "NavigateAction_1.target_location.rotation.x",
+        "NavigateAction_1.target_location.rotation.y",
+        "NavigateAction_1.target_location.rotation.z",
     }
 
     assert set(variables.keys()) == expected_names
@@ -846,20 +849,20 @@ def test_parameterize_move_torse_navigate(immutable_model_world):
     restricted_distribution.normalize()
 
     pose_constraints = {
-        variables["NavigateAction_1.target_location.pose.position.x"]: 1.5,
-        variables["NavigateAction_1.target_location.pose.position.y"]: -2.0,
-        variables["NavigateAction_1.target_location.pose.orientation.x"]: 0.0,
-        variables["NavigateAction_1.target_location.pose.orientation.y"]: 0.0,
-        variables["NavigateAction_1.target_location.pose.orientation.z"]: 0.0,
-        variables["NavigateAction_1.target_location.pose.orientation.w"]: 1.0,
+        variables["NavigateAction_1.target_location.position.x"]: 1.5,
+        variables["NavigateAction_1.target_location.position.y"]: -2.0,
+        variables["NavigateAction_1.target_location.rotation.x"]: 0.0,
+        variables["NavigateAction_1.target_location.rotation.y"]: 0.0,
+        variables["NavigateAction_1.target_location.rotation.z"]: 0.0,
+        variables["NavigateAction_1.target_location.rotation.w"]: 1.0,
     }
 
     final_distribution, _ = restricted_distribution.conditional(pose_constraints)
     final_distribution.normalize()
 
     target_x, target_y = 1.5, -2.0
-    nav_x = variables["NavigateAction_1.target_location.pose.position.x"]
-    nav_y = variables["NavigateAction_1.target_location.pose.position.y"]
+    nav_x = variables["NavigateAction_1.target_location.position.x"]
+    nav_y = variables["NavigateAction_1.target_location.position.y"]
 
     for sample_values in final_distribution.sample(10):
         sample = dict(zip(final_distribution.variables, sample_values))
@@ -889,14 +892,13 @@ def test_parameterize_pickup_navigate_place(immutable_model_world):
 
     expected_variables = {
         "NavigateAction_1.keep_joint_states",
-        "NavigateAction_1.target_location.header.sequence",
-        "NavigateAction_1.target_location.pose.orientation.w",
-        "NavigateAction_1.target_location.pose.orientation.x",
-        "NavigateAction_1.target_location.pose.orientation.y",
-        "NavigateAction_1.target_location.pose.orientation.z",
-        "NavigateAction_1.target_location.pose.position.x",
-        "NavigateAction_1.target_location.pose.position.y",
-        "NavigateAction_1.target_location.pose.position.z",
+        "NavigateAction_1.target_location.position.x",
+        "NavigateAction_1.target_location.position.y",
+        "NavigateAction_1.target_location.position.z",
+        "NavigateAction_1.target_location.rotation.w",
+        "NavigateAction_1.target_location.rotation.x",
+        "NavigateAction_1.target_location.rotation.y",
+        "NavigateAction_1.target_location.rotation.z",
         "PickUpAction_0.arm",
         "PickUpAction_0.grasp_description.approach_direction",
         "PickUpAction_0.grasp_description.manipulation_offset",
@@ -910,14 +912,13 @@ def test_parameterize_pickup_navigate_place(immutable_model_world):
         "PickUpAction_0.grasp_description.rotate_gripper",
         "PickUpAction_0.grasp_description.vertical_alignment",
         "PlaceAction_2.arm",
-        "PlaceAction_2.target_location.header.sequence",
-        "PlaceAction_2.target_location.pose.orientation.w",
-        "PlaceAction_2.target_location.pose.orientation.x",
-        "PlaceAction_2.target_location.pose.orientation.y",
-        "PlaceAction_2.target_location.pose.orientation.z",
-        "PlaceAction_2.target_location.pose.position.x",
-        "PlaceAction_2.target_location.pose.position.y",
-        "PlaceAction_2.target_location.pose.position.z",
+        "PlaceAction_2.target_location.position.x",
+        "PlaceAction_2.target_location.position.y",
+        "PlaceAction_2.target_location.position.z",
+        "PlaceAction_2.target_location.rotation.w",
+        "PlaceAction_2.target_location.rotation.x",
+        "PlaceAction_2.target_location.rotation.y",
+        "PlaceAction_2.target_location.rotation.z",
     }
 
     assert set(variables.keys()) == expected_variables
@@ -948,15 +949,15 @@ def test_parameterize_pickup_navigate_place(immutable_model_world):
     nav_target_x = 2.0
     nav_target_y = 3.0
     pose_constraints = {
-        variables["NavigateAction_1.target_location.pose.position.x"]: nav_target_x,
-        variables["NavigateAction_1.target_location.pose.position.y"]: nav_target_y,
+        variables["NavigateAction_1.target_location.position.x"]: nav_target_x,
+        variables["NavigateAction_1.target_location.position.y"]: nav_target_y,
     }
 
     final_distribution, _ = restricted_dist.conditional(pose_constraints)
     final_distribution.normalize()
 
-    v_nav_x = variables["NavigateAction_1.target_location.pose.position.x"]
-    v_nav_y = variables["NavigateAction_1.target_location.pose.position.y"]
+    v_nav_x = variables["NavigateAction_1.target_location.position.x"]
+    v_nav_y = variables["NavigateAction_1.target_location.position.y"]
 
     for sample_values in final_distribution.sample(10):
         sample = dict(zip(final_distribution.variables, sample_values))

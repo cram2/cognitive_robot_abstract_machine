@@ -27,13 +27,13 @@ class Element(Enum):
 
 
 @dataclass
-class PositionTypeWrapper(Symbol):
-    position_type: Type[Position]
+class KRROODPositionTypeWrapper(Symbol):
+    position_type: Type[KRROODPosition]
 
 
 # check that flat classes work
 @dataclass(unsafe_hash=True)
-class Position(Symbol):
+class KRROODPosition(Symbol):
     x: float
     y: float
     z: float
@@ -41,7 +41,7 @@ class Position(Symbol):
 
 # check that classes with optional values work
 @dataclass
-class Orientation(Symbol):
+class KRROODOrientation(Symbol):
     x: float
     y: float
     z: float
@@ -50,43 +50,43 @@ class Orientation(Symbol):
 
 # check that one to one relationship work
 @dataclass
-class Pose(Symbol):
-    position: Position
-    orientation: Orientation
+class KRROODPose(Symbol):
+    position: KRROODPosition
+    orientation: KRROODOrientation
 
 
 @dataclass
 class OptionalTestCase(Symbol):
     value: int
-    optional_position: Optional[Position] = None
-    list_of_orientations: List[Orientation] = field(default_factory=list)
+    optional_position: Optional[KRROODPosition] = None
+    list_of_orientations: List[KRROODOrientation] = field(default_factory=list)
     list_of_values: List[int] = field(default_factory=list)
 
 
 # check that many to many relationship to built in types and non built in types work
 @dataclass
-class Positions(Symbol):
-    positions: List[Position]
+class KRROODPositions(Symbol):
+    positions: List[KRROODPosition]
     some_strings: List[str]
 
 
 @dataclass
-class PositionsSubclassWithAnotherPosition(Positions):
-    positions2: Position
+class KRROODPositionsSubclassWithAnotherKRROODPosition(KRROODPositions):
+    positions2: KRROODPosition
 
 
 # check that one to many relationships work where the many side is of the same type
 @dataclass
-class DoublePositionAggregator(Symbol):
-    positions1: List[Position]
-    positions2: List[Position]
+class DoubleKRROODPositionAggregator(Symbol):
+    positions1: List[KRROODPosition]
+    positions2: List[KRROODPosition]
 
 
 # check that inheritance works
 
 
 @dataclass
-class Position4D(Position):
+class KRROODPosition4D(KRROODPosition):
     w: float
 
 
@@ -94,7 +94,7 @@ class Position4D(Position):
 
 
 @dataclass
-class Position5D(Position4D):
+class KRROODPosition5D(KRROODPosition4D):
     v: float
 
 
@@ -122,26 +122,21 @@ class Atom(NotMappedParent, Symbol):
 
 
 # check that custom type checks work
-class PhysicalObject:
+class KRROODPhysicalObject:
     pass
 
 
-class Cup(PhysicalObject):
+class KRROODCup(KRROODPhysicalObject):
     pass
 
 
-class Bowl(PhysicalObject):
+class KRROODBowl(KRROODPhysicalObject):
     pass
-
-
-# @dataclass
-# class MultipleInheritance(Position, Orientation):
-#    pass
 
 
 @dataclass
 class OriginalSimulatedObject(Symbol):
-    concept: Optional[PhysicalObject]
+    concept: Optional[KRROODPhysicalObject]
     placeholder: float = field(default=0)
 
 
@@ -155,17 +150,17 @@ class ObjectAnnotation(Symbol):
 
 
 @dataclass
-class KinematicChain(Symbol):
+class KRROODKinematicChain(Symbol):
     name: str
 
 
 @dataclass
-class Torso(KinematicChain):
+class KRROODTorso(KRROODKinematicChain):
     """
-    A Torso is a kinematic chain connecting the base of the robot with a collection of other kinematic chains.
+    A KRROODTorso is a kinematic chain connecting the base of the robot with a collection of other kinematic chains.
     """
 
-    kinematic_chains: List[KinematicChain] = field(default_factory=list)
+    kinematic_chains: List[KRROODKinematicChain] = field(default_factory=list)
     """
     A collection of kinematic chains that are connected to the torso.
     """
@@ -235,7 +230,7 @@ class ConceptType(TypeDecorator):
 
     impl = types.String(256)
 
-    def process_bind_param(self, value: PhysicalObject, dialect):
+    def process_bind_param(self, value: KRROODPhysicalObject, dialect):
         return value.__class__.__module__ + "." + value.__class__.__name__
 
     def process_result_value(self, value: impl, dialect) -> Optional[Type]:
@@ -294,20 +289,20 @@ class ContainerGeneration(Symbol):
 
 
 @dataclass
-class Vector(Symbol):
+class KRROODVector(Symbol):
     x: float
 
 
 @dataclass
-class VectorMapped(AlternativeMapping[Vector]):
+class KRROODVectorMapped(AlternativeMapping[KRROODVector]):
     x: float
 
     @classmethod
     def from_domain_object(cls, obj: T):
-        return VectorMapped(obj.x)
+        return KRROODVectorMapped(obj.x)
 
     def to_domain_object(self) -> T:
-        return Vector(self.x)
+        return KRROODVector(self.x)
 
 
 @dataclass
@@ -329,28 +324,28 @@ class RotationMapped(AlternativeMapping[Rotation]):
 
 
 @dataclass
-class Transformation(Symbol):
-    vector: Vector
+class KRROODTransformation(Symbol):
+    vector: KRROODVector
     rotation: Rotation
 
 
 @dataclass
-class TransformationMapped(AlternativeMapping[Transformation]):
-    vector: Vector
+class KRROODTransformationMapped(AlternativeMapping[KRROODTransformation]):
+    vector: KRROODVector
     rotation: Rotation
 
     @classmethod
     def from_domain_object(cls, obj: T):
-        return TransformationMapped(obj.vector, obj.rotation)
+        return KRROODTransformationMapped(obj.vector, obj.rotation)
 
     def to_domain_object(self) -> T:
-        return Transformation(self.vector, self.rotation)
+        return KRROODTransformation(self.vector, self.rotation)
 
 
 @dataclass
 class Shape(Symbol):
     name: str
-    origin: Transformation
+    origin: KRROODTransformation
 
 
 @dataclass
@@ -364,24 +359,24 @@ class MoreShapes(Symbol):
 
 
 @dataclass
-class VectorsWithProperty(Symbol):
-    _vectors: List[Vector]
+class KRROODVectorsWithProperty(Symbol):
+    _vectors: List[KRROODVector]
 
     @property
-    def vectors(self) -> List[Vector]:
+    def vectors(self) -> List[KRROODVector]:
         return self._vectors
 
 
 @dataclass
-class VectorsWithPropertyMapped(AlternativeMapping[VectorsWithProperty]):
-    vectors: List[Vector]
+class KRROODVectorsWithPropertyMapped(AlternativeMapping[KRROODVectorsWithProperty]):
+    vectors: List[KRROODVector]
 
     @classmethod
     def from_domain_object(cls, obj: T):
-        return VectorsWithPropertyMapped(obj.vectors)
+        return KRROODVectorsWithPropertyMapped(obj.vectors)
 
     def to_domain_object(self) -> T:
-        return VectorsWithProperty(self.vectors)
+        return KRROODVectorsWithProperty(self.vectors)
 
 
 @dataclass
@@ -430,7 +425,7 @@ class PrivateDefaultFactory(Symbol):
 
 @dataclass
 class RelationshipParent(Symbol):
-    positions: Position
+    positions: KRROODPosition
 
 
 @dataclass
@@ -662,8 +657,8 @@ class UnderspecifiedTypesContainer:
 
 
 @dataclass
-class TestPositionSet:
-    positions: Set[Position] = field(default_factory=set)
+class TestKRROODPositionSet:
+    positions: Set[KRROODPosition] = field(default_factory=set)
 
 
 class PolymorphicEnum(Enum): ...
@@ -703,7 +698,7 @@ class GenericClass(Generic[T]):
 @dataclass
 class GenericClassAssociation:
     associated_value: GenericClass[float]
-    associated_value_list: List[GenericClass[Position]]
+    associated_value_list: List[GenericClass[KRROODPosition]]
 
     associated_value_not_parametrized: GenericClass = None
     associated_value_not_parametrized_list: List[GenericClass] = field(
