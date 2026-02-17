@@ -426,9 +426,9 @@ class Floor(HasSupportingSurface):
         :param floor_polytope: A list of 3D points defining the floor poly
         """
         room_body = Body.from_3d_points(name=name, points_3d=floor_polytope)
-        self = cls(root=room_body)
-        self._create_with_connection_in_world(name, world, self.root, world_root_T_self)
-        return self
+        return cls._create_with_connection_in_world(
+            name, world, room_body, world_root_T_self
+        )
 
 
 @dataclass(eq=False)

@@ -15,7 +15,7 @@ from pycram.designators.location_designator import (
     AccessingLocation,
 )
 from pycram.language import SequentialPlan
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.robot_plans import (
     NavigateActionDescription,
     MoveTorsoActionDescription,
@@ -130,8 +130,8 @@ def test_reachability_costmap_location(immutable_multiple_robot_simple_apartment
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
     # assertTrue(Arms.LEFT == location.reachable_arm or Arms.RIGHT == location.reachable_arm)
 
 
@@ -145,13 +145,17 @@ def test_reachability_pose_costmap_location(immutable_multiple_robot_simple_apar
     with simulated_robot:
         plan.perform()
     location_desig = CostmapLocation(
-        Pose.from_list([-2.2, 0, 1], [0, 0, 0, 1], world.root),
+        Pose(
+            Point3.from_iterable([-2.2, 0, 1]),
+            Quaternion.from_iterable([0, 0, 0, 1]),
+            reference_frame=world.root,
+        ),
         reachable_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
 
 
 def test_visibility_costmap_location(immutable_multiple_robot_simple_apartment):
@@ -168,8 +172,8 @@ def test_visibility_costmap_location(immutable_multiple_robot_simple_apartment):
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
 
 
 def test_visibility_pose_costmap_location(immutable_multiple_robot_simple_apartment):
@@ -182,13 +186,13 @@ def test_visibility_pose_costmap_location(immutable_multiple_robot_simple_apartm
     with simulated_robot:
         plan.perform()
     location_desig = CostmapLocation(
-        Pose.from_list([-1, 0, 1.2], frame=world.root),
+        Pose(Point3.from_iterable([-1, 0, 1.2]), reference_frame=world.root),
         visible_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
 
 
 def test_reachability_and_visibility_costmap_location(
@@ -210,8 +214,8 @@ def test_reachability_and_visibility_costmap_location(
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
 
 
 def test_reachability_probabilistic_costmap_location(
@@ -231,8 +235,8 @@ def test_reachability_probabilistic_costmap_location(
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
     # assertTrue(Arms.LEFT == location.reachable_arm or Arms.RIGHT == location.reachable_arm)
 
 
@@ -249,13 +253,17 @@ def test_reachability_pose_probabilistic_costmap_location(
     with simulated_robot:
         plan.perform()
     location_desig = ProbabilisticCostmapLocation(
-        Pose.from_list([0.4, 0.6, 0.9], [0, 0, 0, 1], frame=world.root),
+        Pose(
+            Point3.from_iterable([0.4, 0.6, 0.9]),
+            Quaternion.from_iterable([0, 0, 0, 1]),
+            reference_frame=world.root,
+        ),
         reachable_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
     # assertTrue(Arms.LEFT == location.reachable_arm or Arms.RIGHT == location.reachable_arm)
 
 
@@ -275,8 +283,8 @@ def test_visibility_probabilistic_costmap_location(
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
 
 
 def test_visibility_pose_probabilistic_costmap_location(
@@ -291,13 +299,13 @@ def test_visibility_pose_probabilistic_costmap_location(
     with simulated_robot:
         plan.perform()
     location_desig = ProbabilisticCostmapLocation(
-        Pose.from_list([-1, 0, 1.2], frame=world.root),
+        Pose(Point3.from_iterable([-1, 0, 1.2]), reference_frame=world.root),
         visible_for=robot_view,
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
 
 
 def test_reachability_and_visibility_probabilistic_costmap_location(
@@ -319,8 +327,8 @@ def test_reachability_and_visibility_probabilistic_costmap_location(
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
 
 
 def test_semantic_location(immutable_model_world):
@@ -329,16 +337,16 @@ def test_semantic_location(immutable_model_world):
         world.get_body_by_name("island_countertop")
     )
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
 
     location_desig = SemanticCostmapLocation(
         world.get_body_by_name("island_countertop"),
         for_object=world.get_body_by_name("milk.stl"),
     )
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
 
 
 def test_probabilistic_semantic_location(immutable_multiple_robot_simple_apartment):
@@ -348,8 +356,8 @@ def test_probabilistic_semantic_location(immutable_multiple_robot_simple_apartme
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
 
     location_desig = ProbabilisticSemanticLocation(
         [world.get_body_by_name("box")],
@@ -358,8 +366,8 @@ def test_probabilistic_semantic_location(immutable_multiple_robot_simple_apartme
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
 
 
 def test_accessing_location(immutable_model_world):
@@ -372,20 +380,20 @@ def test_accessing_location(immutable_model_world):
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
     access_pose = location_desig.resolve()
 
-    assert len(access_pose.position.to_list()) == 3
-    assert len(access_pose.orientation.to_list()) == 4
+    assert len(access_pose.to_position().to_list()) == 4
+    assert len(access_pose.to_quaternion().to_list()) == 4
 
 
 def test_giskard_location_pose(immutable_model_world):
     world, robot_view, context = immutable_model_world
     location_desig = GiskardLocation(
-        Pose.from_list([2.1, 2, 1], frame=world.root), Arms.RIGHT
+        Pose(Point3.from_iterable([2.1, 2, 1]), reference_frame=world.root), Arms.RIGHT
     )
     plan = SequentialPlan(context, NavigateActionDescription(location_desig))
 
     location = location_desig.resolve()
-    assert len(location.position.to_list()) == 3
-    assert len(location.orientation.to_list()) == 4
+    assert len(location.to_position().to_list()) == 4
+    assert len(location.to_quaternion().to_list()) == 4
 
 
 def test_costmap_location_last_result(immutable_multiple_robot_simple_apartment):
@@ -410,7 +418,7 @@ def test_costmap_location_last_result(immutable_multiple_robot_simple_apartment)
     location = location_desig.resolve()
     last_result = next(location_desig.last_result)
 
-    assert len(last_result.position.to_list()) == 3
-    assert len(last_result.orientation.to_list()) == 4
+    assert len(last_result.to_position().to_list()) == 4
+    assert len(last_result.to_quaternion().to_list()) == 4
     assert location == last_result
     assert location is last_result

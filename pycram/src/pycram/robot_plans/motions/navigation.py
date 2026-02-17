@@ -5,7 +5,6 @@ from giskardpy.motion_statechart.tasks.pointing import Pointing
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 from .base import BaseMotion
-from ...process_module import ProcessModuleManager
 
 
 @dataclass
@@ -32,5 +31,5 @@ class MoveMotion(BaseMotion):
         return CartesianPose(
             root_link=self.world.root,
             tip_link=self.robot_view.root,
-            goal_pose=self.target,
+            goal_pose=self.target.to_homogeneous_matrix(),
         )

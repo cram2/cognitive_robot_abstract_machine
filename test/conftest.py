@@ -200,7 +200,7 @@ def cylinder_bot_diff_world():
 def world_with_urdf_factory(
     urdf_path: str,
     robot_semantic_annotation: Type[AbstractRobot] | None,
-    drive_connection_type: Type[OmniDrive],
+    drive_connection_type: Type[OmniDrive | DiffDrive],
 ):
     """
     Builds this tree:
@@ -220,12 +220,11 @@ def world_with_urdf_factory(
         )
         world_with_urdf.add_connection(map_C_localization)
 
-        if drive_connection_type is OmniDrive:
-            c_root_bf = OmniDrive.create_with_dofs(
-                parent=localization_body,
-                child=world_with_urdf.root,
-                world=world_with_urdf,
-            )
+        c_root_bf = drive_connection_type.create_with_dofs(
+            parent=localization_body,
+            child=world_with_urdf.root,
+            world=world_with_urdf,
+        )
         world_with_urdf.add_connection(c_root_bf)
 
     return world_with_urdf
@@ -233,15 +232,8 @@ def world_with_urdf_factory(
 
 @pytest.fixture(scope="session")
 def pr2_world_setup():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "pycram",
-        "resources",
-        "robots",
-    )
-    pr2 = os.path.join(urdf_dir, "pr2_calibrated_with_ft.urdf")
-    return world_with_urdf_factory(pr2, PR2, OmniDrive)
+    urdf_dir = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+    return world_with_urdf_factory(urdf_dir, PR2, OmniDrive)
 
 
 @pytest.fixture(scope="session")
@@ -285,7 +277,7 @@ def stretch_world():
         "robots",
     )
     stretch = os.path.join(urdf_dir, "stretch_description.urdf")
-    return world_with_urdf_factory(stretch, Stretch, OmniDrive)
+    return world_with_urdf_factory(stretch, Stretch, DiffDrive)
 
 
 @pytest.fixture(scope="session")
@@ -298,7 +290,7 @@ def tiago_world():
         "robots",
     )
     tiago = os.path.join(urdf_dir, "tiago_dual.urdf")
-    return world_with_urdf_factory(tiago, Tiago, OmniDrive)
+    return world_with_urdf_factory(tiago, Tiago, DiffDrive)
 
 
 @pytest.fixture(scope="session")
@@ -528,6 +520,15 @@ def stretch_apartment_world(stretch_world_setup, apartment_world_setup):
     )
 
     return apartment_copy
+
+
+@pytest.fixture(scope="session")
+def tiago_apartment_world(tiago_world, apartment_world_setup):
+    apartment_copy = deepcopy(apartment_world_setup)
+    tiago_copy = deepcopy(tiago_world)
+    apartment_copy.merge_world(tiago_copy)
+
+    return apartment_copy, Tiago.from_world(apartment_copy)
 
 
 ###############################

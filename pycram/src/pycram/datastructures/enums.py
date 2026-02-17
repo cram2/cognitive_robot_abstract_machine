@@ -53,19 +53,6 @@ class FindBodyInRegionMethod(Enum):
     """
 
 
-class DescriptionType(Enum):
-    URDF = "urdf"
-    MJCF = "mjcf"
-
-    def get_file_extension(self):
-        if self == DescriptionType.URDF:
-            return ".urdf"
-        elif self == DescriptionType.MJCF:
-            return ".xml"
-        else:
-            raise ValueError("Unknown description type")
-
-
 class ExecutionType(Enum):
     """Enum for Execution Process Module types."""
 
@@ -103,7 +90,6 @@ class TaskStatus(int, Enum):
     FAILED = 3
     INTERRUPTED = 4
     SLEEPING = 5
-
 
 class JointType(Enum):
     """
@@ -181,49 +167,6 @@ class VerticalAlignment(Grasp, Enum):
     NoAlignment = (AxisIdentifier.Undefined, 0)
 
 
-class ObjectType(int, Enum):
-    """
-    Enum for Object types to easier identify different objects
-    """
-
-    METALMUG = auto()
-    PRINGLES = auto()
-    MILK = auto()
-    SPOON = auto()
-    BOWL = auto()
-    BREAKFAST_CEREAL = auto()
-    JEROEN_CUP = auto()
-    ROBOT = auto()
-    GRIPPER = auto()
-    ENVIRONMENT = auto()
-    GENERIC_OBJECT = auto()
-    HUMAN = auto()
-    IMAGINED_SURFACE = auto()
-
-
-class Shape(Enum):
-    """
-    Enum for visual shapes of objects
-    """
-
-    SPHERE = 2
-    BOX = 3
-    CYLINDER = 4
-    MESH = 5
-    PLANE = 6
-    CAPSULE = 7
-
-
-class WorldMode(Enum):
-    """
-    Enum for the different modes of the world.
-    """
-
-    GUI = "GUI"
-    DIRECT = "DIRECT"
-
-
-
 class GripperType(Enum):
     """
     Enum for the different types of grippers.
@@ -287,62 +230,6 @@ class DetectionState(int, Enum):
     PAUSE = 2
 
 
-class LoggerLevel(Enum):
-    """
-    Enum for the different logger levels.
-    """
-
-    DEBUG = "debug"
-    INFO = "info"
-    WARN = "warn"
-    ERROR = "error"
-    FATAL = "fatal"
-
-
-class VirtualMobileBaseJointName(Enum):
-    """
-    Enum for the joint names of the virtual mobile base.
-    """
-
-    LINEAR_X = "odom_vel_lin_x_joint"
-    LINEAR_Y = "odom_vel_lin_y_joint"
-    ANGULAR_Z = "odom_vel_ang_z_joint"
-
-
-class MJCFGeomType(Enum):
-    """
-    Enum for the different geom types in a MuJoCo XML file.
-    """
-
-    BOX = "box"
-    CYLINDER = "cylinder"
-    CAPSULE = "capsule"
-    SPHERE = "sphere"
-    PLANE = "plane"
-    MESH = "mesh"
-    ELLIPSOID = "ellipsoid"
-    HFIELD = "hfield"
-    SDF = "sdf"
-
-
-MJCFBodyType = MJCFGeomType
-"""
-Alias for MJCFGeomType. As the body type is the same as the geom type.
-"""
-
-
-class MJCFJointType(Enum):
-    """
-    Enum for the different joint types in a MuJoCo XML file.
-    """
-
-    FREE = "free"
-    BALL = "ball"
-    SLIDE = "slide"
-    HINGE = "hinge"
-    FIXED = "fixed"  # Added for compatibility with PyCRAM, but not a real joint type in MuJoCo.
-
-
 class MovementType(Enum):
     """
     Enum for the different movement types of the robot.
@@ -361,81 +248,6 @@ class WaypointsMovementType(Enum):
 
     ENFORCE_ORIENTATION_STRICT = auto()
     ENFORCE_ORIENTATION_FINAL_POINT = auto()
-
-
-class MultiverseAPIName(Enum):
-    """
-    Enum for the different APIs of the Multiverse.
-    """
-
-    GET_CONTACT_POINTS = "get_contact_points"
-    GET_CONTACT_BODIES = "get_contact_bodies"
-    GET_CONTACT_BODIES_AND_POINTS = "get_contact_bodies_and_points"
-    GET_CONSTRAINT_EFFORT = "get_constraint_effort"
-    GET_BOUNDING_BOX = "get_bounding_box"
-    ATTACH = "attach"
-    DETACH = "detach"
-    GET_RAYS = "get_rays"
-    EXIST = "exist"
-    PAUSE = "pause"
-    UNPAUSE = "unpause"
-    SAVE = "save"
-    LOAD = "load"
-
-
-class MultiverseProperty(Enum):
-    def __str__(self):
-        return self.value
-
-
-class MultiverseBodyProperty(MultiverseProperty):
-    """
-    Enum for the different properties of a body the Multiverse.
-    """
-
-    POSITION = "position"
-    ORIENTATION = "quaternion"
-    RELATIVE_VELOCITY = "relative_velocity"
-
-
-class MultiverseJointProperty(MultiverseProperty):
-    pass
-
-
-class MultiverseJointPosition(MultiverseJointProperty):
-    """
-    Enum for the Position names of the different joint types in the Multiverse.
-    """
-
-    REVOLUTE_JOINT_POSITION = "joint_rvalue"
-    PRISMATIC_JOINT_POSITION = "joint_tvalue"
-
-    @classmethod
-    def from_pycram_joint_type(cls, joint_type: JointType) -> "MultiverseJointPosition":
-        if joint_type in [JointType.REVOLUTE, JointType.CONTINUOUS]:
-            return MultiverseJointPosition.REVOLUTE_JOINT_POSITION
-        elif joint_type == JointType.PRISMATIC:
-            return MultiverseJointPosition.PRISMATIC_JOINT_POSITION
-        else:
-            raise UnsupportedJointType(joint_type)
-
-
-class MultiverseJointCMD(MultiverseJointProperty):
-    """
-    Enum for the Command names of the different joint types in the Multiverse.
-    """
-
-    REVOLUTE_JOINT_CMD = "cmd_joint_rvalue"
-    PRISMATIC_JOINT_CMD = "cmd_joint_tvalue"
-
-    @classmethod
-    def from_pycram_joint_type(cls, joint_type: JointType) -> "MultiverseJointCMD":
-        if joint_type in [JointType.REVOLUTE, JointType.CONTINUOUS]:
-            return MultiverseJointCMD.REVOLUTE_JOINT_CMD
-        elif joint_type == JointType.PRISMATIC:
-            return MultiverseJointCMD.PRISMATIC_JOINT_CMD
-        else:
-            raise UnsupportedJointType(joint_type)
 
 
 class FilterConfig(Enum):

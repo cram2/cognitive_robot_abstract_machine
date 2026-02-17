@@ -2012,7 +2012,7 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
     The spawner to spawn WorldEntity, Shape, and Connection objects in the simulator.
     """
 
-    def _notify(self):
+    def _notify(self, **kwargs):
         for modification in self.world._model_manager.model_modification_blocks[-1]:
             if isinstance(modification, AddKinematicStructureEntityModification):
                 entity = modification.kinematic_structure_entity

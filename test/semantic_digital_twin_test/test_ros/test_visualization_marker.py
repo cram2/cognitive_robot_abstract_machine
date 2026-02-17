@@ -10,7 +10,7 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
+    VizMarkerPublisher, ShapeSource,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -34,7 +34,7 @@ def test_visualization_marker(rclpy_node, cylinder_bot_world):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(node=rclpy_node, world=cylinder_bot_world)
     viz = VizMarkerPublisher(
-        world=cylinder_bot_world, node=rclpy_node, use_visuals=False
+        world=cylinder_bot_world, node=rclpy_node, shape_source=ShapeSource.COLLISION_ONLY
     )
     tf_wrapper.wait_for_transform(
         "map",
@@ -84,7 +84,7 @@ def test_visualization_marker_pr2(rclpy_node, pr2_world_state_reset):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(node=rclpy_node, world=pr2_world_state_reset)
     viz = VizMarkerPublisher(
-        world=pr2_world_state_reset, node=rclpy_node, use_visuals=False
+        world=pr2_world_state_reset, node=rclpy_node, shape_source=ShapeSource.COLLISION_ONLY
     )
     tf_wrapper.wait_for_transform(
         "odom_combined",
@@ -107,13 +107,13 @@ def test_visualization_marker_pr2(rclpy_node, pr2_world_state_reset):
         sleep(0.1)
     else:
         assert False, "Callback timed out"
-    assert len(callback.last_msg.markers) == 54
+    assert len(callback.last_msg.markers) == 53
 
 
 def test_visualization_marker_tracy(rclpy_node, tracy_world):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(node=rclpy_node, world=tracy_world)
-    viz = VizMarkerPublisher(world=tracy_world, node=rclpy_node, use_visuals=True)
+    viz = VizMarkerPublisher(world=tracy_world, node=rclpy_node)
 
     callback = Callback()
 
@@ -174,7 +174,7 @@ def test_trimesh(rclpy_node):
         world.add_connection(body_C_body2)
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(node=rclpy_node, world=world)
-    viz = VizMarkerPublisher(world=world, node=rclpy_node, use_visuals=True)
+    viz = VizMarkerPublisher(world=world, node=rclpy_node)
 
     assert tf_wrapper.wait_for_transform(
         str(world.root.name),

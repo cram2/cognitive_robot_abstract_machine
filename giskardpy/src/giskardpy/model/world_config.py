@@ -8,11 +8,11 @@ from dataclasses import dataclass, field
 import numpy as np
 from sqlalchemy import select
 
-from krrood.ormatic.utils import create_engine
 from sqlalchemy.orm import sessionmaker
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
@@ -179,15 +179,7 @@ class WorldFromDatabaseConfig(WorldConfig):
         pass
 
     def setup_world(self):
-        semantic_digital_twin_database_uri = os.environ.get(
-            "SEMANTIC_DIGITAL_TWIN_DATABASE_URI"
-        )
-        assert (
-            semantic_digital_twin_database_uri is not None
-        ), "Please set the SEMANTIC_DIGITAL_TWIN_DATABASE_URI environment variable."
-
-        engine = create_engine(semantic_digital_twin_database_uri)
-        session = sessionmaker(bind=engine)()
+        session = semantic_digital_twin_sessionmaker()()
         world_dao = session.scalar(
             select(WorldMappingDAO).where(
                 WorldMappingDAO.database_id == self.primary_key

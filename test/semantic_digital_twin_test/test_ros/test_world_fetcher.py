@@ -3,6 +3,7 @@ import json
 import numpy as np
 from std_srvs.srv import Trigger
 
+from krrood.ormatic.dao import to_dao
 from semantic_digital_twin.adapters.ros.world_fetcher import (
     FetchWorldServer,
     fetch_world_from_service,
@@ -11,6 +12,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Door
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix

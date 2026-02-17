@@ -835,7 +835,7 @@ def test_overwrite_dof_limits(world_setup):
     assert connection.dof.limits.lower.velocity == -1
     assert connection.dof.limits.upper.velocity == 1
 
-    new_limits = DerivativeMap([0.69, 0.42, 1337, 23])
+    new_limits = DerivativeMap(0.69, 0.42, 1337, 23)
 
     connection.raw_dof._overwrite_dof_limits(
         new_lower_limits=new_limits * -1, new_upper_limits=new_limits
@@ -849,7 +849,7 @@ def test_overwrite_dof_limits(world_setup):
     assert connection.dof.limits.lower.jerk == -new_limits.jerk
     assert connection.dof.limits.upper.jerk == new_limits.jerk
 
-    new_limits2 = DerivativeMap([3333, 3333, 3333, 3333])
+    new_limits2 = DerivativeMap(3333, 3333, 3333, 3333)
 
     connection.raw_dof._overwrite_dof_limits(
         new_lower_limits=new_limits2 * -1, new_upper_limits=new_limits2
@@ -892,7 +892,7 @@ def test_overwrite_dof_limits_mimic(world_setup):
         connection.dof.limits.upper.velocity * 2,
     )
 
-    new_limits = DerivativeMap([0.69, 0.42, 1337, 23])
+    new_limits = DerivativeMap(0.69, 0.42, 1337, 23)
 
     with pytest.raises(UsageError):
         mimic_connection.dof._overwrite_dof_limits(
@@ -935,7 +935,7 @@ def test_overwrite_dof_limits_mimic(world_setup):
     assert np.isclose(mimic_connection.dof.limits.upper.jerk, new_limits.jerk * 2)
 
     # limits are only applied if the new ones are lower
-    new_limits2 = DerivativeMap([3333, 3333, 3333, 3333])
+    new_limits2 = DerivativeMap(3333, 3333, 3333, 3333)
 
     mimic_connection.raw_dof._overwrite_dof_limits(
         new_lower_limits=new_limits2 * -1, new_upper_limits=new_limits2

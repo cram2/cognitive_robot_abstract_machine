@@ -3,17 +3,19 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
+from inspect import isclass
 
-from typing_extensions import List, Dict, TYPE_CHECKING, Optional, Set, Type
+from typing_extensions import List, Dict, TYPE_CHECKING, Optional, Set, Type, get_origin
 
 from .dao import AlternativeMapping
 from .utils import InheritanceStrategy
-from ..utils import module_and_class_name
 from ..class_diagrams.class_diagram import (
     WrappedClass,
+    Inheritance,
 )
 from ..class_diagrams.failures import ClassIsUnMappedInClassDiagram
 from ..class_diagrams.wrapped_field import WrappedField
+from ..utils import module_and_class_name
 
 if TYPE_CHECKING:
     from .ormatic import ORMatic
@@ -64,9 +66,9 @@ class ColumnConstructor:
 
 
 @dataclass
-class AssociationTable:
+class AssociationObject:
     """
-    Represents an association table for many-to-many relationships in SQLAlchemy.
+    Represents an association object for many-to-many relationships in SQLAlchemy that can be rendered with jinja.
     """
 
     name: str
@@ -102,6 +104,11 @@ class AssociationTable:
     right_primary_key: str
     """
     The full primary key reference for the right table (e.g., 'TableName.primary_key').
+    """
+
+    primary_key_name: Optional[str] = None
+    """
+    The name of the primary key column, if any.
     """
 
 
@@ -142,6 +149,9 @@ class WrappedTable:
     """
 
     mapper_args: Dict[str, str] = field(default_factory=dict, init=False)
+    """
+    Keyword Arguments for the sqlalchemy mapper
+    """
 
     primary_key_name: str = "database_id"
     """
@@ -241,7 +251,7 @@ class WrappedTable:
 
     @cached_property
     def tablename(self):
-        result = self.wrapped_clazz.clazz.__name__
+        result = self.wrapped_clazz.name
         result += "DAO"
         return result
 
@@ -250,13 +260,37 @@ class WrappedTable:
         """
         Resolve the parent DAO table for this table.
 
-        This first tries to use a direct inheritance relation. If that is not
-        available and this table is an alternative mapping, it resolves the
-        parent through the original classes' inheritance and maps back to the
+        This first tries to use a direct inheritance relation from the class diagram.
+        If that is not available, it tries to find a parent via MRO.
+        If that is not available and this table is an alternative mapping, it resolves
+        the parent through the original classes' inheritance and maps back to the
         correct DAO table.
 
         :return: The parent ``WrappedTable`` or ``None`` if there is no parent.
         """
+        # Try finding parent via inheritance graph in class diagram
+        try:
+            inheritance_parents = (
+                self.ormatic.class_dependency_graph._dependency_graph.predecessors(
+                    self.wrapped_clazz.index
+                )
+            )
+            for parent_wrapped in inheritance_parents:
+                # Check if this parent has a wrapped table and if the relation is Inheritance
+                # We need to check the actual relation object
+                edge_data = (
+                    self.ormatic.class_dependency_graph._dependency_graph.get_edge_data(
+                        parent_wrapped.index, self.wrapped_clazz.index
+                    )
+                )
+
+                if (
+                    isinstance(edge_data, Inheritance)
+                    and parent_wrapped in self.ormatic.wrapped_tables
+                ):
+                    return self.ormatic.wrapped_tables[parent_wrapped]
+        except (AttributeError, KeyError):
+            pass
 
         direct_parent = self._find_direct_parent_wrapped()
         if direct_parent is not None:
@@ -290,8 +324,18 @@ class WrappedTable:
         # Get the actual class from wrapped_clazz
         current_class = self.wrapped_clazz.clazz
 
+        # Handle GenericAlias which doesn't have __mro__
+        origin = get_origin(current_class)
+        if origin is not None and not isinstance(current_class, type):
+            mro = origin.__mro__
+        else:
+            try:
+                mro = current_class.__mro__
+            except AttributeError:
+                return None
+
         # Iterate through MRO, skipping the first element (the class itself)
-        for parent_class in current_class.__mro__[1:]:
+        for parent_class in mro[1:]:
             # Skip object base class
             if parent_class is object:
                 continue
@@ -359,7 +403,20 @@ class WrappedTable:
         ``wrapped_tables`` are keyed by the original class nodes, even if an
         alternative mapping is used. This ensures we always use the correct key.
         """
-        if issubclass(wrapped.clazz, AlternativeMapping):
+
+        origin = get_origin(wrapped.clazz)
+        actual_cls = (
+            origin
+            if (origin is not None and not isinstance(wrapped.clazz, type))
+            else wrapped.clazz
+        )
+
+        try:
+            is_alt_mapping = issubclass(actual_cls, AlternativeMapping)
+        except TypeError:
+            is_alt_mapping = False
+
+        if is_alt_mapping:
             for rel in self.ormatic.alternatively_maps_relations:
                 if rel.source == wrapped:
                     return rel.target
@@ -367,7 +424,17 @@ class WrappedTable:
 
     @property
     def is_alternatively_mapped(self):
-        return issubclass(self.wrapped_clazz.clazz, AlternativeMapping)
+
+        origin = get_origin(self.wrapped_clazz.clazz)
+        actual_cls = (
+            origin
+            if (origin is not None and not isinstance(self.wrapped_clazz.clazz, type))
+            else self.wrapped_clazz.clazz
+        )
+        try:
+            return issubclass(actual_cls, AlternativeMapping)
+        except TypeError:
+            return False
 
     @cached_property
     def fields(self) -> List[WrappedField]:
@@ -375,17 +442,22 @@ class WrappedTable:
         :return: The list of fields specified only in this associated dataclass that should be mapped.
         """
 
-        # Collect all inherited field names up the chain
-        inherited_names: set[str] = set()
+        # Collect all inherited mapped field names up the chain
+        inherited_mapped_names: set[str] = set()
         p = self.parent_table
         while p is not None:
-            # Use the original dataclass fields of each ancestor
-            inherited_names.update(f.field.name for f in p.wrapped_clazz.fields)
+            # Check what the parent actually created
+            inherited_mapped_names.update(c.name for c in p.builtin_columns)
+            inherited_mapped_names.update(c.name for c in p.custom_columns)
+            inherited_mapped_names.update(c.name for c in p.foreign_keys)
+            inherited_mapped_names.update(c.name for c in p.relationships)
             p = p.parent_table
 
         # Keep only fields that are not inherited by name
         result = [
-            f for f in self.wrapped_clazz.fields if f.field.name not in inherited_names
+            f
+            for f in self.wrapped_clazz.fields
+            if f.field.name not in inherited_mapped_names
         ]
 
         # If the parent table is alternatively mapped, drop fields that do not exist
@@ -441,7 +513,20 @@ class WrappedTable:
             such as its data type, whether it represents a built-in or user-defined type, or if it has
             specific ORM container properties.
         """
-        if wrapped_field.is_type_type:
+        if (
+            wrapped_field.is_underspecified_generic
+            and isclass(wrapped_field.type_endpoint)
+            and not any(
+                [
+                    am
+                    for am in self.ormatic.alternative_mappings
+                    if issubclass(wrapped_field.type_endpoint, am.original_class())
+                ]
+            )
+        ):
+            logger.info(f"Skipping underspecified generic field.")
+
+        elif wrapped_field.is_type_type:
             logger.info(f"Parsing as type.")
             self.create_type_type_column(wrapped_field)
 
@@ -463,7 +548,7 @@ class WrappedTable:
             and wrapped_field.type_endpoint in self.ormatic.mapped_classes
         ):
             logger.info(f"Parsing as one to many relationship.")
-            self.create_one_to_many_relationship(wrapped_field)
+            self.create_many_to_many_relationship(wrapped_field)
 
         # handle custom types
         elif (
@@ -585,7 +670,7 @@ class WrappedTable:
             ColumnConstructor(rel_name, rel_type, rel_constructor)
         )
 
-    def create_one_to_many_relationship(self, wrapped_field: WrappedField):
+    def create_many_to_many_relationship(self, wrapped_field: WrappedField):
         """
         Creates a many-to-many relationship mapping for the given wrapped field using an association table.
         This allows multiple instances of the source table to reference the same instances of the target table.
@@ -598,7 +683,7 @@ class WrappedTable:
 
         # create association table name
         association_table_name = (
-            f"{self.tablename.lower()}_{wrapped_field.field.name}_association"
+            f"{self.tablename}_{wrapped_field.field.name}_association"
         )
 
         # create foreign key names for the association table
@@ -610,7 +695,7 @@ class WrappedTable:
         right_fk_name = f"target_{target_wrapped_table.tablename.lower()}{self.ormatic.foreign_key_postfix}"
 
         # create association table metadata
-        association_table = AssociationTable(
+        association_table = AssociationObject(
             name=association_table_name,
             left_table_name=self.tablename,
             left_foreign_key=left_fk_name,
@@ -618,24 +703,27 @@ class WrappedTable:
             right_table_name=target_wrapped_table.tablename,
             right_foreign_key=right_fk_name,
             right_primary_key=target_wrapped_table.full_primary_key_name,
+            primary_key_name="database_id",
         )
 
         # add association table to ORMatic
-        self.ormatic.association_tables.append(association_table)
+        self.ormatic.association_objects.append(association_table)
 
-        # create a relationship with a list using the association table
+        # create a relationship
         rel_name = f"{wrapped_field.field.name}"
-        rel_type = f"Mapped[{module_and_class_name(wrapped_field.container_type)}[{target_wrapped_table.tablename}]]"
-        # Provide explicit join conditions to disambiguate self-referential associations
-        primaryjoin = f"{self.tablename}.{self.primary_key_name} == {association_table_name}.c.{left_fk_name}"
-        secondaryjoin = f"{target_wrapped_table.tablename}.{target_wrapped_table.primary_key_name} == {association_table_name}.c.{right_fk_name}"
+
+        # Use the actual container type from the domain model (e.g., list)
+        container_name = module_and_class_name(wrapped_field.container_type)
+
+        # Association Object pattern
+        rel_type = f"Mapped[{module_and_class_name(wrapped_field.container_type)}[{association_table.name}]]"
         rel_constructor = (
-            f"relationship('{target_wrapped_table.tablename}', "
-            f"secondary='{association_table_name}', "
-            f"primaryjoin='{primaryjoin}', "
-            f"secondaryjoin='{secondaryjoin}', "
-            f"cascade='save-update, merge')"
+            f"relationship('{association_table.name}', "
+            f"collection_class={container_name}, "
+            f"cascade='all, delete-orphan', "
+            f"foreign_keys='[{association_table.name}.{association_table.left_foreign_key}]')"
         )
+
         self.relationships.append(
             ColumnConstructor(rel_name, rel_type, rel_constructor)
         )

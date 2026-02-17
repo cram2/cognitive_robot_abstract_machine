@@ -121,7 +121,7 @@ class JointState(SubclassJSONSerializer):
                 for name in data["connections"]
             ]
         else:
-            connections = from_json(data["connections"])
+            raise NotImplementedError("World is required to resolve connections")
         target_values = from_json(data["target_values"])
         state_type = from_json(data["joint_state_type"])
         name = from_json(data["name"])

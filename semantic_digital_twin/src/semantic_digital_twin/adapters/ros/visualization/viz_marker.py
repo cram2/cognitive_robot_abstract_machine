@@ -1,6 +1,9 @@
 from __future__ import annotations
 import time
 from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional
+from uuid import UUID
 
 import rclpy
 from rclpy.node import Node
@@ -16,6 +19,27 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ....world import World
+
+
+class ShapeSource(Enum):
+    """
+    Enum to specify which shapes to use for visualization.
+    """
+
+    VISUAL_ONLY = "visual_only"
+    """
+    The shapes to use for visualization are visual shapes only.
+    """
+
+    COLLISION_ONLY = "collision_only"
+    """
+    The shapes to use for visualization are collision shapes only.
+    """
+
+    VISUAL_WITH_COLLISION_BACKUP = "visual_with_collision_backup"
+    """
+    The shapes to use for visualization are visual shapes, but if there are no visual shapes, use collision shapes as a backup.
+    """
 
 
 @dataclass
@@ -41,9 +65,11 @@ class VizMarkerPublisher(ModelChangeCallback):
     The name of the topic to which the Visualization Marker should be published.
     """
 
-    use_visuals: bool = field(kw_only=True, default=True)
+    shape_source: ShapeSource = field(
+        kw_only=True, default=ShapeSource.VISUAL_WITH_COLLISION_BACKUP
+    )
     """
-    Whether to use the visual shapes of the bodies or the collision shapes.
+    Which shapes to use for each body
     """
 
     markers: MarkerArray = field(init=False, default_factory=MarkerArray)
@@ -64,16 +90,29 @@ class VizMarkerPublisher(ModelChangeCallback):
         time.sleep(0.2)
         self.notify()
         time.sleep(0.2)
+
+    def with_tf_publisher(self):
+        """
+        Launches a tf publisher in conjunction with the VizMarkerPublisher.
+        """
         TFPublisher(self.world, self.node)
 
-    def _notify(self):
+    def _select_shapes(self, body):
+        if self.shape_source is ShapeSource.VISUAL_ONLY:
+            return body.visual.shapes
+        if self.shape_source is ShapeSource.COLLISION_ONLY:
+            return body.collision.shapes
+        if self.shape_source is ShapeSource.VISUAL_WITH_COLLISION_BACKUP:
+            return body.visual.shapes if body.visual.shapes else body.collision.shapes
+        raise ValueError(f"Unsupported shape_source: {self.shape_source!r}")
+
+    def _notify(self, **kwargs):
         self.markers = MarkerArray()
         for body in self.world.bodies:
+            shapes = self._select_shapes(body)
+            if not shapes:
+                continue
             marker_ns = str(body.name)
-            if self.use_visuals:
-                shapes = body.visual.shapes
-            else:
-                shapes = body.collision.shapes
             for i, shape in enumerate(shapes):
                 marker = SemDTToRos2Converter.convert(shape)
                 marker.frame_locked = True

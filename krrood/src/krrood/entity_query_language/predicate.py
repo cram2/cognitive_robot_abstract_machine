@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import wraps, lru_cache
+from functools import wraps
 
 from typing_extensions import (
     Callable,
@@ -12,9 +11,6 @@ from typing_extensions import (
     Type,
     Tuple,
     ClassVar,
-    Dict,
-    List,
-    Iterable,
 )
 
 from .enums import PredicateType
@@ -23,11 +19,10 @@ from .symbol_graph import (
     SymbolGraph,
 )
 from .symbolic import (
-    SymbolicExpression,
     Variable,
     _any_of_the_kwargs_is_a_variable,
 )
-from .utils import T
+from .utils import T, merge_args_and_kwargs
 
 
 def symbolic_function(
@@ -149,36 +144,3 @@ def update_cache(instance: Symbol):
     """
     if not isinstance(instance, Predicate):
         SymbolGraph().add_node(WrappedInstance(instance))
-
-
-@lru_cache
-def get_function_argument_names(function: Callable) -> List[str]:
-    """
-    :param function: A function to inspect
-    :return: The argument names of the function
-    """
-    return list(inspect.signature(function).parameters.keys())
-
-
-def merge_args_and_kwargs(
-    function: Callable, args, kwargs, ignore_first: bool = False
-) -> Dict[str, Any]:
-    """
-    Merge the arguments and keyword-arguments of a function into a dict of keyword-arguments.
-
-    :param function: The function to get the argument names from
-    :param args: The arguments passed to the function
-    :param kwargs: The keyword arguments passed to the function
-    :param ignore_first: Rather to ignore the first argument or not.
-    Use this when `function` contains something like `self`
-    :return: The dict of assigned keyword-arguments.
-    """
-    starting_index = 1 if ignore_first else 0
-    all_kwargs = {
-        name: arg
-        for name, arg in zip(
-            get_function_argument_names(function)[starting_index:], args
-        )
-    }
-    all_kwargs.update(kwargs)
-    return all_kwargs

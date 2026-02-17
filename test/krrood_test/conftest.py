@@ -72,7 +72,8 @@ def generate_sqlalchemy_interface():
     }
 
     all_classes |= {FunctionType}
-
+    logging.basicConfig(level=logging.DEBUG)
+    logging.getLogger("krrood").setLevel(logging.DEBUG)
     class_diagram = ClassDiagram(
         list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
     )

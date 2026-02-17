@@ -67,7 +67,7 @@ def visibility_validator(
                     parent=world.root, child=gen_body, world=world
                 )
             )
-        gen_body.parent_connection.origin = object_or_pose.to_spatial_type()
+        gen_body.parent_connection.origin = object_or_pose.to_homogeneous_matrix()
     else:
         gen_body = object_or_pose
     r_t = world.ray_tracer

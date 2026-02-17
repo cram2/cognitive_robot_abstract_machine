@@ -41,7 +41,7 @@ from .tf_transformations import (
 )
 
 if TYPE_CHECKING:
-    from .robot_description import CameraDescription
+    from .view_manager import CameraDescription
 
 
 def link_pose_for_joint_config(obj: Body, joint_config: Dict[str, float]) -> Pose:

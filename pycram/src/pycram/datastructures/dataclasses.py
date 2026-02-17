@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import math
-
-from dataclasses import dataclass, fields, field
-from enum import Enum
+from dataclasses import dataclass, field
 
 import numpy as np
+from typing_extensions import (
+    List,
+    Optional,
+    Any,
+    TYPE_CHECKING, Dict, Union,
+)
+
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3
 from semantic_digital_twin.world import World
-
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
@@ -29,7 +33,6 @@ from typing_extensions import (
 
 from .enums import (
     JointType,
-    VirtualMobileBaseJointName,
     Grasp,
     ApproachDirection,
     VerticalAlignment,
@@ -147,138 +150,6 @@ class ExecutionData:
     """
 
 
-@dataclass
-class ManipulatorData:
-    """
-    A dataclass for storing the information of a manipulator that is used for creating a robot description for that
-    manipulator. A manipulator is an Arm with an end-effector that can be used to interact with the environment.
-    """
-
-    name: str
-    """
-    Name of the Manipulator.
-    """
-    base_link: str
-    """
-    Manipulator's base link.
-    """
-    arm_end_link: str
-    """
-    Manipulator's arm end link.
-    """
-    joint_names: List[str]
-    """
-    List of joint names.
-    """
-    home_joint_values: List[float]
-    """
-    List of joint values for the home position. (default position)
-    """
-    gripper_name: str
-    """
-    Name of the gripper at the end of the arm.
-    """
-    gripper_tool_frame: str
-    """
-    Name of the frame of the gripper tool.
-    """
-    gripper_joint_names: List[str]
-    """
-    List of gripper joint names.
-    """
-    closed_joint_values: List[float]
-    """
-    List of joint values for the gripper in the closed position.
-    """
-    open_joint_values: List[float]
-    """
-    List of joint values for the gripper in the open position.
-    """
-    opening_distance: float
-    """
-    The opening distance of the gripper.
-    """
-    fingers_link_names: Optional[List[str]] = None
-    """
-    List of link names for the fingers of the gripper.
-    """
-    relative_dir: str = ""
-    """
-    Relative directory of the manipulator description file in the resources directory.
-    """
-    gripper_cmd_topic: Optional[str] = None
-    """
-    Gripper command topic in ROS if it has one.
-    """
-    gripper_open_cmd_value: Optional[float] = None
-    """
-    Grip open command value.
-    """
-    gripper_close_cmd_value: Optional[float] = None
-    """
-    Grip close command value.
-    """
-    gripper_relative_dir: Optional[str] = None
-    """
-    Relative directory of the gripper description file in the resources directory if it has one and is not part of the
-     manipulator description file.
-    """
-
-@dataclass
-class CollisionCallbacks:
-    """
-    Dataclass for storing the collision callbacks which are callables that get called when there is a collision
-    or when a collision is no longer there.
-    """
-
-    on_collision_cb: Callable
-    no_collision_cb: Optional[Callable] = None
-
-
-@dataclass
-class LateralFriction:
-    """
-    Dataclass for storing the information of the lateral friction.
-    """
-
-    lateral_friction: float
-    lateral_friction_direction: List[float]
-
-
-@dataclass
-class TextAnnotation:
-    """
-    Dataclass for storing text annotations that can be displayed in the simulation.
-    """
-
-    text: str
-    position: List[float]
-    id: int
-    color: Color = field(default_factory=lambda: Color(0, 0, 0, 1))
-    size: float = 0.1
-
-
-@dataclass
-class VirtualJoint:
-    """
-    A virtual (not real) joint that is most likely used for simulation purposes.
-    """
-
-    name: str
-    type_: JointType
-    axes: Optional[Vector3] = None
-
-    @property
-    def type(self):
-        return self.type_
-
-    @property
-    def is_virtual(self):
-        return True
-
-    def __hash__(self):
-        return hash(self.name)
-
 
 class Rotations(Dict[Optional[Union[Grasp, bool]], List[float]]):
     """
@@ -309,64 +180,3 @@ class Rotations(Dict[Optional[Union[Grasp, bool]], List[float]]):
         False: [0, 0, 0, 1],
         True: [math.sqrt(2) / 2, 0, 0, math.sqrt(2) / 2],
     }
-
-
-@dataclass
-class VirtualMobileBaseJoints:
-    """
-    Dataclass for storing the names, types and axes of the virtual mobile base joints of a mobile robot.
-    """
-
-    translation_x: Optional[VirtualJoint] = VirtualJoint(
-        VirtualMobileBaseJointName.LINEAR_X.value,
-        JointType.PRISMATIC,
-        Vector3(x=1.0, y=0.0, z=0.0),
-    )
-    translation_y: Optional[VirtualJoint] = VirtualJoint(
-        VirtualMobileBaseJointName.LINEAR_Y.value,
-        JointType.PRISMATIC,
-        Vector3(x=0.0, y=1.0, z=0.0),
-    )
-    angular_z: Optional[VirtualJoint] = VirtualJoint(
-        VirtualMobileBaseJointName.ANGULAR_Z.value,
-        JointType.REVOLUTE,
-        Vector3(x=0.0, y=0.0, z=1.0),
-    )
-
-    @property
-    def names(self) -> List[str]:
-        """
-        Return the names of the virtual mobile base joints.
-        """
-        return [getattr(self, field.name).name for field in fields(self)]
-
-    def get_types(self) -> Dict[str, JointType]:
-        """
-        Return the joint types of the virtual mobile base joints.
-        """
-        return {
-            getattr(self, field.name).name: getattr(self, field.name).type_
-            for field in fields(self)
-        }
-
-    def get_axes(self) -> Dict[str, Vector3]:
-        """
-        Return the axes (i.e. The axis on which the joint moves) of the virtual mobile base joints.
-        """
-        return {
-            getattr(self, field.name).name: getattr(self, field.name).axes
-            for field in fields(self)
-        }
-
-
-@dataclass
-class MultiverseMetaData:
-    """Meta data for the Multiverse Client, the simulation_name should be non-empty and unique for each simulation"""
-
-    world_name: str = "world"
-    simulation_name: str = "cram"
-    length_unit: str = "m"
-    angle_unit: str = "rad"
-    mass_unit: str = "kg"
-    time_unit: str = "s"
-    handedness: str = "rhs"

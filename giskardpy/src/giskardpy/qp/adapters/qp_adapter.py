@@ -380,7 +380,7 @@ class Weights(ProblemDataPart):
                     ):
                         continue
                     normalized_weight = self.normalize_dof_weight(
-                        limit=v.limits.upper.data[derivative],
+                        limit=v.limits.upper[derivative],
                         base_weight=self.config.get_dof_weight(v.name, derivative),
                         t=t,
                         derivative=derivative,

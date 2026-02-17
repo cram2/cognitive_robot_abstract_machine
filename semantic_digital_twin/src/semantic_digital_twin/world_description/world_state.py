@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Union, Iterator
+from typing import Union, Iterator, Optional
 from uuid import UUID
 
 from typing_extensions import MutableMapping, List, Dict, Self, TYPE_CHECKING
@@ -73,7 +73,7 @@ class WorldStateEntryView:
 
 
 @dataclass
-class WorldState(MutableMapping):
+class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     """
     Tracks the state of all DOF in the world.
     Data is stored in a 4xN numpy array, such that it can be used as input for compiled functions without copying.
@@ -105,14 +105,14 @@ class WorldState(MutableMapping):
     Callbacks to be called when the state of the world changes.
     """
 
-    def _notify_state_change(self) -> None:
+    def _notify_state_change(self, **kwargs) -> None:
         """
         If you have changed the state of the world, call this function to trigger necessary events and increase
         the state version.
         """
         self.version += 1
         for callback in self.state_change_callbacks:
-            callback.notify()
+            callback.notify(**kwargs)
 
     def _add_dof(self, uuid: UUID) -> None:
         idx = len(self._ids)

@@ -1,107 +1,72 @@
 from __future__ import annotations
-import pytest
-from random_events.set import Set
-from random_events.variable import Continuous, Integer, Symbolic
-from random_events.product_algebra import Event, SimpleEvent
-from krrood.class_diagrams.class_diagram import ClassDiagram
-from krrood.probabilistic_knowledge.parameterizer import Parameterizer
-from pycram.datastructures.enums import Arms
-from pycram.robot_plans import MoveTorsoAction
-from pycram.robot_plans.actions.core.navigation import NavigateAction
-from pycram.robot_plans.actions.core.pick_up import PickUpAction
-from pycram.robot_plans.actions.core.placing import PlaceAction
-from pycram.datastructures.grasp import GraspDescription
 
-from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3, Quaternion
-from test.krrood_test.dataset.example_classes import (
-    KRROODPosition,
-    KRROODOrientation,
-    KRROODPose,
-    Atom,
-    Element,
-)
+import unittest
+
+from random_events.variable import Continuous
+from random_events.product_algebra import SimpleEvent
+
+from krrood.ormatic.dao import to_dao
+from krrood.probabilistic_knowledge.parameterizer import Parameterizer, Parameterization
+from test.krrood_test.dataset.example_classes import OptionalTestCase
+from test.krrood_test.dataset.example_classes import Position, Pose, Orientation
 
 
-@pytest.fixture
-def parameterizer() -> Parameterizer:
-    """
-    Fixture for the Parameterizer instance.
-    """
-    return Parameterizer()
-
-
-def test_parameterize_position(parameterizer: Parameterizer):
+def test_parameterize_position():
     """
     Test parameterization of the Position class.
     """
-    class_diagram = ClassDiagram([KRROODPosition])
-    wrapped_position = class_diagram.get_wrapped_class(KRROODPosition)
-    variables = parameterizer(wrapped_position)
+    position = Position(None, None, None)
+    parameterizer = Parameterizer()
+    parameterization = parameterizer.parameterize_dao(to_dao(position), "Position")
     expected_variables = [
-        Continuous("KRROODPosition.x"),
-        Continuous("KRROODPosition.y"),
-        Continuous("KRROODPosition.z"),
+        Continuous("Position.x"),
+        Continuous("Position.y"),
+        Continuous("Position.z"),
     ]
-    assert variables == expected_variables
+    assert parameterization.variables == expected_variables
 
 
-def test_parameterize_orientation(parameterizer: Parameterizer):
+def test_parameterize_orientation():
     """
     Test parameterization of the Orientation class.
     """
-    class_diagram = ClassDiagram([KRROODOrientation])
-    wrapped_orientation = class_diagram.get_wrapped_class(KRROODOrientation)
-    variables = parameterizer(wrapped_orientation)
+    orientation = Orientation(None, None, None, None)
+    parameterizer = Parameterizer()
+    parameterization = parameterizer.parameterize_dao(
+        to_dao(orientation), "Orientation"
+    )
     expected_variables = [
-        Continuous("KRROODOrientation.x"),
-        Continuous("KRROODOrientation.y"),
-        Continuous("KRROODOrientation.z"),
-        Continuous("KRROODOrientation.w"),
+        Continuous("Orientation.x"),
+        Continuous("Orientation.y"),
+        Continuous("Orientation.z"),
     ]
 
-    assert variables == expected_variables
+    assert parameterization.variables == expected_variables
 
 
-def test_parameterize_pose(parameterizer: Parameterizer):
+def test_parameterize_pose():
     """
     Test parameterization of the Pose class.
     """
-    class_diagram = ClassDiagram([KRROODPose, KRROODPosition, KRROODOrientation])
-    wrapped_pose = class_diagram.get_wrapped_class(KRROODPose)
-    variables = parameterizer(wrapped_pose)
+    pose = Pose(
+        position=Position(None, None, None),
+        orientation=Orientation(None, None, None, None),
+    )
+    parameterizer = Parameterizer()
+    parameterization = parameterizer.parameterize_dao(to_dao(pose), "Pose")
     expected_variables = [
-        Continuous("KRROODPose.position.x"),
-        Continuous("KRROODPose.position.y"),
-        Continuous("KRROODPose.position.z"),
-        Continuous("KRROODPose.orientation.x"),
-        Continuous("KRROODPose.orientation.y"),
-        Continuous("KRROODPose.orientation.z"),
-        Continuous("KRROODPose.orientation.w"),
+        Continuous("Pose.position.x"),
+        Continuous("Pose.position.y"),
+        Continuous("Pose.position.z"),
+        Continuous("Pose.orientation.x"),
+        Continuous("Pose.orientation.y"),
+        Continuous("Pose.orientation.z"),
     ]
 
-    assert variables == expected_variables
+    assert parameterization.variables == expected_variables
 
 
-def test_parameterize_atom(parameterizer: Parameterizer):
-    """
-    Test parameterization of the Atom class.
-    """
-    class_diagram = ClassDiagram([Atom, Element])
-    wrapped_atom = class_diagram.get_wrapped_class(Atom)
-    variables = parameterizer(wrapped_atom)
-    expected_variables = [
-        Symbolic("Atom.element", Set.from_iterable(Element)),
-        Integer("Atom.type"),
-        Continuous("Atom.charge"),
-    ]
-
-    assert [(type(v), v.name) for v in variables] == [
-        (type(v), v.name) for v in expected_variables
-    ]
-
-
-def test_create_fully_factorized_distribution(parameterizer: Parameterizer):
+def test_create_fully_factorized_distribution():
     """
     Test for a fully factorized distribution.
     """
@@ -109,198 +74,271 @@ def test_create_fully_factorized_distribution(parameterizer: Parameterizer):
         Continuous("Variable.A"),
         Continuous("Variable.B"),
     ]
-    probabilistic_circuit = parameterizer.create_fully_factorized_distribution(
-        variables
-    )
+    parameterization = Parameterization(variables)
+    probabilistic_circuit = parameterization.create_fully_factorized_distribution()
     assert len(probabilistic_circuit.variables) == 2
     assert set(probabilistic_circuit.variables) == set(variables)
 
 
-def test_parameterize_movetorse_navigate(parameterizer: Parameterizer):
+def test_parameterize_object():
     """
-    Test parameterization of a potential robot plan consisting of: MoveTorso - Navigate - MoveTorso.
-
-    This test verifies:
-    1. Parameterization of simple robot action plan
-    2. Sampling from the constrained distribution and validation of constraints.
+    Test parameterization of a single object via parameterize.
     """
+    position = Position(x=1.0, y=2.0, z=3.0)
+    parameterizer = Parameterizer()
+    parameterization = parameterizer.parameterize(position, "Position")
+    expected_names = {"Position.x", "Position.y", "Position.z"}
+    assert {v.name for v in parameterization.variables} == expected_names
+    assert len(parameterization.simple_event.variables) == 3
 
-    plan_classes = [MoveTorsoAction, NavigateAction, Pose, Vector3, Quaternion]
-    class_diagram = ClassDiagram(plan_classes)
-    wrapped_move_torso = class_diagram.get_wrapped_class(MoveTorsoAction)
-    wrapped_navigate = class_diagram.get_wrapped_class(NavigateAction)
 
-    movetorso_variables1 = parameterizer.parameterize(
-        wrapped_move_torso, prefix="MoveTorsoAction_1"
-    )
-    navigate_variables = parameterizer(wrapped_navigate)
-    movetorso_variables2 = parameterizer.parameterize(
-        wrapped_move_torso, prefix="MoveTorsoAction_2"
-    )
-
-    all_variables = movetorso_variables1 + navigate_variables + movetorso_variables2
-    variables = {v.name: v for v in all_variables}
-
+def test_parameterize_list():
+    """
+    Test parameterization of a list of objects via parameterize.
+    """
+    positions = [Position(x=1.0, y=2.0, z=3.0), Position(x=4.0, y=5.0, z=6.0)]
+    parameterizer = Parameterizer()
+    parameterization = parameterizer.parameterize(positions, "Positions")
     expected_names = {
-        "MoveTorsoAction_1.torso_state",
-        "MoveTorsoAction_2.torso_state",
-        "NavigateAction.keep_joint_states",
-        "NavigateAction.target_location.header.sequence",
-        "NavigateAction.target_location.pose.position.x",
-        "NavigateAction.target_location.pose.position.y",
-        "NavigateAction.target_location.pose.position.z",
-        "NavigateAction.target_location.pose.orientation.x",
-        "NavigateAction.target_location.pose.orientation.y",
-        "NavigateAction.target_location.pose.orientation.z",
-        "NavigateAction.target_location.pose.orientation.w",
+        "Positions[0].x",
+        "Positions[0].y",
+        "Positions[0].z",
+        "Positions[1].x",
+        "Positions[1].y",
+        "Positions[1].z",
     }
+    variables = parameterization.variables
+    event = parameterization.simple_event
 
-    assert set(variables.keys()) == expected_names
-
-    probabilistic_circuit = parameterizer.create_fully_factorized_distribution(
-        all_variables
-    )
-
-    expected_distribution_names = expected_names - {
-        "NavigateAction.target_location.header.sequence"
-    }
-    assert {
-        v.name for v in probabilistic_circuit.variables
-    } == expected_distribution_names
-
-    torso_1 = variables["MoveTorsoAction_1.torso_state"]
-    torso_2 = variables["MoveTorsoAction_2.torso_state"]
-
-    consistency_events = [
-        SimpleEvent({torso_1: [state], torso_2: [state]}) for state in TorsoState
-    ]
-    restricted_distribution, _ = probabilistic_circuit.truncated(
-        Event(*consistency_events)
-    )
-    restricted_distribution.normalize()
-
-    pose_constraints = {
-        variables["NavigateAction.target_location.pose.position.x"]: 1.5,
-        variables["NavigateAction.target_location.pose.position.y"]: -2.0,
-        variables["NavigateAction.target_location.pose.orientation.x"]: 0.0,
-        variables["NavigateAction.target_location.pose.orientation.y"]: 0.0,
-        variables["NavigateAction.target_location.pose.orientation.z"]: 0.0,
-        variables["NavigateAction.target_location.pose.orientation.w"]: 1.0,
-    }
-
-    final_distribution, _ = restricted_distribution.conditional(pose_constraints)
-    final_distribution.normalize()
-
-    target_x, target_y = 1.5, -2.0
-    nav_x = variables["NavigateAction.target_location.pose.position.x"]
-    nav_y = variables["NavigateAction.target_location.pose.position.y"]
-
-    for sample_values in final_distribution.sample(10):
-        sample = dict(zip(final_distribution.variables, sample_values))
-        assert sample[torso_1] == sample[torso_2]
-        assert sample[nav_x] == target_x
-        assert sample[nav_y] == target_y
+    assert {v.name for v in variables} == expected_names
+    assert len(event.variables) == 6
+    # Check some values
+    x0_var = next(v for v in variables if v.name == "Positions[0].x")
+    x1_var = next(v for v in variables if v.name == "Positions[1].x")
+    assert event[x0_var].simple_sets[0].lower == 1.0
+    assert event[x1_var].simple_sets[0].lower == 4.0
 
 
-def test_parameterize_pickup_navigate_place(parameterizer: Parameterizer):
+def test_parameterize_nested_object():
     """
-    Test parameterization of a potential robot plan consisting of: PickUp - Navigate - Place.
-
-    This test verifies:
-    1. Parameterization of pick up, navigate, placing robot action plan
-    2. Creating and sampling from a constrained distribution over the plan variables.
+    Test parameterization of a nested object via parameterize.
     """
-
-    plan_classes = [
-        PickUpAction,
-        NavigateAction,
-        PlaceAction,
-        GraspDescription,
-        Pose,
-        Vector3,
-        Quaternion,
-    ]
-    class_diagram = ClassDiagram(plan_classes)
-
-    wrapped_pickup = class_diagram.get_wrapped_class(PickUpAction)
-    wrapped_navigate = class_diagram.get_wrapped_class(NavigateAction)
-    wrapped_place = class_diagram.get_wrapped_class(PlaceAction)
-
-    pickup_variables = parameterizer.parameterize(wrapped_pickup, prefix="PickUpAction")
-    navigate_variables = parameterizer.parameterize(
-        wrapped_navigate, prefix="NavigateAction"
+    pose = Pose(
+        position=Position(x=1.0, y=2.0, z=3.0),
+        orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
-    place_variables = parameterizer.parameterize(wrapped_place, prefix="PlaceAction")
+    parameterizer = Parameterizer()
+    parameterization = parameterizer.parameterize(pose, "Pose")
 
-    all_variables = pickup_variables + navigate_variables + place_variables
-    variables = {v.name: v for v in all_variables}
-
-    expected_variables = {
-        "PickUpAction.arm",
-        "PickUpAction.grasp_description.approach_direction",
-        "PickUpAction.grasp_description.vertical_alignment",
-        "PickUpAction.grasp_description.rotate_gripper",
-        "PickUpAction.grasp_description.manipulation_offset",
-        "NavigateAction.keep_joint_states",
-        "NavigateAction.target_location.header.sequence",
-        "NavigateAction.target_location.pose.position.x",
-        "NavigateAction.target_location.pose.position.y",
-        "NavigateAction.target_location.pose.position.z",
-        "NavigateAction.target_location.pose.orientation.x",
-        "NavigateAction.target_location.pose.orientation.y",
-        "NavigateAction.target_location.pose.orientation.z",
-        "NavigateAction.target_location.pose.orientation.w",
-        "PlaceAction.arm",
-        "PlaceAction.target_location.header.sequence",
-        "PlaceAction.target_location.pose.position.x",
-        "PlaceAction.target_location.pose.position.y",
-        "PlaceAction.target_location.pose.position.z",
-        "PlaceAction.target_location.pose.orientation.x",
-        "PlaceAction.target_location.pose.orientation.y",
-        "PlaceAction.target_location.pose.orientation.z",
-        "PlaceAction.target_location.pose.orientation.w",
+    # Position has x, y, z (3)
+    # Orientation has x, y, z, w (4)
+    # Total = 7
+    assert len(parameterization.variables) == 7
+    expected_names = {
+        "Pose.position.x",
+        "Pose.position.y",
+        "Pose.position.z",
+        "Pose.orientation.x",
+        "Pose.orientation.y",
+        "Pose.orientation.z",
+        "Pose.orientation.w",
     }
+    assert {v.name for v in parameterization.variables} == expected_names
 
-    assert set(variables.keys()) == expected_variables
 
-    probabilistic_distribution = parameterizer.create_fully_factorized_distribution(
-        all_variables
-    )
+class TestDAOParameterizer(unittest.TestCase):
 
-    expected_distribution = expected_variables - {
-        "NavigateAction.target_location.header.sequence",
-        "PlaceAction.target_location.header.sequence",
-    }
-    assert {
-        v.name for v in probabilistic_distribution.variables
-    } == expected_distribution
+    def setUp(self):
+        self.parameterizer = Parameterizer()
 
-    arm_pickup = variables["PickUpAction.arm"]
-    arm_place = variables["PlaceAction.arm"]
+    def test_parameterize_flat_dao(self):
+        pos = Position(x=1.0, y=2.0, z=3.0)
+        pos_dao = to_dao(pos)
+        parameterization = self.parameterizer.parameterize_dao(pos_dao, "pos")
+        variables = parameterization.variables
+        event = parameterization.simple_event
 
-    arm_consistency_events = [
-        SimpleEvent({arm_pickup: [arm], arm_place: [arm]}) for arm in Arms
-    ]
-    restricted_dist, _ = probabilistic_distribution.truncated(
-        Event(*arm_consistency_events)
-    )
-    restricted_dist.normalize()
+        self.assertEqual(len(variables), 3)
+        var_names = {v.name for v in variables}
+        self.assertIn("pos.x", var_names)
+        self.assertIn("pos.y", var_names)
+        self.assertIn("pos.z", var_names)
 
-    nav_target_x = 2.0
-    nav_target_y = 3.0
-    pose_constraints = {
-        variables["NavigateAction.target_location.pose.position.x"]: nav_target_x,
-        variables["NavigateAction.target_location.pose.position.y"]: nav_target_y,
-    }
+        for var in variables:
+            self.assertIsInstance(var, Continuous)
+            self.assertEqual(
+                event[var].simple_sets[0].lower,
+                getattr(pos, var.name.split(".")[-1]),
+            )
 
-    final_distribution, _ = restricted_dist.conditional(pose_constraints)
-    final_distribution.normalize()
+    def test_parameterize_nested_dao(self):
+        pose = Pose(
+            position=Position(x=1.0, y=2.0, z=3.0),
+            orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
+        )
+        pose_dao = to_dao(pose)
+        parameterization = self.parameterizer.parameterize_dao(pose_dao, "pose")
+        variables = parameterization.variables
+        event = parameterization.simple_event
 
-    v_nav_x = variables["NavigateAction.target_location.pose.position.x"]
-    v_nav_y = variables["NavigateAction.target_location.pose.position.y"]
+        # Position has x, y, z (3)
+        # Orientation has x, y, z, w (4)
+        # Total = 7
+        self.assertEqual(len(variables), 7)
 
-    for sample_values in final_distribution.sample(10):
-        sample = dict(zip(final_distribution.variables, sample_values))
-        assert sample[arm_pickup] == sample[arm_place]
-        assert sample[v_nav_x] == nav_target_x
-        assert sample[v_nav_y] == nav_target_y
+        var_names = {v.name for v in variables}
+        self.assertIn("pose.position.x", var_names)
+        self.assertIn("pose.orientation.w", var_names)
+
+        # Check values in event
+        for var in variables:
+            parts = var.name.split(".")
+            if parts[1] == "position":
+                val = getattr(pose.position, parts[2])
+            else:
+                val = getattr(pose.orientation, parts[2])
+            self.assertEqual(event[var].simple_sets[0].lower, val)
+
+    def test_parameterize_dao_set_value(self):
+        optional = OptionalTestCase(1)
+        optional_dao = to_dao(optional)
+        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
+
+        self.assertEqual(1, len(parameterization.variables))
+
+    def test_parameterize_dao_none_value(self):
+        optional = OptionalTestCase(None)
+        optional_dao = to_dao(optional)
+        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
+
+        self.assertEqual(len(parameterization.variables), 1)
+
+    def test_parameterize_dao_set_value_set_optional(self):
+        optional = OptionalTestCase(1, Position(1.0, 2.0, 3.0))
+        optional_dao = to_dao(optional)
+        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
+
+        self.assertEqual(len(parameterization.variables), 4)
+
+    def test_parameterize_dao_none_value_underspecified_optional(self):
+        optional = OptionalTestCase(None, Position(1.0, None, 3.0))
+        optional_dao = to_dao(optional)
+        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
+
+        self.assertEqual(len(parameterization.variables), 4)
+
+    def test_parameterize_dao_set_value_set_relationship(self):
+        optional = OptionalTestCase(
+            1, list_of_orientations=[Orientation(0.0, 0.0, 0.0, 1.0)]
+        )
+        optional_dao = to_dao(optional)
+        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
+
+        self.assertEqual(len(parameterization.variables), 5)
+
+    def test_parameterize_dao_set_value_underspecified_relationship(self):
+        optional = OptionalTestCase(
+            1, list_of_orientations=[Orientation(0.0, 0.0, None, 1.0)]
+        )
+        optional_dao = to_dao(optional)
+        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
+
+        self.assertEqual(len(parameterization.variables), 5)
+
+    def test_parameterize_dao_set_value_set_builtin(self):
+        optional = OptionalTestCase(1, list_of_values=[0])
+        optional_dao = to_dao(optional)
+        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
+
+        self.assertEqual(len(parameterization.variables), 2)
+
+    def test_parameterize_dao_set_value_underspecified_builtin(self):
+        optional = OptionalTestCase(1, list_of_values=[None])
+        optional_dao = to_dao(optional)
+        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
+
+        self.assertEqual(len(parameterization.variables), 2)
+
+    def test_parameterize_dao_with_optional_filled(self):
+        # Orientation with w=None
+        orient = Orientation(x=0.0, y=0.0, z=None, w=1.0)
+        orient_dao = to_dao(orient)
+        parameterization = self.parameterizer.parameterize_dao(orient_dao, "orient")
+        variables = parameterization.variables
+        event = parameterization.simple_event
+
+        self.assertEqual(len(variables), 4)
+        z_var = next(v for v in variables if v.name == "orient.z")
+        # Since SimpleEvent fills missing variables with reals(), orient.w should be a full interval
+        self.assertTrue(event[z_var].simple_sets[0].lower < -1e10)
+        self.assertTrue(event[z_var].simple_sets[0].upper > 1e10)
+
+    def test_parameterization_initialization(self):
+        """
+        Test the initialization of Parameterization with default values.
+        """
+        parameterization = Parameterization()
+        self.assertEqual(parameterization.variables, [])
+        self.assertEqual(parameterization.simple_event, SimpleEvent({}))
+
+    def test_parameterization_update_variables(self):
+        """
+        Test updating variables in Parameterization.
+        """
+        parameterization = Parameterization()
+        var_a = Continuous("A")
+        parameterization.extend_variables([var_a])
+        self.assertEqual(parameterization.variables, [var_a])
+
+        var_b = Continuous("B")
+        parameterization.extend_variables([var_b])
+        self.assertEqual(parameterization.variables, [var_a, var_b])
+
+    def test_parameterization_update_simple_event(self):
+        """
+        Test updating simple event in Parameterization.
+        """
+        var_a = Continuous("A")
+        parameterization = Parameterization(variables=[var_a])
+        event = SimpleEvent({var_a: 1.0})
+        parameterization.update_simple_event(event)
+        self.assertEqual(parameterization.simple_event[var_a].simple_sets[0].lower, 1.0)
+
+    def test_parameterization_fill_missing_variables(self):
+        """
+        Test filling missing variables in Parameterization.
+        """
+        var_a = Continuous("A")
+        var_b = Continuous("B")
+        parameterization = Parameterization(variables=[var_a, var_b])
+        parameterization.update_simple_event(SimpleEvent({var_a: 1.0}))
+
+        self.assertNotIn(var_b, parameterization.simple_event.variables)
+        parameterization.fill_missing_variables()
+        self.assertIn(var_b, parameterization.simple_event.variables)
+
+    def test_parameterization_update_parameterization(self):
+        """
+        Test updating a parameterization with another one.
+        """
+        var_a = Continuous("A")
+        param_a = Parameterization(
+            variables=[var_a], simple_event=SimpleEvent({var_a: 1.0})
+        )
+
+        var_b = Continuous("B")
+        param_b = Parameterization(
+            variables=[var_b], simple_event=SimpleEvent({var_b: 2.0})
+        )
+
+        param_a.merge_parameterization(param_b)
+
+        self.assertEqual(len(param_a.variables), 2)
+        self.assertIn(var_a, param_a.variables)
+        self.assertIn(var_b, param_a.variables)
+        self.assertEqual(param_a.simple_event[var_a].simple_sets[0].lower, 1.0)
+        self.assertEqual(param_a.simple_event[var_b].simple_sets[0].lower, 2.0)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -8,13 +8,12 @@ from typing_extensions import Any, Optional, Callable, TypeVar
 
 from ...designator import DesignatorDescription
 from ...failures import PlanFailure
-from ...has_parameters import HasParameters
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ActionDescription(DesignatorDescription, HasParameters):
+class ActionDescription(DesignatorDescription):
     _pre_perform_callbacks = []
     _post_perform_callbacks = []
 

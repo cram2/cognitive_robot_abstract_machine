@@ -220,14 +220,14 @@ class Manipulator(SemanticRobotAnnotation, ABC):
     Abstract base class of robot manipulators. Always has a tool frame.
     """
 
-    tool_frame: Body = field(default=None)
+    tool_frame: Body = field(kw_only=True)
 
-    front_facing_orientation: Quaternion = field(default=None)
+    front_facing_orientation: Quaternion = field(kw_only=True)
     """
     The orientation of the manipulator's tool frame, which is usually the front-facing orientation.
     """
 
-    front_facing_axis: Vector3 = field(default=None)
+    front_facing_axis: Vector3 = field(kw_only=True)
     """
     The axis of the manipulator's tool frame that is facing forward.
     """
@@ -543,10 +543,10 @@ class AbstractRobot(Agent):
         for connection in self._world.get_connections_by_type(ActiveConnection1DOF):
             connection.raw_dof._overwrite_dof_limits(
                 new_lower_limits=DerivativeMap(
-                    [None, -new_limits[connection], None, None]
+                    None, -new_limits[connection], None, None
                 ),
                 new_upper_limits=DerivativeMap(
-                    [None, new_limits[connection], None, None]
+                    None, new_limits[connection], None, None
                 ),
             )
 

@@ -15,7 +15,7 @@ from ...datastructures.enums import ExecutionType
 from typing_extensions import TypeVar
 
 from ...designator import DesignatorDescription
-from ...process_module import ProcessModuleManager
+from ...motion_executor import MotionExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class AlternativeMotion(HasGeneric[T], ABC):
             if (
                 issubclass(alternative, motion.__class__)
                 and alternative.original_class() == robot_view.__class__
-                and ProcessModuleManager.execution_type == alternative.execution_type
+                and MotionExecutor.execution_type == alternative.execution_type
             ):
                 return alternative
         return None

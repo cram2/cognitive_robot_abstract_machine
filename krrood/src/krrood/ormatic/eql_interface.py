@@ -18,6 +18,7 @@ from ..entity_query_language.symbolic import (
     The,
     Variable,
     Literal,
+    Where,
 )
 
 from .dao import get_dao_class
@@ -441,6 +442,8 @@ class EQLTranslator:
             return self.translate_comparator(query)
         if isinstance(query, Attribute):
             return self.translate_attribute(query)
+        if isinstance(query, Where):
+            return self.translate_query(query.conditions)
 
         raise UnsupportedQueryTypeError(f"Unknown query type: {type(query)}")
 

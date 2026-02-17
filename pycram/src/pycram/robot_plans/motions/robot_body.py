@@ -7,10 +7,9 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.robots.abstract_robot import Camera
 
 from .base import BaseMotion
-from ...process_module import ProcessModuleManager
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 
-from ...robot_description import ViewManager
+from ...view_manager import ViewManager
 
 
 @dataclass

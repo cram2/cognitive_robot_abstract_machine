@@ -466,7 +466,7 @@ def test_load_collision_config_srdf(pr2_world_state_reset):
     )
     assert (
         len(pr2_world_state_reset._collision_pair_manager.disabled_collision_pairs)
-        == 1485
+        == 1431
     )
 
 

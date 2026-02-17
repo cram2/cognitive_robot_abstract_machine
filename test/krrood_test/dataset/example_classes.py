@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from types import FunctionType
-from typing import Set
+from typing import Set, Generic
 
 from sqlalchemy import types, TypeDecorator, JSON
 from typing_extensions import Dict, Any, Sequence, Self
@@ -53,6 +53,14 @@ class KRROODOrientation(Symbol):
 class KRROODPose(Symbol):
     position: KRROODPosition
     orientation: KRROODOrientation
+
+
+@dataclass
+class OptionalTestCase(Symbol):
+    value: int
+    optional_position: Optional[Position] = None
+    list_of_orientations: List[Orientation] = field(default_factory=list)
+    list_of_values: List[int] = field(default_factory=list)
 
 
 # check that many to many relationship to built in types and non built in types work
@@ -669,3 +677,30 @@ class ChildEnum2(PolymorphicEnum):
 @dataclass
 class PolymorphicEnumAssociation:
     value: PolymorphicEnum
+
+
+@dataclass(frozen=True)
+class NamedNumbers:
+    name: str
+    numbers: List[int] = field(default_factory=list)
+
+    def __hash__(self):
+        return hash(self.name)
+
+
+@dataclass
+class GenericClass(Generic[T]):
+    value: T
+    optional_value: Optional[T] = None
+    container: List[T] = field(default_factory=list)
+
+
+@dataclass
+class GenericClassAssociation:
+    associated_value: GenericClass[float]
+    associated_value_list: List[GenericClass[Position]]
+
+    associated_value_not_parametrized: GenericClass = None
+    associated_value_not_parametrized_list: List[GenericClass] = field(
+        default_factory=list
+    )

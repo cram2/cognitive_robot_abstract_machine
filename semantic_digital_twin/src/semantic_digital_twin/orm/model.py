@@ -10,19 +10,16 @@ from typing_extensions import List
 from typing_extensions import Optional
 
 from krrood.ormatic.dao import AlternativeMapping
-from ..datastructures.prefixed_name import PrefixedName
-from ..mixin import HasSimulatorProperties
 from ..spatial_types import (
     RotationMatrix,
     Vector3,
     Point3,
     HomogeneousTransformationMatrix,
 )
-from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import Quaternion, Pose
 from ..world import World
 from ..world_description.connections import Connection
-from ..world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
+from ..world_description.degree_of_freedom import DegreeOfFreedom
 from ..world_description.world_entity import (
     SemanticAnnotation,
     KinematicStructureEntity,
@@ -229,32 +226,6 @@ class PoseMapping(AlternativeMapping[Pose]):
             position=self.position,
             orientation=self.rotation,
             reference_frame=None,
-        )
-
-
-@dataclass
-class DegreeOfFreedomMapping(
-    AlternativeMapping[DegreeOfFreedom], HasSimulatorProperties
-):
-    name: PrefixedName
-    limits: DegreeOfFreedomLimits
-    id: UUID
-
-    @classmethod
-    def from_domain_object(cls, obj: DegreeOfFreedom):
-        return cls(
-            name=obj.name,
-            limits=obj.limits,
-            id=obj.id,
-        )
-
-    def to_domain_object(self) -> DegreeOfFreedom:
-        return DegreeOfFreedom(
-            name=self.name,
-            limits=DegreeOfFreedomLimits(
-                lower=self.limits.lower, upper=self.limits.upper
-            ),
-            id=self.id,
         )
 
 

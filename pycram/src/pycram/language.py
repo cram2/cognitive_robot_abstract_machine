@@ -247,7 +247,7 @@ class CodePlan(LanguagePlan):
         super().__init__(code, context)
 
 
-@dataclass
+@dataclass(eq=False)
 class LanguageNode(PlanNode):
     designator_type: Type[LanguageNode] = field(default_factory=lambda: LanguageNode)
     """

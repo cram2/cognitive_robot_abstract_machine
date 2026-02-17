@@ -17,8 +17,8 @@ from pycram.datastructures.enums import (
 )
 from pycram.datastructures.grasp import GraspDescription
 from pycram.language import SequentialPlan
-from pycram.process_module import simulated_robot
-from pycram.robot_description import ViewManager
+from pycram.motion_executor import simulated_robot
+from pycram.view_manager import ViewManager
 from pycram.robot_plans import (
     MoveTorsoAction,
     MoveTorsoActionDescription,
@@ -52,9 +52,17 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+    Quaternion,
+)
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
+
+# The alternative mapping needs to be imported for the stretch to work properly
+import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
+import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 
 
 @pytest.fixture(scope="session", params=["hsrb", "stretch", "tiago", "pr2"])
@@ -145,7 +153,9 @@ def test_navigate_multi(immutable_multiple_robot_apartment):
     world, view, context = immutable_multiple_robot_apartment
     plan = SequentialPlan(
         context,
-        NavigateActionDescription(Pose.from_list([1, 2, 0], frame=world.root)),
+        NavigateActionDescription(
+            Pose(Point3.from_iterable([1, 2, 0]), reference_frame=world.root)
+        ),
     )
 
     with simulated_robot:
@@ -213,6 +223,7 @@ def test_park_arms_multi(immutable_multiple_robot_apartment):
 
 def test_reach_action_multi(immutable_multiple_robot_apartment):
     world, view, context = immutable_multiple_robot_apartment
+
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
 
     grasp_description = GraspDescription(
@@ -225,7 +236,7 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
         1, -2, 0.8, reference_frame=world.root
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        0.3, -2.5, 0, reference_frame=world.root
+        0.3, -2.4, 0, reference_frame=world.root
     )
     world.notify_state_change()
 
@@ -233,7 +244,9 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
         context,
         ParkArmsActionDescription(Arms.BOTH),
         ReachActionDescription(
-            target_pose=Pose.from_list([1, -2, 0.8], frame=world.root),
+            target_pose=Pose(
+                Point3.from_iterable([1, -2, 0.8]), reference_frame=world.root
+            ),
             object_designator=milk_body,
             arm=Arms.LEFT,
             grasp_description=grasp_description,
@@ -272,7 +285,7 @@ def test_grasping(immutable_multiple_robot_apartment):
     )
     robot_view.root.parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(
-            0.3, -2.5, 0, reference_frame=world.root
+            0.3, -2.4, 0, reference_frame=world.root
         )
     )
     world.notify_state_change()
@@ -303,7 +316,7 @@ def test_pick_up_multi(mutable_multiple_robot_apartment):
         1, -2, 0.6, reference_frame=world.root
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        0.3, -2.5, 0, reference_frame=world.root
+        0.3, -2.4, 0, reference_frame=world.root
     )
     world.notify_state_change()
 
@@ -345,7 +358,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
         1, -2, 0.6, reference_frame=world.root
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        0.3, -2.5, 0, reference_frame=world.root
+        0.3, -2.4, 0, reference_frame=world.root
     )
     world.notify_state_change()
 
@@ -357,7 +370,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
         ),
         PlaceActionDescription(
             world.get_body_by_name("milk.stl"),
-            Pose.from_list([1, -2.2, 0.6], frame=world.root),
+            Pose(Point3.from_iterable([1, -2.2, 0.6]), reference_frame=world.root),
             Arms.LEFT,
         ),
     )
@@ -381,8 +394,14 @@ def test_place_multi(mutable_multiple_robot_apartment):
 
 def test_look_at(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
-    description = LookAtActionDescription([Pose.from_list([3, 0, 1], frame=world.root)])
-    assert description.resolve().target == Pose.from_list([3, 0, 1], frame=world.root)
+    description = LookAtActionDescription(
+        [Pose(Point3.from_iterable([3, 0, 1]), reference_frame=world.root)]
+    )
+    assert np.allclose(
+        description.resolve().target.to_np(),
+        Pose(Point3.from_iterable([3, 0, 1]), reference_frame=world.root).to_np(),
+        atol=1e-3,
+    )
 
     plan = SequentialPlan(context, description)
     with simulated_robot:
@@ -422,7 +441,11 @@ def test_open(immutable_multiple_robot_apartment):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            Pose.from_list([1.75, 1.75, 0], [0, 0, 0.5, 1], world.root)
+            Pose(
+                Point3.from_iterable([1.6, 1.9, 0]),
+                Quaternion.from_iterable([0, 0, 0.3, 1]),
+                reference_frame=world.root,
+            )
         ),
         OpenActionDescription(world.get_body_by_name("handle_cab10_m"), [Arms.LEFT]),
     )
@@ -436,7 +459,7 @@ def test_open(immutable_multiple_robot_apartment):
 def test_close(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
 
-    world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.45
+    world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.3
     world.notify_state_change()
 
     plan = SequentialPlan(
@@ -444,7 +467,11 @@ def test_close(immutable_multiple_robot_apartment):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            Pose.from_list([1.75, 1.75, 0], [0, 0, 0.5, 1], world.root)
+            Pose(
+                Point3.from_iterable([1.46, 2.0, 0]),
+                Quaternion.from_iterable([0, 0, 0.4, 1]),
+                reference_frame=world.root,
+            )
         ),
         CloseActionDescription(world.get_body_by_name("handle_cab10_m"), [Arms.LEFT]),
     )
@@ -459,17 +486,16 @@ def test_facing(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
 
     with simulated_robot:
-        milk_pose = Pose.from_spatial_type(
-            world.get_body_by_name("milk.stl").global_pose
-        )
+        milk_pose = world.get_body_by_name("milk.stl").global_pose.to_pose()
         plan = SequentialPlan(context, FaceAtActionDescription(milk_pose, True))
         plan.perform()
         milk_in_robot_frame = world.transform(
             world.get_body_by_name("milk.stl").global_pose,
             robot_view.root,
         )
-        milk_in_robot_frame = Pose.from_spatial_type(milk_in_robot_frame)
-        assert milk_in_robot_frame.position.y == pytest.approx(0.0, abs=0.01)
+        assert milk_in_robot_frame.to_position().y.to_np()[0] == pytest.approx(
+            0.0, abs=0.01
+        )
 
 
 def test_transport(mutable_multiple_robot_apartment):
@@ -477,7 +503,13 @@ def test_transport(mutable_multiple_robot_apartment):
 
     description = TransportActionDescription(
         world.get_body_by_name("milk.stl"),
-        [Pose.from_list([3.1, 2.2, 0.95], [0.0, 0.0, 1.0, 0.0], world.root)],
+        [
+            Pose(
+                Point3.from_iterable([3.1, 2.2, 0.95]),
+                Quaternion.from_iterable([0.0, 0.0, 1.0, 0.0]),
+                reference_frame=world.root,
+            )
+        ],
         [Arms.RIGHT],
     )
     plan = SequentialPlan(

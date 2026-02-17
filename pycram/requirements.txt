@@ -15,5 +15,5 @@ pillow
 polytope # needed for random events
 krrood
 semantic_digital_twin
-rustworkx_utils
+rustworkx_utils==0.0.1
 scikit-image

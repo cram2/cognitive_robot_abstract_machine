@@ -7,7 +7,7 @@ import math
 import trimesh.boolean
 from krrood.entity_query_language.predicate import (
     Predicate,
-    Symbol,
+    Symbol, symbolic_function,
 )
 from random_events.interval import Interval
 from typing_extensions import List, TYPE_CHECKING, Iterable, Type
@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     )
 
 
+@symbolic_function
 def stable(obj: Body) -> bool:
     """
     Checks if an object is stable in the world. Stable meaning that its position will not change after simulating
@@ -45,6 +46,7 @@ def stable(obj: Body) -> bool:
     raise NotImplementedError("Needs multiverse")
 
 
+@symbolic_function
 def contact(
     body1: Body,
     body2: Body,
@@ -66,6 +68,7 @@ def contact(
     return result.contact_distance < threshold
 
 
+@symbolic_function
 def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
     """
     Get all bodies and regions that are visible from the given camera using a segmentation mask.
@@ -92,6 +95,7 @@ def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
     return bodies
 
 
+@symbolic_function
 def visible(camera: Camera, obj: KinematicStructureEntity) -> bool:
     """
     Checks if a body/region is visible by the given camera.
@@ -99,6 +103,7 @@ def visible(camera: Camera, obj: KinematicStructureEntity) -> bool:
     return obj in get_visible_bodies(camera)
 
 
+@symbolic_function
 def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     """
     Determines the bodies that occlude a given body in the scene as seen from a specified camera.
@@ -164,6 +169,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     return bodies
 
 
+@symbolic_function
 def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> bool:
     """
     Checks if a manipulator can reach a given position.
@@ -184,7 +190,7 @@ def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> b
         return False
     return True
 
-
+@symbolic_function
 def is_supported_by(
     supported_body: Body, supporting_body: Body, max_intersection_height: float = 0.1
 ) -> bool:
@@ -226,6 +232,7 @@ def is_supported_by(
     return size < max_intersection_height
 
 
+@symbolic_function
 def is_body_in_region(body: Body, region: Region) -> float:
     """
     Check if the body is in the region by computing the fraction of the body's
