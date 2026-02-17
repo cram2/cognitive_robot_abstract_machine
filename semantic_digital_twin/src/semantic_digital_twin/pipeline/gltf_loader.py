@@ -152,6 +152,12 @@ class GLTFLoader(Step):
             for child in root_children:
                 to_visit_new_node.add((child, root))
             visited_nodes.add(root)
+        else:
+            object_nodes, new_object_notes = self._grouping_similar_meshes(root)
+            node_fusion_mesh = self._fusion_meshes(object_nodes)
+            root_body = self._trimesh_to_body(node_fusion_mesh, root)
+            world_elements[root] = root_body
+            connection[root] = []
 
         while to_visit_new_node:
             node, body_parent = to_visit_new_node.pop()
