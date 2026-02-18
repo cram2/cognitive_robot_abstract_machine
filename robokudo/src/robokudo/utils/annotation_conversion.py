@@ -379,7 +379,8 @@ class BoundingBox3DForShapeSizeConverter(Annotation2ODConverter):
     def convert(
             self, annotation: BoundingBox3D, cas: CAS, object_designator: ObjectDesignator
     ) -> None:
-        # TODO find a good decision criteria for size. This should be a semantic label! (small, large etc.)
+        # TODO A (new!) Annotator should infer semantic size.
+        #  Find a good decision criteria for size. This should be a semantic label! (small, large etc.)
         object_designator.size = f""
         vector = Vector3()
         vector.x = float(annotation.x_length)
@@ -389,24 +390,6 @@ class BoundingBox3DForShapeSizeConverter(Annotation2ODConverter):
         size.dimensions = vector
         size.radius = float(0.0)
         object_designator.shape_size.append(size)
-
-
-# class BoundingBox3DAnnotationForShapeSizeConverter(Annotation2ODConverter):
-#     def can_convert(self, annotation: BoundingBox3DAnnotation) -> bool:
-#         return isinstance(annotation, BoundingBox3DAnnotation)
-#
-#     def convert(self, annotation: BoundingBox3DAnnotation, cas: CAS,
-#                 object_designator: ObjectDesignator) -> None:
-#         # TODO find a good decision criteria for size. This should be a semantic label! (small, large etc.)
-#         object_designator.size = f''
-#         vector = geometry_msgs.msg.Vector3()
-#         vector.x = float(annotation.x_length)
-#         vector.y = float(annotation.y_length)
-#         vector.z = float(annotation.z_length)
-#         size = ShapeSize()
-#         size.dimensions = vector
-#         size.radius = float(0.0)
-#         object_designator.shape_size.append(size)
 
 
 class Shape2ODConverter(Annotation2ODConverter):
