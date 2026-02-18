@@ -1251,10 +1251,14 @@ class TestCartesianTasks:
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
-    def test_cart_goal_sequence_at_build(self, pr2_world_state_reset: World):
+    def test_cart_goal_sequence_at_build(
+        self, pr2_world_state_reset: World, rclpy_node
+    ):
         """
         Test CartesianPose sequence with Bind_at_build policy.
         """
+        tf_publisher = TFPublisher(node=rclpy_node, world=pr2_world_state_reset)
+        viz = VizMarkerPublisher(world=pr2_world_state_reset, node=rclpy_node)
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "base_footprint"
         )
