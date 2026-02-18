@@ -75,7 +75,6 @@ def transform_pose_from_world_to_cam(cas: CAS, pose: PoseAnnotation) -> PoseAnno
     pose_mat = transform.get_transform_matrix_from_q(pose.rotation, pose.translation)
     world_to_cam_transform = get_world_to_cam_transform_matrix(cas)
 
-    # TODO Adapt following names (switch cam and world)
     pose_in_cam_mat = np.matmul(world_to_cam_transform, pose_mat)
 
     new_pose = PoseAnnotation()

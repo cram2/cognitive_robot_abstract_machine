@@ -141,14 +141,12 @@ class ModuleLoader:
 
         :param ros_pkg_name: Name of ROS package containing annotator
         :param module_name: Name of annotator module
-        :return: None (TODO: implement annotator loading)
-        :rtype: None
+        :return: The requested module. This is not pointing to an Annotator in this module. It's just the module.
+        :rtype: module
         """
         module_type = RobokudoModuleType.Annotator
         loaded_module = self._load_module(ros_pkg_name, module_type, module_name)
-        # Example: If the module defines class Annotator:
-        # return loaded_module.Annotator()
-        return loaded_module  # Or return an instance
+        return loaded_module
 
     def load_camera_config(self, ros_pkg_name: str, module_name: str) -> Any:
         """Load a camera config module. Expects class `CameraConfig`.
