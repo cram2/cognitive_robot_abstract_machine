@@ -1,6 +1,7 @@
 import os
 from copy import deepcopy
 
+import numpy as np
 import pytest
 
 from pycram.datastructures.dataclasses import Context
@@ -244,9 +245,9 @@ def test_grasp_sequence_front(immutable_simple_pr2_world):
 
     grasp_sequence = grasp_desc.grasp_pose_sequence(world.get_body_by_name("milk.stl"))
 
-    assert grasp_sequence[0].orientation.to_list() == [0, 0, 0, 1]
-    assert grasp_sequence[1].orientation.to_list() == [0, 0, 0, 1]
-    assert grasp_sequence[2].orientation.to_list() == [0, 0, 0, 1]
+    assert np.allclose(grasp_sequence[0].orientation.to_list(), [0, 0, 0, 1])
+    assert np.allclose(grasp_sequence[1].orientation.to_list(), [0, 0, 0, 1])
+    assert np.allclose(grasp_sequence[2].orientation.to_list(), [0, 0, 0, 1])
 
     assert grasp_sequence[0].position.to_list() == pytest.approx(
         [-0.082, 0, 0], abs=0.01

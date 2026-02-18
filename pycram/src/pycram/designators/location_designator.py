@@ -1676,8 +1676,7 @@ class GiskardLocation(LocationDesignatorDescription):
 
             test_world = deepcopy(self.world)
             test_world.name = "Test World"
-            TFPublisher(test_world, self.plan.context.ros_node)
-            VizMarkerPublisher(test_world, self.plan.context.ros_node)
+
             test_robot = self.robot_view.__class__.from_world(test_world)
             test_ee = test_world._get_world_entity_by_hash(
                 hash(ee.manipulator.tool_frame)

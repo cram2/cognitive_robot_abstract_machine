@@ -372,13 +372,15 @@ def test_accessing_location(immutable_model_world):
     assert len(access_pose.orientation.to_list()) == 4
 
 
-def test_giskard_location_pose(immutable_model_world, rclpy_node):
+def test_giskard_location_pose(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    context.ros_node = rclpy_node
     location_desig = GiskardLocation(
-        PoseStamped.from_list([2.1, 2, 1], frame=world.root), Arms.RIGHT
+        PoseStamped.from_list([1.9, 2, 1], frame=world.root), Arms.RIGHT
     )
-    plan = SequentialPlan(context, NavigateActionDescription(location_desig))
+    plan = SequentialPlan(
+        context,
+        NavigateActionDescription(location_desig),
+    )
 
     location = location_desig.resolve()
     assert len(location.position.to_list()) == 3
