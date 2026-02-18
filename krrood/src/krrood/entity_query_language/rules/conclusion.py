@@ -11,30 +11,29 @@ from ..core.base_expressions import (
     OperationResult,
     SymbolicExpression,
     Selectable,
+    BinaryExpression,
 )
 from ..core.variable import Variable
 
 
 @dataclass(eq=False)
-class Conclusion(SymbolicExpression, ABC):
+class Conclusion(BinaryExpression, ABC):
     """
     Base for side-effecting/action clauses that adjust outputs (e.g., Set, Add).
     """
 
-    variable: Selectable
+    left: Selectable
     """
     The variable being affected by the conclusion.
     """
-    value: Any
+    right: Any
     """
     The value added or set to the variable by the conclusion.
     """
 
     def __post_init__(self):
 
-        self.variable, self.value = self._update_children_(self.variable, self.value)
-
-        self.value._is_inferred_ = True
+        super().__post_init__()
 
         current_parent = SymbolicExpression._current_parent_in_context_stack_()
         if current_parent is None:
@@ -42,13 +41,13 @@ class Conclusion(SymbolicExpression, ABC):
         self._parent_ = current_parent
         self._parent_._add_conclusion_(self)
 
-    def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
-    ):
-        if self.variable is old_child:
-            self.variable = new_child
-        elif self.value is old_child:
-            self.value = new_child
+    @property
+    def variable(self) -> Selectable:
+        return self.left
+
+    @property
+    def value(self) -> Any:
+        return self.right
 
     @property
     def _name_(self) -> str:
