@@ -25,6 +25,8 @@ import py_trees
 import robokudo.annotators.core
 import robokudo.semantic_map
 import robokudo.types
+import robokudo.types.annotation
+import robokudo.types.scene
 import robokudo.utils.error_handling
 import robokudo.utils.transform
 from robokudo.cas import CASViews
@@ -95,7 +97,7 @@ class LocationAnnotator(robokudo.annotators.core.ThreadedAnnotator):
         self.semantic_map = None
 
     def load_semantic_map(self) -> None:
-        """Load semantic map from configured package and name.
+        """Load a semantic map from the configured package and name.
 
         Uses ModuleLoader to dynamically load the semantic map descriptor
         from the configured ROS package.
@@ -167,9 +169,7 @@ class LocationAnnotator(robokudo.annotators.core.ThreadedAnnotator):
         self.semantic_map.publish_visualization_markers()
 
         active_regions = self.semantic_map.entries
-        # TODO Filter active regions by either:
-        #  - QUERY
-        #  - FRUSTUM CULLING
+        # TODO Filter active regions by FRUSTUM CULLING
 
         cam_to_world_transform = self.get_cas().get(robokudo.cas.CASViews.VIEWPOINT_CAM_TO_WORLD)
 

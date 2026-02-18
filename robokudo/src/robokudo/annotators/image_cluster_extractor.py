@@ -25,6 +25,9 @@ from rcl_interfaces.msg import ParameterDescriptor
 
 import robokudo
 import robokudo.annotators.core
+import robokudo.types.scene
+import robokudo.utils.annotator_helper
+import robokudo.utils.cv_helper
 import robokudo.utils.error_handling
 from robokudo.cas import CASViews
 
@@ -49,19 +52,6 @@ class ImageClusterExtractor(robokudo.annotators.core.BaseAnnotator):
     * Provides visualization of detected clusters
 
     The HSV thresholds can be adjusted dynamically based on color queries.
-
-    :ivar color: Input RGB color image
-    :type color: numpy.ndarray
-    :ivar depth: Input depth image
-    :type depth: numpy.ndarray
-    :ivar hsv: HSV converted color image
-    :type hsv: numpy.ndarray
-    :ivar cam_intrinsics: Camera intrinsic parameters
-    :type cam_intrinsics: o3d.camera.PinholeCameraIntrinsic
-    :ivar query: Current color query if any
-    :type query: robokudo.types.Query
-    :ivar display_mode: Current visualization mode
-    :type display_mode: ImageClusterExtractor.ViewMode
     """
 
     class ViewMode:
@@ -86,8 +76,10 @@ class ImageClusterExtractor(robokudo.annotators.core.BaseAnnotator):
         * Color name to HSV range mappings
         * Outlier removal parameters
         """
+
         class Parameters:
             """Parameter class containing all configurable settings."""
+
             def __init__(self):
                 """Initialize default parameter values."""
                 self.hsv_min = (150, 130, 85)
@@ -119,50 +111,51 @@ class ImageClusterExtractor(robokudo.annotators.core.BaseAnnotator):
 
         parameters = Parameters()  # overwrite the parameters explicitly to enable auto-completion
 
-    def dyn_rec_callback(self, config, level):
-        self.rk_logger.info("Received reconf call: " + str(config))
-        self.descriptor.parameters.hsv_min = (config['h_min'], config['s_min'], config['v_min'])
-        self.descriptor.parameters.hsv_max = (config['h_max'], config['s_max'], config['v_max'])
-        self.descriptor.parameters.erosion_iterations = config['erosion_iterations']
-        self.descriptor.parameters.contour_min_size = config['contour_min_size']
-        self.descriptor.parameters.num_of_objects = config['num_of_objects']
-        self.descriptor.parameters.min_points_threshold = config['min_points_threshold']
-        return config
+    # def dyn_rec_callback(self, config, level):
+    #    self.rk_logger.info("Received reconf call: " + str(config))
+    #    self.descriptor.parameters.hsv_min = (config['h_min'], config['s_min'], config['v_min'])
+    #    self.descriptor.parameters.hsv_max = (config['h_max'], config['s_max'], config['v_max'])
+    #    self.descriptor.parameters.erosion_iterations = config['erosion_iterations']
+    #    self.descriptor.parameters.contour_min_size = config['contour_min_size']
+    #    self.descriptor.parameters.num_of_objects = config['num_of_objects']
+    #    self.descriptor.parameters.min_points_threshold = config['min_points_threshold']
+    #    return config
 
     def __init__(self, name="ImageClusterExtractor", descriptor=Descriptor()):
-        """
-        Default construction. Minimal one-time init!
-        """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         self.color = None
+        self.depth = None
+        self.query = None
+        self.cam_intrinsics = None
 
+        # TODO Refactor this to new RPC method without using ROS
         # Add variables (name, description, default value, min, max, edit_method)
-        self.declare_parameter("h_min", self.descriptor.parameters.hsv_min[0],
-                               ParameterDescriptor(min_value=str(0), max_value=str(359)))
-        self.declare_parameter("h_max", self.descriptor.parameters.hsv_max[0],
-                               ParameterDescriptor(min_value=str(0), max_value=str(359)))
-        self.declare_parameter("s_min", self.descriptor.parameters.hsv_min[1],
-                               ParameterDescriptor(min_value=str(0), max_value=str(255)))
-        self.declare_parameter("s_max", self.descriptor.parameters.hsv_max[1],
-                               ParameterDescriptor(min_value=str(0), max_value=str(255)))
+        # self.declare_parameter("h_min", self.descriptor.parameters.hsv_min[0],
+        #                       ParameterDescriptor(min_value=str(0), max_value=str(359)))
+        # self.declare_parameter("h_max", self.descriptor.parameters.hsv_max[0],
+        #                       ParameterDescriptor(min_value=str(0), max_value=str(359)))
+        # self.declare_parameter("s_min", self.descriptor.parameters.hsv_min[1],
+        #                       ParameterDescriptor(min_value=str(0), max_value=str(255)))
+        # self.declare_parameter("s_max", self.descriptor.parameters.hsv_max[1],
+        #                       ParameterDescriptor(min_value=str(0), max_value=str(255)))
 
-        self.declare_parameter("v_min", self.descriptor.parameters.hsv_min[2],
-                               ParameterDescriptor(min_value=str(0), max_value=str(255)))
-        self.declare_parameter("v_max", self.descriptor.parameters.hsv_max[2],
-                               ParameterDescriptor(min_value=str(0), max_value=str(255)))
+        # self.declare_parameter("v_min", self.descriptor.parameters.hsv_min[2],
+        #                       ParameterDescriptor(min_value=str(0), max_value=str(255)))
+        # self.declare_parameter("v_max", self.descriptor.parameters.hsv_max[2],
+        #                       ParameterDescriptor(min_value=str(0), max_value=str(255)))
 
-        self.declare_parameter("erosion_iterations", self.descriptor.parameters.erosion_iterations,
-                               ParameterDescriptor(min_value=str(0), max_value=str(20)))
+        # self.declare_parameter("erosion_iterations", self.descriptor.parameters.erosion_iterations,
+        #                       ParameterDescriptor(min_value=str(0), max_value=str(20)))
 
-        self.declare_parameter("contour_min_size", self.descriptor.parameters.contour_min_size,
-                               ParameterDescriptor(min_value=str(0), max_value=str(20000)))
+        # self.declare_parameter("contour_min_size", self.descriptor.parameters.contour_min_size,
+        #                       ParameterDescriptor(min_value=str(0), max_value=str(20000)))
 
-        self.declare_parameter("num_of_objects", self.descriptor.parameters.num_of_objects,
-                               ParameterDescriptor(min_value=str(1), max_value=str(6)))
+        # self.declare_parameter("num_of_objects", self.descriptor.parameters.num_of_objects,
+        #                       ParameterDescriptor(min_value=str(1), max_value=str(6)))
 
-        self.declare_parameter("min_points_threshold", self.descriptor.parameters.min_points_threshold,
-                               ParameterDescriptor(min_value=str(0), max_value=str(100)))
+        # self.declare_parameter("min_points_threshold", self.descriptor.parameters.min_points_threshold,
+        # ParameterDescriptor(min_value=str(0), max_value=str(100)))
 
         self.display_mode = self.ViewMode.masked_object
 
@@ -230,18 +223,13 @@ class ImageClusterExtractor(robokudo.annotators.core.BaseAnnotator):
 
         self.adjust_hsv_threshold_to_query()
 
-        # TODO Be aware that the height is mis-set in the cam info!
-
         # Apply the HSV threshold on the image and find contours on the resultant binary image
         hsv_mask = cv2.inRange(self.hsv, self.descriptor.parameters.hsv_min, self.descriptor.parameters.hsv_max)
         contours, hierarchy = cv2.findContours(image=hsv_mask, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_SIMPLE)
 
         if len(contours) == 0:
             # Fail if no contours have been found
-            # TODO Handle failures in a pipeline properly in the Sequence/Pipeline!
             raise Exception(f"Couldn't find contour")
-            # self.send_empty_query_answer()
-            # return py_trees.Status.SUCCESS  # TODO See above: This should actually be FAILURE and then catch it
 
         # Visualization purposes
         result = copy.deepcopy(resized_color)
@@ -256,23 +244,8 @@ class ImageClusterExtractor(robokudo.annotators.core.BaseAnnotator):
         largest_elements = sorted_areas[:self.descriptor.parameters.num_of_objects]
         filtered_contours = [contours[i] for i, area in enumerate(contour_areas) if area in largest_elements]
 
-        # self.send_empty_query_answer()
-        # return py_trees.Status.SUCCESS  # TODO See above: This should actually be FAILURE and then catch it
-
-        # contour_with_size = [(c, cv2.contourArea(c)) for c in contours]
-        # contour_with_size_sorted = sorted(contour_with_size, key=lambda tup: tup[1], reverse=True)
-
-        # largest_contour = contours[contour_idx_with_largest_area]
-
-        # amount_of_contours = 50
-        # contours_to_display = numpy.asarray([x for (x, y) in contour_with_size_sorted])
-        # contours_to_display = contours_to_display[0:amount_of_contours]
-        # Draw only the boundaries around the detected shape
-        # cv2.drawContours(image=result, contours=contours, contourIdx=-1, color=(0, 255, 0), thickness=2,
-        #                  lineType=cv2.LINE_AA)
-
         # Draw a 'mask' based on the contours
-        # This will completly mask out the area inside a contour instead of just drawing contour points
+        # This will completely mask out the area inside a contour instead of just drawing contour points
         # List to store ObjectHypothesis instances
         object_hypotheses = []
         visualized_geometries = []
@@ -315,14 +288,13 @@ class ImageClusterExtractor(robokudo.annotators.core.BaseAnnotator):
             visualized_geometries.append(cloud)
 
             if len(cloud.points) >= self.descriptor.parameters.min_points_threshold:
-                # Create ObjectHypothesis instance
+                # Create an ObjectHypothesis instance
 
                 object_hypothesis = robokudo.types.scene.ObjectHypothesis()
                 # Set ObjectHypothesis attributes
-                object_hypothesis.id = i
+                object_hypothesis.id = str(i)
                 object_hypothesis.source = self.name
                 object_hypothesis.points = cloud
-                # object_hypothesis.point_indices = None  # TODO?
 
                 # Calculate bounding rectangle for the current contour
                 x, y, w, h = cv2.boundingRect(contour)
@@ -369,18 +341,6 @@ class ImageClusterExtractor(robokudo.annotators.core.BaseAnnotator):
         self.feedback_message = f'Processing took {(end_timer - start_timer):.4f}s'
         return py_trees.common.Status.SUCCESS
 
-    def send_empty_query_answer(self):
-        """Send empty query result when no objects are found.
-
-        Creates and sets an empty QueryResult message on the blackboard.
-
-        :return: None
-        """
-        blackboard = py_trees.Blackboard()
-        from robokudo.identifier import BBIdentifier
-        import robokudo_msgs.msg
-        blackboard.set(BBIdentifier.QUERY_ANSWER, robokudo_msgs.msg.QueryResult())
-
     def key_callback(self, key):
         """Handle keyboard input to change visualization mode.
 
@@ -392,9 +352,3 @@ class ImageClusterExtractor(robokudo.annotators.core.BaseAnnotator):
             self.display_mode = self.ViewMode.masked_object
         if key == ord('2'):
             self.display_mode = self.ViewMode.depth_mask
-
-
-"""ROS1 TO ROS2 
-The ROS2 version uses the built-in parameter declaration system of ROS2 nodes.
- This system also allows for parameters to be changed at runtime.
- """
