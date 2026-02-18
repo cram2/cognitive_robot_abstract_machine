@@ -18,23 +18,27 @@ The module is used for:
 * Output type safety
 """
 import logging
+
 import numpy as np
 import py_trees
-import robokudo.annotators.outputs
-import robokudo.defs
 from py_trees.behaviour import Behaviour
+
+import robokudo.defs
+import robokudo.pipeline
+import robokudo.utils.tree
+
 
 class AnnotatorOutputStruct:
     """
-    Container for annotator-specific outputs. These will get consumed by the GUI after the pipeline is ran or you have used the SetPipelineRedraw Behaviour. Check out the GUI related classes for more details.
+    Container for annotator-specific outputs. These will get consumed by the GUI after the pipeline is run,
+    or you have used the SetPipelineRedraw Behaviour. Check out the GUI-related classes for more details.
 
     This class stores and manages different types of outputs
-    (e.g. images, point clouds) for a single annotator.
+    (e.g., images, point clouds) for a single annotator.
 
     :ivar image: Image output data
     :type image: numpy.ndarray
-    :ivar point_cloud: Point cloud output data
-    :type point_cloud: open3d.geometry.PointCloud
+    :ivar geometries: Open3D Geometries data. Will be passed to o3d.visualization.O3DVisualizer.add_geometry.
     """
 
     def __init__(self):
@@ -43,8 +47,7 @@ class AnnotatorOutputStruct:
         """
         self.image = np.zeros((640, 480, 3), dtype="uint8")
         self.geometries = None
-        #self.lock = None
-        self.render_next_time = True  # render defaults on first run
+        self.render_next_time = True  # render defaults on the first run
 
     def set_image(self, img):
         """
@@ -66,6 +69,7 @@ class AnnotatorOutputStruct:
         self.geometries = geometries
         self.render_next_time = True
 
+
 class AnnotatorOutputs:
     """
     Container for all annotator outputs in a pipeline.
@@ -86,7 +90,7 @@ class AnnotatorOutputs:
 
     def init_annotator(self, annotator_name):
         """
-        Initialize output structure for an annotator.
+        Initialize the output structure for an annotator.
 
         :param annotator_name: Name of the annotator
         :type annotator_name: str
@@ -114,14 +118,15 @@ class AnnotatorOutputPerPipelineMap:
         """
         Initialize an empty pipeline map.
         """
-        self.map = {} # Key: Pipeline Name, Value: AnnotatorOutputs
+        self.map = {}  # Key: Pipeline Name, Value: AnnotatorOutputs
 
 
 class ClearAnnotatorOutputs(Behaviour):
     """
     Put directly in the corresponding RK Pipeline
     """
-    def __init__(self,name='ClearAnnotatorOutputs'):
+
+    def __init__(self, name='ClearAnnotatorOutputs'):
         super().__init__("ClearAnnotatorOutputs")
         self.rk_logger = logging.getLogger(robokudo.defs.PACKAGE_NAME)
 
@@ -132,12 +137,9 @@ class ClearAnnotatorOutputs(Behaviour):
         assert (isinstance(annotator_output_pipeline_map_buffer,
                            robokudo.annotators.outputs.AnnotatorOutputPerPipelineMap))
 
-        # TODO This should maybe be a method in BaseAnnotator
         pipeline = robokudo.utils.tree.find_parent_of_type(self, robokudo.pipeline.Pipeline)
         annotator_outputs = annotator_output_pipeline_map_buffer.map[pipeline.name]
         assert (isinstance(annotator_outputs, robokudo.annotators.outputs.AnnotatorOutputs))
         annotator_outputs.clear_outputs()
 
         return py_trees.common.Status.SUCCESS
-
-
