@@ -453,7 +453,7 @@ def test_close(immutable_multiple_robot_apartment):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            PoseStamped.from_list([1.46, 2.0, 0], [0, 0, 0.4, 1], world.root)
+            PoseStamped.from_list([1.65, 2.0, 0], [0, 0, 0.4, 1], world.root)
         ),
         CloseActionDescription(world.get_body_by_name("handle_cab10_m"), [Arms.LEFT]),
     )

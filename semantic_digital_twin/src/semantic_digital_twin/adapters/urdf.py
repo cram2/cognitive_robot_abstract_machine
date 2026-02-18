@@ -135,6 +135,8 @@ class URDFParser:
     def from_file(cls, file_path: str, prefix: Optional[str] = None) -> URDFParser:
         if file_path.endswith(".xacro"):
             return cls.from_xacro(file_path, prefix)
+
+        file_path = CompositePathResolver().resolve(file_path)
         if file_path is not None:
             with open(file_path, "r") as file:
                 # Since parsing URDF causes a lot of warning messages which can't be deactivated, we suppress them

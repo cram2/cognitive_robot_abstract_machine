@@ -9,13 +9,38 @@ requires-python = ">=3.10,<3.13"
 description = "Meta-package that wires local subprojects together"
 readme = "README.md"
 authors = [{ name = "AICOR Institute", email = "you@example.com" }]
-# IMPORTANT: Use absolute file URLs for portability
-# The names must match each subproject’s [project.name]
-#dependencies = [
-#  "pycram-robotics @ file:///home/jonas/workspace/cognitive_robot_abstract_machine/pycram",
-#  "giskardpy @ file:///home/jonas/workspace/cognitive_robot_abstract_machine/giskardpy",
-#  "semantic_digital_twin @ file:///home/jonas/workspace/cognitive_robot_abstract_machine/semantic_digital_twin",
-#]
+
+# Add dependencies on all workspace members by their distribution names
+# uv will resolve these to editable installs via [tool.uv.sources]
+dependencies = [
+  "pycram-robotics",
+  "giskardpy",
+  "semantic_digital_twin",
+  "krrood",
+  "random-events",
+  "probabilistic_model",
+  "multiverse_simulators"
+]
+
+[tool.uv.workspace]
+members = [
+  "pycram",
+  "giskardpy",
+  "semantic_digital_twin",
+  "krrood",
+  "random_events",
+  "probabilistic_model",
+  "multiverse_simulators"
+]
+
+[tool.uv.sources]
+pycram-robotics       = { workspace = true }
+giskardpy             = { workspace = true }
+semantic_digital_twin = { workspace = true }
+krrood                = { workspace = true }
+probabilistic_model   = { workspace = true }
+random_events         = { workspace = true }
+multiverse_simulators = { workspace = true }
 
 [tool.poetry]
 package-mode = false
@@ -29,7 +54,5 @@ random_events = { path = "random_events", develop = true }
 probabilistic_model = { path = "probabilistic_model", develop = true }
 multiverse_simulators = { path = "multiverse_simulators", develop = true }
 
-
 [tool.setuptools]
-# Make the root distribution package-less (no auto-discovery)
 packages = []
