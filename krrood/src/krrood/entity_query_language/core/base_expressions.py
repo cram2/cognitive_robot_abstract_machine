@@ -394,21 +394,33 @@ class SymbolicExpression(ABC):
             return cls._symbolic_expression_stack_[-1]
         return None
 
-    @cached_property
+    @property
     def _unique_variables_(self) -> Set[Variable]:
         """
         :return: Set of unique variables in this symbolic expression.
         """
         return make_set(self._all_variable_instances_)
 
-    @cached_property
-    @abstractmethod
+    @property
     def _all_variable_instances_(self) -> List[Variable]:
         """
         Get the leaf instances of the symbolic expression.
         This is useful for accessing the leaves of the symbolic expression tree.
         """
-        ...
+        from .variable import Variable
+
+        return [c for c in self._children_ if isinstance(c, Variable)]
+
+    @property
+    def _leaves_(self) -> Iterator[SymbolicExpression]:
+        """
+        Get the leaf instances of the symbolic expression.
+        This is useful for accessing the leaves of the symbolic expression tree.
+        """
+        if len(self._children_) == 0:
+            yield self
+        for child in self._children_:
+            yield from child.leaves
 
     def __and__(self, other):
         from ..operators.core_logical_operators import AND
@@ -474,10 +486,6 @@ class UnaryExpression(SymbolicExpression, ABC):
         if self._child_ is old_child:
             self._child_ = new_child
 
-    @cached_property
-    def _all_variable_instances_(self) -> List[Selectable]:
-        return self._child_._all_variable_instances_
-
     @property
     def _name_(self) -> str:
         return self.__class__.__name__
@@ -515,17 +523,6 @@ class MultiArityExpression(SymbolicExpression, ABC):
     def update_children(self, *children: SymbolicExpression) -> None:
         self._operation_children_ = self._update_children_(*children)
 
-    @cached_property
-    def _all_variable_instances_(self) -> List[Selectable]:
-        """
-        Get the leaf instances of the symbolic expression.
-        This is useful for accessing the leaves of the symbolic expression tree.
-        """
-        variables = []
-        for child in self._operation_children_:
-            variables.extend(child._all_variable_instances_)
-        return variables
-
     @property
     def _name_(self) -> str:
         return self.__class__.__name__
@@ -557,14 +554,6 @@ class BinaryExpression(SymbolicExpression, ABC):
             self.left = new_child
         elif self.right is old_child:
             self.right = new_child
-
-    @cached_property
-    def _all_variable_instances_(self) -> List[Selectable]:
-        """
-        Get the leaf instances of the symbolic expression.
-        This is useful for accessing the leaves of the symbolic expression tree.
-        """
-        return self.left._all_variable_instances_ + self.right._all_variable_instances_
 
 
 @dataclass(eq=False, repr=False)

@@ -154,10 +154,6 @@ class DomainMapping(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         self._var_ = self
 
     @cached_property
-    def _all_variable_instances_(self) -> List[Variable]:
-        return self._child_._all_variable_instances_
-
-    @cached_property
     def _type_(self):
         return self._child_._type_
 

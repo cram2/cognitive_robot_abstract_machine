@@ -162,10 +162,6 @@ class Variable(CanBehaveLikeAVariable[T]):
     def _name_(self):
         return self._name__
 
-    @cached_property
-    def _all_variable_instances_(self) -> List[Variable]:
-        return [self]
-
     @property
     def _is_iterable_(self):
         return is_iterable(next(iter(self._domain_), None))
@@ -290,13 +286,6 @@ class InstantiatedVariable(
             if v is old_child:
                 self._child_vars_[k] = new_child
                 break
-
-    @cached_property
-    def _all_variable_instances_(self) -> List[Variable]:
-        variables = [self]
-        for v in self._child_vars_.values():
-            variables.extend(v._all_variable_instances_)
-        return variables
 
 
 DomainType = TypingUnion[Iterable[T], None]

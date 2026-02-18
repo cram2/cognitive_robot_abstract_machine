@@ -543,11 +543,12 @@ def distinct(
     """
     Indicate that the result of the expression should be distinct.
     """
-    if isinstance(expression, Query):
-        return expression.distinct(*on)
-    elif isinstance(expression, ResultQuantifier):
-        return expression._child_.distinct(*on)
-    elif isinstance(expression, Selectable):
-        return entity(expression).distinct(*on)
-    else:
-        raise UnsupportedExpressionTypeForDistinct(type(expression))
+    match expression:
+        case Query():
+            return expression.distinct(*on)
+        case ResultQuantifier():
+            return expression._child_.distinct(*on)
+        case Selectable():
+            return entity(expression).distinct(*on)
+        case _:
+            raise UnsupportedExpressionTypeForDistinct(type(expression))

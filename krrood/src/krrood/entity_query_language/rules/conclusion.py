@@ -50,12 +50,6 @@ class Conclusion(SymbolicExpression, ABC):
         elif self.value is old_child:
             self.value = new_child
 
-    @cached_property
-    def _all_variable_instances_(self) -> List[Selectable]:
-        return (
-            self.variable._all_variable_instances_ + self.value._all_variable_instances_
-        )
-
     @property
     def _name_(self) -> str:
         value_str = (

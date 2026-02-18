@@ -509,10 +509,6 @@ class SetOfSelectable(UnaryExpression, CanBehaveLikeAVariable[T]):
     def _name_(self) -> str:
         return f"{self._set_of_._name_}[{self._selected_var_._name_}]"
 
-    @cached_property
-    def _all_variable_instances_(self) -> List[Selectable]:
-        return self._set_of_._all_variable_instances_
-
 
 @dataclass(eq=False, repr=False)
 class Entity(Query, CanBehaveLikeAVariable[T]):
