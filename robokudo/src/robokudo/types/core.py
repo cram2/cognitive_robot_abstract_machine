@@ -62,13 +62,6 @@ class Query(Type):
     """
 
 
-# class Scene(Identifiable):
-#     def __init__(self):
-#         super(Scene, self).__init__()
-#         self.timestamp = 0
-#         self.viewpoint = None  # type: BaseAnnotator #TODO TF time stamped
-#
-
 @dataclass
 class Annotation(Type):
     """Base class for all annotations.
