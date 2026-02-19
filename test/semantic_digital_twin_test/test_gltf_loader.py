@@ -22,6 +22,28 @@ import os
 class TestGLTFLoader:
     """Test suite for GLTFLoader."""
 
+    def test_invalid_file_path(self):
+        """Test handling of non-existent file."""
+        world = World()
+        loader = GLTFLoader(file_path="/nonexistent/path/file.gltf")
+
+        with pytest.raises(ValueError, match="Failed to load file"):
+            world = loader.apply(world)
+
+    def test_malformed_gltf(self):
+        """Test handling of malformed GLTF data."""
+        with tempfile.NamedTemporaryFile(suffix=".gltf", delete=False, mode='w') as f:
+            f.write("{ invalid json without closing brace")
+            temp_path = f.name
+
+        try:
+            world = World()
+            loader = GLTFLoader(file_path=temp_path)
+
+            with pytest.raises(ValueError, match="Failed to load file"):
+                world = loader.apply(world)
+        finally:
+            os.unlink(temp_path)
     def test_empty_gltf_file(self):
         """Test handling of GLTF file with only a root node (no geometry)."""
         # Create minimal scene with empty root mesh

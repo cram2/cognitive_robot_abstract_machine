@@ -300,12 +300,8 @@ class GLTFLoader(Step):
         return self._build_world_from_elements(world_elements, connection, world)
 
     def _apply(self, world: World) -> World:
-        """Load GLTF/GLB file and create world objects.
-
-        Note: This is called within modify_world() context by Step.apply()
-        """
+        """Load GLTF/GLB file and create world objects."""
         try:
-
             self.scene = trimesh.load(self.file_path)
             if self.scene is None:
                 raise ValueError("Failed to load scene from file")
@@ -314,10 +310,19 @@ class GLTFLoader(Step):
 
         # Handle case where trimesh loads a single mesh instead of a Scene
         if isinstance(self.scene, trimesh.Trimesh):
-            # Wrap single mesh in a scene
             mesh = self.scene
             self.scene = trimesh.Scene()
             self.scene.add_geometry(mesh, node_name="root", geom_name="root_geom")
+
+        if len(self.scene.geometry) == 0:
+            root = self._get_root_node()
+            empty_body = Body(
+                name=PrefixedName(root),
+                collision=ShapeCollection([]),
+                visual=ShapeCollection([])
+            )
+            world.add_kinematic_structure_entity(empty_body)
+            return world
 
         return self._create_world_objects(world)
 
