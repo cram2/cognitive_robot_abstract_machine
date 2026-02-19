@@ -9,6 +9,7 @@ from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.pose import PoseStamped
+from pycram.datastructures.trajectory import PoseTrajectory
 from pycram.language import SequentialPlan
 from pycram.motion_executor import simulated_robot
 from pycram.testing import _make_sine_scan_poses
@@ -282,7 +283,7 @@ def test_move_tcp_follows_sine_waypoints(immutable_tracy_block_world):
         reference_frame=world.root,
     )
     target_pose = PoseStamped.from_spatial_type(anchor_T @ offset_T)
-    waypoints = _make_sine_scan_poses(target_pose, lane_axis="z")
+    waypoints = PoseTrajectory(_make_sine_scan_poses(target_pose, lane_axis="z"))
 
     plan = SequentialPlan(
         context,
@@ -294,7 +295,7 @@ def test_move_tcp_follows_sine_waypoints(immutable_tracy_block_world):
     tip_pose = right_arm.manipulator.tool_frame.global_pose
     tip_position = tip_pose.to_position().to_np()
     tip_orientation = tip_pose.to_quaternion().to_np()
-    expected = waypoints[-1]
+    expected = waypoints.poses[-1]
 
     assert tip_position[:3] == pytest.approx(expected.position.to_list(), abs=0.03)
     compare_orientations(
