@@ -1,7 +1,13 @@
 from typing_extensions import List
 
-from krrood.entity_query_language.factories import variable_from, contains, entity, inference, variable, \
-    set_of
+from krrood.entity_query_language.factories import (
+    variable_from,
+    contains,
+    entity,
+    inference,
+    variable,
+    set_of,
+)
 from ...semantic_annotations.semantic_annotations import (
     Wardrobe,
     Door,
@@ -29,7 +35,11 @@ def conclusion_90574698325129464513441443063592862114(case) -> List[Handle]:
     def get_handles(case: World) -> List[Handle]:
         """Get possible value(s) for World.semantic_annotations of types list/set of Handle"""
         kse = variable_from(case.kinematic_structure_entities)
-        return entity(inference(Handle)(root=kse)).where(contains(kse.name.name.lower(), "handle")).tolist()
+        return (
+            entity(inference(Handle)(root=kse))
+            .where(contains(kse.name.name.lower(), "handle"))
+            .tolist()
+        )
 
     return get_handles(case)
 
@@ -48,9 +58,14 @@ def conclusion_331345798360792447350644865254855982739(case) -> List[Drawer]:
         handle = variable(Handle, case.semantic_annotations)
         fixed_connection = variable(FixedConnection, case.connections)
         prismatic_connection = variable(PrismaticConnection, case.connections)
-        return entity(inference(Drawer)(root=fixed_connection.parent, handle=handle)).where(
-            fixed_connection.child == handle.root,
-            fixed_connection.parent == prismatic_connection.child).tolist()
+        return (
+            entity(inference(Drawer)(root=fixed_connection.parent, handle=handle))
+            .where(
+                fixed_connection.child == handle.root,
+                fixed_connection.parent == prismatic_connection.child,
+            )
+            .tolist()
+        )
 
     return get_drawers(case)
 
@@ -68,10 +83,17 @@ def conclusion_35528769484583703815352905256802298589(case) -> List[Wardrobe]:
         """Get possible value(s) for World.semantic_annotations of types list/set of Wardrobe"""
         drawer = variable(Drawer, case.semantic_annotations)
         prismatic_connection = variable(PrismaticConnection, case.connections)
-        drawers_per_wardrobe = set_of(prismatic_connection, drawer).where(
-            prismatic_connection.child == drawer.root).grouped_by(prismatic_connection.parent)
-        return inference(Wardrobe)(root=drawers_per_wardrobe[prismatic_connection].parent,
-                                   drawers=drawers_per_wardrobe[drawer]).to_list()
+        return (
+            entity(
+                inference(Wardrobe)(
+                    root=prismatic_connection.parent,
+                    drawers=drawer,
+                )
+            )
+            .where(prismatic_connection.child == drawer.root)
+            .grouped_by(prismatic_connection.parent)
+            .tolist()
+        )
 
     return get_wardrobes(case)
 
@@ -152,8 +174,8 @@ def conclusion_10840634078579061471470540436169882059(case) -> List[Fridge]:
             c
             for c in case.connections
             if isinstance(c, RevoluteConnection)
-               and c.child in fridge_doors_bodies
-               and "fridge" in c.parent.name.name.lower()
+            and c.child in fridge_doors_bodies
+            and "fridge" in c.parent.name.name.lower()
         ]
         return [
             Fridge(
