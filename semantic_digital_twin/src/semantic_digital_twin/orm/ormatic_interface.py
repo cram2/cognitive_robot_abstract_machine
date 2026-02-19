@@ -183,6 +183,26 @@ class WorldMappingDAO_degrees_of_freedom_association(Base, AssociationDataAccess
     )
 
 
+class ConnectionDAO_simulator_additional_properties_association(
+    Base, AssociationDataAccessObject
+):
+
+    __tablename__ = "ConnectionDAO_simulator_additional_properties_association"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_connectiondao_id: Mapped[int] = mapped_column(
+        ForeignKey("ConnectionDAO.database_id")
+    )
+    target_simulatoradditionalpropertydao_id: Mapped[int] = mapped_column(
+        ForeignKey("SimulatorAdditionalPropertyDAO.database_id")
+    )
+
+    target: Mapped[SimulatorAdditionalPropertyDAO] = relationship(
+        "SimulatorAdditionalPropertyDAO",
+        foreign_keys=[target_simulatoradditionalpropertydao_id],
+    )
+
+
 class HasDoorsDAO_doors_association(Base, AssociationDataAccessObject):
 
     __tablename__ = "HasDoorsDAO_doors_association"
@@ -1661,6 +1681,14 @@ class ConnectionDAO(
         use_existing_column=True,
     )
 
+    simulator_additional_properties: Mapped[
+        builtins.list[ConnectionDAO_simulator_additional_properties_association]
+    ] = relationship(
+        "ConnectionDAO_simulator_additional_properties_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[ConnectionDAO_simulator_additional_properties_association.source_connectiondao_id]",
+    )
     parent: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,

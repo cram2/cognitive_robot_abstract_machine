@@ -49,19 +49,20 @@ def robot_in_collision(
 
     world = robot._world
 
-    world.collision_manager.clear_temporary_rules()
-    world.collision_manager.add_temporary_rule(
-        AvoidExternalCollisions(
-            buffer_zone_distance=threshold,
-            robot=robot,
+    with world.modify_world():
+        world.collision_manager.clear_temporary_rules()
+        world.collision_manager.add_temporary_rule(
+            AvoidExternalCollisions(
+                buffer_zone_distance=threshold,
+                robot=robot,
+            )
         )
-    )
-    world.collision_manager.add_temporary_rule(AllowSelfCollisions(robot=robot))
-    world.collision_manager.add_temporary_rule(
-        AllowCollisionBetweenGroups(
-            body_group_a=robot.bodies, body_group_b=ignore_collision_with
+        world.collision_manager.add_temporary_rule(AllowSelfCollisions(robot=robot))
+        world.collision_manager.add_temporary_rule(
+            AllowCollisionBetweenGroups(
+                body_group_a=robot.bodies, body_group_b=ignore_collision_with
+            )
         )
-    )
     world.collision_manager.update_collision_matrix()
 
     collisions = world.collision_manager.compute_collisions()

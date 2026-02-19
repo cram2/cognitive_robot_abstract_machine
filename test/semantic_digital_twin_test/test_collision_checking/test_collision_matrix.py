@@ -54,29 +54,30 @@ class TestCollisionRules:
         pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
 
         collision_manager = CollisionManager(
-            pr2_world_copy,
-            collision_detector=BulletCollisionDetector(pr2_world_copy),
+            _world=pr2_world_copy,
+            collision_detector=BulletCollisionDetector(_world=pr2_world_copy),
         )
-        collision_manager.add_default_rule(
-            AvoidAllCollisions(
-                buffer_zone_distance=0.2,
-                violated_distance=0.05,
+        with pr2_world_copy.modify_world():
+            collision_manager.add_default_rule(
+                AvoidAllCollisions(
+                    buffer_zone_distance=0.2,
+                    violated_distance=0.05,
+                )
             )
-        )
-        collision_manager.add_default_rule(
-            AvoidExternalCollisions(
-                buffer_zone_distance=0.1,
-                robot=pr2,
-                body_subset={torso_lift_link},
+            collision_manager.add_default_rule(
+                AvoidExternalCollisions(
+                    buffer_zone_distance=0.1,
+                    robot=pr2,
+                    body_subset={torso_lift_link},
+                )
             )
-        )
-        collision_manager.add_default_rule(
-            AvoidExternalCollisions(
-                buffer_zone_distance=0.05,
-                robot=pr2,
-                body_subset={head_pan_link},
+            collision_manager.add_default_rule(
+                AvoidExternalCollisions(
+                    buffer_zone_distance=0.05,
+                    robot=pr2,
+                    body_subset={head_pan_link},
+                )
             )
-        )
         collision_manager.update_collision_matrix()
         # PR2 has a rule for base_link: buffer=0.2, violated=0.05
         # It's added to low_priority_rules
@@ -91,7 +92,8 @@ class TestCollisionRules:
         override_rule = AvoidAllCollisions(
             buffer_zone_distance=0.5, violated_distance=0.1
         )
-        collision_manager.add_temporary_rule(override_rule)
+        with pr2_world_copy.modify_world():
+            collision_manager.add_temporary_rule(override_rule)
         collision_manager.update_collision_matrix()
         assert collision_manager.get_buffer_zone_distance(base_link, env) == 0.5
         assert collision_manager.get_violated_distance(base_link, env) == 0.1

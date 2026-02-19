@@ -735,7 +735,7 @@ class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
 
 
 @dataclass(eq=False)
-class Connection(WorldEntity, SubclassJSONSerializer):
+class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
     """
     Represents a connection between two entities in the world.
     """

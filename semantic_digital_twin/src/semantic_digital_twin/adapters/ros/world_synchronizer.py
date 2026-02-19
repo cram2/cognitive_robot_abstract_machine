@@ -25,11 +25,12 @@ from ...orm.ormatic_interface import *
 from ...world import World
 from ...world_description.world_entity import (
     WorldEntityWithClassBasedID,
+    WorldEntityWithID,
 )
 
 
 @dataclass
-class Synchronizer(WorldEntityWithClassBasedID):
+class Synchronizer(WorldEntityWithID):
     """
     Abstract Synchronizer class to manage world synchronizations between processes running semantic digital twin.
     It manages publishers and subscribers, ensuring proper cleanup after use.
@@ -150,6 +151,8 @@ class SynchronizerOnCallback(Synchronizer, Callback, ABC):
     def _subscription_callback(self, msg: Message):
         if self._is_paused:
             self.missed_messages.append(msg)
+            print(f"{self._world.name=}, {type(self)}")
+            print(len(self.missed_messages))
         else:
             self.apply_message(msg)
 
