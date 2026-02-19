@@ -15,9 +15,81 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.connections import FixedConnection
 
+import tempfile
+import os
+
 
 class TestGLTFLoader:
     """Test suite for GLTFLoader."""
+
+    def test_empty_gltf_file(self):
+        """Test handling of GLTF file with only a root node (no geometry)."""
+        # Create minimal scene with empty root mesh
+        scene = trimesh.Scene()
+        empty_mesh = trimesh.Trimesh()  # Empty mesh with 0 vertices
+        scene.add_geometry(empty_mesh, node_name="root", geom_name="empty_geom")
+
+        with tempfile.NamedTemporaryFile(suffix=".glb", delete=False) as f:
+            temp_path = f.name
+
+        scene.export(temp_path, file_type="glb")
+
+        try:
+            world = World()
+            loader = GLTFLoader(file_path=temp_path)
+            world = loader.apply(world)
+
+            # Should create body with empty collision shapes
+            assert world.root is not None
+            assert len(world.root.collision.shapes) == 0
+        finally:
+            os.unlink(temp_path)
+
+    def test_non_geometry_nodes_only(self):
+        """Test GLTF with transform nodes that have no actual mesh data."""
+        scene = trimesh.Scene()
+
+        # Root with geometry, child without geometry
+        mesh = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
+        scene.add_geometry(mesh, node_name="root", geom_name="root_geom")
+
+        # Add transform-only node (will be skipped during processing)
+        scene.graph.update(
+            frame_to="transform_node",
+            frame_from="root",
+            transform=trimesh.transformations.translation_matrix([1, 0, 0])
+        )
+
+        # Add leaf with geometry as child of transform node
+        leaf_mesh = trimesh.creation.icosphere(radius=0.3)
+        scene.add_geometry(
+            leaf_mesh,
+            node_name="leaf",
+            geom_name="leaf_geom",
+            parent_node_name="transform_node",
+            transform=trimesh.transformations.translation_matrix([0, 1, 0])
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".glb", delete=False) as f:
+            temp_path = f.name
+
+        scene.export(temp_path, file_type="glb")
+
+        try:
+            world = World()
+            loader = GLTFLoader(file_path=temp_path)
+            world = loader.apply(world)
+
+            # Should skip transform_node and connect leaf directly to root
+            assert len(list(world.kinematic_structure_entities)) == 2
+
+            # Verify transform_node was skipped
+            body_names = {str(b.name) for b in world.kinematic_structure_entities}
+            assert "root" in body_names
+            assert "leaf" in body_names
+            assert "transform_node" not in body_names
+        finally:
+            os.unlink(temp_path)
 
     def test_trimesh_to_body(self):
         """Test converting a trimesh to Body object."""
@@ -80,7 +152,7 @@ class TestGLTFLoader:
     def test_get_root_node_multiple_fails(self):
         """Test that multiple roots raises error."""
         mesh1 = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
-        mesh2 = trimesh.creation.icosphere(radius=0.5)  # Fixed: use icosphere
+        mesh2 = trimesh.creation.icosphere(radius=0.5)
 
         scene = trimesh.Scene()
         scene.add_geometry(mesh1, node_name="root1", geom_name="geom1")
@@ -117,7 +189,7 @@ class TestGLTFLoader:
     def test_build_world_with_connections(self):
         """Test building world with parent-child connections."""
         mesh1 = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
-        mesh2 = trimesh.creation.icosphere(radius=0.5)  # Fixed: use icosphere
+        mesh2 = trimesh.creation.icosphere(radius=0.5)
 
         loader = GLTFLoader(file_path="/dummy/path.gltf")
         parent_body = loader._trimesh_to_body(mesh1, "parent")
@@ -133,7 +205,7 @@ class TestGLTFLoader:
         world_elements = {"parent": parent_body, "child": child_body}
         connection = {"parent": ["child"], "child": []}
 
-        # Fixed: wrap in modify_world context
+        # Wrap in modify_world context
         with world.modify_world():
             world = loader._build_world_from_elements(world_elements, connection, world)
 

@@ -1,6 +1,9 @@
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Set
+import re
 
+import numpy as np
 import trimesh
+
 from .pipeline import Step
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -9,15 +12,40 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.geometry import TriangleMesh, Scale
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-import re
 
 class GLTFLoader(Step):
+    """Load GLTF/GLB files into a World.
 
-    file_path: str #where i get it??
+    This loader parses GLTF/GLB files (including FreeCAD exports) and creates
+    Body objects with FixedConnection relationships matching the scene hierarchy.
+
+    Features:
+    - Handles FreeCAD naming conventions (e.g., Bolt_001, Bolt_002 are fused)
+    - Applies node transformations correctly
+    - Skips non-geometry nodes while preserving hierarchy
+    - Creates proper parent-child connections
+
+    Example:
+        >>> world = World()
+        >>> loader = GLTFLoader(file_path="model.gltf")
+        >>> world = loader.apply(world)
+
+    Limitations:
+    - Only creates FixedConnection (no joints/articulations)
+    - Does not handle GLTF extensions for physics/joints
+
+    Attributes:
+        file_path: Path to the GLTF/GLB file
+        scene: The loaded trimesh Scene (set after _apply is called)
+    """
+
+    file_path: str
     scene: trimesh.Scene = None
 
-    def __init__(self, file_path: str):
+
+    def __init__(self, file_path: str,):
         self.file_path = file_path
+
 
     def _get_root_node(self) -> str:
         base_frame = self.scene.graph.base_frame
@@ -27,12 +55,21 @@ class GLTFLoader(Step):
         return root_children[0]
 
     def _get_relative_transform(self, parent_node: str, child_node: str) -> HomogeneousTransformationMatrix:
-        """Get the relative transform from parent to child node."""
+        """Get the relative transform from parent to child node.
+
+        Computes the transform that converts from parent frame to child frame.
+
+        Args:
+            parent_node: Name of the parent node
+            child_node: Name of the child node
+
+        Returns:
+            The relative transformation matrix from parent to child
+        """
         parent_transform, _ = self.scene.graph.get(parent_node)
         child_transform, _ = self.scene.graph.get(child_node)
 
         # Compute relative transform: parent_inv @ child
-        import numpy as np
         parent_inv = np.linalg.inv(parent_transform)
         relative = parent_inv @ child_transform
 
@@ -59,43 +96,87 @@ class GLTFLoader(Step):
 
         return body
 
-    def _grouping_similar_meshes(self, base_node) -> Tuple[set, set]:
-        base_name_pattern = re.compile(r"^(.*?)(_[A-Za-z0-9]+)?$")#could be diffrent systems but freeCAD export always this
-        #biggest problem if same names connect it will fuse then like Bolt_Simple
-        base_name, _ = base_name_pattern.match(base_node).groups()
+    def _grouping_similar_meshes(self, base_node: str) -> Tuple[Set[str], Set[str]]:
+        """Group meshes with similar names (e.g., Bolt_001, Bolt_002 -> Bolt).
+
+        FreeCAD exports parts with suffixes like _001, _002, etc.
+        This method groups them for fusion.
+        """
+        # Extract base name by removing trailing _XXX suffix (numbers or short alphanumeric)
+        base_name_match = re.match(r"^(.+?)(?:_\d+|_[A-Za-z]\d*)?$", str(base_node))
+        if base_name_match:
+            base_name = base_name_match.group(1)
+        else:
+            base_name = str(base_node)
+
         object_nodes = set()
         object_nodes.add(base_node)
         new_object_notes = set()
         to_search = [base_node]
-        while to_search:
+        max_iterations = 10000  # Safety limit to prevent infinite loops
+        iterations = 0
+
+        while to_search and iterations < max_iterations:
+            iterations += 1
             node = to_search.pop()
             children = self.scene.graph.transforms.children.get(node, [])
             for child in children:
                 if child in object_nodes:
                     continue
-                elif base_name_pattern.match(str(child)):
+                # Check if child has the same base name
+                child_str = str(child)
+                child_match = re.match(r"^(.+?)(?:_\d+|_[A-Za-z]\d*)?$", child_str)
+                child_base = child_match.group(1) if child_match else child_str
+
+                if child_base == base_name:
                     object_nodes.add(child)
                     to_search.append(child)
                 else:
                     new_object_notes.add(child)
+
+        if iterations >= max_iterations:
+            print(f"Warning: Hit max iterations in _grouping_similar_meshes for {base_node}")
+
         return object_nodes, new_object_notes
 
-    def _fusion_meshes(self, object_nodes) -> trimesh.Trimesh:
+    def _fusion_meshes(self, object_nodes: Set[str]) -> trimesh.Trimesh:
+        """Fuse multiple mesh nodes into a single mesh.
+
+        Applies the world transform to each mesh before concatenating them.
+
+        Args:
+            object_nodes: Set of node names to fuse
+
+        Returns:
+            A single concatenated mesh, or empty Trimesh if no geometry found
+        """
         meshes: List[trimesh.Trimesh] = []
         for node in object_nodes:
             transform, geometry_name = self.scene.graph.get(node)
-            mesh = self.scene.geometry.get(geometry_name).copy()
-            if mesh is None:
-                continue #should not happen but just in case
+            if geometry_name is None:
+                continue
+            geometry = self.scene.geometry.get(geometry_name)
+            if geometry is None:
+                continue
+            mesh = geometry.copy()
             mesh.apply_transform(transform)
             meshes.append(mesh)
         if meshes:
             return trimesh.util.concatenate(meshes)
-        return trimesh.Trimesh() # should not happen but just in case
+        return trimesh.Trimesh()  # Empty mesh if no geometry found
 
     def _build_world_from_elements(self, world_elements: Dict[str, Body], connection: Dict[str, List[str]],
                                    world: World) -> World:
+        """Build the world from parsed elements and their connections.
 
+        Args:
+            world_elements: Dictionary mapping node names to Body objects
+            connection: Dictionary mapping parent node names to list of child node names
+            world: The world to add entities to
+
+        Returns:
+            The modified world
+        """
         object_root = self._get_root_node()
         if object_root not in world_elements:
             raise ValueError(f"Root node '{object_root}' not found in world_elements")
@@ -129,16 +210,24 @@ class GLTFLoader(Step):
                     name=PrefixedName(f"{node}_{child}")
                 )
                 world.add_connection(conn)
-        print(len(world_elements), len(connection))
         return world
 
-    def _create_world_objects(self, world) -> World:
+    def _create_world_objects(self, world: World) -> World:
+        """Parse the scene graph and create world objects with connections.
+
+        This method traverses the scene graph, groups similar meshes (e.g., Bolt_001, Bolt_002),
+        fuses them, and creates Body objects with parent-child connections.
+
+        Non-geometry nodes (like transforms/sketches) are skipped but their children
+        are still processed with the correct parent body.
+        """
         root = self._get_root_node()
         world_elements = {}
-        connection = {} # will be filled greedy first to note no more against cycle if directed
+        connection = {}
         visited_nodes = set()
         to_visit_new_node = set()
-        # Root is special case, no geometry cant be ingnored.
+
+        # Root is special case, no geometry can't be ignored.
         trans, root_geometry = self.scene.graph.get(root)
         if root_geometry is None:
             root_body = Body(
@@ -155,11 +244,17 @@ class GLTFLoader(Step):
         else:
             object_nodes, new_object_notes = self._grouping_similar_meshes(root)
             node_fusion_mesh = self._fusion_meshes(object_nodes)
+            visited_nodes = visited_nodes.union(object_nodes)
+            for child in new_object_notes:
+                to_visit_new_node.add((child, root))
             root_body = self._trimesh_to_body(node_fusion_mesh, root)
             world_elements[root] = root_body
             connection[root] = []
 
+
         while to_visit_new_node:
+            # Check if we've hit the limit
+
             node, body_parent = to_visit_new_node.pop()
             if node in visited_nodes:
                 continue
@@ -167,7 +262,7 @@ class GLTFLoader(Step):
             _, geometry_name = self.scene.graph.get(node)
 
             if geometry_name is None:
-                # Non-geometry node, just track connections
+                # Non-geometry node, just track connections and pass through
                 new_nodes = self.scene.graph.transforms.children.get(node, [])
                 for child in new_nodes:
                     if child not in visited_nodes:
@@ -175,11 +270,21 @@ class GLTFLoader(Step):
                 visited_nodes.add(node)
                 continue
 
-            # Geometry node: create body
+
             object_nodes, new_object_notes = self._grouping_similar_meshes(node)
             node_fusion_mesh = self._fusion_meshes(object_nodes)
+            visited_nodes = visited_nodes.union(object_nodes)
+
+
+            if len(node_fusion_mesh.vertices) == 0:
+                visited_nodes.add(node)
+                for child in new_object_notes.difference(visited_nodes):
+                    to_visit_new_node.add((child, body_parent))
+                continue
+
             body = self._trimesh_to_body(node_fusion_mesh, node)
             world_elements[node] = body
+
 
             # Connect to body_parent
             if body_parent in connection:
@@ -190,16 +295,30 @@ class GLTFLoader(Step):
             for child in new_object_notes.difference(visited_nodes):
                 to_visit_new_node.add((child, node))
 
-            visited_nodes = visited_nodes.union(object_nodes)
             visited_nodes.add(node)
 
         return self._build_world_from_elements(world_elements, connection, world)
 
-    #Wolrd is empty complet overwrite???
     def _apply(self, world: World) -> World:
-        self.scene = trimesh.load(self.file_path)
-        if self.scene is None:
-            raise ValueError("Failed to load scene from file.")
+        """Load GLTF/GLB file and create world objects.
+
+        Note: This is called within modify_world() context by Step.apply()
+        """
+        try:
+
+            self.scene = trimesh.load(self.file_path)
+            if self.scene is None:
+                raise ValueError("Failed to load scene from file")
+        except Exception as e:
+            raise ValueError(f"Failed to load file: {e}")
+
+        # Handle case where trimesh loads a single mesh instead of a Scene
+        if isinstance(self.scene, trimesh.Trimesh):
+            # Wrap single mesh in a scene
+            mesh = self.scene
+            self.scene = trimesh.Scene()
+            self.scene.add_geometry(mesh, node_name="root", geom_name="root_geom")
+
         return self._create_world_objects(world)
 
 
