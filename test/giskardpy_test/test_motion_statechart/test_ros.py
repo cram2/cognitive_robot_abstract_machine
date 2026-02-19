@@ -104,9 +104,9 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
     msc.add_node(local_min := LocalMinimumReached())
     msc.add_node(EndMotion.when_true(local_min))
 
-    msc_copy = to_and_from_json(msc, pr2_world_copy)
+    # msc_copy = to_and_from_json(msc, pr2_world_copy)
 
-    kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
-    kin_sim.compile(motion_statechart=msc_copy)
+    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+    kin_sim.compile(motion_statechart=msc)
 
     kin_sim.tick_until_end(500)

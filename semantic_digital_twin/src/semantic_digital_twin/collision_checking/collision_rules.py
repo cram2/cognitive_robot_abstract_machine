@@ -79,7 +79,7 @@ class AllowCollisionRule(CollisionRule, ABC):
     """
     Set of collision checks that are allowed to occur.
     """
-    allowed_collision_bodies: set[Body] = field(default_factory=set)
+    allowed_collision_bodies: set[Body] = field(default_factory=set, init=False)
     """
     Set of bodies that are allowed to collide.
     """
@@ -292,7 +292,7 @@ class AllowCollisionForAdjacentPairs(AllowCollisionRule):
 
 
 @dataclass
-class SelfCollisionMatrixRule(AllowCollisionRule):
+class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
     """
     Used to load collision matrices sorted as srdf, e.g., those created by moveit.
     """
@@ -352,4 +352,30 @@ class SelfCollisionMatrixRule(AllowCollisionRule):
             self.allowed_collision_pairs.add(
                 CollisionCheck.create_and_validate(body_a, body_b)
             )
+        return self
+
+    def to_json(self) -> Dict[str, Any]:
+        """ """
+        ...
+        allowed_body_ids = {body.id for body in self.allowed_collision_bodies}
+
+        return {
+            **super().to_json(),
+            "allowed_body_ids": to_json(allowed_body_ids),
+            "allowed_collision_pairs": to_json(self.allowed_collision_pairs),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        allowed_body_ids = from_json(data["allowed_body_ids"], **kwargs)
+        allowed_bodies = {
+            tracker.get_world_entity_with_id(id=_id) for _id in allowed_body_ids
+        }
+        self = cls()
+        self.allowed_collision_bodies = allowed_bodies
+        self.allowed_collision_pairs = set(
+            from_json(data["allowed_collision_pairs"], **kwargs)
+        )
+
         return self

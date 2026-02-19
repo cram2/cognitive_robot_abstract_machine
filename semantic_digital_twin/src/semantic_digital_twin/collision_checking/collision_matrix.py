@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class CollisionCheck:
+class CollisionCheck(SubclassJSONSerializer):
     body_a: Body
     """
     First body in the collision check.
@@ -68,6 +68,23 @@ class CollisionCheck:
     def sort_bodies(self):
         if self.body_a.id > self.body_b.id:
             self.body_a, self.body_b = self.body_b, self.body_a
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "body_a": to_json(self.body_a.id),
+            "body_b": to_json(self.body_b.id),
+            "distance": to_json(self.distance),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        return cls(
+            body_a=tracker.get_world_entity_with_id(id=from_json(data["body_a"])),
+            body_b=tracker.get_world_entity_with_id(id=from_json(data["body_b"])),
+            distance=data["distance"],
+        )
 
 
 @dataclass
