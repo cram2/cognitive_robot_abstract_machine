@@ -333,10 +333,9 @@ class BoundingBoxCollection(ShapeCollection):
             ), "All shapes must have the same reference frame."
 
         local_bbs = [shape.local_frame_bounding_box for shape in shapes]
-        reference_frame = shapes[0].origin.reference_frame
         return cls(
             [bb.transform_to_origin(bb.origin) for bb in local_bbs],
-            reference_frame,
+            shapes.reference_frame,
         )
 
     def as_shapes(self) -> ShapeCollection:

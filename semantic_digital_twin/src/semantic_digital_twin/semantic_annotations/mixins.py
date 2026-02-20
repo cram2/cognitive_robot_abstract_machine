@@ -7,6 +7,13 @@ import numpy as np
 import trimesh
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     uniform_measure_of_event,
+    fully_factorized,
+)
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProbabilisticCircuit,
+    ProductUnit,
+    SumUnit,
+    leaf,
 )
 from random_events.product_algebra import Event
 from typing_extensions import (
@@ -19,6 +26,7 @@ from typing_extensions import (
 )
 
 from krrood.ormatic.utils import classproperty
+from probabilistic_model.distributions import GaussianDistribution
 from ..datastructures.prefixed_name import PrefixedName
 from ..datastructures.variables import SpatialVariables
 from ..exceptions import (
@@ -250,6 +258,10 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
             )
             parent_entity = parent_entity.parent_kinematic_structure_entity
         return future_root_T_self
+
+    @property
+    def global_pose(self) -> HomogeneousTransformationMatrix:
+        return self.root.global_pose
 
 
 @dataclass(eq=False)
@@ -570,6 +582,22 @@ class HasStorageSpace(HasRootBody, ABC):
         self._attach_child_entity_in_kinematic_structure(object.root)
         self.objects.append(object)
 
+    def get_objects_of_type(
+        self, object_type: Type[SemanticAnnotation]
+    ) -> List[HasRootBody]:
+        """
+        Returns all objects of a given type in the semantic annotation.
+
+        ..warning:: object_type does not have to be a subclass of HasRootBody, as some semantic concepts, for example
+        Food may not necessarily inherit from HasRootBody, but some objects stored in here may inherit from Food as well
+        as HasRootBody.
+
+        :param object_type: The type of the semantic annotations to return.
+
+        :return: A list of semantic annotations of the given type.
+        """
+        return [obj for obj in self.objects if isinstance(obj, object_type)]
+
 
 @dataclass(eq=False)
 class HasSupportingSurface(HasStorageSpace, ABC):
@@ -582,29 +610,30 @@ class HasSupportingSurface(HasStorageSpace, ABC):
     The supporting surface region of the semantic annotation.
     """
 
-    @synchronized_attribute_modification
     def calculate_supporting_surface(
         self,
         upward_threshold: float = 0.95,
         clearance_threshold: float = 0.5,
         min_surface_area: float = 0.0225,  # 15cm x 15cm
-    ):
+    ) -> Optional[Region]:
         """
-        Calculate and set the supporting surface region for the semantic annotation.
+        Calculate the supporting surface region for the semantic annotation, and add it to the world
 
         :param upward_threshold: The threshold for the face normal to be considered upward-facing.
         :param clearance_threshold: The threshold for the vertical clearance above the surface.
         :param min_surface_area: The minimum area for a surface to be considered a supporting surface.
+
+        :return: The supporting surface region, or None if no suitable region could be found.
         """
         mesh = self.root.combined_mesh
         if mesh is None:
-            return
+            return None
         # --- Find upward-facing faces ---
         normals = mesh.face_normals
         upward_mask = normals[:, 2] > upward_threshold
 
         if not upward_mask.any():
-            return
+            return None
 
         # --- Find connected upward-facing regions ---
         upward_face_indices = np.nonzero(upward_mask)[0]
@@ -615,7 +644,7 @@ class HasSupportingSurface(HasStorageSpace, ABC):
         large_groups = [g for g in face_groups if g.area >= min_surface_area]
 
         if not large_groups:
-            return
+            return None
 
         # --- Merge qualifying upward-facing submeshes ---
         candidates = trimesh.util.concatenate(large_groups)
@@ -639,9 +668,7 @@ class HasSupportingSurface(HasStorageSpace, ABC):
         clear_mask = (distances > clearance_threshold) | np.isinf(distances)
 
         if not clear_mask.any():
-            raise ValueError(
-                "No upward-facing surfaces with sufficient clearance found."
-            )
+            return None
 
         candidates_filtered = candidates.submesh([clear_mask], append=True)
 
@@ -665,131 +692,88 @@ class HasSupportingSurface(HasStorageSpace, ABC):
         self_C_supporting_surface = FixedConnection(
             parent=self.root, child=supporting_surface
         )
-        with self._world.modify_world():
-            self._world.add_region(supporting_surface)
-            self._world.add_connection(self_C_supporting_surface)
-        self.supporting_surface = supporting_surface
+        self._world.add_region(supporting_surface)
+        self._world.add_connection(self_C_supporting_surface)
         return supporting_surface
 
-    def points_on_supporting_surface(self, amount: int = 100) -> List[Point3]:
-        """
-        Get a set of points on the supporting surface of the semantic annotation.
-        If there are any objects stored in the semantic annotation, their geometry is subtracted from the area that is sampled.
+    @synchronized_attribute_modification
+    def add_supporting_surface(self, region: Region):
+        self._attach_child_entity_in_kinematic_structure(region)
+        self.supporting_surface = region
 
-        :param amount: The number of points to sample.
-
-        :return: A list of sampled points.
-        """
-        area_of_table = BoundingBoxCollection.from_shapes(self.root.collision)
-        event = area_of_table.event
-
-        event_2d = event.marginal(SpatialVariables.xy)
-        for object in self.objects:
-            object_event = BoundingBoxCollection.from_shapes(
-                object.root.collision
-            ).event
-            object_event_2d = object_event.marginal(SpatialVariables.xy)
-            event_2d = event_2d - object_event_2d
-
-        p = uniform_measure_of_event(event)
-        p = p.marginal(SpatialVariables.xy)
-        samples = p.sample(amount)
-        z_coordinate = np.full(
-            (amount, 1), max([b.max_z for b in area_of_table]) + 0.01
-        )
-        samples = np.concatenate((samples, z_coordinate), axis=1)
-        return [Point3(*s, reference_frame=self.root) for s in samples]
-
-    def points_on_supporting_surface_for_object(
-        self, physical_object: HasRootBody, amount: int = 100
-    ) -> List[Point3]:
-        """
-        Get a set of points on the supporting surface of the semantic annotation.
-        The largest x or y dimension value of the object is used to enlarge the area of the objects stored in
-        the semantic annotation, whose geometry is subtracted from the area that is sampled. This is to ensure the physical object
-        does not collide with any of the objects stored in the semantic annotation when placed on one of the sampled points.
-
-        :param physical_object: The physical object to sample points for.
-        :param amount: The number of points to sample.
-
-        :return: A list of sampled points.
-        """
-
-        largest_xy_dimension = physical_object.root.combined_mesh.extents[:2].max()
-
-        area_of_table = BoundingBoxCollection.from_shapes(self.root.collision)
-        event = area_of_table.event
-
-        event_2d = event.marginal(SpatialVariables.xy)
-        for object in self.objects:
-            object_event = (
-                BoundingBoxCollection.from_shapes(object.root.collision)
-                .bounding_box()
-                .enlarge_all(largest_xy_dimension)
-                .simple_event.as_composite_set()
-            )
-            object_event_2d = object_event.marginal(SpatialVariables.xy)
-            event_2d = event_2d - object_event_2d
-
-        p = uniform_measure_of_event(event)
-        p = p.marginal(SpatialVariables.xy)
-        samples = p.sample(amount)
-        z_coordinate = np.full(
-            (amount, 1), max([b.max_z for b in area_of_table]) + 0.01
-        )
-        samples = np.concatenate((samples, z_coordinate), axis=1)
-        return [Point3(*s, reference_frame=self.root) for s in samples]
-
-    def points_on_supporting_surface_for_object_around_object(
+    def sample_points_from_surface(
         self,
-        physical_object: HasRootBody,
-        around_object: HasRootBody,
+        body_to_sample_for: Optional[HasRootBody] = None,
+        category_of_interest: Optional[Type[SemanticAnnotation]] = None,
         amount: int = 100,
+        calculate_supporting_surface_if_not_set: bool = False,
     ) -> List[Point3]:
         """
-        Get a set of points on the supporting surface of the semantic annotation.
-        The largest x or y dimension value of the object is used to enlarge the area of the objects stored in
-        the semantic annotation, whose geometry is subtracted from the area that is sampled. This is to ensure the physical object
-        does not collide with any of the objects stored in the semantic annotation when placed on one of the sampled points.
-        Before returning the sampled points, they are sorted by the distance to the around_object, with the closest points first.
+        Samples points from a surface considering constraints such as object collisions, object
+        dimensions, and specified categories of interest.
 
-        :param physical_object: The physical object to sample points for.
-        :param around_object: The object to place the sampled points around.
+        :param body_to_sample_for: The physical object to sample points for.
+        :param category_of_interest: The object to place the sampled points around.
         :param amount: The number of points to sample.
 
         :return: A list of sampled points, sorted by distance to the around_object.
         """
+        if calculate_supporting_surface_if_not_set and self.supporting_surface is None:
+            with self._world.modify_world():
+                surface_region = self.calculate_supporting_surface()
+            with self._world.modify_world():
+                self.add_supporting_surface(surface_region)
+        largest_xy_object_dimension = body_to_sample_for.root.combined_mesh.extents[
+            :2
+        ].max()
+        z_object_dimension = body_to_sample_for.root.combined_mesh.extents[2]
 
-        largest_xy_dimension = physical_object.root.combined_mesh.extents[:2].max()
-
-        area_of_table = BoundingBoxCollection.from_shapes(self.root.collision)
+        area_of_table = BoundingBoxCollection.from_shapes(self.supporting_surface.area)
+        area_of_table.transform_all_shapes_to_own_frame()
         event = area_of_table.event
 
         event_2d = event.marginal(SpatialVariables.xy)
-        for object in self.objects:
+        for obj in self.objects:
             object_event = (
-                BoundingBoxCollection.from_shapes(object.root.collision)
+                BoundingBoxCollection.from_shapes(obj.root.collision)
                 .bounding_box()
-                .enlarge_all(largest_xy_dimension)
+                .enlarge_all(largest_xy_object_dimension)
                 .simple_event.as_composite_set()
             )
             object_event_2d = object_event.marginal(SpatialVariables.xy)
             event_2d = event_2d - object_event_2d
 
-        p = uniform_measure_of_event(event)
-        p = p.marginal(SpatialVariables.xy)
-        samples = p.sample(amount)
+        surface_circuit = ProbabilisticCircuit()
+        surface_circuit_root = SumUnit(probabilistic_circuit=surface_circuit)
 
-        def distance_to_object(sample, around_object):
-            return np.linalg.norm(
-                sample[:2]
-                - around_object.root.parent_connection.origin.to_position()[:2]
+        for obj in self.get_objects_of_type(category_of_interest):
+            world_P_obj = obj.global_pose.to_position()
+
+            p_object_root = ProductUnit(probabilistic_circuit=surface_circuit)
+            surface_circuit_root.add_subcircuit(p_object_root, 1.0)
+
+            x_p = GaussianDistribution(
+                SpatialVariables.x.value,
+                float(world_P_obj[0]),
+                largest_xy_object_dimension,
             )
+            y_p = GaussianDistribution(
+                SpatialVariables.y.value,
+                float(world_P_obj[1]),
+                largest_xy_object_dimension,
+            )
+            p_object_root.add_subcircuit(leaf(x_p, surface_circuit))
+            p_object_root.add_subcircuit(leaf(y_p, surface_circuit))
 
-        samples = sorted(samples, key=lambda s: distance_to_object(s, around_object))
+        surface_circuit.truncated(event_2d)
+
+        samples = surface_circuit.sample(amount)
+
+        samples = samples[np.argsort(surface_circuit.log_likelihood(samples))[::-1]]
 
         z_coordinate = np.full(
-            (amount, 1), max([b.max_z for b in area_of_table]) + 0.01
+            (amount, 1),
+            max([b.max_z for b in area_of_table]) + (z_object_dimension / 2),
         )
         samples = np.concatenate((samples, z_coordinate), axis=1)
 
