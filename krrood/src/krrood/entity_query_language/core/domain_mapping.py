@@ -42,9 +42,6 @@ from ..utils import (
 )
 from ...symbol_graph.symbol_graph import SymbolGraph
 
-if TYPE_CHECKING:
-    from .variable import Variable
-
 
 @dataclass(eq=False, repr=False)
 class CanBehaveLikeAVariable(Selectable[T], ABC):
@@ -59,22 +56,6 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
     """
     A storage of created domain mappings to prevent recreating same mapping multiple times.
     """
-
-    def _update_truth_value_(self, current_value: Any) -> None:
-        """
-        Updates the truth value of the variable based on the current value.
-
-        :param current_value: The current value of the variable.
-        """
-        # Calculating the truth value is not always done for efficiency. The truth value is updated only when this
-        # operation is a child of a TruthValueOperator.
-        if isinstance(self._parent_, TruthValueOperator):
-            is_true = (
-                len(current_value) > 0
-                if is_iterable(current_value)
-                else bool(current_value)
-            )
-            self._is_false_ = not is_true
 
     def _get_domain_mapping_(
         self, type_: Type[DomainMapping], *args, **kwargs
@@ -223,7 +204,7 @@ class Attribute(DomainMapping):
     """
 
     @property
-    def _is_iterable_(self):
+    def _original_value_is_iterable_and_this_operation_preserves_that_(self):
         if not self._wrapped_field_:
             return False
         return self._wrapped_field_.is_iterable
@@ -351,9 +332,9 @@ class Flatten(DomainMapping):
         return f"Flatten({self._child_._name_})"
 
     @property
-    def _is_iterable_(self):
+    def _original_value_is_iterable_and_this_operation_preserves_that_(self):
         """
-        :return: False as Flatten does not preserve the original iterable structure.
+        :return: False as Flatten loops inside the iterable yielding element by element.
         """
         return False
 

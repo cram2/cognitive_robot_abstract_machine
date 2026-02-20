@@ -30,7 +30,7 @@ from typing_extensions import (
 )
 
 from ..failures import NoExpressionFoundForGivenID
-from ..utils import make_list, T, make_set
+from ..utils import make_list, T, make_set, is_iterable
 from ...symbol_graph.symbol_graph import SymbolGraph
 
 if TYPE_CHECKING:
@@ -48,7 +48,7 @@ class SymbolicExpression(ABC):
     """
     Base class for all symbolic expressions.
 
-    Symbolic expressions form a rooted directed acyclic graph (rooted DAG) and are evaluated lazily to produce
+    Symbolic expressions form a rooted directed acyclic graph and are evaluated lazily to produce
     bindings for variables, subject to logical constraints.
     """
 
@@ -300,7 +300,6 @@ class SymbolicExpression(ABC):
     ) -> Iterator[OperationResult]:
         """
         Evaluate the symbolic expression and set the operands indices.
-        This method should be implemented by subclasses.
         """
         pass
 
@@ -561,8 +560,8 @@ class BinaryExpression(SymbolicExpression, ABC):
 @dataclass(eq=False, repr=False)
 class TruthValueOperator(SymbolicExpression, ABC):
     """
-    An abstract superclass for operators that work with truth values of operations, thus requiring its children expressions to update
-    their truth value when yielding results.
+    An abstract superclass for operators that work with truth values of operations, thus requiring its children
+     expressions to update their truth value when yielding results.
     """
 
 
@@ -570,7 +569,9 @@ class TruthValueOperator(SymbolicExpression, ABC):
 class DerivedExpression(SymbolicExpression, ABC):
     """
     A symbolic expression that has its results derived from another symbolic expression, and thus it's value is the
-    value of the child expression.
+    value of the child expression. For example, filter expressions just filter the results of their children but they
+    do not produce a new value of their own, thus they do not have a binding that belongs to them specifically in the
+    result bindings dictionary.
     """
 
     @property
@@ -598,7 +599,6 @@ class Filter(DerivedExpression, TruthValueOperator, ABC):
     """
     Data source that evaluates the truth value for each data point according to a condition expression and filters out
     the data points that do not satisfy the condition.
-    The truth value of this expression is derived from the truth value of the condition expression.
     """
 
     @property
@@ -609,7 +609,7 @@ class Filter(DerivedExpression, TruthValueOperator, ABC):
     @abstractmethod
     def condition(self) -> SymbolicExpression:
         """
-        The conditions expression which generate the valid bindings that satisfy the constraints.
+        The conditions expression that generates the valid bindings that satisfy the constraints.
         """
         ...
 
@@ -725,8 +725,36 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
 
     _type_: Type[T] = field(init=False, default=None)
     """
-    The type of the variable.
+    The type of the selectable.
     """
+
+    def _build_operation_result_and_update_truth_value_(
+        self, bindings: Bindings
+    ) -> OperationResult:
+        """
+        Build an OperationResult instance and update the truth value based on the bindings.
+
+        :param bindings: The bindings of the result.
+        :return: The OperationResult instance with an updated truth value.
+        """
+        self._update_truth_value_(bindings[self._binding_id_])
+        return OperationResult(bindings, self._is_false_, self)
+
+    def _update_truth_value_(self, current_value: Any) -> None:
+        """
+        Updates the truth value of the variable based on the current value.
+
+        :param current_value: The current value of the variable.
+        """
+        # Calculating the truth value is not always done for efficiency. The truth value is updated only when this
+        # operation is a child of a TruthValueOperator.
+        if isinstance(self._parent_, TruthValueOperator):
+            is_true = (
+                len(current_value) > 0
+                if is_iterable(current_value)
+                else bool(current_value)
+            )
+            self._is_false_ = not is_true
 
     @cached_property
     def _binding_id_(self) -> int:
@@ -754,12 +782,21 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
         return result.value
 
     @property
-    def _is_iterable_(self):
+    def _original_value_is_iterable_and_this_operation_preserves_that_(self):
         """
         Whether the selectable is iterable.
 
         :return: True if the selectable is iterable, False otherwise.
         """
         if self._var_ and self._var_ is not self:
-            return self._var_._is_iterable_
+            return (
+                self._var_._original_value_is_iterable_and_this_operation_preserves_that_
+            )
         return False
+
+    @cached_property
+    def _name_(self):
+        if self._type_:
+            return self._type_.__name__
+        else:
+            return f"{self.__class__.__name__}({type(next(iter(self._domain_source_))).__name__, ...})"
