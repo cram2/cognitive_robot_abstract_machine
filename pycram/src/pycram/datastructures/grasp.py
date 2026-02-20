@@ -51,7 +51,9 @@ class GraspDescription:
     The offset between the center of the pose in the grasp sequence
     """
 
-    def _pose_sequence(self, pose: PoseStamped, body: Body = None, reverse: bool = False) -> List[PoseStamped]:
+    def _pose_sequence(
+        self, pose: PoseStamped, body: Body = None, reverse: bool = False
+    ) -> List[PoseStamped]:
         """
         Calculates the pose sequence to grasp something at the pose if the body is given its geometry is also taken into
         account. The pose sequence consists of 3 poses: one in front of the body (taking body geometry into account),
@@ -69,27 +71,40 @@ class GraspDescription:
         grasp_orientation = self.grasp_orientation()
 
         if body:
-            bb_in_frame = body.collision.as_bounding_box_collection_in_frame(body).bounding_box()
+            bb_in_frame = body.collision.as_bounding_box_collection_in_frame(
+                body
+            ).bounding_box()
 
-            approach_axis = np.array(self.approach_direction.axis.value, dtype=np.bool)
+            approach_axis = np.array(self.approach_direction.axis.value, dtype=bool)
 
             # Pre-pose calculation
-            offset = (np.array(bb_in_frame.dimensions)[approach_axis] / 2 + self.manipulation_offset)[0]
+            offset = (
+                np.array(bb_in_frame.dimensions)[approach_axis] / 2
+                + self.manipulation_offset
+            )[0]
         else:
             offset = 0
 
-        pre_pose = PoseStamped.from_list(pose.position.to_list(), pose.orientation.to_list(), frame=pose_frame)
+        pre_pose = PoseStamped.from_list(
+            pose.position.to_list(), pose.orientation.to_list(), frame=pose_frame
+        )
         pre_pose.rotate_by_quaternion(grasp_orientation)
-        pre_pose = translate_pose_along_local_axis(pre_pose, self.manipulation_axis(), -offset)
+        pre_pose = translate_pose_along_local_axis(
+            pre_pose, self.manipulation_axis(), -offset
+        )
 
         grasp_pose = deepcopy(pose)
         grasp_pose.rotate_by_quaternion(grasp_orientation)
 
         # Lift pose calculation
-        lift_pose_map = PoseStamped.from_spatial_type(world.transform(pose.to_spatial_type(), world.root))
+        lift_pose_map = PoseStamped.from_spatial_type(
+            world.transform(pose.to_spatial_type(), world.root)
+        )
         lift_pose_map.position.z += self.manipulation_offset
 
-        lift_pose =  PoseStamped.from_spatial_type(world.transform(lift_pose_map.to_spatial_type(), pose_frame))
+        lift_pose = PoseStamped.from_spatial_type(
+            world.transform(lift_pose_map.to_spatial_type(), pose_frame)
+        )
         lift_pose.rotate_by_quaternion(grasp_orientation)
 
         sequence = [pre_pose, grasp_pose, lift_pose]
@@ -116,7 +131,7 @@ class GraspDescription:
         :param pose: The pose at which the body in the manipulator should be placed
         :return: The pose sequence.
         """
-        body =  self.manipulator.tool_frame.child_kinematic_structure_entities[0]
+        body = self.manipulator.tool_frame.child_kinematic_structure_entities[0]
         return self._pose_sequence(pose, body, reverse=True)
 
     def manipulation_axis(self) -> List[float]:
@@ -128,7 +143,6 @@ class GraspDescription:
         """
         return self.calculate_manipulator_axis(AxisIdentifier.X)
 
-
     def lift_axis(self) -> List[float]:
         """
         Axis of the manipulator that is lifting the body. Translates the z-axis of the global frame to how the
@@ -137,7 +151,6 @@ class GraspDescription:
         :returns: The axis of the manipulator that is lifting the body.
         """
         return self.calculate_manipulator_axis(AxisIdentifier.Z)
-
 
     def calculate_manipulator_axis(self, axis: AxisIdentifier) -> List[float]:
         """
@@ -151,7 +164,13 @@ class GraspDescription:
             *axis_list, reference_frame=self.manipulator._world.root
         )
 
-        grasp_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(0, 0, 0, *self.manipulator.front_facing_orientation.to_np(), reference_frame=self.manipulator._world.root)
+        grasp_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
+            0,
+            0,
+            0,
+            *self.manipulator.front_facing_orientation.to_np(),
+            reference_frame=self.manipulator._world.root,
+        )
         world = self.manipulator._world
 
         front_global = world.transform(front_pose, world.root)
@@ -175,7 +194,9 @@ class GraspDescription:
             rotation, Rotations.HORIZONTAL_ROTATIONS[self.rotate_gripper]
         )
 
-        orientation = quaternion_multiply(rotation, self.manipulator.front_facing_orientation.to_np())
+        orientation = quaternion_multiply(
+            rotation, self.manipulator.front_facing_orientation.to_np()
+        )
 
         norm = math.sqrt(sum(comp**2 for comp in orientation))
         orientation = [comp / norm for comp in orientation]
@@ -192,10 +213,10 @@ class GraspDescription:
         rim_direction_index = self.approach_direction.value[0].value.index(1)
 
         rim_offset = (
-                body.collision.as_bounding_box_collection_in_frame(body)
-                .bounding_box()
-                .dimensions[rim_direction_index]
-                / 2
+            body.collision.as_bounding_box_collection_in_frame(body)
+            .bounding_box()
+            .dimensions[rim_direction_index]
+            / 2
         )
         return rim_offset
 
@@ -209,16 +230,18 @@ class GraspDescription:
         """
         edge_offset = -self.edge_offset(body) if grasp_edge else 0
         orientation = self.grasp_orientation()
-        grasp_pose = PoseStamped().from_list([edge_offset, 0, 0], orientation, frame=body)
+        grasp_pose = PoseStamped().from_list(
+            [edge_offset, 0, 0], orientation, frame=body
+        )
 
         return grasp_pose
 
     @classmethod
     def calculate_grasp_descriptions(
-            cls,
-            manipulator: Manipulator,
-            pose: PoseStamped,
-            grasp_alignment: Optional[PreferredGraspAlignment] = None,
+        cls,
+        manipulator: Manipulator,
+        pose: PoseStamped,
+        grasp_alignment: Optional[PreferredGraspAlignment] = None,
     ) -> List[GraspDescription]:
         """
         This method determines the possible grasp configurations (approach axis and vertical alignment) of the body,
@@ -231,7 +254,9 @@ class GraspDescription:
         :return: A sorted list of GraspDescription instances representing all grasp permutations.
         """
         world = manipulator._world
-        objectTmap = PoseStamped.from_spatial_type(world.transform(pose.to_spatial_type(), world.root))
+        objectTmap = PoseStamped.from_spatial_type(
+            world.transform(pose.to_spatial_type(), world.root)
+        )
 
         robot_pose = PoseStamped.from_spatial_type(manipulator._robot.root.global_pose)
 
@@ -283,8 +308,8 @@ class GraspDescription:
 
     @staticmethod
     def calculate_closest_faces(
-            pose_to_robot_vector: PyCramVector3,
-            specified_grasp_axis: AxisIdentifier = AxisIdentifier.Undefined,
+        pose_to_robot_vector: PyCramVector3,
+        specified_grasp_axis: AxisIdentifier = AxisIdentifier.Undefined,
     ) -> Union[
         Tuple[ApproachDirection, ApproachDirection],
         Tuple[VerticalAlignment, VerticalAlignment],
@@ -351,6 +376,7 @@ class GraspDescription:
         )
 
         return primary_face, secondary_face
+
 
 @dataclass
 class PreferredGraspAlignment:

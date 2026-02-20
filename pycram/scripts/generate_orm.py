@@ -56,6 +56,12 @@ classes, alternative_mappings, type_mappings = get_classes_of_ormatic_interface(
     semantic_digital_twin.orm.ormatic_interface
 )
 
+# filter out test classes that should not be in the production ORM
+classes = [c for c in classes if not c.__module__.startswith("test.")]
+alternative_mappings = [
+    am for am in alternative_mappings if not am.__module__.startswith("test.")
+]
+
 classes = set(classes)
 
 # create of classes that should be mapped

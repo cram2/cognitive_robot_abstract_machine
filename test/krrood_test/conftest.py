@@ -102,31 +102,29 @@ def generate_sqlalchemy_interface():
 
 def pytest_configure(config):
     """
-    Generate ormatic_interface.py before krrood_test collection.
-
-    This hook runs before pytest collects tests and imports modules,
-    ensuring the generated file exists before any module-level imports.
+    Set log levels before krrood_test collection.
     """
 
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
     logging.getLogger("numpy").setLevel(logging.WARNING)
 
 
-def pytest_sessionstart(session):
-    try:
-        generate_sqlalchemy_interface()
+# Generate ormatic_interface.py at module level, before the star import below.
+# This must happen here (not in a pytest hook) because hooks run after the
+# conftest module is fully imported, which means the import on the next line
+# would fail if the generated file is stale or missing.
+try:
+    generate_sqlalchemy_interface()
+except Exception as e:
+    traceback.print_exc()
+    import warnings
 
-    except Exception as e:
-        import warnings
-
-        traceback.print_exc()
-        warnings.warn(
-            f"Failed to generate ormatic_interface.py. "
-            "The Tests may fail or behave inconsistent if the file was not generated correctly."
-            f"Error: {e}",
-            RuntimeWarning,
-        )
-
+    warnings.warn(
+        f"Failed to generate ormatic_interface.py. "
+        "Tests may fail or behave inconsistently if the file was not generated correctly. "
+        f"Error: {e}",
+        RuntimeWarning,
+    )
 
 from .dataset.ormatic_interface import *
 

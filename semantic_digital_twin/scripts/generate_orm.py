@@ -113,12 +113,16 @@ all_classes -= {
 all_classes = {
     c for c in all_classes if is_dataclass(c) and not issubclass(c, AlternativeMapping)
 }
-all_classes |= {am.original_class() for am in recursive_subclasses(AlternativeMapping)}
+all_classes |= {
+    am.original_class()
+    for am in recursive_subclasses(AlternativeMapping)
+    if not am.__module__.startswith("test.")
+}
 
 alternative_mappings = [
     am
     for am in recursive_subclasses(AlternativeMapping)
-    if am.original_class() in all_classes
+    if am.original_class() in all_classes and not am.__module__.startswith("test.")
 ]
 
 

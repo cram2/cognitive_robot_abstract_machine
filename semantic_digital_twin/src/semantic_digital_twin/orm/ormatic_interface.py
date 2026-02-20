@@ -16,10 +16,14 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 
 import builtins
+import datetime
 import enum
 import krrood.adapters.json_serializer
+import krrood.entity_query_language.orm.model
+import krrood.ormatic.alternative_mappings
 import krrood.ormatic.custom_types
 import krrood.ormatic.type_dict
+import pycram.orm.model
 import semantic_digital_twin.callbacks.callback
 import semantic_digital_twin.datastructures.joint_state
 import semantic_digital_twin.datastructures.prefixed_name
@@ -78,6 +82,23 @@ class JointStateDAO_connections_association(Base, AssociationDataAccessObject):
     )
 
 
+class PlanMappingDAO_nodes_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "PlanMappingDAO_nodes_association"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_planmappingdao_id: Mapped[int] = mapped_column(
+        ForeignKey("PlanMappingDAO.database_id")
+    )
+    target_plannodemappingdao_id: Mapped[int] = mapped_column(
+        ForeignKey("PlanNodeMappingDAO.database_id")
+    )
+
+    target: Mapped[PlanNodeMappingDAO] = relationship(
+        "PlanNodeMappingDAO", foreign_keys=[target_plannodemappingdao_id]
+    )
+
+
 class ShapeDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
@@ -108,6 +129,23 @@ class ShapeCollectionDAO_shapes_association(Base, AssociationDataAccessObject):
 
     target: Mapped[ShapeDAO] = relationship(
         "ShapeDAO", foreign_keys=[target_shapedao_id]
+    )
+
+
+class SymbolGraphMappingDAO_instances_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "SymbolGraphMappingDAO_instances_association"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_symbolgraphmappingdao_id: Mapped[int] = mapped_column(
+        ForeignKey("SymbolGraphMappingDAO.database_id")
+    )
+    target_wrappedinstancemappingdao_id: Mapped[int] = mapped_column(
+        ForeignKey("WrappedInstanceMappingDAO.database_id")
+    )
+
+    target: Mapped[WrappedInstanceMappingDAO] = relationship(
+        "WrappedInstanceMappingDAO", foreign_keys=[target_wrappedinstancemappingdao_id]
     )
 
 
@@ -748,6 +786,58 @@ class AccelerationVariableDAO(
     )
 
 
+class ActionDescriptionNodeMappingDAO(
+    Base, DataAccessObject[pycram.orm.model.ActionDescriptionNodeMapping]
+):
+
+    __tablename__ = "ActionDescriptionNodeMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    start_time: Mapped[typing.Optional[datetime.datetime]] = mapped_column(
+        use_existing_column=True
+    )
+    end_time: Mapped[typing.Optional[datetime.datetime]] = mapped_column(
+        use_existing_column=True
+    )
+
+    status: Mapped[pycram.datastructures.enums.TaskStatus] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+    designator_type: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+
+class ActionNodeMappingDAO(Base, DataAccessObject[pycram.orm.model.ActionNodeMapping]):
+
+    __tablename__ = "ActionNodeMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    start_time: Mapped[typing.Optional[datetime.datetime]] = mapped_column(
+        use_existing_column=True
+    )
+    end_time: Mapped[typing.Optional[datetime.datetime]] = mapped_column(
+        use_existing_column=True
+    )
+
+    status: Mapped[pycram.datastructures.enums.TaskStatus] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+    designator_type: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+
 class BoundingBoxDAO(
     Base, DataAccessObject[semantic_digital_twin.world_description.geometry.BoundingBox]
 ):
@@ -1135,6 +1225,92 @@ class ModelChangeCallbackDAO(
     }
 
 
+class PlanMappingDAO(Base, DataAccessObject[pycram.orm.model.PlanMapping]):
+
+    __tablename__ = "PlanMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    nodes: Mapped[builtins.list[PlanMappingDAO_nodes_association]] = relationship(
+        "PlanMappingDAO_nodes_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[PlanMappingDAO_nodes_association.source_planmappingdao_id]",
+    )
+
+
+class PlanNodeMappingDAO(Base, DataAccessObject[pycram.orm.model.PlanNodeMapping]):
+
+    __tablename__ = "PlanNodeMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    start_time: Mapped[typing.Optional[datetime.datetime]] = mapped_column(
+        use_existing_column=True
+    )
+    end_time: Mapped[typing.Optional[datetime.datetime]] = mapped_column(
+        use_existing_column=True
+    )
+
+    status: Mapped[pycram.datastructures.enums.TaskStatus] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "PlanNodeMappingDAO",
+    }
+
+
+class DesignatorNodeMappingDAO(
+    PlanNodeMappingDAO, DataAccessObject[pycram.orm.model.DesignatorNodeMapping]
+):
+
+    __tablename__ = "DesignatorNodeMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(PlanNodeMappingDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    designator_type: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "DesignatorNodeMappingDAO",
+        "inherit_condition": database_id == PlanNodeMappingDAO.database_id,
+    }
+
+
+class MotionNodeMappingDAO(
+    DesignatorNodeMappingDAO, DataAccessObject[pycram.orm.model.MotionNodeMapping]
+):
+
+    __tablename__ = "MotionNodeMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(DesignatorNodeMappingDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MotionNodeMappingDAO",
+        "inherit_condition": database_id == DesignatorNodeMappingDAO.database_id,
+    }
+
+
 class Point3MappingDAO(
     Base, DataAccessObject[semantic_digital_twin.orm.model.Point3Mapping]
 ):
@@ -1262,6 +1438,22 @@ class PrefixedNameDAO(
     prefix: Mapped[typing.Optional[builtins.str]] = mapped_column(
         String(255), use_existing_column=True
     )
+
+
+class PyCRAMQuaternionMappingDAO(
+    Base, DataAccessObject[pycram.orm.model.PyCRAMQuaternionMapping]
+):
+
+    __tablename__ = "PyCRAMQuaternionMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    x: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    y: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    z: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    w: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
 class QuaternionMappingDAO(
@@ -1569,6 +1761,26 @@ class StateChangeCallbackDAO(
         "polymorphic_identity": "StateChangeCallbackDAO",
         "inherit_condition": database_id == CallbackDAO.database_id,
     }
+
+
+class SymbolGraphMappingDAO(
+    Base, DataAccessObject[krrood.entity_query_language.orm.model.SymbolGraphMapping]
+):
+
+    __tablename__ = "SymbolGraphMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    instances: Mapped[builtins.list[SymbolGraphMappingDAO_instances_association]] = (
+        relationship(
+            "SymbolGraphMappingDAO_instances_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[SymbolGraphMappingDAO_instances_association.source_symbolgraphmappingdao_id]",
+        )
+    )
 
 
 class TriangleMeshDAO(
@@ -5987,4 +6199,37 @@ class WorldStateMappingDAO(
     )
     ids: Mapped[typing.List[uuid.UUID]] = mapped_column(
         JSON, nullable=False, use_existing_column=True
+    )
+
+
+class WrappedInstanceMappingDAO(
+    Base,
+    DataAccessObject[krrood.entity_query_language.orm.model.WrappedInstanceMapping],
+):
+
+    __tablename__ = "WrappedInstanceMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class FunctionMappingDAO(
+    Base, DataAccessObject[krrood.ormatic.alternative_mappings.FunctionMapping]
+):
+
+    __tablename__ = "FunctionMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    module_name: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
+    function_name: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
+    class_name: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        String(255), use_existing_column=True
     )
