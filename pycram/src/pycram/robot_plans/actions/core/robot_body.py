@@ -15,11 +15,12 @@ from semantic_digital_twin.datastructures.definitions import (
 from ....datastructures.enums import AxisIdentifier, Arms
 from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import Vector3Stamped
+from ....datastructures.trajectory import PoseTrajectory
 from ....failures import TorsoGoalNotReached, ConfigurationNotReached
 from ....language import SequentialPlan
 from ....view_manager import ViewManager
 from ....robot_plans.actions.base import ActionDescription
-from ....robot_plans.motions.gripper import MoveGripperMotion
+from ....robot_plans.motions.gripper import MoveGripperMotion, MoveTCPWaypointsMotion
 from ....robot_plans.motions.robot_body import MoveJointsMotion
 from ....validation.goal_validator import create_multiple_joint_goal_validator
 
@@ -303,7 +304,53 @@ class CarryAction(ActionDescription):
         )
 
 
+@dataclass
+class FollowTCPPathAction(ActionDescription):
+    """
+    Represents an action to move a robotic arm's TCP (Tool Center Point) along a
+    path of poses.
+    """
+
+    target_location: PoseTrajectory
+    """
+    Path poses for the TCP motion.
+    """
+
+    arm: Arms
+    """
+    Entry from the enum for which arm should be parked.
+    """
+
+    def execute(self) -> None:
+        target_locations = list(self.target_location.poses)
+
+        motion = MoveTCPWaypointsMotion(
+            target_locations,
+            self.arm,
+            allow_gripper_collision=True,
+        )
+
+        SequentialPlan(self.context, motion).perform()
+
+    def validate(
+        self,
+        result: Optional[Any] = None,
+        max_wait_time: timedelta = timedelta(seconds=2),
+    ):
+        pass
+
+    @classmethod
+    def description(
+        cls,
+        arm: Union[Iterable[Arms], Arms],
+        target_locations: Union[Iterable[PoseTrajectory], PoseTrajectory],
+    ) -> PartialDesignator[FollowTCPPathAction]:
+        return PartialDesignator(cls, target_location=target_locations, arm=arm)
+
+
+
 MoveTorsoActionDescription = MoveTorsoAction.description
 SetGripperActionDescription = SetGripperAction.description
 ParkArmsActionDescription = ParkArmsAction.description
 CarryActionDescription = CarryAction.description
+FollowTCPPathActionDescription = FollowTCPPathAction.description
