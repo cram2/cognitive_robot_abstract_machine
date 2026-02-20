@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     from ..cas import CAS
 
+
 def crop_image(image: npt.NDArray, xy: tuple, wh: tuple) -> npt.NDArray:
     """Crop region from image using coordinates and dimensions.
 
@@ -174,11 +175,11 @@ def clamp_bounding_rect(
     x1, y1, w, h = bounding_rect
     x2, y2 = x1 + w, y1 + h
 
-    x1 = max(0, min(x1, image_width - 1))
-    y1 = max(0, min(y1, image_height - 1))
+    x1 = max(0, min(x1, image_width))
+    y1 = max(0, min(y1, image_height))
 
-    x2 = max(0, min(x2, image_width - 1))
-    y2 = max(0, min(y2, image_height - 1))
+    x2 = max(0, min(x2, image_width))
+    y2 = max(0, min(y2, image_height))
 
     return x1, y1, x2 - x1, y2 - y1
 
