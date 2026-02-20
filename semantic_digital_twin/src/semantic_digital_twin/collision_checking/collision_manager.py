@@ -84,7 +84,7 @@ class CollisionManager(ModelChangeCallback):
     The collision detector implementation used for computing closest points between bodies.
     """
 
-    collision_matrix: CollisionMatrix = field(init=False)
+    collision_matrix: CollisionMatrix = field(init=False, repr=False)
     """
     The collision matrix describing for which body pairs the collision detector should check for closest points.
     """

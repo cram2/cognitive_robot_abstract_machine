@@ -239,10 +239,8 @@ class Tiago(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             "arm_right_5_joint",
             "arm_right_6_joint",
             "arm_right_7_joint",
-            "gripper_right_left_finger_joint",
-            "gripper_right_right_finger_joint",
-            "gripper_left_left_finger_joint",
-            "gripper_left_right_finger_joint",
+            "gripper_right_finger_joint",
+            "gripper_left_finger_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
@@ -287,19 +285,18 @@ class Tiago(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
         self.right_arm.add_joint_state(right_arm_park)
 
         left_gripper_joints = [
-            self._world.get_connection_by_name("gripper_left_left_finger_joint"),
-            self._world.get_connection_by_name("gripper_left_right_finger_joint"),
+            self._world.get_connection_by_name("gripper_left_finger_joint"),
         ]
 
         left_gripper_open = JointState.from_mapping(
             name=PrefixedName("left_gripper_open", prefix=self.name.name),
-            mapping=dict(zip(left_gripper_joints, [0.044, 0.044])),
+            mapping=dict(zip(left_gripper_joints, [0.05])),
             state_type=GripperState.OPEN,
         )
 
         left_gripper_close = JointState.from_mapping(
             name=PrefixedName("left_gripper_close", prefix=self.name.name),
-            mapping=dict(zip(left_gripper_joints, [0.0, 0.0])),
+            mapping=dict(zip(left_gripper_joints, [0.75])),
             state_type=GripperState.CLOSE,
         )
 
@@ -307,19 +304,18 @@ class Tiago(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
         self.left_arm.manipulator.add_joint_state(left_gripper_open)
 
         right_gripper_joints = [
-            self._world.get_connection_by_name("gripper_right_left_finger_joint"),
-            self._world.get_connection_by_name("gripper_right_right_finger_joint"),
+            self._world.get_connection_by_name("gripper_right_finger_joint"),
         ]
 
         right_gripper_open = JointState.from_mapping(
             name=PrefixedName("right_gripper_open", prefix=self.name.name),
-            mapping=dict(zip(right_gripper_joints, [0.044, 0.044])),
+            mapping=dict(zip(right_gripper_joints, [0.05])),
             state_type=GripperState.OPEN,
         )
 
         right_gripper_close = JointState.from_mapping(
             name=PrefixedName("right_gripper_close", prefix=self.name.name),
-            mapping=dict(zip(right_gripper_joints, [0.0, 0.0])),
+            mapping=dict(zip(right_gripper_joints, [0.75])),
             state_type=GripperState.CLOSE,
         )
 
