@@ -61,6 +61,10 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 class DisableCollisionReason(Enum):
+    """
+    Enum for reasons why two bodies are disabled from colliding.
+    """
+
     Unknown = -1
     Never = 1
     Adjacent = 2
@@ -80,13 +84,28 @@ reason_color_map = {
 
 @dataclass
 class SelfCollisionMatrixInterface:
+    """
+    Interface for managing self-collision matrix.
+    """
+
     world: World = field(init=False)
+    """
+    World instance for managing bodies.
+    """
     _reasons: Dict[Tuple[Body, Body], DisableCollisionReason] = field(
         init=False, default_factory=dict
     )
-    _disabled_links: Set[Body] = field(init=False, default_factory=set)
-    collision_matrix: SelfCollisionMatrixRule = field(init=False)
+    """
+    Dictionary for storing reasons for allowing collisions for pairs of bodies.
+    """
+    self_collision_matrix_rule: SelfCollisionMatrixRule = field(init=False)
+    """
+    SelfCollisionMatrixRule instance for computing self-collision matrix.
+    """
     robot: AbstractRobot = field(init=False)
+    """
+    MinimalRobot instance for computing self-collision matrix.
+    """
 
     def __post_init__(self):
         self.world = World()
@@ -98,7 +117,7 @@ class SelfCollisionMatrixInterface:
 
     def load_urdf(self, urdf_path: str):
         robot_world = URDFParser.from_file(urdf_path).parse()
-        self.collision_matrix = SelfCollisionMatrixRule()
+        self.self_collision_matrix_rule = SelfCollisionMatrixRule()
         self.robot = MinimalRobot.from_world(robot_world)
         with self.world.modify_world():
             self.world.clear()
@@ -111,7 +130,7 @@ class SelfCollisionMatrixInterface:
         with self.world.modify_world():
             for body in self.world.bodies_with_collision:
                 for shape in body.collision.shapes:
-                    if body in self.collision_matrix.allowed_collision_bodies:
+                    if body in self.self_collision_matrix_rule.allowed_collision_bodies:
                         shape.color = Color(1.0, 0.0, 0.0, 0.25)
                         continue
                     shape.color = Color(1.0, 1.0, 1.0, 0.5)
@@ -125,7 +144,7 @@ class SelfCollisionMatrixInterface:
         return [
             body
             for body in self.bodies
-            if body not in self.collision_matrix.allowed_collision_bodies
+            if body not in self.self_collision_matrix_rule.allowed_collision_bodies
         ]
 
     def sort_bodies(self, body_a: Body, body_b: Body) -> tuple[Body, Body]:
@@ -149,11 +168,11 @@ class SelfCollisionMatrixInterface:
     def compute_self_collision_matrix(
         self, progress_bar: Callable[[int, str], None], **kwargs: dict
     ):
-        self.collision_matrix.compute_self_collision_matrix(
+        self.self_collision_matrix_rule.compute_self_collision_matrix(
             robot=self.robot, progress_callback=progress_bar, **kwargs
         )
         self._reasons = {}
-        for collision_check in self.collision_matrix.allowed_collision_pairs:
+        for collision_check in self.self_collision_matrix_rule.allowed_collision_pairs:
             self.set_reason_for_pair(
                 collision_check.body_a,
                 collision_check.body_b,
@@ -161,10 +180,10 @@ class SelfCollisionMatrixInterface:
             )
 
     def load_srdf(self, srdf_path: str):
-        self.collision_matrix = SelfCollisionMatrixRule.from_collision_srdf(
+        self.self_collision_matrix_rule = SelfCollisionMatrixRule.from_collision_srdf(
             srdf_path, self.world
         )
-        for collision_check in self.collision_matrix.allowed_collision_pairs:
+        for collision_check in self.self_collision_matrix_rule.allowed_collision_pairs:
             self.set_reason_for_pair(
                 collision_check.body_a,
                 collision_check.body_b,
@@ -172,24 +191,24 @@ class SelfCollisionMatrixInterface:
             )
 
     def safe_srdf(self, file_path: str):
-        self.collision_matrix.save_self_collision_matrix(
+        self.self_collision_matrix_rule.save_self_collision_matrix(
             self.robot.name.name, file_path
         )
 
     def add_body(self, body: Body):
-        self.collision_matrix.allowed_collision_bodies.discard(body)
+        self.self_collision_matrix_rule.allowed_collision_bodies.discard(body)
 
     def remove_body(self, body: Body):
-        self.collision_matrix.allowed_collision_bodies.add(body)
+        self.self_collision_matrix_rule.allowed_collision_bodies.add(body)
 
     def add_pair(self, body_a: Body, body_b: Body, reason: DisableCollisionReason):
         collision_check = CollisionCheck.create_and_validate(body_a, body_b)
-        self.collision_matrix.allowed_collision_pairs.add(collision_check)
+        self.self_collision_matrix_rule.allowed_collision_pairs.add(collision_check)
         self.set_reason_for_pair(body_a, body_b, reason)
 
     def remove_pair(self, body_a: Body, body_b: Body):
         collision_check = CollisionCheck.create_and_validate(body_a, body_b)
-        self.collision_matrix.allowed_collision_pairs.discard(collision_check)
+        self.self_collision_matrix_rule.allowed_collision_pairs.discard(collision_check)
         self.set_reason_for_pair(body_a, body_b, None)
 
 
