@@ -243,40 +243,10 @@ class Table(QTableWidget):
 
     def __post_init__(self):
         super().__init__()
-        self.cellClicked.connect(self.table_item_callback)
-
-    def update_disabled_links(self, bodies: Set[Body]):
-        for body in bodies:
-            self.self_collision_matrix_interface.add_body(body)
-        self.synchronize()
-
-    def disable_link(self, body_name: str):
-        body = self.world.get_body_by_name(body_name)
-        self.self_collision_matrix_interface.remove_body(body)
-
-    def enable_link(self, body_name: str):
-        body = self.world.get_body_by_name(body_name)
-        self.self_collision_matrix_interface.add_body(body)
+        self.cellClicked.connect(self._table_item_callback)
 
     def get_widget(self, row, column):
         return self.cellWidget(row, column).layout().itemAt(0).widget()
-
-    def prefix_reasons_to_str_reasons(
-        self, reasons: Dict[Tuple[PrefixedName, PrefixedName], DisableCollisionReason]
-    ) -> Dict[Tuple[str, str], DisableCollisionReason]:
-        return {
-            (x[0].short_name, x[1].short_name): reason for x, reason in reasons.items()
-        }
-
-    @property
-    def str_reasons(self) -> Dict[Tuple[str, str], DisableCollisionReason]:
-        return self.prefix_reasons_to_str_reasons(self._reasons)
-
-    @property
-    def reasons(
-        self,
-    ) -> Dict[Tuple[PrefixedName, PrefixedName], DisableCollisionReason]:
-        return self._reasons
 
     def table_id_to_body(self, index: int) -> Body:
         return self.bodies[index]
@@ -297,12 +267,7 @@ class Table(QTableWidget):
         self.get_widget(row, column).sync_reason()
         self.get_widget(column, row).sync_reason()
 
-    def reason_from_index(self, row, column):
-        body_a = self.table_id_to_body(row)
-        body_b = self.table_id_to_body(column)
-        return self.self_collision_matrix_interface.get_reason_for_pair(body_a, body_b)
-
-    def table_item_callback(self, row, column):
+    def _table_item_callback(self, row, column):
         body_a = self.table_id_to_body(row)
         body_b = self.table_id_to_body(column)
         color = reason_color_map[DisableCollisionReason.Unknown]
@@ -349,9 +314,6 @@ class Table(QTableWidget):
         return [body.name.name for body in self.bodies]
 
     def synchronize(self):
-        # self.table.update_disabled_links(disabled_links)
-        # if reasons is not None:
-        #     self._reasons = {self.sort_bodies(*k): v for k, v in reasons.items()}
         self.self_collision_matrix_interface.world.notify_state_change()
         self.clear()
         self.setRowCount(len(self.bodies))
@@ -387,7 +349,7 @@ def get_readable_color(red: float, green: float, blue: float) -> Tuple[int, int,
         return 255, 255, 255
 
 
-class MyProgressBar(QProgressBar):
+class ProgressBarWithText(QProgressBar):
     def set_progress(self, value: int, text: Optional[str] = None):
         value = int(min(max(value, 0), 100))
         self.setValue(value)
@@ -535,37 +497,6 @@ class ComputeSelfCollisionMatrixParameterDialog(QDialog):
         return params
 
 
-# class RosparamSelectionDialog(QDialog):
-#     default_option = '/robot_description'
-#
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-#
-#         self.setWindowTitle("File Selection")
-#
-#         self.layout = QVBoxLayout(self)
-#
-#         self.label = QLabel("Please select an option:")
-#         self.layout.addWidget(self.label)
-#
-#         self.combo_box = QComboBox(self)
-#         self.combo_box.setEditable(True)  # Make the combo box editable
-#         self.layout.addWidget(self.combo_box)
-#
-#         # Add the options to the combobox
-#         self.combo_box.addItems(rospy.get_param_names())
-#         if rospy.has_param(self.default_option):
-#             self.combo_box.setCurrentText(self.default_option)
-#
-#         self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-#         self.buttonBox.accepted.connect(self.accept)
-#         self.buttonBox.rejected.connect(self.reject)
-#         self.layout.addWidget(self.buttonBox)
-#
-#     def get_selected_option(self):
-#         return self.combo_box.currentText()
-
-
 class ClickableLabel(QLabel):
     def __init__(self, text="", parent=None):
         super().__init__(text, parent)
@@ -642,13 +573,6 @@ class DisableBodiesDialog(QDialog):
         self.buttonBox.accepted.connect(self.accept)
         self.layout.addWidget(self.buttonBox)
 
-    def checked_links(self) -> List[str]:
-        return [
-            self.links[i]
-            for i, cbw in enumerate(self.checkbox_widgets)
-            if cbw.is_checked()
-        ]
-
 
 @dataclass
 class Application(QMainWindow):
@@ -666,7 +590,7 @@ class Application(QMainWindow):
         self.setWindowTitle("Self Collision Matrix Tool")
         self.setMinimumSize(800, 600)
 
-        self.progress = MyProgressBar(self)
+        self.progress = ProgressBarWithText(self)
 
         self.table = Table(self.self_collision_matrix_interface)
 
@@ -707,13 +631,10 @@ class Application(QMainWindow):
     def _create_urdf_box_layout(self) -> QHBoxLayout:
         self.load_urdf_file_button = QPushButton("Load urdf from file")
         self.load_urdf_file_button.clicked.connect(self._load_urdf_file_button_callback)
-        # self.load_urdf_param_button = QPushButton('Load urdf from parameter server')
-        # self.load_urdf_param_button.clicked.connect(self.load_urdf_from_paramserver)
-        self.urdf_progress = MyProgressBar(self)
+        self.urdf_progress = ProgressBarWithText(self)
         self.urdf_progress.set_progress(0, "No urdf loaded")
         urdf_section = QHBoxLayout()
         urdf_section.addWidget(self.load_urdf_file_button)
-        # urdf_section.addWidget(self.load_urdf_param_button)
         urdf_section.addWidget(self.urdf_progress)
         return urdf_section
 
@@ -728,22 +649,26 @@ class Application(QMainWindow):
             label.setStyleSheet(
                 f"background-color: rgb{color}; color: rgb{get_readable_color(*color)};"
             )
-            if reason == DisableCollisionReason.Never:
-                label.setToolTip("These links are never in contact.")
-            elif reason == DisableCollisionReason.Unknown:
-                label.setToolTip("This link pair was disabled for an unknown reason.")
-            elif reason == DisableCollisionReason.Adjacent:
-                label.setToolTip(
-                    "This link pair is only connected by joints that cannot move."
-                )
-            elif reason == DisableCollisionReason.Default:
-                label.setToolTip(
-                    "This link pair is in collision in the robot's default state."
-                )
-            elif reason == DisableCollisionReason.AlmostAlways:
-                label.setToolTip("This link pair is almost always in collision.")
-            else:
-                label.setToolTip("Collisions will be computed.")
+
+            match reason:
+                case DisableCollisionReason.Never:
+                    tooltip = "These links are never in contact."
+                case DisableCollisionReason.Unknown:
+                    tooltip = "This link pair was disabled for an unknown reason."
+                case DisableCollisionReason.Adjacent:
+                    tooltip = (
+                        "This link pair is only connected by joints that cannot move."
+                    )
+                case DisableCollisionReason.Default:
+                    tooltip = (
+                        "This link pair is in collision in the robot's default state."
+                    )
+                case DisableCollisionReason.AlmostAlways:
+                    tooltip = "This link pair is almost always in collision."
+                case _:
+                    tooltip = "Collisions will be computed."
+
+            label.setToolTip(tooltip)
             legend.addWidget(label)
         return legend
 
@@ -755,13 +680,6 @@ class Application(QMainWindow):
                 progress_bar=self.progress.set_progress,
                 **parameters,
             )
-            # reasons = (
-            #     god_map.collision_expression_manager._compute_srdf_button_callback(
-            #         self.group_name,
-            #         save_to_tmp=False,
-            #         **parameters,
-            #     )
-            # )
             self.table.synchronize()
             self.progress.set_progress(100, "Done checking collisions")
         else:
@@ -834,10 +752,6 @@ class Application(QMainWindow):
                 50, f"Applying vhacd to concave meshes of {urdf_file}"
             )
             self.urdf_progress.set_progress(80, f"Updating table {urdf_file}")
-            # reasons = {
-            #     (body.name.name, body.name.name): DisableCollisionReason.Adjacent
-            #     for body in self.world.bodies_with_collision
-            # }
             self.table.synchronize()
             self.set_tmp_srdf_path()
             self.enable_srdf_buttons()
