@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
+from itertools import combinations
+from typing import Dict, Any
 from itertools import combinations, combinations_with_replacement
 
 import numpy as np
@@ -17,11 +19,13 @@ from typing_extensions import (
 )
 
 from .collision_detector import ClosestPoints, CollisionCheckingResult
+from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from .collision_matrix import (
     CollisionRule,
     CollisionMatrix,
     CollisionCheck,
 )
+from ..adapters.world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
 from ..robots.abstract_robot import AbstractRobot
 
 if TYPE_CHECKING:
@@ -80,11 +84,13 @@ class AllowCollisionRule(CollisionRule, ABC):
     Base class for collision rules that remove collision checks from the collision matrix.
     """
 
-    allowed_collision_pairs: set[CollisionCheck] = field(default_factory=set)
+    allowed_collision_pairs: set[CollisionCheck] = field(
+        default_factory=set, init=False
+    )
     """
     Set of collision checks that are allowed to occur.
     """
-    allowed_collision_bodies: set[Body] = field(default_factory=set)
+    allowed_collision_bodies: set[Body] = field(default_factory=set, init=False)
     """
     Set of bodies that are allowed to collide.
     """
@@ -141,7 +147,7 @@ class AvoidAllCollisions(AvoidCollisionRule):
 
 
 @dataclass
-class AvoidExternalCollisions(AvoidCollisionRule):
+class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
     """
     Adds collision checks between all bodies managed by the rule and all bodies that do not belong to the robot.
     that are not managed by the rule.
@@ -169,6 +175,19 @@ class AvoidExternalCollisions(AvoidCollisionRule):
                     body_a=body_a, body_b=body_b, distance=self.buffer_zone_distance
                 )
                 self.added_collision_checks.add(collision_check)
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "robot": to_json(self.robot.id),
+            "body_subset": to_json(self.body_subset),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        robot = tracker.get_world_entity_with_id(id=from_json(data["robot"]))
+        return cls(robot=robot, body_subset=from_json(data["body_subset"], **kwargs))
 
 
 @dataclass
@@ -469,7 +488,7 @@ class AllowCollisionForAdjacentPairs(AllowCollisionRule):
 
 
 @dataclass
-class SelfCollisionMatrixRule(AllowCollisionRule):
+class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
     """
     Used to load collision matrices sorted as srdf, e.g., those created by moveit.
     """
@@ -531,6 +550,30 @@ class SelfCollisionMatrixRule(AllowCollisionRule):
             self.allowed_collision_pairs.add(
                 CollisionCheck.create_and_validate(body_a, body_b)
             )
+        return self
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "allowed_body_ids": to_json(
+                {body.id for body in self.allowed_collision_bodies}
+            ),
+            "allowed_collision_pairs": to_json(self.allowed_collision_pairs),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        allowed_body_ids = from_json(data["allowed_body_ids"], **kwargs)
+        allowed_bodies = {
+            tracker.get_world_entity_with_id(id=_id) for _id in allowed_body_ids
+        }
+        self = cls()
+        self.allowed_collision_bodies = allowed_bodies
+        self.allowed_collision_pairs = set(
+            from_json(data["allowed_collision_pairs"], **kwargs)
+        )
+
         return self
 
     def compute_self_collision_matrix(

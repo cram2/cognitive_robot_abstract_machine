@@ -118,8 +118,7 @@ def test_in_contact():
 
 
 def test_robot_in_contact(pr2_world_copy: World):
-    pr2: PR2 = PR2.from_world(pr2_world_copy)
-
+    pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
     body = Body(name=PrefixedName("test_body"))
     collision1 = Box(
         scale=Scale(1.0, 1.0, 1.0),
@@ -150,9 +149,6 @@ def test_robot_in_contact(pr2_world_copy: World):
 
 
 def test_get_visible_objects(pr2_world_copy: World):
-
-    pr2: PR2 = PR2.from_world(pr2_world_copy)
-
     body = Body(name=PrefixedName("test_body"))
     collision1 = Box(
         scale=Scale(1.0, 1.0, 1.0),
@@ -181,10 +177,10 @@ def test_get_visible_objects(pr2_world_copy: World):
 
 def test_occluding_bodies(pr2_world_state_reset: World):
     world = deepcopy(pr2_world_state_reset)
+    pr2 = PR2.from_world(world)
     world.get_body_by_name("base_footprint").parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
     )
-    pr2: PR2 = PR2.from_world(world)
 
     def make_body(name: str) -> Body:
         result = Body(name=PrefixedName(name))
@@ -299,7 +295,7 @@ def test_supporting(two_block_world):
 
 
 def test_is_body_in_gripper(pr2_world_copy):
-    pr2: PR2 = PR2.from_world(pr2_world_copy)
+    pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
 
     gripper = pr2_world_copy.get_semantic_annotations_by_type(ParallelGripper)
 
@@ -354,9 +350,7 @@ def test_is_body_in_gripper(pr2_world_copy):
 
 
 def test_reachable(pr2_world_state_reset, rclpy_node):
-    TFPublisher(pr2_world_state_reset, rclpy_node)
-    VizMarkerPublisher(pr2_world_state_reset, rclpy_node)
-    pr2: PR2 = PR2.from_world(pr2_world_state_reset)
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
 
     tool_frame_T_reachable_goal = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=-0.2,
@@ -411,9 +405,7 @@ def test_reachable(pr2_world_state_reset, rclpy_node):
 
 
 def test_blocking(pr2_world_copy):
-
-    pr2: PR2 = PR2.from_world(pr2_world_copy)
-
+    pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
     obstacle = Body(name=PrefixedName("obstacle"))
     collision = Box(
         scale=Scale(3.0, 1.0, 1.0),

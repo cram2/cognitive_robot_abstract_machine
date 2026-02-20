@@ -93,7 +93,7 @@ class SelfCollisionMatrixInterface:
         with self.world.modify_world():
             self.world.add_body(Body(name=PrefixedName("map")))
         VizMarkerPublisher(
-            self.world, rospy.node, shape_source=ShapeSource.COLLISION_ONLY
+            _world=self.world, node=rospy.node, shape_source=ShapeSource.COLLISION_ONLY
         ).with_tf_publisher()
 
     def load_urdf(self, urdf_path: str):

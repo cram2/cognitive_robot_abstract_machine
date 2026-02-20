@@ -15,10 +15,11 @@ from krrood.symbolic_math.symbolic_math import (
 from .collision_matrix import CollisionMatrix, CollisionCheck
 from ..callbacks.callback import ModelChangeCallback, StateChangeCallback
 from ..spatial_types import HomogeneousTransformationMatrix
-from ..world_description.world_entity import Body
-
-if TYPE_CHECKING:
-    from ..world import World
+from ..world_description.world_entity import (
+    Body,
+    WorldEntityWithID,
+    WorldEntityWithClassBasedID,
+)
 
 
 @dataclass
@@ -99,19 +100,15 @@ class ClosestPoints:
         )
 
 
-@dataclass
+@dataclass(eq=False)
 class CollisionDetectorModelUpdater(ModelChangeCallback):
     """
     Updates and compiles the collision detector's collision forward kinematics expressions when the world model changes.
     """
 
-    collision_detector: CollisionDetector
+    collision_detector: CollisionDetector = field(kw_only=True)
     """
     Reference to the collision detector.
-    """
-    world: World = field(init=False)
-    """
-    Reference to the world.
     """
     compiled_collision_fks: CompiledFunction = field(init=False)
     """
@@ -119,11 +116,11 @@ class CollisionDetectorModelUpdater(ModelChangeCallback):
     """
 
     def __post_init__(self):
-        self.world = self.collision_detector.world
+        self._world = self.collision_detector._world
         super().__post_init__()
 
     def _notify(self, **kwargs):
-        if self.world.is_empty():
+        if self._world.is_empty():
             return
         self.collision_detector.sync_world_model()
         self.compile_collision_fks()
@@ -133,25 +130,25 @@ class CollisionDetectorModelUpdater(ModelChangeCallback):
         Compile the collision FK functions for all bodies with collision.
         """
         collision_fks = []
-        world_root = self.world.root
-        for body in self.world.bodies_with_collision:
+        world_root = self._world.root
+        for body in self._world.bodies_with_collision:
             if body == world_root:
                 if body.has_collision():
                     collision_fks.append(HomogeneousTransformationMatrix())
                 continue
             collision_fks.append(
-                self.world.compose_forward_kinematics_expression(world_root, body)
+                self._world.compose_forward_kinematics_expression(world_root, body)
             )
         collision_fks = Matrix.vstack(collision_fks)
 
         self.compiled_collision_fks = collision_fks.compile(
             parameters=VariableParameters.from_lists(
-                self.world.state.position_float_variables
+                self._world.state.position_float_variables
             )
         )
         if not collision_fks.is_constant():
             self.compiled_collision_fks.bind_args_to_memory_view(
-                0, self.world.state.positions
+                0, self._world.state.positions
             )
 
     def compute(self) -> np.ndarray:
@@ -164,30 +161,28 @@ class CollisionDetectorStateUpdater(StateChangeCallback):
     Updates the collision detector's collision FK cache when the world state changes.
     """
 
-    collision_detector: CollisionDetector
+    collision_detector: CollisionDetector = field(kw_only=True)
     """
     Reference to the collision detector that this updater belongs to.
     """
-    world: World = field(init=False)
 
     def __post_init__(self):
-        self.world = self.collision_detector.world
+        self._world = self.collision_detector._world
         super().__post_init__()
 
     def _notify(self, **kwargs):
-        if self.world.is_empty():
+        if self._world.is_empty():
             return
         self.collision_detector.world_model_updater.compiled_collision_fks.evaluate()
         self.collision_detector.sync_world_state()
 
 
-@dataclass
-class CollisionDetector(abc.ABC):
+@dataclass(eq=False)
+class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
     """
     Abstract class for collision detectors.
     """
 
-    world: World
     world_model_updater: CollisionDetectorModelUpdater = field(init=False)
     world_state_updater: CollisionDetectorStateUpdater = field(init=False)
 

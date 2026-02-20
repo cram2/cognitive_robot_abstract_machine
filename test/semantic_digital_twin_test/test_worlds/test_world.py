@@ -1,4 +1,5 @@
 from copy import deepcopy
+from dataclasses import dataclass
 
 import numpy as np
 import pytest
@@ -37,6 +38,7 @@ from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     Body,
     Actuator,
+    WorldEntityWithClassBasedID,
 )
 from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
@@ -760,6 +762,20 @@ def test_copy_id(pr2_world_state_reset):
     pr2_copy = deepcopy(pr2_world_state_reset)
     for body in pr2_world_state_reset.bodies:
         assert body.id == pr2_copy.get_kinematic_structure_entity_by_name(body.name).id
+
+
+def test_world_entity_with_class_id():
+    @dataclass(eq=False)
+    class A(WorldEntityWithClassBasedID): ...
+
+    @dataclass(eq=False)
+    class B(WorldEntityWithClassBasedID): ...
+
+    a_1 = A()
+    a_2 = A()
+    b_1 = B()
+    assert a_1 == a_2
+    assert a_1 != b_1
 
 
 def test_copy_reference_frames_shape(pr2_world_state_reset):

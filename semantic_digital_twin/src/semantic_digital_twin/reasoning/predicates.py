@@ -7,7 +7,8 @@ import math
 import trimesh.boolean
 from krrood.entity_query_language.predicate import (
     Predicate,
-    Symbol, symbolic_function,
+    Symbol,
+    symbolic_function,
 )
 from random_events.interval import Interval
 from typing_extensions import List, TYPE_CHECKING, Iterable, Type
@@ -60,7 +61,7 @@ def contact(
     :param threshold: The threshold for contact detection
     :return: True if the two objects are in contact False else
     """
-    tcd = TrimeshCollisionDetector(body1._world)
+    tcd = TrimeshCollisionDetector(_world=body1._world)
     result = tcd.check_collision_between_bodies(body1, body2)
 
     if result is None:
@@ -189,6 +190,7 @@ def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> b
     except UnreachableException as e:
         return False
     return True
+
 
 @symbolic_function
 def is_supported_by(

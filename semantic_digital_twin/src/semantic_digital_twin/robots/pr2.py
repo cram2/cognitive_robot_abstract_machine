@@ -59,11 +59,11 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             "collision_configs",
             "pr2.srdf",
         )
-        self._world.collision_manager.ignore_collision_rules.append(
+        self._world.collision_manager.add_ignore_collision_rule(
             SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
         )
 
-        self._world.collision_manager.default_rules.extend(
+        self._world.collision_manager.extend_default_rules(
             [
                 AvoidExternalCollisions(
                     buffer_zone_distance=0.1, violated_distance=0.0, robot=self
@@ -87,7 +87,7 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             ]
         )
 
-        self._world.collision_manager.max_avoided_bodies_rules.extend(
+        self._world.collision_manager.extend_max_avoided_bodies_rules(
             [
                 MaxAvoidedCollisionsOverride(
                     2, bodies={self._world.get_body_by_name("base_link")}

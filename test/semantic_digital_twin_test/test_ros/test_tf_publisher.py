@@ -27,7 +27,7 @@ def test_tf_publisher(rclpy_node, pr2_world_state_reset):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
         node=rclpy_node,
-        world=pr2_world_state_reset,
+        _world=pr2_world_state_reset,
     )
 
     assert tf_wrapper.wait_for_transform(
@@ -54,7 +54,7 @@ def test_clear(rclpy_node, pr2_world_copy):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
         node=rclpy_node,
-        world=pr2_world_copy,
+        _world=pr2_world_copy,
     )
 
     assert tf_wrapper.wait_for_transform(
@@ -119,9 +119,9 @@ def test_tf_publisher_kitchen(rclpy_node, pr2_apartment_world):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
         node=rclpy_node,
-        world=pr2_apartment_world,
+        _world=pr2_apartment_world,
     )
-    VizMarkerPublisher(world=pr2_apartment_world, node=rclpy_node)
+    VizMarkerPublisher(_world=pr2_apartment_world, node=rclpy_node)
 
     milk = pr2_apartment_world.get_kinematic_structure_entities_by_name("milk.stl")[0]
 
@@ -206,7 +206,7 @@ def test_tf_publisher_with_Regions(rclpy_node, pr2_world_state_reset):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
         node=rclpy_node,
-        world=pr2_world_state_reset,
+        _world=pr2_world_state_reset,
     )
 
     assert tf_wrapper.wait_for_transform(
@@ -228,7 +228,7 @@ def test_empty_world(rclpy_node):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
         node=rclpy_node,
-        world=world,
+        _world=world,
     )
     assert not tf_wrapper.wait_for_transform(
         "muh1",
@@ -260,7 +260,7 @@ def test_static_world(rclpy_node):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
         node=rclpy_node,
-        world=world,
+        _world=world,
         ignored_kinematic_structure_entities={body2, body3, body5},
     )
 
@@ -309,7 +309,7 @@ def test_static_world2(rclpy_node):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
         node=rclpy_node,
-        world=world,
+        _world=world,
         ignored_kinematic_structure_entities={body2},
     )
 

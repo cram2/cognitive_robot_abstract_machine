@@ -175,8 +175,9 @@ def collision_check(robot: AbstractRobot, world: World) -> List[ClosestPoints]:
     :param world: The world in which collision should be checked
     :raises: RobotInCollision if the robot collides with an object it is not allowed to collide with.
     """
-    world.collision_manager.clear_temporary_rules()
-    world.collision_manager.add_temporary_rule(AllowSelfCollisions(robot=robot))
+    with world.modify_world():
+        world.collision_manager.clear_temporary_rules()
+        world.collision_manager.add_temporary_rule(AllowSelfCollisions(robot=robot))
     world.collision_manager.update_collision_matrix(buffer=0.0)
     return [
         contact

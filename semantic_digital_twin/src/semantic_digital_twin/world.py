@@ -29,10 +29,8 @@ from typing_extensions import List
 from typing_extensions import Type, Set
 
 from .callbacks.callback import ModelChangeCallback
-from .collision_checking.collision_detector import CollisionDetector
 from .collision_checking.collision_manager import CollisionManager
 from .collision_checking.pybullet_collision_detector import BulletCollisionDetector
-from .collision_checking.trimesh_collision_detector import TrimeshCollisionDetector
 from .datastructures.prefixed_name import PrefixedName
 from .datastructures.types import NpMatrix4x4
 from .exceptions import (
@@ -417,9 +415,9 @@ class World(HasSimulatorProperties):
 
     def __post_init__(self):
         self.state = WorldState(_world=self)
-        self._forward_kinematic_manager = ForwardKinematicsManager(self)
+        self._forward_kinematic_manager = ForwardKinematicsManager(_world=self)
         self.collision_manager = CollisionManager(
-            self, collision_detector=BulletCollisionDetector(self)
+            _world=self, collision_detector=BulletCollisionDetector(_world=self)
         )
 
     def __hash__(self):

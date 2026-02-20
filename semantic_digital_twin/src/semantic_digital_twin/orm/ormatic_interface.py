@@ -183,15 +183,35 @@ class WorldMappingDAO_degrees_of_freedom_association(Base, AssociationDataAccess
     )
 
 
-class WorldEntityDAO_simulator_additional_properties_association(
+class ConnectionDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "WorldEntityDAO_simulator_additional_properties_association"
+    __tablename__ = "ConnectionDAO_simulator_additional_properties_association"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_worldentitydao_id: Mapped[int] = mapped_column(
-        ForeignKey("WorldEntityDAO.database_id")
+    source_connectiondao_id: Mapped[int] = mapped_column(
+        ForeignKey("ConnectionDAO.database_id")
+    )
+    target_simulatoradditionalpropertydao_id: Mapped[int] = mapped_column(
+        ForeignKey("SimulatorAdditionalPropertyDAO.database_id")
+    )
+
+    target: Mapped[SimulatorAdditionalPropertyDAO] = relationship(
+        "SimulatorAdditionalPropertyDAO",
+        foreign_keys=[target_simulatoradditionalpropertydao_id],
+    )
+
+
+class WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_association(
+    Base, AssociationDataAccessObject
+):
+
+    __tablename__ = "WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_association"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_worldentitywithsimulatorpropertiesdao_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldEntityWithSimulatorPropertiesDAO.database_id")
     )
     target_simulatoradditionalpropertydao_id: Mapped[int] = mapped_column(
         ForeignKey("SimulatorAdditionalPropertyDAO.database_id")
@@ -780,36 +800,6 @@ class BoundingBoxDAO(
     )
 
 
-class CallbackDAO(
-    Base, DataAccessObject[semantic_digital_twin.callbacks.callback.Callback]
-):
-
-    __tablename__ = "CallbackDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    polymorphic_type: Mapped[str] = mapped_column(
-        String(255), nullable=False, use_existing_column=True
-    )
-
-    world_id: Mapped[int] = mapped_column(
-        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_on": "polymorphic_type",
-        "polymorphic_identity": "CallbackDAO",
-    }
-
-
 class ColorDAO(
     Base, DataAccessObject[semantic_digital_twin.world_description.geometry.Color]
 ):
@@ -1070,23 +1060,6 @@ class InsideOfDAO(
         "polymorphic_identity": "InsideOfDAO",
         "inherit_condition": database_id
         == KinematicStructureEntitySpatialRelationDAO.database_id,
-    }
-
-
-class ModelChangeCallbackDAO(
-    CallbackDAO,
-    DataAccessObject[semantic_digital_twin.callbacks.callback.ModelChangeCallback],
-):
-
-    __tablename__ = "ModelChangeCallbackDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(CallbackDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "ModelChangeCallbackDAO",
-        "inherit_condition": database_id == CallbackDAO.database_id,
     }
 
 
@@ -1509,23 +1482,6 @@ class SphereDAO(
     }
 
 
-class StateChangeCallbackDAO(
-    CallbackDAO,
-    DataAccessObject[semantic_digital_twin.callbacks.callback.StateChangeCallback],
-):
-
-    __tablename__ = "StateChangeCallbackDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(CallbackDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "StateChangeCallbackDAO",
-        "inherit_condition": database_id == CallbackDAO.database_id,
-    }
-
-
 class TriangleMeshDAO(
     MeshDAO,
     DataAccessObject[semantic_digital_twin.world_description.geometry.TriangleMesh],
@@ -1825,14 +1781,6 @@ class WorldEntityDAO(
         use_existing_column=True,
     )
 
-    simulator_additional_properties: Mapped[
-        builtins.list[WorldEntityDAO_simulator_additional_properties_association]
-    ] = relationship(
-        "WorldEntityDAO_simulator_additional_properties_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[WorldEntityDAO_simulator_additional_properties_association.source_worldentitydao_id]",
-    )
     name: Mapped[PrefixedNameDAO] = relationship(
         "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
     )
@@ -1881,6 +1829,14 @@ class ConnectionDAO(
         use_existing_column=True,
     )
 
+    simulator_additional_properties: Mapped[
+        builtins.list[ConnectionDAO_simulator_additional_properties_association]
+    ] = relationship(
+        "ConnectionDAO_simulator_additional_properties_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[ConnectionDAO_simulator_additional_properties_association.source_connectiondao_id]",
+    )
     parent: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
@@ -2185,25 +2141,6 @@ class WorldEntityWithIDDAO(
     }
 
 
-class ActuatorDAO(
-    WorldEntityWithIDDAO,
-    DataAccessObject[semantic_digital_twin.world_description.world_entity.Actuator],
-):
-
-    __tablename__ = "ActuatorDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldEntityWithIDDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "ActuatorDAO",
-        "inherit_condition": database_id == WorldEntityWithIDDAO.database_id,
-    }
-
-
 class DegreeOfFreedomDAO(
     WorldEntityWithIDDAO,
     DataAccessObject[
@@ -2242,14 +2179,14 @@ class DegreeOfFreedomDAO(
     }
 
 
-class KinematicStructureEntityDAO(
+class WorldEntityWithClassBasedIDDAO(
     WorldEntityWithIDDAO,
     DataAccessObject[
-        semantic_digital_twin.world_description.world_entity.KinematicStructureEntity
+        semantic_digital_twin.world_description.world_entity.WorldEntityWithClassBasedID
     ],
 ):
 
-    __tablename__ = "KinematicStructureEntityDAO"
+    __tablename__ = "WorldEntityWithClassBasedIDDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(WorldEntityWithIDDAO.database_id),
@@ -2258,8 +2195,135 @@ class KinematicStructureEntityDAO(
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "KinematicStructureEntityDAO",
+        "polymorphic_identity": "WorldEntityWithClassBasedIDDAO",
         "inherit_condition": database_id == WorldEntityWithIDDAO.database_id,
+    }
+
+
+class CallbackDAO(
+    WorldEntityWithClassBasedIDDAO,
+    DataAccessObject[semantic_digital_twin.callbacks.callback.Callback],
+):
+
+    __tablename__ = "CallbackDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldEntityWithClassBasedIDDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CallbackDAO",
+        "inherit_condition": database_id == WorldEntityWithClassBasedIDDAO.database_id,
+    }
+
+
+class ModelChangeCallbackDAO(
+    CallbackDAO,
+    DataAccessObject[semantic_digital_twin.callbacks.callback.ModelChangeCallback],
+):
+
+    __tablename__ = "ModelChangeCallbackDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(CallbackDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ModelChangeCallbackDAO",
+        "inherit_condition": database_id == CallbackDAO.database_id,
+    }
+
+
+class StateChangeCallbackDAO(
+    CallbackDAO,
+    DataAccessObject[semantic_digital_twin.callbacks.callback.StateChangeCallback],
+):
+
+    __tablename__ = "StateChangeCallbackDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(CallbackDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "StateChangeCallbackDAO",
+        "inherit_condition": database_id == CallbackDAO.database_id,
+    }
+
+
+class WorldEntityWithSimulatorPropertiesDAO(
+    WorldEntityWithIDDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.world_entity.WorldEntityWithSimulatorProperties
+    ],
+):
+
+    __tablename__ = "WorldEntityWithSimulatorPropertiesDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldEntityWithIDDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    simulator_additional_properties: Mapped[
+        builtins.list[
+            WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_association
+        ]
+    ] = relationship(
+        "WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_association.source_worldentitywithsimulatorpropertiesdao_id]",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WorldEntityWithSimulatorPropertiesDAO",
+        "inherit_condition": database_id == WorldEntityWithIDDAO.database_id,
+    }
+
+
+class ActuatorDAO(
+    WorldEntityWithSimulatorPropertiesDAO,
+    DataAccessObject[semantic_digital_twin.world_description.world_entity.Actuator],
+):
+
+    __tablename__ = "ActuatorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldEntityWithSimulatorPropertiesDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ActuatorDAO",
+        "inherit_condition": database_id
+        == WorldEntityWithSimulatorPropertiesDAO.database_id,
+    }
+
+
+class KinematicStructureEntityDAO(
+    WorldEntityWithSimulatorPropertiesDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.world_entity.KinematicStructureEntity
+    ],
+):
+
+    __tablename__ = "KinematicStructureEntityDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldEntityWithSimulatorPropertiesDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "KinematicStructureEntityDAO",
+        "inherit_condition": database_id
+        == WorldEntityWithSimulatorPropertiesDAO.database_id,
     }
 
 
@@ -2333,7 +2397,7 @@ class RegionDAO(
 
 
 class SemanticAnnotationDAO(
-    WorldEntityWithIDDAO,
+    WorldEntityWithSimulatorPropertiesDAO,
     DataAccessObject[
         semantic_digital_twin.world_description.world_entity.SemanticAnnotation
     ],
@@ -2342,14 +2406,15 @@ class SemanticAnnotationDAO(
     __tablename__ = "SemanticAnnotationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldEntityWithIDDAO.database_id),
+        ForeignKey(WorldEntityWithSimulatorPropertiesDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "SemanticAnnotationDAO",
-        "inherit_condition": database_id == WorldEntityWithIDDAO.database_id,
+        "inherit_condition": database_id
+        == WorldEntityWithSimulatorPropertiesDAO.database_id,
     }
 
 
