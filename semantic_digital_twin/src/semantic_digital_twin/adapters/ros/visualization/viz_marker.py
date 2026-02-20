@@ -34,7 +34,7 @@ class ShapeSource(Enum):
     """
 
 
-@dataclass
+@dataclass(eq=False)
 class VizMarkerPublisher(ModelChangeCallback):
     """
     Publishes the world model as a visualization marker.
@@ -47,7 +47,7 @@ class VizMarkerPublisher(ModelChangeCallback):
         4. make sure that the fixed frame is the tf root.
     """
 
-    node: Node
+    node: Node = field(kw_only=True)
     """
     The ROS2 node that will be used to publish the visualization marker.
     """
@@ -87,7 +87,7 @@ class VizMarkerPublisher(ModelChangeCallback):
         """
         Launches a tf publisher in conjunction with the VizMarkerPublisher.
         """
-        TFPublisher(self.world, self.node)
+        TFPublisher(_world=self._world, node=self.node)
 
     def _select_shapes(self, body):
         if self.shape_source is ShapeSource.VISUAL_ONLY:
@@ -100,7 +100,7 @@ class VizMarkerPublisher(ModelChangeCallback):
 
     def _notify(self, **kwargs):
         self.markers = MarkerArray()
-        for body in self.world.bodies:
+        for body in self._world.bodies:
             shapes = self._select_shapes(body)
             if not shapes:
                 continue

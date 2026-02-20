@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import inspect
 import uuid
 from abc import ABC, abstractmethod
@@ -33,7 +34,9 @@ from krrood.adapters.json_serializer import (
 )
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.predicate import Symbol
+from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math.symbolic_math import Matrix
+from krrood.utils import get_full_class_name
 from .geometry import TriangleMesh
 from .inertial_properties import Inertial
 from .shape_collection import ShapeCollection, BoundingBoxCollection
@@ -60,7 +63,7 @@ id_generator = IDGenerator()
 
 
 @dataclass(eq=False)
-class WorldEntity(Symbol, HasSimulatorProperties):
+class WorldEntity(Symbol):
     """
     A class representing an entity in the world.
 
@@ -88,6 +91,8 @@ class WorldEntity(Symbol, HasSimulatorProperties):
     def __post_init__(self):
         if self.name is None:
             self.name = PrefixedName(f"{self.__class__.__name__}_{hash(self)}")
+        if self._world is not None:
+            self.add_to_world(self._world)
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
@@ -227,7 +232,33 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
 
 
 @dataclass(eq=False)
-class KinematicStructureEntity(WorldEntityWithID, ABC):
+class WorldEntityWithClassBasedID(WorldEntityWithID):
+    """
+    A WorldEntity that has a unique identifier based on its class name. As a consequence, all instances of a class will
+    have the same ID.
+    """
+
+    id: UUID = field(init=False)
+    """
+    A unique identifier for this world entity.
+    """
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.id = uuid.UUID(
+            hex=hashlib.md5(get_full_class_name(cls).encode("utf-8")).hexdigest()
+        )
+
+
+@dataclass(eq=False)
+class WorldEntityWithSimulatorProperties(WorldEntityWithID, HasSimulatorProperties):
+    """
+    A WorldEntity that has properties relevant for simulation.
+    """
+
+
+@dataclass(eq=False)
+class KinematicStructureEntity(WorldEntityWithSimulatorProperties, ABC):
     """
     An entity that is part of the kinematic structure of the world.
     """
@@ -479,7 +510,7 @@ GenericWorldEntity = TypeVar("GenericWorldEntity", bound=WorldEntity)
 
 
 @dataclass(eq=False)
-class SemanticAnnotation(WorldEntityWithID):
+class SemanticAnnotation(WorldEntityWithSimulatorProperties):
     """
     Represents a semantic annotation on a set of bodies in the world.
 
@@ -704,7 +735,7 @@ class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
 
 
 @dataclass(eq=False)
-class Connection(WorldEntity, SubclassJSONSerializer):
+class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
     """
     Represents a connection between two entities in the world.
     """
@@ -1001,7 +1032,7 @@ def _attr_values(
 
 
 @dataclass(eq=False)
-class Actuator(WorldEntityWithID):
+class Actuator(WorldEntityWithSimulatorProperties):
     """
     Represents an actuator in the world model.
     """

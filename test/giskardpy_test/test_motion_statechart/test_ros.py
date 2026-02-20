@@ -1,4 +1,5 @@
 import json
+import time
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -18,12 +19,6 @@ from semantic_digital_twin.adapters.ros.world_fetcher import (
 )
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
-)
-from semantic_digital_twin.collision_checking.collision_matrix import (
-    MaxAvoidedCollisionsOverride,
-)
-from semantic_digital_twin.collision_checking.collision_rules import (
-    AvoidCollisionBetweenGroups,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.pr2 import PR2
@@ -48,6 +43,8 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
     pr2_world_copy = fetch_world_from_service(
         rclpy_node,
     )
+
+    time.sleep(2)
 
     fetched_pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
 

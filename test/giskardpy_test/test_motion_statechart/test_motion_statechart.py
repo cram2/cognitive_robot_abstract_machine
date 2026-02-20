@@ -1262,8 +1262,8 @@ class TestCartesianTasks:
     """Test suite for all Cartesian motion tasks."""
 
     def test_simple_cartesian_pose(self, cylinder_bot_world: World, rclpy_node):
-        TFPublisher(world=cylinder_bot_world, node=rclpy_node)
-        VizMarkerPublisher(world=cylinder_bot_world, node=rclpy_node)
+        TFPublisher(_world=cylinder_bot_world, node=rclpy_node)
+        VizMarkerPublisher(_world=cylinder_bot_world, node=rclpy_node)
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
 
         msc = MotionStatechart()
@@ -1392,8 +1392,8 @@ class TestCartesianTasks:
     def test_cart_goal_sequence_at_build(
         self, pr2_world_state_reset: World, rclpy_node
     ):
-        tf_publisher = TFPublisher(node=rclpy_node, world=pr2_world_state_reset)
-        viz = VizMarkerPublisher(world=pr2_world_state_reset, node=rclpy_node)
+        tf_publisher = TFPublisher(node=rclpy_node, _world=pr2_world_state_reset)
+        viz = VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
 
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "base_footprint"
@@ -2946,11 +2946,12 @@ class TestCollisionAvoidance:
         )
         robot = pr2_with_box.get_semantic_annotations_by_type(AbstractRobot)[0]
 
-        pr2_with_box.collision_manager.add_temporary_rule(
-            AvoidExternalCollisions(
-                buffer_zone_distance=0.1, violated_distance=0.0, robot=robot
+        with pr2_with_box.modify_world():
+            pr2_with_box.collision_manager.add_temporary_rule(
+                AvoidExternalCollisions(
+                    buffer_zone_distance=0.1, violated_distance=0.0, robot=robot
+                )
             )
-        )
 
         msc = MotionStatechart()
         msc.add_node(

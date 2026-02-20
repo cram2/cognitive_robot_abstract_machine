@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing_extensions import List, Optional, Type, Iterable
 
 from krrood.entity_query_language.predicate import Symbol, Predicate
+from semantic_digital_twin.mixin import HasSimulatorProperties
 
 
 @dataclass(unsafe_hash=True)

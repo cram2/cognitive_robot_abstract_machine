@@ -3,35 +3,27 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Self
 
 import numpy as np
-from typing_extensions import TYPE_CHECKING, Callable, Dict
-from uuid import UUID
+from typing_extensions import Dict
 
-from ..datastructures.prefixed_name import PrefixedName
-
-if TYPE_CHECKING:
-    from ..world import World
+from krrood.adapters.json_serializer import SubclassJSONSerializer
+from ..world_description.world_entity import WorldEntityWithClassBasedID
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class Callback(ABC):
+@dataclass(eq=False)
+class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
     """
     Callback is an abstract base class (ABC)
-    reacting to changes in the associated `world`.
-    It provides a flexible  mechanism for subclasses to implement custom behaviors to be triggered
+    reacting to changes in the associated `_world`.
+    It provides a flexible mechanism for subclasses to implement custom behaviors to be triggered
     whenever a change occurs.
 
     The primary purpose of this class is to encapsulate logic that needs to be
-    executed as a response to certain events or changes within the `world` object.
-    """
-
-    world: World
-    """
-    The world this callback is listening on.
+    executed as a response to certain events or changes within the `_world` object.
     """
 
     _is_paused = False
@@ -75,8 +67,16 @@ class Callback(ABC):
         """
         self._is_paused = False
 
+    def to_json(self) -> Dict[str, Any]:
+        return {**super().to_json(), "is_paused": self._is_paused}
 
-@dataclass
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        instance = super()._from_json(data, **kwargs)
+        instance._is_paused = data.get("is_paused", False)
+        return instance
+
+
+@dataclass(eq=False)
 class StateChangeCallback(Callback, ABC):
     """
     Callback for handling state changes.
@@ -88,12 +88,12 @@ class StateChangeCallback(Callback, ABC):
     """
 
     def __post_init__(self):
-        self.world.state.state_change_callbacks.append(self)
+        self._world.state.state_change_callbacks.append(self)
         self.update_previous_world_state()
 
     def stop(self):
         try:
-            self.world.state.state_change_callbacks.remove(self)
+            self._world.state.state_change_callbacks.remove(self)
         except ValueError:
             pass
 
@@ -101,20 +101,21 @@ class StateChangeCallback(Callback, ABC):
         """
         Update the previous world state to reflect the current world positions.
         """
-        self.previous_world_state_data = np.copy(self.world.state.positions)
+        self.previous_world_state_data = np.copy(self._world.state.positions)
 
 
-@dataclass
+@dataclass(eq=False)
 class ModelChangeCallback(Callback, ABC):
     """
     Callback for handling model changes.
     """
 
     def __post_init__(self):
-        self.world.get_world_model_manager().model_change_callbacks.append(self)
+        super().__post_init__()
+        self._world.get_world_model_manager().model_change_callbacks.append(self)
 
     def stop(self):
         try:
-            self.world.get_world_model_manager().model_change_callbacks.remove(self)
+            self._world.get_world_model_manager().model_change_callbacks.remove(self)
         except ValueError:
             pass

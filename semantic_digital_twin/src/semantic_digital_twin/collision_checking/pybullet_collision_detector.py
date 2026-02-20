@@ -263,7 +263,7 @@ def create_object(
     return out
 
 
-@dataclass
+@dataclass(eq=False)
 class BulletCollisionDetector(CollisionDetector):
     """
     Collision detector based on the giskard wrapper for bullet.
@@ -293,9 +293,9 @@ class BulletCollisionDetector(CollisionDetector):
         self.reset_cache()
         self.clear()
         self.body_to_bullet_object = {}
-        if self.world.is_empty():
+        if self._world.is_empty():
             return
-        for body in self.world.bodies_with_collision:
+        for body in self._world.bodies_with_collision:
             self.add_body(body)
         self._ordered_bullet_objects = list(self.body_to_bullet_object.values())
 
@@ -344,10 +344,10 @@ class BulletCollisionDetector(CollisionDetector):
         return CollisionCheckingResult(
             [
                 ClosestPoints(
-                    body_a=self.world.get_kinematic_structure_entity_by_id(
+                    body_a=self._world.get_kinematic_structure_entity_by_id(
                         collision.obj_a.name
                     ),
-                    body_b=self.world.get_kinematic_structure_entity_by_id(
+                    body_b=self._world.get_kinematic_structure_entity_by_id(
                         collision.obj_b.name
                     ),
                     distance=collision.contact_distance,

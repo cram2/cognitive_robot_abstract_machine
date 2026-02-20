@@ -38,8 +38,6 @@ class ForwardKinematicsManager(ModelChangeCallback):
     3. Efficient computation of forward kinematics as position and quaternion, useful for ROS tf.
     """
 
-    world: World
-
     compiled_all_fks: CompiledFunction = field(init=False)
 
     forward_kinematics_for_all_bodies: np.ndarray = field(init=False)
@@ -60,7 +58,7 @@ class ForwardKinematicsManager(ModelChangeCallback):
     body_id_to_all_fk_index: Dict[UUID, int] = field(init=False)
 
     def _notify(self, **kwargs):
-        if len(self.world.kinematic_structure_entities) == 0:
+        if len(self._world.kinematic_structure_entities) == 0:
             return
         self.update_root_T_kse_expression_cache()
         self.compose_expression.cache_clear()
@@ -72,14 +70,14 @@ class ForwardKinematicsManager(ModelChangeCallback):
 
     def update_root_T_kse_expression_cache(self):
         self.root_T_kse_expression_cache = {
-            self.world.root.id: HomogeneousTransformationMatrix()
+            self._world.root.id: HomogeneousTransformationMatrix()
         }
         for parent, childs in rustworkx.bfs_successors(
-            self.world.kinematic_structure, self.world.root.index
+            self._world.kinematic_structure, self._world.root.index
         ):
             root_T_parent = self.root_T_kse_expression_cache[parent.id]
             for child in childs:
-                parent_C_child = self.world.get_connection(parent, child)
+                parent_C_child = self._world.get_connection(parent, child)
                 self.root_T_kse_expression_cache[child.id] = (
                     root_T_parent @ parent_C_child.origin_expression
                 )
@@ -91,19 +89,19 @@ class ForwardKinematicsManager(ModelChangeCallback):
         all_fks = Matrix.vstack(
             [
                 self.root_T_kse_expression_cache[body.id]
-                for body in self.world.kinematic_structure_entities
+                for body in self._world.kinematic_structure_entities
             ]
         )
 
         self.compiled_all_fks = all_fks.compile(
             parameters=VariableParameters.from_lists(
-                self.world.state.position_float_variables
+                self._world.state.position_float_variables
             )
         )
-        self.compiled_all_fks.bind_args_to_memory_view(0, self.world.state.positions)
+        self.compiled_all_fks.bind_args_to_memory_view(0, self._world.state.positions)
         self.body_id_to_all_fk_index = {
             body.id: i * 4
-            for i, body in enumerate(self.world.kinematic_structure_entities)
+            for i, body in enumerate(self._world.kinematic_structure_entities)
         }
 
     def recompute(self) -> None:
@@ -124,10 +122,12 @@ class ForwardKinematicsManager(ModelChangeCallback):
             It determines the endpoint of the forward kinematics calculation.
         :return: An expression representing the computed forward kinematics of the tip KinematicStructureEntity relative to the root KinematicStructureEntity.
         """
-        if root == self.world.root:
+        if root == self._world.root:
             return self.root_T_kse_expression_cache[tip.id]
         fk = HomogeneousTransformationMatrix()
-        root_chain, tip_chain = self.world.compute_split_chain_of_connections(root, tip)
+        root_chain, tip_chain = self._world.compute_split_chain_of_connections(
+            root, tip
+        )
         connection: Connection
         for connection in root_chain:
             tip_T_root = connection.origin_expression.inverse()
@@ -171,8 +171,8 @@ class ForwardKinematicsManager(ModelChangeCallback):
         """
         root = root.id
         tip = tip.id
-        root_is_world = root == self.world.root.id
-        tip_is_world = tip == self.world.root.id
+        root_is_world = root == self._world.root.id
+        tip_is_world = tip == self._world.root.id
 
         if not tip_is_world:
             i = self.body_id_to_all_fk_index[tip]
