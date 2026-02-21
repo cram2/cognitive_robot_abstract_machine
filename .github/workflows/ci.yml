@@ -67,6 +67,7 @@ jobs:
           source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
           python -m pytest -sv cognitive_robot_abstract_machine/test/pycram_test/test_designator/test_multi_robot_action_designator.py::test_move_gripper_multi
+          python -m pytest -sv cognitive_robot_abstract_machine/test/semantic_digital_twin_test/test_adapters/test_multi_sim.py::test_apartment_multi_sim_in_5s
 
       - name: Save cache
         uses: actions/cache/save@v4
