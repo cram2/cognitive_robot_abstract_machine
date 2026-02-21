@@ -183,12 +183,6 @@ class Attribute(MappedVariable):
         super().__post_init__()
         self._update_type_()
 
-    @property
-    def _original_value_is_iterable_and_this_operation_preserves_that_(self):
-        if not self._wrapped_field_:
-            return False
-        return self._wrapped_field_.is_iterable
-
     @cached_property
     def _owner_class_(self):
         """
@@ -318,13 +312,6 @@ class FlatVariable(MappedVariable):
     @cached_property
     def _name_(self):
         return f"Flatten({self._child_._name_})"
-
-    @property
-    def _original_value_is_iterable_and_this_operation_preserves_that_(self):
-        """
-        :return: False as Flatten loops inside the iterable yielding element by element.
-        """
-        return False
 
 
 @dataclass

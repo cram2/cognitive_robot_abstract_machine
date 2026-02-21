@@ -143,9 +143,9 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
     ) -> Iterable[OperationResult]:
         self._is_false_ = result.is_false
         if result.is_true:
-            self._conclusion_.update(result.operand._conclusion_)
+            self._conclusions_.update(result.operand._conclusions_)
         yield OperationResult(result.bindings, self._is_false_, self, result)
-        self._conclusion_.clear()
+        self._conclusions_.clear()
 
     @classmethod
     def _get_current_conditions_root_for_rule_type_from_context_stack(
@@ -185,11 +185,11 @@ class Alternative(OR, ConclusionSelector):
     ) -> Iterable[OperationResult]:
         for output in OR._evaluate__(self, sources):
             if output.is_true:
-                self._conclusion_.update(
-                    output.previous_operation_result.operand._conclusion_
+                self._conclusions_.update(
+                    output.previous_operation_result.operand._conclusions_
                 )
             yield output
-            self._conclusion_.clear()
+            self._conclusions_.clear()
 
     @classmethod
     def _get_current_conditions_root_for_rule_type_from_context_stack(
@@ -220,11 +220,11 @@ class Next(EQLUnion, ConclusionSelector):
     ) -> Iterable[OperationResult]:
         for output in EQLUnion._evaluate__(self, sources):
             if output.is_true:
-                self._conclusion_.update(
-                    output.previous_operation_result.operand._conclusion_
+                self._conclusions_.update(
+                    output.previous_operation_result.operand._conclusions_
                 )
             yield output
-            self._conclusion_.clear()
+            self._conclusions_.clear()
 
     @classmethod
     def _get_current_conditions_root_for_rule_type_from_context_stack(

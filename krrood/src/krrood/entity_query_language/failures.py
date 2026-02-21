@@ -4,6 +4,7 @@ This module defines some custom exception types used by the entity_query_languag
 
 from __future__ import annotations
 
+import uuid
 from abc import ABC
 from dataclasses import dataclass, field
 
@@ -544,7 +545,7 @@ class NoExpressionFoundForGivenID(DataclassException):
     """
     The current symbolic expression being evaluated.
     """
-    expression_id: int
+    expression_id: uuid.UUID
     """
     The ID of the expression that was not found.
     """

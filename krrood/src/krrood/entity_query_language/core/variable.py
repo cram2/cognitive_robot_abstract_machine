@@ -121,10 +121,6 @@ class Variable(CanHaveDomainSource[T]):
     ):
         raise ValueError(f"class {self.__class__} does not have children")
 
-    @property
-    def _original_value_is_iterable_and_this_operation_preserves_that_(self):
-        return is_iterable(next(iter(self._re_enterable_domain_generator_), None))
-
     @cached_property
     def _name_(self) -> str:
         if self._type_:
