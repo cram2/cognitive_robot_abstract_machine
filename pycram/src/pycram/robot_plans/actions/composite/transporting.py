@@ -85,7 +85,7 @@ class TransportAction(ActionDescription):
                 entity(
                     drawer := variable(Drawer, domain=self.world.semantic_annotations)
                 ).where(drawer.root == container)
-            ).evaluate()
+            ).tolist()
             if sem_anno:
                 SequentialPlan(
                     self.context,
