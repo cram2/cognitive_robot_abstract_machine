@@ -5,7 +5,7 @@ import datetime
 from random_events.set import Set
 from random_events.variable import Continuous, Symbolic
 
-from krrood.entity_query_language.factories import variable_from
+from krrood.entity_query_language.factories import variable_from, variable
 from krrood.ormatic.dao import to_dao
 from krrood.probabilistic_knowledge.object_access_variable import ObjectAccessVariable
 from krrood.probabilistic_knowledge.parameterizer import Parameterizer, Parameterization
@@ -26,20 +26,21 @@ def test_parameterize_position():
     Test parameterization of the Position class.
     """
     position = Position(..., ..., ...)
-    position_dao_variable = variable_from([to_dao(position)])
+    dao = to_dao(position)
+    position_dao_variable = variable(type(dao), [dao])
     parameterizer = Parameterizer()
     parameterization = parameterizer.parameterize(position)
     expected_variables = [
         ObjectAccessVariable(
-            Continuous("PositionDAO.x"),
+            Continuous(position_dao_variable.x._name_),
             position_dao_variable.x,
         ),
         ObjectAccessVariable(
-            Continuous("PositionDAO.y"),
+            Continuous(position_dao_variable.y._name_),
             position_dao_variable.y,
         ),
         ObjectAccessVariable(
-            Continuous("PositionDAO.z"),
+            Continuous(position_dao_variable.z._name_),
             position_dao_variable.z,
         ),
     ]
@@ -61,17 +62,18 @@ def test_parameterize_orientation_mixed_none():
     Test parameterization of the Orientation class.
     """
     orientation = Orientation(..., None, ..., None)
-    orientation_dao_variable = variable_from([to_dao(orientation)])
+    dao = to_dao(orientation)
+    orientation_dao_variable = variable(type(dao), [dao])
     parameterizer = Parameterizer()
     parameterization = parameterizer.parameterize(orientation)
 
     expected_variables = [
         ObjectAccessVariable(
-            Continuous("OrientationDAO.x"),
+            Continuous(orientation_dao_variable.x._name_),
             orientation_dao_variable.x,
         ),
         ObjectAccessVariable(
-            Continuous("OrientationDAO.z"),
+            Continuous(orientation_dao_variable.z._name_),
             orientation_dao_variable.z,
         ),
     ]
@@ -88,33 +90,34 @@ def test_parameterize_pose():
         orientation=Orientation(..., ..., ..., None),
     )
 
-    pose_dao_variable = variable_from([to_dao(pose)])
+    dao = to_dao(pose)
+    pose_dao_variable = variable(type(dao), [dao])
 
     parameterizer = Parameterizer()
     parameterization = parameterizer.parameterize(pose)
     expected_variables = [
         ObjectAccessVariable(
-            Continuous("PoseDAO.position.x"),
+            Continuous(pose_dao_variable.position.x._name_),
             pose_dao_variable.position.x,
         ),
         ObjectAccessVariable(
-            Continuous("PoseDAO.position.y"),
+            Continuous(pose_dao_variable.position.y._name_),
             pose_dao_variable.position.y,
         ),
         ObjectAccessVariable(
-            Continuous("PoseDAO.position.z"),
+            Continuous(pose_dao_variable.position.z._name_),
             pose_dao_variable.position.z,
         ),
         ObjectAccessVariable(
-            Continuous("PoseDAO.orientation.x"),
+            Continuous(pose_dao_variable.orientation.x._name_),
             pose_dao_variable.orientation.x,
         ),
         ObjectAccessVariable(
-            Continuous("PoseDAO.orientation.y"),
+            Continuous(pose_dao_variable.orientation.y._name_),
             pose_dao_variable.orientation.y,
         ),
         ObjectAccessVariable(
-            Continuous("PoseDAO.orientation.z"),
+            Continuous(pose_dao_variable.orientation.z._name_),
             pose_dao_variable.orientation.z,
         ),
     ]
