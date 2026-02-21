@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-class ClusterPositionAnnotator(robokudo.annotators.core.BaseAnnotator):
+class ClusterPositionAnnotator(core.BaseAnnotator):
     """3D position estimation for object hypotheses.
 
     This annotator:
@@ -50,7 +50,7 @@ class ClusterPositionAnnotator(robokudo.annotators.core.BaseAnnotator):
        Can process either ObjectHypothesis or CloudAnnotation data.
     """
 
-    class Descriptor(robokudo.annotators.core.BaseAnnotator.Descriptor):
+    class Descriptor(core.BaseAnnotator.Descriptor):
         """Configuration descriptor for position estimation."""
 
         class Parameters:
@@ -70,7 +70,7 @@ class ClusterPositionAnnotator(robokudo.annotators.core.BaseAnnotator):
             def __init__(self):
                 # On which data shall we perform the position estimation?
                 # Object Hypothesis or specific annotations like CloudAnnotation?
-                self.analysis_scope = robokudo.types.scene.ObjectHypothesis
+                self.analysis_scope = scene.ObjectHypothesis
                 self.visualizer_point_radius = 0.04  # in meters
 
     def __init__(self, name="ClusterPositionAnnotator", descriptor=Descriptor()):
@@ -105,7 +105,7 @@ class ClusterPositionAnnotator(robokudo.annotators.core.BaseAnnotator):
         centroids_to_visualize = []
 
         object_hypotheses = self.get_cas().filter_annotations_by_type(
-            robokudo.types.scene.ObjectHypothesis
+            scene.ObjectHypothesis
         )
 
         for object_hypothesis in object_hypotheses:
@@ -114,11 +114,11 @@ class ClusterPositionAnnotator(robokudo.annotators.core.BaseAnnotator):
 
             if (
                 self.descriptor.parameters.analysis_scope
-                == robokudo.types.annotation.CloudAnnotation
+                == annotation.CloudAnnotation
             ):
-                o_clouds: List[robokudo.types.annotation.CloudAnnotation] = (
-                    robokudo.cas.CAS.filter_by_type(
-                        robokudo.types.annotation.CloudAnnotation,
+                o_clouds: List[annotation.CloudAnnotation] = (
+                    CAS.filter_by_type(
+                        annotation.CloudAnnotation,
                         object_hypothesis.annotations,
                     )
                 )
@@ -158,7 +158,7 @@ class ClusterPositionAnnotator(robokudo.annotators.core.BaseAnnotator):
         :return: Position annotation with centroid as translation
         :rtype: robokudo.types.annotation.PositionAnnotation
         """
-        position = robokudo.types.annotation.PositionAnnotation()
+        position = annotation.PositionAnnotation()
         position.source = type(self).__name__
         position.translation = centroid
         return position
