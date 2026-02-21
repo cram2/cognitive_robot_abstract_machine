@@ -597,6 +597,7 @@ class Region(KinematicStructureEntity):
 
     def __post_init__(self):
         self.area.reference_frame = self
+        self.area.transform_all_shapes_to_own_frame()
 
     @classmethod
     def from_shape_collection(

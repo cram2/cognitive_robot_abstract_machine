@@ -79,7 +79,7 @@ queried_world = session.scalars(select(WorldMappingDAO)).one()
 reconstructed_world = queried_world.from_dao()
 table = [semantic_annotation for semantic_annotation in reconstructed_world.semantic_annotations if isinstance(semantic_annotation, Table)][0]
 print(table)
-print(table.points_on_supporting_surface(2))
+print(table.sample_points_from_surface(amount=2))
 ```
 
 ## Maintaining the ORM 🧰

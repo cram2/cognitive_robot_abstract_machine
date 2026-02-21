@@ -191,6 +191,14 @@ class ShapeCollection(SubclassJSONSerializer):
             .scale
         )
 
+    @property
+    def min_point(self) -> Point3:
+        return Point3.from_iterable(self.combined_mesh.bounds[0])
+
+    @property
+    def max_point(self) -> Point3:
+        return Point3.from_iterable(self.combined_mesh.bounds[1])
+
 
 @dataclass
 class BoundingBoxCollection(ShapeCollection):
@@ -333,10 +341,9 @@ class BoundingBoxCollection(ShapeCollection):
             ), "All shapes must have the same reference frame."
 
         local_bbs = [shape.local_frame_bounding_box for shape in shapes]
-        reference_frame = shapes[0].origin.reference_frame
         return cls(
             [bb.transform_to_origin(bb.origin) for bb in local_bbs],
-            reference_frame,
+            shapes.reference_frame,
         )
 
     def as_shapes(self) -> ShapeCollection:
