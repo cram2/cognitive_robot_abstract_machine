@@ -43,8 +43,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /github/home/.cache/semantic_digital_twin
-          key: ${{ runner.os }}-cache-${{ github.ref_name }}
+          key: ${{ runner.os }}-cache-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
+            ${{ runner.os }}-cache-${{ github.ref_name }}
             ${{ runner.os }}-cache-
 
       - name: Build ORM
