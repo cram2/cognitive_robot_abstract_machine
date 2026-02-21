@@ -8,9 +8,8 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from typing import Callable, Union as TypingUnion, Type
 
-from typing_extensions import Iterable
+from typing_extensions import Iterable, TYPE_CHECKING, Type
 
 from ..core.base_expressions import (
     TruthValueOperator,
@@ -18,8 +17,10 @@ from ..core.base_expressions import (
     Bindings,
     OperationResult,
     BinaryExpression,
-    SymbolicExpression,
 )
+
+if TYPE_CHECKING:
+    from ..factories import ConditionType
 
 
 @dataclass(eq=False, repr=False)
@@ -58,6 +59,19 @@ class LogicalBinaryOperator(LogicalOperator, BinaryExpression, ABC):
     Abstract base class for logical operators that take two operands (i.e. have two children) only.
     """
 
+    def evaluate_right(self, sources: Bindings) -> Iterable[OperationResult]:
+        """
+        Evaluate the right operand.
+
+        :param sources: The current bindings to use during evaluation.
+        :return: The new bindings after evaluating the right operand.
+        """
+        for right_value in self.right._evaluate_(sources, parent=self):
+            self._is_false_ = right_value.is_false
+            yield OperationResult(
+                right_value.bindings, self._is_false_, self, right_value
+            )
+
 
 @dataclass(eq=False, repr=False)
 class AND(LogicalBinaryOperator):
@@ -70,19 +84,14 @@ class AND(LogicalBinaryOperator):
         sources: Bindings,
     ) -> Iterable[OperationResult]:
 
-        left_values = self.left._evaluate_(sources, parent=self)
-        for left_value in left_values:
+        for left_value in self.left._evaluate_(sources, parent=self):
             self._is_false_ = left_value.is_false
             if self._is_false_:
-                yield OperationResult(left_value.bindings, self._is_false_, self)
+                yield OperationResult(
+                    left_value.bindings, self._is_false_, self, left_value
+                )
             else:
-                yield from self.evaluate_right(left_value)
-
-    def evaluate_right(self, left_value: OperationResult) -> Iterable[OperationResult]:
-        right_values = self.right._evaluate_(left_value.bindings, parent=self)
-        for right_value in right_values:
-            self._is_false_ = right_value.is_false
-            yield OperationResult(right_value.bindings, self._is_false_, self)
+                yield from self.evaluate_right(left_value.bindings)
 
 
 @dataclass(eq=False, repr=False)
@@ -110,25 +119,9 @@ class OR(LogicalBinaryOperator):
                     left_value.bindings, self._is_false_, self, left_value
                 )
 
-    def evaluate_right(self, sources: Bindings) -> Iterable[OperationResult]:
-        """
-        Evaluate the right operand.
-
-        :param sources: The current bindings to use during evaluation.
-        :return: The new bindings after evaluating the right operand.
-        """
-        for right_value in self.right._evaluate_(sources, parent=self):
-            self._is_false_ = right_value.is_false
-            yield OperationResult(
-                right_value.bindings, self._is_false_, self, right_value
-            )
-
-
-OperatorOptimizer = Callable[[SymbolicExpression, SymbolicExpression], LogicalOperator]
-
 
 def chained_logic(
-    operator: TypingUnion[Type[LogicalOperator], OperatorOptimizer], *conditions
+    operator: Type[LogicalBinaryOperator], *conditions: ConditionType
 ) -> LogicalOperator:
     """
     A chian of logic operation over multiple conditions, e.g. cond1 | cond2 | cond3.

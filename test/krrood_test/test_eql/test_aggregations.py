@@ -14,6 +14,7 @@ from krrood.entity_query_language.factories import (
     contains,
     an,
     a,
+    flat_variable,
 )
 from krrood.entity_query_language.predicate import length
 from ..dataset.example_classes import NamedNumbers
@@ -113,7 +114,7 @@ def test_max_on_empty_list(handles_and_containers_world):
 def test_non_aggregated_selectables_with_aggregated_ones(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
-    drawer = variable_from(cabinet.drawers)
+    drawer = flat_variable(cabinet.drawers)
     with pytest.raises(NonAggregatedSelectedVariablesError):
         query = a(
             set_of(drawer, eql.max(drawer))
@@ -144,7 +145,7 @@ def test_non_aggregated_selectables_without_aggregation_and_with_grouped_by(
 def test_non_aggregated_conditions_with_aggregated_ones(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
-    drawer = variable_from(cabinet.drawers)
+    drawer = flat_variable(cabinet.drawers)
     query = a(
         set_of(cabinet, eql.max(drawer.handle.name))
         .where(cabinet.container.name.startswith("C"))
@@ -163,10 +164,9 @@ def test_non_aggregated_conditions_with_aggregated_ones(handles_and_containers_w
 def test_max_grouped_by(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
-    drawer = variable_from(cabinet.drawers)
+    drawer = flat_variable(cabinet.drawers)
 
     # We want to find the drawer with the "largest" handle name (alphabetically) per cabinet.
-    # drawers_by_cabinet = variable_from(cabinet.drawers).grouped_by(cabinet)
     query = a(
         set_of(
             cabinet, max_drawer := eql.max(drawer, key=lambda d: d.handle.name)
@@ -192,7 +192,7 @@ def test_max_grouped_by(handles_and_containers_world):
 def test_having_with_max(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
-    drawer = variable_from(cabinet.drawers)
+    drawer = flat_variable(cabinet.drawers)
 
     query = a(
         set_of(
@@ -211,7 +211,7 @@ def test_having_with_max(handles_and_containers_world):
 def test_multiple_grouped_variables(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
-    drawer = variable_from(cabinet.drawers)
+    drawer = flat_variable(cabinet.drawers)
 
     # Group by both cabinet and drawer (silly, but tests multiple variables)
     query = a(
@@ -229,7 +229,7 @@ def test_multiple_grouped_variables(handles_and_containers_world):
 def test_sum_grouped_by(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
-    drawer = variable_from(cabinet.drawers)
+    drawer = flat_variable(cabinet.drawers)
     # Give drawers a numeric property to sum. They don't have one, but we can use a key func.
     # Let's sum the length of handle names per cabinet.
 
@@ -253,7 +253,7 @@ def test_sum_grouped_by(handles_and_containers_world):
 def test_count_grouped_by(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
-    cabinet_drawers = variable_from(cabinet.drawers)
+    cabinet_drawers = flat_variable(cabinet.drawers)
     query = an(entity(eql.count(cabinet_drawers)).grouped_by(cabinet))
     result = list(query.evaluate())
     expected = [len(c.drawers) for c in world.views if isinstance(c, Cabinet)]
@@ -330,7 +330,7 @@ def test_count_with_duplicates(handles_and_containers_world):
     )
     world.views.append(cabinet_with_duplicate_drawers)
     cabinet = variable(Cabinet, domain=world.views)
-    cabinet_drawer = variable_from(cabinet.drawers)
+    cabinet_drawer = flat_variable(cabinet.drawers)
     query = a(
         set_of(count := eql.count(), cabinet, cabinet_drawer).grouped_by(
             cabinet, cabinet_drawer
@@ -350,7 +350,7 @@ def test_count_with_duplicates(handles_and_containers_world):
 def test_max_count_grouped_by(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
-    cabinet_drawers = variable_from(cabinet.drawers)
+    cabinet_drawers = flat_variable(cabinet.drawers)
     query = eql.max(entity(eql.count(cabinet_drawers)).grouped_by(cabinet))
     result = query.tolist()
     assert len(result) == 1
@@ -365,7 +365,7 @@ def test_max_count_grouped_by(handles_and_containers_world):
 def test_max_count_grouped_by_without_explicit_entity(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
-    cabinet_drawers = variable_from(cabinet.drawers)
+    cabinet_drawers = flat_variable(cabinet.drawers)
     query = eql.max(eql.count(cabinet_drawers).grouped_by(cabinet))
     result = query.tolist()
     assert len(result) == 1
@@ -380,7 +380,7 @@ def test_max_count_grouped_by_without_explicit_entity(handles_and_containers_wor
 def test_max_count_grouped_by_wrong(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
-    cabinet_drawers = variable_from(cabinet.drawers)
+    cabinet_drawers = flat_variable(cabinet.drawers)
     with pytest.raises(NestedAggregationError):
         query = eql.max(eql.count(cabinet_drawers))
 
@@ -576,7 +576,7 @@ def assert_correct_results_for_complex_aggregation_query(
 def test_order_by_aggregation(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
-    drawer = variable_from(cabinet.drawers)
+    drawer = flat_variable(cabinet.drawers)
     query = an(
         entity(cabinet)
         .grouped_by(cabinet)

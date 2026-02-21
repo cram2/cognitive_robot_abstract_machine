@@ -45,7 +45,7 @@ class Conclusion(BinaryExpression, ABC):
         if current_parent is None:
             current_parent = self._conditions_root_
         self._parent_ = current_parent
-        self._parent_._add_conclusion_(self)
+        self._parent_._conclusions_.add(self)
 
     @property
     def variable(self) -> Selectable:

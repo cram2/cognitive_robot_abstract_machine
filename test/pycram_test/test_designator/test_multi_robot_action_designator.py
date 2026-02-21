@@ -46,6 +46,7 @@ from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     GripperState,
     JointStateType,
+    StaticJointState,
 )
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
@@ -202,7 +203,7 @@ def test_park_arms_multi(immutable_multiple_robot_apartment):
     joints = []
     states = []
     for arm in robot_view.arms:
-        joint_state = arm.get_joint_state_by_type(JointStateType.PARK)
+        joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
         joints.extend(joint_state.connections)
         states.extend(joint_state.target_values)
     for connection, value in zip(joints, states):

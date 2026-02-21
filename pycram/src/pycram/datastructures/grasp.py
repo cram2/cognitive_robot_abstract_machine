@@ -30,8 +30,8 @@ class GraspDescription:
     """
     The direction from which the body should be grasped. These are the four directions in the x-y plane (FRONT, BACK, LEFT, RIGHT).
     """
-    vertical_alignment: VerticalAlignment
 
+    vertical_alignment: VerticalAlignment
     """
     The alignment of the gripper with the body in the z-axis (TOP, BOTTOM).
     """

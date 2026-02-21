@@ -27,7 +27,7 @@ from typing_extensions import (
     Iterator,
 )
 
-from ..core.domain_mapping import CanBehaveLikeAVariable
+from ..core.mapped_variable import CanBehaveLikeAVariable
 from .builders import (
     WhereBuilder,
     HavingBuilder,
@@ -68,7 +68,7 @@ if TYPE_CHECKING:
 
 ResultMapping = Callable[[Iterator[OperationResult]], Iterator[OperationResult]]
 """
-A function that maps the results of a query object descriptor to a new set of results.
+A function that maps the results of a query to a new set of results.
 """
 
 
@@ -83,31 +83,31 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
         default_factory=tuple, kw_only=True
     )
     """
-    The variables that are selected by the query object descriptor.
+    The variables that are selected by the query.
     """
     _distinct_on: Tuple[Selectable, ...] = field(default_factory=tuple, init=False)
     """
-    Parameters for distinct results of the query object descriptor.
+    Parameters for distinct results of the query.
     """
     _results_mapping: List[ResultMapping] = field(init=False, default_factory=list)
     """
-    Mapping functions that map the results of the query object descriptor to a new set of results.
+    Mapping functions that map the results of the query to a new set of results.
     """
     _seen_results: Optional[SeenSet] = field(init=False, default=None)
     """
-    A set of seen results, used when distinct is called in the query object descriptor.
+    A set of seen results, used when distinct is called in the query.
     """
     _where_builder_: Optional[WhereBuilder] = field(init=False, default=None)
     """
-    The builder for the `Where` expression of the query object descriptor.
+    The builder for the `Where` expression of the query.
     """
     _grouped_by_builder_: Optional[GroupedByBuilder] = field(init=False, default=None)
     """
-    The builder for the `GroupedBy` expression of the query object descriptor.
+    The builder for the `GroupedBy` expression of the query.
     """
     _having_builder: Optional[HavingBuilder] = field(init=False, default=None)
     """
-    The builder for the `Having` expression of the query object descriptor.
+    The builder for the `Having` expression of the query.
     """
     _ordered_by_builder_: Optional[OrderedByBuilder] = field(default=None, init=False)
     """
@@ -115,13 +115,13 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
     """
     _quantifier_builder_: Optional[QuantifierBuilder] = field(default=None, init=False)
     """
-    The builder for the `ResultQuantifier` expression of the query object descriptor. The default quantifier is `An`
+    The builder for the `ResultQuantifier` expression of the query. The default quantifier is `An`
      which yields all results.
     """
     _built_: bool = field(default=False, init=False)
     """
-    Whether the query object descriptor has built the query (wired the query operations) or not. If built already, it
-    cannot be modified further and an error will be raised if a user tries to modify the query object descriptor.
+    Whether the query has built the query (wired the query operations) or not. If built already, it
+    cannot be modified further and an error will be raised if a user tries to modify the query.
     """
 
     def __post_init__(self):
@@ -149,7 +149,7 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
 
     def evaluate(self) -> Iterator:
         """
-        Wrap the query object descriptor in a ResultQuantifier expression and evaluate it,
+        Wrap the query in a ResultQuantifier expression and evaluate it,
          returning an iterator over the results.
         """
         self.build()
@@ -161,12 +161,10 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
         Set the conditions that describe the query object. The conditions are chained using AND.
 
         :param conditions: The conditions that describe the query object.
-        :return: This query object descriptor.
+        :return: This query.
         """
         if self._where_builder_ is None:
-            self._where_builder_ = WhereBuilder(
-                conditions=conditions, query_descriptor=self
-            )
+            self._where_builder_ = WhereBuilder(conditions=conditions, query=self)
         else:
             self._where_builder_.conditions += conditions
         return self
@@ -177,12 +175,10 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
         Set the conditions that describe the query object. The conditions are chained using AND.
 
         :param conditions: The conditions that describe the query object.
-        :return: This query object descriptor.
+        :return: This query.
         """
         if self._having_builder is None:
-            self._having_builder = HavingBuilder(
-                conditions=conditions, query_descriptor=self
-            )
+            self._having_builder = HavingBuilder(conditions=conditions, query=self)
         else:
             self._having_builder.conditions += conditions
         return self
@@ -210,10 +206,10 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
         *on: TypingUnion[Selectable, Any],
     ) -> TypingUnion[Self, T]:
         """
-        Apply distinctness constraint to the query object descriptor results.
+        Apply distinctness constraint to the query results.
 
         :param on: The variables to be used for distinctness.
-        :return: This query object descriptor.
+        :return: This query.
         """
         self._distinct_on = on if on else self._selected_variables_
         self._seen_results = SeenSet(keys=self._distinct_on_ids_)
@@ -228,7 +224,7 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
         Specify the variables to group the results by.
 
         :param variables_to_group_by: The variables to group the results by.
-        :return: This query object descriptor.
+        :return: This query.
         """
         self._grouped_by_builder_ = GroupedByBuilder(self, variables_to_group_by)
         return self
@@ -238,7 +234,7 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
         Limit the number of results to n.
 
         :param n: The maximum number of results to return.
-        :return: This query object descriptor.
+        :return: This query.
         """
         self._limit_ = n
         if not isinstance(self._limit_, int) or self._limit_ <= 0:
@@ -257,7 +253,7 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
 
         :param quantifier_type: The type of the quantifier to be used.
         :param quantification_constraint: The constraint to apply to the quantifier.
-        :return: This query object descriptor.
+        :return: This query.
         """
         self._quantifier_builder_ = QuantifierBuilder(
             self, quantifier_type, quantification_constraint
@@ -273,9 +269,9 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
 
     def build(self) -> Self:
         """
-        Build the query object descriptor by wiring the nodes together in the correct order of evaluation.
+        Build the query by wiring the nodes together in the correct order of evaluation.
 
-        :return: This query object descriptor.
+        :return: This query.
         """
         if self._built_:
             return self
@@ -312,7 +308,7 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
         sources: Bindings,
     ) -> Iterable[OperationResult]:
         """
-        Evaluate the query descriptor by constraining values, updating conclusions,
+        Evaluate the query by constraining values, updating conclusions,
         and selecting variables.
         """
 
@@ -381,7 +377,7 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
         self, results_gen: Iterator[OperationResult]
     ) -> Iterator[OperationResult]:
         """
-        Apply distinctness constraint to the query object descriptor results.
+        Apply distinctness constraint to the query results.
 
         :param results_gen: Generator of results.
         :return: Generator of distinct results.
@@ -454,7 +450,7 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
     @UnaryExpression._parent_.setter
     def _parent_(self, parent: SymbolicExpression):
         """
-        Make sure to set the parent of the built expression of the query instead of the query object descriptor itself.
+        Make sure to set the parent of the built expression of the query instead of the query itself.
         """
         self.build()
         if self._expression_ is not self:

@@ -8,6 +8,7 @@ from krrood.entity_query_language.factories import (
     refinement,
     alternative,
     next_rule,
+    deduced_variable,
 )
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.query_graph import QueryGraph
@@ -65,7 +66,7 @@ def test_generate_drawers_from_query(handles_and_containers_world):
     handle = variable(Handle, domain=world.bodies)
     fixed_connection = variable(FixedConnection, domain=world.connections)
     prismatic_connection = variable(PrismaticConnection, domain=world.connections)
-    drawers = variable(Drawer, domain=None, inferred=True)
+    drawers = deduced_variable(Drawer)
     query = an(
         entity(drawers).where(
             container == fixed_connection.parent,
@@ -97,7 +98,7 @@ def test_rule_tree_with_a_refinement(doors_and_drawers_world):
     body = variable(Body, domain=world.bodies)
     handle = variable(Handle, domain=world.bodies)
     fixed_connection = variable(FixedConnection, domain=world.connections)
-    drawers_and_doors = variable(View, domain=None, inferred=True)
+    drawers_and_doors = deduced_variable(View)
     query = an(
         entity(drawers_and_doors).where(
             body == fixed_connection.parent,
@@ -132,7 +133,7 @@ def test_rule_tree_with_multiple_refinements(doors_and_drawers_world):
     handle = variable(Handle, domain=world.bodies)
     fixed_connection = variable(FixedConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     query = an(
         entity(views).where(
             body == fixed_connection.parent,
@@ -173,7 +174,7 @@ def test_rule_tree_with_an_alternative(doors_and_drawers_world):
     handle = variable(Handle, domain=world.bodies)
     fixed_connection = variable(FixedConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     query = an(
         entity(views)
         .where(
@@ -216,7 +217,7 @@ def test_rule_tree_with_multiple_alternatives(doors_and_drawers_world):
     fixed_connection = variable(FixedConnection, domain=world.connections)
     prismatic_connection = variable(PrismaticConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     query = an(
         entity(views)
         .where(
@@ -267,7 +268,7 @@ def test_rule_tree_with_multiple_alternatives_optimized(doors_and_drawers_world)
     fixed_connection = variable(FixedConnection, domain=world.connections)
     prismatic_connection = variable(PrismaticConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     query = an(
         entity(views)
         .where(
@@ -331,7 +332,7 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree(doors_and_drawers
     fixed_connection = variable(FixedConnection, domain=world.connections)
     prismatic_connection = variable(PrismaticConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     query = an(
         entity(views)
         .where(
@@ -382,7 +383,7 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree_optimized(
     fixed_connection = variable(FixedConnection, domain=world.connections)
     prismatic_connection = variable(PrismaticConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     query = an(
         entity(views)
         .where(

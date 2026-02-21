@@ -21,7 +21,7 @@ from ..dataset.semantic_world_like_classes import (
     Door,
     Wardrobe,
 )
-from krrood.entity_query_language.factories import entity, variable, and_, inference, an, alternative
+from krrood.entity_query_language.factories import entity, variable, and_, inference, an, alternative, deduced_variable
 from krrood.entity_query_language.rules.conclusion import Add
 
 from krrood.entity_query_language.predicate import HasType
@@ -63,7 +63,7 @@ def test_render_rx_graph_as_igraph_complex(doors_and_drawers_world):
     )
     prismatic_connection = variable(PrismaticConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     rule = an(
         entity(views).where(
             fixed_connection_condition,

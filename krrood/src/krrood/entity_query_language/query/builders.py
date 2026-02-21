@@ -26,7 +26,7 @@ from .quantifiers import ResultQuantificationConstraint, ResultQuantifier, An
 from .operations import Where, Having, OrderedBy, GroupedBy
 from ..operators.aggregators import Aggregator
 from ..core.variable import Literal, Variable
-from ..core.domain_mapping import DomainMapping
+from ..core.mapped_variable import MappedVariable
 
 if TYPE_CHECKING:
     from ..factories import ConditionType
@@ -40,20 +40,20 @@ class ExpressionBuilder(ABC):
     build the expression.
     """
 
-    query_descriptor: Query
+    query: Query
     """
-    The query object descriptor that the expression is being built for.
+    The query that the expression is being built for.
     """
 
     @abstractmethod
     @cached_property
     def expression(self) -> SymbolicExpression:
         """
-        The expression that is built from the metadata.
+        :return: The expression that is built from the metadata.
         """
 
     def __hash__(self) -> int:
-        return hash((self.__class__, self.query_descriptor))
+        return hash((self.__class__, self.query))
 
 
 @dataclass(eq=False)
@@ -72,19 +72,19 @@ class FilterBuilder(ExpressionBuilder, ABC):
 
     def assert_correct_conditions(self):
         """
-        :raises NoConditionsProvidedToWhereStatementOfDescriptor: If no conditions are provided.
+        :raises NoConditionsProvided: If no conditions are provided.
         :raises LiteralConditionError: If any of the conditions is a literal expression.
         """
         # If there are no conditions raise error.
         if len(self.conditions) == 0:
-            raise NoConditionsProvided(self.query_descriptor)
+            raise NoConditionsProvided(self.query)
 
         # If there's a constant condition raise error.
         literal_expressions = [
             exp for exp in self.conditions if not isinstance(exp, SymbolicExpression)
         ]
         if literal_expressions:
-            raise LiteralConditionError(self.query_descriptor, literal_expressions)
+            raise LiteralConditionError(self.query, literal_expressions)
 
     @cached_property
     def aggregators_and_non_aggregators_in_conditions(
@@ -102,7 +102,7 @@ class FilterBuilder(ExpressionBuilder, ABC):
             for var in cond._children_:
                 if isinstance(var, Aggregator):
                     aggregators.append(var)
-                elif isinstance(var, DomainMapping) and any(
+                elif isinstance(var, MappedVariable) and any(
                     isinstance(v, Aggregator) for v in var._descendants_
                 ):
                     aggregators.append(var)
@@ -135,9 +135,7 @@ class WhereBuilder(FilterBuilder):
             self.aggregators_and_non_aggregators_in_conditions
         )
         if aggregators:
-            raise AggregatorInWhereConditionsError(
-                aggregators, descriptor=self.query_descriptor
-            )
+            raise AggregatorInWhereConditionsError(aggregators, query=self.query)
 
     @cached_property
     def expression(self) -> Where:
@@ -168,7 +166,7 @@ class HavingBuilder(FilterBuilder):
         )
         if non_aggregators:
             raise NonAggregatorInHavingConditionsError(
-                non_aggregators, descriptor=self.query_descriptor
+                non_aggregators, query=self.query
             )
 
     @cached_property
@@ -193,7 +191,7 @@ class GroupedByBuilder(ExpressionBuilder):
     @cached_property
     def expression(self) -> GroupedBy:
         aggregators, non_aggregators = self.aggregators_and_non_aggregators
-        where = self.query_descriptor._where_expression_
+        where = self.query._where_expression_
         children = []
         if where:
             children.append(where)
@@ -212,7 +210,7 @@ class GroupedByBuilder(ExpressionBuilder):
         :raises UsageError: If the selected variables are not valid.
         """
         aggregators, non_aggregated_variables = (
-            self.query_descriptor._aggregated_and_non_aggregated_variables_in_selection_
+            self.query._aggregated_and_non_aggregated_variables_in_selection_
         )
         if aggregators and not all(
             self.variable_is_in_or_derived_from_a_grouped_by_variable(v)
@@ -222,7 +220,7 @@ class GroupedByBuilder(ExpressionBuilder):
                 self,
                 non_aggregated_variables,
                 aggregators,
-                descriptor=self.query_descriptor,
+                query=self.query,
             )
 
     @lru_cache
@@ -238,16 +236,16 @@ class GroupedByBuilder(ExpressionBuilder):
             return True
         elif variable._binding_id_ in self.ids_of_aggregated_variables:
             return False
-        elif isinstance(variable, DomainMapping) and any(
+        elif isinstance(variable, MappedVariable) and any(
             self.variable_is_in_or_derived_from_a_grouped_by_variable(d)
             for d in variable._descendants_
         ):
             return True
         elif (
             isinstance(variable, Variable)
-            and isinstance(variable._domain_source_, Selectable)
+            and isinstance(variable._domain_, Selectable)
             and self.variable_is_in_or_derived_from_a_grouped_by_variable(
-                variable._domain_source_
+                variable._domain_
             )
         ):
             return True
@@ -280,7 +278,7 @@ class GroupedByBuilder(ExpressionBuilder):
         :return: A tuple of lists of aggregator and non-aggregator variables used in the query.
         """
         aggregated_variables, non_aggregated_variables = (
-            self.query_descriptor._aggregated_and_non_aggregated_variables_in_selection_
+            self.query._aggregated_and_non_aggregated_variables_in_selection_
         )
 
         all_aggregators, non_aggregators = (
@@ -316,8 +314,8 @@ class GroupedByBuilder(ExpressionBuilder):
         self,
     ) -> Tuple[List[Aggregator], List[Selectable]]:
         non_aggregated_variables, aggregators = [], []
-        if self.query_descriptor._ordered_by_builder_:
-            variable = self.query_descriptor._ordered_by_builder_.variable
+        if self.query._ordered_by_builder_:
+            variable = self.query._ordered_by_builder_.variable
             if isinstance(variable, Aggregator):
                 aggregators.append(variable)
                 if variable._child_ is not None:
@@ -329,11 +327,11 @@ class GroupedByBuilder(ExpressionBuilder):
     @cached_property
     def aggregators_in_selected_variables(self) -> Tuple[Aggregator, ...]:
         """
-        :return: A tuple of aggregators in the selected variables of the query descriptor.
+        :return: A tuple of aggregators in the selected variables of the query.
         """
         return tuple(
             var
-            for var in self.query_descriptor._selected_variables_
+            for var in self.query._selected_variables_
             if isinstance(var, Aggregator)
         )
 
@@ -364,7 +362,7 @@ class QuantifierBuilder(ExpressionBuilder):
                 _quantification_constraint_=self.quantification_constraint,
             )
         else:
-            return self.type(self.query_descriptor._expression_)
+            return self.type(self.query._expression_)
 
 
 @dataclass(eq=False)

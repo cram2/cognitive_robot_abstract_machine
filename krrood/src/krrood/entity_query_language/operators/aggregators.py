@@ -6,6 +6,7 @@ It contains classes for counting, summing, averaging, and finding extreme values
 
 from __future__ import annotations
 
+import numbers
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -29,7 +30,13 @@ from ..core.base_expressions import (
 from ..failures import NestedAggregationError, InvalidChildType
 from ..utils import T
 from ..core.variable import Variable
-from ..core.domain_mapping import CanBehaveLikeAVariable
+from ..core.mapped_variable import CanBehaveLikeAVariable
+
+
+IntOrFloat = int | float
+"""
+A type representing a number, which can be either an integer or a float.
+"""
 
 
 @dataclass(eq=False, repr=False)
@@ -166,28 +173,22 @@ class EntityAggregator(Aggregator[T], ABC):
         ...
 
 
-Number = int | float
-"""
-A type representing a number, which can be either an integer or a float.
-"""
-
-
 @dataclass(eq=False, repr=False)
-class Sum(EntityAggregator[Number]):
+class Sum(EntityAggregator[numbers.Number]):
     """
     Calculate the sum of the child results.
     """
 
     def _apply_aggregation_function_and_get_bindings_(
         self, child_result: OperationResult
-    ) -> Dict[int, Optional[Number]]:
+    ) -> Dict[int, Optional[IntOrFloat]]:
         return {
             self._binding_id_: self.get_aggregation_result_from_child_result(
                 child_result
             )
         }
 
-    def aggregation_function(self, result: Collection[Number]) -> Number:
+    def aggregation_function(self, result: Collection[IntOrFloat]) -> IntOrFloat:
         return sum(result)
 
 
@@ -197,7 +198,7 @@ class Average(Sum):
     Calculate the average of the child results.
     """
 
-    def aggregation_function(self, result: Collection[Number]) -> Number:
+    def aggregation_function(self, result: Collection[IntOrFloat]) -> IntOrFloat:
         sum_value = super().aggregation_function(result)
         return sum_value / len(result)
 

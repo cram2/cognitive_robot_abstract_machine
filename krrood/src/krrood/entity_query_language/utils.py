@@ -135,7 +135,8 @@ T = TypeVar("T")
 
 
 def chain_stages(
-    stages: List[Callable[[Bindings | OperationResult], Iterator[OperationResult]]], initial: Bindings
+    stages: List[Callable[[Bindings | OperationResult], Iterator[OperationResult]]],
+    initial: Bindings,
 ) -> Iterator[OperationResult]:
     """
     Chains a sequence of stages into a single pipeline.
@@ -152,7 +153,9 @@ def chain_stages(
         stages in sequence.
     """
 
-    def evaluate_next_stage_or_yield(i: int, b: OperationResult | Bindings) -> Iterator[OperationResult]:
+    def evaluate_next_stage_or_yield(
+        i: int, b: OperationResult | Bindings
+    ) -> Iterator[OperationResult]:
         """
         Recursively evaluates the next stage or yields the current binding if all stages are done.
 
@@ -240,7 +243,7 @@ def ensure_hashable(obj) -> Hashable:
     return obj
 
 
-def is_hashable(obj):
+def is_hashable(obj) -> bool:
     """
     Checks if an object is hashable by attempting to compute its hash.
 

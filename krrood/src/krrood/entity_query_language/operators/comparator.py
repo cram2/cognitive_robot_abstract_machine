@@ -32,9 +32,6 @@ from ..core.base_expressions import (
 from .set_operations import PerformsCartesianProduct
 from ..utils import is_iterable, make_set
 
-if TYPE_CHECKING:
-    pass
-
 
 @dataclass(eq=False, repr=False)
 class Comparator(BinaryExpression, PerformsCartesianProduct):

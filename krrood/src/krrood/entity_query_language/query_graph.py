@@ -16,7 +16,7 @@ from .operators.aggregators import Aggregator
 from .operators.core_logical_operators import LogicalOperator
 from .core.base_expressions import SymbolicExpression, Filter
 from .core.variable import Variable, Literal
-from .core.domain_mapping import DomainMapping
+from .core.mapped_variable import MappedVariable
 from .operators.comparator import Comparator
 
 try:
@@ -173,7 +173,7 @@ class ColorLegend(RXUtilsColorLegend):
             case Concatenation():
                 name = "Union"
                 color = "#949292"
-            case DomainMapping():
+            case MappedVariable():
                 name = "DomainMapping"
                 color = "#8FC7B8"
             case Comparator():

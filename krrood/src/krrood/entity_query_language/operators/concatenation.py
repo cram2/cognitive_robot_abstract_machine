@@ -12,7 +12,7 @@ from typing import Tuple, Iterable
 from ..core.base_expressions import Bindings, OperationResult, Selectable
 from ..operators.set_operations import Union
 from ..utils import T
-from ..core.domain_mapping import CanBehaveLikeAVariable
+from ..core.mapped_variable import CanBehaveLikeAVariable
 
 
 @dataclass(eq=False, repr=False)

@@ -7,20 +7,28 @@ Alternative, and Next.
 
 from __future__ import annotations
 
-import typing
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing_extensions import Optional, Iterable
+from typing_extensions import Optional, Iterable, TYPE_CHECKING, Self
 
 from .conclusion import Conclusion
 from ..operators.set_operations import Union as EQLUnion
-from ..operators.core_logical_operators import LogicalBinaryOperator, OR
+from ..operators.core_logical_operators import (
+    LogicalBinaryOperator,
+    OR,
+    AND,
+    chained_logic,
+    LogicalOperator,
+)
 from ..core.base_expressions import (
     Bindings,
     OperationResult,
     SymbolicExpression,
     TruthValueOperator,
 )
+
+if TYPE_CHECKING:
+    from ..factories import ConditionType
 
 
 @dataclass(eq=False)
@@ -29,14 +37,75 @@ class ConclusionSelector(TruthValueOperator, ABC):
     Base class for operators that selects the conclusions to pass through from it's operands' conclusions.
     """
 
+    @classmethod
+    def create_and_update_rule_tree(
+        cls,
+        *conditions: ConditionType,
+    ) -> Self:
+        """
+        Create a new RDR rule (e.g., Refinement, Alternative, Next) and add it to the current rule tree.
+
+        Each provided condition is chained with AND, and the resulting branch is
+        connected via ElseIf/Next to the current node, representing an alternative/next path.
+
+        :param conditions: Conditions to chain with AND to create the new condition expression.
+        :returns: The conditions root after attaching the new condition to the rule tree.
+        """
+        new_condition = chained_logic(AND, *conditions)
+
+        current_conditions_root = (
+            cls._get_current_conditions_root_for_rule_type_from_context_stack()
+        )
+
+        prev_parent = current_conditions_root._parent_
+
+        new_conditions_root = cls._create_between_two_expressions(
+            current_conditions_root, new_condition
+        )
+
+        if new_conditions_root is not current_conditions_root:
+            prev_parent._replace_child_(current_conditions_root, new_conditions_root)
+
+        return new_condition
+
+    @classmethod
+    @abstractmethod
+    def _get_current_conditions_root_for_rule_type_from_context_stack(
+        cls,
+    ) -> SymbolicExpression:
+        """
+        :return: The current conditions root to connect the new condition to via this ConclusionSelector.
+        """
+        ...
+
+    @classmethod
+    @abstractmethod
+    def _create_between_two_expressions(
+        cls,
+        current_condition: SymbolicExpression,
+        new_condition: SymbolicExpression,
+    ) -> Self:
+        """
+        Connects the new condition by a ConclusionSelector to the current condition.
+
+        :param current_condition: The current condition in the expression tree.
+        :param new_condition: The new condition to be added to the rule tree.
+        """
+        ...
+
 
 @dataclass(eq=False)
-class ExceptIf(LogicalBinaryOperator, ConclusionSelector):
+class Refinement(LogicalBinaryOperator, ConclusionSelector):
     """
     Conditional branch that yields left unless the right side produces values.
 
     This encodes an "except if" behavior: when the right condition matches,
     the left branch's conclusions/outputs are excluded; otherwise, left flows through.
+    """
+
+    right_yielded: bool = False
+    """
+    Whether the right branch has yielded any True results.
     """
 
     def _evaluate__(
@@ -46,35 +115,60 @@ class ExceptIf(LogicalBinaryOperator, ConclusionSelector):
         """
         Evaluate the ExceptIf condition and yield the results.
         """
-
-        # constrain left values by available sources
-        left_values = self.left._evaluate_(sources, parent=self)
-        for left_value in left_values:
-
-            self._is_false_ = left_value.is_false
-            if self._is_false_:
-                yield left_value
+        for left_value in self.left._evaluate_(sources, self):
+            if left_value.is_false:
+                yield from self.get_operation_result_and_clear_conclusion(left_value)
                 continue
+            yield from self.evaluate_right(left_value.bindings)
+            if not self.right_yielded:
+                # If the right branch didn't yield any True values, propagate the left branch's conclusions.
+                yield from self.get_operation_result_and_clear_conclusion(left_value)
 
-            right_yielded = False
-            for right_value in self.right._evaluate_(left_value.bindings, parent=self):
-                if right_value.is_false:
-                    continue
-                right_yielded = True
-                yield from self.yield_and_update_conclusion(
-                    right_value, self.right._conclusion_
-                )
-            if not right_yielded:
-                yield from self.yield_and_update_conclusion(
-                    left_value, self.left._conclusion_
-                )
+    def evaluate_right(self, bindings: Bindings) -> Iterable[OperationResult]:
+        """
+        Evaluate the right branch of the ExceptIf condition and yield the results. In addition, update the right_yielded
+         flag and the conclusion if the right branch is True.
 
-    def yield_and_update_conclusion(
-        self, result: OperationResult, conclusion: typing.Set[Conclusion]
+        :param bindings: The current bindings from the left evaluation to evaluate the right branch with.
+        :return: The results of evaluating the right branch.
+        """
+        self.right_yielded = False
+        for right_value in self.right._evaluate_(bindings, parent=self):
+            if right_value.is_true:
+                self.right_yielded = True
+            yield from self.get_operation_result_and_clear_conclusion(right_value)
+
+    def get_operation_result_and_clear_conclusion(
+        self, result: OperationResult
     ) -> Iterable[OperationResult]:
-        self._conclusion_.update(conclusion)
-        yield OperationResult(result.bindings, self._is_false_, self)
-        self._conclusion_.clear()
+        self._is_false_ = result.is_false
+        if result.is_true:
+            self._conclusions_.update(result.operand._conclusions_)
+        yield OperationResult(result.bindings, self._is_false_, self, result)
+        self._conclusions_.clear()
+
+    @classmethod
+    def _get_current_conditions_root_for_rule_type_from_context_stack(
+        cls,
+    ) -> ConditionType:
+        """
+        :return: The current conditions root to use for creating a new condition connected via alternative or next edge.
+        """
+        return SymbolicExpression._current_parent_in_context_stack_()
+
+    @classmethod
+    def _create_between_two_expressions(
+        cls,
+        current_condition: SymbolicExpression,
+        new_condition: LogicalOperator,
+    ) -> Self:
+        """
+        Constructs a new rule from the provided rule type and the current conditions root.
+
+        :param current_condition: The current conditions root in the expression tree.
+        :param new_condition: The new condition to be added to the rule tree.
+        """
+        return cls(current_condition, new_condition)
 
 
 @dataclass(eq=False)
@@ -91,11 +185,27 @@ class Alternative(OR, ConclusionSelector):
     ) -> Iterable[OperationResult]:
         for output in OR._evaluate__(self, sources):
             if output.is_true:
-                self._conclusion_.update(
-                    output.previous_operation_result.operand._conclusion_
+                self._conclusions_.update(
+                    output.previous_operation_result.operand._conclusions_
                 )
             yield output
-            self._conclusion_.clear()
+            self._conclusions_.clear()
+
+    @classmethod
+    def _get_current_conditions_root_for_rule_type_from_context_stack(
+        cls,
+    ) -> ConditionType:
+        return (
+            _get_current_conditions_root_for_alternative_or_next_rule_types_from_context_stack()
+        )
+
+    @classmethod
+    def _create_between_two_expressions(
+        cls,
+        current_condition: SymbolicExpression,
+        new_condition: LogicalOperator,
+    ) -> Self:
+        return cls(current_condition, new_condition)
 
 
 @dataclass(eq=False)
@@ -110,17 +220,51 @@ class Next(EQLUnion, ConclusionSelector):
     ) -> Iterable[OperationResult]:
         for output in EQLUnion._evaluate__(self, sources):
             if output.is_true:
-                self._conclusion_.update(
-                    output.previous_operation_result.operand._conclusion_
+                self._conclusions_.update(
+                    output.previous_operation_result.operand._conclusions_
                 )
             yield output
-            self._conclusion_.clear()
+            self._conclusions_.clear()
 
-    def add_child(self, child: SymbolicExpression) -> None:
+    @classmethod
+    def _get_current_conditions_root_for_rule_type_from_context_stack(
+        cls,
+    ) -> ConditionType:
         """
-        Adds a child operand to the union operator.
+        :return: The current conditions root to use for creating a new condition connected via Next operator.
+        """
+        return (
+            _get_current_conditions_root_for_alternative_or_next_rule_types_from_context_stack()
+        )
 
-        :param child: The child operand to add.
-        """
-        self._operation_children_ = self._operation_children_ + (child,)
-        child._parent_ = self
+    @classmethod
+    def _create_between_two_expressions(
+        cls,
+        current_condition: SymbolicExpression,
+        new_condition: SymbolicExpression,
+    ) -> Self:
+        match current_condition:
+            case cls():
+                current_condition.add_child(new_condition)
+                new_conditions_root = current_condition
+            case _:
+                new_conditions_root = Next((current_condition, new_condition))
+        return new_conditions_root
+
+
+def _get_current_conditions_root_for_alternative_or_next_rule_types_from_context_stack() -> (
+    ConditionType
+):
+    """
+    :return: The current conditions root to use for creating a new condition connected via Alternative/Next operator.
+    """
+    current_node = SymbolicExpression._current_parent_in_context_stack_()
+    current_node_parent = current_node._parent_
+    if isinstance(current_node_parent, (Alternative, Next)):
+        current_node = current_node_parent
+    elif (
+        isinstance(current_node_parent, Refinement)
+        and current_node is current_node_parent.left
+    ):
+        current_node = current_node_parent
+    return current_node

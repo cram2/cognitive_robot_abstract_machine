@@ -55,14 +55,6 @@ class Pose(Symbol):
     orientation: Orientation
 
 
-@dataclass
-class OptionalTestCase(Symbol):
-    value: int
-    optional_position: Optional[Position] = None
-    list_of_orientations: List[Orientation] = field(default_factory=list)
-    list_of_values: List[int] = field(default_factory=list)
-
-
 # check that many to many relationship to built in types and non built in types work
 @dataclass
 class Positions(Symbol):

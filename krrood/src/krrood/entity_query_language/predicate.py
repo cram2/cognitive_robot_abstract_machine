@@ -22,7 +22,6 @@ from typing_extensions import (
     Dict,
 )
 
-from .enums import PredicateType
 from .utils import T, merge_args_and_kwargs
 from .core.variable import Variable, InstantiatedVariable
 from .core.base_expressions import Selectable
@@ -48,7 +47,6 @@ def symbolic_function(
         all_kwargs = merge_args_and_kwargs(function, args, kwargs)
         if _any_of_the_kwargs_is_a_variable(all_kwargs):
             return InstantiatedVariable(
-                _name__=function.__name__,
                 _type_=function,
                 _kwargs_=all_kwargs,
             )
@@ -75,7 +73,6 @@ class Predicate(Symbol, ABC):
         if _any_of_the_kwargs_is_a_variable(all_kwargs):
             return InstantiatedVariable(
                 _type_=cls,
-                _name__=cls.__name__,
                 _kwargs_=all_kwargs,
             )
         return super().__new__(cls)

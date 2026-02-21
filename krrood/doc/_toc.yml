@@ -28,6 +28,10 @@ parts:
     - file: ormatic/tips_and_tricks
     - file: ormatic/json
 
+- caption: Miscellaneous
+  chapters:
+    - file: parametrizer
+
 - caption: References
   chapters:
     - file: autoapi/index

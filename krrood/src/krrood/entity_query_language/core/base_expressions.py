@@ -6,14 +6,13 @@ It contains the base classes for all expressions, results, and binding managemen
 
 from __future__ import annotations
 
-import typing
+import itertools
 import uuid
 from abc import ABC, abstractmethod
 from collections import UserDict
 from copy import copy
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
-from typing import Generic, Type
 
 from typing_extensions import (
     Dict,
@@ -27,17 +26,19 @@ from typing_extensions import (
     Set,
     Self,
     TYPE_CHECKING,
+    Generic,
+    Type,
 )
 
 from ..failures import NoExpressionFoundForGivenID
-from ..utils import make_list, T, make_set
+from ..utils import make_list, T, make_set, is_iterable
 from ...symbol_graph.symbol_graph import SymbolGraph
 
 if TYPE_CHECKING:
     from ..rules.conclusion import Conclusion
     from .variable import Variable
 
-Bindings = Dict[int, Any]
+Bindings = Dict[uuid.UUID, Any]
 """
 A dictionary for variable bindings in EQL operations
 """
@@ -48,15 +49,15 @@ class SymbolicExpression(ABC):
     """
     Base class for all symbolic expressions.
 
-    Symbolic expressions form a rooted directed acyclic graph (rooted DAG) and are evaluated lazily to produce
+    Symbolic expressions form a rooted directed acyclic graph and are evaluated lazily to produce
     bindings for variables, subject to logical constraints.
     """
 
-    _id_: int = field(init=False, repr=False, default_factory=lambda: uuid.uuid4().int)
+    _id_: uuid.UUID = field(init=False, repr=False, default_factory=uuid.uuid4)
     """
     Unique identifier of this node.
     """
-    _conclusion_: typing.Set[Conclusion] = field(init=False, default_factory=set)
+    _conclusions_: Set[Conclusion] = field(init=False, default_factory=set)
     """
     Set of conclusion expressions attached to this node, these are evaluated when the truth value of this node is true
     during evaluation.
@@ -94,9 +95,7 @@ class SymbolicExpression(ABC):
     The current parent symbolic expression of this expression during evaluation. Since a node can have multiple parents,
     this attribute is used to track the current parent that is being evaluated.
     """
-    _expression_: Optional[SymbolicExpression] = field(
-        init=False, repr=False, default=None
-    )
+    _expression_: SymbolicExpression = field(init=False, repr=False)
     """
     Useful when this expression is a builder that wires multiple components together to create the final expression.
     This defaults to Self.
@@ -110,7 +109,7 @@ class SymbolicExpression(ABC):
         self._expression_ = self
 
     @lru_cache
-    def _get_expression_by_id_(self, id_: int) -> SymbolicExpression:
+    def _get_expression_by_id_(self, id_: uuid.UUID) -> SymbolicExpression:
         try:
             return next(
                 expression
@@ -121,16 +120,23 @@ class SymbolicExpression(ABC):
             raise NoExpressionFoundForGivenID(self, id_)
 
     @property
+    def _is_true_(self) -> bool:
+        """
+        :return: Whether this expression evaluates to True.
+        """
+        return not self._is_false__
+
+    @property
     def _is_false_(self) -> bool:
         """
-        :return: The current truth value of evaluation result for this expression.
+        :return: Whether this expression evaluates to False.
         """
         return self._is_false__
 
     @_is_false_.setter
     def _is_false_(self, value: bool):
         """
-        Set the current truth value of evaluation result for this expression.
+        Set the current truth value of an evaluation result for this expression.
         """
         self._is_false__ = value
 
@@ -154,16 +160,10 @@ class SymbolicExpression(ABC):
         This is the exposed evaluation method for users.
         """
         SymbolGraph().remove_dead_instances()
-        results = map(
-            self._process_result_, (res for res in self._evaluate_() if res.is_true)
+        results = (
+            self._process_result_(res) for res in self._evaluate_() if res.is_true
         )
-        if self._limit_ is None:
-            yield from results
-        else:
-            for res_num, result in enumerate(results, 1):
-                yield result
-                if res_num == self._limit_:
-                    return
+        yield from itertools.islice(results, self._limit_)
 
     def _replace_child_(
         self, old_child: SymbolicExpression, new_child: SymbolicExpression
@@ -206,15 +206,13 @@ class SymbolicExpression(ABC):
         """
         from .variable import Literal
 
-        children = dict(enumerate(children))
-        for k, v in children.items():
-            if not isinstance(v, SymbolicExpression):
-                children[k] = Literal(v)
-        for k, v in children.items():
-            # With graph structure, do not copy nodes; just connect an edge.
+        children = [
+            v if isinstance(v, SymbolicExpression) else Literal(_value_=v)
+            for v in children
+        ]
+        for v in children:
             v._parent_ = self
-            children[k] = v._expression_
-        return tuple(children.values())
+        return tuple(v._expression_ for v in children)
 
     def _process_result_(self, result: OperationResult) -> Any:
         """
@@ -276,17 +274,17 @@ class SymbolicExpression(ABC):
         # and when the result truth value is True.
         if not (self._conditions_root_ is self) or current_result.is_false:
             return current_result
-        for conclusion in self._conclusion_:
+        for conclusion in self._conclusions_:
             current_result.bindings = next(
                 conclusion._evaluate_(current_result.bindings, parent=self)
             ).bindings
         return current_result
 
     @cached_property
-    def _binding_id_(self) -> int:
+    def _binding_id_(self) -> uuid.UUID:
         """
         The binding id is the id used in the bindings (the results dictionary of operations). It is sometimes different
-        from the id of the symbolic expression itself because some operations do not have results themselves but their
+        from the id of the symbolic expression itself because some operations do not have results themselves, but their
         children do, so they delegate the binding id to one of their children. For example, in the case of quantifiers,
         the quantifier expression itself does not have a binding id, but it delegates it to its child variable that is
          being selected and tracked.
@@ -300,15 +298,8 @@ class SymbolicExpression(ABC):
     ) -> Iterator[OperationResult]:
         """
         Evaluate the symbolic expression and set the operands indices.
-        This method should be implemented by subclasses.
         """
         pass
-
-    def _add_conclusion_(self, conclusion: Conclusion):
-        """
-        Add a conclusion expression to this symbolic expression.
-        """
-        self._conclusion_.add(conclusion)
 
     @property
     def _parent_(self) -> Optional[SymbolicExpression]:
@@ -349,10 +340,14 @@ class SymbolicExpression(ABC):
         """
         :return: The root of the symbolic expression graph that contains conditions, or None if no conditions found.
         """
-        for expression in self._all_expressions_:
-            if isinstance(expression, Filter):
-                return expression.condition
-        return self._root_
+        return next(
+            (
+                expr.condition
+                for expr in self._all_expressions_
+                if isinstance(expr, Filter)
+            ),
+            self._root_,
+        )
 
     @property
     def _root_(self) -> SymbolicExpression:
@@ -395,9 +390,9 @@ class SymbolicExpression(ABC):
         :return: The current parent symbolic expression in the enclosing context of the ``with`` statement. Used when
         making rule trees.
         """
-        if cls._symbolic_expression_stack_:
-            return cls._symbolic_expression_stack_[-1]
-        return None
+        if not cls._symbolic_expression_stack_:
+            return None
+        return cls._symbolic_expression_stack_[-1]
 
     @property
     def _unique_variables_(self) -> Set[Variable]:
@@ -463,7 +458,7 @@ class SymbolicExpression(ABC):
         SymbolicExpression._symbolic_expression_stack_.pop()
 
     def __hash__(self):
-        return hash(id(self))
+        return hash(self._id_)
 
     def __repr__(self):
         return self._name_
@@ -561,8 +556,8 @@ class BinaryExpression(SymbolicExpression, ABC):
 @dataclass(eq=False, repr=False)
 class TruthValueOperator(SymbolicExpression, ABC):
     """
-    An abstract superclass for operators that work with truth values of operations, thus requiring its children expressions to update
-    their truth value when yielding results.
+    An abstract superclass for operators that work with truth values of operations, thus requiring its children
+     expressions to update their truth value when yielding results.
     """
 
 
@@ -570,7 +565,9 @@ class TruthValueOperator(SymbolicExpression, ABC):
 class DerivedExpression(SymbolicExpression, ABC):
     """
     A symbolic expression that has its results derived from another symbolic expression, and thus it's value is the
-    value of the child expression.
+    value of the child expression. For example, filter expressions just filter the results of their children but they
+    do not produce a new value of their own, thus they do not have a binding that belongs to them specifically in the
+    result bindings dictionary.
     """
 
     @property
@@ -598,7 +595,6 @@ class Filter(DerivedExpression, TruthValueOperator, ABC):
     """
     Data source that evaluates the truth value for each data point according to a condition expression and filters out
     the data points that do not satisfy the condition.
-    The truth value of this expression is derived from the truth value of the condition expression.
     """
 
     @property
@@ -609,7 +605,7 @@ class Filter(DerivedExpression, TruthValueOperator, ABC):
     @abstractmethod
     def condition(self) -> SymbolicExpression:
         """
-        The conditions expression which generate the valid bindings that satisfy the constraints.
+        The conditions expression that generates the valid bindings that satisfy the constraints.
         """
         ...
 
@@ -641,7 +637,7 @@ class OperationResult:
     The result of the operation that was evaluated before this one.
     """
 
-    @cached_property
+    @property
     def all_bindings(self) -> Bindings:
         """
         :return: All the bindings from all the evaluated operations until this one, including this one.
@@ -653,11 +649,11 @@ class OperationResult:
             return self.bindings
         return self.previous_operation_result.bindings | self.bindings
 
-    @cached_property
+    @property
     def has_value(self) -> bool:
         return self.operand._binding_id_ in self.bindings
 
-    @cached_property
+    @property
     def is_true(self) -> bool:
         return not self.is_false
 
@@ -725,8 +721,38 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
 
     _type_: Type[T] = field(init=False, default=None)
     """
-    The type of the variable.
+    The type of the selectable.
     """
+
+    def _build_operation_result_and_update_truth_value_(
+        self, bindings: Bindings, child_result: Optional[OperationResult] = None
+    ) -> OperationResult:
+        """
+        Build an OperationResult instance and update the truth value based on the bindings.
+
+        :param bindings: The bindings of the result.
+        :param child_result: The result of the child operation, if any.
+        :return: The OperationResult instance with an updated truth value.
+        """
+        self._update_truth_value_(bindings[self._binding_id_])
+        return OperationResult(bindings, self._is_false_, self, child_result)
+
+    def _update_truth_value_(self, current_value: Any) -> None:
+        """
+        Updates the truth value of the variable based on the current value.
+
+        :param current_value: The current value of the variable.
+        """
+        # Calculating the truth value is not always done for efficiency. The truth value is updated only when this
+        # operation is a child of a TruthValueOperator.
+        if not isinstance(self._parent_, TruthValueOperator):
+            return
+        is_true = (
+            len(current_value) > 0
+            if is_iterable(current_value)
+            else bool(current_value)
+        )
+        self._is_false_ = not is_true
 
     @cached_property
     def _binding_id_(self) -> int:
@@ -753,13 +779,9 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
         """
         return result.value
 
-    @property
-    def _is_iterable_(self):
-        """
-        Whether the selectable is iterable.
-
-        :return: True if the selectable is iterable, False otherwise.
-        """
-        if self._var_ and self._var_ is not self:
-            return self._var_._is_iterable_
-        return False
+    @cached_property
+    def _name_(self):
+        if self._type_:
+            return self._type_.__name__
+        else:
+            return self.__class__.__name__

@@ -27,7 +27,7 @@ from ..core.base_expressions import (
 from ..failures import UnsupportedAggregationOfAGroupedByVariable
 from ..operators.set_operations import MultiArityExpressionThatPerformsACartesianProduct
 from ..utils import ensure_hashable, is_iterable
-from ..core.domain_mapping import DomainMapping
+from ..core.mapped_variable import MappedVariable
 
 GroupKey = Tuple[Any, ...]
 """
@@ -262,7 +262,7 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         expression = self._get_expression_by_id_(var_id)
         return (
             len(self.variables_to_group_by) == 1
-            and isinstance(expression, DomainMapping)
+            and isinstance(expression, MappedVariable)
             and expression._child_._binding_id_ in self.ids_of_variables_to_group_by
         )
 

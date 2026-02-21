@@ -18,7 +18,7 @@ from krrood.entity_query_language.factories import (
     not_,
     contains,
     in_,
-    flatten,
+    flat_variable,
     for_all,
     exists,
     an,
@@ -169,7 +169,7 @@ def test_generate_with_using_in(handles_and_containers_world):
     """
     world = handles_and_containers_world
 
-    B = variable(Body, domain=world.bodies, name="B")
+    B = variable(Body, domain=world.bodies)
     query = an(
         entity(B).where(
             in_("Handle", B.name),
@@ -475,8 +475,15 @@ def test_not_and(handles_and_containers_world):
         )
     )
 
+    equivalent_query = an(
+        entity(B).where(
+            not_(contains(B.name, "Handle")) | not_(contains(B.name, "1")),
+        )
+    )
+
     all_not_handle1 = list(query.evaluate())
-    assert len(all_not_handle1) == 5, "Should generate 5 bodies"
+    assert len(all_not_handle1) == 5, "Should generate 7 bodies"
+    assert len(equivalent_query.tolist()) == 5, "Should generate 7 bodies"
     assert all(
         h.name != "Handle1" for h in all_not_handle1
     ), "All generated items should satisfy query"
@@ -697,7 +704,7 @@ def test_equivalent_to_contains_type_using_exists():
     fb = variable(FruitBox, domain=None)
     fruit_box_query = an(
         entity(fb).where(
-            exists(fb, HasType(flatten(fb.fruits), Apple)),
+            exists(fb, HasType(flat_variable(fb.fruits), Apple)),
         )
     )
 
@@ -891,15 +898,7 @@ def test_distinct_with_order_by():
 
 
 def test_variable_domain(handles_and_containers_world):
-    world = variable(World, domain=[handles_and_containers_world])
-    body = variable(Body, domain=world.bodies)
-    query = an(entity(body).where(contains(body.name, "Handle")))
-    assert len(list(query.evaluate())) == 3
-
-
-def test_variable_from(handles_and_containers_world):
-    world = variable(World, domain=[handles_and_containers_world])
-    body = variable_from(world.bodies)
+    body = variable(Body, domain=handles_and_containers_world.bodies)
     query = an(entity(body).where(contains(body.name, "Handle")))
     assert len(list(query.evaluate())) == 3
 
@@ -907,7 +906,7 @@ def test_variable_from(handles_and_containers_world):
 def test_multiple_dependent_selectables(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
-    cabinet_drawers = variable_from(cabinet.drawers)
+    cabinet_drawers = flat_variable(cabinet.drawers)
     old_evaluate = cabinet_drawers._evaluate__
 
     def _cabinet_drawers_evaluate__(bindings):
@@ -929,7 +928,7 @@ def test_flatten_iterable_attribute(handles_and_containers_world):
     world = handles_and_containers_world
 
     views = variable(Cabinet, world.views)
-    drawers = flatten(views.drawers)
+    drawers = flat_variable(views.drawers)
     query = an(entity(drawers))
 
     results = list(query.evaluate())
@@ -945,7 +944,7 @@ def test_flatten_iterable_attribute_and_use_not_equal(handles_and_containers_wor
     cabinets = variable(Cabinet, world.views)
     drawer_1_var = variable(Drawer, world.views)
     drawer_1 = an(entity(drawer_1_var).where(drawer_1_var.handle.name == "Handle1"))
-    drawers = flatten(cabinets.drawers)
+    drawers = flat_variable(cabinets.drawers)
     query = an(entity(drawers).where(drawer_1 != drawers))
 
     results = list(query.evaluate())

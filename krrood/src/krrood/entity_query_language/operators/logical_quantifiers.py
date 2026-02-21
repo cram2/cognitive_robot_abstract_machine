@@ -44,7 +44,7 @@ class QuantifiedConditional(LogicalBinaryOperator, ABC):
 class ForAll(QuantifiedConditional):
     """
     This operator is the universal conditional operator. It returns bindings that satisfy the condition for all the
-    values of the quantified variable. It short circuits by ignoring the bindings that doesn't satisfy the condition.
+    values of the quantified variable. It is efficient as it ignores the bindings that don't satisfy the condition.
     """
 
     @cached_property
@@ -107,7 +107,7 @@ class ForAll(QuantifiedConditional):
 class Exists(QuantifiedConditional):
     """
     An existential checker that checks if a condition holds for any value of the variable given, the benefit
-    of this is that this short circuits the condition and returns True if the condition holds for any value without
+    of this is that it returns True if the condition holds for any value without
     getting all the condition values that hold for one specific value of the variable.
     """
 

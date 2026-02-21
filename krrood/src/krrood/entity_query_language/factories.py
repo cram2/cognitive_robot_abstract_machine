@@ -9,12 +9,12 @@ import operator
 from typing_extensions import Union, Iterable
 
 from .core.base_expressions import SymbolicExpression
-from .enums import RDREdge
+from .enums import DomainSource
 from .failures import UnsupportedExpressionTypeForDistinct
 from .query.match import Match, MatchVariable
 from .operators.aggregators import Max, Min, Sum, Average, Count
 from .operators.comparator import Comparator
-from .operators.core_logical_operators import chained_logic, AND, OR, LogicalOperator
+from .operators.core_logical_operators import chained_logic, AND, OR
 from .operators.logical_quantifiers import ForAll, Exists
 from .operators.concatenation import Concatenation
 from .query.quantifiers import (
@@ -23,14 +23,15 @@ from .query.quantifiers import (
     The,
     ResultQuantifier,
 )
-from .rules.conclusion_selector import ExceptIf, Alternative, Next
+from .rules.conclusion_selector import Refinement, Alternative, Next
 from .query.query import Entity, SetOf, Query
 from .utils import is_iterable
 from .core.variable import (
     DomainType,
     Literal,
+    ExternallySetVariable,
 )
-from .core.domain_mapping import Flatten, CanBehaveLikeAVariable
+from .core.mapped_variable import FlatVariable, CanBehaveLikeAVariable
 from .predicate import *  # type: ignore
 from ..symbol_graph.symbol_graph import Symbol, SymbolGraph
 
@@ -97,9 +98,7 @@ def match_variable(
 
 def variable(
     type_: Type[T],
-    domain: DomainType,
-    name: Optional[str] = None,
-    inferred: bool = False,
+    domain: Optional[DomainType],
 ) -> Union[T, Selectable[T]]:
     """
     Declare a symbolic variable that can be used inside queries.
@@ -115,39 +114,44 @@ def variable(
     :param domain: Iterable of potential values for the variable or None.
      If None, the domain will be inferred from the SymbolGraph for Symbol types, else should not be evaluated by EQL
       but by another evaluator (e.g., EQL To SQL converter in Ormatic).
-    :param name: The variable name, only required for pretty printing.
-    :param inferred: Whether the variable is inferred or not.
     :return: A Variable that can be queried for.
     """
     # Determine the domain source
     if is_iterable(domain):
-        domain_source = filter(lambda x: isinstance(x, type_), domain)
-    elif domain is None and not inferred and issubclass(type_, Symbol):
-        domain_source = SymbolGraph().get_instances_of_type(type_)
+        domain = filter(lambda x: isinstance(x, type_), domain)
+    elif domain is None and issubclass(type_, Symbol):
+        domain = SymbolGraph().get_instances_of_type(type_)
     else:
-        domain_source = domain
-
-    if name is None:
-        name = type_.__name__
+        domain = domain
 
     result = Variable(
         _type_=type_,
-        _domain_source_=domain_source,
-        _name__=name,
-        _is_inferred_=inferred,
+        _domain_=domain,
     )
 
     return result
 
 
-def variable_from(
-    domain: Union[Iterable[T], Selectable[T]],
-    name: Optional[str] = None,
-) -> Union[T, Selectable[T]]:
+def deduced_variable(
+    type_: Optional[Type[T]] = None,
+) -> Union[Type[T], ExternallySetVariable[T]]:
     """
-    Similar to `variable` but constructed from a domain directly wihout specifying its type.
+    Create a variable that is inferred through deductive reasoning.
+
+    :param type_: The type of the variable values.
+    :return: An instance of `ExternallySetVariable[T]`.
     """
-    return Literal(data=domain, name=name, wrap_in_iterator=False)
+    return ExternallySetVariable(_type_=type_, _domain_source_=DomainSource.DEDUCTION)
+
+
+def variable_from(domain: Union[Iterable[T], Selectable[T]]) -> Union[T, Selectable[T]]:
+    """
+    Create a variable from a given domain.
+
+    :param domain: An iterable or selectable expression to use as the variable's domain.
+    :return: A variable that can be queried for.
+    """
+    return Variable(_domain_=domain)
 
 
 # %% Operators on Variables
@@ -188,7 +192,7 @@ def in_(item: Any, container: Union[Iterable, CanBehaveLikeAVariable[T]]):
     return Comparator(container, item, operator.contains)
 
 
-def flatten(
+def flat_variable(
     var: Union[CanBehaveLikeAVariable[T], Iterable[T]],
 ) -> Union[CanBehaveLikeAVariable[T], T]:
     """
@@ -196,7 +200,7 @@ def flatten(
     This returns a DomainMapping that, when evaluated, yields one solution per inner element
     (similar to SQL UNNEST), keeping existing variable bindings intact.
     """
-    return Flatten(var)
+    return FlatVariable(var)
 
 
 # %% Logical Operators
@@ -231,14 +235,14 @@ def not_(operand: ConditionType) -> SymbolicExpression:
     A symbolic NOT operation that can be used to negate symbolic expressions.
     """
     if not isinstance(operand, SymbolicExpression):
-        operand = Literal(operand)
+        operand = Literal(_value_=operand)
     return operand._invert_()
 
 
 def for_all(
     universal_variable: Union[CanBehaveLikeAVariable[T], T],
     condition: ConditionType,
-):
+) -> ForAll:
     """
     A universal on variable that finds all sets of variable bindings (values) that satisfy the condition for **every**
      value of the universal_variable.
@@ -253,7 +257,7 @@ def for_all(
 def exists(
     universal_variable: Union[CanBehaveLikeAVariable[T], T],
     condition: ConditionType,
-):
+) -> Exists:
     """
     A universal on variable that finds all sets of variable bindings (values) that satisfy the condition for **any**
      value of the universal_variable.
@@ -277,7 +281,7 @@ def an(
 
     :param entity_: An entity or a set expression to quantify over.
     :param quantification: Optional quantification constraint.
-    :return: The entity with the quantifier applied.
+    :return: The entity with the applied quantifier.
     """
     return entity_._quantify_(An, quantification_constraint=quantification)
 
@@ -295,7 +299,7 @@ def the(
     Select the unique value satisfying the given entity description.
 
     :param entity_: An entity or a set expression to quantify over.
-    :return: The entity with the quantifier applied.
+    :return: The entity with the applied quantifier.
     """
     return entity_._quantify_(The)
 
@@ -315,7 +319,6 @@ def inference(
     """
     return lambda **kwargs: InstantiatedVariable(
         _type_=type_,
-        _name__=type_.__name__,
         _kwargs_=kwargs,
     )
 
@@ -331,12 +334,7 @@ def refinement(*conditions: ConditionType) -> SymbolicExpression:
     :param conditions: The refinement conditions. They are chained with AND.
     :returns: The newly created branch node for further chaining.
     """
-    new_branch = chained_logic(AND, *conditions)
-    current_node = SymbolicExpression._current_parent_in_context_stack_()
-    prev_parent = current_node._parent_
-    new_conditions_root = ExceptIf(current_node, new_branch)
-    prev_parent._replace_child_(current_node, new_conditions_root)
-    return new_branch
+    return Refinement.create_and_update_rule_tree(*conditions)
 
 
 def alternative(*conditions: ConditionType) -> SymbolicExpression:
@@ -349,7 +347,7 @@ def alternative(*conditions: ConditionType) -> SymbolicExpression:
     :param conditions: Conditions to chain with AND and attach as an alternative.
     :returns: The newly created branch node for further chaining.
     """
-    return alternative_or_next(RDREdge.Alternative, *conditions)
+    return Alternative.create_and_update_rule_tree(*conditions)
 
 
 def next_rule(*conditions: ConditionType) -> SymbolicExpression:
@@ -362,81 +360,7 @@ def next_rule(*conditions: ConditionType) -> SymbolicExpression:
     :param conditions: Conditions to chain with AND and attach as an alternative.
     :returns: The newly created branch node for further chaining.
     """
-    return alternative_or_next(RDREdge.Next, *conditions)
-
-
-def alternative_or_next(
-    condition_edge_type: Union[RDREdge.Alternative, RDREdge.Next],
-    *conditions: ConditionType,
-) -> SymbolicExpression:
-    """
-    Add an alternative/next branch to the current condition tree.
-
-    Each provided condition is chained with AND, and the resulting branch is
-    connected via ElseIf/Next to the current node, representing an alternative/next path.
-
-    :param condition_edge_type: The type of the branch, either alternative or next.
-    :param conditions: Conditions to chain with AND and attach as an alternative.
-    :returns: The newly created branch node for further chaining.
-    """
-    new_condition = chained_logic(AND, *conditions)
-
-    current_conditions_root = get_current_conditions_root_for_alternative_or_next()
-
-    prev_parent = current_conditions_root._parent_
-
-    new_conditions_root = construct_new_conditions_root_for_alternative_or_next(
-        condition_edge_type, current_conditions_root, new_condition
-    )
-
-    if new_conditions_root is not current_conditions_root:
-        prev_parent._replace_child_(current_conditions_root, new_conditions_root)
-
-    return new_condition
-
-
-def get_current_conditions_root_for_alternative_or_next() -> ConditionType:
-    """
-    :return: the current conditions root to use for creating a new condition connected via alternative or next edge.
-    """
-    current_node = SymbolicExpression._current_parent_in_context_stack_()
-    if isinstance(current_node._parent_, (Alternative, Next)):
-        current_node = current_node._parent_
-    elif (
-        isinstance(current_node._parent_, ExceptIf)
-        and current_node is current_node._parent_.left
-    ):
-        current_node = current_node._parent_
-    return current_node
-
-
-def construct_new_conditions_root_for_alternative_or_next(
-    condition_edge_type: Union[RDREdge.Next, RDREdge.Alternative],
-    current_conditions_root: SymbolicExpression,
-    new_condition: LogicalOperator,
-) -> Union[Next, Alternative]:
-    """
-    Constructs a new conditions root for alternative or next condition edge types.
-
-    :param condition_edge_type: The type of the edge connecting the current node to the new branch.
-    :param current_conditions_root: The current conditions root in the expression tree.
-    :param new_condition: The new condition to be added to the rule tree.
-    """
-    match condition_edge_type:
-        case RDREdge.Alternative:
-            new_conditions_root = Alternative(current_conditions_root, new_condition)
-        case RDREdge.Next:
-            match current_conditions_root:
-                case Next():
-                    current_conditions_root.add_child(new_condition)
-                    new_conditions_root = current_conditions_root
-                case _:
-                    new_conditions_root = Next((current_conditions_root, new_condition))
-        case _:
-            raise ValueError(
-                f"Invalid edge type: {condition_edge_type}, expected one of: {RDREdge.Alternative}, {RDREdge.Next}"
-            )
-    return new_conditions_root
+    return Next.create_and_update_rule_tree(*conditions)
 
 # %% Aggregators
 

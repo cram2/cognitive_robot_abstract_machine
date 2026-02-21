@@ -46,6 +46,15 @@ class Union(MultiArityExpression):
             child_result.bindings, self._is_false_, self, child_result
         )
 
+    def add_child(self, child: SymbolicExpression) -> None:
+        """
+        Adds a child operand to the union operator.
+
+        :param child: The child operand to add.
+        """
+        self._operation_children_ = self._operation_children_ + (child,)
+        child._parent_ = self
+
 
 @dataclass(eq=False, repr=False)
 class PerformsCartesianProduct(SymbolicExpression, ABC):
@@ -58,13 +67,16 @@ class PerformsCartesianProduct(SymbolicExpression, ABC):
     @abstractmethod
     def _product_operands_(self) -> Tuple[SymbolicExpression, ...]:
         """
-        The operands of the cartesian product operation.
+        :return: The operands of the cartesian product operation.
         """
         ...
 
     def _evaluate_product_(self, sources: Bindings) -> Iterator[OperationResult]:
         """
         Evaluate the symbolic expressions by generating combinations of values from their evaluation generators.
+
+        :param sources: The current bindings.
+        :return: An Iterable of Bindings for each combination of values.
         """
         ordered_operands = self._optimize_operands_order_(sources)
         return cartesian_product_while_passing_the_bindings_around(

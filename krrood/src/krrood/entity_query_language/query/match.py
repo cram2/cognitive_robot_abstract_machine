@@ -31,7 +31,7 @@ from ..predicate import HasType
 from .quantifiers import An
 from ..core.variable import Literal, DomainType
 from ..core.base_expressions import Selectable
-from ..core.domain_mapping import Attribute, Flatten, CanBehaveLikeAVariable
+from ..core.mapped_variable import Attribute, FlatVariable, CanBehaveLikeAVariable
 from ..utils import T
 
 
@@ -254,7 +254,7 @@ class MatchVariable(Match[T]):
     constraints.
     """
 
-    domain: DomainType = field(default=None, kw_only=True)
+    domain: Optional[DomainType] = field(default=None, kw_only=True)
     """
     The domain to use for the variable created by the match.
     """
@@ -292,7 +292,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
     """
     The value to assign to the attribute, which can be a Match instance or a Literal.
     """
-    variable: Union[Attribute, Flatten] = field(default=None, kw_only=True)
+    variable: Union[Attribute, FlatVariable] = field(default=None, kw_only=True)
     """
     The symbolic variable representing the attribute.
     """

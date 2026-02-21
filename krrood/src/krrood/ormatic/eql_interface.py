@@ -16,7 +16,7 @@ from ..entity_query_language.query.quantifiers import ResultQuantifier, An, The
 from ..entity_query_language.operators.core_logical_operators import AND, OR
 from ..entity_query_language.core.base_expressions import SymbolicExpression
 from ..entity_query_language.core.variable import Variable, Literal
-from ..entity_query_language.core.domain_mapping import Attribute
+from ..entity_query_language.core.mapped_variable import Attribute
 from ..entity_query_language.operators.comparator import Comparator
 
 from .dao import get_dao_class
@@ -238,7 +238,7 @@ class DomainValueExtractor:
                 literal_node.value if hasattr(literal_node, "value") else literal_node
             )
 
-        values = [value for value in literal_node._domain_]
+        values = [value for value in literal_node._re_enterable_domain_generator_]
 
         if len(values) > 1:
             return values
@@ -261,7 +261,7 @@ class DomainValueExtractor:
             return variable.value if hasattr(variable, "value") else variable
 
         try:
-            sample = next(iter(variable._domain_)).value
+            sample = next(iter(variable._re_enterable_domain_generator_)).value
         except (StopIteration, AttributeError):
             return variable.value if hasattr(variable, "value") else variable
 
