@@ -121,14 +121,6 @@ class AlignPerpendicular(FeatureFunctionGoal):
     Completion occurs when |current_angle - π/2| < `threshold`.
     """
 
-    tip_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    The link where the controlled normal vector is attached.
-    """
-    root_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    The reference link defining the fixed coordinate frame.
-    """
     tip_normal: Vector3 = field(kw_only=True)
     """
     The normal vector to be controlled, defined in the tip link frame.
@@ -141,7 +133,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
     """
     Priority weight for the alignment constraint in the optimization problem.
     """
-    max_vel: float = field(default=0.2, kw_only=True)
+    maximum_velocity: float = field(default=0.2, kw_only=True)
     """
     Maximum allowed angular velocity for the alignment motion in radians per second.
     """
@@ -160,7 +152,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
         expr = self.root_V_reference_feature @ self.root_V_controlled_feature
 
         artifacts.constraints.add_equality_constraint(
-            reference_velocity=self.max_vel,
+            reference_velocity=self.maximum_velocity,
             equality_bound=0 - expr,
             weight=self.weight,
             task_expression=expr,
@@ -170,113 +162,142 @@ class AlignPerpendicular(FeatureFunctionGoal):
         return artifacts
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class HeightGoal(FeatureFunctionGoal):
     """
-    Moves the tip_point to be the specified distance away from the reference_point along the z-axis of the map frame.
-    :param tip_point: Tip point to be controlled.
-    :param reference_point: Reference point to measure the distance against.
-    :param lower_limit: Lower limit to control the distance away from the reference_point.
-    :param upper_limit: Upper limit to control the distance away from the reference_point.
+    Moves the `tip_point` to be the specified distance away from the `reference_point`
+    along the z-axis of the map frame.
     """
 
-    tip_link: Body
-    root_link: Body
-    tip_point: Point3
-    reference_point: Point3
-    lower_limit: float
-    upper_limit: float
-    weight: float = DefaultWeights.WEIGHT_BELOW_CA
-    max_vel: float = 0.2
+    tip_point: Point3 = field(kw_only=True)
+    """
+    Tip point to be controlled.
+    """
+    reference_point: Point3 = field(kw_only=True)
+    """
+    Reference point to measure the distance against.
+    """
+    lower_limit: float = field(kw_only=True)
+    """
+    Lower limit to control the distance away from the `reference_point`.
+    """
+    upper_limit: float = field(kw_only=True)
+    """
+    Upper limit to control the distance away from the `reference_point`.
+    """
+    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
+    """
+    Priority weight for the height constraint in the optimization problem.
+    """
+    maximum_velocity: float = field(default=0.2, kw_only=True)
+    """
+    Maximum allowed velocity for the height motion in meters per second.
+    """
 
-    def __post_init__(self):
-        self.reference_feature = self.reference_point
-        self.controlled_feature = self.tip_point
-        super().__post_init__()
+    def get_controlled_and_reference_features(self):
+        return self.tip_point, self.reference_point
+
+    def build(self, context: BuildContext) -> NodeArtifacts:
+        artifacts = super().build(context)
 
         expr = (
             self.root_P_controlled_feature - self.root_P_reference_feature
         ) @ Vector3.Z()
 
-        self.add_inequality_constraint(
-            reference_velocity=self.max_vel,
+        artifacts.constraints.add_inequality_constraint(
+            reference_velocity=self.maximum_velocity,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
             weight=self.weight,
             task_expression=expr,
             name=f"{self.name}_constraint",
         )
-        self.observation_expression = sm.logic_and(
+
+        artifacts.observation = sm.logic_and(
             sm.if_less_eq(expr, self.upper_limit, 1, 0),
             sm.if_greater_eq(expr, self.lower_limit, 1, 0),
         )
 
+        return artifacts
 
-@dataclass
+
+@dataclass(eq=False, repr=False)
 class DistanceGoal(FeatureFunctionGoal):
     """
-    Moves the tip_point to be the specified distance away from the reference_point measured in the x-y-plane of the map frame.
-    :param tip_point: Tip point to be controlled.
-    :param reference_point: Reference point to measure the distance against.
-    :param lower_limit: Lower limit to control the distance away from the reference_point.
-    :param upper_limit: Upper limit to control the distance away from the reference_point.
+    Moves the `tip_point` to be the specified distance away from the `reference_point`
+    measured in the x-y-plane of the map frame.
     """
 
-    tip_link: Body
-    root_link: Body
-    tip_point: Point3
-    reference_point: Point3
-    lower_limit: float
-    upper_limit: float
-    weight: float = DefaultWeights.WEIGHT_BELOW_CA
-    max_vel: float = 0.2
+    tip_point: Point3 = field(kw_only=True)
+    """
+    Tip point to be controlled.
+    """
+    reference_point: Point3 = field(kw_only=True)
+    """
+    Reference point to measure the distance against.
+    """
+    lower_limit: float = field(kw_only=True)
+    """
+    Lower limit to control the distance away from the `reference_point`.
+    """
+    upper_limit: float = field(kw_only=True)
+    """
+    Upper limit to control the distance away from the `reference_point`.
+    """
+    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
+    """
+    Priority weight for the distance constraint in the optimization problem.
+    """
+    maximum_velocity: float = field(default=0.2, kw_only=True)
+    """
+    Maximum allowed velocity for the distance motion in meters per second.
+    """
 
-    def __post_init__(self):
-        self.controlled_feature = self.tip_point
-        self.reference_feature = self.reference_point
-        super().__post_init__()
+    def get_controlled_and_reference_features(self):
+        return self.tip_point, self.reference_point
+
+    def build(self, context: BuildContext) -> NodeArtifacts:
+        artifacts = super().build(context)
 
         root_V_diff = self.root_P_controlled_feature - self.root_P_reference_feature
         root_V_diff[2] = 0.0
         expr = root_V_diff.norm()
 
-        self.add_inequality_constraint(
-            reference_velocity=self.max_vel,
+        artifacts.constraints.add_inequality_constraint(
+            reference_velocity=self.maximum_velocity,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
             weight=self.weight,
             task_expression=expr,
             name=f"{self.name}_constraint",
         )
+
         # An extra constraint that makes the execution more stable
-        self.add_inequality_constraint_vector(
-            reference_velocities=[self.max_vel] * 3,
-            lower_errors=[0, 0, 0],
-            upper_errors=[0, 0, 0],
-            weights=[self.weight] * 3,
-            task_expression=root_V_diff[:3],
-            names=[f"{self.name}_extra1", f"{self.name}_extra2", f"{self.name}_extra3"],
-        )
-        self.observation_expression = sm.logic_and(
+        for i, axis_name in enumerate(["x", "y", "z"]):
+            artifacts.constraints.add_inequality_constraint(
+                reference_velocity=self.maximum_velocity,
+                lower_error=0,
+                upper_error=0,
+                weight=self.weight,
+                task_expression=root_V_diff[i],
+                name=f"{self.name}_extra_{axis_name}",
+            )
+
+        artifacts.observation = sm.logic_and(
             sm.if_less_eq(expr, self.upper_limit, sm.Scalar(1), sm.Scalar(0)),
             sm.if_greater_eq(expr, self.lower_limit, sm.Scalar(1), sm.Scalar(0)),
         )
+
+        return artifacts
 
 
 @dataclass(eq=False, repr=False)
 class AngleGoal(FeatureFunctionGoal):
     """
-    Controls the angle between the tip_vector and the reference_vector to be between lower_angle and upper_angle.
+    Controls the angle between the `tip_vector` and the `reference_vector` to be between
+    `lower_angle` and `upper_angle`.
     """
 
-    root_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    Root link of the kinematic chain.
-    """
-    tip_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    Tip link of the kinematic chain.
-    """
     tip_vector: Vector3 = field(kw_only=True)
     """
     Tip vector to be controlled.
@@ -287,14 +308,20 @@ class AngleGoal(FeatureFunctionGoal):
     """
     lower_angle: float = field(kw_only=True)
     """
-    Lower limit to control the angle between the tip_vector and the reference_vector.
+    Lower limit to control the angle between the `tip_vector` and the `reference_vector`.
     """
     upper_angle: float = field(kw_only=True)
     """
-    Upper limit to control the angle between the tip_vector and the reference_vector.
+    Upper limit to control the angle between the `tip_vector` and the `reference_vector`.
     """
     weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
-    max_vel: float = field(default=0.2, kw_only=True)
+    """
+    Priority weight for the angle constraint in the optimization problem.
+    """
+    maximum_velocity: float = field(default=0.2, kw_only=True)
+    """
+    Maximum allowed angular velocity for the angle motion in radians per second.
+    """
 
     def get_controlled_and_reference_features(self):
         return self.tip_vector, self.reference_vector
@@ -307,7 +334,7 @@ class AngleGoal(FeatureFunctionGoal):
         )
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.max_vel,
+            reference_velocity=self.maximum_velocity,
             upper_error=self.upper_angle - expr,
             lower_error=self.lower_angle - expr,
             weight=self.weight,
