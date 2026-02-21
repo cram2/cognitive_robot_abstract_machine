@@ -101,7 +101,7 @@ class Plan:
     """
     parameterizer: Parameterizer = field(init=False)
     """
-    Parameterizer used to parameterize the plan.
+    Parameterizer used to generate parameterizations the plan.
     """
 
     def __init__(self, root: PlanNode, context: Context):
@@ -628,13 +628,13 @@ class Plan:
         if cls.on_end_callback and action_type in cls.on_end_callback:
             cls.on_end_callback[action_type].remove(callback)
 
-    def parameterize(self) -> Parameterization:
+    def generate_parameterizations(
+        self,
+    ) -> List[Tuple[ActionDescription, Parameterization]]:
         """
         Parameterize all parameters of a plan using the krrood parameterizer.
 
-        :param classes: List of classes to include in the ClassDiagram
-                        (including classes found on the plan nodes).
-        :return: List of random event variables created by the parameterizer.
+        :return: Dictionary mapping all Designator nodes to their parameterizations.
         """
 
         ordered_nodes = [self.root] + self.root.recursive_children
@@ -645,19 +645,11 @@ class Plan:
             if isinstance(node, DesignatorNode) and node.designator_type is not None
         ]
 
-        parameterization = Parameterization()
-
+        result = []
         for index, node in enumerate(designator_nodes):
-            prefix = f"{node.designator_type.__name__}_{index}"
-            new_parameterization = self.parameterizer.parameterize(
-                node.designator_type(**node.kwargs), prefix=prefix
-            )
-            parameterization.merge_parameterization(new_parameterization)
-
-        return parameterization
-
-    def create_fully_factorized_distribution(self):
-        return self.parameterizer.create_fully_factorized_distribution()
+            action = node.designator_type(**node.kwargs)
+            result.append((action, Parameterizer().parameterize(action)))
+        return result
 
 
 def managed_node(func: Callable) -> Callable:

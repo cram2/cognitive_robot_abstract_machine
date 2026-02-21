@@ -2055,7 +2055,7 @@ class MoveGripperMotionDAO(
         use_existing_column=True
     )
 
-    motion: Mapped[semantic_digital_twin.datastructures.definitions.JointStateType] = (
+    motion: Mapped[semantic_digital_twin.datastructures.definitions.GripperState] = (
         mapped_column(
             krrood.ormatic.custom_types.PolymorphicEnumType,
             nullable=False,
@@ -2260,12 +2260,12 @@ class MoveTorsoActionDAO(
         use_existing_column=True,
     )
 
-    torso_state: Mapped[
-        semantic_digital_twin.datastructures.definitions.JointStateType
-    ] = mapped_column(
-        krrood.ormatic.custom_types.PolymorphicEnumType,
-        nullable=False,
-        use_existing_column=True,
+    torso_state: Mapped[semantic_digital_twin.datastructures.definitions.TorsoState] = (
+        mapped_column(
+            krrood.ormatic.custom_types.PolymorphicEnumType,
+            nullable=False,
+            use_existing_column=True,
+        )
     )
 
     __mapper_args__ = {
@@ -3695,7 +3695,7 @@ class SetGripperActionDAO(
         nullable=False,
         use_existing_column=True,
     )
-    motion: Mapped[semantic_digital_twin.datastructures.definitions.JointStateType] = (
+    motion: Mapped[semantic_digital_twin.datastructures.definitions.GripperState] = (
         mapped_column(
             krrood.ormatic.custom_types.PolymorphicEnumType,
             nullable=False,
