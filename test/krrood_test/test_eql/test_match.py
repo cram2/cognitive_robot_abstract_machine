@@ -1,15 +1,9 @@
 import pytest
 
-from krrood.entity_query_language.entity import (
-    entity,
-    variable,
-    set_of,
-)
-from krrood.entity_query_language.entity_result_processors import the
+from krrood.entity_query_language.factories import entity, set_of, variable, the, match, match_variable
 from krrood.entity_query_language.failures import NoKwargsInMatchVar
-from krrood.entity_query_language.match import match_variable, match
 from krrood.entity_query_language.predicate import HasType
-from krrood.entity_query_language.symbolic import UnificationDict
+from krrood.entity_query_language.core.base_expressions import UnificationDict
 from ..dataset.semantic_world_like_classes import (
     FixedConnection,
     Container,
@@ -24,7 +18,7 @@ def test_match(handles_and_containers_world):
         parent=match(Container)(name="Container1"),
         child=match(Handle)(name="Handle1"),
     )
-    fixed_connection_query = the(entity(fixed_connection))
+    fixed_connection_query = the(fixed_connection)
 
     fc = variable(FixedConnection, domain=None)
     fixed_connection_query_manual = the(
@@ -36,8 +30,8 @@ def test_match(handles_and_containers_world):
         )
     )
 
-    fixed_connection = fixed_connection_query.evaluate()
-    fixed_connection_manual = fixed_connection_query_manual.evaluate()
+    fixed_connection = fixed_connection_query.tolist()[0]
+    fixed_connection_manual = fixed_connection_query_manual.tolist()[0]
     assert fixed_connection == fixed_connection_manual
     assert isinstance(fixed_connection, FixedConnection)
     assert fixed_connection.parent.name == "Container1"
@@ -70,11 +64,11 @@ def test_select(handles_and_containers_world):
         )
     )
 
-    assert set(container_and_handle_2.evaluate().values()) == set(
-        container_and_handle.evaluate().values()
+    assert set(container_and_handle_2.tolist()[0].values()) == set(
+        container_and_handle.tolist()[0].values()
     )
 
-    answers = container_and_handle.evaluate()
+    answers = container_and_handle.tolist()[0]
     assert isinstance(answers, UnificationDict)
     assert answers[container].name == "Container1"
     assert answers[handle].name == "Handle1"
@@ -107,11 +101,11 @@ def test_select_where(handles_and_containers_world):
         )
     )
 
-    assert set(container_and_handle_2.evaluate().values()) == set(
-        container_and_handle.evaluate().values()
+    assert set(container_and_handle_2.tolist()[0].values()) == set(
+        container_and_handle.tolist()[0].values()
     )
 
-    answers = container_and_handle.evaluate()
+    answers = container_and_handle.tolist()[0]
     assert isinstance(answers, UnificationDict)
     assert answers[container].name == "Container3"
     assert answers[handle].name == "Handle3"

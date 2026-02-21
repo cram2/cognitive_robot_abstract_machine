@@ -2,9 +2,8 @@ import os
 
 import pytest
 
-from krrood.entity_query_language.entity import entity, variable
-from krrood.entity_query_language.entity_result_processors import an
-from krrood.entity_query_language.symbol_graph import SymbolGraph
+from krrood.entity_query_language.factories import entity, variable, an
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 from ..dataset.example_classes import Position
 
 try:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..dataset.university_ontology_like_classes import Company, Person, CEO
-from krrood.entity_query_language.symbol_graph import SymbolGraph
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 
 SymbolGraph().clear()
 SymbolGraph()

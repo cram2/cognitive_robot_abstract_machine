@@ -1,5 +1,13 @@
+"""
+Pattern-matching helpers for the Entity Query Language.
+
+This module provides high-level match abstractions that build symbolic expressions for variables and attributes
+from concise, readable matching syntax.
+"""
+
 from __future__ import annotations
 
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -13,28 +21,23 @@ from typing_extensions import (
     Union,
     Self,
     Generic,
+    TYPE_CHECKING,
 )
 
-from .entity import (
-    ConditionType,
-    variable,
-    entity,
-)
-from .failures import (
+from ..failures import (
     NoKwargsInMatchVar,
 )
-from .predicate import HasType
-from .rxnode import RWXNode
-from .symbolic import (
-    CanBehaveLikeAVariable,
-    Attribute,
-    Selectable,
-    Literal,
-    An,
-    Flatten,
-    DomainType,
-)
-from .utils import T
+from ..predicate import HasType
+from .quantifiers import An
+from ..core.variable import Literal, DomainType
+from ..core.base_expressions import Selectable
+from ..core.mapped_variable import Attribute, FlatVariable, CanBehaveLikeAVariable
+from ..utils import T
+
+
+if TYPE_CHECKING:
+    from ..factories import ConditionType
+    from .query import Entity
 
 
 @dataclass
@@ -62,19 +65,14 @@ class AbstractMatchExpression(Generic[T], ABC):
     """
     The parent match if this is a nested match.
     """
-    node: Optional[RWXNode] = field(init=False, default=None)
-    """
-    The RWXNode representing the match expression in the match query graph.
-    """
     resolved: bool = field(init=False, default=False)
     """
     Whether the match is resolved or not.
     """
-
-    def __post_init__(self):
-        self.node = RWXNode(self.name, data=self)
-        if self.parent:
-            self.node.parent = self.parent.node
+    id: int = field(init=False, default_factory=lambda: uuid.uuid4().int)
+    """
+    The unique identifier of the match expression.
+    """
 
     @cached_property
     @abstractmethod
@@ -109,10 +107,6 @@ class AbstractMatchExpression(Generic[T], ABC):
     @abstractmethod
     def name(self) -> str: ...
 
-    @property
-    def id(self):
-        return self.node.id
-
     @cached_property
     def type(self) -> Optional[Type[T]]:
         """
@@ -129,7 +123,10 @@ class AbstractMatchExpression(Generic[T], ABC):
         """
         :return: The root match expression.
         """
-        return self.node.root.data
+        parent = self
+        while parent.parent is not None:
+            parent = parent.parent
+        return parent
 
     def __eq__(self, other):
         return hash(self) == hash(other)
@@ -168,16 +165,18 @@ class Match(AbstractMatchExpression[T]):
         return self
 
     @cached_property
-    def expression(self) -> Union[An[T], T]:
+    def expression(self) -> Union[Entity[T], T]:
         """
         Return the entity expression corresponding to the match query.
         """
-        if not self.variable:
+        from ..factories import entity
+
+        if self.variable is None:
             self.resolve()
         entity_ = entity(self.variable)
         if self.conditions:
             entity_ = entity_.where(*self.conditions)
-        return An(entity_)
+        return entity_
 
     def _resolve(
         self,
@@ -223,6 +222,8 @@ class Match(AbstractMatchExpression[T]):
         self.parent = parent
 
     def create_variable(self):
+        from ..factories import variable
+
         self.variable = variable(self.type, domain=None)
 
     def evaluate(self):
@@ -253,12 +254,14 @@ class MatchVariable(Match[T]):
     constraints.
     """
 
-    domain: DomainType = field(default=None, kw_only=True)
+    domain: Optional[DomainType] = field(default=None, kw_only=True)
     """
     The domain to use for the variable created by the match.
     """
 
     def create_variable(self):
+        from ..factories import variable
+
         self.variable = variable(self.type, domain=self.domain)
 
     def __call__(self, **kwargs) -> Union[An[T], T]:
@@ -289,7 +292,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
     """
     The value to assign to the attribute, which can be a Match instance or a Literal.
     """
-    variable: Union[Attribute, Flatten] = field(default=None, kw_only=True)
+    variable: Union[Attribute, FlatVariable] = field(default=None, kw_only=True)
     """
     The symbolic variable representing the attribute.
     """
@@ -368,30 +371,3 @@ class AttributeMatch(AbstractMatchExpression[T]):
 
     def __str__(self):
         return self.name
-
-
-def match(
-    type_: Optional[Union[Type[T], Selectable[T]]] = None,
-) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
-    """
-    Create a symbolic variable matching the type and the provided keyword arguments. This is used for easy variable
-     definitions when there are structural constraints.
-
-    :param type_: The type of the variable (i.e., The class you want to instantiate).
-    :return: The Match instance.
-    """
-    return Match(type_=type_)
-
-
-def match_variable(
-    type_: Union[Type[T], Selectable[T]], domain: DomainType
-) -> Union[Type[T], An[T], CanBehaveLikeAVariable[T], MatchVariable[T]]:
-    """
-    Same as :py:func:`krrood.entity_query_language.match.match` but with a domain to use for the variable created
-     by the match.
-
-    :param type_: The type of the variable (i.e., The class you want to instantiate).
-    :param domain: The domain used for the variable created by the match.
-    :return: The Match instance.
-    """
-    return MatchVariable(type_=type_, domain=domain)

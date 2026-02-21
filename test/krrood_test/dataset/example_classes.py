@@ -13,7 +13,7 @@ from typing_extensions import Dict, Any, Sequence, Self
 from typing_extensions import List, Optional, Type
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
-from krrood.entity_query_language.predicate import Symbol
+from krrood.symbol_graph.symbol_graph import Symbol
 from krrood.ormatic.dao import AlternativeMapping, T
 
 

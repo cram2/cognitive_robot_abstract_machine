@@ -1,18 +1,10 @@
 from __future__ import annotations
 
 import itertools
-from copy import deepcopy
 from typing import Optional, List
 
 import trimesh.sample
-from krrood.entity_query_language.entity import (
-    variable,
-    entity,
-    and_,
-    not_,
-    contains,
-)
-from krrood.entity_query_language.entity_result_processors import an, the
+from krrood.entity_query_language.factories import entity, variable, and_, not_, contains, an, the
 
 from ..collision_checking.collision_detector import Collision, CollisionCheck
 from ..collision_checking.trimesh_collision_detector import TrimeshCollisionDetector
@@ -110,7 +102,7 @@ def blocking(
             contains(r.bodies, tip),
         )
     )
-    return robot_in_collision(robot.evaluate(), [])
+    return robot_in_collision(robot.first(), [])
 
 
 def is_body_in_gripper(

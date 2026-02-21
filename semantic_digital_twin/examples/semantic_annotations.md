@@ -84,8 +84,7 @@ rt.scene.show("jupyter")
 Thanks to the semantic annotations, an agent can query for apples directly using EQL:
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.entity_result_processors import an
-from krrood.entity_query_language.entity import variable, entity
+from krrood.entity_query_language.factories import variable, entity, an
 apples = an(entity(variable(Apple, world.semantic_annotations)))
 print(*apples.evaluate(), sep="\n")
 ```
@@ -156,7 +155,6 @@ We can now use EQL to get us only the ProduceBoxes that actually contain apples!
 
 ```{code-cell} ipython3
 from semantic_digital_twin.reasoning.predicates import ContainsType
-from krrood.entity_query_language.entity_result_processors import an
 
 fb = variable(ProduceBox, domain=world.semantic_annotations)
 produce_box_query = an(entity(fb).where(ContainsType(fb.produces, Apple)))

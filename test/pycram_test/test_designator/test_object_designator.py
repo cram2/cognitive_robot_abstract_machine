@@ -1,7 +1,4 @@
-import pytest
-
-from krrood.entity_query_language.entity import entity, variable, and_, contains
-from krrood.entity_query_language.entity_result_processors import an, the
+from krrood.entity_query_language.factories import entity, variable, contains, an
 
 from pycram.designator import EQLObjectDesignator, NamedObject
 from pycram.designators.object_designator import *

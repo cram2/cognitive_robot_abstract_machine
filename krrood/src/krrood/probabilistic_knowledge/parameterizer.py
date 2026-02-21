@@ -24,8 +24,8 @@ from .object_access_variable import ObjectAccessVariable, AttributeAccessLike
 from ..adapters.json_serializer import list_like_classes
 from ..class_diagrams.class_diagram import WrappedClass
 from ..class_diagrams.wrapped_field import WrappedField
-from ..entity_query_language.entity import variable_from
-from ..entity_query_language.symbolic import Index, Selectable
+from ..entity_query_language.factories import variable_from, variable
+from ..entity_query_language.core.mapped_variable import Index, Selectable
 from ..ormatic.dao import (
     DataAccessObject,
     get_dao_class,
@@ -184,7 +184,7 @@ class Parameterizer:
 
         dao = to_dao(obj)
 
-        dao_variable = variable_from([dao])
+        dao_variable = variable(type(dao), [dao])
 
         self._parameterize_dao(dao, dao_variable)
 

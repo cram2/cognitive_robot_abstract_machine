@@ -20,11 +20,10 @@ import datetime
 import enum
 import krrood.adapters.json_serializer
 import krrood.entity_query_language.orm.model
-import krrood.entity_query_language.predicate
-import krrood.entity_query_language.symbol_graph
 import krrood.ormatic.alternative_mappings
 import krrood.ormatic.custom_types
 import krrood.ormatic.type_dict
+import krrood.symbol_graph.symbol_graph
 import sqlalchemy.sql.sqltypes
 import test.krrood_test.dataset.example_classes
 import test.krrood_test.dataset.semantic_world_like_classes
@@ -838,8 +837,7 @@ class PolymorphicEnumAssociationDAO(
 
 
 class PredicateClassRelationDAO(
-    Base,
-    DataAccessObject[krrood.entity_query_language.symbol_graph.PredicateClassRelation],
+    Base, DataAccessObject[krrood.symbol_graph.symbol_graph.PredicateClassRelation]
 ):
 
     __tablename__ = "PredicateClassRelationDAO"
@@ -923,7 +921,7 @@ class MultipleInheritanceDAO(
     }
 
 
-class SymbolDAO(Base, DataAccessObject[krrood.entity_query_language.predicate.Symbol]):
+class SymbolDAO(Base, DataAccessObject[krrood.symbol_graph.symbol_graph.Symbol]):
 
     __tablename__ = "SymbolDAO"
 
@@ -1706,22 +1704,6 @@ class PositionsSubclassWithAnotherPositionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PositionsSubclassWithAnotherPositionDAO",
         "inherit_condition": database_id == PositionsDAO.database_id,
-    }
-
-
-class PredicateDAO(
-    SymbolDAO, DataAccessObject[krrood.entity_query_language.predicate.Predicate]
-):
-
-    __tablename__ = "PredicateDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PredicateDAO",
-        "inherit_condition": database_id == SymbolDAO.database_id,
     }
 
 
