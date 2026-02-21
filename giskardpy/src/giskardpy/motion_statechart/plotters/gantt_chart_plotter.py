@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Dict, TYPE_CHECKING, List
 
@@ -11,8 +12,9 @@ from .styles import LiftCycleStateToColor, ObservationStateToColor
 from ..context import MotionStatechartContext
 from ..data_types import LifeCycleValues, ObservationStateValues
 from ..graph_node import Goal, MotionStatechartNode
-from ...middleware import get_middleware
 from ...utils.utils import create_path
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ..motion_statechart import MotionStatechart
@@ -101,14 +103,12 @@ class HistoryGanttChartPlotter:
 
         nodes = self.motion_statechart.nodes
         if len(nodes) == 0:
-            get_middleware().logwarn(
-                "Gantt chart skipped: no nodes in motion statechart."
-            )
+            logger.warning("Gantt chart skipped: no nodes in motion statechart.")
             return
 
         history = self.motion_statechart.history.history
         if len(history) == 0:
-            get_middleware().logwarn("Gantt chart skipped: empty StateHistory.")
+            logger.warning("Gantt chart skipped: empty StateHistory.")
             return
 
         ordered_nodes = self._sort_nodes_by_parents()
@@ -570,4 +570,4 @@ class HistoryGanttChartPlotter:
         create_path(file_name)
         plt.savefig(file_name)
         plt.close()
-        get_middleware().loginfo(f"Saved gantt chart to {file_name}.")
+        logger.info(f"Saved gantt chart to {file_name}.")

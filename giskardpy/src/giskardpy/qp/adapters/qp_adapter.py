@@ -283,7 +283,7 @@ class ProblemDataPart(ABC):
                     f'Maximum reachable with prediction horizon = "{self.config.prediction_horizon}", '
                     f'jerk limit = "{upper_limits.jerk}" and dt = "{self.config.mpc_dt}" is "{max_reachable_vel}".'
                 )
-                get_middleware().logerr(error_msg)
+                logger.error(error_msg)
                 raise VelocityLimitUnreachableException(error_msg)
             else:
                 raise

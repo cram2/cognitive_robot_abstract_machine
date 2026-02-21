@@ -21,6 +21,9 @@ from giskardpy.qp.exceptions import (
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.utils.utils import create_path
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+import logging
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -65,7 +68,7 @@ class QPControllerDebugger:
                 raise HardConstraintsViolatedException(error_message)
         except AttributeError:
             pass
-        get_middleware().loginfo("No slack limit violation detected.")
+        logger.info("No slack limit violation detected.")
 
     def _print_pandas_array(self, array):
         import pandas as pd
@@ -330,7 +333,7 @@ class QPControllerDebugger:
 
         result = self.qp_controller.qp_solver.analyze_infeasibility()
         if result is None:
-            get_middleware().loginfo(
+            logger.info(
                 f"Can only compute possible causes with gurobi, "
                 f"but current solver is {self.qp_controller.config.qp_solver_id.name}."
             )
@@ -340,17 +343,17 @@ class QPControllerDebugger:
         with pd.option_context(
             "display.max_rows", None, "display.max_columns", None, "display.width", None
         ):
-            get_middleware().loginfo("Irreducible Infeasible Subsystem:")
-            get_middleware().loginfo("  Free variable bounds")
+            logger.info("Irreducible Infeasible Subsystem:")
+            logger.info("  Free variable bounds")
             free_variables = self.p_lb[b_ids]
             free_variables["ub"] = self.p_ub[b_ids]
             free_variables = free_variables.rename(columns={"data": "lb"})
             print(free_variables)
-            get_middleware().loginfo("  Equality constraints:")
+            logger.info("  Equality constraints:")
             print_iis_matrix(eq_ids, b_ids, self.p_E, self.p_bE)
-            get_middleware().loginfo("  Inequality constraint lower bounds:")
+            logger.info("  Inequality constraint lower bounds:")
             print_iis_matrix(lbA_ids, b_ids, self.p_A, self.p_lbA)
-            get_middleware().loginfo("  Inequality constraint upper bounds:")
+            logger.info("  Inequality constraint upper bounds:")
             print_iis_matrix(ubA_ids, b_ids, self.p_A, self.p_ubA)
 
 
@@ -376,7 +379,7 @@ class QPController:
     def __post_init__(self, degrees_of_freedom: List[DegreeOfFreedom]):
         self.qp_solver = self.config.qp_solver_class()
         if self.config.verbose:
-            get_middleware().loginfo(
+            logger.info(
                 f"Initialized QP Controller:\n"
                 f'sample period: "{self.config.mpc_dt}"s\n'
                 f'max derivative: "{self.config.max_derivative.name}"\n'
@@ -395,10 +398,10 @@ class QPController:
             config=self.config,
         )
 
-        # get_middleware().loginfo("Done compiling controller:")
-        # get_middleware().loginfo(f'  #free variables: {self.num_free_variables}')
-        # get_middleware().loginfo(f'  #equality constraints: {self.num_eq_constraints}')
-        # get_middleware().loginfo(f'  #inequality constraints: {self.num_ineq_constraints}')
+        # logger.info("Done compiling controller:")
+        # logger.info(f'  #free variables: {self.num_free_variables}')
+        # logger.info(f'  #equality constraints: {self.num_eq_constraints}')
+        # logger.info(f'  #inequality constraints: {self.num_ineq_constraints}')
 
     def _set_active_dofs(self, degrees_of_freedom: List[DegreeOfFreedom]):
         all_active_float_variables = set().union(
