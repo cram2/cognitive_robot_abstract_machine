@@ -14,7 +14,7 @@ from typing import Optional
 
 from typing_extensions import TYPE_CHECKING
 
-from krrood.entity_query_language.predicate import Symbol
+from krrood.symbol_graph.symbol_graph import Symbol
 
 if TYPE_CHECKING:
     # These imports are only available to type checkers, not at runtime

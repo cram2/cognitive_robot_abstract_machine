@@ -29,8 +29,7 @@ import threading
 import time
 
 import numpy as np
-from krrood.entity_query_language.entity import entity, variable, in_
-from krrood.entity_query_language.entity_result_processors import the
+from krrood.entity_query_language.factories import entity, variable, in_, the
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Slider, Dresser
@@ -87,7 +86,7 @@ drawer = the(
     entity(
         variable(type_=Drawer, domain=world.semantic_annotations),
     )
-).evaluate()
+).first()
 ```
 
 We can update the drawer's state by altering the free variables position of its prismatic connection to the dresser.
@@ -129,7 +128,7 @@ Now we can start moving the dresser everywhere and even rotate it.
 from semantic_digital_twin.world_description.world_entity import Connection
 
 connection = variable(type_=Connection, domain=world.connections)
-free_connection = the(entity(connection).where(connection.parent == world.root)).evaluate()
+free_connection = the(entity(connection).where(connection.parent == world.root)).first()
 with world.modify_world():
     free_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1., 1., 0., 0., 0., 0.5 * np.pi)
 rt = RayTracer(world)
@@ -145,7 +144,7 @@ We can close the drawer again as follows:
 
 ```{code-cell} ipython3
 connection = variable(PrismaticConnection, domain=world.connections)
-connection = the(entity(connection).where(in_("drawer", connection.child.name.name))).evaluate()
+connection = the(entity(connection).where(in_("drawer", connection.child.name.name))).first()
 with world.modify_world():
     world.state[connection.dof.id] = [0., 0., 0., 0.]
 rt = RayTracer(world)

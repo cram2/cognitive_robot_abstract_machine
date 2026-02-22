@@ -8,8 +8,7 @@ import pytest
 from typing_extensions import Type
 
 from krrood.class_diagrams import ClassDiagram
-from krrood.entity_query_language.predicate import Symbol
-from krrood.entity_query_language.symbol_graph import SymbolGraph
+from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )

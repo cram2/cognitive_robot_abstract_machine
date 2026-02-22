@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from typing_extensions import Dict, List
 
-from krrood.entity_query_language.entity import entity, variable
-from krrood.entity_query_language.entity_result_processors import an
+from krrood.entity_query_language.factories import entity, variable, an
 from krrood.entity_query_language.predicate import Symbol
-from krrood.entity_query_language.symbol_graph import SymbolGraph
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 
 
 def test_indexing_on_dict_field():

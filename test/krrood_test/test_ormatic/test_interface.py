@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy import select, inspect
 
+from krrood.entity_query_language import factories
 from krrood.ormatic.alternative_mappings import FunctionMapping, UncallableFunction
 from krrood.ormatic.dao import (
     to_dao,

@@ -1,22 +1,19 @@
 import logging
 import os
 import traceback
-import uuid
 from dataclasses import is_dataclass
 
 import pytest
-import sqlalchemy
-from sqlalchemy import JSON
 from sqlalchemy.orm import Session, configure_mappers
 
 import krrood.entity_query_language.orm.model
-import krrood.entity_query_language.symbol_graph
+import krrood.symbol_graph.symbol_graph
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.entity_query_language.predicate import (
     HasTypes,
     HasType,
 )
-from krrood.entity_query_language.symbol_graph import SymbolGraph
+from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ormatic.alternative_mappings import *  # type: ignore
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
@@ -35,6 +32,7 @@ from .dataset.semantic_world_like_classes import *
 from .test_eql.conf.world.doors_and_drawers import DoorsAndDrawersWorld
 from .test_eql.conf.world.handles_and_containers import (
     HandlesAndContainersWorld,
+    InferredCabinetsWorld,
 )
 
 
@@ -55,7 +53,7 @@ def generate_sqlalchemy_interface():
         alternative_mapping.original_class()
         for alternative_mapping in recursive_subclasses(AlternativeMapping)
     }
-    all_classes |= set(classes_of_module(krrood.entity_query_language.symbol_graph))
+    all_classes |= set(classes_of_module(krrood.symbol_graph.symbol_graph))
     all_classes |= set(classes_of_module(example_classes))
     all_classes |= set(classes_of_module(semantic_world_like_classes))
     all_classes |= {Symbol}
@@ -134,6 +132,12 @@ from .dataset.ormatic_interface import *
 @pytest.fixture
 def handles_and_containers_world() -> World:
     world = HandlesAndContainersWorld().create()
+    return world
+
+
+@pytest.fixture
+def inferred_cabinets_world() -> World:
+    world = InferredCabinetsWorld().create()
     return world
 
 

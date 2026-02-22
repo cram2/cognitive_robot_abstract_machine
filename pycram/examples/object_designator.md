@@ -44,12 +44,13 @@ For a more detailed documentation check out their website (https://github.com/co
 To query for a body for example the milk bottle we need to create a query.
 
 ```python
-from krrood.entity_query_language.entity import entity, contains, variable
-from krrood.entity_query_language.entity_result_processors import an
+
+from krrood.entity_query_language.factories import entity, variable, contains, an
 from semantic_digital_twin.world_description.world_entity import Body
+
 body = variable(type_=Body, domain=world.bodies)
 query = an(entity(body).where(
-                  contains(body.name.name, "milk")))
+    contains(body.name.name, "milk")))
 ```
 This query searches in all bodies of the world, this is defined by the ```let``` in the first line. The next lines define 
 constrains of this body, in this case we check the name of each body if it contains the string "milk". 
@@ -70,12 +71,13 @@ contains the sub-string "cabinet" would yield multiple results.
 We first need a query with multiple results.
 
 ```python
-from krrood.entity_query_language.entity import entity, contains, variable
-from krrood.entity_query_language.entity_result_processors import an
+
+from krrood.entity_query_language.factories import entity, variable, contains, an
 from semantic_digital_twin.world_description.world_entity import Body
+
 body = variable(Body, domain=world.bodies)
 query = an(entity(body).where(
-                  contains(body.name.name, "cabinet")))
+    contains(body.name.name, "cabinet")))
 ```
 
 ```python
