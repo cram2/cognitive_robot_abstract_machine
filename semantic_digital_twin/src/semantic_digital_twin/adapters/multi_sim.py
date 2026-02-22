@@ -8,17 +8,17 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import IntEnum
 from types import NoneType
-from typing_extensions import Dict, List, Any, ClassVar, Type, Optional, Union, Self
+from typing_extensions import Dict, List, Any, ClassVar, Type, Optional, Union
 
 import numpy
-from mujoco_connector import MultiverseMujocoConnector
+from mujoco_simulator import MujocoSimulator
 import mujoco
-from multiverse_simulator import (
-    MultiverseSimulator,
-    MultiverseSimulatorState,
-    MultiverseViewer,
-    MultiverseAttribute,
-    MultiverseCallbackResult,
+from base_simulator import (
+    BaseSimulator,
+    SimulatorState,
+    SimulatorViewer,
+    SimulatorAttribute,
+    SimulatorCallbackResult,
 )
 from krrood.utils import recursive_subclasses
 from scipy.spatial.transform import Rotation
@@ -47,6 +47,7 @@ from ..world_description.geometry import (
     FileMesh,
     TriangleMesh,
     Mesh,
+    Color,
 )
 from ..world_description.world_entity import (
     Region,
@@ -858,6 +859,121 @@ class MujocoEquality(SimulatorAdditionalProperty):
     """
 
 
+@dataclass
+class MujocoTendon(SimulatorAdditionalProperty):
+    """
+    Additional properties representing a MuJoCo tendon in the world model.
+    """
+
+    name: str = ""
+    """
+    Name of the tendon.
+    """
+
+    actuator_force_limited: mujoco.mjtLimited = mujoco.mjtLimited.mjLIMITED_AUTO
+    """
+    This attribute specifies whether actuator forces acting on the tendon should be clamped.
+    """
+
+    actuator_force_range: List[float] = field(default_factory=lambda: [0.0, 0.0])
+    """
+    Range for clamping total actuator forces acting on this tendon.
+    """
+
+    armature: float = 0.0
+    """
+    Inertia associated with changes in tendon length.
+    """
+
+    damping: float = 0.0
+    """
+    Damping coefficient. A positive value generates a damping force (linear in velocity) acting along the tendon.
+    """
+
+    frictionloss: float = 0.01
+    """
+    Friction loss caused by dry friction. To enable friction loss, set this attribute to a positive value.
+    """
+
+    group: int = 0
+    """
+    Defaults class for setting unspecified attributes.
+    """
+
+    limited: mujoco.mjtLimited = mujoco.mjtLimited.mjLIMITED_AUTO
+    """
+    If this attribute is “true”, the length limits defined by the range attribute below are imposed by the constraint solver. 
+    If this attribute is “auto”, and autolimits is set in compiler, length limits will be enabled if range is defined.
+    """
+
+    margin: float = 0.0
+    """
+    The limit constraint becomes active when the absolute value of the difference between the tendon length and either limit of the specified range falls below this margin. 
+    """
+
+    material: str = ""
+    """
+    Material used to set the appearance of the tendon.
+    """
+
+    range: List[float] = field(default_factory=lambda: [0.0, 0.0])
+    """
+    Range of allowed tendon lengths.
+    """
+
+    rgba: List[float] = field(default_factory=lambda: Color(0.5, 0.5, 0.5, 1))
+    """
+    Color and transparency of the tendon.
+    """
+
+    solver_impedance_friction: List[float] = field(
+        default_factory=lambda: [0.9, 0.95, 0.001, 0.5, 2]
+    )
+    """
+    Constraint solver parameters for simulating dry friction in the tendon.
+    """
+
+    solver_impedance_limit: List[float] = field(
+        default_factory=lambda: [0.9, 0.95, 0.001, 0.5, 2]
+    )
+    """
+    Constraint solver parameters for simulating tendon limits.
+    """
+
+    solver_reference_friction: List[float] = field(default_factory=lambda: [0.02, 1.0])
+    """
+    Constraint solver parameters for simulating dry friction in the tendon.
+    """
+
+    solver_reference_limit: List[float] = field(default_factory=lambda: [0.02, 1.0])
+    """
+    Constraint solver parameters for simulating tendon limits.
+    """
+
+    spring_length: List[float] = field(default_factory=lambda: [-1.0, -1.0])
+    """
+    Spring resting position, can take either one or two values. If one value is given, it corresponds to the length of the tendon at rest.
+    """
+
+    stiffness: float = 0.0
+    """
+    Stiffness coefficient. A positive value generates a spring force (linear in position) acting along the tendon.
+    """
+
+    width: float = 0.003
+    """
+    Radius of the cross-section area of the spatial tendon, used for rendering. 
+    Parts of the tendon that wrap around geom obstacles are rendered with reduced width.
+    """
+
+    joints: Dict[str, float] = field(default_factory=dict)
+    """
+    This element adds a joint to the computation of the fixed tendon length.
+    The position or angle of each included joint is multiplied by the corresponding coef value, 
+    and added up to obtain the tendon length.
+    """
+
+
 @dataclass(eq=False)
 class MujocoGeom(SimulatorAdditionalProperty):
     """
@@ -1357,6 +1473,7 @@ class MujocoBuilder(MultiSimBuilder):
 
     def _end_build(self, file_path: str):
         self._build_equalities()
+        self._build_tendons()
         self.spec.compile()
         self.spec.to_file(file_path)
         import xml.etree.ElementTree as ET
@@ -1561,21 +1678,21 @@ class MujocoBuilder(MultiSimBuilder):
             ),
             None,
         )
-        if connection is None:
-            raise MultiSimError(
-                f"Connection for DOF {dof_name} not found, it need to be added first."
+        if connection is not None:
+            connection_name = connection.name.name
+            joint_spec = self._find_entity(
+                entity_type=mujoco.mjtObj.mjOBJ_JOINT, entity_name=connection_name
             )
-        connection_name = connection.name.name
-        joint_spec = self._find_entity(
-            entity_type=mujoco.mjtObj.mjOBJ_JOINT, entity_name=connection_name
-        )
-        if joint_spec is None:
-            raise MujocoEntityNotFoundError(
-                entity_name=connection_name,
-                entity_type=mujoco.mjtObj.mjOBJ_JOINT,
-            )
-        actuator_props["target"] = joint_spec.name
-        actuator_props["trntype"] = mujoco.mjtTrn.mjTRN_JOINT
+            if joint_spec is None:
+                raise MujocoEntityNotFoundError(
+                    entity_name=connection_name,
+                    entity_type=mujoco.mjtObj.mjOBJ_JOINT,
+                )
+            actuator_props["target"] = joint_spec.name
+            actuator_props["trntype"] = mujoco.mjtTrn.mjTRN_JOINT
+        else:
+            actuator_props["target"] = dof_name
+            actuator_props["trntype"] = mujoco.mjtTrn.mjTRN_TENDON
         actuator_name = actuator.name.name
         actuator_spec = self.spec.add_actuator(**actuator_props)
         if actuator_spec is None:
@@ -1647,6 +1764,35 @@ class MujocoBuilder(MultiSimBuilder):
                 equality.name2 = mujoco_equality.name_2
                 equality.data = mujoco_equality.data
 
+    def _build_tendons(self):
+        """
+        Builds all tendons in the Mujoco spec.
+        """
+        for mujoco_tendon in self.world.simulator_additional_properties:
+            if isinstance(mujoco_tendon, MujocoTendon):
+                tendon: mujoco.MjsTendon = self.spec.add_tendon()
+                tendon.name = mujoco_tendon.name
+                tendon.actfrclimited = mujoco_tendon.actuator_force_limited
+                tendon.actfrcrange = mujoco_tendon.actuator_force_range
+                tendon.armature = mujoco_tendon.armature
+                tendon.damping = mujoco_tendon.damping
+                tendon.frictionloss = mujoco_tendon.frictionloss
+                tendon.group = mujoco_tendon.group
+                tendon.limited = mujoco_tendon.limited
+                tendon.margin = mujoco_tendon.margin
+                tendon.material = mujoco_tendon.material
+                tendon.range = mujoco_tendon.range
+                tendon.rgba = mujoco_tendon.rgba.to_rgba()
+                tendon.solimp_friction = mujoco_tendon.solver_impedance_friction
+                tendon.solimp_limit = mujoco_tendon.solver_impedance_limit
+                tendon.solref_friction = mujoco_tendon.solver_reference_friction
+                tendon.solref_limit = mujoco_tendon.solver_reference_limit
+                tendon.springlength = mujoco_tendon.spring_length
+                tendon.stiffness = mujoco_tendon.stiffness
+                tendon.width = mujoco_tendon.width
+                for joint_name, joint_coef in mujoco_tendon.joints.items():
+                    tendon.wrap_joint(joint_name, joint_coef)
+
     def _find_entity(
         self,
         entity_type: mujoco.mjtObj,
@@ -1679,7 +1825,7 @@ class EntitySpawner(ABC):
     """
 
     @classmethod
-    def spawn(cls, simulator: MultiverseSimulator, entity: entity_type) -> bool:  # type: ignore
+    def spawn(cls, simulator: BaseSimulator, entity: entity_type) -> bool:  # type: ignore
         """
         Spawns a WorldEntity object in the Multiverse simulator.
 
@@ -1698,7 +1844,7 @@ class EntitySpawner(ABC):
         raise NotImplementedError(f"No converter found for entity type {type(entity)}.")
 
     @abstractmethod
-    def _spawn(self, simulator: MultiverseSimulator, entity: Any) -> bool:
+    def _spawn(self, simulator: BaseSimulator, entity: Any) -> bool:
         """
         The actual spawning method to be implemented by subclasses.
 
@@ -1720,7 +1866,7 @@ class KinematicStructureEntitySpawner(EntitySpawner):
     """
 
     def _spawn(
-        self, simulator: MultiverseSimulator, entity: KinematicStructureEntity
+        self, simulator: BaseSimulator, entity: KinematicStructureEntity
     ) -> bool:
         """
         Spawns a KinematicStructureEntity object in the Multiverse simulator including its shapes.
@@ -1736,7 +1882,7 @@ class KinematicStructureEntitySpawner(EntitySpawner):
 
     @abstractmethod
     def _spawn_kinematic_structure_entity(
-        self, simulator: MultiverseSimulator, entity: KinematicStructureEntity
+        self, simulator: BaseSimulator, entity: KinematicStructureEntity
     ) -> bool:
         """
         Spawns a KinematicStructureEntity object in the Multiverse simulator.
@@ -1750,7 +1896,7 @@ class KinematicStructureEntitySpawner(EntitySpawner):
 
     @abstractmethod
     def _spawn_shapes(
-        self, simulator: MultiverseSimulator, entity: KinematicStructureEntity
+        self, simulator: BaseSimulator, entity: KinematicStructureEntity
     ) -> bool:
         """
         Spawns the shapes of a KinematicStructureEntity object in the Multiverse simulator.
@@ -1766,7 +1912,7 @@ class KinematicStructureEntitySpawner(EntitySpawner):
     def _spawn_shape(
         self,
         parent: Union[Body, Region],
-        simulator: MultiverseSimulator,
+        simulator: BaseSimulator,
         shape: Shape,
         visible: bool,
         collidable: bool,
@@ -1795,7 +1941,7 @@ class BodySpawner(KinematicStructureEntitySpawner, ABC):
     The type of the entity to spawn.
     """
 
-    def _spawn_shapes(self, simulator: MultiverseSimulator, parent: Body) -> bool:
+    def _spawn_shapes(self, simulator: BaseSimulator, parent: Body) -> bool:
         return all(
             self._spawn_shape(
                 parent=parent,
@@ -1820,7 +1966,7 @@ class RegionSpawner(KinematicStructureEntitySpawner, ABC):
     The type of the entity to spawn.
     """
 
-    def _spawn_shapes(self, simulator: MultiverseSimulator, parent: Region) -> bool:
+    def _spawn_shapes(self, simulator: BaseSimulator, parent: Region) -> bool:
         return all(
             self._spawn_shape(
                 parent=parent,
@@ -1843,7 +1989,7 @@ class ActuatorSpawner(EntitySpawner):
     The type of the entity to spawn.
     """
 
-    def _spawn(self, simulator: MultiverseSimulator, entity: Actuator) -> bool:
+    def _spawn(self, simulator: BaseSimulator, entity: Actuator) -> bool:
         """
         Spawns an Actuator object in the Multiverse simulator, including its dofs.
 
@@ -1855,9 +2001,7 @@ class ActuatorSpawner(EntitySpawner):
         return self._spawn_actuator(simulator, entity)
 
     @abstractmethod
-    def _spawn_actuator(
-        self, simulator: MultiverseSimulator, actuator: Actuator
-    ) -> bool:
+    def _spawn_actuator(self, simulator: BaseSimulator, actuator: Actuator) -> bool:
         """
         Spawns an Actuator object in the Multiverse simulator.
 
@@ -1883,7 +2027,7 @@ class MujocoKinematicStructureEntitySpawner(
     """
 
     def _spawn_kinematic_structure_entity(
-        self, simulator: MultiverseMujocoConnector, entity: KinematicStructureEntity
+        self, simulator: MujocoSimulator, entity: KinematicStructureEntity
     ) -> bool:
         kinematic_structure_entity_props = (
             MujocoKinematicStructureEntityConverter.convert(entity)
@@ -1898,13 +2042,13 @@ class MujocoKinematicStructureEntitySpawner(
         )
         return (
             result.type
-            == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+            == SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
         )
 
     def _spawn_shape(
         self,
         parent: Body,
-        simulator: MultiverseMujocoConnector,
+        simulator: MujocoSimulator,
         shape: Shape,
         visible: bool,
         collidable: bool,
@@ -1921,7 +2065,7 @@ class MujocoKinematicStructureEntitySpawner(
         )
         return (
             result.type
-            == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+            == SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
         )
 
 
@@ -1948,9 +2092,7 @@ class MujocoActuatorSpawner(MujocoEntitySpawner, ActuatorSpawner):
 
     entity_type: ClassVar[Type[Actuator]] = Actuator
 
-    def _spawn_actuator(
-        self, simulator: MultiverseMujocoConnector, actuator: Actuator
-    ) -> bool:
+    def _spawn_actuator(self, simulator: MujocoSimulator, actuator: Actuator) -> bool:
         actuator_props = MujocoActuatorConverter.convert(actuator)
         actuator_name = actuator_props.pop("name")
         dof_names = actuator_props.pop("dof_names")
@@ -1981,7 +2123,7 @@ class MujocoActuatorSpawner(MujocoEntitySpawner, ActuatorSpawner):
         )
         return (
             result.type
-            == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+            == SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
         )
 
 
@@ -1997,7 +2139,7 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
     The world to synchronize with the simulator.
     """
 
-    simulator: MultiverseSimulator
+    simulator: BaseSimulator
     """
     The Multiverse simulator to synchronize with the world.
     """
@@ -2027,7 +2169,7 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
 
 @dataclass
 class MujocoSynchronizer(MultiSimSynchronizer):
-    simulator: MultiverseMujocoConnector
+    simulator: MujocoSimulator
     entity_converter: Type[EntityConverter] = field(default=MujocoConverter)
     entity_spawner: Type[EntitySpawner] = field(default=MujocoEntitySpawner)
 
@@ -2037,7 +2179,7 @@ class MultiSim(ABC):
     Class to handle the simulation of a world using the Multiverse simulator.
     """
 
-    simulator_class: ClassVar[Type[MultiverseSimulator]]
+    simulator_class: ClassVar[Type[BaseSimulator]]
     """
     The class of the Multiverse simulator to use.
     """
@@ -2052,7 +2194,7 @@ class MultiSim(ABC):
     The class of the MultiSimBuilder to use.
     """
 
-    simulator: MultiverseSimulator
+    simulator: BaseSimulator
     """
     The Multiverse simulator instance.
     """
@@ -2070,7 +2212,7 @@ class MultiSim(ABC):
     def __init__(
         self,
         world: World,
-        viewer: MultiverseViewer,
+        viewer: SimulatorViewer,
         headless: bool = False,
         step_size: float = 1e-3,
         real_time_factor: float = 1.0,
@@ -2105,7 +2247,7 @@ class MultiSim(ABC):
         Starts the simulation. This will start one physics simulation thread and render it at 60Hz.
         """
         assert (
-            self.simulator.state != MultiverseSimulatorState.RUNNING
+            self.simulator.state != SimulatorState.RUNNING
         ), "Simulation is already running."
         self.simulator.start()
 
@@ -2120,14 +2262,14 @@ class MultiSim(ABC):
         """
         Pauses the simulation. This will pause the physics simulation but not the rendering.
         """
-        if self.simulator.state != MultiverseSimulatorState.PAUSED:
+        if self.simulator.state != SimulatorState.PAUSED:
             self.simulator.pause()
 
     def unpause_simulation(self):
         """
         Unpauses the simulation. This will unpause the physics simulation.
         """
-        if self.simulator.state == MultiverseSimulatorState.PAUSED:
+        if self.simulator.state == SimulatorState.PAUSED:
             self.simulator.unpause()
 
     def reset_simulation(self):
@@ -2150,7 +2292,7 @@ class MultiSim(ABC):
         :param write_objects: The objects to be written to the simulator.
         """
         self._viewer.write_objects = write_objects
-        if self.simulator.state == MultiverseSimulatorState.PAUSED:
+        if self.simulator.state == SimulatorState.PAUSED:
             self.simulator.step()
 
     def set_read_objects(self, read_objects: Dict[str, Dict[str, List[float]]]):
@@ -2167,10 +2309,10 @@ class MultiSim(ABC):
         :param read_objects: The objects to be read from the simulator.
         """
         self._viewer.read_objects = read_objects
-        if self.simulator.state == MultiverseSimulatorState.PAUSED:
+        if self.simulator.state == SimulatorState.PAUSED:
             self.simulator.step()
 
-    def get_read_objects(self) -> Dict[str, Dict[str, MultiverseAttribute]]:
+    def get_read_objects(self) -> Dict[str, Dict[str, SimulatorAttribute]]:
         """
         Gets the objects that are being read from the simulator.
         For example, if you have set the read objects as follows:
@@ -2192,7 +2334,7 @@ class MultiSim(ABC):
 
         :return: The objects that are being read from the simulator.
         """
-        if self.simulator.state == MultiverseSimulatorState.PAUSED:
+        if self.simulator.state == SimulatorState.PAUSED:
             self.simulator.step()
         return self._viewer.read_objects
 
@@ -2238,15 +2380,15 @@ class MultiSim(ABC):
                 break
             time.sleep(1e-3)
         self._viewer.read_objects = origin_read_objects
-        if origin_state == MultiverseSimulatorState.PAUSED:
+        if origin_state == SimulatorState.PAUSED:
             self.pause_simulation()
         return stable
 
 
 class MujocoSim(MultiSim):
-    simulator_class: ClassVar[Type[MultiverseSimulator]] = MultiverseMujocoConnector
+    simulator_class: ClassVar[Type[BaseSimulator]] = MujocoSimulator
     synchronizer_class: ClassVar[Type[MultiSimSynchronizer]] = MujocoSynchronizer
     builder_class: ClassVar[Type[MultiSimBuilder]] = MujocoBuilder
-    simulator: MultiverseMujocoConnector
+    simulator: MujocoSimulator
     synchronizer: Type[MultiSimSynchronizer] = MujocoSynchronizer
     default_file_path: str = "/tmp/scene.xml"
