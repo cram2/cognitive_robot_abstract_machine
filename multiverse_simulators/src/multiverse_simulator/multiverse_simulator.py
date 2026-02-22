@@ -5,7 +5,6 @@
 import atexit
 import logging
 import time
-import os
 from dataclasses import dataclass
 from enum import Enum
 from functools import partial
@@ -17,6 +16,7 @@ import numpy
 
 class MultiverseSimulatorState(Enum):
     """Multiverse Simulator State Enum"""
+
     STOPPED = 0
     PAUSED = 1
     RUNNING = 2
@@ -24,6 +24,7 @@ class MultiverseSimulatorState(Enum):
 
 class MultiverseSimulatorStopReason(Enum):
     """Multiverse Simulator Stop Reason"""
+
     STOP = 0
     MAX_REAL_TIME = 1
     MAX_SIMULATION_TIME = 2
@@ -94,99 +95,45 @@ class MultiverseAttribute:
         return self._values
 
 
-class MultiverseLogger:
-    """Base class for Multiverse Logger"""
-
-    def __init__(self, objects: Dict[str, Dict[str, MultiverseAttribute]]):
-        self._data_size = 1
-        for object_data in objects.values():
-            for attribute_values in object_data.values():
-                self._data_size += len(attribute_values.default_value)
-        self._objects = objects
-        self._data = numpy.array([])
-        self._start_time = time.time()
-
-    def log_data(self, new_data: numpy.ndarray):
-        if new_data.size != self._data_size - 1:
-            raise ValueError("New data size does not match existing data size.")
-        new_data = numpy.append([time.time()], new_data)
-        self._data = numpy.append(self._data, new_data)
-
-    def save_data(self, save_file_path: str):
-        data = {}
-        number_of_data = int(len(self._data) / self._data_size)
-        data['step'] = numpy.arange(0, number_of_data)
-        data['time'] = self._data[0::self._data_size]
-        data_adr = 1
-        for object_name, object_data in self.objects.items():
-            for attribute_name, attribute_values in object_data.items():
-                if len(attribute_values.default_value) == 1:
-                    data_name = f"{object_name}_{attribute_name}"
-                    data[data_name] = self.data[data_adr::self._data_size]
-                    data_adr += 1
-                else:
-                    for i in range(len(attribute_values.default_value)):
-                        data_name = f"{object_name}_{attribute_name}_{i}"
-                        data[data_name] = self.data[data_adr::self._data_size]
-                        data_adr += 1
-
-        import pandas as pd
-
-        # Create a DataFrame
-        df = pd.DataFrame(data)
-
-        # Writing to CSV, index=False to avoid writing row numbers
-        print(f"Saving data to {save_file_path}")
-        save_file_dir = os.path.dirname(save_file_path)
-        if not os.path.exists(save_file_dir):
-            os.makedirs(save_file_dir)
-        df.to_csv(save_file_path, index=False)
-
-    @property
-    def objects(self):
-        return self._objects
-
-    @property
-    def data(self):
-        return self._data
-
-    @property
-    def start_time(self):
-        return self._start_time
-
-
 class MultiverseViewer:
     """Base class for Multiverse Viewer"""
 
-    logger: Optional[MultiverseLogger] = None
-
     def __init__(
-            self,
-            write_objects: Optional[Dict[str, Dict[str, Union[numpy.ndarray, List[float]]]]] = None,
-            read_objects: Optional[Dict[str, Dict[str, Union[numpy.ndarray, List[float]]]]] = None,
-            logging_interval: float = -1
+        self,
+        write_objects: Optional[
+            Dict[str, Dict[str, Union[numpy.ndarray, List[float]]]]
+        ] = None,
+        read_objects: Optional[
+            Dict[str, Dict[str, Union[numpy.ndarray, List[float]]]]
+        ] = None,
     ):
-        self._write_objects = self.from_array(write_objects) if write_objects is not None else {}
+        self._write_objects = (
+            self.from_array(write_objects) if write_objects is not None else {}
+        )
         self._write_data = numpy.array([])
 
-        self._read_objects = self.from_array(read_objects) if read_objects is not None else {}
+        self._read_objects = (
+            self.from_array(read_objects) if read_objects is not None else {}
+        )
         self._read_data = numpy.array([])
 
-        self._logging_interval = logging_interval
-        if self.logging_interval > 0:
-            self.logger = MultiverseLogger(self.read_objects)
-
     @staticmethod
-    def from_array(data: Dict[str, Dict[str, Union[numpy.ndarray, List[float]]]]) \
-            -> Dict[str, Dict[str, MultiverseAttribute]]:
+    def from_array(
+        data: Dict[str, Dict[str, Union[numpy.ndarray, List[float]]]],
+    ) -> Dict[str, Dict[str, MultiverseAttribute]]:
         """
         Convert the data array to MultiverseAttribute objects
 
         :param data: Dict[str, Dict[str, Union[numpy.ndarray, List[float]]]], data array
         :return: Dict[str, Dict[str, MultiverseAttribute]], MultiverseAttribute objects
         """
-        return {key: {key2: MultiverseAttribute(default_value=value)
-                      for key2, value in value.items()} for key, value in data.items()}
+        return {
+            key: {
+                key2: MultiverseAttribute(default_value=value)
+                for key2, value in value.items()
+            }
+            for key, value in data.items()
+        }
 
     def initialize_data(self, number_of_envs: int) -> "MultiverseViewer":
         """
@@ -194,10 +141,12 @@ class MultiverseViewer:
 
         :param number_of_envs: int, number of environments
         """
-        self._write_data = numpy.array([self._initialize_data(self._write_objects)
-                                        for _ in range(number_of_envs)])
-        self._read_data = numpy.array([self._initialize_data(self._read_objects)
-                                       for _ in range(number_of_envs)])
+        self._write_data = numpy.array(
+            [self._initialize_data(self._write_objects) for _ in range(number_of_envs)]
+        )
+        self._read_data = numpy.array(
+            [self._initialize_data(self._read_objects) for _ in range(number_of_envs)]
+        )
         for objects in [self._write_objects, self._read_objects]:
             for attrs in objects.values():
                 for attr in attrs.values():
@@ -205,14 +154,23 @@ class MultiverseViewer:
         return self
 
     @staticmethod
-    def _initialize_data(objects: Dict[str, Dict[str, MultiverseAttribute]]) -> numpy.ndarray:
+    def _initialize_data(
+        objects: Dict[str, Dict[str, MultiverseAttribute]],
+    ) -> numpy.ndarray:
         """
         Flatten attribute values into a NumPy array.
 
         :param objects: Dict[str, Dict[str, MultiverseAttribute]], objects with attributes
         :return: numpy.ndarray, flattened attribute values
         """
-        return numpy.array([i for attrs in objects.values() for attr in attrs.values() for i in attr.default_value])
+        return numpy.array(
+            [
+                i
+                for attrs in objects.values()
+                for attr in attrs.values()
+                for i in attr.default_value
+            ]
+        )
 
     @property
     def write_objects(self) -> Dict[str, Dict[str, MultiverseAttribute]]:
@@ -220,10 +178,16 @@ class MultiverseViewer:
         return self._write_objects
 
     @write_objects.setter
-    def write_objects(self, send_objects: Dict[str, Dict[str, Union[numpy.ndarray, List[float], MultiverseAttribute]]]):
+    def write_objects(
+        self,
+        send_objects: Dict[
+            str, Dict[str, Union[numpy.ndarray, List[float], MultiverseAttribute]]
+        ],
+    ):
         number_of_envs = self.write_data.shape[0]
         self._write_objects, self._write_data = (
-            self._get_objects_and_data_from_target_objects(send_objects, number_of_envs))
+            self._get_objects_and_data_from_target_objects(send_objects, number_of_envs)
+        )
         assert self.write_data.shape[0] == self.read_data.shape[0]
 
     @property
@@ -232,41 +196,64 @@ class MultiverseViewer:
         return self._read_objects
 
     @read_objects.setter
-    def read_objects(self, objects: Dict[str, Dict[str, Union[numpy.ndarray, List[float], MultiverseAttribute]]]):
+    def read_objects(
+        self,
+        objects: Dict[
+            str, Dict[str, Union[numpy.ndarray, List[float], MultiverseAttribute]]
+        ],
+    ):
         number_of_envs = self.read_data.shape[0]
         self._read_objects, self._read_data = (
-            self._get_objects_and_data_from_target_objects(objects, number_of_envs))
+            self._get_objects_and_data_from_target_objects(objects, number_of_envs)
+        )
         assert self.read_data.shape[0] == self.write_data.shape[0]
-        if self.logging_interval > 0:
-            self.logger = MultiverseLogger(self.read_objects)
 
     @staticmethod
     def _get_objects_and_data_from_target_objects(
-            target_objects: Dict[str, Dict[str, Union[numpy.ndarray, List[float], MultiverseAttribute]]],
-            number_of_envs: int) \
-            -> Tuple[Dict[str, Dict[str, MultiverseAttribute]], numpy.ndarray]:
+        target_objects: Dict[
+            str, Dict[str, Union[numpy.ndarray, List[float], MultiverseAttribute]]
+        ],
+        number_of_envs: int,
+    ) -> Tuple[Dict[str, Dict[str, MultiverseAttribute]], numpy.ndarray]:
         """
         Update object attribute values from the target objects.
 
         :param target_objects: Dict[str, Dict[str, Union[numpy.ndarray, List[float], MultiverseAttribute]]], target objects
         :param number_of_envs: int, number of environments
         """
-        if any(isinstance(value, (numpy.ndarray, list)) for values in target_objects.values() for value in
-               values.values()):
-            objects = MultiverseViewer.from_array(target_objects) if target_objects is not None else {}
+        if any(
+            isinstance(value, (numpy.ndarray, list))
+            for values in target_objects.values()
+            for value in values.values()
+        ):
+            objects = (
+                MultiverseViewer.from_array(target_objects)
+                if target_objects is not None
+                else {}
+            )
         else:
             objects = target_objects
         for attrs in objects.values():
             for attr in attrs.values():
                 if attr._values is None:
                     attr.initialize_data(number_of_envs)
-        data = numpy.array([[value for attrs in objects.values()
-                             for attr in attrs.values()
-                             for value in attr.values[env_id]] for env_id in range(number_of_envs)])
+        data = numpy.array(
+            [
+                [
+                    value
+                    for attrs in objects.values()
+                    for attr in attrs.values()
+                    for value in attr.values[env_id]
+                ]
+                for env_id in range(number_of_envs)
+            ]
+        )
         return objects, data
 
     @staticmethod
-    def _update_objects_from_data(objects: Dict[str, Dict[str, MultiverseAttribute]], data: numpy.ndarray):
+    def _update_objects_from_data(
+        objects: Dict[str, Dict[str, MultiverseAttribute]], data: numpy.ndarray
+    ):
         """
         Update object attribute values from the data array.
 
@@ -276,7 +263,7 @@ class MultiverseViewer:
             j = 0
             for obj_name, attrs in objects.items():
                 for name, attr in attrs.items():
-                    attr.values[i] = values[j:j + len(attr.default_value)]
+                    attr.values[i] = values[j : j + len(attr.default_value)]
                     j += len(attr.default_value)
 
     @property
@@ -287,7 +274,8 @@ class MultiverseViewer:
     def write_data(self, data: numpy.ndarray):
         if data.shape != self._write_data.shape:
             raise ValueError(
-                f"Data length mismatch with write_objects, expected {self._write_data.shape}, got {data.shape}")
+                f"Data length mismatch with write_objects, expected {self._write_data.shape}, got {data.shape}"
+            )
         self._write_data[:] = data
 
     @property
@@ -298,12 +286,9 @@ class MultiverseViewer:
     def read_data(self, data: numpy.ndarray):
         if data.shape != self._read_data.shape:
             raise ValueError(
-                f"Data length mismatch with read_objects, expected {self._read_data.shape}, got {data.shape}")
+                f"Data length mismatch with read_objects, expected {self._read_data.shape}, got {data.shape}"
+            )
         self._read_data[:] = data
-
-    @property
-    def logging_interval(self) -> float:
-        return self._logging_interval
 
 
 @dataclass
@@ -385,14 +370,16 @@ class MultiverseSimulator:
     instance_level_callbacks: List[MultiverseCallback] = None
     """Instance level callback functions"""
 
-    def __init__(self,
-                 viewer: Optional[MultiverseViewer] = None,
-                 number_of_envs: int = 1,
-                 headless: bool = False,
-                 real_time_factor: float = 1.0,
-                 step_size: float = 1E-3,
-                 callbacks: List[MultiverseCallback] = None,
-                 **kwargs):
+    def __init__(
+        self,
+        viewer: Optional[MultiverseViewer] = None,
+        number_of_envs: int = 1,
+        headless: bool = False,
+        real_time_factor: float = 1.0,
+        step_size: float = 1e-3,
+        callbacks: List[MultiverseCallback] = None,
+        **kwargs,
+    ):
         """
         Initialize the simulator with the viewer and the following keyword arguments:
 
@@ -410,7 +397,9 @@ class MultiverseSimulator:
         self._start_real_time = self.current_real_time
         self._state = MultiverseSimulatorState.STOPPED
         self._stop_reason = None
-        self._viewer = viewer.initialize_data(number_of_envs) if viewer is not None else None
+        self._viewer = (
+            viewer.initialize_data(number_of_envs) if viewer is not None else None
+        )
         self._renderer = MultiverseRenderer()
         self._current_render_time = self.current_real_time
         self.instance_level_callbacks = []
@@ -425,14 +414,21 @@ class MultiverseSimulator:
 
     @property
     def callbacks(self):
-        return {callback.__name__: partial(callback, self) for callback in
-                [*self.class_level_callbacks, *self.instance_level_callbacks]}
+        return {
+            callback.__name__: partial(callback, self)
+            for callback in [
+                *self.class_level_callbacks,
+                *self.instance_level_callbacks,
+            ]
+        }
 
-    def start(self,
-              simulate_in_thread: bool = True,
-              render_in_thread: bool = False,
-              constraints: MultiverseSimulatorConstraints = None,
-              time_out_in_seconds: float = 10.0):
+    def start(
+        self,
+        simulate_in_thread: bool = True,
+        render_in_thread: bool = False,
+        constraints: MultiverseSimulatorConstraints = None,
+        time_out_in_seconds: float = 10.0,
+    ):
         """
         Start the simulator, if run_in_thread is True, run the simulator in a thread until the constraints are met
 
@@ -461,6 +457,7 @@ class MultiverseSimulator:
             self.simulation_thread = Thread(target=self.run, args=(constraints,))
             self.simulation_thread.start()
         if not self.headless and render_in_thread:
+
             def render():
                 with self.renderer:
                     while self.renderer.is_running():
@@ -470,10 +467,9 @@ class MultiverseSimulator:
             self.render_thread = Thread(target=render)
             self.render_thread.start()
 
-    def run(self,
-            constraints: MultiverseSimulatorConstraints = None):
+    def run(self, constraints: MultiverseSimulatorConstraints = None):
         """
-        Run the simulator while the state is RUNNING or until the constraints are met
+        Run the simulator while the state is RUNNING or until the constraints are met.
 
         :param constraints: MultiverseSimulatorConstraints, constraints for stopping the simulator
         """
@@ -486,53 +482,60 @@ class MultiverseSimulator:
                 if self.state == MultiverseSimulatorState.RUNNING:
                     if self.current_simulation_time == 0.0:
                         self.reset()
-                    if self.real_time_factor > 0:
-                        real_time_pass = self.current_real_time - self.start_real_time
-                        simulation_time_pass = self.current_simulation_time * self.real_time_factor
-                        delta_time = simulation_time_pass - real_time_pass
-                        if delta_time <= self.step_size:
-                            self.step()
-                        if delta_time > self.step_size * self.real_time_factor * 10:
-                            self.log_warning(
-                                f"Real time is {delta_time} seconds ({delta_time / self.step_size} step_size) behind simulation time")
-                        elif delta_time < -self.step_size * self.real_time_factor * 10:
-                            self.log_warning(
-                                f"Real time is {-delta_time} seconds ({-delta_time / self.step_size} step_size) ahead of simulation time")
-                    else:
-                        self.step()
+                    self.step()
                 elif self.state == MultiverseSimulatorState.PAUSED:
                     self.pause_callback()
-                if self.render_thread is None and self.current_real_time - self._current_render_time > 1.0 / 60.0:
+                if (
+                    self.render_thread is None
+                    and self.current_real_time - self._current_render_time > 1.0 / 60.0
+                ):
                     self._current_render_time = self.current_real_time
                     self.render()
         self.stop_callback()
 
     def step(self):
-        """Step the simulator"""
+        """
+        Step the simulator. It reads the data from the viewer and writes the data to the simulator,
+        then it reads the data from the simulator and writes the data to the viewer.
+        It also increments the current simulation time and the current number of steps.
+        If the current simulation time is not consistent with the current number of steps and step size, it resets the simulator.
+        """
         self.pre_step_callback()
-        if self.state == MultiverseSimulatorState.RUNNING:
-            last_simulation_time = self.current_simulation_time
+        last_simulation_time = (
+            self.current_simulation_time
+            if self.state == MultiverseSimulatorState.RUNNING
+            else None
+        )
         if self._viewer is not None:
             self.write_data_to_simulator(write_data=self._viewer.write_data)
             self.step_callback()
             self.read_data_from_simulator(read_data=self._viewer.read_data)
-            if self._viewer.logging_interval > 0.0:
-                self._viewer.logger.log_data(new_data=self._viewer.read_data)
         else:
             self.step_callback()
-        if self.state == MultiverseSimulatorState.RUNNING and not numpy.isclose(self.current_simulation_time - last_simulation_time, self.step_size):
+        if self.state == MultiverseSimulatorState.RUNNING and not numpy.isclose(
+            self.current_simulation_time - last_simulation_time, self.step_size
+        ):
+            self.log_warning(
+                f"Simulation time {self.current_simulation_time:.4f} is inconsistent with "
+                f"number of steps {self.current_number_of_steps} and step size {self.step_size}, resetting the simulator"
+            )
             self.reset()
         if not numpy.isclose(
-                self.current_number_of_steps * self.step_size, self.current_simulation_time):
-            if numpy.isclose(self.current_simulation_time, self.step_size, self.step_size):
+            self.current_number_of_steps * self.step_size, self.current_simulation_time
+        ):
+            if numpy.isclose(
+                self.current_simulation_time, self.step_size, self.step_size
+            ):
                 self._current_number_of_steps = 1
             else:
-                self.log_error(f"Simulation time {self.current_simulation_time:.4f} is inconsistent with "
-                            f"number of steps {self.current_number_of_steps} and step size {self.step_size}")
+                self.log_error(
+                    f"Simulation time {self.current_simulation_time:.4f} is inconsistent with "
+                    f"number of steps {self.current_number_of_steps} and step size {self.step_size}"
+                )
 
     def write_data_to_simulator(self, write_data: numpy.ndarray):
         """
-        Write data to the simulator
+        Write data to the simulator.
 
         :param write_data: numpy.ndarray, data to write
         """
@@ -540,14 +543,16 @@ class MultiverseSimulator:
 
     def read_data_from_simulator(self, read_data: numpy.ndarray):
         """
-        Read data from the simulator
+        Read data from the simulator.
 
         :param read_data: numpy.ndarray, data to read
         """
         raise NotImplementedError("read_data method is not implemented")
 
     def stop(self):
-        """Stop the simulator"""
+        """
+        Stop the simulator, close the renderer and join the simulation thread if it exists and is alive.
+        """
         if self.renderer.is_running():
             self.renderer.close()
         if self.render_thread is not None and self.render_thread.is_alive():
@@ -558,14 +563,18 @@ class MultiverseSimulator:
         self._stop_reason = MultiverseSimulatorStopReason.STOP
 
     def pause(self):
-        """Pause the simulator"""
+        """
+        Pause the simulator. It doesn't pause the renderer.
+        """
         if self.state != MultiverseSimulatorState.RUNNING:
             self.log_warning("Cannot pause when the simulator is not running")
         else:
             self._state = MultiverseSimulatorState.PAUSED
 
     def unpause(self):
-        """Unpause the simulator and run the simulator"""
+        """
+        Unpause the simulator and run the simulator.
+        """
         if self.state == MultiverseSimulatorState.PAUSED:
             self.unpause_callback()
             self._state = MultiverseSimulatorState.RUNNING
@@ -581,27 +590,48 @@ class MultiverseSimulator:
         self._current_number_of_steps = 0
         self._start_real_time = self.current_real_time
 
-    def should_stop(self,
-                    constraints: MultiverseSimulatorConstraints = None) -> Optional[MultiverseSimulatorStopReason]:
+    def should_stop(
+        self, constraints: MultiverseSimulatorConstraints = None
+    ) -> Optional[MultiverseSimulatorStopReason]:
         """
+        Check if the simulator should stop based on the constraints.
+
         :param constraints: MultiverseSimulatorConstraints, constraints for stopping the simulator
+
         :return: bool, True if the simulator should stop, False otherwise
         """
         if constraints is not None:
-            if constraints.max_real_time is not None and self.current_real_time - self.start_real_time >= constraints.max_real_time:
-                self.log_info(f"Stopping simulation because max_real_time [{constraints.max_real_time}] reached")
+            if (
+                constraints.max_real_time is not None
+                and self.current_real_time - self.start_real_time
+                >= constraints.max_real_time
+            ):
+                self.log_info(
+                    f"Stopping simulation because max_real_time [{constraints.max_real_time}] reached"
+                )
                 return MultiverseSimulatorStopReason.MAX_REAL_TIME
-            if constraints.max_simulation_time is not None and self.current_simulation_time >= constraints.max_simulation_time:
+            if (
+                constraints.max_simulation_time is not None
+                and self.current_simulation_time >= constraints.max_simulation_time
+            ):
                 self.log_info(
-                    f"Stopping simulation because max_simulation_time [{constraints.max_simulation_time}] reached")
+                    f"Stopping simulation because max_simulation_time [{constraints.max_simulation_time}] reached"
+                )
                 return MultiverseSimulatorStopReason.MAX_SIMULATION_TIME
-            if constraints.max_number_of_steps is not None and self.current_number_of_steps >= constraints.max_number_of_steps:
+            if (
+                constraints.max_number_of_steps is not None
+                and self.current_number_of_steps >= constraints.max_number_of_steps
+            ):
                 self.log_info(
-                    f"Stopping simulation because max_number_of_steps [{constraints.max_number_of_steps}] reached")
+                    f"Stopping simulation because max_number_of_steps [{constraints.max_number_of_steps}] reached"
+                )
                 return MultiverseSimulatorStopReason.MAX_NUMBER_OF_STEPS
         return self.should_stop_callback()
 
     def start_callback(self):
+        """
+        This function is called when the simulator starts. It initializes the current simulation time and the renderer.
+        """
         self._current_simulation_time = 0.0
         self._renderer = MultiverseRenderer()
 
@@ -618,44 +648,87 @@ class MultiverseSimulator:
         pass
 
     def pre_step_callback(self):
+        """
+        Update `write_ids` and `read_ids` based on the viewer's `write_objects` and `read_objects`.
+        """
         if self._viewer is not None:
-            if self.__should_process_objects(self._viewer.write_objects, self._write_objects):
+            if self.__should_process_objects(
+                self._viewer.write_objects, self._write_objects
+            ):
                 self._process_objects(self._viewer.write_objects, self._write_ids)
                 self._write_objects = self._viewer.write_objects
-            if self.__should_process_objects(self._viewer.read_objects, self._read_objects):
+            if self.__should_process_objects(
+                self._viewer.read_objects, self._read_objects
+            ):
                 self._process_objects(self._viewer.read_objects, self._read_ids)
                 self._read_objects = self._viewer.read_objects
 
     @staticmethod
     def __should_process_objects(viewer_objects, cache_objects):
+        """
+        Check if the objects in the viewer are different from the objects in the cache.
+        """
         for name, attrs in cache_objects.items():
-            if name not in viewer_objects or any(attr_name not in viewer_objects[name] for attr_name in attrs):
+            if name not in viewer_objects or any(
+                attr_name not in viewer_objects[name] for attr_name in attrs
+            ):
                 return True
         for name, attrs in viewer_objects.items():
-            if name not in cache_objects or any(attr_name not in cache_objects[name] for attr_name in attrs):
+            if name not in cache_objects or any(
+                attr_name not in cache_objects[name] for attr_name in attrs
+            ):
                 return True
         return False
 
     def step_callback(self):
+        """
+        This function is called after the step function.
+        It increments the current simulation time and the current number of steps.
+        """
         if self.state == MultiverseSimulatorState.RUNNING:
             self._current_simulation_time += self.step_size
             self._current_number_of_steps += 1
 
     def stop_callback(self):
+        """
+        This function is called when the simulator stops.
+        It closes the renderer.
+        """
         if self.renderer.is_running():
             self.renderer.close()
 
     def pause_callback(self):
-        self._start_real_time += self.current_real_time - self.current_simulation_time - self.start_real_time
+        """
+        This function is called when the simulator is paused.
+        It updates the start_real_time to current_real_time - current_simulation_time.
+        """
+        self._start_real_time += (
+            self.current_real_time - self.current_simulation_time - self.start_real_time
+        )
 
     def unpause_callback(self):
+        """
+        This function is called when the simulator is unpaused.
+        """
         pass
 
     def reset_callback(self):
+        """
+        This function is called when the simulator is reset.
+        It sets the current simulation time to 0.0.
+        """
         self._current_simulation_time = 0.0
 
     def should_stop_callback(self) -> Optional[MultiverseSimulatorStopReason]:
-        return None if self.renderer.is_running() else MultiverseSimulatorStopReason.VIEWER_IS_CLOSED
+        """
+        This function is called when the simulator should stop.
+        It returns None if the renderer is running, otherwise it returns MultiverseSimulatorStopReason.VIEWER_IS_CLOSED.
+        """
+        return (
+            None
+            if self.renderer.is_running()
+            else MultiverseSimulatorStopReason.VIEWER_IS_CLOSED
+        )
 
     @classmethod
     def log_info(cls, message: str):
@@ -672,10 +745,6 @@ class MultiverseSimulator:
     @property
     def headless(self) -> bool:
         return self._headless
-
-    @property
-    def real_time_factor(self) -> float:
-        return self._real_time_factor
 
     @property
     def step_size(self) -> float:
@@ -710,13 +779,19 @@ class MultiverseSimulator:
         return self._renderer
 
     @classmethod
-    def add_callback(cls, callback: Union[Callable, MultiverseCallback], callbacks: List[MultiverseCallback]):
+    def add_callback(
+        cls,
+        callback: Union[Callable, MultiverseCallback],
+        callbacks: List[MultiverseCallback],
+    ):
         if not isinstance(callback, MultiverseCallback):
             if isinstance(callback, Callable):
                 callback = MultiverseCallback(callback=callback)
             else:
-                raise TypeError(f"Function {callback} must be an instance of MultiverseCallback or Callable, "
-                                f"got {type(callback)}")
+                raise TypeError(
+                    f"Function {callback} must be an instance of MultiverseCallback or Callable, "
+                    f"got {type(callback)}"
+                )
         if callback.__name__ in [callback.__name__ for callback in callbacks]:
             raise AttributeError(f"Function {callback.__name__} is already defined")
         callbacks.append(callback)
