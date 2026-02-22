@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-"""Multiverse Simulator base class"""
-
 import atexit
 import logging
 import time
@@ -14,16 +12,16 @@ from typing import Optional, Dict, List, Tuple, Any, Callable, Union
 import numpy
 
 
-class MultiverseSimulatorState(Enum):
-    """Multiverse Simulator State Enum"""
+class SimulatorState(Enum):
+    """Simulator State Enum"""
 
     STOPPED = 0
     PAUSED = 1
     RUNNING = 2
 
 
-class MultiverseSimulatorStopReason(Enum):
-    """Multiverse Simulator Stop Reason"""
+class SimulatorStopReason(Enum):
+    """Simulator Stop Reason"""
 
     STOP = 0
     MAX_REAL_TIME = 1
@@ -34,14 +32,14 @@ class MultiverseSimulatorStopReason(Enum):
 
 
 @dataclass
-class MultiverseSimulatorConstraints:
+class SimulatorConstraints:
     max_real_time: float = None
     max_simulation_time: float = None
     max_number_of_steps: int = None
 
 
-class MultiverseRenderer:
-    """Base class for Multiverse Renderer"""
+class SimulatorRenderer:
+    """Base class for Renderer"""
 
     _is_running: bool = False
 
@@ -69,8 +67,8 @@ class MultiverseRenderer:
 
 
 @dataclass
-class MultiverseAttribute:
-    """Base class for Multiverse Attribute"""
+class SimulatorAttribute:
+    """Base class for Simulator Attribute"""
 
     default_value: numpy.ndarray
     """Default value of the attribute"""
@@ -95,8 +93,8 @@ class MultiverseAttribute:
         return self._values
 
 
-class MultiverseViewer:
-    """Base class for Multiverse Viewer"""
+class SimulatorViewer:
+    """Base class for Simulator Viewer"""
 
     def __init__(
         self,
@@ -120,22 +118,22 @@ class MultiverseViewer:
     @staticmethod
     def from_array(
         data: Dict[str, Dict[str, Union[numpy.ndarray, List[float]]]],
-    ) -> Dict[str, Dict[str, MultiverseAttribute]]:
+    ) -> Dict[str, Dict[str, SimulatorAttribute]]:
         """
-        Convert the data array to MultiverseAttribute objects
+        Convert the data array to SimulatorAttribute objects
 
         :param data: Dict[str, Dict[str, Union[numpy.ndarray, List[float]]]], data array
-        :return: Dict[str, Dict[str, MultiverseAttribute]], MultiverseAttribute objects
+        :return: Dict[str, Dict[str, SimulatorAttribute]], SimulatorAttribute objects
         """
         return {
             key: {
-                key2: MultiverseAttribute(default_value=value)
+                key2: SimulatorAttribute(default_value=value)
                 for key2, value in value.items()
             }
             for key, value in data.items()
         }
 
-    def initialize_data(self, number_of_envs: int) -> "MultiverseViewer":
+    def initialize_data(self, number_of_envs: int) -> "SimulatorViewer":
         """
         Initialize the data for the viewer
 
@@ -155,12 +153,12 @@ class MultiverseViewer:
 
     @staticmethod
     def _initialize_data(
-        objects: Dict[str, Dict[str, MultiverseAttribute]],
+        objects: Dict[str, Dict[str, SimulatorAttribute]],
     ) -> numpy.ndarray:
         """
         Flatten attribute values into a NumPy array.
 
-        :param objects: Dict[str, Dict[str, MultiverseAttribute]], objects with attributes
+        :param objects: Dict[str, Dict[str, SimulatorAttribute]], objects with attributes
         :return: numpy.ndarray, flattened attribute values
         """
         return numpy.array(
@@ -173,7 +171,7 @@ class MultiverseViewer:
         )
 
     @property
-    def write_objects(self) -> Dict[str, Dict[str, MultiverseAttribute]]:
+    def write_objects(self) -> Dict[str, Dict[str, SimulatorAttribute]]:
         self._update_objects_from_data(self._write_objects, self.write_data)
         return self._write_objects
 
@@ -181,7 +179,7 @@ class MultiverseViewer:
     def write_objects(
         self,
         send_objects: Dict[
-            str, Dict[str, Union[numpy.ndarray, List[float], MultiverseAttribute]]
+            str, Dict[str, Union[numpy.ndarray, List[float], SimulatorAttribute]]
         ],
     ):
         number_of_envs = self.write_data.shape[0]
@@ -191,7 +189,7 @@ class MultiverseViewer:
         assert self.write_data.shape[0] == self.read_data.shape[0]
 
     @property
-    def read_objects(self) -> Dict[str, Dict[str, MultiverseAttribute]]:
+    def read_objects(self) -> Dict[str, Dict[str, SimulatorAttribute]]:
         self._update_objects_from_data(self._read_objects, self.read_data)
         return self._read_objects
 
@@ -199,7 +197,7 @@ class MultiverseViewer:
     def read_objects(
         self,
         objects: Dict[
-            str, Dict[str, Union[numpy.ndarray, List[float], MultiverseAttribute]]
+            str, Dict[str, Union[numpy.ndarray, List[float], SimulatorAttribute]]
         ],
     ):
         number_of_envs = self.read_data.shape[0]
@@ -211,14 +209,14 @@ class MultiverseViewer:
     @staticmethod
     def _get_objects_and_data_from_target_objects(
         target_objects: Dict[
-            str, Dict[str, Union[numpy.ndarray, List[float], MultiverseAttribute]]
+            str, Dict[str, Union[numpy.ndarray, List[float], SimulatorAttribute]]
         ],
         number_of_envs: int,
-    ) -> Tuple[Dict[str, Dict[str, MultiverseAttribute]], numpy.ndarray]:
+    ) -> Tuple[Dict[str, Dict[str, SimulatorAttribute]], numpy.ndarray]:
         """
         Update object attribute values from the target objects.
 
-        :param target_objects: Dict[str, Dict[str, Union[numpy.ndarray, List[float], MultiverseAttribute]]], target objects
+        :param target_objects: Dict[str, Dict[str, Union[numpy.ndarray, List[float], SimulatorAttribute]]], target objects
         :param number_of_envs: int, number of environments
         """
         if any(
@@ -227,7 +225,7 @@ class MultiverseViewer:
             for value in values.values()
         ):
             objects = (
-                MultiverseViewer.from_array(target_objects)
+                SimulatorViewer.from_array(target_objects)
                 if target_objects is not None
                 else {}
             )
@@ -252,12 +250,12 @@ class MultiverseViewer:
 
     @staticmethod
     def _update_objects_from_data(
-        objects: Dict[str, Dict[str, MultiverseAttribute]], data: numpy.ndarray
+        objects: Dict[str, Dict[str, SimulatorAttribute]], data: numpy.ndarray
     ):
         """
         Update object attribute values from the data array.
 
-        :param objects: Dict[str, List[MultiverseAttribute]], objects with attributes
+        :param objects: Dict[str, List[SimulatorAttribute]], objects with attributes
         """
         for i, values in enumerate(data):
             j = 0
@@ -292,15 +290,21 @@ class MultiverseViewer:
 
 
 @dataclass
-class MultiverseCallbackResult:
-    """Multiverse Function Result Enum"""
-
+class SimulatorCallbackResult:
     class OutType(str, Enum):
+        """
+        Output type for SimulatorCallbackResult
+        """
+
         MUJOCO = "mujoco"
         PYBULLET = "pybullet"
         ISAACSIM = "isaacsim"
 
     class ResultType(Enum):
+        """
+        Result type for SimulatorCallbackResult
+        """
+
         SUCCESS_WITHOUT_EXECUTION = 0
         SUCCESS_AFTER_EXECUTION_ON_MODEL = 1
         SUCCESS_AFTER_EXECUTION_ON_DATA = 2
@@ -322,34 +326,34 @@ class MultiverseCallbackResult:
         return self
 
 
-class MultiverseCallback:
-    """Base class for Multiverse Callback"""
+class SimulatorCallback:
+    """Base class for Simulator Callback"""
 
     def __init__(self, callback: Callable):
         """
         Initialize the function with the callback
 
-        :param callback: Callable, callback function, must return MultiverseCallbackResult
+        :param callback: Callable, callback function, must return SimulatorCallbackResult
         """
         self._call = callback
         self.__name__ = callback.__name__
 
     def __call__(self, *args, render: bool = True, **kwargs):
         result = self._call(*args, **kwargs)
-        if not isinstance(result, MultiverseCallbackResult):
-            raise TypeError("Callback function must return MultiverseCallbackResult")
+        if not isinstance(result, SimulatorCallbackResult):
+            raise TypeError("Callback function must return SimulatorCallbackResult")
         simulator = args[0]
-        if not isinstance(simulator, MultiverseSimulator):
-            raise TypeError("First argument must be of type MultiverseSimulator")
+        if not isinstance(simulator, BaseSimulator):
+            raise TypeError("First argument must be of type BaseSimulator")
         if render:
             simulator.renderer.sync()
         return result
 
 
-class MultiverseSimulator:
-    """Base class for Multiverse Simulator"""
+class BaseSimulator:
+    """Base class for Base Simulator"""
 
-    name: str = "Multiverse Simulation"
+    name: str = "Base Simulation"
     """Name of the simulator"""
 
     ext: str = ""
@@ -364,43 +368,43 @@ class MultiverseSimulator:
     logger: logging.Logger = logging.getLogger(__name__)
     """Logger for the simulator"""
 
-    class_level_callbacks: List[MultiverseCallback] = []
+    class_level_callbacks: List[SimulatorCallback] = []
     """Class level callback functions"""
 
-    instance_level_callbacks: List[MultiverseCallback] = None
+    instance_level_callbacks: List[SimulatorCallback] = None
     """Instance level callback functions"""
 
     def __init__(
         self,
-        viewer: Optional[MultiverseViewer] = None,
+        viewer: Optional[SimulatorViewer] = None,
         number_of_envs: int = 1,
         headless: bool = False,
         real_time_factor: float = 1.0,
         step_size: float = 1e-3,
-        callbacks: List[MultiverseCallback] = None,
+        callbacks: List[SimulatorCallback] = None,
         **kwargs,
     ):
         """
         Initialize the simulator with the viewer and the following keyword arguments:
 
-        :param viewer: MultiverseViewer, viewer for the simulator
+        :param viewer: SimulatorViewer, viewer for the simulator
         :param number_of_envs: int, number of environments
         :param headless: bool, True to run the simulator in headless mode
         :param real_time_factor: float, real time factor
         :param step_size: float, step size
-        :param callbacks: List[MultiverseCallback], list of callback functions
+        :param callbacks: List[SimulatorCallback], list of callback functions
         """
         self._headless = headless
         self._real_time_factor = real_time_factor
         self._step_size = step_size
         self._current_number_of_steps = 0
         self._start_real_time = self.current_real_time
-        self._state = MultiverseSimulatorState.STOPPED
+        self._state = SimulatorState.STOPPED
         self._stop_reason = None
         self._viewer = (
             viewer.initialize_data(number_of_envs) if viewer is not None else None
         )
-        self._renderer = MultiverseRenderer()
+        self._renderer = SimulatorRenderer()
         self._current_render_time = self.current_real_time
         self.instance_level_callbacks = []
         if callbacks is not None:
@@ -426,16 +430,16 @@ class MultiverseSimulator:
         self,
         simulate_in_thread: bool = True,
         render_in_thread: bool = False,
-        constraints: MultiverseSimulatorConstraints = None,
+        constraints: SimulatorConstraints = None,
         time_out_in_seconds: float = 10.0,
     ):
         """
         Start the simulator, if run_in_thread is True, run the simulator in a thread until the constraints are met
 
-        :param constraints: MultiverseSimulatorConstraints, constraints for stopping the simulator
+        :param constraints: SimulatorConstraints, constraints for stopping the simulator
         :param simulate_in_thread: bool, True to simulate the simulator in a thread
         :param render_in_thread: bool, True to render the simulator in a thread
-        :param constraints: MultiverseSimulatorConstraints, constraints for stopping the simulator
+        :param constraints: SimulatorConstraints, constraints for stopping the simulator
         :param time_out_in_seconds: float, timeout for starting the renderer
         """
         self.start_callback()
@@ -451,7 +455,7 @@ class MultiverseSimulator:
             return
         self._current_number_of_steps = 0
         self._start_real_time = self.current_real_time
-        self._state = MultiverseSimulatorState.RUNNING
+        self._state = SimulatorState.RUNNING
         self._stop_reason = None
         if simulate_in_thread:
             self.simulation_thread = Thread(target=self.run, args=(constraints,))
@@ -467,23 +471,23 @@ class MultiverseSimulator:
             self.render_thread = Thread(target=render)
             self.render_thread.start()
 
-    def run(self, constraints: MultiverseSimulatorConstraints = None):
+    def run(self, constraints: SimulatorConstraints = None):
         """
         Run the simulator while the state is RUNNING or until the constraints are met.
 
-        :param constraints: MultiverseSimulatorConstraints, constraints for stopping the simulator
+        :param constraints: SimulatorConstraints, constraints for stopping the simulator
         """
         with self.renderer:
-            while self.state != MultiverseSimulatorState.STOPPED:
+            while self.state != SimulatorState.STOPPED:
                 self._stop_reason = self.should_stop(constraints)
                 if self.stop_reason is not None:
-                    self._state = MultiverseSimulatorState.STOPPED
+                    self._state = SimulatorState.STOPPED
                     break
-                if self.state == MultiverseSimulatorState.RUNNING:
+                if self.state == SimulatorState.RUNNING:
                     if self.current_simulation_time == 0.0:
                         self.reset()
                     self.step()
-                elif self.state == MultiverseSimulatorState.PAUSED:
+                elif self.state == SimulatorState.PAUSED:
                     self.pause_callback()
                 if (
                     self.render_thread is None
@@ -503,7 +507,7 @@ class MultiverseSimulator:
         self.pre_step_callback()
         last_simulation_time = (
             self.current_simulation_time
-            if self.state == MultiverseSimulatorState.RUNNING
+            if self.state == SimulatorState.RUNNING
             else None
         )
         if self._viewer is not None:
@@ -512,7 +516,7 @@ class MultiverseSimulator:
             self.read_data_from_simulator(read_data=self._viewer.read_data)
         else:
             self.step_callback()
-        if self.state == MultiverseSimulatorState.RUNNING and not numpy.isclose(
+        if self.state == SimulatorState.RUNNING and not numpy.isclose(
             self.current_simulation_time - last_simulation_time, self.step_size
         ):
             self.log_warning(
@@ -557,27 +561,27 @@ class MultiverseSimulator:
             self.renderer.close()
         if self.render_thread is not None and self.render_thread.is_alive():
             self.render_thread.join()
-        self._state = MultiverseSimulatorState.STOPPED
+        self._state = SimulatorState.STOPPED
         if self.simulation_thread is not None and self.simulation_thread.is_alive():
             self.simulation_thread.join()
-        self._stop_reason = MultiverseSimulatorStopReason.STOP
+        self._stop_reason = SimulatorStopReason.STOP
 
     def pause(self):
         """
         Pause the simulator. It doesn't pause the renderer.
         """
-        if self.state != MultiverseSimulatorState.RUNNING:
+        if self.state != SimulatorState.RUNNING:
             self.log_warning("Cannot pause when the simulator is not running")
         else:
-            self._state = MultiverseSimulatorState.PAUSED
+            self._state = SimulatorState.PAUSED
 
     def unpause(self):
         """
         Unpause the simulator and run the simulator.
         """
-        if self.state == MultiverseSimulatorState.PAUSED:
+        if self.state == SimulatorState.PAUSED:
             self.unpause_callback()
-            self._state = MultiverseSimulatorState.RUNNING
+            self._state = SimulatorState.RUNNING
         else:
             self.log_warning("Cannot unpause when the simulator is not paused")
 
@@ -591,12 +595,12 @@ class MultiverseSimulator:
         self._start_real_time = self.current_real_time
 
     def should_stop(
-        self, constraints: MultiverseSimulatorConstraints = None
-    ) -> Optional[MultiverseSimulatorStopReason]:
+        self, constraints: SimulatorConstraints = None
+    ) -> Optional[SimulatorStopReason]:
         """
         Check if the simulator should stop based on the constraints.
 
-        :param constraints: MultiverseSimulatorConstraints, constraints for stopping the simulator
+        :param constraints: SimulatorConstraints, constraints for stopping the simulator
 
         :return: bool, True if the simulator should stop, False otherwise
         """
@@ -609,7 +613,7 @@ class MultiverseSimulator:
                 self.log_info(
                     f"Stopping simulation because max_real_time [{constraints.max_real_time}] reached"
                 )
-                return MultiverseSimulatorStopReason.MAX_REAL_TIME
+                return SimulatorStopReason.MAX_REAL_TIME
             if (
                 constraints.max_simulation_time is not None
                 and self.current_simulation_time >= constraints.max_simulation_time
@@ -617,7 +621,7 @@ class MultiverseSimulator:
                 self.log_info(
                     f"Stopping simulation because max_simulation_time [{constraints.max_simulation_time}] reached"
                 )
-                return MultiverseSimulatorStopReason.MAX_SIMULATION_TIME
+                return SimulatorStopReason.MAX_SIMULATION_TIME
             if (
                 constraints.max_number_of_steps is not None
                 and self.current_number_of_steps >= constraints.max_number_of_steps
@@ -625,7 +629,7 @@ class MultiverseSimulator:
                 self.log_info(
                     f"Stopping simulation because max_number_of_steps [{constraints.max_number_of_steps}] reached"
                 )
-                return MultiverseSimulatorStopReason.MAX_NUMBER_OF_STEPS
+                return SimulatorStopReason.MAX_NUMBER_OF_STEPS
         return self.should_stop_callback()
 
     def start_callback(self):
@@ -633,7 +637,7 @@ class MultiverseSimulator:
         This function is called when the simulator starts. It initializes the current simulation time and the renderer.
         """
         self._current_simulation_time = 0.0
-        self._renderer = MultiverseRenderer()
+        self._renderer = SimulatorRenderer()
 
     def render(self):
         self.renderer.sync()
@@ -685,7 +689,7 @@ class MultiverseSimulator:
         This function is called after the step function.
         It increments the current simulation time and the current number of steps.
         """
-        if self.state == MultiverseSimulatorState.RUNNING:
+        if self.state == SimulatorState.RUNNING:
             self._current_simulation_time += self.step_size
             self._current_number_of_steps += 1
 
@@ -719,15 +723,13 @@ class MultiverseSimulator:
         """
         self._current_simulation_time = 0.0
 
-    def should_stop_callback(self) -> Optional[MultiverseSimulatorStopReason]:
+    def should_stop_callback(self) -> Optional[SimulatorStopReason]:
         """
         This function is called when the simulator should stop.
-        It returns None if the renderer is running, otherwise it returns MultiverseSimulatorStopReason.VIEWER_IS_CLOSED.
+        It returns None if the renderer is running, otherwise it returns SimulatorStopReason.VIEWER_IS_CLOSED.
         """
         return (
-            None
-            if self.renderer.is_running()
-            else MultiverseSimulatorStopReason.VIEWER_IS_CLOSED
+            None if self.renderer.is_running() else SimulatorStopReason.VIEWER_IS_CLOSED
         )
 
     @classmethod
@@ -751,11 +753,11 @@ class MultiverseSimulator:
         return self._step_size
 
     @property
-    def state(self) -> MultiverseSimulatorState:
+    def state(self) -> SimulatorState:
         return self._state
 
     @property
-    def stop_reason(self) -> MultiverseSimulatorStopReason:
+    def stop_reason(self) -> SimulatorStopReason:
         return self._stop_reason
 
     @property
@@ -775,21 +777,21 @@ class MultiverseSimulator:
         return self._current_number_of_steps
 
     @property
-    def renderer(self) -> MultiverseRenderer:
+    def renderer(self) -> SimulatorRenderer:
         return self._renderer
 
     @classmethod
     def add_callback(
         cls,
-        callback: Union[Callable, MultiverseCallback],
-        callbacks: List[MultiverseCallback],
+        callback: Union[Callable, SimulatorCallback],
+        callbacks: List[SimulatorCallback],
     ):
-        if not isinstance(callback, MultiverseCallback):
+        if not isinstance(callback, SimulatorCallback):
             if isinstance(callback, Callable):
-                callback = MultiverseCallback(callback=callback)
+                callback = SimulatorCallback(callback=callback)
             else:
                 raise TypeError(
-                    f"Function {callback} must be an instance of MultiverseCallback or Callable, "
+                    f"Function {callback} must be an instance of SimulatorCallback or Callable, "
                     f"got {type(callback)}"
                 )
         if callback.__name__ in [callback.__name__ for callback in callbacks]:
@@ -797,14 +799,14 @@ class MultiverseSimulator:
         callbacks.append(callback)
         cls.log_info(f"Function {callback.__name__} is registered")
 
-    def add_instance_callback(self, callback: Union[Callable, MultiverseCallback]):
+    def add_instance_callback(self, callback: Union[Callable, SimulatorCallback]):
         self.add_callback(callback, self.instance_level_callbacks)
 
     @classmethod
-    def add_class_callback(cls, callback: Union[Callable, MultiverseCallback]):
+    def add_class_callback(cls, callback: Union[Callable, SimulatorCallback]):
         cls.add_callback(callback, cls.class_level_callbacks)
 
     @classmethod
-    def multiverse_callback(cls, callback):
+    def simulator_callback(cls, callback):
         cls.add_class_callback(callback)
         return callback

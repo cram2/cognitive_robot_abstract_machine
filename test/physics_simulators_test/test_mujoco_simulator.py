@@ -4,14 +4,14 @@ import unittest
 
 import numpy
 import mujoco
-from mujoco_connector import MultiverseMujocoConnector
-from multiverse_simulator import (
-    MultiverseSimulatorConstraints,
-    MultiverseSimulatorState,
-    MultiverseViewer,
-    MultiverseCallbackResult,
+from mujoco_simulator import MujocoSimulator
+from base_simulator import (
+    SimulatorConstraints,
+    SimulatorState,
+    SimulatorViewer,
+    SimulatorCallbackResult,
 )
-from test_multiverse_simulator import MultiverseSimulatorTestCase
+from test_base_simulator import BaseSimulatorTestCase
 
 resources_path = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -25,9 +25,9 @@ headless = os.environ.get("CI", "false").lower() == "true"
 # headless = False
 
 
-class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
+class MujocoSimulatorTestCase(BaseSimulatorTestCase):
     file_path = os.path.join(resources_path, "floor.xml")
-    Simulator = MultiverseMujocoConnector
+    Simulator = MujocoSimulator
     headless = headless
     step_size = 1e-3
 
@@ -42,10 +42,10 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
         for step in range(4000):
             if step < 1000:
                 result = simulator.callbacks["get_all_body_names"]()
-                self.assertIsInstance(result, MultiverseCallbackResult)
+                self.assertIsInstance(result, SimulatorCallbackResult)
                 self.assertEqual(
                     result.type,
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                 )
                 self.assertEqual(
                     result.result,
@@ -68,10 +68,10 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                 )
 
                 result = simulator.callbacks["get_all_joint_names"]()
-                self.assertIsInstance(result, MultiverseCallbackResult)
+                self.assertIsInstance(result, SimulatorCallbackResult)
                 self.assertEqual(
                     result.type,
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                 )
                 self.assertEqual(
                     result.result,
@@ -91,21 +91,21 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
             if step == 1000 or step == 3000:
                 result = simulator.callbacks["attach"](body_1_name="abc")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.FAILURE_BEFORE_EXECUTION_ON_MODEL,
+                    SimulatorCallbackResult.ResultType.FAILURE_BEFORE_EXECUTION_ON_MODEL,
                     result.type,
                 )
                 self.assertEqual("Body 1 abc not found", result.info)
 
                 result = simulator.callbacks["attach"](body_1_name="world")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.FAILURE_BEFORE_EXECUTION_ON_MODEL,
+                    SimulatorCallbackResult.ResultType.FAILURE_BEFORE_EXECUTION_ON_MODEL,
                     result.type,
                 )
                 self.assertEqual("Body 1 and body 2 are the same", result.info)
 
                 result = simulator.callbacks["attach"](body_1_name="box")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertEqual(
@@ -116,7 +116,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     body_1_name="box", body_2_name="hand"
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL,
+                    SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL,
                     result.type,
                 )
                 self.assertIn("Attached body 1 box to body 2 hand", result.info)
@@ -125,14 +125,14 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     body_1_name="box", body_2_name="left_finger"
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL,
+                    SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL,
                     result.type,
                 )
                 result = simulator.enable_contact(
                     body_1_name="box", body_2_name="right_finger"
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL,
+                    SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL,
                     result.type,
                 )
 
@@ -140,7 +140,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     body_1_name="box", body_2_name="hand"
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertEqual(
@@ -150,7 +150,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
             if step == 1200:
                 result = simulator.callbacks["get_joint_value"](joint_name="joint1")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, float)
@@ -160,7 +160,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     joint_names=["joint1", "joint2"]
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, dict)
@@ -173,7 +173,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
 
                 result = simulator.callbacks["get_body_position"](body_name="box")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, numpy.ndarray)
@@ -181,7 +181,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
 
                 result = simulator.callbacks["get_body_quaternion"](body_name="box")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, numpy.ndarray)
@@ -191,7 +191,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     body_names=["box", "link0"]
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, dict)
@@ -206,7 +206,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     body_names=["box", "link0"]
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, dict)
@@ -223,13 +223,13 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     body_name="box", position=box_position
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
+                    SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
                     result.type,
                 )
 
                 result = simulator.callbacks["get_body_position"](body_name="box")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, numpy.ndarray)
@@ -240,7 +240,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     bodies_positions={"box": box_position}
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
+                    SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
                     result.type,
                 )
 
@@ -253,13 +253,13 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     body_name="box", quaternion=box_quaternion
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
+                    SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
                     result.type,
                 )
 
                 result = simulator.callbacks["get_body_quaternion"](body_name="box")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, numpy.ndarray)
@@ -271,7 +271,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     bodies_quaternions={"box": box_quaternion}
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
+                    SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
                     result.type,
                 )
 
@@ -283,13 +283,13 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     joint_name="joint1", value=joint1_value
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
+                    SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
                     result.type,
                 )
 
                 result = simulator.callbacks["get_joint_value"](joint_name="joint1")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, float)
@@ -300,7 +300,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     joints_values=joints_values
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
+                    SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
                     result.type,
                 )
 
@@ -308,7 +308,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     joint_names=["joint1", "joint2"]
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, dict)
@@ -322,13 +322,13 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
             if step == 1550:
                 result = simulator.callbacks["save"](key_name="step_1550")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.key_id = result.result
                 result = simulator.callbacks["load"](key_id=self.key_id)
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
+                    SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
                     result.type,
                 )
                 self.assertEqual(self.key_id, result.result)
@@ -343,7 +343,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     file_path=self.save_file_path, key_name="step_1570"
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.key_id = result.result
@@ -351,7 +351,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     file_path=self.save_file_path, key_id=self.key_id
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
+                    SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
                     result.type,
                 )
                 self.assertEqual(self.key_id, result.result)
@@ -359,28 +359,28 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
             if step == 2000 or step == 4000:
                 result = simulator.callbacks["detach"](body_name="abc")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.FAILURE_BEFORE_EXECUTION_ON_MODEL,
+                    SimulatorCallbackResult.ResultType.FAILURE_BEFORE_EXECUTION_ON_MODEL,
                     result.type,
                 )
                 self.assertEqual("Body abc not found", result.info)
 
                 result = simulator.callbacks["detach"](body_name="world")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertEqual("Body world is already detached", result.info)
 
                 result = simulator.callbacks["detach"](body_name="box")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL,
+                    SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL,
                     result.type,
                 )
                 self.assertEqual("Detached body box from body hand", result.info)
 
                 result = simulator.callbacks["detach"](body_name="box")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertEqual("Body box is already detached", result.info)
@@ -388,14 +388,14 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
             if step == 8000:
                 result = simulator.callbacks["get_contact_bodies"](body_name="abc")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.FAILURE_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.FAILURE_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertEqual("Body abc not found", result.info)
 
                 result = simulator.callbacks["get_contact_bodies"](body_name="hand")
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, set)
@@ -403,7 +403,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
             if step == 100:
                 result = simulator.callbacks["get_contact_points"](body_names=["abc"])
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.FAILURE_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.FAILURE_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertEqual("Body abc not found", result.info)
@@ -412,7 +412,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     body_names=["box", "hand"]
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, list)
@@ -420,7 +420,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
 
                 result = simulator.callbacks["get_contact_points"](body_names=["world"])
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertIsInstance(result.result, list)
@@ -431,7 +431,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     ray_from_position=[0.7, 0.0, 1.0], ray_to_position=[0.7, 0.0, 0.0]
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
 
@@ -439,7 +439,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     ray_from_position=[0.7, 0.0, 0.2], ray_to_position=[0.7, 0.0, 0.0]
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
 
@@ -448,7 +448,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                     ray_to_positions=[[0.7, 0.0, 1.0], [0.7, 0.0, 0.0]],
                 )
                 self.assertEqual(
-                    MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+                    SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
                     result.type,
                 )
                 self.assertAlmostEqual(
@@ -461,66 +461,66 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
 
 
 # @unittest.skip("This test is not meant to be run in CI")
-class MultiverseMujocoConnectorComplexTestCase(MultiverseMujocoConnectorBaseTestCase):
+class MujocoSimulatorComplexTestCase(MujocoSimulatorTestCase):
     file_path = os.path.join(resources_path, "mjx_single_cube_no_mesh.xml")
-    Simulator = MultiverseMujocoConnector
+    Simulator = MujocoSimulator
     headless = headless
     step_size = 5e-4
 
     def test_running_in_10s_in_1(self):
-        simulator = self.test_initialize_multiverse_simulator()
-        constraints = MultiverseSimulatorConstraints(max_real_time=10.0)
+        simulator = self.test_initialize_simulator()
+        constraints = SimulatorConstraints(max_real_time=10.0)
         simulator.start(
             constraints=constraints, simulate_in_thread=True, render_in_thread=True
         )
-        while simulator.state != MultiverseSimulatorState.STOPPED:
+        while simulator.state != SimulatorState.STOPPED:
             time.sleep(1)
-        self.assertIs(simulator.state, MultiverseSimulatorState.STOPPED)
+        self.assertIs(simulator.state, SimulatorState.STOPPED)
 
     def test_running_in_10s_2(self):
-        simulator = self.test_initialize_multiverse_simulator()
-        constraints = MultiverseSimulatorConstraints(max_real_time=10.0)
+        simulator = self.test_initialize_simulator()
+        constraints = SimulatorConstraints(max_real_time=10.0)
         simulator.start(
             constraints=constraints, simulate_in_thread=True, render_in_thread=False
         )
-        while simulator.state != MultiverseSimulatorState.STOPPED:
+        while simulator.state != SimulatorState.STOPPED:
             time.sleep(1)
-        self.assertIs(simulator.state, MultiverseSimulatorState.STOPPED)
+        self.assertIs(simulator.state, SimulatorState.STOPPED)
 
     def test_running_in_10s_3(self):
-        simulator = self.test_initialize_multiverse_simulator()
-        constraints = MultiverseSimulatorConstraints(max_real_time=10.0)
+        simulator = self.test_initialize_simulator()
+        constraints = SimulatorConstraints(max_real_time=10.0)
         simulator.start(
             constraints=constraints, simulate_in_thread=False, render_in_thread=True
         )
-        while simulator.state != MultiverseSimulatorState.STOPPED:
+        while simulator.state != SimulatorState.STOPPED:
             simulator.step()
             time.sleep(0.001)
             if simulator.current_number_of_steps == 10000:
                 simulator.stop()
-        self.assertIs(simulator.state, MultiverseSimulatorState.STOPPED)
+        self.assertIs(simulator.state, SimulatorState.STOPPED)
 
     def test_running_in_10s_4(self):
-        simulator = self.test_initialize_multiverse_simulator()
-        constraints = MultiverseSimulatorConstraints(max_real_time=10.0)
+        simulator = self.test_initialize_simulator()
+        constraints = SimulatorConstraints(max_real_time=10.0)
         simulator.start(
             constraints=constraints, simulate_in_thread=False, render_in_thread=False
         )
-        while simulator.state != MultiverseSimulatorState.STOPPED:
+        while simulator.state != SimulatorState.STOPPED:
             simulator.step()
             simulator.render()
             time.sleep(0.001)
             if simulator.current_number_of_steps == 10000:
                 simulator.stop()
-        self.assertIs(simulator.state, MultiverseSimulatorState.STOPPED)
+        self.assertIs(simulator.state, SimulatorState.STOPPED)
 
     def test_running_2_simulators(self):
-        simulator1 = self.test_initialize_multiverse_simulator()
+        simulator1 = self.test_initialize_simulator()
         simulator1.start(simulate_in_thread=False, render_in_thread=True)
         self.headless = True
-        simulator2 = self.test_initialize_multiverse_simulator()
+        simulator2 = self.test_initialize_simulator()
         simulator2.start(simulate_in_thread=False)
-        simulator3 = self.test_initialize_multiverse_simulator()
+        simulator3 = self.test_initialize_simulator()
         simulator3.start(simulate_in_thread=False)
         for step in range(10000):
             simulator1.step()
@@ -529,9 +529,9 @@ class MultiverseMujocoConnectorComplexTestCase(MultiverseMujocoConnectorBaseTest
         simulator1.stop()
         simulator2.stop()
         simulator3.stop()
-        self.assertIs(simulator1.state, MultiverseSimulatorState.STOPPED)
-        self.assertIs(simulator2.state, MultiverseSimulatorState.STOPPED)
-        self.assertIs(simulator3.state, MultiverseSimulatorState.STOPPED)
+        self.assertIs(simulator1.state, SimulatorState.STOPPED)
+        self.assertIs(simulator2.state, SimulatorState.STOPPED)
+        self.assertIs(simulator3.state, SimulatorState.STOPPED)
 
     def test_running_in_10s_with_viewer(self):
         write_objects = {
@@ -551,14 +551,12 @@ class MultiverseMujocoConnectorComplexTestCase(MultiverseMujocoConnectorBaseTest
             "actuator2": {"cmd_joint_angular_position": [0.0]},
             "world": {"energy": [0.0, 0.0]},
         }
-        viewer = MultiverseViewer(
-            write_objects=write_objects, read_objects=read_objects
-        )
-        simulator = self.test_initialize_multiverse_simulator(viewer=viewer)
-        constraints = MultiverseSimulatorConstraints(max_simulation_time=10.0)
+        viewer = SimulatorViewer(write_objects=write_objects, read_objects=read_objects)
+        simulator = self.test_initialize_simulator(viewer=viewer)
+        constraints = SimulatorConstraints(max_simulation_time=10.0)
         simulator.start(constraints=constraints)
         use_write_data = False
-        while simulator.state != MultiverseSimulatorState.STOPPED:
+        while simulator.state != SimulatorState.STOPPED:
             time_now = time.time()
             f = 0.5
             act_1_value = numpy.pi / 6 * numpy.sin(2.0 * numpy.pi * f * time_now)
@@ -592,11 +590,11 @@ class MultiverseMujocoConnectorComplexTestCase(MultiverseMujocoConnectorBaseTest
                     act_2_value,
                     places=0,
                 )
-        self.assertIs(simulator.state, MultiverseSimulatorState.STOPPED)
+        self.assertIs(simulator.state, SimulatorState.STOPPED)
 
     def test_read_and_write_data_in_the_loop(self):
-        viewer = MultiverseViewer()
-        simulator = self.test_initialize_multiverse_simulator(viewer=viewer)
+        viewer = SimulatorViewer()
+        simulator = self.test_initialize_simulator(viewer=viewer)
         simulator.start(simulate_in_thread=False)
         for step in range(10000):
             if step == 100:
@@ -759,7 +757,7 @@ class MultiverseMujocoConnectorComplexTestCase(MultiverseMujocoConnectorBaseTest
             else:
                 self.assertEqual(viewer.read_data.shape, (1, 0))
         simulator.stop()
-        self.assertIs(simulator.state, MultiverseSimulatorState.STOPPED)
+        self.assertIs(simulator.state, SimulatorState.STOPPED)
 
 
 if __name__ == "__main__":

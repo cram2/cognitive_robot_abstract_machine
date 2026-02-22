@@ -22,15 +22,10 @@ from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body, Region, Actuator
 
-try:
-    multi_sim_found = True
-    from mujoco_connector import MultiverseMujocoConnector
-    from multiverse_simulator import MultiverseSimulatorState, MultiverseViewer
-    from semantic_digital_twin.adapters.mjcf import MJCFParser
-    from semantic_digital_twin.adapters.multi_sim import MujocoSim, MujocoActuator
-except ImportError:
-    MultiverseMujocoConnector = None
-    multi_sim_found = False
+from mujoco_simulator import MujocoSimulator
+from base_simulator import SimulatorState, SimulatorViewer
+from semantic_digital_twin.adapters.mjcf import MJCFParser
+from semantic_digital_twin.adapters.multi_sim import MujocoSim, MujocoActuator
 
 urdf_dir = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -62,23 +57,23 @@ only_run_test_in_CI = os.environ.get("CI", "false").lower() == "false"
 
 
 @unittest.skipIf(
-    only_run_test_in_CI or not multi_sim_found,
+    only_run_test_in_CI,
     "Only run test in CI or multisim could not be imported.",
 )
 class MujocoSimReadWriteTestCase(unittest.TestCase):
     file_path = os.path.normpath(os.path.join(mjcf_dir, "mjx_single_cube_no_mesh.xml"))
-    Simulator = MultiverseMujocoConnector
+    Simulator = MujocoSimulator
     step_size = 5e-4
 
     def test_read_and_write_data_in_the_loop(self):
-        viewer = MultiverseViewer()
+        viewer = SimulatorViewer()
         simulator = self.Simulator(
             viewer=viewer,
             file_path=self.file_path,
             headless=headless,
             step_size=self.step_size,
         )
-        self.assertIs(simulator.state, MultiverseSimulatorState.STOPPED)
+        self.assertIs(simulator.state, SimulatorState.STOPPED)
         self.assertIs(simulator.headless, headless)
         self.assertIsNone(simulator.stop_reason)
         self.assertIsNone(simulator.simulation_thread)
@@ -223,11 +218,11 @@ class MujocoSimReadWriteTestCase(unittest.TestCase):
             else:
                 self.assertEqual(viewer.read_data.shape, (1, 0))
         simulator.stop()
-        self.assertIs(simulator.state, MultiverseSimulatorState.STOPPED)
+        self.assertIs(simulator.state, SimulatorState.STOPPED)
 
 
 @unittest.skipIf(
-    only_run_test_in_CI or not multi_sim_found,
+    only_run_test_in_CI,
     "Only run test in CI or multisim could not be imported.",
 )
 class MujocoSimTestCase(unittest.TestCase):
@@ -249,9 +244,9 @@ class MujocoSimTestCase(unittest.TestCase):
 
     def test_empty_multi_sim_in_5s(self):
         world = World()
-        viewer = MultiverseViewer()
+        viewer = SimulatorViewer()
         multi_sim = MujocoSim(viewer=viewer, world=world, headless=headless)
-        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIsInstance(multi_sim.simulator, MujocoSimulator)
         self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
@@ -262,11 +257,11 @@ class MujocoSimTestCase(unittest.TestCase):
         self.assertGreaterEqual(time.time() - start_time, 5.0)
 
     def test_world_multi_sim_in_5s(self):
-        viewer = MultiverseViewer()
+        viewer = SimulatorViewer()
         multi_sim = MujocoSim(
             viewer=viewer, world=self.test_urdf_1_world, headless=headless
         )
-        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIsInstance(multi_sim.simulator, MujocoSimulator)
         self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
@@ -283,11 +278,11 @@ class MujocoSimTestCase(unittest.TestCase):
             ).parse()
         except ParsingError:
             self.skipTest("Skipping HSRB krrood_test due to URDF parsing error.")
-        viewer = MultiverseViewer()
+        viewer = SimulatorViewer()
         multi_sim = MujocoSim(
             viewer=viewer, world=self.test_urdf_2_world, headless=headless
         )
-        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIsInstance(multi_sim.simulator, MujocoSimulator)
         self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
@@ -298,11 +293,11 @@ class MujocoSimTestCase(unittest.TestCase):
         self.assertGreaterEqual(time.time() - start_time, 5.0)
 
     def test_world_multi_sim_with_change(self):
-        viewer = MultiverseViewer()
+        viewer = SimulatorViewer()
         multi_sim = MujocoSim(
             viewer=viewer, world=self.test_urdf_1_world, headless=headless
         )
-        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIsInstance(multi_sim.simulator, MujocoSimulator)
         self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
@@ -401,14 +396,14 @@ class MujocoSimTestCase(unittest.TestCase):
         multi_sim.stop_simulation()
 
     def test_multi_sim_in_5s(self):
-        viewer = MultiverseViewer()
+        viewer = SimulatorViewer()
         multi_sim = MujocoSim(
             world=self.test_mjcf_1_world,
             viewer=viewer,
             headless=headless,
             step_size=self.step_size,
         )
-        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIsInstance(multi_sim.simulator, MujocoSimulator)
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
@@ -432,14 +427,14 @@ class MujocoSimTestCase(unittest.TestCase):
             "world": {"energy": [0.0, 0.0]},
             "box": {"position": [0.0, 0.0, 0.0], "quaternion": [1.0, 0.0, 0.0, 0.0]},
         }
-        viewer = MultiverseViewer(read_objects=read_objects)
+        viewer = SimulatorViewer(read_objects=read_objects)
         multi_sim = MujocoSim(
             world=self.test_mjcf_1_world,
             viewer=viewer,
             headless=headless,
             step_size=self.step_size,
         )
-        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIsInstance(multi_sim.simulator, MujocoSimulator)
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
@@ -454,14 +449,14 @@ class MujocoSimTestCase(unittest.TestCase):
 
     def test_write_objects_to_multi_sim_in_5s(self):
         write_objects = {"box": {"position": [0.0, 0.0, 0.0]}}
-        viewer = MultiverseViewer(write_objects=write_objects)
+        viewer = SimulatorViewer(write_objects=write_objects)
         multi_sim = MujocoSim(
             world=self.test_mjcf_1_world,
             viewer=viewer,
             headless=headless,
             step_size=self.step_size,
         )
-        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIsInstance(multi_sim.simulator, MujocoSimulator)
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
@@ -485,14 +480,14 @@ class MujocoSimTestCase(unittest.TestCase):
         write_objects = {
             "box": {"position": [0.0, 0.0, 0.0], "quaternion": [1.0, 0.0, 0.0, 0.0]}
         }
-        viewer = MultiverseViewer()
+        viewer = SimulatorViewer()
         multi_sim = MujocoSim(
             world=self.test_mjcf_1_world,
             viewer=viewer,
             headless=headless,
             step_size=self.step_size,
         )
-        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIsInstance(multi_sim.simulator, MujocoSimulator)
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
@@ -520,7 +515,7 @@ class MujocoSimTestCase(unittest.TestCase):
         write_objects = {
             "box": {"position": [0.0, 0.0, 0.0], "quaternion": [1.0, 0.0, 0.0, 0.0]}
         }
-        viewer = MultiverseViewer()
+        viewer = SimulatorViewer()
         multi_sim = MujocoSim(
             world=self.test_mjcf_1_world,
             viewer=viewer,
@@ -574,14 +569,14 @@ class MujocoSimTestCase(unittest.TestCase):
         self.assertLess(unstable_fail_count, 10)  # Allow less than 10% failure
 
     def test_mesh_scale_and_equality(self):
-        viewer = MultiverseViewer()
+        viewer = SimulatorViewer()
         multi_sim = MujocoSim(
             world=self.test_mjcf_2_world,
             viewer=viewer,
             headless=headless,
             step_size=self.step_size,
         )
-        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIsInstance(multi_sim.simulator, MujocoSimulator)
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
@@ -598,9 +593,9 @@ class MujocoSimTestCase(unittest.TestCase):
         except ParsingError:
             self.skipTest("Skipping tracy test due to URDF parsing error.")
 
-        viewer = MultiverseViewer()
+        viewer = SimulatorViewer()
         multi_sim = MujocoSim(viewer=viewer, world=dae_world, headless=headless)
-        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIsInstance(multi_sim.simulator, MujocoSimulator)
         self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
@@ -611,7 +606,7 @@ class MujocoSimTestCase(unittest.TestCase):
         self.assertGreaterEqual(time.time() - start_time, 5.0)
 
     def test_mujocosim_world_with_added_objects(self):
-        viewer = MultiverseViewer()
+        viewer = SimulatorViewer()
         milk_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
             "..",
@@ -633,7 +628,7 @@ class MujocoSimTestCase(unittest.TestCase):
         multi_sim = MujocoSim(
             viewer=viewer, world=self.test_urdf_1_world, headless=headless
         )
-        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertIsInstance(multi_sim.simulator, MujocoSimulator)
         self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)

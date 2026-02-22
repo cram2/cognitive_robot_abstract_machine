@@ -11,14 +11,14 @@ from types import NoneType
 from typing_extensions import Dict, List, Any, ClassVar, Type, Optional, Union
 
 import numpy
-from mujoco_connector import MultiverseMujocoConnector
+from mujoco_simulator import MujocoSimulator
 import mujoco
-from multiverse_simulator import (
-    MultiverseSimulator,
-    MultiverseSimulatorState,
-    MultiverseViewer,
-    MultiverseAttribute,
-    MultiverseCallbackResult,
+from base_simulator import (
+    BaseSimulator,
+    SimulatorState,
+    SimulatorViewer,
+    SimulatorAttribute,
+    SimulatorCallbackResult,
 )
 from krrood.utils import recursive_subclasses
 from scipy.spatial.transform import Rotation
@@ -1825,7 +1825,7 @@ class EntitySpawner(ABC):
     """
 
     @classmethod
-    def spawn(cls, simulator: MultiverseSimulator, entity: entity_type) -> bool:  # type: ignore
+    def spawn(cls, simulator: BaseSimulator, entity: entity_type) -> bool:  # type: ignore
         """
         Spawns a WorldEntity object in the Multiverse simulator.
 
@@ -1844,7 +1844,7 @@ class EntitySpawner(ABC):
         raise NotImplementedError(f"No converter found for entity type {type(entity)}.")
 
     @abstractmethod
-    def _spawn(self, simulator: MultiverseSimulator, entity: Any) -> bool:
+    def _spawn(self, simulator: BaseSimulator, entity: Any) -> bool:
         """
         The actual spawning method to be implemented by subclasses.
 
@@ -1866,7 +1866,7 @@ class KinematicStructureEntitySpawner(EntitySpawner):
     """
 
     def _spawn(
-        self, simulator: MultiverseSimulator, entity: KinematicStructureEntity
+        self, simulator: BaseSimulator, entity: KinematicStructureEntity
     ) -> bool:
         """
         Spawns a KinematicStructureEntity object in the Multiverse simulator including its shapes.
@@ -1882,7 +1882,7 @@ class KinematicStructureEntitySpawner(EntitySpawner):
 
     @abstractmethod
     def _spawn_kinematic_structure_entity(
-        self, simulator: MultiverseSimulator, entity: KinematicStructureEntity
+        self, simulator: BaseSimulator, entity: KinematicStructureEntity
     ) -> bool:
         """
         Spawns a KinematicStructureEntity object in the Multiverse simulator.
@@ -1896,7 +1896,7 @@ class KinematicStructureEntitySpawner(EntitySpawner):
 
     @abstractmethod
     def _spawn_shapes(
-        self, simulator: MultiverseSimulator, entity: KinematicStructureEntity
+        self, simulator: BaseSimulator, entity: KinematicStructureEntity
     ) -> bool:
         """
         Spawns the shapes of a KinematicStructureEntity object in the Multiverse simulator.
@@ -1912,7 +1912,7 @@ class KinematicStructureEntitySpawner(EntitySpawner):
     def _spawn_shape(
         self,
         parent: Union[Body, Region],
-        simulator: MultiverseSimulator,
+        simulator: BaseSimulator,
         shape: Shape,
         visible: bool,
         collidable: bool,
@@ -1941,7 +1941,7 @@ class BodySpawner(KinematicStructureEntitySpawner, ABC):
     The type of the entity to spawn.
     """
 
-    def _spawn_shapes(self, simulator: MultiverseSimulator, parent: Body) -> bool:
+    def _spawn_shapes(self, simulator: BaseSimulator, parent: Body) -> bool:
         return all(
             self._spawn_shape(
                 parent=parent,
@@ -1966,7 +1966,7 @@ class RegionSpawner(KinematicStructureEntitySpawner, ABC):
     The type of the entity to spawn.
     """
 
-    def _spawn_shapes(self, simulator: MultiverseSimulator, parent: Region) -> bool:
+    def _spawn_shapes(self, simulator: BaseSimulator, parent: Region) -> bool:
         return all(
             self._spawn_shape(
                 parent=parent,
@@ -1989,7 +1989,7 @@ class ActuatorSpawner(EntitySpawner):
     The type of the entity to spawn.
     """
 
-    def _spawn(self, simulator: MultiverseSimulator, entity: Actuator) -> bool:
+    def _spawn(self, simulator: BaseSimulator, entity: Actuator) -> bool:
         """
         Spawns an Actuator object in the Multiverse simulator, including its dofs.
 
@@ -2001,9 +2001,7 @@ class ActuatorSpawner(EntitySpawner):
         return self._spawn_actuator(simulator, entity)
 
     @abstractmethod
-    def _spawn_actuator(
-        self, simulator: MultiverseSimulator, actuator: Actuator
-    ) -> bool:
+    def _spawn_actuator(self, simulator: BaseSimulator, actuator: Actuator) -> bool:
         """
         Spawns an Actuator object in the Multiverse simulator.
 
@@ -2029,7 +2027,7 @@ class MujocoKinematicStructureEntitySpawner(
     """
 
     def _spawn_kinematic_structure_entity(
-        self, simulator: MultiverseMujocoConnector, entity: KinematicStructureEntity
+        self, simulator: MujocoSimulator, entity: KinematicStructureEntity
     ) -> bool:
         kinematic_structure_entity_props = (
             MujocoKinematicStructureEntityConverter.convert(entity)
@@ -2044,13 +2042,13 @@ class MujocoKinematicStructureEntitySpawner(
         )
         return (
             result.type
-            == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+            == SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
         )
 
     def _spawn_shape(
         self,
         parent: Body,
-        simulator: MultiverseMujocoConnector,
+        simulator: MujocoSimulator,
         shape: Shape,
         visible: bool,
         collidable: bool,
@@ -2067,7 +2065,7 @@ class MujocoKinematicStructureEntitySpawner(
         )
         return (
             result.type
-            == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+            == SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
         )
 
 
@@ -2094,9 +2092,7 @@ class MujocoActuatorSpawner(MujocoEntitySpawner, ActuatorSpawner):
 
     entity_type: ClassVar[Type[Actuator]] = Actuator
 
-    def _spawn_actuator(
-        self, simulator: MultiverseMujocoConnector, actuator: Actuator
-    ) -> bool:
+    def _spawn_actuator(self, simulator: MujocoSimulator, actuator: Actuator) -> bool:
         actuator_props = MujocoActuatorConverter.convert(actuator)
         actuator_name = actuator_props.pop("name")
         dof_names = actuator_props.pop("dof_names")
@@ -2127,7 +2123,7 @@ class MujocoActuatorSpawner(MujocoEntitySpawner, ActuatorSpawner):
         )
         return (
             result.type
-            == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+            == SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
         )
 
 
@@ -2143,7 +2139,7 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
     The world to synchronize with the simulator.
     """
 
-    simulator: MultiverseSimulator
+    simulator: BaseSimulator
     """
     The Multiverse simulator to synchronize with the world.
     """
@@ -2173,7 +2169,7 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
 
 @dataclass
 class MujocoSynchronizer(MultiSimSynchronizer):
-    simulator: MultiverseMujocoConnector
+    simulator: MujocoSimulator
     entity_converter: Type[EntityConverter] = field(default=MujocoConverter)
     entity_spawner: Type[EntitySpawner] = field(default=MujocoEntitySpawner)
 
@@ -2183,7 +2179,7 @@ class MultiSim(ABC):
     Class to handle the simulation of a world using the Multiverse simulator.
     """
 
-    simulator_class: ClassVar[Type[MultiverseSimulator]]
+    simulator_class: ClassVar[Type[BaseSimulator]]
     """
     The class of the Multiverse simulator to use.
     """
@@ -2198,7 +2194,7 @@ class MultiSim(ABC):
     The class of the MultiSimBuilder to use.
     """
 
-    simulator: MultiverseSimulator
+    simulator: BaseSimulator
     """
     The Multiverse simulator instance.
     """
@@ -2216,7 +2212,7 @@ class MultiSim(ABC):
     def __init__(
         self,
         world: World,
-        viewer: MultiverseViewer,
+        viewer: SimulatorViewer,
         headless: bool = False,
         step_size: float = 1e-3,
         real_time_factor: float = 1.0,
@@ -2251,7 +2247,7 @@ class MultiSim(ABC):
         Starts the simulation. This will start one physics simulation thread and render it at 60Hz.
         """
         assert (
-            self.simulator.state != MultiverseSimulatorState.RUNNING
+            self.simulator.state != SimulatorState.RUNNING
         ), "Simulation is already running."
         self.simulator.start()
 
@@ -2266,14 +2262,14 @@ class MultiSim(ABC):
         """
         Pauses the simulation. This will pause the physics simulation but not the rendering.
         """
-        if self.simulator.state != MultiverseSimulatorState.PAUSED:
+        if self.simulator.state != SimulatorState.PAUSED:
             self.simulator.pause()
 
     def unpause_simulation(self):
         """
         Unpauses the simulation. This will unpause the physics simulation.
         """
-        if self.simulator.state == MultiverseSimulatorState.PAUSED:
+        if self.simulator.state == SimulatorState.PAUSED:
             self.simulator.unpause()
 
     def reset_simulation(self):
@@ -2296,7 +2292,7 @@ class MultiSim(ABC):
         :param write_objects: The objects to be written to the simulator.
         """
         self._viewer.write_objects = write_objects
-        if self.simulator.state == MultiverseSimulatorState.PAUSED:
+        if self.simulator.state == SimulatorState.PAUSED:
             self.simulator.step()
 
     def set_read_objects(self, read_objects: Dict[str, Dict[str, List[float]]]):
@@ -2313,10 +2309,10 @@ class MultiSim(ABC):
         :param read_objects: The objects to be read from the simulator.
         """
         self._viewer.read_objects = read_objects
-        if self.simulator.state == MultiverseSimulatorState.PAUSED:
+        if self.simulator.state == SimulatorState.PAUSED:
             self.simulator.step()
 
-    def get_read_objects(self) -> Dict[str, Dict[str, MultiverseAttribute]]:
+    def get_read_objects(self) -> Dict[str, Dict[str, SimulatorAttribute]]:
         """
         Gets the objects that are being read from the simulator.
         For example, if you have set the read objects as follows:
@@ -2338,7 +2334,7 @@ class MultiSim(ABC):
 
         :return: The objects that are being read from the simulator.
         """
-        if self.simulator.state == MultiverseSimulatorState.PAUSED:
+        if self.simulator.state == SimulatorState.PAUSED:
             self.simulator.step()
         return self._viewer.read_objects
 
@@ -2384,15 +2380,15 @@ class MultiSim(ABC):
                 break
             time.sleep(1e-3)
         self._viewer.read_objects = origin_read_objects
-        if origin_state == MultiverseSimulatorState.PAUSED:
+        if origin_state == SimulatorState.PAUSED:
             self.pause_simulation()
         return stable
 
 
 class MujocoSim(MultiSim):
-    simulator_class: ClassVar[Type[MultiverseSimulator]] = MultiverseMujocoConnector
+    simulator_class: ClassVar[Type[BaseSimulator]] = MujocoSimulator
     synchronizer_class: ClassVar[Type[MultiSimSynchronizer]] = MujocoSynchronizer
     builder_class: ClassVar[Type[MultiSimBuilder]] = MujocoBuilder
-    simulator: MultiverseMujocoConnector
+    simulator: MujocoSimulator
     synchronizer: Type[MultiSimSynchronizer] = MujocoSynchronizer
     default_file_path: str = "/tmp/scene.xml"
