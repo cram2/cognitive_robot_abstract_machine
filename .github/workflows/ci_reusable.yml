@@ -43,10 +43,14 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /github/home/.cache/semantic_digital_twin
-          key: ${{ runner.os }}-cache-${{ github.ref_name }}-${{ github.run_id }}
+          key: ${{ runner.os }}-cache-${{ github.ref_name }}-${{ github.run_id }}-${{ inputs.lib }}
           restore-keys: |
             ${{ runner.os }}-cache-${{ github.ref_name }}
             ${{ runner.os }}-cache-
+
+      - name: List files in cache 1
+        run: |
+          ls -R /github/home/.cache/semantic_digital_twin
 
       - name: Build ORM
         if: ${{inputs.lib == 'pycram' || inputs.lib == 'semantic_digital_twin'}}
@@ -61,3 +65,13 @@ jobs:
           source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
           python -m pytest -sv cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+
+      - name: Save cache
+        uses: actions/cache/save@v4
+        with:
+          path: /github/home/.cache/semantic_digital_twin
+          key: ${{ runner.os }}-cache-${{ github.ref_name }}-${{ github.run_id }}-${{ inputs.lib }}
+
+      - name: List files in cache 2
+        run: |
+          ls -R /github/home/.cache/semantic_digital_twin

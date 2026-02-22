@@ -23,68 +23,8 @@ jobs:
         run: |
           echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
 
-  create_mesh_cache:
-    needs: to-lowercase
-    runs-on: ubuntu-latest
-    container:
-      image: ${{ needs.to-lowercase.outputs.repo_lowercase }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: cognitive_robot_abstract_machine
-          submodules: recursive
-
-      - name: Initialize submodules explicitly
-        run: |
-          cd cognitive_robot_abstract_machine
-          git config --global --add safe.directory "*"
-          git submodule sync --recursive
-          git submodule update --init --recursive
-
-      - name: Install dependencies
-        run: |
-          cd cognitive_robot_abstract_machine
-          source /opt/ros/cram-env/bin/activate
-          poetry install
-
-      - name: Build ORM
-        run: |
-          cd cognitive_robot_abstract_machine/pycram/scripts/
-          source /opt/ros/overlay_ws/install/setup.bash
-          source /opt/ros/cram-env/bin/activate
-          python generate_orm.py
-
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
-
-      - name: Restore cache
-        uses: actions/cache/restore@v4
-        with:
-          path: /github/home/.cache/semantic_digital_twin
-          key: ${{ runner.os }}-cache-${{ github.ref_name }}
-          restore-keys: |
-            ${{ runner.os }}-cache-
-
-      - name: Run test_multi_robot_action_designator
-        run: |
-          source /opt/ros/overlay_ws/install/setup.bash
-          source /opt/ros/cram-env/bin/activate
-          python -m pytest -sv cognitive_robot_abstract_machine/test/pycram_test/test_designator/test_multi_robot_action_designator.py::test_move_gripper_multi
-          python -m pytest -sv cognitive_robot_abstract_machine/test/semantic_digital_twin_test/test_adapters/test_multi_sim.py::MujocoSimTestCase::test_apartment_multi_sim_in_5s
-
-      - name: Save cache
-        uses: actions/cache/save@v4
-        with:
-          path: /github/home/.cache/semantic_digital_twin
-          key: ${{ runner.os }}-cache-${{ github.ref_name }}-${{ github.run_id }}
-
-      - name: List files in cache
-        run: |
-          ls -R /github/home/.cache/semantic_digital_twin
-
   test_each_lib:
-    needs: [to-lowercase, create_mesh_cache]
+    needs: [to-lowercase]
     strategy:
       fail-fast: false
       matrix:
