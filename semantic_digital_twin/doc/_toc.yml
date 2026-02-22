@@ -19,7 +19,6 @@ parts:
         - file: examples/semantic_annotation_factories
         - file: examples/persistence_of_annotated_worlds
         - file: examples/graph_of_convex_sets
-        - file: examples/multiverse
 - caption: Developer Guide
   chapters:
     - file: developer_guide
