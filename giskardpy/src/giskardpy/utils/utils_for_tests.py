@@ -6,7 +6,6 @@ from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
 
-from giskardpy.middleware import get_middleware
 from giskardpy.utils.math import shortest_angular_distance
 
 BIG_NUMBER = 1e100

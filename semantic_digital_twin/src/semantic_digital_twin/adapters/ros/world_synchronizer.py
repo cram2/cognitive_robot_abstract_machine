@@ -23,24 +23,23 @@ from ...callbacks.callback import Callback, StateChangeCallback, ModelChangeCall
 from ...exceptions import MissingPublishChangesKWARG
 from ...orm.ormatic_interface import *
 from ...world import World
+from ...world_description.world_entity import (
+    WorldEntityWithClassBasedID,
+    WorldEntityWithID,
+)
 
 
 @dataclass
-class Synchronizer(ABC):
+class Synchronizer(WorldEntityWithID):
     """
     Abstract Synchronizer class to manage world synchronizations between processes running semantic digital twin.
     It manages publishers and subscribers, ensuring proper cleanup after use.
     The communication is JSON string based.
     """
 
-    node: RosNode
+    node: RosNode = field(kw_only=True)
     """
     The rclpy node used to create the publishers and subscribers.
-    """
-
-    world: World
-    """
-    The world to synchronize.
     """
 
     topic_name: Optional[str] = None
@@ -80,7 +79,7 @@ class Synchronizer(ABC):
         The metadata of the synchronizer which can be used to compare origins of messages.
         """
         return MetaData(
-            world_id=self.world._id,
+            world_id=self._world._id,
             node_name=self.node.get_name(),
             process_id=os.getpid(),
         )
@@ -89,7 +88,7 @@ class Synchronizer(ABC):
         """
         Wrap the origin subscription callback by self-skipping and disabling the next world callback.
         """
-        tracker = WorldEntityWithIDKwargsTracker.from_world(self.world)
+        tracker = WorldEntityWithIDKwargsTracker.from_world(self._world)
 
         msg = self.message_type.from_json(
             json.loads(msg.data), **tracker.create_kwargs()
@@ -131,7 +130,7 @@ class SynchronizerOnCallback(Synchronizer, Callback, ABC):
     Additionally, ensures that the callback is cleaned up on close.
     """
 
-    missed_messages: List = field(default_factory=list, init=False, repr=False)
+    missed_messages: List[Message] = field(default_factory=list, init=False, repr=False)
     """
     The messages that the callback did not trigger due to being paused.
     """
@@ -149,7 +148,7 @@ class SynchronizerOnCallback(Synchronizer, Callback, ABC):
 
         self.world_callback(publish_changes=publish_changes)
 
-    def _subscription_callback(self, msg):
+    def _subscription_callback(self, msg: Message):
         if self._is_paused:
             self.missed_messages.append(msg)
         else:
@@ -175,7 +174,7 @@ class SynchronizerOnCallback(Synchronizer, Callback, ABC):
         """
         if not self.missed_messages:
             return
-        with self.world.modify_world(publish_changes=False):
+        with self._world.modify_world(publish_changes=False):
             for msg in self.missed_messages:
                 self.apply_message(msg)
 
@@ -193,8 +192,8 @@ class StateSynchronizer(StateChangeCallback, SynchronizerOnCallback):
     topic_name: str = "/semantic_digital_twin/world_state"
 
     def __post_init__(self):
-        super().__post_init__()
-        SynchronizerOnCallback.__post_init__(self)
+        StateChangeCallback.__post_init__(self)
+        Synchronizer.__post_init__(self)
 
     def apply_message(self, msg: WorldStateUpdate):
         """
@@ -203,12 +202,12 @@ class StateSynchronizer(StateChangeCallback, SynchronizerOnCallback):
         :param msg: The message containing the new state information.
         """
         # Parse incoming states: WorldState has 'states' only
-        indices = [self.world.state._index[_id] for _id in msg.ids]
+        indices = [self._world.state._index[_id] for _id in msg.ids]
 
         if indices:
-            self.world.state.data[0, indices] = np.asarray(msg.states, dtype=float)
+            self._world.state.data[0, indices] = np.asarray(msg.states, dtype=float)
             self.update_previous_world_state()
-            self.world.notify_state_change(publish_changes=False)
+            self._world.notify_state_change(publish_changes=False)
 
     def world_callback(self, publish_changes: bool = True):
         """
@@ -237,8 +236,8 @@ class StateSynchronizer(StateChangeCallback, SynchronizerOnCallback):
         Returns a mapping of DOF name to current position for entries whose position
         differs from the previous snapshot, using a vectorized tolerance-based diff.
         """
-        ids = self.world.state.keys()  # List[PrefixedName] in column order
-        curr = self.world.state.positions  # np.ndarray shape (N,)
+        ids = self._world.state.keys()  # List[PrefixedName] in column order
+        curr = self._world.state.positions  # np.ndarray shape (N,)
         prev = self.previous_world_state_data  # np.ndarray shape (N,)
 
         # If the number of DOFs changed (model update), send everything once
@@ -267,21 +266,17 @@ class ModelSynchronizer(
     message_type: ClassVar[Type[SubclassJSONSerializer]] = ModificationBlock
     topic_name: str = "/semantic_digital_twin/world_model"
 
-    def __post_init__(self):
-        super().__post_init__()
-        SynchronizerOnCallback.__post_init__(self)
-
     def apply_message(self, msg: ModificationBlock):
         running_callbacks = [
             callback
-            for callback in self.world.state.state_change_callbacks
+            for callback in self._world.state.state_change_callbacks
             if not callback._is_paused
         ]
         for callback in running_callbacks:
             callback.pause()
 
-        with self.world.modify_world(publish_changes=False):
-            msg.modifications.apply(self.world)
+        with self._world.modify_world(publish_changes=False):
+            msg.modifications.apply(self._world)
         for callback in running_callbacks:
             callback.resume()
 
@@ -292,7 +287,7 @@ class ModelSynchronizer(
 
         msg = ModificationBlock(
             meta_data=self.meta_data,
-            modifications=self.world.get_world_model_manager().model_modification_blocks[
+            modifications=self._world.get_world_model_manager().model_modification_blocks[
                 -1
             ],
         )
@@ -326,7 +321,7 @@ class ModelReloadSynchronizer(Synchronizer):
         Save the current world model to the database and publish the primary key to the ROS topic such that other
         processes can subscribe to the model changes and update their worlds.
         """
-        dao: WorldMappingDAO = to_dao(self.world)
+        dao: WorldMappingDAO = to_dao(self._world)
         self.session.add(dao)
         self.session.commit()
         message = LoadModel(primary_key=dao.database_id, meta_data=self.meta_data)
@@ -343,7 +338,7 @@ class ModelReloadSynchronizer(Synchronizer):
         )
         new_world = self.session.scalars(query).one().from_dao()
         self._replace_world(new_world)
-        self.world._notify_model_change(publish_changes=False)
+        self._world._notify_model_change(publish_changes=False)
 
     def _replace_world(self, new_world: World):
         """
@@ -356,5 +351,5 @@ class ModelReloadSynchronizer(Synchronizer):
 
         :param new_world: The new world instance to replace the current world.
         """
-        self.world.clear()
-        self.world.merge_world(new_world)
+        self._world.clear()
+        self._world.merge_world(new_world)

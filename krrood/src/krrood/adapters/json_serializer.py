@@ -124,7 +124,7 @@ class SubclassJSONSerializer:
             return data
 
         if isinstance(data, list_like_classes):
-            return [from_json(d) for d in data]
+            return [from_json(d, **kwargs) for d in data]
 
         fully_qualified_class_name = data.get(JSON_TYPE_NAME)
         if not fully_qualified_class_name:
@@ -257,13 +257,13 @@ class JSONAttributeDiff(SubclassJSONSerializer):
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(
             attribute_name=data["attribute_name"],
-            removed_values=from_json(data["removed_values"]),
-            added_values=from_json(data["added_values"]),
+            removed_values=from_json(data["removed_values"], **kwargs),
+            added_values=from_json(data["added_values"], **kwargs),
         )
 
 
 def shallow_diff_json(
-    original_json: Dict[str, Any], new_json: Dict[str, Any]
+    original_json: Dict[str, Any], new_json: Dict[str, Any], **kwargs
 ) -> List[JSONAttributeDiff]:
     """
     Create a shallow diff between two JSON dicts. Result describes the changes that need to be applied to first json to get second json.
@@ -277,13 +277,14 @@ def shallow_diff_json(
     diffs: List[JSONAttributeDiff] = [
         diff
         for key in all_keys
-        if (diff := _compute_attribute_diff(original_json, new_json, key)) is not None
+        if (diff := _compute_attribute_diff(original_json, new_json, key, **kwargs))
+        is not None
     ]
     return diffs
 
 
 def _compute_attribute_diff(
-    original_json: Any, new_json: Any, key: str
+    original_json: Any, new_json: Any, key: str, **kwargs
 ) -> Optional[JSONAttributeDiff]:
     """
     Compute the attribute diff for a single key between two JSON dicts.
@@ -301,11 +302,11 @@ def _compute_attribute_diff(
         if original_value == new_value:
             return None
         return JSONAttributeDiff(
-            attribute_name=key, added_values=[from_json(new_value)]
+            attribute_name=key, added_values=[from_json(new_value, **kwargs)]
         )
 
-    add = [from_json(x) for x in new_value if x not in original_value]
-    remove = [from_json(x) for x in original_value if x not in new_value]
+    add = [from_json(x, **kwargs) for x in new_value if x not in original_value]
+    remove = [from_json(x, **kwargs) for x in original_value if x not in new_value]
     if not (add or remove):
         return None
     return JSONAttributeDiff(

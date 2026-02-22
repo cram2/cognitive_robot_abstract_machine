@@ -1,16 +1,20 @@
 from __future__ import annotations
+
+import logging
 from collections import defaultdict
 from typing import Tuple, Dict, TYPE_CHECKING
 
 import gurobipy
 import numpy as np
-from giskardpy.qp.adapters.qp_adapter import QPData, GiskardToExplicitQPAdapter
 from gurobipy import GRB, GurobiError
-from line_profiler import profile
-from giskardpy.qp.exceptions import QPSolverException, InfeasibleException
-from giskardpy.middleware import get_middleware
-from giskardpy.qp.solvers.qp_solver import QPSolver
-from giskardpy.qp.solvers.qp_solver_ids import SupportedQPSolver
+
+from .qp_solver import QPSolver
+from .qp_solver_ids import SupportedQPSolver
+from ..adapters.explicit_adapter import GiskardToExplicitQPAdapter
+from ..adapters.qp_adapter import QPData
+from ..exceptions import QPSolverException, InfeasibleException
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import scipy.sparse as sp
@@ -68,7 +72,6 @@ class QPSolverGurobi(QPSolver):
     }
     _times: Dict[Tuple[int, int, int], list] = defaultdict(list)
 
-    @profile
     def init(self, qp_data: QPData):
         import scipy.sparse as sp
 
@@ -112,7 +115,7 @@ class QPSolverGurobi(QPSolver):
 
     def print_debug(self):
         gurobipy.setParam(gurobipy.GRB.Param.LogToConsole, True)
-        get_middleware().logwarn(error_info[self.qpProblem.status])
+        logger.warning(error_info[self.qpProblem.status])
         self.qpProblem.reset()
         self.qpProblem.optimize()
         self.qpProblem.printStats()
@@ -143,7 +146,7 @@ class QPSolverGurobi(QPSolver):
         success = self.qpProblem.status
         if success in {gurobipy.GRB.OPTIMAL, gurobipy.GRB.SUBOPTIMAL}:
             if success == gurobipy.GRB.SUBOPTIMAL:
-                get_middleware().logwarn("warning, suboptimal solution!")
+                logger.warning("warning, suboptimal solution!")
             return np.array(self.qpProblem.X)
         if success in {
             gurobipy.GRB.INFEASIBLE,

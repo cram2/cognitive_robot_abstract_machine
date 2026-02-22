@@ -25,13 +25,13 @@ from ...world_description.world_entity import KinematicStructureEntity
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(eq=False)
 class TfPublisherModelCallback(ModelChangeCallback):
     """
     Publishes the TF tree of the world.
     """
 
-    node: Node
+    node: Node = field(kw_only=True)
     """
     ros2 node used to publish tf messages
     """
@@ -62,7 +62,7 @@ class TfPublisherModelCallback(ModelChangeCallback):
 
     def update_connections_to_expression(self):
         self.connections_to_expression.clear()
-        for connection in self.world.connections:
+        for connection in self._world.connections:
             if (
                 connection.parent in self.ignored_kinematic_structure_entities
                 and connection.child in self.ignored_kinematic_structure_entities
@@ -74,11 +74,14 @@ class TfPublisherModelCallback(ModelChangeCallback):
 
     def compile_tf_expression(self):
         tf = Matrix.vstack([pose for pose in self.connections_to_expression.values()])
-        params = [v.variables.position for v in self.world.degrees_of_freedom]
-        self.compiled_tf = tf.compile(parameters=VariableParameters.from_lists(params))
+        self.compiled_tf = tf.compile(
+            parameters=VariableParameters.from_lists(
+                self._world.state.position_float_variables
+            )
+        )
         if self.compiled_tf.is_result_empty():
             return
-        self.compiled_tf.bind_args_to_memory_view(0, self.world.state.positions)
+        self.compiled_tf.bind_args_to_memory_view(0, self._world.state.positions)
 
     def init_tf_message(self):
         self.tf_message = TFMessage()
@@ -88,10 +91,10 @@ class TfPublisherModelCallback(ModelChangeCallback):
         for i, (parent_link_id, child_link_id) in enumerate(
             self.connections_to_expression
         ):
-            parent_link = self.world.get_kinematic_structure_entity_by_id(
+            parent_link = self._world.get_kinematic_structure_entity_by_id(
                 parent_link_id
             )
-            child_link = self.world.get_kinematic_structure_entity_by_id(child_link_id)
+            child_link = self._world.get_kinematic_structure_entity_by_id(child_link_id)
 
             self.tf_message.transforms[i].header.frame_id = str(parent_link.name)
             self.tf_message.transforms[i].child_frame_id = str(child_link.name)
@@ -112,17 +115,15 @@ class TfPublisherModelCallback(ModelChangeCallback):
             p_T_c.transform.rotation.w = pose[6]
 
 
-@dataclass
+@dataclass(eq=False)
 class TFPublisher(StateChangeCallback):
     """
     On state change, publishes the TF tree of the world.
     Puts a frame in every kinematic structure entity that is not in the ignored_bodies set.
     """
 
-    node: Node
+    node: Node = field(kw_only=True)
     """ros2 node used to publish tf messages"""
-    world: World
-    """World for which to publish tf messages."""
     ignored_kinematic_structure_entities: set[KinematicStructureEntity] = field(
         default_factory=set
     )
@@ -149,7 +150,7 @@ class TFPublisher(StateChangeCallback):
         sleep(0.2)
         self.tf_model_cb = TfPublisherModelCallback(
             node=self.node,
-            world=self.world,
+            _world=self._world,
             ignored_kinematic_structure_entities=self.ignored_kinematic_structure_entities,
         )
         self.tf_model_cb.notify()
@@ -166,7 +167,7 @@ class TFPublisher(StateChangeCallback):
         ignored_bodies = set(robot.bodies)
         return cls(
             node=node,
-            world=robot._world,
+            _world=robot._world,
             ignored_kinematic_structure_entities=ignored_bodies,
         )
 
@@ -193,12 +194,12 @@ class TFPublisher(StateChangeCallback):
         )
         return cls(
             node=node,
-            world=world,
+            _world=world,
             ignored_kinematic_structure_entities=ignored_bodies,
         )
 
     def _notify(self, **kwargs):
-        if self.world.state.version % self.throttle_state_updates != 0:
+        if self._world.state.version % self.throttle_state_updates != 0:
             return
         self.tf_model_cb.update_tf_message()
         self.tf_pub.publish(self.tf_model_cb.tf_message)

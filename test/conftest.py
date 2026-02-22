@@ -16,6 +16,7 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
 from krrood.utils import recursive_subclasses
 from pycram.datastructures.dataclasses import Context  # type: ignore
 from semantic_digital_twin.adapters.mesh import STLParser
+from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
@@ -26,7 +27,7 @@ from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.utils import rclpy_installed, tracy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -34,12 +35,17 @@ from semantic_digital_twin.world_description.connections import (
     DiffDrive,
     FixedConnection,
     Connection6DoF,
+    RevoluteConnection,
 )
-from semantic_digital_twin.world_description.geometry import Box, Scale, Cylinder
+from semantic_digital_twin.world_description.geometry import (
+    Box,
+    Scale,
+    Cylinder,
+    Sphere,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import (
     Body,
-    CollisionCheckingConfig,
 )
 
 ###############################
@@ -124,9 +130,6 @@ def cylinder_bot_world():
         robot = Body(
             name=PrefixedName("bot"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.1, height=0.5)]),
-            collision_config=CollisionCheckingConfig(
-                buffer_zone_distance=0.05, violated_distance=0.0, max_avoided_bodies=3
-            ),
         )
         robot_world.add_body(robot)
         MinimalRobot.from_world(robot_world)
@@ -148,11 +151,133 @@ def cylinder_bot_world():
         )
         world.add_connection(env_connection)
 
+        environment2 = Body(
+            name=PrefixedName("environment2"),
+            collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.5)]),
+        )
+        env_connection2 = FixedConnection(
+            parent=body,
+            child=environment2,
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                y=0.5
+            ),
+        )
+        world.add_connection(env_connection2)
+
         connection = OmniDrive.create_with_dofs(
             world=world, parent=body, child=robot_world.root
         )
         world.merge_world(robot_world, connection)
         connection.has_hardware_interface = True
+
+    return world
+
+
+@pytest.fixture()
+def self_collision_bot_world():
+    world = World()
+    with world.modify_world():
+        robot = Body(
+            name=PrefixedName("map"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+        l_shoulder = Body(
+            name=PrefixedName("l_shoulder"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+        l_tip = Body(
+            name=PrefixedName("l_tip"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+        l_thumb = Body(
+            name=PrefixedName("l_thumb"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+        r_shoulder = Body(
+            name=PrefixedName("r_shoulder"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+        r_tip = Body(
+            name=PrefixedName("r_tip"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+        r_thumb = Body(
+            name=PrefixedName("r_thumb"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+
+        world.add_connection(
+            RevoluteConnection.create_with_dofs(
+                parent=robot,
+                child=l_shoulder,
+                axis=Vector3.Z(),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.2, y=0.2
+                ),
+                world=world,
+            )
+        )
+        world.add_connection(
+            RevoluteConnection.create_with_dofs(
+                parent=l_shoulder,
+                child=l_tip,
+                axis=Vector3.Z(),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.2
+                ),
+                world=world,
+            )
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=l_tip,
+                child=l_thumb,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    y=-0.05, z=0.1
+                ),
+            )
+        )
+
+        world.add_connection(
+            RevoluteConnection.create_with_dofs(
+                parent=robot,
+                child=r_shoulder,
+                axis=Vector3.Z(),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.2,
+                    y=-0.2,
+                ),
+                world=world,
+            )
+        )
+        world.add_connection(
+            RevoluteConnection.create_with_dofs(
+                parent=r_shoulder,
+                child=r_tip,
+                axis=Vector3.Z(),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.2
+                ),
+                world=world,
+            )
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=r_tip,
+                child=r_thumb,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    y=0.05, z=0.1
+                ),
+            )
+        )
+        MinimalRobot.from_world(world)
 
     return world
 
@@ -164,9 +289,6 @@ def cylinder_bot_diff_world():
         robot = Body(
             name=PrefixedName("bot"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.1, height=0.5)]),
-            collision_config=CollisionCheckingConfig(
-                buffer_zone_distance=0.05, violated_distance=0.0, max_avoided_bodies=3
-            ),
         )
         robot_world.add_body(robot)
         MinimalRobot.from_world(robot_world)
@@ -226,6 +348,7 @@ def world_with_urdf_factory(
             world=world_with_urdf,
         )
         world_with_urdf.add_connection(c_root_bf)
+        c_root_bf.has_hardware_interface = True
 
     return world_with_urdf
 
@@ -234,6 +357,13 @@ def world_with_urdf_factory(
 def pr2_world_setup():
     urdf_dir = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     return world_with_urdf_factory(urdf_dir, PR2, OmniDrive)
+
+
+@pytest.fixture(scope="function")
+def pr2_world_copy(pr2_world_setup):
+    result = deepcopy(pr2_world_setup)
+    PR2.from_world(result)
+    return result
 
 
 @pytest.fixture(scope="session")
@@ -533,9 +663,9 @@ def tiago_apartment_world(tiago_world, apartment_world_setup):
 def pr2_world_state_reset(pr2_world_setup):
     world = deepcopy(pr2_world_setup)
     PR2.from_world(world)
-    state = deepcopy(world.state.data)
+    state = world.state.data.copy()
     yield world
-    world.state.data = state
+    world.state.data[:] = state
 
 
 ###############################

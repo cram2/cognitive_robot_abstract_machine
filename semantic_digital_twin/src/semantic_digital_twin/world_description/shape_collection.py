@@ -13,7 +13,7 @@ from typing_extensions import Dict, Any, Self, Optional, List, Iterator
 from typing_extensions import TYPE_CHECKING
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
-from .geometry import Shape, BoundingBox
+from .geometry import Shape, BoundingBox, Color
 from ..datastructures.variables import SpatialVariables
 from ..spatial_types import HomogeneousTransformationMatrix, Point3
 
@@ -48,6 +48,14 @@ class ShapeCollection(SubclassJSONSerializer):
         if self.reference_frame is not None:
             return self.reference_frame._world
         return None
+
+    def dye_shapes(self, color: Color):
+        """
+        Dye all shapes in this collection with the given color.
+        :param color: The color to dye the shapes with.
+        """
+        for shape in self.shapes:
+            shape.color = color
 
     def transform_all_shapes_to_own_frame(self):
         """

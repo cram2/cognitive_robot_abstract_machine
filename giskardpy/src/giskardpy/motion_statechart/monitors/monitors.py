@@ -5,13 +5,10 @@ from abc import ABC
 from dataclasses import field
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.context import BuildContext
-from giskardpy.motion_statechart.data_types import ObservationStateValues
-from giskardpy.motion_statechart.graph_node import (
-    MotionStatechartNode,
-    NodeArtifacts,
-)
-from giskardpy.utils.decorators import dataclass
+from ..context import MotionStatechartContext
+from ..data_types import ObservationStateValues
+from ..graph_node import MotionStatechartNode, NodeArtifacts
+from ...utils.decorators import dataclass
 
 
 @dataclass
@@ -34,12 +31,29 @@ class ThreadedPayloadMonitor(MotionStatechartNode, ABC):
 
 @dataclass
 class LocalMinimumReached(MotionStatechartNode):
-    min_cut_off: float = 0.01
-    max_cut_off: float = 0.06
-    joint_convergence_threshold: float = 0.01
-    windows_size: int = 1
+    """
+    Checks if the robot has reached a local minimum in the trajectory,
+    by checking if all velocities are below a degree of freedoms' max velocity *`joint_convergence_threshold`.
+    """
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    joint_convergence_threshold: float = 0.01
+    """
+    if a degree of freedom velocity is below its maximum velocity * this value, it is considered as not moving. 
+    """
+    minimum_threshold: float = 0.01
+    """
+    Minimum value for degree of freedom velocity * joint_convergence_threshold. 
+    """
+    maximum_threshold: float = 0.06
+    """
+    Maximum value for degree of freedom velocity * joint_convergence_threshold. 
+    """
+    windows_size: int = 1
+    """
+    Windows size for joint convergence check.
+    """
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
         ref = []
@@ -48,7 +62,7 @@ class LocalMinimumReached(MotionStatechartNode):
             velocity_limit = dof.limits.upper.velocity
             velocity_limit *= self.joint_convergence_threshold
             velocity_limit = min(
-                max(self.min_cut_off, velocity_limit), self.max_cut_off
+                max(self.minimum_threshold, velocity_limit), self.maximum_threshold
             )
             ref.append(velocity_limit)
             symbols.append(dof.variables.velocity)
@@ -64,23 +78,3 @@ class LocalMinimumReached(MotionStatechartNode):
             traj_longer_than_1_sec, sm.logic_all(sm.abs(vel_symbols) < ref)
         )
         return artifacts
-
-
-@dataclass
-class TimeAbove(MotionStatechartNode):
-    threshold: float = field(kw_only=True)
-
-    def __post_init__(self):
-        traj_length_in_sec = context.time_symbol
-        condition = traj_length_in_sec > self.threshold
-        self.observation_expression = condition
-
-
-@dataclass
-class Alternator(MotionStatechartNode):
-    mod: int = 2
-
-    def __post_init__(self):
-        time = context.time_symbol
-        expr = sm.fmod(sm.floor(time), self.mod) == 0
-        self.observation_expression = expr

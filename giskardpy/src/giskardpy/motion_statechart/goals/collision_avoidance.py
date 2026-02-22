@@ -1,142 +1,55 @@
-from collections import defaultdict
 from dataclasses import field, dataclass
-from typing import Dict, List, Tuple
-
-from line_profiler import profile
+from itertools import combinations
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.data_types.exceptions import GiskardException
-from giskardpy.middleware import get_middleware
-from giskardpy.model.collision_matrix_manager import CollisionRequest
-from giskardpy.motion_statechart.context import BuildContext
-from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.graph_node import (
-    Goal,
-    MotionStatechartNode,
-    NodeArtifacts,
+from krrood.symbolic_math.symbolic_math import Scalar, FloatVariable
+from semantic_digital_twin.collision_checking.collision_groups import CollisionGroup
+from semantic_digital_twin.collision_checking.collision_variable_managers import (
+    SelfCollisionVariableManager,
+    ExternalCollisionVariableManager,
 )
-from giskardpy.motion_statechart.graph_node import (
-    Task,
-)
-from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
-from semantic_digital_twin.world_description.connections import ActiveConnection
-from semantic_digital_twin.world_description.world_entity import (
-    Body,
-    KinematicStructureEntity,
+from semantic_digital_twin.spatial_types import (
+    Vector3,
+    Point3,
 )
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+    Body,
+)
+from ..context import MotionStatechartContext
+from ..data_types import DefaultWeights
+from ..graph_node import Goal, MotionStatechartNode, NodeArtifacts
+from ..graph_node import Task
+from ...qp.qp_controller_config import QPControllerConfig
 
 
 @dataclass(eq=False, repr=False)
-class ExternalCollisionDistanceMonitor(MotionStatechartNode):
-    tip: Body = field(kw_only=True)
-    idx: int = field(default=0, kw_only=True)
-
-    def build(self, context: BuildContext) -> NodeArtifacts:
-        artifacts = NodeArtifacts()
-
-        artifacts.observation = (
-            context.collision_scene.external_contact_distance_symbol(self.tip, self.idx)
-            > 50
-        )
-
-        return artifacts
-
-
-@dataclass(eq=False, repr=False)
-class ExternalCollisionAvoidanceTask(Task):
+class _CollisionAvoidanceTask(Task):
     """
-    Moves root_T_tip @ tip_P_contact in root_T_contact_normal direction until the distance is larger than buffer_zone.
-    Limits the slack variables to prevent the tip from coming closer than violated_distance.
-    Can result in insolvable QPs if multiple of these constraints are violated.
+    Superclass with helper methods for collision avoidance tasks.
     """
-
-    connection: ActiveConnection = field(kw_only=True)
-    max_velocity: float = field(default=0.2, kw_only=True)
-    idx: int = field(default=0, kw_only=True)
-    max_avoided_bodies: int = field(default=1, kw_only=True)
-
-    @property
-    def tip(self) -> KinematicStructureEntity:
-        return self.connection.child
-
-    def create_weight(self, context: BuildContext) -> sm.Scalar:
-        """
-        Creates a weight for this task which is scaled by the number of external collisions.
-        :return:
-        """
-        number_of_external_collisions = (
-            context.collision_scene.external_number_of_collisions_symbol(self.tip)
-        )
-        weight = sm.Scalar(
-            data=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE
-        ).safe_division(sm.min(number_of_external_collisions, self.max_avoided_bodies))
-        return weight
-
-    def create_buffer_zone_expression(
-        self, context: BuildContext
-    ) -> Tuple[sm.Scalar, sm.Scalar]:
-        """
-        Creates an expression that is equal to the buffer zone distance of the body that is currently
-        closest to the main body.
-        """
-        direct_children = context.world.get_direct_child_bodies_with_collision(
-            self.connection
-        )
-
-        buffer_zone_distance = max(
-            b.get_collision_config().buffer_zone_distance
-            for b in direct_children
-            if b.get_collision_config().buffer_zone_distance is not None
-        )
-        violated_distance = max(
-            b.get_collision_config().violated_distance for b in direct_children
-        )
-
-        actual_link_b_hash = context.collision_scene.external_link_b_hash_symbol(
-            self.tip, self.idx
-        )
-        b_result_cases = []
-        for body in context.world.bodies_with_enabled_collision:
-            if body.get_collision_config().buffer_zone_distance is None:
-                continue
-            if body.get_collision_config().disabled:
-                continue
-            if body.get_collision_config().buffer_zone_distance > buffer_zone_distance:
-                b_result_cases.append(
-                    (body.__hash__(), body.get_collision_config().buffer_zone_distance)
-                )
-        if len(b_result_cases) > 0:
-            buffer_zone_expr = sm.if_eq_cases(
-                a=actual_link_b_hash,
-                b_result_cases=b_result_cases,
-                else_result=sm.Scalar(buffer_zone_distance),
-            )
-        else:
-            buffer_zone_expr = buffer_zone_distance
-
-        return buffer_zone_expr, sm.Scalar(violated_distance)
-
-    def compute_control_horizon(
-        self, qp_controller_config: QPControllerConfig
-    ) -> float:
-        control_horizon = qp_controller_config.prediction_horizon - (
-            qp_controller_config.max_derivative - 1
-        )
-        return max(1, control_horizon)
 
     def create_upper_slack(
         self,
-        context: BuildContext,
-        lower_limit: sm.Scalar,
+        context: MotionStatechartContext,
         buffer_zone_expr: sm.Scalar,
         violated_distance: sm.Scalar,
         distance_expression: sm.Scalar,
+        max_velocity: float = 0.2,
     ) -> sm.Scalar:
-        qp_limits_for_lba = (
-            self.max_velocity
+        """
+        Creates upper slack limits for collision avoidance tasks that is just large enough to reach the violated distance.
+        :param context: The motion statechart context.
+        :param buffer_zone_expr: The buffer zone expression for the collision avoidance task.
+        :param violated_distance: The violated distance for the collision avoidance task.
+        :param distance_expression: The distance expression for the collision avoidance task.
+        :param max_velocity: The maximum velocity for the collision avoidance task.
+        :return: The upper slack limit for the collision avoidance task.
+        """
+        distance_to_buffer_zone = buffer_zone_expr - distance_expression
+        qp_limits_for_lower_error_bound = (
+            max_velocity
             * context.qp_controller_config.mpc_dt
             * self.compute_control_horizon(context.qp_controller_config)
         )
@@ -144,7 +57,9 @@ class ExternalCollisionAvoidanceTask(Task):
         hard_threshold = sm.min(violated_distance, buffer_zone_expr / 2)
 
         lower_limit_limited = sm.limit(
-            lower_limit, -qp_limits_for_lba, qp_limits_for_lba
+            distance_to_buffer_zone,
+            -qp_limits_for_lower_error_bound,
+            qp_limits_for_lower_error_bound,
         )
 
         upper_slack = sm.if_greater(
@@ -164,48 +79,160 @@ class ExternalCollisionAvoidanceTask(Task):
         )
         return upper_slack
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def compute_control_horizon(
+        self, qp_controller_config: QPControllerConfig
+    ) -> float:
+        """
+        Computes the control horizon for the QP controller.
+        """
+        control_horizon = qp_controller_config.prediction_horizon - (
+            qp_controller_config.max_derivative - 1
+        )
+        return max(1, control_horizon)
+
+
+@dataclass(eq=False, repr=False)
+class _ExternalCollisionAvoidanceNode(_CollisionAvoidanceTask):
+    """
+    Avoids external collisions between a collision group and its collision_index-closest object in the environment.
+    Moves `root_T_tip @ tip_P_contact` in `root_T_contact_normal` direction until the distance is larger than buffer_zone.
+    Limits the slack variables to prevent the tip from coming closer than violated_distance.
+    .. warning: Can result in insolvable QPs if multiple of these constraints are violated.
+    """
+
+    collision_group: CollisionGroup = field(kw_only=True)
+    """
+    The collision group avoiding external collisions.
+    """
+    max_velocity: float = field(default=0.2, kw_only=True)
+    """
+    The maximum velocity for the collision avoidance task.
+    """
+    collision_index: int = field(default=0, kw_only=True)
+    """
+    The index of the closest object in the collision group.
+    e.g. of collision_index=1 it will avoid the 2. closest contact.
+    """
+    external_collision_manager: ExternalCollisionVariableManager = field(kw_only=True)
+    """
+    Reference to the external collision variable manager shared by other external collision avoidance nodes.
+    """
+
+    @property
+    def root_V_contact_normal(self) -> Vector3:
+        return self.external_collision_manager.get_root_V_contact_normal_symbol(
+            self.collision_group, self.collision_index
+        )
+
+    @property
+    def group_a_P_point_on_a(self) -> Point3:
+        return self.external_collision_manager.get_group_a_P_point_on_a_symbol(
+            self.collision_group, self.collision_index
+        )
+
+    @property
+    def contact_distance(self):
+        return self.external_collision_manager.get_contact_distance_symbol(
+            self.collision_group, self.collision_index
+        )
+
+    @property
+    def buffer_zone_distance(self):
+        return self.external_collision_manager.get_buffer_distance_symbol(
+            self.collision_group, self.collision_index
+        )
+
+    @property
+    def violated_distance(self):
+        return self.external_collision_manager.get_violated_distance_symbol(
+            self.collision_group, self.collision_index
+        )
+
+    @property
+    def has_collision_data(self) -> Scalar:
+        return self.root_V_contact_normal.norm() == 0
+
+
+@dataclass(eq=False, repr=False)
+class _ExternalCollisionHasData(_ExternalCollisionAvoidanceNode):
+    """
+    Monitors whether data was computed for the external collision avoidance task.
+    """
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
-        root_V_contact_normal = context.collision_scene.external_map_V_n_symbol(
-            self.tip, self.idx
-        )
-        tip_P_contact = context.collision_scene.external_new_a_P_pa_symbol(
-            self.tip, self.idx
-        )
-        distance_expression = context.collision_scene.external_contact_distance_symbol(
-            self.tip, self.idx
-        )
+        artifacts.observation = self.has_collision_data
 
-        buffer_zone_expr, violated_distance = self.create_buffer_zone_expression(
-            context
-        )
+        return artifacts
 
-        map_T_a = context.world.compose_forward_kinematics_expression(
+
+@dataclass(eq=False, repr=False)
+class _ExternalCollisionAvoidanceTask(_ExternalCollisionAvoidanceNode):
+    """
+    Avoids external collisions between a collision group and its collision_index-closest object in the environment.
+    Moves `root_T_tip @ tip_P_contact` in `root_T_contact_normal` direction until the distance is larger than buffer_zone.
+    Limits the slack variables to prevent the tip from coming closer than violated_distance.
+    .. warning: Can result in insolvable QPs if multiple of these constraints are violated.
+    """
+
+    max_velocity: float = field(default=0.2, kw_only=True)
+    """
+    The maximum velocity for the collision avoidance task.
+    """
+
+    @property
+    def tip(self) -> KinematicStructureEntity:
+        return self.collision_group.root
+
+    def create_weight(self, context: MotionStatechartContext) -> sm.Scalar:
+        """
+        Creates a weight expression for this task which is scaled by the number of external collisions.
+        """
+        max_avoided_bodies = self.collision_group.get_max_avoided_bodies(
+            context.collision_manager
+        )
+        number_of_external_collisions = 0
+        for index in range(max_avoided_bodies):
+            has_collision_data = (
+                self.external_collision_manager.get_root_V_contact_normal_symbol(
+                    self.collision_group, index
+                ).norm()
+            )
+            is_active = has_collision_data > 0
+            number_of_external_collisions += is_active
+        weight = sm.Scalar(
+            data=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE
+        ).safe_division(sm.min(number_of_external_collisions, max_avoided_bodies))
+        return weight
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        artifacts = NodeArtifacts()
+
+        root_T_group_a = context.world.compose_forward_kinematics_expression(
             context.world.root, self.tip
         )
 
-        map_V_pa = Vector3.from_iterable(map_T_a @ tip_P_contact)
+        root_V_point_on_a = (root_T_group_a @ self.group_a_P_point_on_a).to_vector3()
 
         # the position distance is not accurate, but the derivative is still correct
-        dist = root_V_contact_normal @ map_V_pa
+        a_projected_on_normal = self.root_V_contact_normal @ root_V_point_on_a
 
-        lower_limit = buffer_zone_expr - distance_expression
+        lower_limit = self.buffer_zone_distance - self.contact_distance
 
         artifacts.constraints.add_inequality_constraint(
-            name=self.name,
             reference_velocity=self.max_velocity,
             lower_error=lower_limit,
             upper_error=float("inf"),
             weight=self.create_weight(context),
-            task_expression=dist,
+            task_expression=a_projected_on_normal,
             lower_slack_limit=-float("inf"),
             upper_slack_limit=self.create_upper_slack(
                 context=context,
-                lower_limit=lower_limit,
-                buffer_zone_expr=buffer_zone_expr,
-                violated_distance=violated_distance,
-                distance_expression=sm.Scalar(distance_expression),
+                max_velocity=self.max_velocity,
+                buffer_zone_expr=self.buffer_zone_distance,
+                violated_distance=self.violated_distance,
+                distance_expression=sm.Scalar(self.contact_distance),
             ),
         )
 
@@ -215,165 +242,215 @@ class ExternalCollisionAvoidanceTask(Task):
 @dataclass(eq=False, repr=False)
 class ExternalCollisionAvoidance(Goal):
     """
-    Avoidance collision between all direct children of a connection and the environment.
+    A goal combining an ExternalCollisionDistanceMonitor and an ExternalCollisionAvoidanceTask.
+    One pair will be added for all collision groups of the robot.
+    The task will only be active if the monitor detects that a collision is close.
     """
 
-    connection: ActiveConnection = field(kw_only=True)
+    robot: AbstractRobot = field(kw_only=True)
+    """
+    The robot for which the collision avoidance goal is defined.
+    """
     max_velocity: float = field(default=0.2, kw_only=True)
-    idx: int = field(default=0, kw_only=True)
-    max_avoided_bodies: int = field(default=1, kw_only=True)
+    """
+    The maximum velocity for the collision avoidance task.
+    """
+    external_collision_manager: ExternalCollisionVariableManager = field(init=False)
+    """
+    Reference to the external collision variable manager shared by other external collision avoidance nodes.
+    """
 
-    # %% init false
-    buffer_zone_distance: float = field(init=False)
-    violated_distance: float = field(init=False)
-    _main_body: Body = field(init=False)
+    def expand(self, context: MotionStatechartContext) -> None:
+        self.external_collision_manager = context.external_collision_manager
 
-    def __post_init__(self):
-        super().__post_init__()
-        if isinstance(self.connection.child, Body):
-            self._main_body = self.connection.child
-        else:
-            raise GiskardException(
-                "Child of connection must be of type body for collision avoidance."
-            )
+        for body in self.robot.bodies_with_collision:
+            if context.collision_manager.get_max_avoided_bodies(body):
+                self.external_collision_manager.register_group_of_body(body)
 
-    def expand(self, context: BuildContext) -> None:
-        distance_monitor = ExternalCollisionDistanceMonitor(
-            name=PrefixedName("collision distance", str(self.name)),
-            tip=self._main_body,
-            idx=self.idx,
-        )
+        for group in self.external_collision_manager.registered_groups:
+            max_avoided_bodies = group.get_max_avoided_bodies(context.collision_manager)
+            for index in range(max_avoided_bodies):
+                distance_monitor = _ExternalCollisionHasData(
+                    name=f"{self.name}/monitor({group.root.name.name, index})",
+                    collision_group=group,
+                    collision_index=index,
+                    external_collision_manager=self.external_collision_manager,
+                )
+                self.add_node(distance_monitor)
 
-        self.add_node(distance_monitor)
-
-        task = ExternalCollisionAvoidanceTask(
-            name=PrefixedName(f"task", str(self.name)),
-            connection=self.connection,
-            max_velocity=self.max_velocity,
-            max_avoided_bodies=self.max_avoided_bodies,
-            idx=self.idx,
-        )
-        self.add_node(task)
-
-        task.pause_condition = distance_monitor.observation_variable
-
-    def build(self, context: BuildContext) -> NodeArtifacts:
-        context.collision_scene.monitor_link_for_external(self._main_body, self.idx)
-        return NodeArtifacts()
+                task = _ExternalCollisionAvoidanceTask(
+                    name=f"{self.name}/task({group.root.name.name, index})",
+                    collision_group=group,
+                    max_velocity=self.max_velocity,
+                    collision_index=index,
+                    external_collision_manager=self.external_collision_manager,
+                )
+                self.add_node(task)
+                task.pause_condition = distance_monitor.observation_variable
 
 
 @dataclass(eq=False, repr=False)
-class SelfCollisionDistanceMonitor(MotionStatechartNode):
-    body_a: Body = field(kw_only=True)
-    body_b: Body = field(kw_only=True)
-    idx: int = field(default=0, kw_only=True)
+class ExternalCollisionDistanceMonitor(MotionStatechartNode):
+    """
+    Monitors the distance to the closest external object for a specific collision group of a body.
+    Turns True if the distance falls below a given threshold.
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    .. note:: the input bodies are only used to look up the collision groups.
+    """
+
+    body: Body = field(kw_only=True)
+    """The robot body to monitor."""
+    threshold: float = field(kw_only=True)
+    """Distance threshold in meters."""
+    collision_index: int = field(default=0, kw_only=True)
+    """Index of the closest collision (0 = closest, 1 = second closest, etc.)."""
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        # 1. Access the shared external collision manager
+        # This automatically registers the manager with the CollisionManager
+        manager = context.external_collision_manager
+
+        # 2. Register the body to ensure the manager tracks its collisions
+        manager.register_group_of_body(self.body)
+        group = manager.get_collision_group(self.body)
+
+        # 3. Retrieve the symbolic variable for the contact distance
+        distance_symbol = manager.get_contact_distance_symbol(
+            group=group, idx=self.collision_index
+        )
+
+        # 4. Return an observation artifact
+        # The node's observation_variable will be True when distance < threshold
+        return NodeArtifacts(observation=distance_symbol < self.threshold)
+
+
+@dataclass(eq=False, repr=False)
+class _SelfCollisionAvoidanceNode(_CollisionAvoidanceTask):
+    """
+    Avoids self collisions between two collision groups.
+    Moves `group_a_P_point_on_a @ group_b_P_point_on_b` in `group_a_T_group_b_contact_normal` direction until the distance is larger than buffer_zone.
+    Limits the slack variables to prevent the tip from coming closer than violated_distance.
+    """
+
+    collision_group_a: CollisionGroup = field(kw_only=True)
+    """
+    The first collision group to avoid self collisions with.
+    """
+    collision_group_b: CollisionGroup = field(kw_only=True)
+    """
+    The second collision group to avoid self collisions with.
+    """
+    max_velocity: float = field(default=0.2, kw_only=True)
+    """
+    The maximum velocity for the collision avoidance task.
+    """
+    self_collision_manager: SelfCollisionVariableManager = field(kw_only=True)
+    """
+    Reference to the self collision variable manager shared by other self collision avoidance nodes.
+    """
+
+    @property
+    def group_a_P_point_on_a(self) -> Point3:
+        return self.self_collision_manager.get_group_a_P_point_on_a_symbol(
+            self.collision_group_a, self.collision_group_b
+        )
+
+    @property
+    def group_b_P_point_on_b(self) -> Point3:
+        return self.self_collision_manager.get_group_b_P_point_on_b_symbol(
+            self.collision_group_a, self.collision_group_b
+        )
+
+    @property
+    def group_b_V_contact_normal(self) -> Vector3:
+        return self.self_collision_manager.get_group_b_V_contact_normal_symbol(
+            self.collision_group_a, self.collision_group_b
+        )
+
+    @property
+    def contact_distance(self) -> FloatVariable:
+        return self.self_collision_manager.get_contact_distance_symbol(
+            self.collision_group_a,
+            self.collision_group_b,
+        )
+
+    @property
+    def buffer_zone_distance(self) -> FloatVariable:
+        return self.self_collision_manager.get_buffer_distance_symbol(
+            self.collision_group_a, self.collision_group_b
+        )
+
+    @property
+    def violated_distance(self) -> FloatVariable:
+        return self.self_collision_manager.get_violated_distance_symbol(
+            self.collision_group_a, self.collision_group_b
+        )
+
+    @property
+    def has_collision_data(self) -> Scalar:
+        return self.group_b_V_contact_normal.norm() == 0
+
+
+@dataclass(eq=False, repr=False)
+class _SelfCollisionHasData(_SelfCollisionAvoidanceNode):
+    """
+    Monitors whether data was computed for the self collision avoidance task.
+    """
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
-        artifacts.observation = (
-            context.collision_scene.self_contact_distance_symbol(
-                self.body_a, self.body_b, self.idx
-            )
-            > 50
-        )
+        artifacts.observation = self.has_collision_data
 
         return artifacts
 
 
 @dataclass(eq=False, repr=False)
-class SelfCollisionAvoidanceTask(Task):
-    body_a: Body = field(kw_only=True)
-    body_b: Body = field(kw_only=True)
-    max_velocity: float = field(default=0.2, kw_only=True)
-    idx: int = field(default=0, kw_only=True)
-    max_avoided_bodies: int = field(default=1, kw_only=True)
-    buffer_zone_distance: float = field(kw_only=True)
+class _SelfCollisionAvoidanceTask(_SelfCollisionAvoidanceNode):
+    """
+    Avoids self collisions between two collision groups.
+    Moves `group_a_P_point_on_a @ group_b_P_point_on_b` in `group_a_T_group_b_contact_normal` direction until the distance is larger than buffer_zone.
+    Limits the slack variables to prevent the tip from coming closer than violated_distance.
+    """
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    max_velocity: float = field(default=0.2, kw_only=True)
+    """
+    The maximum velocity for the collision avoidance task.
+    """
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
-        self.root = context.world.root
-        self.control_horizon = context.qp_controller_config.prediction_horizon - (
-            context.qp_controller_config.max_derivative - 1
-        )
-        self.control_horizon = max(1, self.control_horizon)
-        # buffer_zone_distance = max(self.body_a.collision_config.buffer_zone_distance,
-        #                            self.body_b.collision_config.buffer_zone_distance)
-        violated_distance = max(
-            self.body_a.get_collision_config().violated_distance,
-            self.body_b.get_collision_config().violated_distance,
-        )
-        violated_distance = sm.min(violated_distance, self.buffer_zone_distance / 2)
-        actual_distance = context.collision_scene.self_contact_distance_symbol(
-            self.body_a, self.body_b, self.idx
-        )
-        number_of_self_collisions = (
-            context.collision_scene.self_number_of_collisions_symbol(
-                self.body_a, self.body_b
-            )
-        )
-        sample_period = context.qp_controller_config.mpc_dt
-
-        b_T_a = context.world._forward_kinematic_manager.compose_expression(
-            self.body_b, self.body_a
-        )
-        b_P_pb = context.collision_scene.self_new_b_P_pb_symbol(
-            self.body_a, self.body_b, self.idx
-        )
-        pb_T_b = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=b_P_pb
-        ).inverse()
-        a_P_pa = context.collision_scene.self_new_a_P_pa_symbol(
-            self.body_a, self.body_b, self.idx
+        group_b_T_group_a = context.world.compose_forward_kinematics_expression(
+            self.collision_group_b.root, self.collision_group_a.root
         )
 
-        pb_V_n = context.collision_scene.self_new_b_V_n_symbol(
-            self.body_a, self.body_b, self.idx
+        group_b_P_point_on_a = group_b_T_group_a @ self.group_a_P_point_on_a
+
+        group_b_V_point_on_b_to_point_on_a = (
+            group_b_P_point_on_a - self.group_b_P_point_on_b
         )
 
-        pb_V_pa = Vector3.from_iterable(pb_T_b @ b_T_a @ a_P_pa)
-
-        dist = pb_V_n @ pb_V_pa
-
-        qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
-
-        lower_limit = self.buffer_zone_distance - actual_distance
-
-        lower_limit_limited = sm.limit(
-            lower_limit, -qp_limits_for_lba, qp_limits_for_lba
+        a_projected_on_normal = (
+            self.group_b_V_contact_normal @ group_b_V_point_on_b_to_point_on_a
         )
 
-        upper_slack = sm.if_greater(
-            actual_distance,
-            violated_distance,
-            lower_limit_limited + sm.max(0, actual_distance - violated_distance),
-            lower_limit_limited,
-        )
-
-        # undo factor in A
-        upper_slack /= sample_period
-
-        upper_slack = sm.if_greater(
-            actual_distance,
-            50,  # assuming that distance of unchecked closest points is 100
-            sm.Scalar(1e4),
-            sm.max(0, upper_slack),
-        )
-
-        weight = sm.Scalar(
-            data=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE
-        ).safe_division(sm.min(number_of_self_collisions, self.max_avoided_bodies))
+        lower_limit = self.buffer_zone_distance - self.contact_distance
 
         artifacts.constraints.add_inequality_constraint(
-            name=self.name,
             reference_velocity=self.max_velocity,
             lower_error=lower_limit,
             upper_error=float("inf"),
-            weight=weight,
-            task_expression=dist,
+            weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
+            task_expression=a_projected_on_normal,
             lower_slack_limit=-float("inf"),
-            upper_slack_limit=upper_slack,
+            upper_slack_limit=self.create_upper_slack(
+                context=context,
+                max_velocity=self.max_velocity,
+                buffer_zone_expr=self.buffer_zone_distance,
+                violated_distance=self.violated_distance,
+                distance_expression=sm.Scalar(self.contact_distance),
+            ),
         )
 
         return artifacts
@@ -381,168 +458,89 @@ class SelfCollisionAvoidanceTask(Task):
 
 @dataclass(eq=False, repr=False)
 class SelfCollisionAvoidance(Goal):
-    body_a: Body = field(kw_only=True)
-    body_b: Body = field(kw_only=True)
+    """
+    A goal combining a SelfCollisionDistanceMonitor and a SelfCollisionAvoidanceTask.
+    One pair will be added for all collision groups of the robot.
+    The task will only be active if the monitor detects that a collision is close.
+    """
+
+    robot: AbstractRobot = field(kw_only=True)
+    """
+    The robot for which the collision avoidance goal is defined.
+    """
     max_velocity: float = field(default=0.2, kw_only=True)
-    idx: int = field(default=0, kw_only=True)
-    max_avoided_bodies: int = field(default=1, kw_only=True)
-    buffer_zone_distance: float = field(kw_only=True)
+    """
+    The maximum velocity for the collision avoidance task.
+    """
+    self_collision_manager: SelfCollisionVariableManager = field(init=False)
+    """
+    Reference to the self collision variable manager shared by other self collision avoidance nodes.
+    """
 
-    def expand(self, context: BuildContext) -> None:
-        distance_monitor = SelfCollisionDistanceMonitor(
-            name=PrefixedName("collision distance", str(self.name)),
-            body_a=self.body_a,
-            body_b=self.body_b,
-            idx=self.idx,
-        )
-        self.add_node(distance_monitor)
+    def expand(self, context: MotionStatechartContext) -> None:
+        self.self_collision_manager = context.self_collision_manager
+        context.collision_manager.update_collision_matrix()
 
-        task = SelfCollisionAvoidanceTask(
-            name=PrefixedName(f"task", str(self.name)),
-            body_a=self.body_a,
-            body_b=self.body_b,
-            max_velocity=self.max_velocity,
-            idx=self.idx,
-            max_avoided_bodies=self.max_avoided_bodies,
-            buffer_zone_distance=self.buffer_zone_distance,
-        )
-        self.add_node(task)
+        for group_a, group_b in combinations(
+            self.self_collision_manager.collision_groups, 2
+        ):
+            if (
+                group_a.root not in self.robot.kinematic_structure_entities
+                or group_b.root not in self.robot.kinematic_structure_entities
+            ):
+                # this is no self collision
+                continue
+            if not self.self_collision_manager.is_any_collision_checked(
+                group_a, group_b
+            ):
+                continue
+            self.self_collision_manager.register_groups_of_body_combination(
+                group_a.root, group_b.root
+            )
+            (group_a, group_b) = self.self_collision_manager.body_pair_to_group_pair(
+                group_a.root, group_b.root
+            )
 
-        task.pause_condition = distance_monitor.observation_variable
+            distance_monitor = _SelfCollisionHasData(
+                name=f"{self.name}/{group_a.root.name.name, group_b.root.name.name}/monitor",
+                collision_group_a=group_a,
+                collision_group_b=group_b,
+                self_collision_manager=self.self_collision_manager,
+            )
+            self.add_node(distance_monitor)
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
-        context.collision_scene.monitor_link_for_self(
-            self.body_a, self.body_b, self.idx
-        )
-        return NodeArtifacts()
-
-
-# use cases
-# avoid all
-# allow all
-# avoid all then allow something
-# avoid only something
+            task = _SelfCollisionAvoidanceTask(
+                name=f"{self.name}/{group_a.root.name.name, group_b.root.name.name}/task",
+                collision_group_a=group_a,
+                collision_group_b=group_b,
+                max_velocity=self.max_velocity,
+                self_collision_manager=self.self_collision_manager,
+            )
+            self.add_node(task)
+            task.pause_condition = distance_monitor.observation_variable
 
 
 @dataclass(eq=False, repr=False)
-class CollisionAvoidance(Goal):
-    collision_entries: List[CollisionRequest] = field(default_factory=list)
+class SelfCollisionDistanceMonitor(MotionStatechartNode):
+    """
+    Monitors the distance to the closest external object for the group of a body.
+    Turns True if the distance falls below a given threshold.
+    .. note:: the input bodies are only used to look up the collision groups.
+    """
 
-    def expand(self, context: BuildContext) -> None:
-        context.collision_scene.matrix_manager.parse_collision_requests(
-            self.collision_entries
-        )
-        self.collision_entries = (
-            context.collision_scene.matrix_manager.collision_requests
-        )
-        if (
-            not self.collision_entries
-            or not self.collision_entries[-1].is_allow_all_collision()
-        ):
-            self.add_external_collision_avoidance_constraints(context)
-        if (
-            not self.collision_entries
-            or not self.collision_entries[-1].is_allow_all_collision()
-        ):
-            self.add_self_collision_avoidance_constraints(context)
-        collision_matrix = (
-            context.collision_scene.matrix_manager.compute_collision_matrix()
-        )
-        context.collision_scene.set_collision_matrix(collision_matrix)
+    body_a: Body = field(kw_only=True)
+    """First robot body to monitor."""
+    body_b: Body = field(kw_only=True)
+    """Second robot body to monitor."""
+    threshold: float = field(kw_only=True)
+    """Distance threshold in meters."""
 
-    @profile
-    def add_external_collision_avoidance_constraints(self, context: BuildContext):
-        robot: AbstractRobot
-        # thresholds = god_map.collision_scene.matrix_manager.external_thresholds
-        for robot in context.world.get_semantic_annotations_by_type(AbstractRobot):
-            if robot.drive:
-                connection_list = robot.controlled_connections.union({robot.drive})
-            else:
-                connection_list = robot.controlled_connections
-            for connection in connection_list:
-                if connection.frozen_for_collision_avoidance:
-                    continue
-                bodies = context.world.get_direct_child_bodies_with_collision(
-                    connection
-                )
-                if not bodies:
-                    continue
-                max_avoided_bodies = 0
-                for body in bodies:
-                    max_avoided_bodies = max(
-                        max_avoided_bodies,
-                        body.get_collision_config().max_avoided_bodies,
-                    )
-                for idx in range(max_avoided_bodies):
-                    self.add_node(
-                        node := ExternalCollisionAvoidance(
-                            name=PrefixedName(
-                                f"{connection.name}/{idx}", str(self.name)
-                            ),
-                            connection=connection,
-                            idx=idx,
-                            max_avoided_bodies=max_avoided_bodies,
-                        )
-                    )
-                    node.plot_specs.visible = False
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        manager = context.self_collision_manager
 
-        # get_middleware().loginfo(f'Adding {num_constrains} external collision avoidance constraints.')
+        manager.register_groups_of_body_combination(self.body_a, self.body_b)
+        (group_a, group_b) = manager.body_pair_to_group_pair(self.body_a, self.body_b)
 
-    @profile
-    def add_self_collision_avoidance_constraints(self, context: BuildContext):
-        counter: Dict[Tuple[Body, Body], float] = defaultdict(float)
-        num_constr = 0
-        robot: AbstractRobot
-        # collect bodies from the same connection to the main body pair
-        for robot in context.world.get_semantic_annotations_by_type(AbstractRobot):
-            for body_a_original in robot.bodies_with_enabled_collision:
-                for body_b_original in robot.bodies_with_enabled_collision:
-                    if (
-                        (
-                            body_a_original,
-                            body_b_original,
-                        )
-                        in context.world._collision_pair_manager.disabled_collision_pairs
-                        or (
-                            body_b_original,
-                            body_a_original,
-                        )
-                        in context.world._collision_pair_manager.disabled_collision_pairs
-                    ):
-                        continue
-                    body_a, body_b = (
-                        context.world.compute_chain_reduced_to_controlled_connections(
-                            body_a_original, body_b_original
-                        )
-                    )
-                    if body_b.id < body_a.id:
-                        body_a, body_b = body_b, body_a
-                    counter[body_a, body_b] = max(
-                        [
-                            counter[body_a, body_b],
-                            body_a_original.get_collision_config().buffer_zone_distance
-                            or 0,
-                            body_b_original.get_collision_config().buffer_zone_distance
-                            or 0,
-                        ]
-                    )
+        distance_symbol = manager.get_contact_distance_symbol(group_a, group_b)
 
-        for link_a, link_b in counter:
-            # num_of_constraints = min(1, counter[link_a, link_b])
-            # for i in range(num_of_constraints):
-            #     number_of_repeller = min(link_a.collision_config.max_avoided_bodies,
-            #                              link_b.collision_config.max_avoided_bodies)
-            ca_goal = SelfCollisionAvoidance(
-                body_a=link_a,
-                body_b=link_b,
-                name=PrefixedName(f"{link_a.name}/{link_b.name}", str(self.name)),
-                idx=0,
-                max_avoided_bodies=1,
-                buffer_zone_distance=counter[link_a, link_b],
-            )
-            ca_goal.plot_specs.visible = False
-            self.add_node(ca_goal)
-            num_constr += 1
-        get_middleware().loginfo(
-            f"Adding {num_constr} self collision avoidance constraints."
-        )
+        return NodeArtifacts(observation=distance_symbol < self.threshold)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict
 from uuid import UUID
 
@@ -20,6 +20,7 @@ from .datastructures.definitions import JointStateType
 from .datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    from .collision_checking.collision_matrix import CollisionCheck
     from .world import World
     from .world_description.geometry import Scale
     from .world_description.world_entity import (
@@ -254,6 +255,14 @@ class AddingAnExistingSemanticAnnotationError(UsageError):
 
 
 @dataclass
+class SemanticAnnotationNotInWorldError(UsageError):
+    semantic_annotation: SemanticAnnotation
+
+    def __post_init__(self):
+        self.message = f"Semantic annotation {self.semantic_annotation} does not belong to a world."
+
+
+@dataclass
 class MissingWorldModificationContextError(UsageError):
     function: Callable
 
@@ -405,3 +414,42 @@ class AmbiguousNameError(ValueError):
 
 class UnresolvedNameError(ValueError):
     """Raised when no semantic annotation class matches a given name."""
+
+
+@dataclass
+class CollisionCheckingError(DataclassException):
+    message: str = field(kw_only=True, default=None, init=False)
+
+
+@dataclass
+class InvalidCollisionCheckError(CollisionCheckingError):
+    collision_check: CollisionCheck
+
+
+@dataclass
+class NegativeCollisionCheckingDistanceError(InvalidCollisionCheckError):
+    def __post_init__(self):
+        super().__post_init__()
+        self.message = f"Distance must be positive, got {self.collision_check.distance}"
+
+
+@dataclass
+class InvalidBodiesInCollisionCheckError(InvalidCollisionCheckError):
+    def __post_init__(self):
+        super().__post_init__()
+        self.message = f"Body_a and body_b must be different, got {self.collision_check.body_a} and {self.collision_check.body_b}"
+
+
+@dataclass
+class BodyHasNoGeometryError(InvalidCollisionCheckError):
+    def __post_init__(self):
+        super().__post_init__()
+        self.message = ""
+        if not self.collision_check.body_a.has_collision():
+            self.message += (
+                f"Body {self.collision_check.body_a.name} has collision geometry."
+            )
+        if not self.collision_check.body_b.has_collision():
+            self.message += (
+                f"Body {self.collision_check.body_b.name} has collision geometry."
+            )

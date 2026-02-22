@@ -6,24 +6,19 @@ from typing import Dict, Any
 
 import numpy as np
 import rustworkx as rx
-
-from giskardpy.motion_statechart.plotters.gantt_chart_plotter import (
-    HistoryGanttChartPlotter,
-)
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 from line_profiler.explicit_profiler import profile
 from typing_extensions import List, MutableMapping, ClassVar, Self, Type
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.context import BuildContext, ExecutionContext
-from giskardpy.motion_statechart.data_types import (
-    LifeCycleValues,
-    ObservationStateValues,
+from giskardpy.motion_statechart.plotters.gantt_chart_plotter import (
+    HistoryGanttChartPlotter,
 )
-from giskardpy.motion_statechart.exceptions import (
-    EmptyMotionStatechartError,
-)
-from giskardpy.motion_statechart.graph_node import (
+from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.symbolic_math.symbolic_math import VariableParameters
+from .context import MotionStatechartContext
+from .data_types import LifeCycleValues, ObservationStateValues
+from .exceptions import EmptyMotionStatechartError
+from .graph_node import (
     MotionStatechartNode,
     TrinaryCondition,
     Goal,
@@ -33,10 +28,9 @@ from giskardpy.motion_statechart.graph_node import (
     ObservationVariable,
     LifeCycleVariable,
 )
-from giskardpy.motion_statechart.graph_node import Task
-from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphviz
-from giskardpy.qp.constraint_collection import ConstraintCollection
-from krrood.symbolic_math.symbolic_math import VariableParameters
+from .graph_node import Task
+from .plotters.graphviz import MotionStatechartGraphviz
+from ..qp.constraint_collection import ConstraintCollection
 
 
 @dataclass(repr=False, eq=False)
@@ -63,7 +57,7 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
     def __delitem__(self, node: MotionStatechartNode) -> None:
         self.data = np.delete(self.data, node.index)
 
-    def __iter__(self) -> iter:
+    def __iter__(self):
         return iter(self.data)
 
     def __len__(self) -> int:
@@ -183,7 +177,7 @@ class ObservationState(State):
 
     _compiled_updater: sm.CompiledFunction = field(init=False)
 
-    def compile(self, context: BuildContext):
+    def compile(self, context: MotionStatechartContext):
         observation_state_updater = []
         for node in self.motion_statechart.nodes:
             state_f = sm.if_eq_cases(
@@ -206,9 +200,7 @@ class ObservationState(State):
                 self.observation_symbols(),
                 self.life_cycle_symbols(),
                 context.world.state.get_variables(),
-                context.collision_scene.get_external_collision_symbol(),
-                context.collision_scene.get_self_collision_symbol(),
-                context.auxiliary_variable_manager.variables,
+                context.float_variable_data.variables,
             ),
             sparse=False,
         )
@@ -222,13 +214,7 @@ class ObservationState(State):
             arg_idx=2, numpy_array=context.world.state.data
         )
         self._compiled_updater.bind_args_to_memory_view(
-            arg_idx=3, numpy_array=context.collision_scene.external_collision_data
-        )
-        self._compiled_updater.bind_args_to_memory_view(
-            arg_idx=4, numpy_array=context.collision_scene.self_collision_data
-        )
-        self._compiled_updater.bind_args_to_memory_view(
-            arg_idx=5, numpy_array=context.auxiliary_variable_manager.data
+            arg_idx=3, numpy_array=context.float_variable_data.data
         )
 
     @profile
@@ -445,12 +431,12 @@ class MotionStatechart(SubclassJSONSerializer):
         for parent_node in condition.node_dependencies:
             self.rx_graph.add_edge(owner.index, parent_node.index, condition)
 
-    def _build_nodes(self, context: BuildContext):
+    def _build_nodes(self, context: MotionStatechartContext):
         for node in self.nodes:
             self._build_and_apply_artifacts(node, context=context)
 
     def _build_and_apply_artifacts(
-        self, node: MotionStatechartNode, context: BuildContext
+        self, node: MotionStatechartNode, context: MotionStatechartContext
     ):
         if isinstance(node, Goal):
             for child_node in node.nodes:
@@ -467,7 +453,7 @@ class MotionStatechart(SubclassJSONSerializer):
             node._observation_expression = artifacts.observation
         node._debug_expressions = artifacts.debug_expressions
 
-    def compile(self, context: BuildContext):
+    def compile(self, context: MotionStatechartContext):
         """
         Compiles all components of the motion statechart given the provided context.
         This method must be called before tick().
@@ -488,14 +474,14 @@ class MotionStatechart(SubclassJSONSerializer):
             )
         )
 
-    def _expand_goals(self, context: BuildContext):
+    def _expand_goals(self, context: MotionStatechartContext):
         """
         Triggers the expansion of all goals in the motion statechart and add its children to the motion statechart.
         """
         for goal in self.get_nodes_by_type(Goal):
             self._expand_goal(goal, context=context)
 
-    def _expand_goal(self, goal: Goal, context: BuildContext):
+    def _expand_goal(self, goal: Goal, context: MotionStatechartContext):
         goal.expand(context)
         for child_node in goal.nodes:
             if isinstance(child_node, Goal):
@@ -509,7 +495,7 @@ class MotionStatechart(SubclassJSONSerializer):
             )
         return combined_constraint_collection
 
-    def _update_observation_state(self, context: ExecutionContext):
+    def _update_observation_state(self, context: MotionStatechartContext):
         self.observation_state.update_state()
         for node in self.nodes:
             if self.life_cycle_state[node] == LifeCycleValues.RUNNING:
@@ -517,7 +503,7 @@ class MotionStatechart(SubclassJSONSerializer):
                 if observation_overwrite is not None:
                     self.observation_state[node] = observation_overwrite
 
-    def _update_life_cycle_state(self, context: ExecutionContext):
+    def _update_life_cycle_state(self, context: MotionStatechartContext):
         previous = self.life_cycle_state.data.copy()
         self.life_cycle_state.update_state()
         self._trigger_life_cycle_callbacks(
@@ -528,7 +514,7 @@ class MotionStatechart(SubclassJSONSerializer):
         self,
         previous_state: np.ndarray,
         current_state: np.ndarray,
-        context: ExecutionContext,
+        context: MotionStatechartContext,
     ) -> None:
         for node in self.nodes:
             prev = LifeCycleValues(int(previous_state[node.index]))
@@ -554,7 +540,7 @@ class MotionStatechart(SubclassJSONSerializer):
                 case _:
                     pass
 
-    def tick(self, context: ExecutionContext):
+    def tick(self, context: MotionStatechartContext):
         """
         Executes a single tick of the motion statechart.
         First the observation state is updated, then the life cycle state is updated.
@@ -565,7 +551,7 @@ class MotionStatechart(SubclassJSONSerializer):
         self._raise_if_cancel_motion()
         self.history.append(
             next_item=StateHistoryItem(
-                control_cycle=context.control_cycle_counter,
+                control_cycle=len(self.history),
                 life_cycle_state=self.life_cycle_state,
                 observation_state=self.observation_state,
             )
@@ -590,6 +576,10 @@ class MotionStatechart(SubclassJSONSerializer):
             if self.observation_state[node] == ObservationStateValues.TRUE:
                 raise node.exception
 
+    def cleanup_nodes(self, context: MotionStatechartContext):
+        for node in self.nodes:
+            node.cleanup(context)
+
     def draw(self, file_name: str):
         """
         Uses graphviz to draw the motion statechart and safe it at `file_name`.
@@ -599,7 +589,7 @@ class MotionStatechart(SubclassJSONSerializer):
     def plot_gantt_chart(
         self,
         path: str = "./ganttchart.pdf",
-        context: ExecutionContext = None,
+        context: MotionStatechartContext = None,
         second_length_in_cm: float = 2.0,
     ):
         HistoryGanttChartPlotter(

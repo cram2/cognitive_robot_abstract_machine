@@ -6,6 +6,9 @@ from typing import List
 
 import numpy as np
 
+from krrood.entity_query_language.entity import entity, variable
+from krrood.entity_query_language.entity_result_processors import an, the
+from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
 from semantic_digital_twin.world_description.world_entity import Body
@@ -18,6 +21,7 @@ from ..core import (
     PickUpActionDescription,
     PlaceActionDescription,
     OpenActionDescription,
+    MoveTorsoActionDescription,
 )
 from ....config.action_conf import ActionConfig
 from ....datastructures.enums import Arms, Grasp, VerticalAlignment
@@ -76,14 +80,17 @@ class TransportAction(ActionDescription):
         return bodies
 
     def execute(self) -> None:
-        if containers := self.inside_container():
-            for container in containers:
-                sem_anno = container.get_semantic_annotations_by_type(Drawer)
-                if sem_anno:
-                    SequentialPlan(
-                        self.context,
-                        OpenActionDescription(sem_anno[0].handle.body, self.arm),
-                    ).perform()
+        for container in self.inside_container():
+            sem_anno = an(
+                entity(
+                    drawer := variable(Drawer, domain=self.world.semantic_annotations)
+                ).where(drawer.root == container)
+            ).tolist()
+            if sem_anno:
+                SequentialPlan(
+                    self.context,
+                    OpenActionDescription(sem_anno[0].handle.body, self.arm),
+                ).perform()
         SequentialPlan(self.context, ParkArmsActionDescription(Arms.BOTH)).perform()
         pickup_loc = CostmapLocation(
             target=PoseStamped.from_spatial_type(self.object_designator.global_pose),
@@ -107,6 +114,7 @@ class TransportAction(ActionDescription):
                 grasp_description=pickup_pose.grasp_description,
             ),
             ParkArmsActionDescription(Arms.BOTH),
+            MoveTorsoActionDescription(TorsoState.HIGH),
             NavigateActionDescription(
                 CostmapLocation(
                     target=self.target_location,

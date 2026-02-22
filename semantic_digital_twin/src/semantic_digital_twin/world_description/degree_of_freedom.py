@@ -179,6 +179,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
             "lower_limits": to_json(self.limits.lower),
             "upper_limits": to_json(self.limits.upper),
             "name": to_json(self.name),
+            "has_hardware_interface": self.has_hardware_interface,
         }
 
     @classmethod
@@ -190,6 +191,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
             name=from_json(data["name"]),
             limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
             id=uuid,
+            has_hardware_interface=data["has_hardware_interface"],
         )
 
     def __deepcopy__(self, memo):

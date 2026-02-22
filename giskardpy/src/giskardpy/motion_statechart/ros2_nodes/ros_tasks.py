@@ -15,13 +15,10 @@ from std_msgs.msg import Header
 from typing_extensions import Type, TypeVar, Generic
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.context import ExecutionContext, BuildContext
-from giskardpy.motion_statechart.data_types import ObservationStateValues
-from giskardpy.motion_statechart.graph_node import (
-    MotionStatechartNode,
-    NodeArtifacts,
-)
-from giskardpy.motion_statechart.ros_context import RosContextExtension
+from ..context import MotionStatechartContext
+from ..data_types import ObservationStateValues
+from ..graph_node import MotionStatechartNode, NodeArtifacts
+from ..ros_context import RosContextExtension
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -70,13 +67,13 @@ class ActionServerTask(
     """
 
     @abstractmethod
-    def build_msg(self, context: BuildContext):
+    def build_msg(self, context: MotionStatechartContext):
         """
         Build the action server message and returns it.
         """
         ...
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Creates the action client.
         """
@@ -89,7 +86,7 @@ class ActionServerTask(
         self._action_client.wait_for_server()
         return NodeArtifacts()
 
-    def on_start(self, context: ExecutionContext):
+    def on_start(self, context: MotionStatechartContext):
         """
         Creates a goal and sends it to the action server asynchronously.
         """
@@ -131,7 +128,7 @@ class NavigateActionServerTask(
     Topic name for the navigation action server.
     """
 
-    def build_msg(self, context: BuildContext):
+    def build_msg(self, context: MotionStatechartContext):
         root_p_goal = context.world.transform(
             target_frame=context.world.root, spatial_object=self.target_pose
         )
@@ -151,7 +148,7 @@ class NavigateActionServerTask(
         )
         self._msg = NavigateToPose.Goal(pose=pose_stamped)
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Builds the motion state node this includes creating the action client and setting the observation expression.
         The observation is true if the robot is within 1cm of the target pose.
@@ -181,7 +178,7 @@ class NavigateActionServerTask(
 
         return artifacts
 
-    def on_tick(self, context: ExecutionContext) -> ObservationStateValues:
+    def on_tick(self, context: MotionStatechartContext) -> ObservationStateValues:
         if self._result:
             return (
                 ObservationStateValues.TRUE

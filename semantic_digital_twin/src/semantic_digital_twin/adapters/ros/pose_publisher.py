@@ -59,7 +59,7 @@ class PosePublisher(StateChangeCallback):
     The frame in which the marker are published, is set to world root
     """
 
-    def _notify(self):
+    def _notify(self, **kwargs):
         if self.lifetime > 0 and time.time() >= self.end_time:
             self.pause()
         world = self.pose.reference_frame._world

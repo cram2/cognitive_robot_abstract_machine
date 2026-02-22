@@ -11,7 +11,7 @@ from typing_extensions import List, TYPE_CHECKING, Union, Optional, Dict, Any, S
 from krrood.adapters.json_serializer import from_json, to_json
 from .connection_properties import JointDynamics
 from .degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
-from .world_entity import CollisionCheckingConfig, Connection, KinematicStructureEntity
+from .world_entity import Connection, KinematicStructureEntity
 from ..adapters.world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
 from ..datastructures.prefixed_name import PrefixedName
 from ..datastructures.types import NpMatrix4x4
@@ -53,34 +53,6 @@ class ActiveConnection(Connection):
     Has one or more degrees of freedom that can be actively controlled, e.g., robot joints.
     """
 
-    frozen_for_collision_avoidance: bool = field(default=False)
-    """
-    Should be treated as fixed for collision avoidance.
-    Common example are gripper joints, you generally don't want to avoid collisions by closing the fingers, 
-    but by moving the whole hand away.
-    """
-
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["frozen_for_collision_avoidance"] = self.frozen_for_collision_avoidance
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
-        parent = tracker.get_world_entity_with_id(id=from_json(data["parent_id"]))
-        child = tracker.get_world_entity_with_id(id=from_json(data["child_id"]))
-        return cls(
-            name=from_json(data["name"]),
-            parent=parent,
-            child=child,
-            parent_T_connection_expression=from_json(
-                data["parent_T_connection_expression"], **kwargs
-            ),
-            frozen_for_collision_avoidance=data["frozen_for_collision_avoidance"],
-            **kwargs,
-        )
-
     @property
     def has_hardware_interface(self) -> bool:
         """
@@ -101,14 +73,7 @@ class ActiveConnection(Connection):
 
     @property
     def is_controlled(self):
-        return self.has_hardware_interface and not self.frozen_for_collision_avoidance
-
-    def set_static_collision_config_for_direct_child_bodies(
-        self, collision_config: CollisionCheckingConfig
-    ):
-        for child_body in self._world.get_direct_child_bodies_with_collision(self):
-            if not child_body.get_collision_config().disabled:
-                child_body.set_static_collision_config(collision_config)
+        return self.has_hardware_interface
 
 
 @dataclass(eq=False)
@@ -163,7 +128,6 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
             parent_T_connection_expression=from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),
-            frozen_for_collision_avoidance=data["frozen_for_collision_avoidance"],
             axis=Vector3.from_iterable(data["axis"]),
             multiplier=data["multiplier"],
             offset=data["offset"],

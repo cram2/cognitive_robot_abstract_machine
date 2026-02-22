@@ -1,16 +1,21 @@
 from dataclasses import dataclass, field
-from itertools import combinations
-from typing_extensions import Optional, Set, List, Dict, Iterable
 
 import fcl
+import numpy as np
 from trimesh.collision import CollisionManager, mesh_to_BVH
+from typing_extensions import Optional, Dict
 
-from .collision_detector import CollisionDetector, CollisionCheck, Collision
+from .collision_detector import (
+    CollisionDetector,
+    ClosestPoints,
+    CollisionCheckingResult,
+)
+from .collision_matrix import CollisionMatrix
 from ..world_description.world_entity import Body
 
 
 @dataclass
-class TrimeshCollisionDetector(CollisionDetector):
+class FCLCollisionDetector(CollisionDetector):
     collision_manager: CollisionManager = field(
         default_factory=CollisionManager, init=False
     )
@@ -31,6 +36,7 @@ class TrimeshCollisionDetector(CollisionDetector):
     """
     The FCL collision objects for each body in the world
     """
+    buffer: float = field(default=0.05, init=False)
 
     def sync_world_model(self) -> None:
         """
@@ -38,7 +44,7 @@ class TrimeshCollisionDetector(CollisionDetector):
         """
         if self._last_synced_model == self._world.get_world_model_manager().version:
             return
-        bodies_to_be_added = set(self._world.bodies_with_enabled_collision) - set(
+        bodies_to_be_added = set(self._world.bodies_with_collision) - set(
             self._collision_objects.keys()
         )
         for body in bodies_to_be_added:
@@ -49,7 +55,7 @@ class TrimeshCollisionDetector(CollisionDetector):
                 ),
             )
         bodies_to_be_removed = set(self._collision_objects.keys()) - set(
-            self._world.bodies_with_enabled_collision
+            self._world.bodies_with_collision
         )
         for body in bodies_to_be_removed:
             del self._collision_objects[body]
@@ -68,8 +74,8 @@ class TrimeshCollisionDetector(CollisionDetector):
             )
 
     def check_collisions(
-        self, collision_matrix: Optional[Iterable[CollisionCheck]] = None
-    ) -> List[Collision]:
+        self, collision_matrix: CollisionMatrix
+    ) -> CollisionCheckingResult:
         """
         Checks for collisions in the current world state. The collision manager from trimesh returns all collisions,
         which are then filtered based on the provided collision matrix. If there are multiple contacts between two bodies,
@@ -78,17 +84,11 @@ class TrimeshCollisionDetector(CollisionDetector):
         :param collision_matrix: An optional set of CollisionCheck objects to filter the collisions. If None is provided, all collisions are checked.
         :return: A list of Collision objects representing the detected collisions.
         """
-        self.sync_world_model()
-        self.sync_world_state()
-
-        if collision_matrix is None:
-            return []
-
-        collision_pairs = [
-            (cc.body_a, cc.body_b, cc.distance) for cc in collision_matrix
-        ]
         result = []
-        for body_a, body_b, distance in collision_pairs:
+        for collision_check in collision_matrix.collision_checks:
+            body_a = collision_check.body_a
+            body_b = collision_check.body_b
+            distance = collision_check.distance
             if (
                 body_a not in self._collision_objects
                 or body_b not in self._collision_objects
@@ -106,28 +106,28 @@ class TrimeshCollisionDetector(CollisionDetector):
                 distance_request,
                 distance_result,
             )
-            if distance_result.min_distance <= distance:
-                result.append(
-                    Collision(
-                        distance_result.min_distance,
-                        body_a,
-                        body_b,
-                        map_P_pa=distance_result.nearest_points[0],
-                        map_P_pb=distance_result.nearest_points[1],
-                        map_V_n_input=distance_result.nearest_points[0]
-                        - distance_result.nearest_points[1],
-                    )
+            if distance_result.min_distance > distance:
+                continue
+            contact_normal = (
+                distance_result.nearest_points[0] - distance_result.nearest_points[1]
+            )
+            contact_normal /= np.linalg.norm(contact_normal)
+            result.append(
+                ClosestPoints(
+                    distance=distance_result.min_distance,
+                    body_a=body_a,
+                    body_b=body_b,
+                    root_P_point_on_body_a=np.append(
+                        distance_result.nearest_points[0], 1
+                    ),
+                    root_P_point_on_body_b=np.append(
+                        distance_result.nearest_points[1], 1
+                    ),
+                    root_V_contact_normal_from_b_to_a=np.append(contact_normal, 0),
                 )
+            )
 
-        return result
-
-    def check_collision_between_bodies(
-        self, body_a: Body, body_b: Body
-    ) -> Optional[Collision]:
-        collision = self.check_collisions(
-            {CollisionCheck(body_a, body_b, 0.0, self._world)}
-        )
-        return collision[0] if collision else None
+        return CollisionCheckingResult(result)
 
     def reset_cache(self):
         pass

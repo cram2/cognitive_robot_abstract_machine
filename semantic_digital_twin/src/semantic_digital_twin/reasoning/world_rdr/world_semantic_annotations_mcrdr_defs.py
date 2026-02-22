@@ -29,7 +29,7 @@ def conclusion_90574698325129464513441443063592862114(case) -> List[Handle]:
     def get_handles(case: World) -> Union[set, list, Handle]:
         """Get possible value(s) for World.semantic_annotations of types list/set of Handle"""
         return [
-            Handle(root=b)
+            Handle(root=b, _world=case)
             for b in case.kinematic_structure_entities
             if "handle" in b.name.name.lower()
         ]
@@ -63,7 +63,11 @@ def conclusion_331345798360792447350644865254855982739(case) -> List[Drawer]:
             if fc.parent in [pc.child for pc in prismatic_connections]
         ]
         drawers = [
-            Drawer(root=fc.parent, handle=[h for h in handles if h.root == fc.child][0])
+            Drawer(
+                root=fc.parent,
+                handle=[h for h in handles if h.root == fc.child][0],
+                _world=case,
+            )
             for fc in drawer_handle_connections
         ]
         return drawers
@@ -103,7 +107,7 @@ def conclusion_35528769484583703815352905256802298589(case) -> List[Wardrobe]:
             wardrobe_drawers = [
                 d for d in drawers if d.root in wardrobe_drawer_HasCaseAsMainBody_bodies
             ]
-            wardrobes.append(Wardrobe(root=ccb, drawers=wardrobe_drawers))
+            wardrobes.append(Wardrobe(root=ccb, drawers=wardrobe_drawers, _world=case))
 
         return wardrobes
 
@@ -150,7 +154,11 @@ def conclusion_59112619694893607910753808758642808601(case) -> List[Door]:
             if c.parent in bodies_that_have_revolute_joints
         ]
         doors = [
-            Door(root=c.parent, handle=[h for h in handles if h.root == c.child][0])
+            Door(
+                root=c.parent,
+                handle=[h for h in handles if h.root == c.child][0],
+                _world=case,
+            )
             for c in body_handle_connections
         ]
         return doors
@@ -193,6 +201,7 @@ def conclusion_10840634078579061471470540436169882059(case) -> List[Fridge]:
             Fridge(
                 root=c.parent,
                 doors=[fridge_doors[fridge_doors_bodies.index(c.child)]],
+                _world=case,
             )
             for c in fridge_door_connections
         ]

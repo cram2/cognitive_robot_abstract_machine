@@ -114,6 +114,12 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         for callback in self.state_change_callbacks:
             callback.notify(**kwargs)
 
+    def clear(self):
+        self.data = np.zeros((4, 0), dtype=float)
+        self._ids = []
+        self._index = {}
+        self.version += 1
+
     def _add_dof(self, uuid: UUID) -> None:
         idx = len(self._ids)
         self._ids.append(uuid)
@@ -296,6 +302,10 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
             for v_id in self
         ]
         return positions + velocities + accelerations + jerks
+
+    @property
+    def position_float_variables(self) -> List[FloatVariable]:
+        return [v.variables.position for v in self._world.degrees_of_freedom]
 
     def _apply_control_commands(
         self, commands: np.ndarray, dt: float, derivative: Derivatives

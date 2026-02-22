@@ -1,4 +1,5 @@
 import json
+import time
 
 import numpy as np
 from std_srvs.srv import Trigger
@@ -8,8 +9,12 @@ from semantic_digital_twin.adapters.ros.world_fetcher import (
     FetchWorldServer,
     fetch_world_from_service,
 )
+from semantic_digital_twin.adapters.ros.world_synchronizer import ModelSynchronizer
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
+)
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AvoidExternalCollisions,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
@@ -206,3 +211,36 @@ def test_pr2_semantic_annotation(rclpy_node, pr2_world_state_reset):
     assert [sa.name for sa in pr2_world_state_reset.semantic_annotations] == [
         sa.name for sa in pr2_world_copy.semantic_annotations
     ]
+
+
+def test_pr2_collision_rules(rclpy_node, pr2_world_state_reset):
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
+
+    pr2_world_copy = fetch_world_from_service(
+        rclpy_node,
+    )
+    synchronizer_1 = ModelSynchronizer(
+        node=rclpy_node,
+        _world=pr2_world_state_reset,
+    )
+    synchronizer_2 = ModelSynchronizer(
+        node=rclpy_node,
+        _world=pr2_world_copy,
+    )
+
+    assert len(pr2_world_state_reset.collision_manager.rules) == len(
+        pr2_world_copy.collision_manager.rules
+    )
+
+    time.sleep(1)
+
+    with pr2_world_state_reset.modify_world():
+        pr2_world_state_reset.collision_manager.add_temporary_rule(
+            AvoidExternalCollisions(robot=pr2)
+        )
+
+    time.sleep(1)
+    assert len(pr2_world_state_reset.collision_manager.rules) == len(
+        pr2_world_copy.collision_manager.rules
+    )

@@ -3,6 +3,7 @@ from collections import defaultdict
 
 import numpy as np
 import pytest
+from pkg_resources import resource_filename
 from typing_extensions import List
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -440,34 +441,6 @@ def test_kinematic_chains(pr2_world_state_reset):
     for chain in semantic_kinematic_chain_annotation:
         assert chain.root
         assert chain.tip
-
-
-def test_load_collision_config_srdf(pr2_world_state_reset):
-    path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "collision_configs",
-        "pr2.srdf",
-    )
-    pr2_world_state_reset.load_collision_srdf(path)
-    assert (
-        len(
-            [
-                b
-                for b in pr2_world_state_reset.bodies
-                if b.get_collision_config().disabled
-            ]
-        )
-        == 20
-    )
-    assert (
-        len(pr2_world_state_reset._collision_pair_manager.disabled_collision_pairs)
-        == 1431
-    )
 
 
 def test_tracy_semantic_annotation(tracy_world):

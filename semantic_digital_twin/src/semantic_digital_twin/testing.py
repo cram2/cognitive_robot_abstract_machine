@@ -1,9 +1,7 @@
 import os
-import threading
-import time
 
 import pytest
-from krrood.entity_query_language.symbol_graph import SymbolGraph
+from pkg_resources import resource_filename
 from typing_extensions import Tuple
 
 from .adapters.urdf import URDFParser
@@ -11,7 +9,6 @@ from .datastructures.prefixed_name import PrefixedName
 from .spatial_types import HomogeneousTransformationMatrix
 from .spatial_types.derivatives import DerivativeMap
 from .spatial_types.spatial_types import Vector3
-from .utils import rclpy_installed, tracy_installed, hsrb_installed
 from .world import World
 from .world_description.connections import (
     Connection6DoF,
@@ -21,7 +18,7 @@ from .world_description.connections import (
     OmniDrive,
 )
 from .world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
-from .world_description.geometry import Box, Scale, Sphere
+from .world_description.geometry import Box, Scale, Sphere, Cylinder, FileMesh
 from .world_description.shape_collection import ShapeCollection
 from .world_description.world_entity import Body
 
@@ -78,6 +75,104 @@ def world_setup() -> Tuple[
 
 @pytest.fixture
 def world_setup_simple():
+    world = World()
+    root = Body(name=PrefixedName(name="root", prefix="world"))
+    body1 = Body(
+        name=PrefixedName("box", prefix="test"),
+        collision=ShapeCollection(
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                    scale=Scale(0.2, 0.2, 0.2),
+                )
+            ]
+        ),
+    )
+    body2 = Body(
+        name=PrefixedName("cylinder", prefix="test"),
+        collision=ShapeCollection(
+            [
+                Cylinder(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                    width=0.5,
+                    height=0.2,
+                )
+            ]
+        ),
+    )
+    body3 = Body(
+        name=PrefixedName("sphere", prefix="test"),
+        collision=ShapeCollection(
+            [Sphere(origin=HomogeneousTransformationMatrix.from_xyz_rpy(), radius=0.1)]
+        ),
+    )
+
+    body4 = Body(
+        name=PrefixedName("mesh", prefix="test"),
+        collision=ShapeCollection(
+            [
+                FileMesh(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                    filename=os.path.join(
+                        resource_filename("semantic_digital_twin", "../../"),
+                        "resources",
+                        "stl",
+                        "jeroen_cup.stl",
+                    ),
+                    scale=Scale(10, 10, 10),
+                )
+            ]
+        ),
+    )
+    body5 = Body(
+        name=PrefixedName("compound", prefix="test"),
+        collision=ShapeCollection(
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.05),
+                    scale=Scale(0.1, 0.2, 0.2),
+                ),
+                Box(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.05),
+                    scale=Scale(0.1, 0.2, 0.2),
+                ),
+            ]
+        ),
+    )
+
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body1)
+        world.add_kinematic_structure_entity(body2)
+        world.add_kinematic_structure_entity(body3)
+        world.add_kinematic_structure_entity(body4)
+        world.add_kinematic_structure_entity(body5)
+
+        c_root_body1 = Connection6DoF.create_with_dofs(
+            parent=root, child=body1, world=world
+        )
+        c_root_body2 = Connection6DoF.create_with_dofs(
+            parent=root, child=body2, world=world
+        )
+        c_root_body3 = Connection6DoF.create_with_dofs(
+            parent=root, child=body3, world=world
+        )
+        c_root_body4 = Connection6DoF.create_with_dofs(
+            parent=root, child=body4, world=world
+        )
+        c_root_body5 = Connection6DoF.create_with_dofs(
+            parent=root, child=body5, world=world
+        )
+
+        world.add_connection(c_root_body1)
+        world.add_connection(c_root_body2)
+        world.add_connection(c_root_body3)
+        world.add_connection(c_root_body4)
+        world.add_connection(c_root_body5)
+    return world, body1, body2, body3, body4, body5
+
+
+@pytest.fixture()
+def ray_test_world():
     world = World()
     root = Body(name=PrefixedName(name="root", prefix="world"))
     body1 = Body(

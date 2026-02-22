@@ -5,13 +5,9 @@ from typing import List
 
 from typing_extensions import Optional
 
-from giskardpy.motion_statechart.context import BuildContext
-from giskardpy.motion_statechart.graph_node import (
-    Goal,
-    MotionStatechartNode,
-    NodeArtifacts,
-)
-from krrood.symbolic_math.symbolic_math import trinary_logic_and, sum
+from krrood.symbolic_math.symbolic_math import sum
+from ..context import MotionStatechartContext
+from ..graph_node import Goal, MotionStatechartNode, NodeArtifacts
 
 
 @dataclass(repr=False, eq=False)
@@ -23,7 +19,7 @@ class Sequence(Goal):
 
     nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
 
-    def expand(self, context: BuildContext) -> None:
+    def expand(self, context: MotionStatechartContext) -> None:
         last_node: Optional[MotionStatechartNode] = None
         for i, node in enumerate(self.nodes):
             self.add_node(node)
@@ -32,7 +28,7 @@ class Sequence(Goal):
             node.end_condition = node.observation_variable
             last_node = node
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=self.nodes[-1].observation_variable)
 
 
@@ -50,14 +46,19 @@ class Parallel(Goal):
     Defaults to None, which means that all nodes must be True.
     """
 
-    def expand(self, context: BuildContext) -> None:
+    def expand(self, context: MotionStatechartContext) -> None:
         for node in self.nodes:
             self.add_node(node)
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
-        true_observation_variables = [x.observation_variable == True for x in self.nodes]
-        minimum_success = self.minimum_success if self.minimum_success is not None else len(self.nodes)
-
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        true_observation_variables = [
+            x.observation_variable == True for x in self.nodes
+        ]
+        minimum_success = (
+            self.minimum_success
+            if self.minimum_success is not None
+            else len(self.nodes)
+        )
         return NodeArtifacts(
             observation=minimum_success <= sum(*true_observation_variables)
         )

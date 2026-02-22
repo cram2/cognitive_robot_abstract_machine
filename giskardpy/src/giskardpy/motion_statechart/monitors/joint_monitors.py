@@ -1,21 +1,34 @@
 from dataclasses import field, dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.context import BuildContext
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     ActiveConnection1DOF,
 )
+from ..context import MotionStatechartContext
+from ..graph_node import MotionStatechartNode, NodeArtifacts
 
 
 @dataclass(eq=False, repr=False)
 class JointPositionReached(MotionStatechartNode):
-    connection: ActiveConnection1DOF = field(kw_only=True)
-    position: float = field(kw_only=True)
-    threshold: float = field(default=0.01, kw_only=True)
+    """
+    Monitors if a joint position is reached within a certain threshold.
+    """
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    connection: ActiveConnection1DOF = field(kw_only=True)
+    """
+    Monitored joint connection.
+    """
+    position: float = field(kw_only=True)
+    """
+    Target position to monitor.
+    """
+    threshold: float = field(default=0.01, kw_only=True)
+    """
+    Threshold for position error.
+    """
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         current = self.connection.dof.variables.position
         if (
             isinstance(self.connection, RevoluteConnection)

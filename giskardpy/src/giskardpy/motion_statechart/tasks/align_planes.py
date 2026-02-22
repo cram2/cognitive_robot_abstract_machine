@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 
-from giskardpy.motion_statechart.context import BuildContext
-from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.graph_node import Task, NodeArtifacts, DebugExpression
+from ..context import MotionStatechartContext
+from ..data_types import DefaultWeights
+from ..graph_node import Task, NodeArtifacts, DebugExpression
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
@@ -31,7 +31,7 @@ class AlignPlanes(Task):
     reference_velocity: float = field(default=0.5, kw_only=True)
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
         tip_V_tip_normal = context.world.transform(

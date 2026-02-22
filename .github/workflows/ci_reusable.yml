@@ -10,21 +10,16 @@ on:
         description: "Library folder name (relative to repo root)"
         required: true
         type: string
+      repo_lowercase:
+        description: "Lowercase repository name with tag"
+        required: true
+        type: string
 
 jobs:
-  to-lowercase:
-    runs-on: ubuntu-latest
-    outputs:
-      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
-    steps:
-      - id: lowercase
-        run: |
-          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
   test:
-    needs: to-lowercase
     runs-on: ubuntu-latest
     container:
-      image: ${{ needs.to-lowercase.outputs.repo_lowercase }}
+      image: ${{ inputs.repo_lowercase }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,6 +39,20 @@ jobs:
           source /opt/ros/cram-env/bin/activate
           poetry install
 
+      - name: Restore cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /github/home/.cache/semantic_digital_twin
+          key: ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}
+            ${{ runner.os }}-cache-${{ inputs.lib }}
+            ${{ runner.os }}-cache-
+
+      - name: List files in cache 1
+        run: |
+          ls -R /github/home/.cache/semantic_digital_twin
+
       - name: Build ORM
         if: ${{inputs.lib == 'pycram' || inputs.lib == 'semantic_digital_twin'}}
         run: |
@@ -57,3 +66,14 @@ jobs:
           source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
           python -m pytest -sv cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+
+      - name: Save cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /github/home/.cache/semantic_digital_twin
+          key: ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}-${{ github.run_id }}
+
+      - name: List files in cache 2
+        run: |
+          ls -R /github/home/.cache/semantic_digital_twin

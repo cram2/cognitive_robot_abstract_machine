@@ -96,7 +96,7 @@ def immutable_multiple_robot_simple_apartment(
     world, view = setup_multi_robot_simple_apartment
     state = deepcopy(world.state.data)
     yield world, view, Context(world, view)
-    world.state.data = state
+    world.state.data[:] = state
     world.notify_state_change()
 
 
@@ -375,9 +375,12 @@ def test_accessing_location(immutable_model_world):
 def test_giskard_location_pose(immutable_model_world):
     world, robot_view, context = immutable_model_world
     location_desig = GiskardLocation(
-        PoseStamped.from_list([2.1, 2, 1], frame=world.root), Arms.RIGHT
+        PoseStamped.from_list([1.9, 2, 1], frame=world.root), Arms.RIGHT
     )
-    plan = SequentialPlan(context, NavigateActionDescription(location_desig))
+    plan = SequentialPlan(
+        context,
+        NavigateActionDescription(location_desig),
+    )
 
     location = location_desig.resolve()
     assert len(location.position.to_list()) == 3

@@ -30,6 +30,7 @@ from .world_entity import (
     Actuator,
     WorldEntityWithID,
 )
+from ..adapters.world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
 from ..exceptions import MissingWorldModificationContextError
 
 if TYPE_CHECKING:
@@ -88,7 +89,10 @@ class AttributeUpdateModification(WorldModelModification):
 
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]):
-        return cls(from_json(kwargs["entity_id"]), from_json(kwargs["updated_kwargs"]))
+        return cls(
+            from_json(kwargs["entity_id"], **kwargs),
+            from_json(kwargs["updated_kwargs"], **kwargs),
+        )
 
     def apply(self, world: World):
         entity = world.get_world_entity_with_id_by_id(self.entity_id)
@@ -128,8 +132,8 @@ class AttributeUpdateModification(WorldModelModification):
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(
-            entity_id=from_json(data["entity_id"]),
-            updated_kwargs=from_json(data["updated_kwargs"]),
+            entity_id=from_json(data["entity_id"], **kwargs),
+            updated_kwargs=from_json(data["updated_kwargs"], **kwargs),
         )
 
 
@@ -530,7 +534,13 @@ def synchronized_attribute_modification(func):
         object_before_change = to_json(self)
         result = func(self, *args, **kwargs)
         object_after_change = to_json(self)
-        diff = shallow_diff_json(object_before_change, object_after_change)
+
+        tracker = WorldEntityWithIDKwargsTracker.from_world(self._world)
+        tracker_kwargs = tracker.create_kwargs()
+
+        diff = shallow_diff_json(
+            object_before_change, object_after_change, **tracker_kwargs
+        )
 
         current_model_modification_block = (
             self._world.get_world_model_manager().current_model_modification_block
@@ -545,6 +555,7 @@ def synchronized_attribute_modification(func):
                 {
                     "entity_id": object_after_change["id"],
                     "updated_kwargs": to_json(diff),
+                    **tracker_kwargs,
                 }
             )
         )

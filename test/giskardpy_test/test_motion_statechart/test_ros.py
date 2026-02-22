@@ -1,46 +1,18 @@
 import json
-
-import numpy as np
-import pytest
+import time
 
 from giskardpy.executor import Executor
-from giskardpy.model.collision_matrix_manager import (
-    CollisionRequest,
-    CollisionAvoidanceTypes,
-)
-from giskardpy.motion_statechart.context import BuildContext
-from giskardpy.motion_statechart.data_types import (
-    LifeCycleValues,
-    ObservationStateValues,
-)
-from giskardpy.motion_statechart.exceptions import (
-    NodeNotFoundError,
-)
-from giskardpy.motion_statechart.goals.templates import Sequence
-from giskardpy.motion_statechart.graph_node import (
-    TrinaryCondition,
-    EndMotion,
-    CancelMotion,
-)
+from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.goals.collision_avoidance import SelfCollisionAvoidance
+from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
+from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
-from giskardpy.motion_statechart.motion_statechart import (
-    MotionStatechart,
-    LifeCycleState,
-    ObservationState,
+from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
+    SetSeedConfiguration,
 )
+from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from giskardpy.motion_statechart.test_nodes.test_nodes import (
-    ConstTrueNode,
-    TestNestedGoal,
-)
-from giskardpy.qp.qp_controller_config import QPControllerConfig
-from giskardpy.utils.utils import limits_from_urdf_joint
-from krrood.symbolic_math.symbolic_math import (
-    trinary_logic_and,
-    trinary_logic_not,
-    trinary_logic_or,
-)
 from semantic_digital_twin.adapters.ros.world_fetcher import (
     FetchWorldServer,
     fetch_world_from_service,
@@ -49,63 +21,80 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-)
-from semantic_digital_twin.world_description.degree_of_freedom import (
-    DegreeOfFreedom,
-    DegreeOfFreedomLimits,
-)
-from semantic_digital_twin.world_description.world_entity import Body
 
 
-def test_cart_goal_simple(pr2_world_setup: World, rclpy_node):
-    tip = pr2_world_setup.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world_setup.get_kinematic_structure_entity_by_name("odom_combined")
-    tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=-0.2, reference_frame=tip
-    )
-
-    msc = MotionStatechart()
-    cart_goal = CartesianPose(
-        root_link=root,
-        tip_link=tip,
-        goal_pose=tip_goal,
-    )
-    msc.add_node(cart_goal)
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = cart_goal.observation_variable
-
-    json_data = msc.to_json()
+def to_and_from_json(motion_statechart: MotionStatechart, target_world: World):
+    json_data = motion_statechart.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
-    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_setup)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(target_world)
+    kwargs = tracker.create_kwargs()
+    return MotionStatechart.from_json(new_json_data, **kwargs)
+
+
+def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_reset):
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
+
     pr2_world_copy = fetch_world_from_service(
         rclpy_node,
     )
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_copy)
-    kwargs = tracker.create_kwargs()
-    msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
+    time.sleep(2)
 
-    kin_sim = Executor(
-        world=pr2_world_copy,
-        controller_config=QPControllerConfig.create_with_simulation_defaults(),
+    fetched_pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+
+    r_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        "r_gripper_tool_frame"
+    )
+    base_footprint = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        "base_footprint"
     )
 
+    msc = MotionStatechart()
+    msc.add_node(
+        Sequence(
+            [
+                SetSeedConfiguration(
+                    seed_configuration=JointState.from_str_dict(
+                        {
+                            "r_elbow_flex_joint": -1.43286344265,
+                            "r_forearm_roll_joint": -1.26465060073,
+                            "r_shoulder_lift_joint": 0.47990329056,
+                            "r_shoulder_pan_joint": -0.281272240139,
+                            "r_upper_arm_roll_joint": -0.528415402668,
+                            "r_wrist_flex_joint": -1.18811419869,
+                            "r_wrist_roll_joint": 2.26884630124,
+                        },
+                        world=pr2_world_state_reset,
+                    )
+                ),
+                Parallel(
+                    [
+                        CartesianPose(
+                            root_link=base_footprint,
+                            tip_link=r_tip,
+                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                                0.2, reference_frame=r_tip
+                            ),
+                            weight=DefaultWeights.WEIGHT_ABOVE_CA,
+                        ),
+                        SelfCollisionAvoidance(robot=pr2),
+                    ]
+                ),
+            ]
+        )
+    )
+    msc.add_node(local_min := LocalMinimumReached())
+    msc.add_node(EndMotion.when_true(local_min))
+
+    msc_copy = to_and_from_json(msc, pr2_world_copy)
+
+    kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
     kin_sim.compile(motion_statechart=msc_copy)
-    kin_sim.tick_until_end()
 
-    fk = pr2_world_copy.compute_forward_kinematics_np(
-        pr2_world_copy.get_kinematic_structure_entity_by_name(root.name),
-        pr2_world_copy.get_kinematic_structure_entity_by_name(tip.name),
-    )
-    assert np.allclose(fk, tip_goal, atol=cart_goal.threshold)
-    fetcher.close()
+    kin_sim.tick_until_end(500)

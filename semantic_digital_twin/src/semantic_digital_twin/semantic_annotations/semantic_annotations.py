@@ -166,9 +166,7 @@ class Aperture(HasRootRegion):
         body: Body,
         parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
     ) -> Self:
-
-        world._forward_kinematic_manager.recompile()
-        world._forward_kinematic_manager.recompute()
+        world.update_forward_kinematics()
         body_scale = (
             body.collision.as_bounding_box_collection_in_frame(body)
             .bounding_box()

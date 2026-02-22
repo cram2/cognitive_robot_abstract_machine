@@ -397,14 +397,16 @@ class TriangleMesh(Mesh):
         self.mesh.apply_scale(self.scale.to_np())
 
     @property
-    def file_name(self) -> str:
+    def filename(self) -> str:
         return self.file.name
 
     @cached_property
     def file(
         self, dirname: str = "/tmp", file_type: str = "obj"
     ) -> tempfile._TemporaryFileWrapper:
-        f = tempfile.NamedTemporaryFile(dir=dirname, delete=False)
+        f = tempfile.NamedTemporaryFile(
+            dir=dirname, suffix=f".{file_type}", delete=False
+        )
         if file_type == "obj":
             self.mesh.export(f.name, file_type="obj")
             old_mtl_file = "material.mtl"

@@ -1985,19 +1985,14 @@ class MujocoActuatorSpawner(MujocoEntitySpawner, ActuatorSpawner):
         )
 
 
-@dataclass
+@dataclass(eq=False)
 class MultiSimSynchronizer(ModelChangeCallback, ABC):
     """
     A callback to synchronize the world model with the Multiverse simulator.
     This callback will listen to the world model changes and update the Multiverse simulator accordingly.
     """
 
-    world: World
-    """
-    The world to synchronize with the simulator.
-    """
-
-    simulator: MultiverseSimulator
+    simulator: MultiverseSimulator = field(kw_only=True)
     """
     The Multiverse simulator to synchronize with the world.
     """
@@ -2013,7 +2008,7 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
     """
 
     def _notify(self, **kwargs):
-        for modification in self.world._model_manager.model_modification_blocks[-1]:
+        for modification in self._world._model_manager.model_modification_blocks[-1]:
             if isinstance(modification, AddKinematicStructureEntityModification):
                 entity = modification.kinematic_structure_entity
                 self.entity_spawner.spawn(simulator=self.simulator, entity=entity)
@@ -2022,10 +2017,10 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
                 self.entity_spawner.spawn(simulator=self.simulator, entity=entity)
 
     def stop(self):
-        self.world._model_manager.model_change_callbacks.remove(self)
+        self._world._model_manager.model_change_callbacks.remove(self)
 
 
-@dataclass
+@dataclass(eq=False)
 class MujocoSynchronizer(MultiSimSynchronizer):
     simulator: MultiverseMujocoConnector
     entity_converter: Type[EntityConverter] = field(default=MujocoConverter)
@@ -2095,7 +2090,7 @@ class MultiSim(ABC):
             **kwargs,
         )
         self.synchronizer = self.synchronizer_class(
-            world=world,
+            _world=world,
             simulator=self.simulator,
         )
         self._viewer = viewer

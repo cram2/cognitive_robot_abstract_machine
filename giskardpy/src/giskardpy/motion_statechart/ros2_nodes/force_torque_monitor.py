@@ -5,7 +5,7 @@ import numpy as np
 from geometry_msgs.msg import WrenchStamped
 
 from .topic_monitor import TopicSubscriberNode
-from ..context import ExecutionContext
+from ..context import MotionStatechartContext
 from ..data_types import ObservationStateValues
 
 
@@ -50,7 +50,9 @@ class ForceImpactMonitor(ForceTorqueNode):
 
     threshold: float = field(kw_only=True)
 
-    def on_tick(self, context: ExecutionContext) -> Optional[ObservationStateValues]:
+    def on_tick(
+        self, context: MotionStatechartContext
+    ) -> Optional[ObservationStateValues]:
         super().on_tick(context)
         if not self.has_msg():
             return ObservationStateValues.UNKNOWN

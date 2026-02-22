@@ -10,7 +10,7 @@ from rclpy.subscription import Subscription
 from typing_extensions import Generic, Type
 
 import krrood.symbolic_math.symbolic_math as sm
-from ..context import ExecutionContext, BuildContext
+from ..context import MotionStatechartContext
 from ..data_types import ObservationStateValues
 from ..graph_node import MotionStatechartNode, NodeArtifacts
 from ..ros_context import RosContextExtension
@@ -32,7 +32,7 @@ class TopicNode(MotionStatechartNode, Generic[MsgType]):
     """QoS profile to use when subscribing to the topic."""
     ros2_node: Node = field(init=False)
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         ros_context_extension = context.require_extension(RosContextExtension)
         self.ros2_node = ros_context_extension.ros_node
         return NodeArtifacts()
@@ -57,7 +57,7 @@ class TopicSubscriberNode(TopicNode[MsgType]):
     __last_msg is copied to this variable on every tick while this node is RUNNING.
     """
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         node_artifacts = super().build(context)
         self._subscriber = self.ros2_node.create_subscription(
             msg_type=self.msg_type,
@@ -76,13 +76,15 @@ class TopicSubscriberNode(TopicNode[MsgType]):
     def clear_msg(self):
         self.__last_msg = None
 
-    def on_tick(self, context: ExecutionContext) -> Optional[ObservationStateValues]:
+    def on_tick(
+        self, context: MotionStatechartContext
+    ) -> Optional[ObservationStateValues]:
         """
         .. warning:: If you override this method, make sure to call `super().on_tick(context)`.
         """
         self.current_msg = self.__last_msg
 
-    def on_reset(self, context: ExecutionContext):
+    def on_reset(self, context: MotionStatechartContext):
         self.clear_msg()
 
 
@@ -96,7 +98,7 @@ class TopicPublisherNode(TopicNode[MsgType]):
     _publisher: Publisher = field(init=False)
     """Internal ROS publisher object."""
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         node_artifacts = super().build(context)
         self._publisher = self.ros2_node.create_publisher(
             msg_type=self.msg_type,
@@ -112,7 +114,9 @@ class WaitForMessage(TopicSubscriberNode[MsgType]):
     This node will turn to True once a message was received on its topic.
     """
 
-    def on_tick(self, context: ExecutionContext) -> Optional[ObservationStateValues]:
+    def on_tick(
+        self, context: MotionStatechartContext
+    ) -> Optional[ObservationStateValues]:
         super().on_tick(context)
         if self.has_msg():
             return ObservationStateValues.TRUE
@@ -135,10 +139,10 @@ class PublishOnStart(TopicPublisherNode[MsgType]):
         super().__post_init__()
         self.msg_type = type(self.msg)
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         node_artifacts = super().build(context)
         node_artifacts.observation = sm.Scalar.const_true()
         return node_artifacts
 
-    def on_start(self, context: ExecutionContext):
+    def on_start(self, context: MotionStatechartContext):
         self._publisher.publish(self.msg)

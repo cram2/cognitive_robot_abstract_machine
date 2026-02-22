@@ -24,6 +24,11 @@ import semantic_digital_twin.world_description.degree_of_freedom
 import semantic_digital_twin.world_description.geometry
 import semantic_digital_twin.world_description.shape_collection
 import semantic_digital_twin.world_description.world_entity
+import semantic_digital_twin.collision_checking.collision_groups
+import semantic_digital_twin.collision_checking.collision_rules
+import semantic_digital_twin.collision_checking.collision_detector
+import semantic_digital_twin.collision_checking.collision_manager
+import semantic_digital_twin.collision_checking.collision_variable_managers
 from krrood.adapters.json_serializer import JSONAttributeDiff
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
@@ -84,6 +89,20 @@ all_classes |= set(classes_of_module(semantic_digital_twin.robots.abstract_robot
 all_classes |= set(classes_of_module(semantic_digital_twin.datastructures.definitions))
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.hsrb))
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.pr2))
+all_classes |= set(
+    classes_of_module(semantic_digital_twin.collision_checking.collision_rules)
+)
+all_classes |= set(
+    classes_of_module(semantic_digital_twin.collision_checking.collision_matrix)
+)
+all_classes |= set(
+    classes_of_module(semantic_digital_twin.collision_checking.collision_groups)
+)
+all_classes |= set(
+    classes_of_module(
+        semantic_digital_twin.collision_checking.collision_variable_managers
+    )
+)
 # classes |= set(recursive_subclasses(ViewFactory))
 all_classes |= {SimulatorAdditionalProperty}
 all_classes |= set(classes_of_module(semantic_digital_twin.reasoning.predicates))

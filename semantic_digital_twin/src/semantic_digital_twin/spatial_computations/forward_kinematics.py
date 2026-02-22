@@ -1,18 +1,21 @@
 from __future__ import absolute_import, annotations
 
-from collections import OrderedDict
+from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Dict, Tuple, TYPE_CHECKING
+from typing import Dict, TYPE_CHECKING
 from uuid import UUID
 
 import numpy as np
 import rustworkx.visit
+from typing_extensions import List
 
 from krrood.symbolic_math.symbolic_math import (
     CompiledFunction,
     Matrix,
     VariableParameters,
+    FloatVariable,
 )
+from ..callbacks.callback import ModelChangeCallback
 from ..datastructures.types import NpMatrix4x4
 from ..spatial_types import HomogeneousTransformationMatrix
 from ..spatial_types.math import inverse_frame
@@ -23,7 +26,8 @@ if TYPE_CHECKING:
     from ..world import World
 
 
-class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
+@dataclass
+class ForwardKinematicsManager(ModelChangeCallback):
     """
     Visitor class for collection various forward kinematics expressions in a world model.
 
@@ -34,44 +38,49 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
     3. Efficient computation of forward kinematics as position and quaternion, useful for ROS tf.
     """
 
-    compiled_collision_fks: CompiledFunction
-    compiled_all_fks: CompiledFunction
+    compiled_all_fks: CompiledFunction = field(init=False, repr=False)
 
-    forward_kinematics_for_all_bodies: np.ndarray
+    forward_kinematics_for_all_bodies: np.ndarray = field(init=False, repr=False)
     """
     A 2D array containing the stacked forward kinematics expressions for all bodies in the world.
     Dimensions are ((number of bodies) * 4) x 4.
     They are computed in batch for efficiency.
     """
-    body_id_to_forward_kinematics_idx: Dict[UUID, int]
+    body_id_to_forward_kinematics_idx: Dict[UUID, int] = field(init=False, repr=False)
     """
     Given a body id, returns the index of the first row in `forward_kinematics_for_all_bodies` that corresponds to that body.
     """
 
-    def __init__(self, world: World):
-        self.world = world
-        self.child_body_to_fk_expr: Dict[UUID, HomogeneousTransformationMatrix] = {
-            self.world.root.id: HomogeneousTransformationMatrix()
-        }
+    root_T_kse_expression_cache: Dict[UUID, HomogeneousTransformationMatrix] = field(
+        init=False, repr=False
+    )
 
-    def recompile(self):
-        self.child_body_to_fk_expr: Dict[UUID, HomogeneousTransformationMatrix] = {
-            self.world.root.id: HomogeneousTransformationMatrix()
-        }
-        self.world._travel_branch(self.world.root, self)
+    body_id_to_all_fk_index: Dict[UUID, int] = field(init=False, repr=False)
+
+    def _notify(self, **kwargs):
+        if len(self._world.kinematic_structure_entities) == 0:
+            return
+        self.update_root_T_kse_expression_cache()
+        self.compose_expression.cache_clear()
         self.compile()
+        self.recompute()  # we need to recompute because other model updaters might need fk.
 
-    def connection_call(self, edge: Tuple[int, int, Connection]):
-        """
-        Gathers forward kinematics expressions for a connection.
-        """
-        connection = edge[2]
-        map_T_parent = self.child_body_to_fk_expr[connection.parent.id]
-        self.child_body_to_fk_expr[connection.child.id] = map_T_parent.dot(
-            connection.origin_expression
-        )
+    def __hash__(self):
+        return hash(id(self))
 
-    tree_edge = connection_call
+    def update_root_T_kse_expression_cache(self):
+        self.root_T_kse_expression_cache = {
+            self._world.root.id: HomogeneousTransformationMatrix()
+        }
+        for parent, childs in rustworkx.bfs_successors(
+            self._world.kinematic_structure, self._world.root.index
+        ):
+            root_T_parent = self.root_T_kse_expression_cache[parent.id]
+            for child in childs:
+                parent_C_child = self._world.get_connection(parent, child)
+                self.root_T_kse_expression_cache[child.id] = (
+                    root_T_parent @ parent_C_child.origin_expression
+                )
 
     def compile(self) -> None:
         """
@@ -79,28 +88,20 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
         """
         all_fks = Matrix.vstack(
             [
-                self.child_body_to_fk_expr[body.id]
-                for body in self.world.kinematic_structure_entities
+                self.root_T_kse_expression_cache[body.id]
+                for body in self._world.kinematic_structure_entities
             ]
         )
-        collision_fks = []
-        for body in sorted(
-            self.world.bodies_with_enabled_collision, key=lambda b: b.id
-        ):
-            if body == self.world.root:
-                continue
-            collision_fks.append(self.child_body_to_fk_expr[body.id])
-        collision_fks = Matrix.vstack(collision_fks)
-        params = [v.variables.position for v in self.world.degrees_of_freedom]
+
         self.compiled_all_fks = all_fks.compile(
-            parameters=VariableParameters.from_lists(params)
+            parameters=VariableParameters.from_lists(
+                self._world.state.position_float_variables
+            )
         )
-        self.compiled_collision_fks = collision_fks.compile(
-            parameters=VariableParameters.from_lists(params)
-        )
-        self.idx_start = {
+        self.compiled_all_fks.bind_args_to_memory_view(0, self._world.state.positions)
+        self.body_id_to_all_fk_index = {
             body.id: i * 4
-            for i, body in enumerate(self.world.kinematic_structure_entities)
+            for i, body in enumerate(self._world.kinematic_structure_entities)
         }
 
     def recompute(self) -> None:
@@ -108,9 +109,7 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
         Clears cache and recomputes all forward kinematics. Should be called after a state update.
         """
         self.compute_np.cache_clear()
-        self.subs = self.world.state.positions
-        self.forward_kinematics_for_all_bodies = self.compiled_all_fks(self.subs)
-        self.collision_fks = self.compiled_collision_fks(self.subs)
+        self.forward_kinematics_for_all_bodies = self.compiled_all_fks.evaluate()
 
     @copy_lru_cache()
     def compose_expression(
@@ -123,9 +122,12 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
             It determines the endpoint of the forward kinematics calculation.
         :return: An expression representing the computed forward kinematics of the tip KinematicStructureEntity relative to the root KinematicStructureEntity.
         """
-
+        if root == self._world.root:
+            return self.root_T_kse_expression_cache[tip.id]
         fk = HomogeneousTransformationMatrix()
-        root_chain, tip_chain = self.world.compute_split_chain_of_connections(root, tip)
+        root_chain, tip_chain = self._world.compute_split_chain_of_connections(
+            root, tip
+        )
         connection: Connection
         for connection in root_chain:
             tip_T_root = connection.origin_expression.inverse()
@@ -169,17 +171,17 @@ class ForwardKinematicsManager(rustworkx.visit.DFSVisitor):
         """
         root = root.id
         tip = tip.id
-        root_is_world = root == self.world.root.id
-        tip_is_world = tip == self.world.root.id
+        root_is_world = root == self._world.root.id
+        tip_is_world = tip == self._world.root.id
 
         if not tip_is_world:
-            i = self.idx_start[tip]
+            i = self.body_id_to_all_fk_index[tip]
             map_T_tip = self.forward_kinematics_for_all_bodies[i : i + 4]
             if root_is_world:
                 return map_T_tip
 
         if not root_is_world:
-            i = self.idx_start[root]
+            i = self.body_id_to_all_fk_index[root]
             map_T_root = self.forward_kinematics_for_all_bodies[i : i + 4]
             root_T_map = inverse_frame(map_T_root)
             if tip_is_world:

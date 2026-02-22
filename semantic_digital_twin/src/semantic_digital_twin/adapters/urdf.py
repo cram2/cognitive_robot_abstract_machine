@@ -323,7 +323,7 @@ class URDFParser:
                 res.append(
                     Cylinder(
                         origin=origin_transform,
-                        width=geom.geometry.radius,
+                        width=geom.geometry.radius * 2,
                         height=geom.geometry.length,
                         color=color,
                     )

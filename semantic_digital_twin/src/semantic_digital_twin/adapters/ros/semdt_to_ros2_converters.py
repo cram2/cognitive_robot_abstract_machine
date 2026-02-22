@@ -218,9 +218,11 @@ class FileMeshToRos2Converter(ShapeToRos2Converter[FileMesh]):
         marker.scale.x = data.scale.x
         marker.scale.y = data.scale.y
         marker.scale.z = data.scale.z
-        marker.mesh_use_embedded_materials = True
         if data.mesh.visual.kind == TextureVisuals().kind:
+            marker.mesh_use_embedded_materials = True
             marker.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0)
+        else:
+            marker.mesh_use_embedded_materials = False
         return marker
 
 
@@ -235,7 +237,9 @@ class TriangleMeshToRos2Converter(ShapeToRos2Converter[TriangleMesh]):
         marker.scale.x = data.scale.x
         marker.scale.y = data.scale.y
         marker.scale.z = data.scale.z
-        marker.mesh_use_embedded_materials = True
         if data.mesh.visual.kind == TextureVisuals().kind:
+            marker.mesh_use_embedded_materials = True
             marker.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0)
+        else:
+            marker.mesh_use_embedded_materials = False
         return marker

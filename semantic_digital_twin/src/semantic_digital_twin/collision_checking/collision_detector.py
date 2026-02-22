@@ -2,147 +2,80 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass, field
-from itertools import chain
-from typing_extensions import Tuple, Set, List, Optional, Iterable, TYPE_CHECKING
+from uuid import UUID
 
 import numpy as np
+from typing_extensions import TYPE_CHECKING, Self
 
-from ..world_description.connections import ActiveConnection
-from ..world_description.world_entity import Body
-
-if TYPE_CHECKING:
-    from ..world import World
+from krrood.symbolic_math.symbolic_math import (
+    Matrix,
+    VariableParameters,
+    CompiledFunction,
+)
+from .collision_matrix import CollisionMatrix, CollisionCheck
+from ..callbacks.callback import ModelChangeCallback, StateChangeCallback
+from ..spatial_types import HomogeneousTransformationMatrix
+from ..world_description.world_entity import (
+    Body,
+    WorldEntityWithID,
+    WorldEntityWithClassBasedID,
+)
 
 
 @dataclass
-class CollisionCheck:
+class CollisionCheckingResult:
+    """
+    Result of a collision checking operation.
+    """
+
+    contacts: list[ClosestPoints] = field(default_factory=list)
+    """
+    List of contacts detected during the collision checking operation.
+    """
+
+    def any(self) -> bool:
+        """
+        Check if there are any contacts in the result.
+        :return: True if there are contacts, False otherwise.
+        """
+        return len(self.contacts) > 0
+
+
+@dataclass
+class ClosestPoints:
+    """
+    Encapsulates the closest points data between two bodies returned by the collision detector.
+    """
+
     body_a: Body
-    """
-    First body in the collision check.
-    """
-    body_b: Body
-    """
-    Second body in the collision check.
-    """
-    distance: float
-    """
-    Minimum distance to check for collisions.
-    """
-    _world: World
-    """
-    The world context for validation and sorting.
-    """
-
-    def __post_init__(self):
-        self.body_a, self.body_b = self.sort_bodies(self.body_a, self.body_b)
-
-    def __hash__(self):
-        return hash((self.body_a, self.body_b))
-
-    def __eq__(self, other: CollisionCheck):
-        return self.body_a == other.body_a and self.body_b == other.body_b
-
-    def bodies(self) -> Tuple[Body, Body]:
-        return self.body_a, self.body_b
-
-    def _validate(self) -> None:
-        """Validates the collision check parameters."""
-        if self.distance <= 0:
-            raise ValueError(f"Distance must be positive, got {self.distance}")
-
-        if self.body_a == self.body_b:
-            raise ValueError(
-                f'Cannot create collision check between the same body "{self.body_a.name}"'
-            )
-
-        if not self.body_a.has_collision():
-            raise ValueError(f"Body {self.body_a.name} has no collision geometry")
-
-        if not self.body_b.has_collision():
-            raise ValueError(f"Body {self.body_b.name} has no collision geometry")
-
-        if self.body_a not in self._world.bodies_with_enabled_collision:
-            raise ValueError(
-                f"Body {self.body_a.name} is not in list of bodies with collisions"
-            )
-
-        if self.body_b not in self._world.bodies_with_enabled_collision:
-            raise ValueError(
-                f"Body {self.body_b.name} is not in list of bodies with collisions"
-            )
-
-        root_chain, tip_chain = self._world.compute_split_chain_of_connections(
-            self.body_a, self.body_b
-        )
-        if all(
-            not isinstance(c, ActiveConnection) for c in chain(root_chain, tip_chain)
-        ):
-            raise ValueError(
-                f"Relative pose between {self.body_a.name} and {self.body_b.name} is fixed"
-            )
-
-    @classmethod
-    def create_and_validate(
-        cls, body_a: Body, body_b: Body, distance: float, world: World
-    ) -> CollisionCheck:
-        """
-        Creates a collision check with additional world-context validation.
-        Returns None if the check should be skipped (e.g., bodies are linked).
-        """
-        collision_check = cls(
-            body_a=body_a, body_b=body_b, distance=distance, _world=world
-        )
-        collision_check._validate()
-        return collision_check
-
-    def sort_bodies(self, body_a: Body, body_b: Body) -> Tuple[Body, Body]:
-        """
-        Sort both bodies in a consistent manner, needed to avoid checking B with A, when A with B is already checked.
-        """
-        if body_a.id > body_b.id:
-            body_a, body_b = body_b, body_a
-        is_body_a_controlled = self._world.is_body_controlled(body_a)
-        is_body_b_controlled = self._world.is_body_controlled(body_b)
-        if not is_body_a_controlled and is_body_b_controlled:
-            body_a, body_b = body_b, body_a
-        return body_a, body_b
-
-
-@dataclass
-class Collision:
-    contact_distance: float
-    body_a: Body = field(default=None)
     """
     First body in the collision.
     """
-    body_b: Body = field(default=None)
+    body_b: Body
     """
     Second body in the collision.
     """
 
-    map_P_pa: np.ndarray = field(default=None)
+    distance: float
     """
-    Contact point on body A with respect to the world frame.
+    Closest distance between the two bodies.
     """
-    map_P_pb: np.ndarray = field(default=None)
+    root_P_point_on_body_a: np.ndarray
     """
-    Contact point on body B with respect to the world frame.
+    Closest point on body_a with respect to the worlds root.
     """
-    map_V_n_input: np.ndarray = field(default=None)
+    root_P_point_on_body_b: np.ndarray
     """
-    Contact normal with respect to the world frame.
+    Closest point on body_b with respect to the worlds root.
     """
-    a_P_pa: np.ndarray = field(default=None)
+    root_V_contact_normal_from_b_to_a: np.ndarray
     """
-    Contact point on body A with respect to the link a frame. 
-    """
-    b_P_pb: np.ndarray = field(default=None)
-    """
-    Contact point on body B with respect to the link b frame.
+    Normal vector of the contact plane from body_b to body_a with respect to the worlds root.
+    The contact normal points from body_a to body_b.
     """
 
     def __str__(self):
-        return f"{self.body_a}|<->|{self.body_b}: {self.contact_distance}"
+        return f"{self.body_a}|-|{self.body_b}: {self.distance}"
 
     def __repr__(self):
         return str(self)
@@ -153,14 +86,121 @@ class Collision:
     def __eq__(self, other: CollisionCheck):
         return self.body_a == other.body_a and self.body_b == other.body_b
 
+    def reverse(self):
+        """
+        Returns a new ClosestPoints object with the same data but with body_a and body_b swapped.
+        """
+        return ClosestPoints(
+            body_a=self.body_b,
+            body_b=self.body_a,
+            root_P_point_on_body_a=self.root_P_point_on_body_b,
+            root_P_point_on_body_b=self.root_P_point_on_body_a,
+            root_V_contact_normal_from_b_to_a=-self.root_V_contact_normal_from_b_to_a,
+            distance=self.distance,
+        )
+
+
+@dataclass(eq=False)
+class CollisionDetectorModelUpdater(ModelChangeCallback):
+    """
+    Updates and compiles the collision detector's collision forward kinematics expressions when the world model changes.
+    """
+
+    collision_detector: CollisionDetector = field(kw_only=True)
+    """
+    Reference to the collision detector.
+    """
+    compiled_collision_fks: CompiledFunction = field(init=False)
+    """
+    Compiled collision FK function.
+    """
+
+    def __post_init__(self):
+        self._world = self.collision_detector._world
+        super().__post_init__()
+
+    def _notify(self, **kwargs):
+        if self._world.is_empty():
+            return
+        self.collision_detector.sync_world_model()
+        self.compile_collision_fks()
+
+    def compile_collision_fks(self):
+        """
+        Compile the collision FK functions for all bodies with collision.
+        """
+        collision_fks = []
+        world_root = self._world.root
+        for body in self._world.bodies_with_collision:
+            if body == world_root:
+                if body.has_collision():
+                    collision_fks.append(HomogeneousTransformationMatrix())
+                continue
+            collision_fks.append(
+                self._world.compose_forward_kinematics_expression(world_root, body)
+            )
+        collision_fks = Matrix.vstack(collision_fks)
+
+        self.compiled_collision_fks = collision_fks.compile(
+            parameters=VariableParameters.from_lists(
+                self._world.state.position_float_variables
+            )
+        )
+        if not collision_fks.is_constant():
+            self.compiled_collision_fks.bind_args_to_memory_view(
+                0, self._world.state.positions
+            )
+
+    def compute(self) -> np.ndarray:
+        return self.compiled_collision_fks.evaluate()
+
 
 @dataclass
-class CollisionDetector(abc.ABC):
+class CollisionDetectorStateUpdater(StateChangeCallback):
+    """
+    Updates the collision detector's collision FK cache when the world state changes.
+    """
+
+    collision_detector: CollisionDetector = field(kw_only=True)
+    """
+    Reference to the collision detector that this updater belongs to.
+    """
+
+    def __post_init__(self):
+        self._world = self.collision_detector._world
+        super().__post_init__()
+
+    def _notify(self, **kwargs):
+        if self._world.is_empty():
+            return
+        self.collision_detector.world_model_updater.compiled_collision_fks.evaluate()
+        self.collision_detector.sync_world_state()
+
+
+@dataclass(eq=False)
+class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
     """
     Abstract class for collision detectors.
     """
 
-    _world: World
+    world_model_updater: CollisionDetectorModelUpdater = field(init=False)
+    world_state_updater: CollisionDetectorStateUpdater = field(init=False)
+
+    def __post_init__(self):
+        self.world_model_updater = CollisionDetectorModelUpdater(
+            collision_detector=self
+        )
+        self.world_state_updater = CollisionDetectorStateUpdater(
+            collision_detector=self
+        )
+        self.world_model_updater.notify()
+        self.world_state_updater.notify()
+
+    def get_all_collision_fks(self) -> np.ndarray:
+        return self.world_model_updater.compiled_collision_fks._out
+
+    def get_collision_fk(self, body_id: UUID):
+        pass
 
     @abc.abstractmethod
     def sync_world_model(self) -> None:
@@ -176,14 +216,31 @@ class CollisionDetector(abc.ABC):
 
     @abc.abstractmethod
     def check_collisions(
-        self, collision_matrix: Optional[Iterable[CollisionCheck]] = None
-    ) -> List[Collision]:
+        self, collision_matrix: CollisionMatrix
+    ) -> CollisionCheckingResult:
         """
         Computes the collisions for all checks in the collision matrix.
         If collision_matrix is None, checks all collisions.
         :param collision_matrix:
         :return: A list of detected collisions.
         """
+
+    def check_collision_between_bodies(
+        self, body_a: Body, body_b: Body, distance: float = 0.0
+    ) -> ClosestPoints | None:
+        """
+        Checks for collisions between two bodies.
+        :param body_a: The first body to check for collisions.
+        :param body_b: The second body to check for collisions.
+        :param distance: The distance threshold for collision detection.
+        :return: The closest points of contact if a collision is detected, otherwise None.
+        """
+        collision = self.check_collisions(
+            CollisionMatrix(
+                {CollisionCheck.create_and_validate(body_a, body_b, distance)}
+            )
+        )
+        return collision.contacts[0] if collision.any() else None
 
     @abc.abstractmethod
     def reset_cache(self):

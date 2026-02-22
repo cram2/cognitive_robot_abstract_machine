@@ -4,11 +4,11 @@ from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
-from semantic_digital_twin.testing import world_setup_simple
+from semantic_digital_twin.testing import ray_test_world
 
 
-def test_create_segmentation_mask(world_setup_simple):
-    world, body1, body2, body3, body4 = world_setup_simple
+def test_create_segmentation_mask(ray_test_world):
+    world, body1, body2, body3, body4 = ray_test_world
     rt = RayTracer(world)
     rt.update_scene()
 
@@ -39,8 +39,8 @@ def test_create_segmentation_mask(world_setup_simple):
     assert body2.index in seg
 
 
-def test_create_depth_map(world_setup_simple):
-    world, body1, body2, body3, body4 = world_setup_simple
+def test_create_depth_map(ray_test_world):
+    world, body1, body2, body3, body4 = ray_test_world
     rt = RayTracer(world)
     rt.update_scene()
 
@@ -64,8 +64,8 @@ def test_create_depth_map(world_setup_simple):
     assert depth_map[depth_map > 0].min() >= 2.375
 
 
-def test_ray_test(world_setup_simple):
-    world, body1, body2, body3, body4 = world_setup_simple
+def test_ray_test(ray_test_world):
+    world, body1, body2, body3, body4 = ray_test_world
     rt = RayTracer(world)
     rt.update_scene()
 
@@ -82,8 +82,8 @@ def test_ray_test(world_setup_simple):
     assert not np.any(body)
 
 
-def test_ray_test_batch(world_setup_simple):
-    world, body1, body2, body3, body4 = world_setup_simple
+def test_ray_test_batch(ray_test_world):
+    world, body1, body2, body3, body4 = ray_test_world
     world.get_connection(world.root, body1).origin = np.array(
         [[1, 0, 0, 1], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
     )
@@ -109,8 +109,8 @@ def test_ray_test_batch(world_setup_simple):
     assert bodies[1] == body2
 
 
-def test_min_distance(world_setup_simple):
-    world, body1, body2, body3, body4 = world_setup_simple
+def test_min_distance(ray_test_world):
+    world, body1, body2, body3, body4 = ray_test_world
     world.get_connection(world.root, body1).origin = np.array(
         [[1, 0, 0, 0.5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
     )
@@ -130,8 +130,8 @@ def test_min_distance(world_setup_simple):
     assert bodies[0] == body1
 
 
-def test_max_distance(world_setup_simple):
-    world, body1, body2, body3, body4 = world_setup_simple
+def test_max_distance(ray_test_world):
+    world, body1, body2, body3, body4 = ray_test_world
     world.get_connection(world.root, body1).origin = np.array(
         [[1, 0, 0, 1.5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
     )
