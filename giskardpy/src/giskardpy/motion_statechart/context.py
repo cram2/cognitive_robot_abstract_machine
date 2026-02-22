@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from functools import cached_property
 from typing_extensions import Self, Dict, Type, TypeVar
 
 from krrood.symbolic_math.float_variable_data import FloatVariableData
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.collision_checking.collision_manager import CollisionManager
+from semantic_digital_twin.collision_checking.collision_variable_managers import (
+    SelfCollisionVariableManager,
+    ExternalCollisionVariableManager,
+)
 from semantic_digital_twin.world import World
 from .exceptions import MissingContextExtensionError, DuplicateContextExtensionError
 from ..qp.qp_controller_config import QPControllerConfig
@@ -51,6 +56,24 @@ class MotionStatechartContext:
     def collision_manager(self) -> CollisionManager:
         return self.world.collision_manager
 
+    @cached_property
+    def self_collision_manager(self) -> SelfCollisionVariableManager:
+        """
+        Lazy-initialized SelfCollisionVariableManager shared by all self collision avoidance nodes.
+        """
+        manager = SelfCollisionVariableManager(self.float_variable_data)
+        self.collision_manager.add_collision_consumer(manager)
+        return manager
+
+    @cached_property
+    def external_collision_manager(self) -> ExternalCollisionVariableManager:
+        """
+        Lazy-initialized ExternalCollisionVariableManager shared by all external collision avoidance nodes.
+        """
+        manager = ExternalCollisionVariableManager(self.float_variable_data)
+        self.collision_manager.add_collision_consumer(manager)
+        return manager
+
     def require_extension(
         self, extension_type: Type[GenericContextExtension]
     ) -> GenericContextExtension:
@@ -70,6 +93,21 @@ class MotionStatechartContext:
         if extension_type in self.extensions:
             raise DuplicateContextExtensionError(extension_type=extension_type)
         self.extensions[extension_type] = extension
+
+    def cleanup(self):
+        """
+        Removes the lazy-initialized collision managers from the collision manager.
+        """
+        if "self_collision_manager" in self.__dict__:
+            self.collision_manager.remove_collision_consumer(
+                self.self_collision_manager
+            )
+            del self.self_collision_manager
+        if "external_collision_manager" in self.__dict__:
+            self.collision_manager.remove_collision_consumer(
+                self.external_collision_manager
+            )
+            del self.external_collision_manager
 
     @classmethod
     def empty(cls) -> Self:

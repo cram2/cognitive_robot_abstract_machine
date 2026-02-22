@@ -260,12 +260,8 @@ class ExternalCollisionAvoidance(Goal):
     """
 
     def expand(self, context: MotionStatechartContext) -> None:
-        self.external_collision_manager = ExternalCollisionVariableManager(
-            context.float_variable_data
-        )
-        context.collision_manager.add_collision_consumer(
-            self.external_collision_manager
-        )
+        self.external_collision_manager = context.external_collision_manager
+
         for body in self.robot.bodies_with_collision:
             if context.collision_manager.get_max_avoided_bodies(body):
                 self.external_collision_manager.register_group_of_body(body)
@@ -290,11 +286,6 @@ class ExternalCollisionAvoidance(Goal):
                 )
                 self.add_node(task)
                 task.pause_condition = distance_monitor.observation_variable
-
-    def cleanup(self, context: MotionStatechartContext):
-        context.collision_manager.remove_collision_consumer(
-            self.external_collision_manager
-        )
 
 
 @dataclass(eq=False, repr=False)
@@ -451,10 +442,7 @@ class SelfCollisionAvoidance(Goal):
     """
 
     def expand(self, context: MotionStatechartContext) -> None:
-        self.self_collision_manager = SelfCollisionVariableManager(
-            context.float_variable_data
-        )
-        context.collision_manager.add_collision_consumer(self.self_collision_manager)
+        self.self_collision_manager = context.self_collision_manager
         context.collision_manager.update_collision_matrix()
 
         for group_a, group_b in combinations(
@@ -494,6 +482,3 @@ class SelfCollisionAvoidance(Goal):
             )
             self.add_node(task)
             task.pause_condition = distance_monitor.observation_variable
-
-    def cleanup(self, context: MotionStatechartContext):
-        context.collision_manager.remove_collision_consumer(self.self_collision_manager)

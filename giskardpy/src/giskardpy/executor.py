@@ -178,6 +178,7 @@ class Executor:
         finally:
             self._set_velocity_acceleration_jerk_to_zero()
             self.motion_statechart.cleanup_nodes(context=self.context)
+            self.context.cleanup()
 
     def _set_velocity_acceleration_jerk_to_zero(self):
         self.context.world.state.velocities[:] = 0
