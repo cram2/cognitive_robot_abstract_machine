@@ -12,18 +12,21 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
+    Vector3,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
+    RevoluteConnection,
 )
-from semantic_digital_twin.world_description.geometry import Box, Scale, Color
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.geometry import Box, Scale, Color, Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body, Region, Actuator
 
 from mujoco_simulator import MujocoSimulator
-from base_simulator import SimulatorState, SimulatorViewer
+from base_simulator import SimulatorState, SimulatorViewer, SimulatorConstraints
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.adapters.multi_sim import MujocoSim, MujocoActuator
 
@@ -637,6 +640,123 @@ class MujocoSimTestCase(unittest.TestCase):
         time.sleep(5.0)
         multi_sim.stop_simulation()
         self.assertGreaterEqual(time.time() - start_time, 5.0)
+
+    def test_spawn_body_with_connections(self):
+        def spawn_robot_body(spawn_world: World) -> Body:
+            spawn_body = Body(name=PrefixedName("robot"))
+            box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=0, y=0, z=0.5, roll=0, pitch=0, yaw=0, reference_frame=spawn_body
+            )
+            box = Box(
+                origin=box_origin,
+                scale=Scale(0.4, 0.4, 1.0),
+                color=Color(
+                    0.9,
+                    0.9,
+                    0.9,
+                    1.0,
+                ),
+            )
+            spawn_body.collision = ShapeCollection([box], reference_frame=spawn_body)
+            with spawn_world.modify_world():
+                spawn_world.add_connection(
+                    FixedConnection(parent=spawn_world.root, child=spawn_body)
+                )
+            return spawn_body
+
+        def spawn_shoulder_bodies(
+            spawn_world: World, root_body: Body
+        ) -> tuple[Body, Body]:
+            spawn_left_shoulder_body = Body(name=PrefixedName("left_shoulder"))
+            cylinder = Cylinder(
+                width=0.2,
+                height=0.1,
+                color=Color(
+                    0.9,
+                    0.1,
+                    0.1,
+                    1.0,
+                ),
+            )
+            spawn_left_shoulder_body.collision = ShapeCollection(
+                [cylinder], reference_frame=spawn_left_shoulder_body
+            )
+            dof = DegreeOfFreedom(name=PrefixedName("left_shoulder_joint"))
+            left_shoulder_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+                pos_x=0,
+                pos_y=0.3,
+                pos_z=0.9,
+                quat_w=0.707,
+                quat_x=0.707,
+                quat_y=0,
+                quat_z=0,
+            )
+            with spawn_world.modify_world():
+                spawn_world.add_degree_of_freedom(dof)
+                spawn_world.add_connection(
+                    RevoluteConnection(
+                        name=dof.name,
+                        parent=root_body,
+                        child=spawn_left_shoulder_body,
+                        axis=Vector3.Z(reference_frame=spawn_left_shoulder_body),
+                        dof_id=dof.id,
+                        parent_T_connection_expression=left_shoulder_origin,
+                    )
+                )
+            spawn_right_shoulder_body = Body(name=PrefixedName("right_shoulder"))
+            cylinder = Cylinder(
+                width=0.2,
+                height=0.1,
+                color=Color(
+                    0.9,
+                    0.1,
+                    0.1,
+                    1.0,
+                ),
+            )
+            spawn_right_shoulder_body.collision = ShapeCollection(
+                [cylinder], reference_frame=spawn_right_shoulder_body
+            )
+            dof = DegreeOfFreedom(name=PrefixedName("right_shoulder_joint"))
+            right_shoulder_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+                pos_x=0,
+                pos_y=-0.3,
+                pos_z=0.9,
+                quat_w=0.707,
+                quat_x=0.707,
+                quat_y=0,
+                quat_z=0,
+            )
+            with spawn_world.modify_world():
+                spawn_world.add_degree_of_freedom(dof)
+                spawn_world.add_connection(
+                    RevoluteConnection(
+                        name=dof.name,
+                        parent=root_body,
+                        child=spawn_right_shoulder_body,
+                        axis=Vector3.Z(reference_frame=spawn_right_shoulder_body),
+                        dof_id=dof.id,
+                        parent_T_connection_expression=right_shoulder_origin,
+                    )
+                )
+            return spawn_left_shoulder_body, spawn_right_shoulder_body
+
+        world = World()
+        multi_sim = MujocoSim(
+            world=world,
+            headless=headless,
+            step_size=0.001,
+        )
+        multi_sim.start_simulation()
+        time.sleep(1)
+        robot_body = spawn_robot_body(spawn_world=world)
+        spawn_shoulder_bodies(spawn_world=world, root_body=robot_body)
+        time.sleep(1)
+        self.assertEqual(
+            set(multi_sim.simulator.get_all_body_names().result),
+            {"world", "robot", "left_shoulder", "right_shoulder"},
+        )
+        multi_sim.stop_simulation()
 
 
 if __name__ == "__main__":
