@@ -11,6 +11,8 @@ from pycram.datastructures.pose import PoseStamped, Header
 from .data_player import FilePlayer, FrameData
 
 set_logger_level(LogLevel.DEBUG)
+
+
 class CSVEpisodePlayer(FilePlayer):
     data_frames: pd.DataFrame
     data_object_names: Set[str]
@@ -18,18 +20,22 @@ class CSVEpisodePlayer(FilePlayer):
     def get_frame_data_generator(self):
         logger.debug(f"Reading CSV file {self.file_path}")
         self.data_frames = pd.read_csv(self.file_path)
-        self.data_object_names = {v.split(':')[0] for v in self.data_frames.columns if ':' in v}
+        self.data_object_names = {
+            v.split(":")[0] for v in self.data_frames.columns if ":" in v
+        }
         for i, (frame_id, objects_data) in enumerate(self.data_frames.iterrows()):
-            yield FrameData(time=float(objects_data["time"]), objects_data=objects_data.to_dict(), frame_idx=i)
+            yield FrameData(
+                time=float(objects_data["time"]),
+                objects_data=objects_data.to_dict(),
+                frame_idx=i,
+            )
 
     def get_joint_states(self, frame_data: FrameData) -> Dict[str, float]:
         return {}
 
-    def _pause(self):
-        ...
+    def _pause(self): ...
 
-    def _resume(self):
-        ...
+    def _resume(self): ...
 
     def get_objects_poses(self, frame_data: FrameData) -> Dict[Body, Pose]:
         objects_poses: Dict[Body, Pose] = {}
@@ -37,11 +43,22 @@ class CSVEpisodePlayer(FilePlayer):
         current_time = frame_data.time
         for obj_name in self.data_object_names:
             obj_position = [objects_data[f"{obj_name}:position_{i}"] for i in range(3)]
-            obj_orientation = [objects_data[f"{obj_name}:quaternion_{i}"] for i in range(4)]
-            obj_orientation[0], obj_orientation[3] = obj_orientation[3], obj_orientation[0]
-            obj_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=obj_position[0], y=obj_position[1], z=obj_position[2],
-                                                                    roll=obj_orientation[1], pitch=obj_orientation[2], yaw=obj_orientation[3])
-
+            obj_orientation = [
+                objects_data[f"{obj_name}:quaternion_{i}"] for i in range(4)
+            ]
+            obj_orientation[0], obj_orientation[3] = (
+                obj_orientation[3],
+                obj_orientation[0],
+            )
+            obj_pose = Pose.from_xyz_rpy(
+                x=obj_position[0],
+                y=obj_position[1],
+                z=obj_position[2],
+                roll=obj_orientation[1],
+                pitch=obj_orientation[2],
+                yaw=obj_orientation[3],
+            )
+            obj_pose.timestamp = current_time
 
             if self.position_shift:
                 obj_pose.x += self.position_shift.x
@@ -49,5 +66,5 @@ class CSVEpisodePlayer(FilePlayer):
                 obj_pose.z += self.position_shift.z
 
             obj = self.world.get_body_by_name(obj_name)
-            objects_poses[obj] = obj_pose.to_pose()
+            objects_poses[obj] = obj_pose
         return objects_poses
