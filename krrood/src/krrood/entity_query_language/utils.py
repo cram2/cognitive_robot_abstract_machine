@@ -32,10 +32,12 @@ from typing_extensions import (
     Tuple,
     TYPE_CHECKING,
     Hashable,
+    Iterable,
+    Optional,
 )
 
 if TYPE_CHECKING:
-    from krrood.entity_query_language.symbolic import Bindings
+    from .core.base_expressions import Bindings, OperationResult, SymbolicExpression
 
 
 class IDGenerator:
@@ -58,12 +60,6 @@ class IDGenerator:
         """
         self._counter += 1
         return self._counter
-
-
-def lazy_iterate_dicts(dict_of_iterables):
-    """Generator that yields dicts with one value from each iterable"""
-    for values in zip(*dict_of_iterables.values()):
-        yield dict(zip(dict_of_iterables.keys(), values))
 
 
 def generate_combinations(generators_dict):
@@ -108,12 +104,40 @@ def make_set(value: Any) -> Set:
     return set(value) if is_iterable(value) else {value}
 
 
+def cartesian_product_while_passing_the_bindings_around(
+    expressions: Iterable[SymbolicExpression],
+    sources: Bindings,
+    parent: Optional[SymbolicExpression] = None,
+) -> Iterator[OperationResult]:
+    """
+    Evaluate the symbolic expressions by generating combinations of values from their evaluation generators while
+    passing the bindings from the previous evaluated generator to the next.
+
+    :param expressions: The symbolic expressions to evaluate.
+    :param sources: The current bindings.
+    :param parent: The parent expression.
+    :return: An Iterable of Bindings for each combination of values.
+    """
+    expression_evaluation_generators = [
+        (
+            lambda bindings, inner_expression=expression: (
+                result.update(bindings)
+                for result in inner_expression._evaluate_(bindings, parent=parent)
+            )
+        )
+        for expression in expressions
+    ]
+
+    yield from chain_stages(expression_evaluation_generators, sources)
+
+
 T = TypeVar("T")
 
 
 def chain_stages(
-    stages: List[Callable[[Bindings], Iterator[Bindings]]], initial: Bindings
-) -> Iterator[Bindings]:
+    stages: List[Callable[[Bindings | OperationResult], Iterator[OperationResult]]],
+    initial: Bindings,
+) -> Iterator[OperationResult]:
     """
     Chains a sequence of stages into a single pipeline.
 
@@ -122,14 +146,16 @@ def chain_stages(
     by applying each stage in sequence to the current binding.
 
     :param stages: A list of stages where each stage is a callable that accepts
-        a Binding and produces an iterator of bindings.
+        a Binding and produces an iterator of Bindings.
     :param initial: The initial binding to start the computation with.
 
     :return: An iterator over the bindings resulting from applying all
         stages in sequence.
     """
 
-    def evaluate_next_stage_or_yield(i: int, b: Bindings) -> Iterator[Bindings]:
+    def evaluate_next_stage_or_yield(
+        i: int, b: OperationResult | Bindings
+    ) -> Iterator[OperationResult]:
         """
         Recursively evaluates the next stage or yields the current binding if all stages are done.
 
@@ -185,7 +211,7 @@ def merge_args_and_kwargs(
     return all_kwargs
 
 
-def convert_args_and_kwargs_into_a_hashable_key(
+def convert_args_and_kwargs_into_hashable_key(
     dictionary: Dict[str, Any],
 ) -> Tuple[Any, ...]:
     """
@@ -217,7 +243,7 @@ def ensure_hashable(obj) -> Hashable:
     return obj
 
 
-def is_hashable(obj):
+def is_hashable(obj) -> bool:
     """
     Checks if an object is hashable by attempting to compute its hash.
 

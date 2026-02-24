@@ -8,8 +8,7 @@ import pytest
 from typing_extensions import Type
 
 from krrood.class_diagrams import ClassDiagram
-from krrood.entity_query_language.predicate import Symbol
-from krrood.entity_query_language.symbol_graph import SymbolGraph
+from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
@@ -282,14 +281,7 @@ def stretch_world():
 
 @pytest.fixture(scope="session")
 def tiago_world():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "pycram",
-        "resources",
-        "robots",
-    )
-    tiago = os.path.join(urdf_dir, "tiago_dual.urdf")
+    tiago = "package://iai_tiago_description/urdf/tiago_from_our_robot.urdf"
     return world_with_urdf_factory(tiago, Tiago, DiffDrive)
 
 

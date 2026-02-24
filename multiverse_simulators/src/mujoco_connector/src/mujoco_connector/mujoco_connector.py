@@ -13,7 +13,6 @@ import numpy
 
 from multiverse_simulator import (MultiverseSimulator, MultiverseRenderer, MultiverseViewer,
                                   MultiverseCallback, MultiverseCallbackResult, MultiverseSimulatorState)
-from .utills import get_multiverse_connector_plugins
 
 
 class MultiverseMujocoRenderer(MultiverseRenderer):
@@ -45,49 +44,12 @@ class MultiverseMujocoConnector(MultiverseSimulator):
                  real_time_factor: float = 1.0,
                  step_size: float = 1E-3,
                  callbacks: Optional[List[MultiverseCallback]] = None,
-                 multiverse_params: Optional[Dict[str, Any]] = None,
                  **kwargs):
         self._file_path = file_path
         root = ET.parse(file_path).getroot()
         self.name = root.attrib.get("model", self.name)
         super().__init__(viewer, number_of_envs, headless, real_time_factor, step_size, callbacks, **kwargs)
-        for plugin in get_multiverse_connector_plugins():
-            plugin_name = os.path.basename(plugin)
-            if "multiverse_connector" in plugin_name:
-                mujoco.mj_loadPluginLibrary(plugin)
-        assert os.path.exists(self.file_path)
-        if multiverse_params is None:
-            self._mj_spec = mujoco.MjSpec.from_file(filename=self.file_path)
-        else:
-            root = ET.parse(file_path).getroot()
-            extension_element = ET.SubElement(root, "extension")
-            plugin_element = ET.SubElement(extension_element, "plugin")
-            plugin_element.set("plugin", "mujoco.multiverse_connector")
-            instance_element = ET.SubElement(plugin_element, "instance")
-            instance_element.set("name", multiverse_params.get("instance_name", "mujoco_client"))
-            host_config_element = ET.SubElement(instance_element, "config")
-            host_config_element.set("key", "host")
-            host_config_element.set("value", multiverse_params.get("host", "tcp://127.0.0.1"))
-            server_port_config_element = ET.SubElement(instance_element, "config")
-            server_port_config_element.set("key", "server_port")
-            server_port_config_element.set("value", str(multiverse_params.get("server_port", 7000)))
-            client_port_config_element = ET.SubElement(instance_element, "config")
-            client_port_config_element.set("key", "client_port")
-            client_port_config_element.set("value", str(multiverse_params.get("client_port", 7500)))
-            world_name_config_element = ET.SubElement(instance_element, "config")
-            world_name_config_element.set("key", "world_name")
-            world_name_config_element.set("value", multiverse_params.get("world_name", "world"))
-            simulation_name_config_element = ET.SubElement(instance_element, "config")
-            simulation_name_config_element.set("key", "simulation_name")
-            simulation_name_config_element.set("value", multiverse_params.get("simulation_name", "mujoco_sim"))
-            send_config_element = ET.SubElement(instance_element, "config")
-            send_config_element.set("key", "send")
-            send_config_element.set("value", str(multiverse_params.get("send", "{}")))
-            receive_config_element = ET.SubElement(instance_element, "config")
-            receive_config_element.set("key", "receive")
-            receive_config_element.set("value", str(multiverse_params.get("receive", "{}")))
-            self._mj_spec = mujoco.MjSpec.from_string(ET.tostring(root, encoding='unicode'))
-
+        self._mj_spec = mujoco.MjSpec.from_file(filename=self.file_path)
         self._mj_spec.option.integrator = getattr(mujoco.mjtIntegrator,
                                                   f"mjINT_{kwargs.get('integrator', 'RK4')}")
         self._mj_spec.option.noslip_iterations = int(kwargs.get('noslip_iterations', 0))
@@ -993,17 +955,20 @@ class MultiverseMujocoConnector(MultiverseSimulator):
                 mujoco.mju_mulMatVec3(res=vec[i], mat=body.xmat, vec=vec[i])
         geom_id = numpy.zeros(N, numpy.int32)
         dist = numpy.zeros(N, numpy.float64)
-        mujoco.mj_multiRay(m=self._mj_model,
-                           d=self._mj_data,
-                           pnt=pnt,
-                           vec=vec.flatten(),
-                           geomgroup=geomgroup,
-                           flg_static=1,
-                           bodyexclude=-1,
-                           geomid=geom_id,
-                           dist=dist,
-                           nray=N,
-                           cutoff=mujoco.mjMAXVAL)
+        if mujoco.mj_version() < 3005000:
+            mujoco.mj_multiRay(m=self._mj_model,
+                               d=self._mj_data,
+                               pnt=pnt,
+                               vec=vec.flatten(),
+                               geomgroup=geomgroup,
+                               flg_static=1,
+                               bodyexclude=-1,
+                               geomid=geom_id,
+                               dist=dist,
+                               nray=N,
+                               cutoff=mujoco.mjMAXVAL)
+        else:
+            raise NotImplementedError("mj_multiRay implementation for mujoco version >= 3.5.0 is not implemented yet")
         results = []
         for i in range(N):
             if geom_id[i] < 0:

@@ -168,6 +168,9 @@ class Scale:
         max_point = Point3(self.x / 2, self.y / 2, self.z / 2)
         return BoundingBox.from_min_max(min_point, max_point)
 
+    def to_np(self) -> np.ndarray:
+        return np.array([self.x, self.y, self.z])
+
 
 @dataclass
 class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
@@ -306,6 +309,17 @@ class Mesh(Shape, ABC):
         mesh.visual.material = SimpleMaterial(name=material_name, image=image)
         return mesh
 
+    def scale_mesh(self, scale: Scale) -> trimesh.Trimesh:
+        """
+        Scales the mesh according to the given scale.
+
+        :param scale: The scale of the mesh.
+        :return: A scaled mesh object.
+        """
+        copy_mesh = deepcopy(self.mesh)
+        copy_mesh.apply_scale(scale.to_np())
+        return copy_mesh
+
 
 @dataclass(eq=False)
 class FileMesh(Mesh):
@@ -324,6 +338,7 @@ class FileMesh(Mesh):
         The mesh object.
         """
         mesh = trimesh.load_mesh(self.filename)
+        mesh.apply_scale(self.scale.to_np())
         mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
         return mesh
 
@@ -377,6 +392,9 @@ class TriangleMesh(Mesh):
     """
     The loaded mesh object.
     """
+
+    def __post_init__(self):
+        self.mesh.apply_scale(self.scale.to_np())
 
     @property
     def file_name(self) -> str:
@@ -865,7 +883,9 @@ class BoundingBox:
 
     @classmethod
     def from_mesh(
-        cls, mesh: trimesh.Trimesh, origin: HomogeneousTransformationMatrix
+        cls,
+        mesh: trimesh.Trimesh,
+        origin: HomogeneousTransformationMatrix,
     ) -> Self:
         """
         Create a bounding box from a trimesh object.
@@ -873,6 +893,7 @@ class BoundingBox:
         :param origin: The origin of the bounding box.
         :return: The bounding box.
         """
+
         bounds = mesh.bounds
         return cls(
             bounds[0][0],

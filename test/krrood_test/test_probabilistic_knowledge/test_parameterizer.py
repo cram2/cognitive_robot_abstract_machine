@@ -1,44 +1,81 @@
 from __future__ import annotations
 
-import unittest
+import datetime
 
-from random_events.variable import Continuous
-from random_events.product_algebra import SimpleEvent
+from random_events.set import Set
+from random_events.variable import Continuous, Symbolic
 
+from krrood.entity_query_language.factories import variable_from, variable
 from krrood.ormatic.dao import to_dao
+from krrood.probabilistic_knowledge.object_access_variable import ObjectAccessVariable
 from krrood.probabilistic_knowledge.parameterizer import Parameterizer, Parameterization
-from test.krrood_test.dataset.example_classes import OptionalTestCase
-from test.krrood_test.dataset.example_classes import Position, Pose, Orientation
+from ..dataset.example_classes import (
+    Position,
+    Pose,
+    Orientation,
+    Positions,
+    ListOfEnum,
+    TestEnum,
+    Atom,
+    Element,
+)
 
 
 def test_parameterize_position():
     """
     Test parameterization of the Position class.
     """
-    position = Position(None, None, None)
+    position = Position(..., ..., ...)
+    dao = to_dao(position)
+    position_dao_variable = variable(type(dao), [dao])
     parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize_dao(to_dao(position), "Position")
+    parameterization = parameterizer.parameterize(position)
     expected_variables = [
-        Continuous("Position.x"),
-        Continuous("Position.y"),
-        Continuous("Position.z"),
+        ObjectAccessVariable(
+            Continuous(position_dao_variable.x._name_),
+            position_dao_variable.x,
+        ),
+        ObjectAccessVariable(
+            Continuous(position_dao_variable.y._name_),
+            position_dao_variable.y,
+        ),
+        ObjectAccessVariable(
+            Continuous(position_dao_variable.z._name_),
+            position_dao_variable.z,
+        ),
     ]
     assert parameterization.variables == expected_variables
 
 
-def test_parameterize_orientation():
+def test_parameterize_position_skip_none_field():
+    """
+    Test parameterization of the Position class.
+    """
+    position = Position(None, None, None)
+    parameterizer = Parameterizer()
+    parameterization = parameterizer.parameterize(position)
+    assert parameterization.variables == []
+
+
+def test_parameterize_orientation_mixed_none():
     """
     Test parameterization of the Orientation class.
     """
-    orientation = Orientation(None, None, None, None)
+    orientation = Orientation(..., None, ..., None)
+    dao = to_dao(orientation)
+    orientation_dao_variable = variable(type(dao), [dao])
     parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize_dao(
-        to_dao(orientation), "Orientation"
-    )
+    parameterization = parameterizer.parameterize(orientation)
+
     expected_variables = [
-        Continuous("Orientation.x"),
-        Continuous("Orientation.y"),
-        Continuous("Orientation.z"),
+        ObjectAccessVariable(
+            Continuous(orientation_dao_variable.x._name_),
+            orientation_dao_variable.x,
+        ),
+        ObjectAccessVariable(
+            Continuous(orientation_dao_variable.z._name_),
+            orientation_dao_variable.z,
+        ),
     ]
 
     assert parameterization.variables == expected_variables
@@ -49,18 +86,40 @@ def test_parameterize_pose():
     Test parameterization of the Pose class.
     """
     pose = Pose(
-        position=Position(None, None, None),
-        orientation=Orientation(None, None, None, None),
+        position=Position(..., ..., ...),
+        orientation=Orientation(..., ..., ..., None),
     )
+
+    dao = to_dao(pose)
+    pose_dao_variable = variable(type(dao), [dao])
+
     parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize_dao(to_dao(pose), "Pose")
+    parameterization = parameterizer.parameterize(pose)
     expected_variables = [
-        Continuous("Pose.position.x"),
-        Continuous("Pose.position.y"),
-        Continuous("Pose.position.z"),
-        Continuous("Pose.orientation.x"),
-        Continuous("Pose.orientation.y"),
-        Continuous("Pose.orientation.z"),
+        ObjectAccessVariable(
+            Continuous(pose_dao_variable.position.x._name_),
+            pose_dao_variable.position.x,
+        ),
+        ObjectAccessVariable(
+            Continuous(pose_dao_variable.position.y._name_),
+            pose_dao_variable.position.y,
+        ),
+        ObjectAccessVariable(
+            Continuous(pose_dao_variable.position.z._name_),
+            pose_dao_variable.position.z,
+        ),
+        ObjectAccessVariable(
+            Continuous(pose_dao_variable.orientation.x._name_),
+            pose_dao_variable.orientation.x,
+        ),
+        ObjectAccessVariable(
+            Continuous(pose_dao_variable.orientation.y._name_),
+            pose_dao_variable.orientation.y,
+        ),
+        ObjectAccessVariable(
+            Continuous(pose_dao_variable.orientation.z._name_),
+            pose_dao_variable.orientation.z,
+        ),
     ]
 
     assert parameterization.variables == expected_variables
@@ -71,274 +130,114 @@ def test_create_fully_factorized_distribution():
     Test for a fully factorized distribution.
     """
     variables = [
-        Continuous("Variable.A"),
-        Continuous("Variable.B"),
+        ObjectAccessVariable(Continuous("Variable.A"), variable_from([])),
+        ObjectAccessVariable(Continuous("Variable.B"), variable_from([])),
     ]
     parameterization = Parameterization(variables)
     probabilistic_circuit = parameterization.create_fully_factorized_distribution()
     assert len(probabilistic_circuit.variables) == 2
-    assert set(probabilistic_circuit.variables) == set(variables)
+    assert set(probabilistic_circuit.variables) == set(
+        parameterization.random_events_variables
+    )
 
 
-def test_parameterize_object():
+def test_parameterize_object_with_given_values():
     """
-    Test parameterization of a single object via parameterize.
+    Test parameterization of a single object via Parameterizer.parameterize.
     """
     position = Position(x=1.0, y=2.0, z=3.0)
     parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(position, "Position")
-    expected_names = {"Position.x", "Position.y", "Position.z"}
-    assert {v.name for v in parameterization.variables} == expected_names
-    assert len(parameterization.simple_event.variables) == 3
+    parameterization = parameterizer.parameterize(position)
 
-
-def test_parameterize_list():
-    """
-    Test parameterization of a list of objects via parameterize.
-    """
-    positions = [Position(x=1.0, y=2.0, z=3.0), Position(x=4.0, y=5.0, z=6.0)]
-    parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(positions, "Positions")
-    expected_names = {
-        "Positions[0].x",
-        "Positions[0].y",
-        "Positions[0].z",
-        "Positions[1].x",
-        "Positions[1].y",
-        "Positions[1].z",
+    result_by_hand = {
+        Continuous("PositionDAO.x"): 1.0,
+        Continuous("PositionDAO.y"): 2.0,
+        Continuous("PositionDAO.z"): 3.0,
     }
-    variables = parameterization.variables
-    event = parameterization.simple_event
 
-    assert {v.name for v in variables} == expected_names
-    assert len(event.variables) == 6
-    # Check some values
-    x0_var = next(v for v in variables if v.name == "Positions[0].x")
-    x1_var = next(v for v in variables if v.name == "Positions[1].x")
-    assert event[x0_var].simple_sets[0].lower == 1.0
-    assert event[x1_var].simple_sets[0].lower == 4.0
+    assert parameterization.assignments_for_conditioning == result_by_hand
 
 
 def test_parameterize_nested_object():
     """
-    Test parameterization of a nested object via parameterize.
+    Test parameterization of a nested object via Parameterizer.parameterize.
     """
     pose = Pose(
         position=Position(x=1.0, y=2.0, z=3.0),
         orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
     parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(pose, "Pose")
+    parameterization = parameterizer.parameterize(pose)
 
-    # Position has x, y, z (3)
-    # Orientation has x, y, z, w (4)
-    # Total = 7
-    assert len(parameterization.variables) == 7
-    expected_names = {
-        "Pose.position.x",
-        "Pose.position.y",
-        "Pose.position.z",
-        "Pose.orientation.x",
-        "Pose.orientation.y",
-        "Pose.orientation.z",
-        "Pose.orientation.w",
+    result_by_hand = {
+        Continuous("PoseDAO.position.x"): 1.0,
+        Continuous("PoseDAO.position.y"): 2.0,
+        Continuous("PoseDAO.position.z"): 3.0,
+        Continuous("PoseDAO.orientation.x"): 0.0,
+        Continuous("PoseDAO.orientation.y"): 0.0,
+        Continuous("PoseDAO.orientation.z"): 0.0,
+        Continuous("PoseDAO.orientation.w"): 1.0,
     }
-    assert {v.name for v in parameterization.variables} == expected_names
+    assert parameterization.assignments_for_conditioning == result_by_hand
 
 
-class TestDAOParameterizer(unittest.TestCase):
+def test_one_to_many_and_collection_of_builtins():
+    p = Positions([Position(1, 2, 3), Position(4, 5, 6)], ["a", ...])
+    parameters = Parameterizer().parameterize(p)
 
-    def setUp(self):
-        self.parameterizer = Parameterizer()
+    result_by_hand = {
+        Continuous("PositionsDAO.positions[0].target.x"): 1.0,
+        Continuous("PositionsDAO.positions[0].target.y"): 2.0,
+        Continuous("PositionsDAO.positions[0].target.z"): 3.0,
+        Continuous("PositionsDAO.positions[1].target.x"): 4.0,
+        Continuous("PositionsDAO.positions[1].target.y"): 5.0,
+        Continuous("PositionsDAO.positions[1].target.z"): 6.0,
+    }
 
-    def test_parameterize_flat_dao(self):
-        pos = Position(x=1.0, y=2.0, z=3.0)
-        pos_dao = to_dao(pos)
-        parameterization = self.parameterizer.parameterize_dao(pos_dao, "pos")
-        variables = parameterization.variables
-        event = parameterization.simple_event
-
-        self.assertEqual(len(variables), 3)
-        var_names = {v.name for v in variables}
-        self.assertIn("pos.x", var_names)
-        self.assertIn("pos.y", var_names)
-        self.assertIn("pos.z", var_names)
-
-        for var in variables:
-            self.assertIsInstance(var, Continuous)
-            self.assertEqual(
-                event[var].simple_sets[0].lower,
-                getattr(pos, var.name.split(".")[-1]),
-            )
-
-    def test_parameterize_nested_dao(self):
-        pose = Pose(
-            position=Position(x=1.0, y=2.0, z=3.0),
-            orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
-        )
-        pose_dao = to_dao(pose)
-        parameterization = self.parameterizer.parameterize_dao(pose_dao, "pose")
-        variables = parameterization.variables
-        event = parameterization.simple_event
-
-        # Position has x, y, z (3)
-        # Orientation has x, y, z, w (4)
-        # Total = 7
-        self.assertEqual(len(variables), 7)
-
-        var_names = {v.name for v in variables}
-        self.assertIn("pose.position.x", var_names)
-        self.assertIn("pose.orientation.w", var_names)
-
-        # Check values in event
-        for var in variables:
-            parts = var.name.split(".")
-            if parts[1] == "position":
-                val = getattr(pose.position, parts[2])
-            else:
-                val = getattr(pose.orientation, parts[2])
-            self.assertEqual(event[var].simple_sets[0].lower, val)
-
-    def test_parameterize_dao_set_value(self):
-        optional = OptionalTestCase(1)
-        optional_dao = to_dao(optional)
-        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
-
-        self.assertEqual(1, len(parameterization.variables))
-
-    def test_parameterize_dao_none_value(self):
-        optional = OptionalTestCase(None)
-        optional_dao = to_dao(optional)
-        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
-
-        self.assertEqual(len(parameterization.variables), 1)
-
-    def test_parameterize_dao_set_value_set_optional(self):
-        optional = OptionalTestCase(1, Position(1.0, 2.0, 3.0))
-        optional_dao = to_dao(optional)
-        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
-
-        self.assertEqual(len(parameterization.variables), 4)
-
-    def test_parameterize_dao_none_value_underspecified_optional(self):
-        optional = OptionalTestCase(None, Position(1.0, None, 3.0))
-        optional_dao = to_dao(optional)
-        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
-
-        self.assertEqual(len(parameterization.variables), 4)
-
-    def test_parameterize_dao_set_value_set_relationship(self):
-        optional = OptionalTestCase(
-            1, list_of_orientations=[Orientation(0.0, 0.0, 0.0, 1.0)]
-        )
-        optional_dao = to_dao(optional)
-        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
-
-        self.assertEqual(len(parameterization.variables), 5)
-
-    def test_parameterize_dao_set_value_underspecified_relationship(self):
-        optional = OptionalTestCase(
-            1, list_of_orientations=[Orientation(0.0, 0.0, None, 1.0)]
-        )
-        optional_dao = to_dao(optional)
-        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
-
-        self.assertEqual(len(parameterization.variables), 5)
-
-    def test_parameterize_dao_set_value_set_builtin(self):
-        optional = OptionalTestCase(1, list_of_values=[0])
-        optional_dao = to_dao(optional)
-        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
-
-        self.assertEqual(len(parameterization.variables), 2)
-
-    def test_parameterize_dao_set_value_underspecified_builtin(self):
-        optional = OptionalTestCase(1, list_of_values=[None])
-        optional_dao = to_dao(optional)
-        parameterization = self.parameterizer.parameterize_dao(optional_dao, "optional")
-
-        self.assertEqual(len(parameterization.variables), 2)
-
-    def test_parameterize_dao_with_optional_filled(self):
-        # Orientation with w=None
-        orient = Orientation(x=0.0, y=0.0, z=None, w=1.0)
-        orient_dao = to_dao(orient)
-        parameterization = self.parameterizer.parameterize_dao(orient_dao, "orient")
-        variables = parameterization.variables
-        event = parameterization.simple_event
-
-        self.assertEqual(len(variables), 4)
-        z_var = next(v for v in variables if v.name == "orient.z")
-        # Since SimpleEvent fills missing variables with reals(), orient.w should be a full interval
-        self.assertTrue(event[z_var].simple_sets[0].lower < -1e10)
-        self.assertTrue(event[z_var].simple_sets[0].upper > 1e10)
-
-    def test_parameterization_initialization(self):
-        """
-        Test the initialization of Parameterization with default values.
-        """
-        parameterization = Parameterization()
-        self.assertEqual(parameterization.variables, [])
-        self.assertEqual(parameterization.simple_event, SimpleEvent({}))
-
-    def test_parameterization_update_variables(self):
-        """
-        Test updating variables in Parameterization.
-        """
-        parameterization = Parameterization()
-        var_a = Continuous("A")
-        parameterization.extend_variables([var_a])
-        self.assertEqual(parameterization.variables, [var_a])
-
-        var_b = Continuous("B")
-        parameterization.extend_variables([var_b])
-        self.assertEqual(parameterization.variables, [var_a, var_b])
-
-    def test_parameterization_update_simple_event(self):
-        """
-        Test updating simple event in Parameterization.
-        """
-        var_a = Continuous("A")
-        parameterization = Parameterization(variables=[var_a])
-        event = SimpleEvent({var_a: 1.0})
-        parameterization.update_simple_event(event)
-        self.assertEqual(parameterization.simple_event[var_a].simple_sets[0].lower, 1.0)
-
-    def test_parameterization_fill_missing_variables(self):
-        """
-        Test filling missing variables in Parameterization.
-        """
-        var_a = Continuous("A")
-        var_b = Continuous("B")
-        parameterization = Parameterization(variables=[var_a, var_b])
-        parameterization.update_simple_event(SimpleEvent({var_a: 1.0}))
-
-        self.assertNotIn(var_b, parameterization.simple_event.variables)
-        parameterization.fill_missing_variables()
-        self.assertIn(var_b, parameterization.simple_event.variables)
-
-    def test_parameterization_update_parameterization(self):
-        """
-        Test updating a parameterization with another one.
-        """
-        var_a = Continuous("A")
-        param_a = Parameterization(
-            variables=[var_a], simple_event=SimpleEvent({var_a: 1.0})
-        )
-
-        var_b = Continuous("B")
-        param_b = Parameterization(
-            variables=[var_b], simple_event=SimpleEvent({var_b: 2.0})
-        )
-
-        param_a.merge_parameterization(param_b)
-
-        self.assertEqual(len(param_a.variables), 2)
-        self.assertIn(var_a, param_a.variables)
-        self.assertIn(var_b, param_a.variables)
-        self.assertEqual(param_a.simple_event[var_a].simple_sets[0].lower, 1.0)
-        self.assertEqual(param_a.simple_event[var_b].simple_sets[0].lower, 2.0)
+    assert parameters.assignments_for_conditioning == result_by_hand
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_symbolic_variables():
+    obj = ListOfEnum([..., ...])
+
+    parameterizer = Parameterizer()
+    parameterization = parameterizer.parameterize(obj)
+
+    test_enum_set = Set.from_iterable(TestEnum)
+    assert parameterization.random_events_variables == [
+        Symbolic("ListOfEnumDAO.list_of_enum[0]", test_enum_set),
+        Symbolic("ListOfEnumDAO.list_of_enum[1]", test_enum_set),
+    ]
+    assert parameterization.assignments_for_conditioning == {}
+
+
+def test_not_follow_none_relationships():
+    p = Pose(position=Position(..., ..., ...), orientation=None)
+    parameterizer = Parameterizer()
+    parameterization = parameterizer.parameterize(p)
+    variables = [
+        Continuous("PoseDAO.position.x"),
+        Continuous("PoseDAO.position.y"),
+        Continuous("PoseDAO.position.z"),
+    ]
+
+    assert parameterization.random_events_variables == variables
+    assert parameterization.assignments == {}
+
+
+def test_parameterize_object_from_sample():
+    obj = Atom(..., ..., ..., datetime.datetime.now())
+    parameterizer = Parameterizer()
+    parameterization = parameterizer.parameterize(obj)
+    distribution = parameterization.create_fully_factorized_distribution()
+    sample = distribution.sample(1)[0]
+    sample_dict = parameterization.create_assignment_from_variables_and_sample(
+        distribution.variables, sample
+    )
+
+    parameterized_obj: Atom = parameterization.parameterize_object_with_sample(
+        obj, sample_dict
+    )
+    assert parameterized_obj.timestamp == obj.timestamp
+    assert isinstance(parameterized_obj.charge, float)
+    assert isinstance(parameterized_obj.element, Element)

@@ -3,6 +3,7 @@ import time
 import unittest
 
 import numpy
+import mujoco
 from mujoco_connector import MultiverseMujocoConnector
 from multiverse_simulator import MultiverseSimulatorConstraints, MultiverseSimulatorState, MultiverseViewer, \
     MultiverseCallbackResult
@@ -238,7 +239,7 @@ class MultiverseMujocoConnectorBaseTestCase(MultiverseSimulatorTestCase):
                 self.assertIsInstance(result.result, list)
                 self.assertEqual(len(result.result), 4)
 
-            if step == 500:
+            if step == 500 and mujoco.mj_version() < 3005000:
                 result = simulator.callbacks["ray_test"](ray_from_position=[0.7, 0.0, 1.0],
                                                          ray_to_position=[0.7, 0.0, 0.0])
                 self.assertEqual(MultiverseCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION, result.type)

@@ -1,6 +1,6 @@
 from sqlalchemy import select
 
-from krrood.entity_query_language.symbol_graph import SymbolGraph
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 from krrood.ormatic.dao import to_dao
 from ..dataset.example_classes import Position
 from ..dataset.ormatic_interface import *

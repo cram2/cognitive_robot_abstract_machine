@@ -13,7 +13,7 @@ from typing_extensions import Dict, Any, Sequence, Self
 from typing_extensions import List, Optional, Type
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
-from krrood.entity_query_language.predicate import Symbol
+from krrood.symbol_graph.symbol_graph import Symbol
 from krrood.ormatic.dao import AlternativeMapping, T
 
 
@@ -53,14 +53,6 @@ class Orientation(Symbol):
 class Pose(Symbol):
     position: Position
     orientation: Orientation
-
-
-@dataclass
-class OptionalTestCase(Symbol):
-    value: int
-    optional_position: Optional[Position] = None
-    list_of_orientations: List[Orientation] = field(default_factory=list)
-    list_of_values: List[int] = field(default_factory=list)
 
 
 # check that many to many relationship to built in types and non built in types work

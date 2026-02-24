@@ -4,6 +4,7 @@ import copy
 import datetime
 import math
 from dataclasses import dataclass, field
+from numbers import Number
 
 import numpy as np
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -191,9 +192,13 @@ class PyCramQuaternion:
         # if the object is not fully constructed yet
         if not (
             hasattr(self, "x")
+            and isinstance(self.x, Number)
             and hasattr(self, "y")
+            and isinstance(self.y, Number)
             and hasattr(self, "z")
+            and isinstance(self.z, Number)
             and hasattr(self, "w")
+            and isinstance(self.w, Number)
         ):
             return
 

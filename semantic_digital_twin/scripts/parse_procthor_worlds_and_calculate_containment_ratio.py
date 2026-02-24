@@ -7,7 +7,7 @@ import tqdm
 from sqlalchemy.orm import Session
 
 import semantic_digital_twin.adapters.procthor.procthor_resolver
-from krrood.entity_query_language.symbol_graph import SymbolGraph
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 from krrood.ormatic.dao import to_dao, ToDAOState
 from krrood.ormatic.utils import classes_of_module, create_engine
 from semantic_digital_twin.adapters.procthor.procthor_parser import ProcTHORParser

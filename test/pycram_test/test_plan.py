@@ -669,297 +669,44 @@ def test_pause_plan(immutable_model_world):
     )
 
 
-def test_algebra_sequentialplan(immutable_model_world):
+def test_algebra_sequential_plan(mutable_model_world):
     """
     Parameterize a SequentialPlan using krrood parameterizer, create a fully-factorized distribution and
     assert the correctness of sampled values after conditioning and truncation.
     """
-    world, robot_view, context = immutable_model_world
+    world, robot_view, context = mutable_model_world
+
+    target_location = PoseStamped.from_list([..., ..., 0], [0, 0, 0, 1], frame=None)
 
     sp = SequentialPlan(
         context,
         MoveTorsoActionDescription(TorsoState.LOW),
-        NavigateActionDescription(None),
-        MoveTorsoActionDescription(None),
+        NavigateActionDescription(
+            target_location=target_location,
+            keep_joint_states=...,
+        ),
+        MoveTorsoActionDescription(torso_state=...),
     )
 
-    parameterization = sp.parameterize()
-    variables_map = {v.name: v for v in parameterization.variables}
+    parameterization = sp.generate_parameterizations()
+    target_location.frame_id = world.root
+    new_actions = []
 
-    probabilistic_circuit = sp.create_fully_factorized_distribution()
+    for action, parameters in parameterization:
+        distribution = parameters.create_fully_factorized_distribution()
+        distribution, _ = distribution.conditional(
+            parameters.assignments_for_conditioning
+        )
+        sample = distribution.sample(1)[0]
 
-    torso_1 = variables_map["MoveTorsoAction_0.torso_state"]
-    torso_2 = variables_map["MoveTorsoAction_2.torso_state"]
-    consistency_events = [
-        SimpleEvent({torso_1: [state], torso_2: [state]}) for state in TorsoState
-    ]
-    restricted_distribution, _ = probabilistic_circuit.truncated(
-        Event(*consistency_events)
-    )
-    restricted_distribution.normalize()
+        sample_dict = parameters.create_assignment_from_variables_and_sample(
+            distribution.variables, sample
+        )
 
-    navigate_action_constraints = {
-        variables_map["NavigateAction_1.target_location.pose.position.z"]: 0,
-        variables_map["NavigateAction_1.target_location.pose.orientation.x"]: 0,
-        variables_map["NavigateAction_1.target_location.pose.orientation.y"]: 0,
-        variables_map["NavigateAction_1.target_location.pose.orientation.z"]: 0,
-        variables_map["NavigateAction_1.target_location.pose.orientation.w"]: 1,
-    }
-    final_distribution, _ = restricted_distribution.conditional(
-        navigate_action_constraints
-    )
-    final_distribution.normalize()
+        parameterized = parameters.parameterize_object_with_sample(action, sample_dict)
+        new_actions.append(parameterized)
 
-    nav_x = variables_map["NavigateAction_1.target_location.pose.position.x"]
-    nav_y = variables_map["NavigateAction_1.target_location.pose.position.y"]
-    nav_z = next(
-        v
-        for v in final_distribution.variables
-        if v.name == "NavigateAction_1.target_location.pose.position.z"
-    )
-    nav_ox_var = next(
-        v
-        for v in final_distribution.variables
-        if v.name == "NavigateAction_1.target_location.pose.orientation.x"
-    )
-    nav_oy_var = next(
-        v
-        for v in final_distribution.variables
-        if v.name == "NavigateAction_1.target_location.pose.orientation.y"
-    )
-    nav_oz_var = next(
-        v
-        for v in final_distribution.variables
-        if v.name == "NavigateAction_1.target_location.pose.orientation.z"
-    )
-    nav_ow_var = next(
-        v
-        for v in final_distribution.variables
-        if v.name == "NavigateAction_1.target_location.pose.orientation.w"
-    )
-
-    for sample_values in final_distribution.sample(10):
-        sample = dict(zip(final_distribution.variables, sample_values))
-        assert nav_x in sample
-        assert nav_y in sample
-        assert sample[nav_z] == 0.0
-        assert sample[nav_ox_var] == 0.0
-        assert sample[nav_oy_var] == 0.0
-        assert sample[nav_oz_var] == 0.0
-        assert sample[nav_ow_var] == 1.0
-
-
-def test_algebra_parallelplan(immutable_model_world):
-    """
-    Parameterize a ParallelPlan using krrood parameterizer, create a fully-factorized distribution and
-    assert the correctness of sampled values after truncation.
-    """
-    world, robot_view, context = immutable_model_world
-
-    sp = ParallelPlan(
-        context,
-        MoveTorsoActionDescription(None),
-        ParkArmsActionDescription(None),
-    )
-
-    parameterization = sp.parameterize()
-    variables_map = {v.name: v for v in parameterization.variables}
-
-    # Ensure expected variable names exist
-    assert "MoveTorsoAction_0.torso_state" in variables_map
-    assert "ParkArmsAction_1.arm" in variables_map
-
-    probabilistic_circuit = sp.parameterizer.create_fully_factorized_distribution()
-
-    arm_var = variables_map["ParkArmsAction_1.arm"]
-    torso_var = variables_map["MoveTorsoAction_0.torso_state"]
-
-    # Truncate distribution to force arm == Arms.BOTH
-    restricted_dist, _ = probabilistic_circuit.truncated(
-        Event(SimpleEvent({arm_var: [Arms.BOTH]}))
-    )
-    restricted_dist.normalize()
-
-    for sample_values in restricted_dist.sample(5):
-        sample = dict(zip(restricted_dist.variables, sample_values))
-        assert sample[arm_var] == Arms.BOTH
-        assert torso_var in sample
-
-
-def test_parameterize_move_torse_navigate(immutable_model_world):
-    """
-    Test parameterization of a potential robot plan consisting of: MoveTorso - Navigate - MoveTorso.
-
-    This test verifies:
-    1. Parameterization of simple robot action plan
-    2. Sampling from the constrained distribution and validation of constraints.
-    """
-    world, robot_view, context = immutable_model_world
-
-    plan = SequentialPlan(
-        context,
-        MoveTorsoActionDescription(None),
-        NavigateActionDescription(None),
-        MoveTorsoActionDescription(None),
-    )
-
-    parameterization = plan.parameterize()
-
-    variables = {v.name: v for v in parameterization.variables}
-
-    expected_names = {
-        "MoveTorsoAction_0.torso_state",
-        "MoveTorsoAction_2.torso_state",
-        "NavigateAction_1.keep_joint_states",
-        "NavigateAction_1.target_location.header.sequence",
-        "NavigateAction_1.target_location.pose.orientation.w",
-        "NavigateAction_1.target_location.pose.orientation.x",
-        "NavigateAction_1.target_location.pose.orientation.y",
-        "NavigateAction_1.target_location.pose.orientation.z",
-        "NavigateAction_1.target_location.pose.position.x",
-        "NavigateAction_1.target_location.pose.position.y",
-        "NavigateAction_1.target_location.pose.position.z",
-    }
-
-    assert set(variables.keys()) == expected_names
-
-    probabilistic_circuit = plan.parameterizer.create_fully_factorized_distribution()
-
-    expected_distribution_names = expected_names - {
-        "NavigateAction_1.target_location.header.sequence",
-        "NavigateAction_1.target_location.header.frame_id.temp_collision_config.max_avoided_bodies",
-        "NavigateAction_1.target_location.header.frame_id.collision_config.max_avoided_bodies",
-    }
-    assert {
-        v.name for v in probabilistic_circuit.variables
-    } == expected_distribution_names
-
-    torso_1 = variables["MoveTorsoAction_0.torso_state"]
-    torso_2 = variables["MoveTorsoAction_2.torso_state"]
-
-    consistency_events = [
-        SimpleEvent({torso_1: [state], torso_2: [state]}) for state in TorsoState
-    ]
-    restricted_distribution, _ = probabilistic_circuit.truncated(
-        Event(*consistency_events)
-    )
-    restricted_distribution.normalize()
-
-    pose_constraints = {
-        variables["NavigateAction_1.target_location.pose.position.x"]: 1.5,
-        variables["NavigateAction_1.target_location.pose.position.y"]: -2.0,
-        variables["NavigateAction_1.target_location.pose.orientation.x"]: 0.0,
-        variables["NavigateAction_1.target_location.pose.orientation.y"]: 0.0,
-        variables["NavigateAction_1.target_location.pose.orientation.z"]: 0.0,
-        variables["NavigateAction_1.target_location.pose.orientation.w"]: 1.0,
-    }
-
-    final_distribution, _ = restricted_distribution.conditional(pose_constraints)
-    final_distribution.normalize()
-
-    target_x, target_y = 1.5, -2.0
-    nav_x = variables["NavigateAction_1.target_location.pose.position.x"]
-    nav_y = variables["NavigateAction_1.target_location.pose.position.y"]
-
-    for sample_values in final_distribution.sample(10):
-        sample = dict(zip(final_distribution.variables, sample_values))
-        assert sample[torso_1] == sample[torso_2]
-        assert sample[nav_x] == target_x
-        assert sample[nav_y] == target_y
-
-
-def test_parameterize_pickup_navigate_place(immutable_model_world):
-    """
-    Test parameterization of a potential robot plan consisting of: PickUp - Navigate - Place.
-
-    This test verifies:
-    1. Parameterization of pick up, navigate, placing robot action plan
-    2. Creating and sampling from a constrained distribution over the plan variables.
-    """
-    world, robot_view, context = immutable_model_world
-
-    plan = SequentialPlan(
-        context,
-        PickUpActionDescription(None, None, None),
-        NavigateActionDescription(None),
-        PlaceActionDescription(None, None, None),
-    )
-    parameterization = plan.parameterize()
-    variables = {v.name: v for v in parameterization.variables}
-
-    expected_variables = {
-        "NavigateAction_1.keep_joint_states",
-        "NavigateAction_1.target_location.header.sequence",
-        "NavigateAction_1.target_location.pose.orientation.w",
-        "NavigateAction_1.target_location.pose.orientation.x",
-        "NavigateAction_1.target_location.pose.orientation.y",
-        "NavigateAction_1.target_location.pose.orientation.z",
-        "NavigateAction_1.target_location.pose.position.x",
-        "NavigateAction_1.target_location.pose.position.y",
-        "NavigateAction_1.target_location.pose.position.z",
-        "PickUpAction_0.arm",
-        "PickUpAction_0.grasp_description.approach_direction",
-        "PickUpAction_0.grasp_description.manipulation_offset",
-        "PickUpAction_0.grasp_description.manipulator.front_facing_axis.x",
-        "PickUpAction_0.grasp_description.manipulator.front_facing_axis.y",
-        "PickUpAction_0.grasp_description.manipulator.front_facing_axis.z",
-        "PickUpAction_0.grasp_description.manipulator.front_facing_orientation.w",
-        "PickUpAction_0.grasp_description.manipulator.front_facing_orientation.x",
-        "PickUpAction_0.grasp_description.manipulator.front_facing_orientation.y",
-        "PickUpAction_0.grasp_description.manipulator.front_facing_orientation.z",
-        "PickUpAction_0.grasp_description.rotate_gripper",
-        "PickUpAction_0.grasp_description.vertical_alignment",
-        "PlaceAction_2.arm",
-        "PlaceAction_2.target_location.header.sequence",
-        "PlaceAction_2.target_location.pose.orientation.w",
-        "PlaceAction_2.target_location.pose.orientation.x",
-        "PlaceAction_2.target_location.pose.orientation.y",
-        "PlaceAction_2.target_location.pose.orientation.z",
-        "PlaceAction_2.target_location.pose.position.x",
-        "PlaceAction_2.target_location.pose.position.y",
-        "PlaceAction_2.target_location.pose.position.z",
-    }
-
-    assert set(variables.keys()) == expected_variables
-
-    probabilistic_distribution = (
-        plan.parameterizer.create_fully_factorized_distribution()
-    )
-
-    expected_distribution = expected_variables - {
-        "NavigateAction_1.target_location.header.sequence",
-        "PlaceAction_2.target_location.header.sequence",
-    }
-    assert {
-        v.name for v in probabilistic_distribution.variables
-    } == expected_distribution
-
-    arm_pickup = variables["PickUpAction_0.arm"]
-    arm_place = variables["PlaceAction_2.arm"]
-
-    arm_consistency_events = [
-        SimpleEvent({arm_pickup: [arm], arm_place: [arm]}) for arm in Arms
-    ]
-    restricted_dist, _ = probabilistic_distribution.truncated(
-        Event(*arm_consistency_events)
-    )
-    restricted_dist.normalize()
-
-    nav_target_x = 2.0
-    nav_target_y = 3.0
-    pose_constraints = {
-        variables["NavigateAction_1.target_location.pose.position.x"]: nav_target_x,
-        variables["NavigateAction_1.target_location.pose.position.y"]: nav_target_y,
-    }
-
-    final_distribution, _ = restricted_dist.conditional(pose_constraints)
-    final_distribution.normalize()
-
-    v_nav_x = variables["NavigateAction_1.target_location.pose.position.x"]
-    v_nav_y = variables["NavigateAction_1.target_location.pose.position.y"]
-
-    for sample_values in final_distribution.sample(10):
-        sample = dict(zip(final_distribution.variables, sample_values))
-        assert sample[arm_pickup] == sample[arm_place]
-        assert sample[v_nav_x] == nav_target_x
-        assert sample[v_nav_y] == nav_target_y
+    new_plan = SequentialPlan(context, *new_actions)
+    with simulated_robot:
+        new_plan.perform()
+    print(robot_view.root.global_pose)

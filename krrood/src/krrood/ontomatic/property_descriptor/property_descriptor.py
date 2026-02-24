@@ -27,7 +27,7 @@ from ..failures import UnMonitoredContainerTypeForDescriptor
 from ...class_diagrams.class_diagram import WrappedClass, Association
 from ...class_diagrams.wrapped_field import WrappedField
 from ...entity_query_language.predicate import Symbol
-from ...entity_query_language.symbol_graph import (
+from ...symbol_graph.symbol_graph import (
     SymbolGraph,
 )
 from ...entity_query_language.utils import make_set

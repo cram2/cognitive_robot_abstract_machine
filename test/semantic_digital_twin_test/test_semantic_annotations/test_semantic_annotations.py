@@ -1,9 +1,6 @@
 import logging
-from copy import deepcopy
-from dataclasses import field
 
-from krrood.entity_query_language.entity_result_processors import an
-from krrood.entity_query_language.entity import entity, variable, in_, inference
+from krrood.entity_query_language.factories import entity, variable, in_, inference, an
 from numpy.ma.testutils import (
     assert_equal,
 )  # You could replace this with numpy's regular assert for better compatibility
@@ -148,7 +145,6 @@ def test_handle_semantic_annotation_eql(apartment_world_setup):
             in_("handle", body.name.name.lower())
         )
     )
-
     handles = list(query.evaluate())
     assert len(handles) > 0
 

@@ -20,11 +20,10 @@ import datetime
 import enum
 import krrood.adapters.json_serializer
 import krrood.entity_query_language.orm.model
-import krrood.entity_query_language.predicate
-import krrood.entity_query_language.symbol_graph
 import krrood.ormatic.alternative_mappings
 import krrood.ormatic.custom_types
 import krrood.ormatic.type_dict
+import krrood.symbol_graph.symbol_graph
 import sqlalchemy.sql.sqltypes
 import test.krrood_test.dataset.example_classes
 import test.krrood_test.dataset.semantic_world_like_classes
@@ -243,25 +242,6 @@ class MoreShapesDAO_shapes_association(Base, AssociationDataAccessObject):
     )
 
 
-class OptionalTestCaseDAO_list_of_orientations_association(
-    Base, AssociationDataAccessObject
-):
-
-    __tablename__ = "OptionalTestCaseDAO_list_of_orientations_association"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_optionaltestcasedao_id: Mapped[int] = mapped_column(
-        ForeignKey("OptionalTestCaseDAO.database_id")
-    )
-    target_orientationdao_id: Mapped[int] = mapped_column(
-        ForeignKey("OrientationDAO.database_id")
-    )
-
-    target: Mapped[OrientationDAO] = relationship(
-        "OrientationDAO", foreign_keys=[target_orientationdao_id]
-    )
-
-
 class PositionsDAO_positions_association(Base, AssociationDataAccessObject):
 
     __tablename__ = "PositionsDAO_positions_association"
@@ -476,34 +456,6 @@ class GenericClassDAO(
     }
 
 
-class GenericClass_floatDAO(
-    GenericClassDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass[float]],
-):
-
-    __tablename__ = "GenericClass_floatDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(GenericClassDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    optional_value: Mapped[typing.Optional[builtins.float]] = mapped_column(
-        use_existing_column=True
-    )
-
-    container: Mapped[typing.List[builtins.float]] = mapped_column(
-        JSON, nullable=False, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "GenericClass_floatDAO",
-        "inherit_condition": database_id == GenericClassDAO.database_id,
-    }
-
-
 class GenericClass_PositionDAO(
     GenericClassDAO,
     DataAccessObject[
@@ -549,6 +501,34 @@ class GenericClass_PositionDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "GenericClass_PositionDAO",
+        "inherit_condition": database_id == GenericClassDAO.database_id,
+    }
+
+
+class GenericClass_floatDAO(
+    GenericClassDAO,
+    DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass[float]],
+):
+
+    __tablename__ = "GenericClass_floatDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GenericClassDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    optional_value: Mapped[typing.Optional[builtins.float]] = mapped_column(
+        use_existing_column=True
+    )
+
+    container: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GenericClass_floatDAO",
         "inherit_condition": database_id == GenericClassDAO.database_id,
     }
 
@@ -857,8 +837,7 @@ class PolymorphicEnumAssociationDAO(
 
 
 class PredicateClassRelationDAO(
-    Base,
-    DataAccessObject[krrood.entity_query_language.symbol_graph.PredicateClassRelation],
+    Base, DataAccessObject[krrood.symbol_graph.symbol_graph.PredicateClassRelation]
 ):
 
     __tablename__ = "PredicateClassRelationDAO"
@@ -942,7 +921,7 @@ class MultipleInheritanceDAO(
     }
 
 
-class SymbolDAO(Base, DataAccessObject[krrood.entity_query_language.predicate.Symbol]):
+class SymbolDAO(Base, DataAccessObject[krrood.symbol_graph.symbol_graph.Symbol]):
 
     __tablename__ = "SymbolDAO"
 
@@ -1437,50 +1416,6 @@ class ObjectAnnotationDAO(
     }
 
 
-class OptionalTestCaseDAO(
-    SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.OptionalTestCase],
-):
-
-    __tablename__ = "OptionalTestCaseDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    value: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-
-    list_of_values: Mapped[typing.List[builtins.int]] = mapped_column(
-        JSON, nullable=False, use_existing_column=True
-    )
-
-    optional_position_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("PositionDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    optional_position: Mapped[PositionDAO] = relationship(
-        "PositionDAO",
-        uselist=False,
-        foreign_keys=[optional_position_id],
-        post_update=True,
-    )
-    list_of_orientations: Mapped[
-        builtins.list[OptionalTestCaseDAO_list_of_orientations_association]
-    ] = relationship(
-        "OptionalTestCaseDAO_list_of_orientations_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[OptionalTestCaseDAO_list_of_orientations_association.source_optionaltestcasedao_id]",
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "OptionalTestCaseDAO",
-        "inherit_condition": database_id == SymbolDAO.database_id,
-    }
-
-
 class OrientationDAO(
     SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.Orientation]
 ):
@@ -1769,22 +1704,6 @@ class PositionsSubclassWithAnotherPositionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PositionsSubclassWithAnotherPositionDAO",
         "inherit_condition": database_id == PositionsDAO.database_id,
-    }
-
-
-class PredicateDAO(
-    SymbolDAO, DataAccessObject[krrood.entity_query_language.predicate.Predicate]
-):
-
-    __tablename__ = "PredicateDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PredicateDAO",
-        "inherit_condition": database_id == SymbolDAO.database_id,
     }
 
 

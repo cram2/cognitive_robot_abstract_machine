@@ -236,6 +236,7 @@ class TrimeshType(TypeDecorator):
     """
 
     impl = types.LargeBinary(4 * 1024 * 1024 * 1024 - 1)  # 4 GB max
+    cache_ok = True
 
     def process_bind_param(self, value: trimesh.Trimesh, dialect):
         # return binary version of trimesh

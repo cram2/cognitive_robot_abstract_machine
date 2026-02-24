@@ -8,18 +8,16 @@ import sqlalchemy.inspection
 from sqlalchemy import and_, or_, select, Select, func, literal, not_ as sa_not
 from sqlalchemy.orm import Session
 
-from ..entity_query_language.symbolic import (
-    SymbolicExpression,
-    Attribute,
-    Comparator,
-    AND,
-    OR,
-    An,
-    The,
-    Variable,
-    Literal,
-    Where,
+from ..entity_query_language.query.query import (
+    Query,
 )
+from ..entity_query_language.query.operations import Where
+from ..entity_query_language.query.quantifiers import ResultQuantifier, An, The
+from ..entity_query_language.operators.core_logical_operators import AND, OR
+from ..entity_query_language.core.base_expressions import SymbolicExpression
+from ..entity_query_language.core.variable import Variable, Literal
+from ..entity_query_language.core.mapped_variable import Attribute
+from ..entity_query_language.operators.comparator import Comparator
 
 from .dao import get_dao_class
 
@@ -240,7 +238,7 @@ class DomainValueExtractor:
                 literal_node.value if hasattr(literal_node, "value") else literal_node
             )
 
-        values = [value for value in literal_node._domain_]
+        values = [value for value in literal_node._re_enterable_domain_generator_]
 
         if len(values) > 1:
             return values
@@ -263,7 +261,7 @@ class DomainValueExtractor:
             return variable.value if hasattr(variable, "value") else variable
 
         try:
-            sample = next(iter(variable._domain_)).value
+            sample = next(iter(variable._re_enterable_domain_generator_)).value
         except (StopIteration, AttributeError):
             return variable.value if hasattr(variable, "value") else variable
 
@@ -372,26 +370,26 @@ class EQLTranslator:
 
     """
 
-    eql_query: SymbolicExpression
+    eql_query: Query
     session: Session
 
     sql_query: Optional[Select] = None
     join_manager: JoinManager = field(default_factory=JoinManager)
 
     @property
-    def quantifier(self) -> SymbolicExpression:
+    def quantifier(self) -> ResultQuantifier:
         """Get the quantifier from the query."""
-        return self.eql_query
+        return self.eql_query._quantifier_expression_
 
     @property
-    def select_like(self) -> Any:
+    def select_like(self) -> Query:
         """Get the select-like expression from the query."""
-        return self.eql_query._child_
+        return self.eql_query
 
     @property
     def root_condition(self) -> SymbolicExpression:
         """Get the root condition from the query."""
-        return self.eql_query._child_._child_
+        return self.eql_query._conditions_root_
 
     def translate(self) -> None:
         """Translate the EQL query to SQL."""
@@ -443,7 +441,7 @@ class EQLTranslator:
         if isinstance(query, Attribute):
             return self.translate_attribute(query)
         if isinstance(query, Where):
-            return self.translate_query(query.conditions)
+            return self.translate_query(query.condition)
 
         raise UnsupportedQueryTypeError(f"Unknown query type: {type(query)}")
 
@@ -785,7 +783,7 @@ class EQLTranslator:
         return aliased_target
 
 
-def eql_to_sql(query: SymbolicExpression, session: Session) -> EQLTranslator:
+def eql_to_sql(query: Query, session: Session) -> EQLTranslator:
     """
     Translate an EQL query to SQL.
 
@@ -793,6 +791,7 @@ def eql_to_sql(query: SymbolicExpression, session: Session) -> EQLTranslator:
     :param session: The SQLAlchemy session
     :return: The translator instance
     """
+    query.build()
     result = EQLTranslator(query, session)
     result.translate()
     return result

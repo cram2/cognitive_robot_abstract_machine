@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from typing_extensions import Optional
 
-from krrood.entity_query_language.predicate import Symbol
+from krrood.symbol_graph.symbol_graph import Symbol
 
 
 @dataclass(unsafe_hash=True)

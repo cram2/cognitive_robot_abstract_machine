@@ -4,24 +4,25 @@ This module defines some custom exception types used by the entity_query_languag
 
 from __future__ import annotations
 
+import uuid
 from abc import ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING, Type, Any, List
+from typing_extensions import TYPE_CHECKING, Type, Any, List, Tuple, Optional
 
 from ..utils import DataclassException
 
 if TYPE_CHECKING:
-    from .symbolic import (
-        SymbolicExpression,
-        ResultQuantifier,
-        Variable,
-        Selectable,
-        QueryObjectDescriptor,
-        Aggregator,
-        GroupBy,
+    from .query.query import (
+        Query,
     )
-    from .match import Match
+    from .query.operations import GroupedBy
+    from .query.quantifiers import ResultQuantifier
+    from .operators.aggregators import Aggregator
+    from .query.builders import GroupedByBuilder
+    from .core.base_expressions import SymbolicExpression, Selectable
+    from .core.variable import Variable
+    from .query.match import Match
 
 
 @dataclass
@@ -139,6 +140,24 @@ class UsageError(DataclassException):
 
 
 @dataclass
+class TryingToModifyAnAlreadyBuiltQuery(UsageError):
+    """
+    Raised when trying to build an already built `Query`.
+
+    Check how to write queries correctly in :doc:`/krrood/doc/eql/writing_queries`.
+    """
+
+    query: Query
+    """
+    The query that has already been built.
+    """
+
+    def __post_init__(self):
+        self.message = f"{self.query} was already built."
+        super().__post_init__()
+
+
+@dataclass
 class UnsupportedExpressionTypeForDistinct(UsageError):
     """
     Raised when an expression type is not supported for distinct operation.
@@ -154,20 +173,20 @@ class UnsupportedExpressionTypeForDistinct(UsageError):
 
 
 @dataclass
-class NoConditionsProvidedToWhereStatementOfDescriptor(UsageError):
+class NoConditionsProvided(UsageError):
     """
-    Raised when no conditions are provided to the where statement of a query descriptor.
+    Raised when no conditions are provided to the where/having statement of a query.
 
     For further details, see the section on writing queries and `where` clauses in :doc:`/krrood/doc/eql/writing_queries`.
     """
 
-    descriptor: QueryObjectDescriptor
+    query: Query
     """
-    The query object descriptor that has no conditions in its where statement.
+    The query that has no conditions in its where/having statement.
     """
 
     def __post_init__(self):
-        self.message = f"No conditions were provided to the where statement of the descriptor {self.descriptor}"
+        self.message = f"No conditions were provided to the where/having statement of the query {self.query}"
         super().__post_init__()
 
 
@@ -188,7 +207,7 @@ class NestedAggregationError(UsageError):
         self.message = (
             f"Aggregator {self.parent_aggregator} has a child aggregator {self.parent_aggregator._child_}."
             f"Aggregations cannot be nested within another aggregation unless the inner aggregation is explicitly "
-            f"grouped, E.g. eql.max(eql.count(...).grouped_by(...)) ), or wrapped in an entity query descriptor, "
+            f"grouped, E.g. eql.max(eql.count(...).grouped_by(...)) ), or wrapped in an entity query, "
             f"E.g. eql.max(entity(eql.count(...)))"
         )
         super().__post_init__()
@@ -202,9 +221,9 @@ class AggregationUsageError(UsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    descriptor: QueryObjectDescriptor
+    query: Optional[Query] = field(default=None, kw_only=True)
     """
-    The query object descriptor that contains the aggregation.
+    The query that contains the aggregation.
     """
 
 
@@ -216,30 +235,17 @@ class UnsupportedAggregationOfAGroupedByVariable(AggregationUsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    group_by: GroupBy
+    grouped_by: GroupedBy
     """
-    The grouped_by variable that is not Count.
+    The grouped_by operation that contains the grouped_by variable that is being aggregated over.
     """
 
     def __post_init__(self):
         self.message = (
             f"Aggregation over grouped_by variable that is not Count "
-            f"{list(self.group_by.aggregators_of_grouped_by_variables_that_are_not_count())} in the group_by operation"
-            f" {self.group_by}"
+            f"{self.grouped_by.aggregators_of_grouped_by_variables} in the grouped_by operation"
+            f" {self.grouped_by}"
         )
-        super().__post_init__()
-
-
-@dataclass
-class HavingUsedBeforeWhereError(AggregationUsageError):
-    """
-    raised when having is used before where.
-
-    For further details, see :doc:`/krrood/doc/eql/result_processors`.
-    """
-
-    def __post_init__(self):
-        self.message = f"HAVING is used before WHERE in the query object descriptor {self.descriptor}"
         super().__post_init__()
 
 
@@ -251,6 +257,10 @@ class NonAggregatedSelectedVariablesError(AggregationUsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
+    grouped_by_builder: GroupedByBuilder
+    """
+    The builder class for the GroupedDataSource operation.
+    """
     non_aggregated_variables: List[Selectable]
     """
     The non-aggregated selected variables.
@@ -262,9 +272,9 @@ class NonAggregatedSelectedVariablesError(AggregationUsageError):
 
     def __post_init__(self):
         self.message = (
-            f"The variabls {self.non_aggregated_variables} are neither aggregated nor grouped by, they cannot be selected"
+            f"The variables {self.non_aggregated_variables} are neither aggregated nor grouped by, they cannot be selected"
             f" along with the aggregated variables {self.aggregated_variables}. You can only select variables that are"
-            f" either aggregated or are in the grouped by variables {self.descriptor._variables_to_group_by_}."
+            f" either aggregated or are in the grouped by variables {self.grouped_by_builder.variables_to_group_by}."
         )
         super().__post_init__()
 
@@ -277,10 +287,10 @@ class NonAggregatorInHavingConditionsError(AggregationUsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    non_aggregators: List[Selectable]
+    non_aggregators: Tuple[Selectable, ...]
 
     def __post_init__(self):
-        self.message = f"The having condition of the descriptor {self.descriptor} contains non-aggregators {self.non_aggregators}."
+        self.message = f"The having condition of the query {self.query} contains non-aggregators {self.non_aggregators}."
         super().__post_init__()
 
 
@@ -292,15 +302,16 @@ class AggregatorInWhereConditionsError(AggregationUsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    aggregators: List[Aggregator]
+    aggregators: Tuple[Aggregator, ...]
     """
     The aggregators in the where condition.
     """
 
     def __post_init__(self):
         self.message = (
-            f"The where condition of the descriptor {self.descriptor} contains aggregators {self.aggregators}."
-            f"If you want filter using aggregators, use `QueryObjectDescriptor.having()` instead."
+            f"The where condition of the query {self.query} contains aggregators {self.aggregators}."
+            f"If you want filter using aggregators, use `QueryObjectquery.having()` instead. Or wrap the aggregator"
+            f"in a subquery e.g. `an(entity(...).where(entity(eql.count(...)) > n))`"
         )
         super().__post_init__()
 
@@ -356,9 +367,9 @@ class LiteralConditionError(UsageError):
     For further details, see the warning about literal conditions in :doc:`/krrood/doc/eql/writing_queries`.
     """
 
-    query_descriptor: QueryObjectDescriptor
+    query: Query
     """
-    The query object descriptor that contains the literal condition.
+    The query that contains the literal condition.
     """
     literal_conditions: List[Any]
     """
@@ -367,7 +378,7 @@ class LiteralConditionError(UsageError):
 
     def __post_init__(self):
         self.message = (
-            f"The following Literal {self.literal_conditions} was given to the descriptor {self.query_descriptor}."
+            f"The following Literal {self.literal_conditions} was given to the query {self.query}."
             f"Literal conditions are not allowed in queries, as they are always"
             f"either True or False, independent on any other values/bindings in the query"
         )
@@ -525,14 +536,23 @@ class InvalidChildType(UsageError):
 
 
 @dataclass
-class InvalidEntityType(InvalidChildType):
+class NoExpressionFoundForGivenID(DataclassException):
     """
-    Raised when an invalid entity type is given to the quantification operation.
-
-    For further details, see :doc:`/krrood/doc/eql/writing_queries`.
+    Raised when no expression is found for the given expression ID.
     """
 
-    ...
+    symbolic_expression: SymbolicExpression
+    """
+    The current symbolic expression being evaluated.
+    """
+    expression_id: uuid.UUID
+    """
+    The ID of the expression that was not found.
+    """
+
+    def __post_init__(self):
+        self.message = f"No expression found for ID: {self.expression_id} during evaluation of {self.symbolic_expression}."
+        super().__post_init__()
 
 
 @dataclass
@@ -557,4 +577,28 @@ class NoneWrappedFieldError(ClassDiagramError):
 
     def __post_init__(self):
         self.message = f"Field '{self.attr_name}' of class '{self.clazz.__name__}' is not wrapped by a WrappedField."
+        super().__post_init__()
+
+
+@dataclass
+class NoChildToReplace(DataclassException):
+    """
+    Raised when trying to replace a child of an expression that has no children.
+    """
+
+    expression: SymbolicExpression
+    """
+    The expression that has no children.
+    """
+    old_child: SymbolicExpression
+    """
+    The child that was attempted to be replaced.
+    """
+    new_child: SymbolicExpression
+    """
+    The new child that was attempted to be set.
+    """
+
+    def __post_init__(self):
+        self.message = f"Expression '{self.expression}' has no child '{self.old_child}' to replace with '{self.new_child}'."
         super().__post_init__()

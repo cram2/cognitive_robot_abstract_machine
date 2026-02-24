@@ -1,9 +1,6 @@
 import os
-import threading
-import time
 
 import pytest
-from krrood.entity_query_language.symbol_graph import SymbolGraph
 from typing_extensions import Tuple
 
 from .adapters.urdf import URDFParser
@@ -11,7 +8,6 @@ from .datastructures.prefixed_name import PrefixedName
 from .spatial_types import HomogeneousTransformationMatrix
 from .spatial_types.derivatives import DerivativeMap
 from .spatial_types.spatial_types import Vector3
-from .utils import rclpy_installed, tracy_installed, hsrb_installed
 from .world import World
 from .world_description.connections import (
     Connection6DoF,

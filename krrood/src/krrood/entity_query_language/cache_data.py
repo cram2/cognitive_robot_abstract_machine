@@ -120,14 +120,24 @@ class ReEnterableLazyIterable(Generic[T]):
 
     def __iter__(self):
         """
-        Iterate over the values, materializing them as they are iterated over.
+        Iterate over the values, materializing them as they are iterated over. This allows multiple iterations over
+        the iterable simultaneously, and it also allows for efficient access to previously materialized values.
 
         :return: An iterator over the values.
         """
-        yield from self.materialized_values
-        for v in self.iterable:
-            self.materialized_values.append(v)
-            yield v
+        index = 0
+        while True:
+            if index < len(self.materialized_values):
+                yield self.materialized_values[index]
+                index += 1
+            else:
+                try:
+                    v = next(self.iterable)
+                    self.materialized_values.append(v)
+                    yield v
+                    index += 1
+                except StopIteration:
+                    return
 
     def __bool__(self):
         """
