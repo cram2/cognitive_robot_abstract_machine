@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import field, dataclass
+from importlib.resources import files
 from typing import Self
 
 from ..datastructures.definitions import StaticJointState, GripperState
@@ -19,7 +20,8 @@ from ..robots.abstract_robot import (
 from .robot_mixins import HasNeck, SpecifiesLeftRightArm
 from ..spatial_types import Quaternion, Vector3
 from ..world import World
-from ..world_description.connections import FixedConnection
+from ..world_description.connections import FixedConnection, ActiveConnection
+from ..world_description.world_entity import CollisionCheckingConfig
 
 
 @dataclass(eq=False)
@@ -29,7 +31,50 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
      Example can be found at: https://vib.ai.uni-bremen.de/page/comingsoon/the-tracebot-laboratory/
     """
 
-    def load_srdf(self): ...
+    def setup_collision_config(self):
+        """
+        Loads the SRDF file for the Tracy robot, if it exists.
+        """
+        collision_srdf_path = str(
+            files("giskardpy").joinpath("../../self_collision_matrices/iai/tracy.srdf")
+        )
+        self._world.load_collision_srdf(collision_srdf_path)
+
+        frozen_joints = [
+            # Left gripper joints
+            "left_robotiq_85_left_knuckle_joint",
+            "left_robotiq_85_right_knuckle_joint",
+            "left_robotiq_85_left_inner_knuckle_joint",
+            "left_robotiq_85_right_inner_knuckle_joint",
+            "left_robotiq_85_left_finger_tip_joint",
+            "left_robotiq_85_right_finger_tip_joint",
+            # Right gripper joints
+            "right_robotiq_85_left_knuckle_joint",
+            "right_robotiq_85_right_knuckle_joint",
+            "right_robotiq_85_left_inner_knuckle_joint",
+            "right_robotiq_85_right_inner_knuckle_joint",
+            "right_robotiq_85_left_finger_tip_joint",
+            "right_robotiq_85_right_finger_tip_joint",
+        ]
+        for joint_name in frozen_joints:
+            c: ActiveConnection = self._world.get_connection_by_name(joint_name)
+            c.frozen_for_collision_avoidance = True
+
+        for body in self.bodies_with_collisions:
+            collision_config = CollisionCheckingConfig(
+                buffer_zone_distance=0.1, violated_distance=0.0
+            )
+            body.set_static_collision_config(collision_config)
+
+        for joint_name in frozen_joints:
+            c: ActiveConnection = self._world.get_connection_by_name(joint_name)
+            collision_config = CollisionCheckingConfig(
+                buffer_zone_distance=0.005,
+                violated_distance=0.0,
+                max_avoided_bodies=4,
+                disabled=True,
+            )
+            c.set_static_collision_config_for_direct_child_bodies(collision_config)
 
     @classmethod
     def from_world(cls, world: World) -> Self:
