@@ -110,7 +110,7 @@ class SimulatorCallback:
         """
         Initialize the function with the callback
 
-        :param callback: Callable, callback function, must return SimulatorCallbackResult
+        :param callback: callback function, must return SimulatorCallbackResult
         """
         self._call = callback
         self.__name__ = callback.__name__
@@ -161,12 +161,12 @@ class BaseSimulator:
         """
         Initialize the simulator with the viewer and the following keyword arguments:
 
-        :param viewer: SimulatorViewer, viewer for the simulator
-        :param number_of_envs: int, number of environments
-        :param headless: bool, True to run the simulator in headless mode
-        :param real_time_factor: float, real time factor
-        :param step_size: float, step size
-        :param callbacks: List[SimulatorCallback], list of callback functions
+        :param viewer: viewer for the simulator
+        :param number_of_envs: number of environments
+        :param headless: True to run the simulator in headless mode
+        :param real_time_factor: real time factor
+        :param step_size: step size
+        :param callbacks: list of callback functions
         """
         self._headless = headless
         self._step_size = step_size
@@ -180,10 +180,6 @@ class BaseSimulator:
         if callbacks is not None:
             for func in callbacks:
                 self.add_instance_callback(func)
-        self._write_objects = {}
-        self._read_objects = {}
-        self._write_ids = {}
-        self._read_ids = {}
         atexit.register(self.stop)
 
     @property
@@ -206,11 +202,11 @@ class BaseSimulator:
         """
         Start the simulator, if run_in_thread is True, run the simulator in a thread until the constraints are met
 
-        :param constraints: SimulatorConstraints, constraints for stopping the simulator
-        :param simulate_in_thread: bool, True to simulate the simulator in a thread
-        :param render_in_thread: bool, True to render the simulator in a thread
-        :param constraints: SimulatorConstraints, constraints for stopping the simulator
-        :param time_out_in_seconds: float, timeout for starting the renderer
+        :param constraints: constraints for stopping the simulator
+        :param simulate_in_thread: True to simulate the simulator in a thread
+        :param render_in_thread: True to render the simulator in a thread
+        :param constraints: constraints for stopping the simulator
+        :param time_out_in_seconds: timeout for starting the renderer
         """
         self.start_callback()
         self.reset()
@@ -244,7 +240,7 @@ class BaseSimulator:
         """
         Run the simulator while the state is RUNNING or until the constraints are met.
 
-        :param constraints: SimulatorConstraints, constraints for stopping the simulator
+        :param constraints: constraints for stopping the simulator
         """
         with self.renderer:
             while self.state != SimulatorState.STOPPED:
@@ -364,7 +360,7 @@ class BaseSimulator:
         """
         Check if the simulator should stop based on the constraints.
 
-        :param constraints: SimulatorConstraints, constraints for stopping the simulator
+        :param constraints: constraints for stopping the simulator
 
         :return: bool, True if the simulator should stop, False otherwise
         """
@@ -406,15 +402,6 @@ class BaseSimulator:
 
     def render(self):
         self.renderer.sync()
-
-    def _process_objects(self, objects, ids_dict):
-        """
-        Process objects for updating `read_ids` or `write_ids`.
-
-        :param objects: Dictionary of objects and attributes.
-        :param ids_dict: Dictionary to store processed IDs.
-        """
-        pass
 
     def pre_step_callback(self):
         pass
