@@ -1,15 +1,21 @@
 import time
 from abc import abstractmethod
+from dataclasses import dataclass, field
 from os.path import dirname
 from queue import Queue, Empty
 
 from ripple_down_rules.rdr_decorators import RDRDecorator
+
+from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.data_types import ObservationStateValues
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
 from segmind import logger, set_logger_level, LogLevel
 from semantic_digital_twin.reasoning.predicates import (
     InsideOf,
     contact,
     is_supported_by,
 )
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Any, Dict, List, Optional, Type, Callable, Union
 
@@ -32,6 +38,7 @@ from ..datastructures.events import (
     SupportEvent,
 )
 from ..datastructures.object_tracker import ObjectTrackerFactory
+from ..event_logger import EventLogger
 from ..utils import get_support
 
 set_logger_level(LogLevel.DEBUG)
@@ -285,6 +292,128 @@ class InsertionDetector(SpatialRelationDetector):
     def event_types(cls) -> List[Type[InsertionEvent]]:
         return [InsertionEvent]
 
+
+@dataclass(eq=False, repr=False)
+class LossOfSupportNode(MotionStatechartNode, SpatialRelationDetector):
+    tracked_object: Body = field(kw_only=True)
+    logger: EventLogger = field(kw_only=True)
+    bodies_states: Dict[Body, Any] = field(default_factory=dict, init=False)
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        self.update_initial_state(context.world)
+        return NodeArtifacts()
+
+    def update_initial_state(self, world: World = None):
+        for body in world.bodies_with_collision:
+            self.update_body_state(body)
+
+    def on_tick(self, context: MotionStatechartContext) -> Optional[ObservationStateValues]:
+        detected_loss_of_support = []
+
+        if self.tracked_object not in self.bodies_states:
+            self.update_body_state(self.tracked_object)
+        self.update_body_state(self.tracked_object)
+        for event in self.logger.get_events():
+            if isinstance(event, LossOfSupportEvent):
+                detected_loss_of_support.append(event)
+
+        if detected_loss_of_support:
+            return ObservationStateValues.TRUE
+        return ObservationStateValues.FALSE
+
+
+    def update_body_state(self, body: Body, with_bodies: Optional[List[Body]] = None):
+        """
+        Update the state of a body.
+        """
+        support = get_support(body)
+        if body in self.bodies_states:
+            if support is None:
+                if self.bodies_states[body] is None:
+                    return
+                else:
+                    self.logger.log_event(
+                        LossOfSupportEvent(
+                            tracked_object=body, with_object=self.bodies_states[body]
+                        )
+                    )
+            else:
+                if support != self.bodies_states[body]:
+                    self.logger.log_event(
+                        LossOfSupportEvent(
+                            tracked_object=body, with_object=self.bodies_states[body]
+                        )
+                    )
+                else:
+                    return
+        self.bodies_states[body] = support
+
+
+
+@dataclass(eq=False, repr=False)
+class SupportDetectorNode(MotionStatechartNode, SpatialRelationDetector):
+    tracked_object: Body = field(kw_only=True)
+    logger: EventLogger = field(kw_only=True)
+    bodies_states: Dict[Body, Any] = field(default_factory=dict, init=False)
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        self.update_initial_state(context.world)
+        return NodeArtifacts()
+
+    def update_initial_state(self, world: World = None):
+        for body in world.bodies_with_collision:
+            self.update_body_state(body)
+
+    def on_tick(self, context: MotionStatechartContext) -> Optional[ObservationStateValues]:
+        detected_support = []
+        detected_loss_of_support = []
+
+        if self.tracked_object not in self.bodies_states:
+            self.update_body_state(self.tracked_object)
+        self.update_body_state(self.tracked_object)
+        for event in self.logger.get_events():
+            if isinstance(event, SupportEvent):
+                detected_support.append(event)
+            elif isinstance(event, LossOfSupportEvent):
+                detected_loss_of_support.append(event)
+
+        if detected_support or detected_loss_of_support:
+            return ObservationStateValues.TRUE
+        return ObservationStateValues.FALSE
+
+
+    def update_body_state(self, body: Body, with_bodies: Optional[List[Body]] = None):
+        """
+        Update the state of a body.
+        """
+        support = get_support(body)
+        if body in self.bodies_states:
+            if support is None:
+                if self.bodies_states[body] is None:
+                    return
+                else:
+                    self.logger.log_event(
+                        LossOfSupportEvent(
+                            tracked_object=body, with_object=self.bodies_states[body]
+                        )
+                    )
+            else:
+                if self.bodies_states[body] is None:
+                    self.logger.log_event(
+                        SupportEvent(tracked_object=body, with_object=support)
+                    )
+                elif support != self.bodies_states[body]:
+                    self.logger.log_event(
+                        LossOfSupportEvent(
+                            tracked_object=body, with_object=self.bodies_states[body]
+                        )
+                    )
+                    self.logger.log_event(
+                        SupportEvent(tracked_object=body, with_object=support)
+                    )
+                else:
+                    return
+        self.bodies_states[body] = support
 
 class SupportDetector(SpatialRelationDetector):
 

@@ -185,8 +185,8 @@ def get_support(obj: Body) -> Optional[Body]:
     :param obj: The object to check if it is in contact with a supporting surface.
     :return: The supporting surface if it exists, None otherwise.
     """
-    if obj in obj._world.bodies_with_enabled_collision:
-        for b in obj._world.bodies_with_enabled_collision:
+    if obj in obj._world.bodies_with_collision:
+        for b in obj._world.bodies_with_collision:
             if is_supported_by(obj, b):
                 return b
 

@@ -434,9 +434,6 @@ class AbstractContactDetector(DetectorWithTwoTrackedObjects, ABC):
             else self.tracked_object._world.bodies_with_collision
         )
         for obj in objects:
-            logger.debug(
-                f"Checking collision between {self.tracked_object.name.name} and {obj.name.name}"
-            )
             if obj is self.tracked_object:
                 continue
             if contact(self.tracked_object, obj):
@@ -510,9 +507,6 @@ class ContactDetectorNode(MotionStatechartNode, AbstractContactDetector):
         if len(events) > 0:
             for event in events:
                 if isinstance(event, ContactEvent):
-                    logger.debug(
-                        f"{self.tracked_object.name} got into contact with {event.with_object.name}"
-                    )
                     self.logger.log_event(event)
                     detected_contact.append(event)
 
@@ -543,9 +537,6 @@ class LossOfContactDetectorNode(MotionStatechartNode, AbstractContactDetector):
         if len(events) > 0:
             for event in events:
                 if isinstance(event, LossOfContactEvent):
-                    logger.debug(
-                        f"{self.tracked_object.name} lost contact with {event.with_object.name}"
-                    )
                     self.logger.log_event(event)
                     detected_loss_of_contact.append(event)
 
