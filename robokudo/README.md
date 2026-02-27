@@ -2,6 +2,11 @@
 RoboKudo is an open source framework for robot perception for ROS2
 
 ## Installation instructions for Ubuntu (tested on 24.04)
+Please follow the instructions in the main README of this repo to install the dependencies with poetry/uv.
+During the installation, you might get an error related to graphviz. Check out the README of semantic_digital_twin for more information how to fix this and which package has to be installed.
+
+For RoboKudo, you have to handle the virtual environment creation a bit differently though. See below.
+
 
 ### (Optional) create a virtual environment using virtualenvwrapper
 You can use the same virtual environment as the one that CRAM uses and explained in [its main README](https://github.com/Sanic/cognitive_robot_abstract_machine/tree/robokudo?tab=readme-ov-file#installation).
@@ -25,8 +30,9 @@ Using virtualenvwrapper is highly encouraged as the whole CRAM architecture uses
 - Clone the CRAM repository to your filesystem (if you haven't already). In this example, we'll use ~/libs: 
 ```
 mkdir -p ~/libs && cd ~/libs
-git clone https://github.com/cram2/cognitive_robot_abstract_machine.git
+git clone https://github.com/sanic/cognitive_robot_abstract_machine.git
 cd robokudo
+git checkout robokudo
 ```
 - Switch to your venv, if you use one.
 ```
