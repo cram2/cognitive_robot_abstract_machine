@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Set, Any
 
-from giskardpy.motion_statechart.context import SegmindContext, MotionStatechartContext
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -14,7 +14,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass
 class SegmindContext(MotionStatechartContext):
     latest_contact_bodies: Dict[Body, Set[Body]] = None
-    latest_support: Optional[Dict[Body, Body]] = None
+    latest_support: Dict[Body, Set[Body]] = None
     # ToDo:  Why circular import for EventLogger?
     logger: Optional[Any] = None
 
@@ -91,8 +91,12 @@ class ContactDetector(MotionStatechartNode):
                     )
 
             elif obj in latest_contact_bodies:
+                if latest_contact_bodies[obj] == contact_list:
+                    continue
                 latest_contact_bodies[obj] |= contact_list
                 for body in contact_list:
+                    if body in latest_contact_bodies[obj]:
+                        continue
                     events.append(
                         ContactEvent(
                             close_bodies=contact_list,
