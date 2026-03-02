@@ -51,6 +51,7 @@ from krrood.entity_query_language.query_graph import QueryGraph
 from krrood.entity_query_language.utils import (
     cartesian_product_while_passing_the_bindings_around,
 )
+from pycram.orm.ormatic_interface import PosterDAO
 from ...dataset.example_classes import VectorsWithProperty, Pose, Position
 from ...dataset.semantic_world_like_classes import (
     Handle,
@@ -1191,14 +1192,3 @@ def test_type_availability_in_mapped_variables(handles_and_containers_world):
     assert cabinet_drawers._type_ is Drawer
     assert first_drawer._type_ is Drawer
     assert first_drawer_handle._type_ is Handle
-
-
-def test_mode():
-    p1 = Position(0, 0, 0)
-    p2 = Position(0, 0, 0)
-    p3 = Position(0, 0, 1)
-    domain = [p1, p2, p3]
-    v = variable_from(domain)
-
-    q1 = an(entity(v).mode()).tolist()
-    assert q1 == [p1, p2]

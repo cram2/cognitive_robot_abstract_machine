@@ -477,17 +477,6 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
     def _name_(self) -> str:
         return f"({', '.join(var._name_ for var in self._selected_variables_)})"
 
-    def mode(self) -> Self:
-        """
-        Apply a condition to this query that only the elements are returned which appear most frequently.
-        This is done by grouping the elements and only returning from the groups where count(group) == max(count(group))
-        :return: The modified query
-        """
-
-        self.grouped_by(self._selected_variables_)
-
-        return self
-
 
 @dataclass(eq=False, repr=False)
 class SetOf(Query):
