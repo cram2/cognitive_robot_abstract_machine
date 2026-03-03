@@ -20,11 +20,11 @@ from typing_extensions import (
     TypeVar,
 )
 
-from .datastructures.dataclasses import Context
-from .datastructures.partial_designator import PartialDesignator
-from .datastructures.pose import PoseStamped
-from .plan import Plan, PlanNode
-from .utils import bcolors
+from pycram.datastructures.dataclasses import Context
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.datastructures.pose import PoseStamped
+from pycram.plan import Plan, PlanNode
+from pycram.utils import bcolors
 
 
 class DesignatorError(Exception):

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from dataclasses import fields as dc_fields
 from typing_extensions import List, Type
 
-from ...class_diagrams.attribute_introspector import (
+from krrood.class_diagrams.attribute_introspector import (
     AttributeIntrospector,
     DiscoveredAttribute,
 )
@@ -21,7 +21,9 @@ class DescriptorAwareIntrospector(AttributeIntrospector):
     """
 
     def discover(self, owner_cls: Type) -> List[DiscoveredAttribute]:
-        from .property_descriptor import PropertyDescriptor
+        from krrood.ontomatic.property_descriptor.property_descriptor import (
+            PropertyDescriptor,
+        )
 
         # Index all dataclass fields by name
         all_dc_fields = {f.name: f for f in dc_fields(owner_cls)}

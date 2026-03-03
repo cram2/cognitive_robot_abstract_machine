@@ -23,6 +23,7 @@ from ...dataset.semantic_world_like_classes import (
     Body,
     RevoluteConnection,
     Wardrobe,
+    Cabinet,
 )
 
 
@@ -437,3 +438,27 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree_optimized(
         elif isinstance(s, Wardrobe):
             solution_set.add((Wardrobe, s.handle.name, s.body.name, s.container.name))
     assert expected_solution_set == solution_set
+
+
+def test_rule_with_grouped_by(inferred_cabinets_world):
+    world = inferred_cabinets_world
+    drawer = variable(Drawer, world.views)
+    prismatic_connection = variable(PrismaticConnection, world.connections)
+    cabinets = (
+        entity(
+            inference(Cabinet)(
+                container=prismatic_connection.parent,
+                drawers=drawer,
+            )
+        )
+        .where(prismatic_connection.child == drawer.container)
+        .grouped_by(prismatic_connection.parent)
+        .tolist()
+    )
+    assert len(cabinets) == 2
+    assert cabinets[0].container.name == "Container2"
+    assert len(cabinets[0].drawers) == 2
+    assert {d.handle.name for d in cabinets[0].drawers} == {"Handle1", "Handle3"}
+    assert cabinets[1].container.name == "Container4"
+    assert len(cabinets[1].drawers) == 1
+    assert cabinets[1].drawers[0].handle.name == "Handle3"

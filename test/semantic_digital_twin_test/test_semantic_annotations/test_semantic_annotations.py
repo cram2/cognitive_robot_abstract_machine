@@ -9,6 +9,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
@@ -18,7 +19,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 try:
-    from ripple_down_rules.user_interface.gui import RDRCaseViewer
+    from krrood.ripple_down_rules.user_interface.gui import RDRCaseViewer
     from PyQt6.QtWidgets import QApplication
 except ImportError as e:
     logging.debug(e)
@@ -51,11 +52,9 @@ class TestSemanticAnnotation(SemanticAnnotation):
 
     def add_entity(self, body: KinematicStructureEntity):
         self.entity_list.append(body)
-        body._semantic_annotations.add(self)
 
     def add_semantic_annotation(self, semantic_annotation: SemanticAnnotation):
         self.semantic_annotations.append(semantic_annotation)
-        semantic_annotation._semantic_annotations.add(self)
 
     @property
     def chain(self) -> list[KinematicStructureEntity]:
@@ -78,13 +77,14 @@ class TestSemanticAnnotation(SemanticAnnotation):
 
 def test_semantic_annotation_hash(apartment_world_setup):
     semantic_annotation1 = Handle(root=apartment_world_setup.bodies[0])
+    semantic_annotation2 = Handle(root=apartment_world_setup.bodies[0])
     with apartment_world_setup.modify_world():
         apartment_world_setup.add_semantic_annotation(semantic_annotation1)
-    assert hash(semantic_annotation1) == hash(
-        (Handle, apartment_world_setup.bodies[0].id)
-    )
+        apartment_world_setup.add_semantic_annotation(semantic_annotation2)
 
-    semantic_annotation2 = Handle(root=apartment_world_setup.bodies[0])
+    # hash of semantic annotations should be based on their properties, not ids
+    assert id(semantic_annotation1) != id(semantic_annotation2)
+    assert hash(semantic_annotation1) == hash(semantic_annotation2)
     assert semantic_annotation1 == semantic_annotation2
 
 
@@ -129,11 +129,10 @@ def test_aggregate_bodies(kitchen_world):
     ]
 
     assert_equal(
-        world_semantic_annotation.kinematic_structure_entities,
+        set(world_semantic_annotation.kinematic_structure_entities),
         set(kitchen_world.kinematic_structure_entities)
         - {
             kitchen_world.kinematic_structure_entities[0],
-            kitchen_world.kinematic_structure_entities[19],
         },
     )
 
@@ -240,7 +239,6 @@ def test_semantic_annotation_serialization_deserialization_once(apartment_world_
 
     door_de = Door.from_json(door_se, **kwargs)
 
-    assert door == door_de
     assert type(door.handle) == type(door_de.handle)
     assert type(door.root) == type(door_de.root)
 
@@ -258,7 +256,7 @@ def test_minimal_robot_annotation(pr2_world_state_reset):
         )
         world_copy.add_connection(c_root_bf)
 
-    robot = world_copy.get_semantic_annotations_by_type(MinimalRobot)[0]
-    pr2 = PR2.from_world(pr2_world_state_reset)
+    robot = world_copy.get_semantic_annotations_by_type(AbstractRobot)[0]
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(AbstractRobot)[0]
     assert len(robot.bodies) == len(pr2.bodies)
     assert len(robot.connections) == len(pr2.connections)

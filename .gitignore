@@ -82,3 +82,12 @@ mlartifacts
 **/.jupyter_cache/
 **/test_tmp/
 semantic_digital_twin/resources/output
+
+# test generated files
+*.pkl
+test/krrood_test/test_ripple_down_rules/*.dot
+test/krrood_test/test_ripple_down_rules/*.svg
+test/krrood_test/test_ripple_down_rules/test_results/
+test/**/*.pdf
+test/krrood_test/test_ripple_down_rules/test_generated_rdrs
+

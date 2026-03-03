@@ -12,13 +12,13 @@ from dataclasses import dataclass
 
 from typing_extensions import Iterable, Tuple, Iterator
 
-from ..core.base_expressions import (
+from krrood.entity_query_language.core.base_expressions import (
     MultiArityExpression,
     Bindings,
     OperationResult,
     SymbolicExpression,
 )
-from ..utils import cartesian_product_while_passing_the_bindings_around
+from krrood.entity_query_language.utils import cartesian_product_while_passing_the_bindings_around
 
 
 @dataclass(eq=False, repr=False)

@@ -20,20 +20,20 @@ from typing_extensions import (
     Dict,
 )
 
-from .base_expressions import (
+from krrood.entity_query_language.core.base_expressions import (
     UnaryExpression,
     Bindings,
     OperationResult,
     Selectable,
 )
-from ..operators.comparator import Comparator
-from ..utils import (
+from krrood.entity_query_language.operators.comparator import Comparator
+from krrood.entity_query_language.utils import (
     T,
     merge_args_and_kwargs,
     convert_args_and_kwargs_into_hashable_key,
 )
 
-from ...symbol_graph.helpers import get_field_type_endpoint
+from krrood.symbol_graph.helpers import get_field_type_endpoint
 
 
 @dataclass(eq=False, repr=False)

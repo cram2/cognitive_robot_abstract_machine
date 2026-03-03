@@ -9,10 +9,10 @@ from typing_extensions import (
     Any,
 )
 
-from ..utils import DataclassException
+from krrood.utils import DataclassException
 
 if TYPE_CHECKING:
-    from .symbolic_math import FloatVariable
+    from krrood.symbolic_math.symbolic_math import FloatVariable
 
 
 @dataclass

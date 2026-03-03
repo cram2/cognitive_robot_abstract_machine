@@ -1,11 +1,15 @@
+import enum
 from dataclasses import dataclass
+from typing import assert_never, Self
+
+from random_events.set import Set
 
 from typing_extensions import List, Any, Union
 
-from random_events.variable import Variable
+from random_events.variable import Variable, Symbolic, Continuous, Integer
 
-
-from ..entity_query_language.core.mapped_variable import (
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.mapped_variable import (
     Index,
     Attribute,
     MappedVariable,
@@ -61,3 +65,46 @@ class ObjectAccessVariable:
 
     def __hash__(self):
         return hash(self.variable)
+
+    def __eq__(self, other):
+        return self.variable == other.variable
+
+    @classmethod
+    def from_attribute_access_and_type(
+        cls, attribute_access: AttributeAccessLike, type_: type
+    ) -> Self:
+        """
+        Create an ObjectAccessVariable from the given attribute and type.
+
+        :param attribute_access: A symbolic expression representing access to the attribute.
+        :param type_: The type to construct the variable for
+        :return: The ObjectAccessVariable
+        """
+        if issubclass(type_, enum.Enum):
+            result = Symbolic(str(attribute_access), Set.from_iterable(type_))
+        elif issubclass(type_, bool):
+            result = Symbolic(str(attribute_access), Set.from_iterable([True, False]))
+        elif issubclass(type_, int):
+            result = Integer(str(attribute_access))
+        elif issubclass(type_, float):
+            result = Continuous(str(attribute_access))
+        else:
+            assert_never((attribute_access, type_))
+
+        return cls(result, attribute_access)
+
+    @classmethod
+    def from_expression(
+        cls, attribute_access: AttributeAccessLike, expression: SymbolicExpression
+    ) -> Self:
+        """
+        Create an ObjectAccessVariable from the given attribute and a symbolic expression.
+        The symbolic expression is converted to a list and used for the domain of the variable.
+
+        :param attribute_access: A symbolic expression representing access to the attribute.
+        :param expression: The symbolic expression to use for the domain
+        :return: The ObjectAccessVariable
+        """
+        domain = expression.tolist()
+        variable = Symbolic(attribute_access._name_, Set.from_iterable(domain))
+        return cls(variable, attribute_access)

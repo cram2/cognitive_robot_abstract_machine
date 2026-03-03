@@ -27,30 +27,40 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
-from ..datastructures.prefixed_name import PrefixedName
-from ..datastructures.variables import SpatialVariables
-from ..exceptions import (
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.exceptions import (
     MismatchingWorld,
 )
-from ..spatial_types import Point3, HomogeneousTransformationMatrix, Vector3
-from ..world import World
-from ..world_description.connections import (
+from semantic_digital_twin.spatial_types import (
+    Point3,
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
-from ..world_description.degree_of_freedom import DegreeOfFreedomLimits
-from ..world_description.geometry import Scale
-from ..world_description.shape_collection import BoundingBoxCollection
-from ..world_description.world_entity import (
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedomLimits,
+)
+from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+)
+from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     Body,
     Region,
     KinematicStructureEntity,
     Connection,
 )
-from ..world_description.world_modification import synchronized_attribute_modification
+from semantic_digital_twin.world_description.world_modification import (
+    synchronized_attribute_modification,
+)
 
 if TYPE_CHECKING:
-    from .semantic_annotations import (
+    from semantic_digital_twin.semantic_annotations.semantic_annotations import (
         Drawer,
         Door,
         Handle,
@@ -702,8 +712,14 @@ class HasSupportingSurface(HasStorageSpace, ABC):
             ),
             points_3d=points_3d,
         )
+
+        supporting_surface_z_position = self.root.collision.scale.z / 2
         self_C_supporting_surface = FixedConnection(
-            parent=self.root, child=supporting_surface
+            parent=self.root,
+            child=supporting_surface,
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                z=supporting_surface_z_position, reference_frame=self.root
+            ),
         )
         self._world.add_region(supporting_surface)
         self._world.add_connection(self_C_supporting_surface)
@@ -766,7 +782,7 @@ class HasSupportingSurface(HasStorageSpace, ABC):
         samples = surface_circuit.sample(amount)
         samples = samples[np.argsort(surface_circuit.log_likelihood(samples))[::-1]]
         samples = np.concatenate((samples, z_coordinate), axis=1)
-        return [Point3(*s, reference_frame=self.root) for s in samples]
+        return [Point3(*s, reference_frame=self.supporting_surface) for s in samples]
 
     def _build_surface_sampler(
         self,

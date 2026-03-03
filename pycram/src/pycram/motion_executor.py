@@ -4,6 +4,7 @@ from typing import List, Any, ClassVar
 
 from typing_extensions import Callable
 
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
@@ -73,9 +74,11 @@ class MotionExecutor:
         """
         logger.debug(f"Executing {self.motions} motions in simulation")
         executor = Ros2Executor(
-            self.world,
-            controller_config=QPControllerConfig(
-                target_frequency=50, prediction_horizon=4, verbose=False
+            context=MotionStatechartContext(
+                world=self.world,
+                qp_controller_config=QPControllerConfig(
+                    target_frequency=50, prediction_horizon=4, verbose=False
+                ),
             ),
             ros_node=self.ros_node,
         )

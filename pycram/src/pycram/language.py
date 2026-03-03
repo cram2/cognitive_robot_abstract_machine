@@ -20,12 +20,12 @@ from typing_extensions import (
     TYPE_CHECKING,
 )
 
-from .datastructures.dataclasses import Context
-from .datastructures.enums import TaskStatus, MonitorBehavior
-from .datastructures.partial_designator import PartialDesignator
-from .failures import PlanFailure
-from .fluent import Fluent
-from .plan import (
+from pycram.datastructures.dataclasses import Context
+from pycram.datastructures.enums import TaskStatus, MonitorBehavior
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.failures import PlanFailure
+from pycram.fluent import Fluent
+from pycram.plan import (
     PlanNode,
     Plan,
     managed_node,
@@ -33,12 +33,12 @@ from .plan import (
     MotionNode,
     ActionNode,
 )
-from .ros import sleep
+from pycram.ros import sleep
 
 if TYPE_CHECKING:
-    from .robot_plans.actions.base import ActionDescription
+    from pycram.robot_plans.actions.base import ActionDescription
 
-    from .robot_plans import BaseMotion
+    from pycram.robot_plans import BaseMotion
 
 logger = logging.getLogger(__name__)
 

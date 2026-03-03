@@ -4,31 +4,31 @@ from dataclasses import dataclass, field
 
 from typing_extensions import ClassVar, Optional, Dict
 
-from .rules.conclusion import Conclusion
-from .rules.conclusion_selector import ConclusionSelector
-from .query.query import (
+from krrood.entity_query_language.rules.conclusion import Conclusion
+from krrood.entity_query_language.rules.conclusion_selector import ConclusionSelector
+from krrood.entity_query_language.query.query import (
     Query,
 )
-from .query.operations import OrderedBy, GroupedBy
-from .query.quantifiers import ResultQuantifier
-from .operators.concatenation import Concatenation
-from .operators.aggregators import Aggregator
-from .operators.core_logical_operators import LogicalOperator
-from .core.base_expressions import SymbolicExpression, Filter
-from .core.variable import Variable, Literal
-from .core.mapped_variable import MappedVariable
-from .operators.comparator import Comparator
+from krrood.entity_query_language.query.operations import OrderedBy, GroupedBy
+from krrood.entity_query_language.query.quantifiers import ResultQuantifier
+from krrood.entity_query_language.operators.concatenation import Concatenation
+from krrood.entity_query_language.operators.aggregators import Aggregator
+from krrood.entity_query_language.operators.core_logical_operators import (
+    LogicalOperator,
+)
+from krrood.entity_query_language.core.base_expressions import (
+    SymbolicExpression,
+    Filter,
+)
+from krrood.entity_query_language.core.variable import Variable, Literal
+from krrood.entity_query_language.core.mapped_variable import MappedVariable
+from krrood.entity_query_language.operators.comparator import Comparator
 
-try:
-    from rustworkx_utils import (
-        GraphVisualizer,
-        RWXNode as RXUtilsNode,
-        ColorLegend as RXUtilsColorLegend,
-    )
-except ImportError:
-    GraphVisualizer = None
-    RXUtilsNode = type
-    RXUtilsColorLegend = type
+from krrood.rustworkx_utils import (
+    GraphVisualizer,
+    RWXNode as RXUtilsNode,
+    ColorLegend as RXUtilsColorLegend,
+)
 
 import rustworkx as rx
 

@@ -6,7 +6,7 @@ from random_events.variable import Continuous, Symbolic, Integer
 from typing_extensions import Optional
 import json
 
-from ..probabilistic_model import ProbabilisticModel
+from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
 class ProbabilisticModelWrapper(mlflow.pyfunc.PythonModel):

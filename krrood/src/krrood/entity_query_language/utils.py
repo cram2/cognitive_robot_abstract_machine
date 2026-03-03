@@ -37,7 +37,11 @@ from typing_extensions import (
 )
 
 if TYPE_CHECKING:
-    from .core.base_expressions import Bindings, OperationResult, SymbolicExpression
+    from krrood.entity_query_language.core.base_expressions import (
+        Bindings,
+        OperationResult,
+        SymbolicExpression,
+    )
 
 
 class IDGenerator:

@@ -10,19 +10,22 @@ from dataclasses import dataclass, field
 
 from typing_extensions import TYPE_CHECKING, Type, Any, List, Tuple, Optional
 
-from ..utils import DataclassException
+from krrood.utils import DataclassException
 
 if TYPE_CHECKING:
-    from .query.query import (
+    from krrood.entity_query_language.query.query import (
         Query,
     )
-    from .query.operations import GroupedBy
-    from .query.quantifiers import ResultQuantifier
-    from .operators.aggregators import Aggregator
-    from .query.builders import GroupedByBuilder
-    from .core.base_expressions import SymbolicExpression, Selectable
-    from .core.variable import Variable
-    from .query.match import Match
+    from krrood.entity_query_language.query.operations import GroupedBy
+    from krrood.entity_query_language.query.quantifiers import ResultQuantifier
+    from krrood.entity_query_language.operators.aggregators import Aggregator
+    from krrood.entity_query_language.query.builders import GroupedByBuilder
+    from krrood.entity_query_language.core.base_expressions import (
+        SymbolicExpression,
+        Selectable,
+    )
+    from krrood.entity_query_language.core.variable import Variable
+    from krrood.entity_query_language.query.match import Match
 
 
 @dataclass
@@ -602,3 +605,20 @@ class NoChildToReplace(DataclassException):
     def __post_init__(self):
         self.message = f"Expression '{self.expression}' has no child '{self.old_child}' to replace with '{self.new_child}'."
         super().__post_init__()
+
+
+@dataclass
+class GenerativeBackendQueryIsNotMatch(DataclassException):
+    """
+    Exception raised when a query is not a match inside a generative backend.
+    """
+
+    expression: Query
+    """
+    The query that was passed to the generative backend.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Query {self.expression} is not a match inside a generative backend."
+        )

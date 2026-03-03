@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-from .pose import PoseStamped
+from pycram.datastructures.pose import PoseStamped
 
 
 @dataclass()

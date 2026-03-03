@@ -27,43 +27,51 @@ from typing_extensions import (
     Iterator,
 )
 
-from ..core.mapped_variable import CanBehaveLikeAVariable
-from .builders import (
+from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
+from krrood.entity_query_language.query.builders import (
     WhereBuilder,
     HavingBuilder,
     GroupedByBuilder,
     QuantifierBuilder,
     OrderedByBuilder,
 )
-from .operations import Where, Having, GroupedBy
-from .quantifiers import (
+from krrood.entity_query_language.query.operations import Where, Having, GroupedBy
+from krrood.entity_query_language.query.quantifiers import (
     ResultQuantificationConstraint,
     ResultQuantifier,
     An,
 )
-from ..core.base_expressions import (
+from krrood.entity_query_language.core.base_expressions import (
     Bindings,
     OperationResult,
     SymbolicExpression,
     UnaryExpression,
     Selectable,
 )
-from ..cache_data import (
+from krrood.entity_query_language.cache_data import (
     SeenSet,
 )
-from ..failures import (
+from krrood.entity_query_language.core.variable import (
+    InstantiatedVariable,
+    Variable,
+    ExternallySetVariable,
+)
+from krrood.entity_query_language.enums import DomainSource
+from krrood.entity_query_language.failures import (
     UnsupportedNegation,
     TryingToModifyAnAlreadyBuiltQuery,
     NonPositiveLimitValue,
 )
-from ..operators.aggregators import Aggregator
-from ..operators.set_operations import MultiArityExpressionThatPerformsACartesianProduct
-from ..utils import (
+from krrood.entity_query_language.operators.aggregators import Aggregator
+from krrood.entity_query_language.operators.set_operations import (
+    MultiArityExpressionThatPerformsACartesianProduct,
+)
+from krrood.entity_query_language.utils import (
     T,
 )
 
 if TYPE_CHECKING:
-    from ..factories import ConditionType
+    from krrood.entity_query_language.factories import ConditionType
 
 ResultMapping = Callable[[Iterator[OperationResult]], Iterator[OperationResult]]
 """
@@ -424,6 +432,13 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
         for variable in self._selected_variables_:
             if isinstance(variable, Aggregator):
                 aggregated_variables.append(variable)
+            elif isinstance(variable, InstantiatedVariable):
+                non_aggregated_variables.extend(variable._operation_children_)
+            elif (
+                isinstance(variable, ExternallySetVariable)
+                and variable._domain_source_ is DomainSource.DEDUCTION
+            ):
+                continue
             else:
                 non_aggregated_variables.append(variable)
         return aggregated_variables, non_aggregated_variables

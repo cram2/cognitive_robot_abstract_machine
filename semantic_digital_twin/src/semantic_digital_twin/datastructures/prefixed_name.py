@@ -19,6 +19,9 @@ class PrefixedName(Symbol):
             return self.name
         return f"{self.prefix}/{self.name}"
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}('{self.prefix}/{self.name}')"
+
     def __eq__(self, other):
         if not isinstance(other, type(self)):
             return False

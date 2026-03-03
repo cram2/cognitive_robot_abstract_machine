@@ -1,8 +1,9 @@
+from krrood.entity_query_language.factories import variable_from
 from random_events.set import Set
 
 from krrood.entity_query_language.factories import variable_from
 from krrood.ormatic.dao import to_dao
-from random_events.variable import Continuous, Symbolic
+from random_events.variable import Continuous, Symbolic, Set
 
 from krrood.probabilistic_knowledge.object_access_variable import ObjectAccessVariable
 from ..dataset.example_classes import Position, Positions
@@ -46,7 +47,7 @@ def test_object_access_variable_nested():
 
 
 def test_object_access_variable_container():
-    obj = Positions([Position(None, None, None), Position(None, None, None)], [None])
+    obj = Positions([Position(..., ..., ...), Position(..., ..., ...)], [...])
     dao: PositionsDAO = to_dao(obj)
 
     dao_variable = variable_from([dao])

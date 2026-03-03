@@ -4,11 +4,11 @@ from typing import Optional
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from semantic_digital_twin.robots.abstract_robot import Camera
 
-from .base import BaseMotion
-from ...datastructures.pose import Vector3Stamped, PoseStamped
+from pycram.robot_plans.motions.base import BaseMotion
+from pycram.datastructures.pose import Vector3Stamped, PoseStamped
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 
-from ...view_manager import ViewManager
+from pycram.view_manager import ViewManager
 
 
 @dataclass

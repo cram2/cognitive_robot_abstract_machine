@@ -7,22 +7,22 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.world_description.world_entity import Body, Connection
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
-from .pick_up import GraspingActionDescription
-from ...motions.container import OpeningMotion, ClosingMotion
-from ...motions.gripper import MoveGripperMotion
-from ....config.action_conf import ActionConfig
-from ....datastructures.enums import (
+from pycram.robot_plans.actions.core.pick_up import GraspingActionDescription
+from pycram.robot_plans.motions.container import OpeningMotion, ClosingMotion
+from pycram.robot_plans.motions.gripper import MoveGripperMotion
+from pycram.config.action_conf import ActionConfig
+from pycram.datastructures.enums import (
     Arms,
     ContainerManipulationType,
     ApproachDirection,
     VerticalAlignment,
 )
-from ....datastructures.grasp import GraspDescription
-from ....datastructures.partial_designator import PartialDesignator
-from ....failures import ContainerManipulationError
-from ....language import SequentialPlan
-from ....view_manager import ViewManager
-from ....robot_plans.actions.base import ActionDescription
+from pycram.datastructures.grasp import GraspDescription
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.failures import ContainerManipulationError
+from pycram.language import SequentialPlan
+from pycram.view_manager import ViewManager
+from pycram.robot_plans.actions.base import ActionDescription
 
 
 @dataclass

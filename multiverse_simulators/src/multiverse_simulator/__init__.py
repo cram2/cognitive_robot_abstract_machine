@@ -1,4 +1,4 @@
-from .multiverse_simulator import (
+from multiverse_simulator.multiverse_simulator import (
     MultiverseSimulator,
     MultiverseViewer,
     MultiverseAttribute,
@@ -10,4 +10,4 @@ from .multiverse_simulator import (
     MultiverseCallback
 )
 
-from .utils import str_to_dict
+from multiverse_simulator.utils import str_to_dict

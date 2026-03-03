@@ -24,22 +24,22 @@ from krrood.utils import recursive_subclasses
 from scipy.spatial.transform import Rotation
 from trimesh.visual import TextureVisuals
 
-from ..callbacks.callback import ModelChangeCallback
-from ..datastructures.prefixed_name import PrefixedName
-from ..spatial_types.spatial_types import (
+from semantic_digital_twin.callbacks.callback import ModelChangeCallback
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Quaternion,
 )
-from ..world import World
-from ..world_description.connections import (
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
     ActiveConnection1DOF,
     FixedConnection,
     Connection6DoF,
 )
-from ..world_description.geometry import (
+from semantic_digital_twin.world_description.geometry import (
     Box,
     Cylinder,
     Sphere,
@@ -49,7 +49,7 @@ from ..world_description.geometry import (
     Mesh,
     Color,
 )
-from ..world_description.world_entity import (
+from semantic_digital_twin.world_description.world_entity import (
     Region,
     Body,
     KinematicStructureEntity,
@@ -57,8 +57,8 @@ from ..world_description.world_entity import (
     WorldEntity,
     Actuator,
 )
-from ..mixin import SimulatorAdditionalProperty
-from ..world_description.world_modification import (
+from semantic_digital_twin.mixin import SimulatorAdditionalProperty
+from semantic_digital_twin.world_description.world_modification import (
     AddKinematicStructureEntityModification,
     AddActuatorModification,
 )
@@ -2131,19 +2131,14 @@ class MujocoActuatorSpawner(MujocoEntitySpawner, ActuatorSpawner):
         )
 
 
-@dataclass
+@dataclass(eq=False)
 class MultiSimSynchronizer(ModelChangeCallback, ABC):
     """
     A callback to synchronize the world model with the Multiverse simulator.
     This callback will listen to the world model changes and update the Multiverse simulator accordingly.
     """
 
-    world: World
-    """
-    The world to synchronize with the simulator.
-    """
-
-    simulator: MultiverseSimulator
+    simulator: MultiverseSimulator = field(kw_only=True)
     """
     The Multiverse simulator to synchronize with the world.
     """
@@ -2159,7 +2154,7 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
     """
 
     def _notify(self, **kwargs):
-        for modification in self.world._model_manager.model_modification_blocks[-1]:
+        for modification in self._world._model_manager.model_modification_blocks[-1]:
             if isinstance(modification, AddKinematicStructureEntityModification):
                 entity = modification.kinematic_structure_entity
                 self.entity_spawner.spawn(simulator=self.simulator, entity=entity)
@@ -2168,10 +2163,10 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
                 self.entity_spawner.spawn(simulator=self.simulator, entity=entity)
 
     def stop(self):
-        self.world._model_manager.model_change_callbacks.remove(self)
+        self._world._model_manager.model_change_callbacks.remove(self)
 
 
-@dataclass
+@dataclass(eq=False)
 class MujocoSynchronizer(MultiSimSynchronizer):
     simulator: MultiverseMujocoConnector
     entity_converter: Type[EntityConverter] = field(default=MujocoConverter)
@@ -2241,7 +2236,7 @@ class MultiSim(ABC):
             **kwargs,
         )
         self.synchronizer = self.synchronizer_class(
-            world=world,
+            _world=world,
             simulator=self.simulator,
         )
         self._viewer = viewer

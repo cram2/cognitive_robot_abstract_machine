@@ -80,7 +80,8 @@ def immutable_tracy_block_world(tracy_block_world):
     state = deepcopy(tracy_block_world.state.data)
     view = tracy_block_world.get_semantic_annotations_by_type(Tracy)[0]
     yield tracy_block_world, view, Context(tracy_block_world, view)
-    tracy_block_world.state.data = state
+    tracy_block_world.state.data[:] = state
+    tracy_block_world.notify_state_change()
 
 
 @pytest.fixture

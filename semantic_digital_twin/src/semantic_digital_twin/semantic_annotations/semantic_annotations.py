@@ -10,7 +10,7 @@ from typing_extensions import List, Type
 
 from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math import symbolic_math
-from .mixins import (
+from semantic_digital_twin.semantic_annotations.mixins import (
     HasSupportingSurface,
     HasRootRegion,
     HasDrawers,
@@ -24,25 +24,25 @@ from .mixins import (
     HasRootBody,
     HasStorageSpace,
 )
-from ..datastructures.prefixed_name import PrefixedName
-from ..datastructures.variables import SpatialVariables
-from ..exceptions import (
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.exceptions import (
     InvalidPlaneDimensions,
     InvalidHingeActiveAxis,
     MissingSemanticAnnotationError,
 )
-from ..reasoning.predicates import InsideOf
-from ..spatial_types import Point3, HomogeneousTransformationMatrix, Vector3
-from ..world import World
-from ..world_description.connections import (
+from semantic_digital_twin.reasoning.predicates import InsideOf
+from semantic_digital_twin.spatial_types import Point3, HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
     FixedConnection,
 )
-from ..world_description.degree_of_freedom import DegreeOfFreedomLimits
-from ..world_description.geometry import Scale, TriangleMesh
-from ..world_description.shape_collection import BoundingBoxCollection, ShapeCollection
-from ..world_description.world_entity import (
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedomLimits
+from semantic_digital_twin.world_description.geometry import Scale, TriangleMesh
+from semantic_digital_twin.world_description.shape_collection import BoundingBoxCollection, ShapeCollection
+from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     Body,
     Region,
@@ -166,9 +166,7 @@ class Aperture(HasRootRegion):
         body: Body,
         parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
     ) -> Self:
-
-        world._forward_kinematic_manager.recompile()
-        world._forward_kinematic_manager.recompute()
+        world.update_forward_kinematics()
         body_scale = (
             body.collision.as_bounding_box_collection_in_frame(body)
             .bounding_box()

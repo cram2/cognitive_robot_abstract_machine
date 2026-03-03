@@ -7,15 +7,15 @@ from datetime import timedelta
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
-from ..core.misc import DetectActionDescription
-from ..core.navigation import LookAtActionDescription, NavigateActionDescription
-from ....datastructures.enums import DetectionTechnique
-from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
-from ....designators.location_designator import CostmapLocation
-from ....failures import PerceptionObjectNotFound
-from ....language import TryInOrderPlan, SequentialPlan
-from ....robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.core.misc import DetectActionDescription
+from pycram.robot_plans.actions.core.navigation import LookAtActionDescription, NavigateActionDescription
+from pycram.datastructures.enums import DetectionTechnique
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.datastructures.pose import PoseStamped
+from pycram.designators.location_designator import CostmapLocation
+from pycram.failures import PerceptionObjectNotFound
+from pycram.language import TryInOrderPlan, SequentialPlan
+from pycram.robot_plans.actions.base import ActionDescription
 
 
 @dataclass

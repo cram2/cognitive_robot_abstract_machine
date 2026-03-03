@@ -18,19 +18,19 @@ from typing_extensions import (
     DefaultDict,
 )
 
-from .monitored_container import (
+from krrood.ontomatic.property_descriptor.monitored_container import (
     MonitoredContainer,
     monitored_type_map,
 )
-from .property_descriptor_relation import PropertyDescriptorRelation
-from ..failures import UnMonitoredContainerTypeForDescriptor
-from ...class_diagrams.class_diagram import WrappedClass, Association
-from ...class_diagrams.wrapped_field import WrappedField
-from ...entity_query_language.predicate import Symbol
-from ...symbol_graph.symbol_graph import (
+from krrood.ontomatic.property_descriptor.property_descriptor_relation import PropertyDescriptorRelation
+from krrood.ontomatic.failures import UnMonitoredContainerTypeForDescriptor
+from krrood.class_diagrams.class_diagram import WrappedClass, Association
+from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.entity_query_language.predicate import Symbol
+from krrood.symbol_graph.symbol_graph import (
     SymbolGraph,
 )
-from ...entity_query_language.utils import make_set
+from krrood.entity_query_language.utils import make_set
 
 SymbolType = Type[Symbol]
 """

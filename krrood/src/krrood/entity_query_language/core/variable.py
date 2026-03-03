@@ -23,18 +23,18 @@ from typing_extensions import (
     List,
 )
 
-from .base_expressions import (
+from krrood.entity_query_language.core.base_expressions import (
     Bindings,
     OperationResult,
     SymbolicExpression,
     Selectable,
 )
-from .mapped_variable import CanBehaveLikeAVariable
-from ..cache_data import ReEnterableLazyIterable
-from ..enums import DomainSource
-from ..failures import NoChildToReplace
-from ..operators.set_operations import MultiArityExpressionThatPerformsACartesianProduct
-from ..utils import (
+from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
+from krrood.entity_query_language.cache_data import ReEnterableLazyIterable
+from krrood.entity_query_language.enums import DomainSource
+from krrood.entity_query_language.failures import NoChildToReplace
+from krrood.entity_query_language.operators.set_operations import MultiArityExpressionThatPerformsACartesianProduct
+from krrood.entity_query_language.utils import (
     T,
     is_iterable,
     make_list,

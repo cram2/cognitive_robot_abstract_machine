@@ -127,7 +127,9 @@ Example:
 
     Import Strategy:
 
-    - Use relative importing (e.g., from . import utils) always within the package.
+    - Use absolute imports always within the package as this is easier to maintain and clearer to read and understand.
+
+    - Use relative imports always in tests when importing modules defined in the same test folder/package.
 
     - When importing types, use typing extensions instead of typing or the standard library types;
 

@@ -9,6 +9,9 @@ from itertools import chain
 import numpy as np
 import rustworkx as rx
 import rustworkx.visualization
+
+from krrood.entity_query_language.query.match import Match
+from krrood.probabilistic_knowledge.probable_variable import MatchToInstanceTranslator
 from random_events.variable import Variable
 from typing_extensions import (
     Optional,
@@ -38,22 +41,23 @@ from semantic_digital_twin.world_description.world_modification import (
 )
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.probabilistic_knowledge.parameterizer import (
-    Parameterizer,
-    Parameterizer,
+    DataAccessObjectParameterizer,
+    DataAccessObjectParameterizer,
     Parameterization,
+    MatchParameterizer,
 )
-from .datastructures.dataclasses import ExecutionData, Context
-from .datastructures.enums import TaskStatus
-from .datastructures.pose import PoseStamped
-from .failures import PlanFailure
-from .motion_executor import MotionExecutor
+from pycram.datastructures.dataclasses import ExecutionData, Context
+from pycram.datastructures.enums import TaskStatus
+from pycram.datastructures.pose import PoseStamped
+from pycram.failures import PlanFailure
+from pycram.motion_executor import MotionExecutor
 
 if TYPE_CHECKING:
-    from .robot_plans import ActionDescription
-    from .designator import DesignatorDescription, DesignatorType
-    from .datastructures.partial_designator import PartialDesignator
-    from .robot_plans.actions.base import ActionType
-    from .robot_plans.motions.base import MotionType
+    from pycram.robot_plans import ActionDescription
+    from pycram.designator import DesignatorDescription, DesignatorType
+    from pycram.datastructures.partial_designator import PartialDesignator
+    from pycram.robot_plans.actions.base import ActionType
+    from pycram.robot_plans.motions.base import MotionType
 else:
     ActionType = TypeVar("ActionType")
     MotionType = TypeVar("MotionType")
@@ -99,10 +103,6 @@ class Plan:
     """
     Callbacks to be called when a node of the given type is ended.
     """
-    parameterizer: Parameterizer = field(init=False)
-    """
-    Parameterizer used to generate parameterizations the plan.
-    """
 
     def __init__(self, root: PlanNode, context: Context):
         super().__init__()
@@ -119,7 +119,6 @@ class Plan:
         self.current_node: PlanNode = self.root
         if self.super_plan:
             self.super_plan.add_edge(self.super_plan.current_node, self.root)
-        self.parameterizer = Parameterizer()
 
     @property
     def nodes(self) -> List[PlanNode]:
@@ -630,7 +629,7 @@ class Plan:
 
     def generate_parameterizations(
         self,
-    ) -> List[Tuple[ActionDescription, Parameterization]]:
+    ) -> List[Tuple[ActionDescription, Optional[Parameterization]]]:
         """
         Parameterize all parameters of a plan using the krrood parameterizer.
 
@@ -646,9 +645,11 @@ class Plan:
         ]
 
         result = []
-        for index, node in enumerate(designator_nodes):
-            action = node.designator_type(**node.kwargs)
-            result.append((action, Parameterizer().parameterize(action)))
+        for node in designator_nodes:
+            if isinstance(node, Match):
+                obj = MatchToInstanceTranslator(node)
+            else:
+                result.append((node, None))
         return result
 
 

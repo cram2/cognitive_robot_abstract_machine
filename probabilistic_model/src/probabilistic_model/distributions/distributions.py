@@ -9,10 +9,10 @@ from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import *
 from typing_extensions import Union, Iterable, Any, Self, Dict, List, Tuple
 
-from ..constants import SCALING_FACTOR_FOR_EXPECTATION_IN_PLOT
-from ..interfaces.drawio.drawio import DrawIOInterface
-from ..probabilistic_model import ProbabilisticModel, OrderType, MomentType, CenterType
-from ..utils import MissingDict, interval_as_array
+from probabilistic_model.constants import SCALING_FACTOR_FOR_EXPECTATION_IN_PLOT
+from probabilistic_model.interfaces.drawio.drawio import DrawIOInterface
+from probabilistic_model.probabilistic_model import ProbabilisticModel, OrderType, MomentType, CenterType
+from probabilistic_model.utils import MissingDict, interval_as_array
 
 
 class UnivariateDistribution(ProbabilisticModel, SubclassJSONSerializer, DrawIOInterface):

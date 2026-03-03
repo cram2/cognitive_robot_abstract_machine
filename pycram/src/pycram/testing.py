@@ -17,9 +17,9 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
-from .datastructures.dataclasses import Context
-from .datastructures.pose import PoseStamped
-from .plan import Plan
+from pycram.datastructures.dataclasses import Context
+from pycram.datastructures.pose import PoseStamped
+from pycram.plan import Plan
 
 logger = logging.getLogger(__name__)
 

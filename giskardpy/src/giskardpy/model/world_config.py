@@ -38,13 +38,6 @@ class WorldConfig(ABC):
         Implement this method to configure the initial world using it's self. methods.
         """
 
-    @abc.abstractmethod
-    def setup_collision_config(self):
-        """
-        This method is called after the robot is connected to the controller and connections have
-        the controlled flag.
-        """
-
 
 class EmptyWorld(WorldConfig):
     def setup_world(self):

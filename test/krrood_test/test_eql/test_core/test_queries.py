@@ -51,7 +51,8 @@ from krrood.entity_query_language.query_graph import QueryGraph
 from krrood.entity_query_language.utils import (
     cartesian_product_while_passing_the_bindings_around,
 )
-from ...dataset.example_classes import VectorsWithProperty
+from pycram.orm.ormatic_interface import PosterDAO
+from ...dataset.example_classes import VectorsWithProperty, Pose, Position
 from ...dataset.semantic_world_like_classes import (
     Handle,
     Body,

@@ -30,13 +30,14 @@ def test_match(handles_and_containers_world):
         )
     )
 
-    fixed_connection = fixed_connection_query.tolist()[0]
-    fixed_connection_manual = fixed_connection_query_manual.tolist()[0]
-    assert fixed_connection == fixed_connection_manual
-    assert isinstance(fixed_connection, FixedConnection)
-    assert fixed_connection.parent.name == "Container1"
-    assert isinstance(fixed_connection.child, Handle)
-    assert fixed_connection.child.name == "Handle1"
+    fixed_connection_match_result = fixed_connection_query.tolist()[0]
+    fixed_connection_manual_result = fixed_connection_query_manual.tolist()[0]
+    assert fixed_connection_match_result == fixed_connection_manual_result
+    assert fixed_connection.first() == fixed_connection_manual_result
+    assert isinstance(fixed_connection_match_result, FixedConnection)
+    assert fixed_connection_match_result.parent.name == "Container1"
+    assert isinstance(fixed_connection_match_result.child, Handle)
+    assert fixed_connection_match_result.child.name == "Handle1"
 
 
 def test_select(handles_and_containers_world):

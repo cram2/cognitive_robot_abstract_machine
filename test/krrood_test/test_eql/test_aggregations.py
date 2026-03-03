@@ -124,6 +124,24 @@ def test_non_aggregated_selectables_with_aggregated_ones(handles_and_containers_
         _ = list(query.evaluate())
 
 
+def test_non_aggregated_selectables_without_aggregation_and_with_grouped_by(
+    handles_and_containers_world,
+):
+    world = handles_and_containers_world
+    cabinet = variable(Cabinet, domain=world.views)
+    drawer = flat_variable(cabinet.drawers)
+    results = a(
+        set_of(cabinet, drawer)
+        .where(drawer.handle.name.startswith("H"))
+        .grouped_by(cabinet)
+    ).tolist()
+    assert len(results) == 2
+    assert all(isinstance(r[cabinet], Cabinet) for r in results)
+    assert all(isinstance(r[drawer], list) and len(r[drawer]) > 0 for r in results)
+    assert all(isinstance(d, Drawer) for r in results for d in r[drawer])
+    assert all(r[drawer] == r[cabinet].drawers for r in results)
+
+
 def test_non_aggregated_conditions_with_aggregated_ones(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)

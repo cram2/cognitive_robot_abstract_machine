@@ -7,28 +7,29 @@ import math
 import trimesh.boolean
 from krrood.entity_query_language.predicate import (
     Predicate,
-    Symbol, symbolic_function,
+    Symbol,
+    symbolic_function,
 )
 from random_events.interval import Interval
 from typing_extensions import List, TYPE_CHECKING, Iterable, Type
 
-from ..collision_checking.trimesh_collision_detector import TrimeshCollisionDetector
-from ..datastructures.prefixed_name import PrefixedName
-from ..datastructures.variables import SpatialVariables
-from ..spatial_computations.ik_solver import (
+from semantic_digital_twin.collision_checking.trimesh_collision_detector import FCLCollisionDetector
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.spatial_computations.ik_solver import (
     MaxIterationsException,
     UnreachableException,
 )
-from ..spatial_computations.raytracer import RayTracer
-from ..spatial_types import Vector3, Point3
-from ..spatial_types.spatial_types import HomogeneousTransformationMatrix
-from ..world import World
-from ..world_description.connections import FixedConnection
-from ..world_description.geometry import TriangleMesh
-from ..world_description.world_entity import Body, Region, KinematicStructureEntity
+from semantic_digital_twin.spatial_computations.raytracer import RayTracer
+from semantic_digital_twin.spatial_types import Vector3, Point3
+from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import TriangleMesh
+from semantic_digital_twin.world_description.world_entity import Body, Region, KinematicStructureEntity
 
 if TYPE_CHECKING:
-    from ..robots.abstract_robot import (
+    from semantic_digital_twin.robots.abstract_robot import (
         Camera,
     )
 
@@ -60,12 +61,12 @@ def contact(
     :param threshold: The threshold for contact detection
     :return: True if the two objects are in contact False else
     """
-    tcd = TrimeshCollisionDetector(body1._world)
+    tcd = FCLCollisionDetector(_world=body1._world)
     result = tcd.check_collision_between_bodies(body1, body2)
 
     if result is None:
         return False
-    return result.contact_distance < threshold
+    return result.distance < threshold
 
 
 @symbolic_function
@@ -189,6 +190,7 @@ def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> b
     except UnreachableException as e:
         return False
     return True
+
 
 @symbolic_function
 def is_supported_by(

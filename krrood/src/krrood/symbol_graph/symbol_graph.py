@@ -15,17 +15,17 @@ from typing_extensions import (
     Dict,
     DefaultDict,
     Callable,
-    ClassVar
+    ClassVar,
 )
 
-from .. import logger
-from ..class_diagrams import ClassDiagram
-from ..class_diagrams.wrapped_field import WrappedField
-from ..ontomatic.property_descriptor.attribute_introspector import (
+from krrood import logger
+from krrood.class_diagrams import ClassDiagram
+from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
-from ..singleton import SingletonMeta
-from ..utils import recursive_subclasses
+from krrood.singleton import SingletonMeta
+from krrood.utils import recursive_subclasses
 
 
 @dataclass(unsafe_hash=True)

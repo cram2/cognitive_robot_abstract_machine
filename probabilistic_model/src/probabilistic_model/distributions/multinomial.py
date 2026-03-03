@@ -6,10 +6,10 @@ from random_events.utils import SubclassJSONSerializer
 from random_events.variable import Symbolic, Variable
 from typing_extensions import Self, Any, Iterable, List, Optional, Tuple, Dict
 
-from ..probabilistic_circuit.rx.probabilistic_circuit import SymbolicDistribution, UnivariateDiscreteLeaf, ProductUnit, \
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import SymbolicDistribution, UnivariateDiscreteLeaf, ProductUnit, \
     SumUnit, ProbabilisticCircuit, leaf
-from ..probabilistic_model import ProbabilisticModel
-from ..utils import MissingDict
+from probabilistic_model.probabilistic_model import ProbabilisticModel
+from probabilistic_model.utils import MissingDict
 
 
 class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):

@@ -25,13 +25,13 @@ from typing_extensions import (
     Union,
 )
 
-from .failures import MissingContainedTypeOfContainer
-from .utils import behaves_like_a_built_in_class
-from ..utils import module_and_class_name
+from krrood.class_diagrams.failures import MissingContainedTypeOfContainer
+from krrood.class_diagrams.utils import behaves_like_a_built_in_class
+from krrood.utils import module_and_class_name
 
 if TYPE_CHECKING:
-    from .class_diagram import WrappedClass
-    from ..ontomatic.property_descriptor import PropertyDescriptor
+    from krrood.class_diagrams.class_diagram import WrappedClass
+    from krrood.ontomatic.property_descriptor import PropertyDescriptor
 
 
 @dataclass

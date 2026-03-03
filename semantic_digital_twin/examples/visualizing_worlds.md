@@ -47,8 +47,8 @@ node = rclpy.create_node("semantic_digital_twin")
 thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
 thread.start()
 
-tf_publisher = TFPublisher(world=world, node=node)
-viz = VizMarkerPublisher(world=world, node=node)
+tf_publisher = TFPublisher(_world=world, node=node)
+viz = VizMarkerPublisher(_world=world, node=node)
 ```
 
 When you want to stop visualizing, you have to stop the visualizer and afterwards clean up ROS2.

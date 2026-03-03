@@ -5,8 +5,8 @@ from inspect import signature
 
 from typing_extensions import List, Tuple, Any, Dict, TypeVar, Iterator, Iterable, Type
 
-from ..plan import PlanNode
-from ..utils import is_iterable, lazy_product
+from pycram.plan import PlanNode
+from pycram.utils import is_iterable, lazy_product
 
 T = TypeVar("T")
 

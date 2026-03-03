@@ -7,18 +7,18 @@ from inspect import isclass
 
 from typing_extensions import List, Dict, TYPE_CHECKING, Optional, Set, Type, get_origin
 
-from .dao import AlternativeMapping
-from .utils import InheritanceStrategy
-from ..class_diagrams.class_diagram import (
+from krrood.ormatic.dao import AlternativeMapping
+from krrood.ormatic.utils import InheritanceStrategy
+from krrood.class_diagrams.class_diagram import (
     WrappedClass,
     Inheritance,
 )
-from ..class_diagrams.failures import ClassIsUnMappedInClassDiagram
-from ..class_diagrams.wrapped_field import WrappedField
-from ..utils import module_and_class_name
+from krrood.class_diagrams.failures import ClassIsUnMappedInClassDiagram
+from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.utils import module_and_class_name
 
 if TYPE_CHECKING:
-    from .ormatic import ORMatic
+    from krrood.ormatic.ormatic import ORMatic
 
 
 logger = logging.getLogger(__name__)

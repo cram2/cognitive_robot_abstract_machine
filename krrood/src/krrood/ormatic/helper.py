@@ -6,8 +6,8 @@ from typing import Tuple, List, Type, Dict
 
 from sqlalchemy.orm import DeclarativeBase
 
-from .dao import AlternativeMapping, DataAccessObject
-from .utils import classes_of_module, is_direct_subclass
+from krrood.ormatic.dao import AlternativeMapping, DataAccessObject
+from krrood.ormatic.utils import classes_of_module, is_direct_subclass
 
 
 def get_classes_of_ormatic_interface(

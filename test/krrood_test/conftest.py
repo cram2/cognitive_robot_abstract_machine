@@ -4,7 +4,7 @@ import traceback
 from dataclasses import is_dataclass
 
 import pytest
-from sqlalchemy.orm import Session, configure_mappers
+from sqlalchemy.orm import Session, configure_mappers, sessionmaker
 
 import krrood.entity_query_language.orm.model
 import krrood.symbol_graph.symbol_graph
@@ -32,6 +32,7 @@ from .dataset.semantic_world_like_classes import *
 from .test_eql.conf.world.doors_and_drawers import DoorsAndDrawersWorld
 from .test_eql.conf.world.handles_and_containers import (
     HandlesAndContainersWorld,
+    InferredCabinetsWorld,
 )
 
 
@@ -133,6 +134,12 @@ def handles_and_containers_world() -> World:
 
 
 @pytest.fixture
+def inferred_cabinets_world() -> World:
+    world = InferredCabinetsWorld().create()
+    return world
+
+
+@pytest.fixture
 def doors_and_drawers_world() -> World:
     world = DoorsAndDrawersWorld().create()
     SymbolGraph()
@@ -157,7 +164,8 @@ def engine():
 
 @pytest.fixture(scope="session")
 def session(engine):
-    session = Session(engine)
+    session_maker = sessionmaker(engine)
+    session = session_maker()
     yield session
     session.close()
 

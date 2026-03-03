@@ -42,13 +42,13 @@ def _get_type_hints_cached(clazz: Type) -> Dict[str, Any]:
 
 
 from collections import deque
-from .exceptions import (
+from krrood.ormatic.exceptions import (
     NoGenericError,
     NoDAOFoundError,
     NoDAOFoundDuringParsingError,
     UnsupportedRelationshipError,
 )
-from ..utils import recursive_subclasses
+from krrood.utils import recursive_subclasses
 
 logger = logging.getLogger(__name__)
 _repr_thread_local = threading.local()

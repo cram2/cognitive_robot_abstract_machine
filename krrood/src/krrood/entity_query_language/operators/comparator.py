@@ -21,16 +21,16 @@ from typing_extensions import (
     TYPE_CHECKING,
 )
 
-from ..query.quantifiers import The
-from ..core.base_expressions import (
+from krrood.entity_query_language.query.quantifiers import The
+from krrood.entity_query_language.core.base_expressions import (
     Bindings,
     OperationResult,
     SymbolicExpression,
     BinaryExpression,
     Selectable,
 )
-from .set_operations import PerformsCartesianProduct
-from ..utils import is_iterable, make_set
+from krrood.entity_query_language.operators.set_operations import PerformsCartesianProduct
+from krrood.entity_query_language.utils import is_iterable, make_set
 
 
 @dataclass(eq=False, repr=False)

@@ -201,16 +201,12 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
         self,
         world_state: np.ndarray,
         life_cycle_state: np.ndarray,
-        external_collision_data: np.ndarray,
-        self_collision_data: np.ndarray,
-        auxiliary_variables: np.ndarray,
+        float_variables: np.ndarray,
     ) -> QPData:
         args = [
             world_state,
             life_cycle_state,
-            external_collision_data,
-            self_collision_data,
-            auxiliary_variables,
+            float_variables,
         ]
         neq_matrix = self.neq_matrix_compiled(*args)
         (

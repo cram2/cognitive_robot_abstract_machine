@@ -1,4 +1,7 @@
 name: CI (matrix over libs)
+defaults:
+  run:
+    shell: bash -ieo pipefail {0}
 
 on:
   push:
@@ -11,7 +14,17 @@ on:
     branches: [ main ]
 
 jobs:
+  to-lowercase:
+    runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
+    steps:
+      - id: lowercase
+        run: |
+          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
+
   test_each_lib:
+    needs: [to-lowercase]
     strategy:
       fail-fast: false
       matrix:
@@ -26,3 +39,4 @@ jobs:
     uses: ./.github/workflows/ci_reusable.yml
     with:
       lib: ${{ matrix.lib }}
+      repo_lowercase: ${{ needs.to-lowercase.outputs.repo_lowercase }}

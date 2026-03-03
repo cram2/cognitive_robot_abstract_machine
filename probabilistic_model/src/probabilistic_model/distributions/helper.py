@@ -1,7 +1,7 @@
 from random_events.variable import Continuous, Symbolic, Integer
 
-from .distributions import DiracDeltaDistribution, SymbolicDistribution, IntegerDistribution, UnivariateDistribution
-from ..utils import MissingDict
+from probabilistic_model.distributions.distributions import DiracDeltaDistribution, SymbolicDistribution, IntegerDistribution, UnivariateDistribution
+from probabilistic_model.utils import MissingDict
 
 
 def make_dirac(variable, value) -> UnivariateDistribution:

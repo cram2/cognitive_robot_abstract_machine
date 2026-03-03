@@ -62,9 +62,6 @@ jobs:
           pip install -e ./krrood -e ./random_events -e ./probabilistic_model -e ./pycram -e ./semantic_digital_twin -e ./giskardpy
           poetry install
           pip install -r semantic_digital_twin/requirements-self-assessment.txt
-          if [ -d "semantic_digital_twin/src/ripple_down_rules_meta" ] && [ -f "semantic_digital_twin/src/ripple_down_rules_meta/setup.py" ] || [ -f "semantic_digital_twin/src/ripple_down_rules_meta/pyproject.toml" ]; then
-            pip install -e ./semantic_digital_twin/src/ripple_down_rules_meta
-          fi
 
       - name: Build ORM
         run: |

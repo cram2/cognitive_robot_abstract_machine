@@ -5,10 +5,9 @@ from pathlib import Path
 
 from typing_extensions import TYPE_CHECKING, List, Optional, Type
 
-
 if TYPE_CHECKING:
-    from .datastructures.pose import PoseStamped
-    from .datastructures.enums import (
+    from pycram.datastructures.pose import PoseStamped
+    from pycram.datastructures.enums import (
         JointType,
         MultiverseAPIName,
         Arms,
@@ -17,9 +16,9 @@ if TYPE_CHECKING:
         DetectionTechnique,
         ContainerManipulationType,
     )
-    from .validation.goal_validator import MultiJointPositionGoalValidator
-    from .designator import ObjectDesignatorDescription
-    from .designators.location_designator import Location
+    from pycram.validation.goal_validator import MultiJointPositionGoalValidator
+    from pycram.designator import ObjectDesignatorDescription
+    from pycram.designators.location_designator import Location
 
 
 class PlanFailure(Exception):

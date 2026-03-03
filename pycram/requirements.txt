@@ -13,7 +13,5 @@ python-box
 rustworkx
 pillow
 polytope # needed for random events
-krrood
 semantic_digital_twin
-rustworkx_utils==0.0.2
 scikit-image

@@ -9,7 +9,7 @@ from __future__ import annotations
 import itertools
 import uuid
 from abc import ABC, abstractmethod
-from collections import UserDict
+from collections import UserDict, deque
 from copy import copy
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
@@ -30,17 +30,17 @@ from typing_extensions import (
     Type,
 )
 
-from ..failures import NoExpressionFoundForGivenID
-from ..utils import make_list, T, make_set, is_iterable
-from ...symbol_graph.symbol_graph import SymbolGraph
+from krrood.entity_query_language.failures import NoExpressionFoundForGivenID
+from krrood.entity_query_language.utils import make_list, T, make_set, is_iterable
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 
 if TYPE_CHECKING:
-    from ..rules.conclusion import Conclusion
-    from .variable import Variable
+    from krrood.entity_query_language.rules.conclusion import Conclusion
+    from krrood.entity_query_language.core.variable import Variable
 
 Bindings = Dict[uuid.UUID, Any]
 """
-A dictionary for variable bindings in EQL operations
+A dictionary for expressions' bindings in EQL that maps the expression's unique identifier to its value.
 """
 
 
@@ -204,7 +204,7 @@ class SymbolicExpression(ABC):
         """
         Update multiple children expressions of this symbolic expression.
         """
-        from .variable import Literal
+        from krrood.entity_query_language.core.variable import Literal
 
         children = [
             v if isinstance(v, SymbolicExpression) else Literal(_value_=v)
@@ -378,7 +378,7 @@ class SymbolicExpression(ABC):
     @property
     def _descendants_(self) -> Iterator[SymbolicExpression]:
         """
-        :return: All descendants of this symbolic expression.
+        :return: All descendants of this symbolic expression in children first, then depth-first by subtree order.
         """
         yield from self._children_
         for child in self._children_:
@@ -407,7 +407,7 @@ class SymbolicExpression(ABC):
         Get the leaf instances of the symbolic expression.
         This is useful for accessing the leaves of the symbolic expression tree.
         """
-        from .variable import Variable
+        from krrood.entity_query_language.core.variable import Variable
 
         return [c for c in self._children_ if isinstance(c, Variable)]
 
@@ -423,12 +423,12 @@ class SymbolicExpression(ABC):
             yield from child._leaves_
 
     def __and__(self, other):
-        from ..operators.core_logical_operators import AND
+        from krrood.entity_query_language.operators.core_logical_operators import AND
 
         return AND(self, other)
 
     def __or__(self, other):
-        from ..operators.core_logical_operators import OR
+        from krrood.entity_query_language.operators.core_logical_operators import OR
 
         return OR(self, other)
 
@@ -436,7 +436,7 @@ class SymbolicExpression(ABC):
         """
         Invert the symbolic expression.
         """
-        from ..operators.core_logical_operators import Not
+        from krrood.entity_query_language.operators.core_logical_operators import Not
 
         return Not(self)
 

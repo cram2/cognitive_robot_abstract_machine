@@ -11,11 +11,11 @@ from typing_extensions import TypeVar, ClassVar, Type
 from giskardpy.motion_statechart.graph_node import Task
 from krrood.ormatic.dao import HasGeneric
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from ...datastructures.enums import ExecutionType
+from pycram.datastructures.enums import ExecutionType
 from typing_extensions import TypeVar
 
-from ...designator import DesignatorDescription
-from ...motion_executor import MotionExecutor
+from pycram.designator import DesignatorDescription
+from pycram.motion_executor import MotionExecutor
 
 logger = logging.getLogger(__name__)
 

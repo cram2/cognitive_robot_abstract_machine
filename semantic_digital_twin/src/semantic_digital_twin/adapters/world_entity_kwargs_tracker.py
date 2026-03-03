@@ -7,14 +7,14 @@ from uuid import UUID
 from typing_extensions import Dict, Any
 from typing_extensions import Optional, TYPE_CHECKING, Self, ClassVar
 
-from ..exceptions import (
+from semantic_digital_twin.exceptions import (
     WorldEntityWithIDNotInKwargs,
     WorldEntityWithIDNotFoundError,
 )
 
 if TYPE_CHECKING:
-    from ..world import World
-    from ..world_description.world_entity import WorldEntityWithID
+    from semantic_digital_twin.world import World
+    from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
 
 
 @dataclass

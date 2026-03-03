@@ -15,25 +15,45 @@ from functools import cached_property, lru_cache
 
 from typing_extensions import Tuple, List, Type, Optional, Callable, TYPE_CHECKING
 
-from ..core.base_expressions import SymbolicExpression, Selectable
-from ..operators.comparator import Comparator
-from ..operators.core_logical_operators import chained_logic, AND, LogicalOperator
-from ..failures import (
+from krrood.entity_query_language.core.base_expressions import (
+    SymbolicExpression,
+    Selectable,
+)
+from krrood.entity_query_language.operators.comparator import Comparator
+from krrood.entity_query_language.operators.core_logical_operators import (
+    chained_logic,
+    AND,
+    LogicalOperator,
+)
+from krrood.entity_query_language.failures import (
     NoConditionsProvided,
     LiteralConditionError,
     AggregatorInWhereConditionsError,
     NonAggregatorInHavingConditionsError,
     NonAggregatedSelectedVariablesError,
 )
-from .quantifiers import ResultQuantificationConstraint, ResultQuantifier, An
-from .operations import Where, Having, OrderedBy, GroupedBy
-from ..operators.aggregators import Aggregator
-from ..core.variable import Literal, Variable, InstantiatedVariable
-from ..core.mapped_variable import MappedVariable
+from krrood.entity_query_language.query.quantifiers import (
+    ResultQuantificationConstraint,
+    ResultQuantifier,
+    An,
+)
+from krrood.entity_query_language.query.operations import (
+    Where,
+    Having,
+    OrderedBy,
+    GroupedBy,
+)
+from krrood.entity_query_language.operators.aggregators import Aggregator
+from krrood.entity_query_language.core.variable import (
+    Literal,
+    Variable,
+    InstantiatedVariable,
+)
+from krrood.entity_query_language.core.mapped_variable import MappedVariable
 
 if TYPE_CHECKING:
-    from ..factories import ConditionType
-    from .query import Query
+    from krrood.entity_query_language.factories import ConditionType
+    from krrood.entity_query_language.query.query import Query
 
 
 @dataclass
@@ -96,7 +116,7 @@ class FilterBuilder(ExpressionBuilder, ABC):
         """
         :return: A tuple containing the aggregators and non-aggregators in the conditions.
         """
-        from .query import Query
+        from krrood.entity_query_language.query.query import Query
 
         aggregators, non_aggregators = [], []
 

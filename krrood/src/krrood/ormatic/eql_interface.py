@@ -8,18 +8,18 @@ import sqlalchemy.inspection
 from sqlalchemy import and_, or_, select, Select, func, literal, not_ as sa_not
 from sqlalchemy.orm import Session
 
-from ..entity_query_language.query.query import (
+from krrood.entity_query_language.query.query import (
     Query,
 )
-from ..entity_query_language.query.operations import Where
-from ..entity_query_language.query.quantifiers import ResultQuantifier, An, The
-from ..entity_query_language.operators.core_logical_operators import AND, OR
-from ..entity_query_language.core.base_expressions import SymbolicExpression
-from ..entity_query_language.core.variable import Variable, Literal
-from ..entity_query_language.core.mapped_variable import Attribute
-from ..entity_query_language.operators.comparator import Comparator
+from krrood.entity_query_language.query.operations import Where
+from krrood.entity_query_language.query.quantifiers import ResultQuantifier, An, The
+from krrood.entity_query_language.operators.core_logical_operators import AND, OR
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.variable import Variable, Literal
+from krrood.entity_query_language.core.mapped_variable import Attribute
+from krrood.entity_query_language.operators.comparator import Comparator
 
-from .dao import get_dao_class
+from krrood.ormatic.dao import get_dao_class
 
 
 class EQLTranslationError(Exception):

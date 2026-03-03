@@ -11,7 +11,6 @@ import numpy as np
 from line_profiler import profile
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.middleware import get_middleware
 from giskardpy.qp.constraint import (
     DerivativeInequalityConstraint,
     DerivativeEqualityConstraint,
@@ -283,7 +282,7 @@ class ProblemDataPart(ABC):
                     f'Maximum reachable with prediction horizon = "{self.config.prediction_horizon}", '
                     f'jerk limit = "{upper_limits.jerk}" and dt = "{self.config.mpc_dt}" is "{max_reachable_vel}".'
                 )
-                get_middleware().logerr(error_msg)
+                logger.error(error_msg)
                 raise VelocityLimitUnreachableException(error_msg)
             else:
                 raise
@@ -1815,9 +1814,7 @@ class InequalityModel(ProblemDataPart):
 class GiskardToQPAdapter:
     world_state_symbols: List[sm.FloatVariable]
     life_cycle_symbols: List[sm.FloatVariable]
-    external_collision_symbols: List[sm.FloatVariable]
-    self_collision_symbols: List[sm.FloatVariable]
-    auxiliary_variables: List[sm.FloatVariable]
+    float_variables: List[sm.FloatVariable]
 
     degrees_of_freedom: List[DegreeOfFreedom]
     constraint_collection: ConstraintCollection
@@ -1932,9 +1929,7 @@ class GiskardToQPAdapter:
         self,
         world_state: np.ndarray,
         life_cycle_state: np.ndarray,
-        external_collision_data: np.ndarray,
-        self_collision_data: np.ndarray,
-        auxiliary_variables: np.ndarray,
+        float_variables: np.ndarray,
     ) -> QPData:
         raise NotImplementedError()
 

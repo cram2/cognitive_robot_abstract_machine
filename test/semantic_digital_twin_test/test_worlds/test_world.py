@@ -1,31 +1,21 @@
 from copy import deepcopy
+from dataclasses import dataclass
 
 import numpy as np
 import pytest
 from numpy.testing import assert_raises
 
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
-
-from semantic_digital_twin.spatial_types import Vector3
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    PrismaticConnection,
-    RevoluteConnection,
-    Connection6DoF,
-    FixedConnection,
-    OmniDrive,
-)
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
-    AddingAnExistingSemanticAnnotationError,
     DuplicateWorldEntityError,
-    DuplicateKinematicStructureEntityError,
     UsageError,
     MissingWorldModificationContextError,
     DofNotInWorldStateError,
     WrongWorldModelVersion,
     NonMonotonicTimeError,
 )
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 
 # from semantic_digital_twin.spatial_types.math import rotation_matrix_from_rpy
@@ -35,12 +25,20 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Point3,
 )
 from semantic_digital_twin.testing import world_setup
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
+    PrismaticConnection,
+    RevoluteConnection,
+    Connection6DoF,
+    FixedConnection,
+    OmniDrive,
+)
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     Body,
-    CollisionCheckingConfig,
     Actuator,
+    WorldEntityWithClassBasedID,
 )
 from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
@@ -409,33 +407,27 @@ def test_all_degree_of_freedom_have_uuid(world_setup):
     assert len(uuids) == len(world.degrees_of_freedom)
 
 
-def test_merge_world(world_setup, pr2_world_state_reset):
+def test_merge_world(world_setup, pr2_world_copy):
     world, l1, l2, bf, r1, r2 = world_setup
 
-    base_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "base_link"
-    )
-    r_gripper_tool_frame = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+    base_link = pr2_world_copy.get_kinematic_structure_entity_by_name("base_link")
+    r_gripper_tool_frame = pr2_world_copy.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
-    torso_lift_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+    torso_lift_link = pr2_world_copy.get_kinematic_structure_entity_by_name(
         "torso_lift_link"
     )
-    r_shoulder_pan_joint = pr2_world_state_reset.get_connection(
+    r_shoulder_pan_joint = pr2_world_copy.get_connection(
         torso_lift_link,
-        pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_shoulder_pan_link"
-        ),
+        pr2_world_copy.get_kinematic_structure_entity_by_name("r_shoulder_pan_link"),
     )
 
-    l_shoulder_pan_joint = pr2_world_state_reset.get_connection(
+    l_shoulder_pan_joint = pr2_world_copy.get_connection(
         torso_lift_link,
-        pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "l_shoulder_pan_link"
-        ),
+        pr2_world_copy.get_kinematic_structure_entity_by_name("l_shoulder_pan_link"),
     )
 
-    world.merge_world(pr2_world_state_reset)
+    world.merge_world(pr2_world_copy)
 
     assert base_link in world.kinematic_structure_entities
     assert r_gripper_tool_frame in world.kinematic_structure_entities
@@ -444,23 +436,19 @@ def test_merge_world(world_setup, pr2_world_state_reset):
     assert r_shoulder_pan_joint._world == world
 
 
-def test_merge_with_connection(world_setup, pr2_world_state_reset):
+def test_merge_with_connection(world_setup, pr2_world_copy):
     world, l1, l2, bf, r1, r2 = world_setup
 
-    base_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "base_link"
-    )
-    r_gripper_tool_frame = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+    base_link = pr2_world_copy.get_kinematic_structure_entity_by_name("base_link")
+    r_gripper_tool_frame = pr2_world_copy.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
-    torso_lift_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+    torso_lift_link = pr2_world_copy.get_kinematic_structure_entity_by_name(
         "torso_lift_link"
     )
-    r_shoulder_pan_joint = pr2_world_state_reset.get_connection(
+    r_shoulder_pan_joint = pr2_world_copy.get_connection(
         torso_lift_link,
-        pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_shoulder_pan_link"
-        ),
+        pr2_world_copy.get_kinematic_structure_entity_by_name("r_shoulder_pan_link"),
     )
 
     pose = np.eye(4)
@@ -468,22 +456,20 @@ def test_merge_with_connection(world_setup, pr2_world_state_reset):
 
     origin = HomogeneousTransformationMatrix(pose)
 
-    connection = pr2_world_state_reset.get_connection_by_name(
-        "l_gripper_l_finger_joint"
-    )
-    pr2_world_state_reset.state[connection.dof.id].position = 0.55
-    pr2_world_state_reset.notify_state_change()
-    expected_fk = pr2_world_state_reset.compute_forward_kinematics(
+    connection = pr2_world_copy.get_connection_by_name("l_gripper_l_finger_joint")
+    pr2_world_copy.state[connection.dof.id].position = 0.55
+    pr2_world_copy.notify_state_change()
+    expected_fk = pr2_world_copy.compute_forward_kinematics(
         connection.parent, connection.child
     ).to_np()
 
     new_connection = FixedConnection(
         parent=world.root,
-        child=pr2_world_state_reset.root,
+        child=pr2_world_copy.root,
         parent_T_connection_expression=origin,
     )
 
-    world.merge_world(pr2_world_state_reset, new_connection)
+    world.merge_world(pr2_world_copy, new_connection)
     assert base_link in world.kinematic_structure_entities
     assert r_gripper_tool_frame in world.kinematic_structure_entities
     assert new_connection in world.connections
@@ -499,31 +485,25 @@ def test_merge_with_connection(world_setup, pr2_world_state_reset):
     assert np.allclose(actual_fk, expected_fk)
 
 
-def test_merge_with_pose(world_setup, pr2_world_state_reset):
+def test_merge_with_pose(world_setup, pr2_world_copy):
     world, l1, l2, bf, r1, r2 = world_setup
 
-    base_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "base_link"
-    )
-    r_gripper_tool_frame = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+    base_link = pr2_world_copy.get_kinematic_structure_entity_by_name("base_link")
+    r_gripper_tool_frame = pr2_world_copy.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
-    torso_lift_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+    torso_lift_link = pr2_world_copy.get_kinematic_structure_entity_by_name(
         "torso_lift_link"
     )
-    r_shoulder_pan_joint = pr2_world_state_reset.get_connection(
+    r_shoulder_pan_joint = pr2_world_copy.get_connection(
         torso_lift_link,
-        pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_shoulder_pan_link"
-        ),
+        pr2_world_copy.get_kinematic_structure_entity_by_name("r_shoulder_pan_link"),
     )
 
     pose = np.eye(4)
     pose[0, 3] = 1.0  # Translate along x-axis
 
-    world.merge_world_at_pose(
-        pr2_world_state_reset, HomogeneousTransformationMatrix(pose)
-    )
+    world.merge_world_at_pose(pr2_world_copy, HomogeneousTransformationMatrix(pose))
 
     assert base_link in world.kinematic_structure_entities
     assert r_gripper_tool_frame in world.kinematic_structure_entities
@@ -534,25 +514,21 @@ def test_merge_with_pose(world_setup, pr2_world_state_reset):
     ] == pytest.approx(1.0, abs=1e-6)
 
 
-def test_merge_with_pose_rotation(world_setup, pr2_world_state_reset):
+def test_merge_with_pose_rotation(world_setup, pr2_world_copy):
     world, l1, l2, bf, r1, r2 = world_setup
 
-    base_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "base_link"
-    )
-    r_gripper_tool_frame = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+    base_link = pr2_world_copy.get_kinematic_structure_entity_by_name("base_link")
+    r_gripper_tool_frame = pr2_world_copy.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
-    torso_lift_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+    torso_lift_link = pr2_world_copy.get_kinematic_structure_entity_by_name(
         "torso_lift_link"
     )
-    r_shoulder_pan_joint = pr2_world_state_reset.get_connection(
+    r_shoulder_pan_joint = pr2_world_copy.get_connection(
         torso_lift_link,
-        pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_shoulder_pan_link"
-        ),
+        pr2_world_copy.get_kinematic_structure_entity_by_name("r_shoulder_pan_link"),
     )
-    base_footprint = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+    base_footprint = pr2_world_copy.get_kinematic_structure_entity_by_name(
         "base_footprint"
     )
 
@@ -566,9 +542,7 @@ def test_merge_with_pose_rotation(world_setup, pr2_world_state_reset):
         ]
     )
 
-    world.merge_world_at_pose(
-        pr2_world_state_reset, HomogeneousTransformationMatrix(pose)
-    )
+    world.merge_world_at_pose(pr2_world_copy, HomogeneousTransformationMatrix(pose))
 
     assert base_link in world.kinematic_structure_entities
     assert r_gripper_tool_frame in world.kinematic_structure_entities
@@ -788,6 +762,20 @@ def test_copy_id(pr2_world_state_reset):
     pr2_copy = deepcopy(pr2_world_state_reset)
     for body in pr2_world_state_reset.bodies:
         assert body.id == pr2_copy.get_kinematic_structure_entity_by_name(body.name).id
+
+
+def test_world_entity_with_class_id():
+    @dataclass(eq=False)
+    class A(WorldEntityWithClassBasedID): ...
+
+    @dataclass(eq=False)
+    class B(WorldEntityWithClassBasedID): ...
+
+    a_1 = A()
+    a_2 = A()
+    b_1 = B()
+    assert a_1 == a_2
+    assert a_1 != b_1
 
 
 def test_copy_reference_frames_shape(pr2_world_state_reset):
@@ -1010,28 +998,6 @@ def test_dof_removal():
         world.add_connection(c_root_bf)
 
 
-def test_set_static_collision_config():
-    w = World()
-
-    with w.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
-        b2 = Body(name=PrefixedName("b2"))
-        w.add_kinematic_structure_entity(b1)
-        w.add_kinematic_structure_entity(b2)
-
-        dof = DegreeOfFreedom(name=PrefixedName("dofyboi"))
-        w.add_degree_of_freedom(dof)
-        connection = RevoluteConnection(
-            b1, b2, axis=Vector3.from_iterable([0, 0, 1]), dof_id=dof.id
-        )
-        w.add_connection(connection)
-
-        collision_config = CollisionCheckingConfig(
-            buffer_zone_distance=0.05, violated_distance=0.0, max_avoided_bodies=4
-        )
-        connection.set_static_collision_config_for_direct_child_bodies(collision_config)
-
-
 def test_actuators(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
 
@@ -1154,3 +1120,14 @@ def test_reattach_child_to_new_parent(world_setup):
     assert l2 not in world.compute_child_kinematic_structure_entities(l1)
     new_child_global_pose = l2.global_pose
     assert np.allclose(old_child_global_pose, new_child_global_pose)
+
+
+def test_reset_state_context(pr2_world_state_reset):
+    state_copy = pr2_world_state_reset.state.data.copy()
+    with pr2_world_state_reset.reset_state_context():
+        pr2_world_state_reset.get_body_by_name(
+            "base_footprint"
+        ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            10, 10, 0
+        )
+    assert np.allclose(state_copy, pr2_world_state_reset.state.data)

@@ -1,0 +1,4 @@
+[
+  "def _get_value(case):\n    from krrood.ripple_down_rules.utils import flatten_list\n    return flatten_list([p.contained_objects for p in case.parts])",
+  "def _get_value(case):\n    return len(case.parts) > 0"
+]

@@ -119,7 +119,7 @@ def immutable_multiple_robot_apartment(
     world, view = setup_multi_robot_apartment
     state = deepcopy(world.state.data)
     yield world, view, Context(world, view)
-    world.state.data = state
+    world.state.data[:] = state
     world.notify_state_change()
 
 

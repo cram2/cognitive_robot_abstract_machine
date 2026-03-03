@@ -22,21 +22,23 @@ from typing_extensions import (
     TYPE_CHECKING,
 )
 
-from ..core.base_expressions import (
+from krrood.entity_query_language.core.base_expressions import (
     UnaryExpression,
     Bindings,
     OperationResult,
     SymbolicExpression,
     Selectable,
 )
-from ..failures import NestedAggregationError, InvalidChildType
-from ..utils import T
-from ..core.variable import Variable
-from ..core.mapped_variable import CanBehaveLikeAVariable
-
+from krrood.entity_query_language.failures import (
+    NestedAggregationError,
+    InvalidChildType,
+)
+from krrood.entity_query_language.utils import T
+from krrood.entity_query_language.core.variable import Variable
+from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
 
 if TYPE_CHECKING:
-    from ..query.query import Entity
+    from krrood.entity_query_language.query.query import Entity
 
 
 IntOrFloat = int | float
@@ -76,7 +78,7 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
         :return: An iterator over the aggregator results.
         """
-        from ..query.query import Entity
+        from krrood.entity_query_language.query.query import Entity
 
         return Entity(_selected_variables_=(self,)).evaluate()
 
@@ -84,7 +86,7 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         """
         Group the results by the given variables.
         """
-        from ..query.query import Entity
+        from krrood.entity_query_language.query.query import Entity
 
         return Entity(_selected_variables_=(self,)).grouped_by(*variables)
 

@@ -12,17 +12,17 @@ from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
 )
-from ....datastructures.enums import AxisIdentifier, Arms
-from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import Vector3Stamped
-from ....datastructures.trajectory import PoseTrajectory
-from ....failures import TorsoGoalNotReached, ConfigurationNotReached
-from ....language import SequentialPlan
-from ....view_manager import ViewManager
-from ....robot_plans.actions.base import ActionDescription
-from ....robot_plans.motions.gripper import MoveGripperMotion, MoveTCPWaypointsMotion
-from ....robot_plans.motions.robot_body import MoveJointsMotion
-from ....validation.goal_validator import create_multiple_joint_goal_validator
+from pycram.datastructures.enums import AxisIdentifier, Arms
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.datastructures.pose import Vector3Stamped
+from pycram.datastructures.trajectory import PoseTrajectory
+from pycram.failures import TorsoGoalNotReached, ConfigurationNotReached
+from pycram.language import SequentialPlan
+from pycram.view_manager import ViewManager
+from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.motions.gripper import MoveGripperMotion, MoveTCPWaypointsMotion
+from pycram.robot_plans.motions.robot_body import MoveJointsMotion
+from pycram.validation.goal_validator import create_multiple_joint_goal_validator
 
 
 @dataclass

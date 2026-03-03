@@ -153,7 +153,7 @@ class QPData:
         upper_box_filter = relaxed_solution > self.filtered.box_upper_constraints
         relaxed_qp_data.box_lower_constraints[lower_box_filter] -= 100
         relaxed_qp_data.box_upper_constraints[upper_box_filter] += 100
-        relaxed_qp_data.quadratic_weights[lower_box_filter | upper_box_filter] *= 10000
+        relaxed_qp_data.quadratic_weights[lower_box_filter | upper_box_filter] *= 1000
 
         return relaxed_qp_data
 

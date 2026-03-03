@@ -2,13 +2,13 @@ from dataclasses import dataclass
 
 from typing_extensions import List, Optional
 
-from ...symbol_graph.symbol_graph import (
+from krrood.symbol_graph.symbol_graph import (
     SymbolGraph,
     WrappedInstance,
     PredicateClassRelation,
     Symbol,
 )
-from ...ormatic.dao import AlternativeMapping, T
+from krrood.ormatic.dao import AlternativeMapping, T
 
 
 @dataclass

@@ -15,10 +15,12 @@ from typing_extensions import (
     TypeVar,
 )
 
-from ...symbol_graph.symbol_graph import Symbol
+from krrood.symbol_graph.symbol_graph import Symbol
 
 if TYPE_CHECKING:
-    from .property_descriptor import PropertyDescriptor
+    from krrood.ontomatic.property_descriptor.property_descriptor import (
+        PropertyDescriptor,
+    )
 
 
 monitored_type_map: Dict[Type, Type[MonitoredContainer]] = {}

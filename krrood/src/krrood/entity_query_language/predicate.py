@@ -22,10 +22,10 @@ from typing_extensions import (
     Dict,
 )
 
-from .utils import T, merge_args_and_kwargs
-from .core.variable import Variable, InstantiatedVariable
-from .core.base_expressions import Selectable
-from ..symbol_graph.symbol_graph import Symbol
+from krrood.entity_query_language.utils import T, merge_args_and_kwargs
+from krrood.entity_query_language.core.variable import Variable, InstantiatedVariable
+from krrood.entity_query_language.core.base_expressions import Selectable
+from krrood.symbol_graph.symbol_graph import Symbol
 
 
 def symbolic_function(

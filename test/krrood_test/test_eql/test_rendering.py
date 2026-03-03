@@ -5,7 +5,7 @@ import pytest
 from krrood.entity_query_language.query_graph import QueryGraph
 
 try:
-    from rustworkx_utils import GraphVisualizer
+    from krrood.rustworkx_utils import GraphVisualizer
 except ImportError:
     GraphVisualizer = None
 
@@ -21,7 +21,15 @@ from ..dataset.semantic_world_like_classes import (
     Door,
     Wardrobe,
 )
-from krrood.entity_query_language.factories import entity, variable, and_, inference, an, alternative, deduced_variable
+from krrood.entity_query_language.factories import (
+    entity,
+    variable,
+    and_,
+    inference,
+    an,
+    alternative,
+    deduced_variable,
+)
 from krrood.entity_query_language.rules.conclusion import Add
 
 from krrood.entity_query_language.predicate import HasType

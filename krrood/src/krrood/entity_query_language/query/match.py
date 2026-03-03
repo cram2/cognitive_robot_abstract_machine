@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
 
+import rustworkx as rx
 from typing_extensions import (
     Optional,
     Type,
@@ -24,19 +25,24 @@ from typing_extensions import (
     TYPE_CHECKING,
 )
 
-from ..failures import (
+from krrood.entity_query_language.query.quantifiers import An
+from krrood.entity_query_language.core.base_expressions import Selectable
+from krrood.entity_query_language.core.mapped_variable import (
+    Attribute,
+    FlatVariable,
+    CanBehaveLikeAVariable,
+)
+from krrood.entity_query_language.core.variable import Literal, DomainType
+from krrood.entity_query_language.failures import (
     NoKwargsInMatchVar,
 )
-from ..predicate import HasType
-from .quantifiers import An
-from ..core.variable import Literal, DomainType
-from ..core.base_expressions import Selectable
-from ..core.mapped_variable import Attribute, FlatVariable, CanBehaveLikeAVariable
-from ..utils import T
+from krrood.entity_query_language.predicate import HasType
+from krrood.entity_query_language.utils import T
+from krrood.rustworkx_utils import RWXNode
 
 if TYPE_CHECKING:
-    from ..factories import ConditionType
-    from .query import Entity
+    from krrood.entity_query_language.factories import ConditionType
+    from krrood.entity_query_language.query.query import Entity, Query
 
 
 @dataclass
@@ -60,7 +66,7 @@ class AbstractMatchExpression(Generic[T], ABC):
     """
     The conditions that define the match.
     """
-    parent: Optional[Match] = field(init=False, default=None)
+    parent: Optional[AbstractMatchExpression] = field(init=False, default=None)
     """
     The parent match if this is a nested match.
     """
@@ -71,6 +77,10 @@ class AbstractMatchExpression(Generic[T], ABC):
     id: uuid.UUID = field(init=False, default_factory=uuid.uuid4)
     """
     The unique identifier of the match expression.
+    """
+    children: List[AttributeMatch] = field(init=False, default_factory=list)
+    """
+    The child matches of this match expression.
     """
 
     @cached_property
@@ -153,6 +163,12 @@ class Match(AbstractMatchExpression[T]):
     The keyword arguments to match against.
     """
 
+    _expression: Query = field(init=False, default=None)
+    """
+    Cache for the expression (the actual EQL query) as soon as it has been calculated.
+    This is needed to apply where conditions directly to the match instance. 
+    """
+
     def __call__(self, **kwargs) -> Union[Self, T, CanBehaveLikeAVariable[T]]:
         """
         Update the match with new keyword arguments to constrain the type we are matching with.
@@ -163,18 +179,22 @@ class Match(AbstractMatchExpression[T]):
         self.kwargs = kwargs
         return self
 
-    @cached_property
+    @property
     def expression(self) -> Union[Entity[T], T]:
         """
         Return the entity expression corresponding to the match query.
         """
-        from ..factories import entity
+        from krrood.entity_query_language.factories import entity
+
+        if self._expression is not None:
+            return self._expression
 
         if self.variable is None:
             self.resolve()
         entity_ = entity(self.variable)
         if self.conditions:
             entity_ = entity_.where(*self.conditions)
+        self._expression = entity_
         return entity_
 
     def _resolve(
@@ -193,17 +213,18 @@ class Match(AbstractMatchExpression[T]):
         self.update_fields(variable, parent)
         for attr_name, attr_assigned_value in self.kwargs.items():
             attr_match = AttributeMatch(
-                parent=self,
+                parent=parent or self,
                 attribute_name=attr_name,
                 assigned_value=attr_assigned_value,
             )
             attr_match.resolve()
+            self.children.append(attr_match)
             self.conditions.extend(attr_match.conditions)
 
     def update_fields(
         self,
         variable: Optional[Selectable] = None,
-        parent: Optional[Match] = None,
+        parent: Optional[AbstractMatchExpression] = None,
     ):
         """
         Update the match variable, and parent.
@@ -221,7 +242,7 @@ class Match(AbstractMatchExpression[T]):
         self.parent = parent
 
     def create_variable(self):
-        from ..factories import variable
+        from krrood.entity_query_language.factories import variable
 
         self.variable = variable(self.type, domain=None)
 
@@ -233,13 +254,17 @@ class Match(AbstractMatchExpression[T]):
 
     @property
     def name(self) -> str:
-        return f"Match({self.type})"
+        return f"Match({self.type.__name__})"
 
     def __repr__(self):
         return self.name
 
     def __str__(self):
         return self.name
+
+    def where(self, *conditions: ConditionType) -> Match[T]:
+        self.expression.where(*conditions)
+        return self
 
 
 @dataclass(eq=False)
@@ -259,7 +284,7 @@ class MatchVariable(Match[T]):
     """
 
     def create_variable(self):
-        from ..factories import variable
+        from krrood.entity_query_language.factories import variable
 
         self.variable = variable(self.type, domain=self.domain)
 
@@ -296,6 +321,10 @@ class AttributeMatch(AbstractMatchExpression[T]):
     The symbolic variable representing the attribute.
     """
 
+    def __post_init__(self):
+        if isinstance(self.assigned_value, Match):
+            self.children = self.assigned_value.children
+
     @cached_property
     def expression(self) -> Union[CanBehaveLikeAVariable[T], T]:
         """
@@ -305,22 +334,18 @@ class AttributeMatch(AbstractMatchExpression[T]):
             self.resolve()
         return self.variable
 
-    def _resolve(
-        self,
-        parent_match: Optional[Match] = None,
-    ):
+    def _resolve(self):
         """
         Resolve the attribute assignment by creating the conditions and applying the necessary mappings
         to the attribute.
-
-        :param parent_match: The parent match of the attribute assignment.
         """
         if not isinstance(self.assigned_value, AbstractMatchExpression) or (
             self.assigned_value.variable or self.assigned_value.resolved
         ):
             self.conditions.append(self.attribute == self.assigned_variable)
             return
-        self.assigned_value.resolve(self.attribute, parent_match)
+
+        self.assigned_value.resolve(self.attribute, self)
 
         if self.is_type_filter_needed:
             self.conditions.append(HasType(self.attribute, self.assigned_value.type))
@@ -370,3 +395,33 @@ class AttributeMatch(AbstractMatchExpression[T]):
 
     def __str__(self):
         return self.name
+
+
+class ProbableVariable(MatchVariable):
+    """
+    A special type of MatchVariable that represents a variable with probabilistic constraints.
+    """
+
+    def __call__(self, **kwargs):
+        super().__call__(
+            **kwargs
+        )  # call super method but return self s. t. the next operations still act on this instead of the expression
+        return self
+
+
+def construct_graph_and_get_root(
+    node_data: AbstractMatchExpression, graph: Optional[rx.PyDAG] = None
+) -> RWXNode:
+    """
+    Construct a graph representation of the match expression and return the root node.
+
+    :param node_data: The root node of the match expression.
+    :param graph: The graph to construct the subgraph in.
+    :return: The root node of the constructed subgraph.
+    """
+    graph = graph or rx.PyDAG()
+    node = RWXNode(node_data.name, graph, data=node_data)
+    for child in node_data.children:
+        child_node = construct_graph_and_get_root(child, graph=graph)
+        child_node.parent = node
+    return node

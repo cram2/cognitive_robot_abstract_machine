@@ -9,8 +9,8 @@ from typing_extensions import List, Dict
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 
-from ..spatial_types.derivatives import Derivatives
-from .world_state import WorldStateTrajectory
+from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
 
 
 @dataclass

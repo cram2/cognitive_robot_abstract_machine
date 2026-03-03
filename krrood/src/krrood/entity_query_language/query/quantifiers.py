@@ -12,14 +12,14 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Optional, Iterable, Union as TypingUnion, Dict
 
-from ..core.base_expressions import (
+from krrood.entity_query_language.core.base_expressions import (
     UnaryExpression,
     DerivedExpression,
     SymbolicExpression,
     Bindings,
     OperationResult,
 )
-from ..failures import (
+from krrood.entity_query_language.failures import (
     NegativeQuantificationError,
     QuantificationConsistencyError,
     GreaterThanExpectedNumberOfSolutions,
@@ -28,7 +28,7 @@ from ..failures import (
     NoSolutionFound,
     MultipleSolutionFound,
 )
-from ..utils import T
+from krrood.entity_query_language.utils import T
 
 
 @dataclass

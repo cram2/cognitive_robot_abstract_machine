@@ -9,16 +9,16 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.world_description.world_entity import Body
-from .base import BaseMotion
-from ...datastructures.enums import (
+from pycram.robot_plans.motions.base import BaseMotion
+from pycram.datastructures.enums import (
     Arms,
     MovementType,
     WaypointsMovementType,
 )
-from ...datastructures.grasp import GraspDescription
-from ...datastructures.pose import PoseStamped
-from ...view_manager import ViewManager
-from ...utils import translate_pose_along_local_axis
+from pycram.datastructures.grasp import GraspDescription
+from pycram.datastructures.pose import PoseStamped
+from pycram.view_manager import ViewManager
+from pycram.utils import translate_pose_along_local_axis
 
 
 @dataclass

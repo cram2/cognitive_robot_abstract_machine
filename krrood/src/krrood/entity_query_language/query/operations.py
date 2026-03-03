@@ -14,8 +14,8 @@ from functools import cached_property, lru_cache
 
 from typing_extensions import Tuple, Any, Iterator, Iterable, Optional, Callable, Dict
 
-from ..operators.aggregators import Aggregator, Count
-from ..core.base_expressions import (
+from krrood.entity_query_language.operators.aggregators import Aggregator, Count
+from krrood.entity_query_language.core.base_expressions import (
     DerivedExpression,
     SymbolicExpression,
     UnaryExpression,
@@ -25,10 +25,10 @@ from ..core.base_expressions import (
     Filter,
     Selectable,
 )
-from ..failures import UnsupportedAggregationOfAGroupedByVariable
-from ..operators.set_operations import MultiArityExpressionThatPerformsACartesianProduct
-from ..utils import ensure_hashable, is_iterable
-from ..core.mapped_variable import MappedVariable
+from krrood.entity_query_language.failures import UnsupportedAggregationOfAGroupedByVariable
+from krrood.entity_query_language.operators.set_operations import MultiArityExpressionThatPerformsACartesianProduct
+from krrood.entity_query_language.utils import ensure_hashable, is_iterable
+from krrood.entity_query_language.core.mapped_variable import MappedVariable
 
 GroupKey = Tuple[Any, ...]
 """

@@ -144,7 +144,8 @@ class ConnectionModificationTestCase(unittest.TestCase):
 
     def test_semantic_annotation_modifications(self):
         w = World()
-        b1 = Body(name=PrefixedName("b1"))
+        with w.modify_world():
+            w.add_kinematic_structure_entity(b1 := Body(name=PrefixedName("b1")))
         v1 = Handle(root=b1)
         v2 = Door(root=b1, handle=v1)
 

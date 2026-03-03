@@ -8,32 +8,32 @@ import operator
 
 from typing_extensions import Union, Iterable
 
-from .core.base_expressions import SymbolicExpression
-from .enums import DomainSource
-from .failures import UnsupportedExpressionTypeForDistinct
-from .query.match import Match, MatchVariable
-from .operators.aggregators import Max, Min, Sum, Average, Count
-from .operators.comparator import Comparator
-from .operators.core_logical_operators import chained_logic, AND, OR
-from .operators.logical_quantifiers import ForAll, Exists
-from .operators.concatenation import Concatenation
-from .query.quantifiers import (
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.enums import DomainSource
+from krrood.entity_query_language.failures import UnsupportedExpressionTypeForDistinct
+from krrood.entity_query_language.query.match import Match, MatchVariable, ProbableVariable
+from krrood.entity_query_language.operators.aggregators import Max, Min, Sum, Average, Count
+from krrood.entity_query_language.operators.comparator import Comparator
+from krrood.entity_query_language.operators.core_logical_operators import chained_logic, AND, OR
+from krrood.entity_query_language.operators.logical_quantifiers import ForAll, Exists
+from krrood.entity_query_language.operators.concatenation import Concatenation
+from krrood.entity_query_language.query.quantifiers import (
     ResultQuantificationConstraint,
     An,
     The,
     ResultQuantifier,
 )
-from .rules.conclusion_selector import Refinement, Alternative, Next
-from .query.query import Entity, SetOf, Query
-from .utils import is_iterable
-from .core.variable import (
+from krrood.entity_query_language.rules.conclusion_selector import Refinement, Alternative, Next
+from krrood.entity_query_language.query.query import Entity, SetOf, Query
+from krrood.entity_query_language.utils import is_iterable
+from krrood.entity_query_language.core.variable import (
     DomainType,
     Literal,
     ExternallySetVariable,
 )
-from .core.mapped_variable import FlatVariable, CanBehaveLikeAVariable
-from .predicate import *  # type: ignore
-from ..symbol_graph.symbol_graph import Symbol, SymbolGraph
+from krrood.entity_query_language.core.mapped_variable import FlatVariable, CanBehaveLikeAVariable
+from krrood.entity_query_language.predicate import *  # type: ignore
+from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 
 ConditionType = Union[SymbolicExpression, bool, Predicate]
 """
@@ -80,8 +80,8 @@ def match(
 
 
 def match_variable(
-    type_: Union[Type[T], Selectable[T]], domain: Optional[DomainType]
-) -> Union[Type[T], An[T], CanBehaveLikeAVariable[T], MatchVariable[T]]:
+    type_: Union[Type[T], Selectable[T]], domain: DomainType
+) -> Union[T, CanBehaveLikeAVariable[T], MatchVariable[T]]:
     """
     Same as :py:func:`krrood.entity_query_language.match.match` but with a domain to use for the variable created
      by the match.
@@ -91,6 +91,34 @@ def match_variable(
     :return: The Match instance.
     """
     return MatchVariable(type_=type_, domain=domain)
+
+
+def probable_variable(
+    type_: Union[Type[T], Selectable[T]],
+) -> Union[Type[T], MatchVariable[T]]:
+    """
+    Same as :py:func:`krrood.entity_query_language.match.match_variable` but instead of searching for solutions in
+    the domain objects, it is used as a query for probabilistic models to infer solutions that satisfy the constraints
+    in the query.
+
+    .. note::
+
+        Calling a ProbableVariable will return a ProbableVariable instead of its expression.
+    """
+    return ProbableVariable(type_=type_)
+
+
+def probable(
+    type_: Union[Type[T], Selectable[T]],
+) -> Union[Type[T], Match[T]]:
+    """
+    Create a random (probable) variable matching the type and the provided keyword arguments. This is used for easy
+    variable definitions when there are structural constraints.
+
+    :param type_: The type of the variable (i.e., The class you want to instantiate).
+    :return: The Match instance.
+    """
+    return Match(type_=type_)
 
 
 # %% Variable Declaration

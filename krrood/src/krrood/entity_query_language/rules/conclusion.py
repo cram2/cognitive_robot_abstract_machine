@@ -12,14 +12,14 @@ from functools import cached_property
 
 from typing_extensions import Any, List, Iterable
 
-from ..core.base_expressions import (
+from krrood.entity_query_language.core.base_expressions import (
     Bindings,
     OperationResult,
     SymbolicExpression,
     Selectable,
     BinaryExpression,
 )
-from ..core.variable import Variable
+from krrood.entity_query_language.core.variable import Variable
 
 
 @dataclass(eq=False)

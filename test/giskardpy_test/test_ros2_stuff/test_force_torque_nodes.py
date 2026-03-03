@@ -2,6 +2,7 @@ import json
 
 from geometry_msgs.msg import WrenchStamped
 
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import EndMotion
@@ -47,7 +48,9 @@ def test_force_impact_node(rclpy_node):
     new_json_data = json.loads(json_str)
     msc_copy = MotionStatechart.from_json(new_json_data)
 
-    kin_sim = Ros2Executor(world=World(), ros_node=rclpy_node)
+    kin_sim = Ros2Executor(
+        context=MotionStatechartContext(world=World()), ros_node=rclpy_node
+    )
     kin_sim.compile(motion_statechart=msc_copy)
 
     ft_node = msc_copy.nodes[0].nodes[0]

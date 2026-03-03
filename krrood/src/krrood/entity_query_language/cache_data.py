@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .utils import T, ensure_hashable
+from krrood.entity_query_language.utils import T, ensure_hashable
 
 """
 Cache utilities.

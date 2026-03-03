@@ -1,1 +1,1 @@
-from .class_diagram import ClassDiagram, ClassRelation
+from krrood.class_diagrams.class_diagram import ClassDiagram, ClassRelation
