@@ -8,10 +8,10 @@ from random_events.variable import Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Type, Tuple, Self
 
-from .inner_layer import NXConverterLayer
-from .input_layer import ContinuousLayer
-from ..rx.probabilistic_circuit import Unit, ProbabilisticCircuit as NXProbabilisticCircuit, UnivariateContinuousLeaf
-from ...distributions import GaussianDistribution
+from probabilistic_model.probabilistic_circuit.jax.inner_layer import NXConverterLayer
+from probabilistic_model.probabilistic_circuit.jax.input_layer import ContinuousLayer
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import Unit, ProbabilisticCircuit as NXProbabilisticCircuit, UnivariateContinuousLeaf
+from probabilistic_model.distributions import GaussianDistribution
 
 
 class GaussianLayer(ContinuousLayer):

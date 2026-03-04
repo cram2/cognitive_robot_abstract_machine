@@ -5,7 +5,7 @@ from sqlalchemy import TypeDecorator
 from sqlalchemy import types
 from typing_extensions import Type, Optional
 
-from ..utils import module_and_class_name
+from krrood.utils import module_and_class_name
 
 
 class TypeType(TypeDecorator):

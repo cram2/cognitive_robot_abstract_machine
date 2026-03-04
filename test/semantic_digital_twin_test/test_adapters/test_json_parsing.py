@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 import trimesh.boolean
 
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -27,6 +28,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import Box
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -39,10 +41,6 @@ def test_body_json_serialization():
         Box(origin=HomogeneousTransformationMatrix.from_xyz_rpy(0, 1, 0, 0, 0, 1, body))
     ]
     body.collision = ShapeCollection(collision, reference_frame=body)
-    body.collision_config.max_avoided_bodies = 69
-    body.collision_config.disabled = False
-    body.collision_config.buffer_zone_distance = 1.227
-    body.collision_config.violated_distance = 0.23
 
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
@@ -76,7 +74,13 @@ def test_body_json_serialization():
 
     assert body == body2
 
-    assert body.collision_config == body2.collision_config
+
+def test_dof_hardware_interface_serialization():
+    dof = DegreeOfFreedom(has_hardware_interface=True)
+    rebuilt_dof = from_json(to_json(dof))
+
+    assert dof.has_hardware_interface == rebuilt_dof.has_hardware_interface
+    assert dof == rebuilt_dof
 
 
 def test_transformation_matrix_json_serialization():

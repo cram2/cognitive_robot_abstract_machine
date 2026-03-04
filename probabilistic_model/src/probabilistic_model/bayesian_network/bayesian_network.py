@@ -8,9 +8,9 @@ from matplotlib import pyplot as plt
 from random_events.variable import Symbolic, Variable
 from typing_extensions import Optional, Any, Self, List, Tuple, Set, Iterable, Dict
 
-from ..distributions import SymbolicDistribution
-from ..distributions.helper import make_dirac
-from ..probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit, ProductUnit, SumUnit, leaf
+from probabilistic_model.distributions import SymbolicDistribution
+from probabilistic_model.distributions.helper import make_dirac
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit, ProductUnit, SumUnit, leaf
 
 
 @dataclass

@@ -120,7 +120,8 @@ class ConnectionModificationTestCase(unittest.TestCase):
         modifications_copy = WorldModelModificationBlock.from_json(
             modifications.to_json(), **kwargs
         )
-        modifications_copy.apply(w2)
+        with w2.modify_world():
+            modifications_copy.apply(w2)
         self.assertEqual(len(w2.bodies), 3)
         self.assertEqual(len(w2.connections), 2)
 
@@ -136,13 +137,15 @@ class ConnectionModificationTestCase(unittest.TestCase):
         modifications_copy = WorldModelModificationBlock.from_json(
             modifications.to_json()
         )
-        modifications_copy.apply(w2)
+        with w2.modify_world():
+            modifications_copy.apply(w2)
         self.assertEqual(len(w2.bodies), 2)
         self.assertEqual(len(w2.connections), 1)
 
     def test_semantic_annotation_modifications(self):
         w = World()
-        b1 = Body(name=PrefixedName("b1"))
+        with w.modify_world():
+            w.add_kinematic_structure_entity(b1 := Body(name=PrefixedName("b1")))
         v1 = Handle(root=b1)
         v2 = Door(root=b1, handle=v1)
 

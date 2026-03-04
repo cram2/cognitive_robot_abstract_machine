@@ -1,0 +1,7 @@
+[
+  "case.species=='mammal' and case.aquatic==0",
+  "case.species=='fish'",
+  "case.species=='bird' and case.legs>0",
+  "case.species=='molusc' and case.aquatic==0",
+  "case.species=='molusc' and case.aquatic==1"
+]

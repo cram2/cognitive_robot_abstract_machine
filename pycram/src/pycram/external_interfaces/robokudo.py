@@ -3,13 +3,13 @@ import logging
 from threading import Lock, RLock
 from typing import Any
 
-from ..ros import create_action_client
-from ..ros import get_node_names
+from pycram.ros import create_action_client
+from pycram.ros import get_node_names
 
 from typing_extensions import List, Callable, Optional
 
-from ..datastructures.pose import PoseStamped
-from ..designator import ObjectDesignatorDescription
+from pycram.datastructures.pose import PoseStamped
+from pycram.designator import ObjectDesignatorDescription
 
 logger = logging.getLogger(__name__)
 

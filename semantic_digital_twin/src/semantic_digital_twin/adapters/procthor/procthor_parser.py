@@ -12,15 +12,15 @@ from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.orm import Session
 from typing_extensions import assert_never
 
-from ...datastructures.prefixed_name import PrefixedName
-from ...datastructures.variables import SpatialVariables
-from ...orm.ormatic_interface import *
-from ...semantic_annotations.position_descriptions import (
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.orm.ormatic_interface import *
+from semantic_digital_twin.semantic_annotations.position_descriptions import (
     SemanticPositionDescription,
     HorizontalSemanticDirection,
     VerticalSemanticDirection,
 )
-from ...semantic_annotations.semantic_annotations import (
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Room,
     Floor,
     Handle,
@@ -33,15 +33,15 @@ from ...semantic_annotations.semantic_annotations import (
     Bathroom,
     LivingRoom,
 )
-from ...spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,
 )
-from ...world import World
-from ...world_description.connections import FixedConnection
-from ...world_description.geometry import Scale
-from ...world_description.world_entity import Body
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass

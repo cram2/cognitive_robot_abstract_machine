@@ -19,7 +19,7 @@ import ast
 import os
 import re
 
-from ..robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.base import ActionDescription
 
 
 @dataclass

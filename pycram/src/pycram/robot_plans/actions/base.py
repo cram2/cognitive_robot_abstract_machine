@@ -6,15 +6,14 @@ from dataclasses import dataclass
 
 from typing_extensions import Any, Optional, Callable, TypeVar
 
-from ...designator import DesignatorDescription
-from ...failures import PlanFailure
-from ...has_parameters import HasParameters
+from pycram.designator import DesignatorDescription
+from pycram.failures import PlanFailure
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ActionDescription(DesignatorDescription, HasParameters):
+class ActionDescription(DesignatorDescription):
     _pre_perform_callbacks = []
     _post_perform_callbacks = []
 

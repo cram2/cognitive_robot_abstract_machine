@@ -6,7 +6,7 @@ from typing import Tuple, Dict, Any
 import random_events_lib as rl
 from typing_extensions import Self, Iterable
 
-from .utils import SubclassJSONSerializer, CPPWrapper
+from random_events.utils import SubclassJSONSerializer, CPPWrapper
 
 EMPTY_SET_SYMBOL = "∅"
 

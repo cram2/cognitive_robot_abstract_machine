@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import Self
 
-from .abstract_robot import AbstractRobot
-from ..datastructures.prefixed_name import PrefixedName
-from ..world import World
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.world import World
 
 
 @dataclass(eq=False)

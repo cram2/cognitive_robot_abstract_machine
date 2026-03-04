@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 from copy import deepcopy
 from dataclasses import dataclass, field, InitVar
 from typing import List, Optional, TYPE_CHECKING
@@ -11,7 +12,6 @@ import pandas as pd
 from line_profiler import profile
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.middleware import get_middleware
 from giskardpy.qp.adapters.qp_adapter import GiskardToQPAdapter
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.exceptions import (
@@ -21,6 +21,8 @@ from giskardpy.qp.exceptions import (
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.utils.utils import create_path
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -65,7 +67,7 @@ class QPControllerDebugger:
                 raise HardConstraintsViolatedException(error_message)
         except AttributeError:
             pass
-        get_middleware().loginfo("No slack limit violation detected.")
+        logger.info("No slack limit violation detected.")
 
     def _print_pandas_array(self, array):
         import pandas as pd
@@ -330,7 +332,7 @@ class QPControllerDebugger:
 
         result = self.qp_controller.qp_solver.analyze_infeasibility()
         if result is None:
-            get_middleware().loginfo(
+            logger.info(
                 f"Can only compute possible causes with gurobi, "
                 f"but current solver is {self.qp_controller.config.qp_solver_id.name}."
             )
@@ -340,17 +342,17 @@ class QPControllerDebugger:
         with pd.option_context(
             "display.max_rows", None, "display.max_columns", None, "display.width", None
         ):
-            get_middleware().loginfo("Irreducible Infeasible Subsystem:")
-            get_middleware().loginfo("  Free variable bounds")
+            logger.info("Irreducible Infeasible Subsystem:")
+            logger.info("  Free variable bounds")
             free_variables = self.p_lb[b_ids]
             free_variables["ub"] = self.p_ub[b_ids]
             free_variables = free_variables.rename(columns={"data": "lb"})
             print(free_variables)
-            get_middleware().loginfo("  Equality constraints:")
+            logger.info("  Equality constraints:")
             print_iis_matrix(eq_ids, b_ids, self.p_E, self.p_bE)
-            get_middleware().loginfo("  Inequality constraint lower bounds:")
+            logger.info("  Inequality constraint lower bounds:")
             print_iis_matrix(lbA_ids, b_ids, self.p_A, self.p_lbA)
-            get_middleware().loginfo("  Inequality constraint upper bounds:")
+            logger.info("  Inequality constraint upper bounds:")
             print_iis_matrix(ubA_ids, b_ids, self.p_A, self.p_ubA)
 
 
@@ -366,9 +368,7 @@ class QPController:
     constraint_collection: ConstraintCollection
     world_state_symbols: List[sm.FloatVariable]
     life_cycle_variables: List[sm.FloatVariable]
-    external_collision_avoidance_variables: List[sm.FloatVariable]
-    self_collision_avoidance_variables: List[sm.FloatVariable]
-    auxiliary_variables: List[sm.FloatVariable]
+    float_variables: List[sm.FloatVariable]
 
     qp_adapter: GiskardToQPAdapter = field(default=None, init=False)
     qp_solver: QPSolver = field(default=None, init=False)
@@ -378,7 +378,7 @@ class QPController:
     def __post_init__(self, degrees_of_freedom: List[DegreeOfFreedom]):
         self.qp_solver = self.config.qp_solver_class()
         if self.config.verbose:
-            get_middleware().loginfo(
+            logger.info(
                 f"Initialized QP Controller:\n"
                 f'sample period: "{self.config.mpc_dt}"s\n'
                 f'max derivative: "{self.config.max_derivative.name}"\n'
@@ -391,18 +391,11 @@ class QPController:
         self.qp_adapter = self.qp_solver.required_adapter_type(
             world_state_symbols=self.world_state_symbols,
             life_cycle_symbols=self.life_cycle_variables,
-            auxiliary_variables=self.auxiliary_variables,
-            external_collision_symbols=self.external_collision_avoidance_variables,
-            self_collision_symbols=self.self_collision_avoidance_variables,
+            float_variables=self.float_variables,
             degrees_of_freedom=self.active_dofs,
             constraint_collection=self.constraint_collection,
             config=self.config,
         )
-
-        # get_middleware().loginfo("Done compiling controller:")
-        # get_middleware().loginfo(f'  #free variables: {self.num_free_variables}')
-        # get_middleware().loginfo(f'  #equality constraints: {self.num_eq_constraints}')
-        # get_middleware().loginfo(f'  #inequality constraints: {self.num_ineq_constraints}')
 
     def _set_active_dofs(self, degrees_of_freedom: List[DegreeOfFreedom]):
         all_active_float_variables = set().union(
@@ -447,9 +440,7 @@ class QPController:
         self,
         world_state: np.ndarray,
         life_cycle_state: np.ndarray,
-        external_collisions: np.ndarray,
-        self_collisions: np.ndarray,
-        auxiliary_variables: np.ndarray,
+        float_variables: np.ndarray,
     ) -> np.ndarray:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
@@ -458,9 +449,7 @@ class QPController:
             qp_data = self.qp_adapter.evaluate(
                 world_state,
                 life_cycle_state,
-                external_collisions,
-                self_collisions,
-                auxiliary_variables,
+                float_variables,
             )
             try:
                 self.xdot_full = self.qp_solver.solver_call(qp_data.filtered)

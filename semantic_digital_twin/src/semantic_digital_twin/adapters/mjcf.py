@@ -6,8 +6,9 @@ import mujoco
 import numpy
 from scipy.spatial.transform import Rotation
 from typing_extensions import Optional, Dict
+from xml.etree import ElementTree as ET
 
-from .multi_sim import (
+from semantic_digital_twin.adapters.multi_sim import (
     MujocoActuator,
     GeomVisibilityAndCollisionType,
     MujocoCamera,
@@ -15,26 +16,27 @@ from .multi_sim import (
     MujocoGeom,
     MujocoBody,
     MujocoJoint,
+    MujocoTendon,
 )
-from ..datastructures.prefixed_name import PrefixedName
-from ..exceptions import WorldEntityNotFoundError
-from ..spatial_types import (
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import WorldEntityNotFoundError
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Point3,
     Vector3,
 )
-from ..spatial_types.derivatives import DerivativeMap
-from ..world import World, Body
-from ..world_description.connection_properties import JointDynamics
-from ..world_description.connections import (
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.world import World, Body
+from semantic_digital_twin.world_description.connection_properties import JointDynamics
+from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
     FixedConnection,
     Connection6DoF,
 )
-from ..world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
-from ..world_description.geometry import (
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
+from semantic_digital_twin.world_description.geometry import (
     Box,
     Sphere,
     Cylinder,
@@ -43,14 +45,14 @@ from ..world_description.geometry import (
     Color,
     FileMesh,
 )
-from ..world_description.inertial_properties import (
+from semantic_digital_twin.world_description.inertial_properties import (
     Inertial,
     InertiaTensor,
     PrincipalMoments,
     PrincipalAxes,
 )
-from ..world_description.shape_collection import ShapeCollection
-from ..world_description.world_entity import Actuator
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Actuator
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +82,7 @@ class MJCFParser:
         if self.prefix is None:
             self.prefix = os.path.basename(self.file_path).split(".")[0]
         self.spec: mujoco.MjSpec = mujoco.MjSpec.from_file(self.file_path)
+        self.tree = ET.fromstring(self.spec.to_xml())
         self.world = World()
 
     def parse(self) -> World:
@@ -92,6 +95,7 @@ class MJCFParser:
         worldbody: mujoco.MjsBody = self.spec.worldbody
         with self.world.modify_world():
             self.parse_equalities()
+            self.parse_tendons()
 
             root = Body(name=PrefixedName(worldbody.name))
             self.world.add_body(root)
@@ -473,19 +477,27 @@ class MJCFParser:
         :param mujoco_actuator: The Mujoco actuator to parse.
         """
         actuator_name = mujoco_actuator.name
-        if mujoco_actuator.trntype != mujoco.mjtTrn.mjTRN_JOINT:
+        if mujoco_actuator.trntype not in [
+            mujoco.mjtTrn.mjTRN_JOINT,
+            mujoco.mjtTrn.mjTRN_TENDON,
+        ]:
             print(
                 f"Warning: Actuator {actuator_name} has trntype {mujoco_actuator.trntype}, which is not supported. Skipping actuator."
             )
             return
-        joint_name = mujoco_actuator.target
-        connection = self.world.get_connection_by_name(joint_name)
-        dofs = list(connection.dofs)
-        assert (
-            len(dofs) == 1
-        ), f"Actuator {actuator_name} is associated with joint {joint_name} which has {len(connection.dofs)} DOFs, but only single-DOF joints are supported for actuators."
         actuator = Actuator(name=PrefixedName(actuator_name))
-        actuator.add_dof(dofs[0])
+        if mujoco_actuator.trntype == mujoco.mjtTrn.mjTRN_JOINT:
+            joint_name = mujoco_actuator.target
+            connection = self.world.get_connection_by_name(joint_name)
+            dofs = list(connection.dofs)
+            assert (
+                len(dofs) == 1
+            ), f"Actuator {actuator_name} is associated with joint {joint_name} which has {len(connection.dofs)} DOFs, but only single-DOF joints are supported for actuators."
+            actuator.add_dof(dofs[0])
+        else:
+            actuator.add_dof(
+                self.world.get_degree_of_freedom_by_name(mujoco_actuator.target)
+            )
         actuator.simulator_additional_properties.append(
             MujocoActuator(
                 activation_limited=mujoco_actuator.actlimited,
@@ -553,7 +565,11 @@ class MJCFParser:
             MujocoCamera(
                 name=camera_name,
                 mode=mujoco_camera.mode,
-                orthographic=mujoco_camera.orthographic,
+                orthographic=(
+                    mujoco_camera.orthographic
+                    if mujoco.mj_version() < 3005000
+                    else False
+                ),
                 fovy=mujoco_camera.fovy,
                 resolution=resolution,
                 focal_length=focal_length,
@@ -584,7 +600,57 @@ class MJCFParser:
                             data=equality.data.tolist(),
                         )
                     )
+                case mujoco.mjtEq.mjEQ_CONNECT:
+                    self.world.simulator_additional_properties.append(
+                        MujocoEquality(
+                            type=mujoco.mjtEq.mjEQ_CONNECT,
+                            object_type=mujoco.mjtObj.mjOBJ_BODY,
+                            name_1=equality.name1,
+                            name_2=equality.name2,
+                            data=equality.data.tolist(),
+                        )
+                    )
                 case _:
                     logger.warning(
                         f"Equality of type {equality.type} not supported yet. Skipping."
                     )
+
+    def parse_tendons(self):
+        tendon: mujoco.MjsTendon
+        for tendon in self.spec.tendons:
+            joints = {}
+            for joint in self.tree.findall(
+                f".//tendon/fixed[@name='{tendon.name}']/joint"
+            ):
+                name = joint.get("joint")
+                coef = float(joint.get("coef"))
+                assert coef is not None and coef is not None
+                joints[name] = coef
+            dof = DegreeOfFreedom(
+                name=PrefixedName(tendon.name),
+            )
+            self.world.add_degree_of_freedom(dof)
+            self.world.simulator_additional_properties.append(
+                MujocoTendon(
+                    name=tendon.name,
+                    actuator_force_limited=tendon.actfrclimited,
+                    actuator_force_range=tendon.actfrcrange.tolist(),
+                    armature=tendon.armature,
+                    damping=tendon.damping,
+                    frictionloss=tendon.frictionloss,
+                    group=tendon.group,
+                    limited=tendon.limited,
+                    margin=tendon.margin,
+                    material=tendon.material,
+                    range=tendon.range.tolist(),
+                    rgba=Color(*tendon.rgba),
+                    solver_impedance_friction=tendon.solimp_friction.tolist(),
+                    solver_impedance_limit=tendon.solimp_limit.tolist(),
+                    solver_reference_friction=tendon.solref_friction.tolist(),
+                    solver_reference_limit=tendon.solref_limit.tolist(),
+                    spring_length=tendon.springlength.tolist(),
+                    stiffness=tendon.stiffness,
+                    width=tendon.width,
+                    joints=joints,
+                )
+            )

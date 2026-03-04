@@ -6,11 +6,13 @@ from dataclasses import field, dataclass
 from datetime import datetime
 from enum import IntEnum
 from itertools import chain
-from typing import ClassVar
-
 import numpy as np
 import rustworkx as rx
 import rustworkx.visualization
+
+from krrood.entity_query_language.query.match import Match
+from krrood.probabilistic_knowledge.probable_variable import MatchToInstanceTranslator
+from random_events.variable import Variable
 from typing_extensions import (
     Optional,
     Callable,
@@ -25,30 +27,37 @@ from typing_extensions import (
     Union,
     Generic,
     TypeVar,
+    ClassVar,
 )
 
 from giskardpy.motion_statechart.graph_node import Task
 from krrood.class_diagrams.failures import ClassIsUnMappedInClassDiagram
+from krrood.ormatic.dao import get_dao_class, to_dao
+from random_events.product_algebra import SimpleEvent
+from krrood.ormatic.utils import leaf_types
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
 )
 from krrood.class_diagrams.class_diagram import ClassDiagram
-from krrood.probabilistic_knowledge.parameterizer import Parameterizer
-from .datastructures.dataclasses import ExecutionData, Context
-from .datastructures.enums import TaskStatus
-from .datastructures.pose import PoseStamped
-from .external_interfaces import giskard
-from .failures import PlanFailure
-from .has_parameters import leaf_types
-from .motion_executor import MotionExecutor
+from krrood.probabilistic_knowledge.parameterizer import (
+    DataAccessObjectParameterizer,
+    DataAccessObjectParameterizer,
+    Parameterization,
+    MatchParameterizer,
+)
+from pycram.datastructures.dataclasses import ExecutionData, Context
+from pycram.datastructures.enums import TaskStatus
+from pycram.datastructures.pose import PoseStamped
+from pycram.failures import PlanFailure
+from pycram.motion_executor import MotionExecutor
 
 if TYPE_CHECKING:
-    from .robot_plans import ActionDescription
-    from .designator import DesignatorDescription, DesignatorType
-    from .datastructures.partial_designator import PartialDesignator
-    from .robot_plans.actions.base import ActionType
-    from .robot_plans.motions.base import MotionType
+    from pycram.robot_plans import ActionDescription
+    from pycram.designator import DesignatorDescription, DesignatorType
+    from pycram.datastructures.partial_designator import PartialDesignator
+    from pycram.robot_plans.actions.base import ActionType
+    from pycram.robot_plans.motions.base import MotionType
 else:
     ActionType = TypeVar("ActionType")
     MotionType = TypeVar("MotionType")
@@ -618,48 +627,30 @@ class Plan:
         if cls.on_end_callback and action_type in cls.on_end_callback:
             cls.on_end_callback[action_type].remove(callback)
 
-
-    def parameterize_plan(self, classes: Optional[List[type]] = None) -> List[Any]:
+    def generate_parameterizations(
+        self,
+    ) -> List[Tuple[ActionDescription, Optional[Parameterization]]]:
         """
         Parameterize all parameters of a plan using the krrood parameterizer.
 
-        :param classes: List of classes to include in the ClassDiagram
-                        (including classes found on the plan nodes).
-        :return: List of random event variables created by the parameterizer.
+        :return: Dictionary mapping all Designator nodes to their parameterizations.
         """
 
         ordered_nodes = [self.root] + self.root.recursive_children
-        designator_nodes = []
-        all_classes = set(classes)
 
-        for node in ordered_nodes:
-            if not (isinstance(node, DesignatorNode) and node.designator_type):
-                continue
+        designator_nodes = [
+            node
+            for node in ordered_nodes
+            if isinstance(node, DesignatorNode) and node.designator_type is not None
+        ]
 
-            designator_nodes.append(node)
-            all_classes.add(node.designator_type)
-
-        class_diagram = ClassDiagram(list(all_classes))
-        parameterizer = Parameterizer()
-
-        all_variables = []
-
-        for index, node in enumerate(designator_nodes):
-            try:
-                wrapped_class = class_diagram.get_wrapped_class(node.designator_type)
-            except ClassIsUnMappedInClassDiagram as e:
-                logger.error(
-                    f"Unmapped designator class for node {getattr(node, 'name', repr(node))} "
-                    f"(designator_index={index}, node_index={node.index}, {node.__class__.__name__}): {e}"
-                )
-                raise
-
-            prefix = f"{node.designator_type.__name__}_{index}"
-            variables = parameterizer.parameterize(wrapped_class, prefix=prefix)
-
-            all_variables.extend(variables)
-
-        return all_variables
+        result = []
+        for node in designator_nodes:
+            if isinstance(node, Match):
+                obj = MatchToInstanceTranslator(node)
+            else:
+                result.append((node, None))
+        return result
 
 
 def managed_node(func: Callable) -> Callable:
@@ -885,8 +876,7 @@ class PlanNode:
         """
         self.status = TaskStatus.INTERRUPTED
         logger.info(f"Interrupted node: {str(self)}")
-        if giskard.giskard_wrapper:
-            giskard.giskard_wrapper.interrupt()
+        # TODO: cancel giskard execution
 
     def resume(self):
         """

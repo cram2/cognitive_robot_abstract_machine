@@ -3,8 +3,8 @@ from numpy import nextafter
 
 from scipy.stats import gamma, norm
 
-from .distributions import *
-from ..utils import simple_interval_as_array
+from probabilistic_model.distributions.distributions import *
+from probabilistic_model.utils import simple_interval_as_array
 
 
 class GaussianDistribution(ContinuousDistribution):

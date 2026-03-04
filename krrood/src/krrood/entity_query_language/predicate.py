@@ -1,9 +1,15 @@
+"""
+Predicates and symbolic function utilities for the Entity Query Language.
+
+This module defines predicate classes for boolean checks and a decorator to build symbolic expressions
+from regular Python functions when variables are present.
+"""
+
 from __future__ import annotations
 
-import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import wraps, lru_cache
+from functools import wraps
 
 from typing_extensions import (
     Callable,
@@ -12,22 +18,14 @@ from typing_extensions import (
     Type,
     Tuple,
     ClassVar,
+    Sized,
     Dict,
-    List,
-    Iterable,
 )
 
-from .enums import PredicateType
-from .symbol_graph import (
-    WrappedInstance,
-    SymbolGraph,
-)
-from .symbolic import (
-    SymbolicExpression,
-    Variable,
-    _any_of_the_kwargs_is_a_variable,
-)
-from .utils import T
+from krrood.entity_query_language.utils import T, merge_args_and_kwargs
+from krrood.entity_query_language.core.variable import Variable, InstantiatedVariable
+from krrood.entity_query_language.core.base_expressions import Selectable
+from krrood.symbol_graph.symbol_graph import Symbol
 
 
 def symbolic_function(
@@ -48,25 +46,13 @@ def symbolic_function(
     def wrapper(*args, **kwargs) -> Optional[Any]:
         all_kwargs = merge_args_and_kwargs(function, args, kwargs)
         if _any_of_the_kwargs_is_a_variable(all_kwargs):
-            return Variable(
-                _name__=function.__name__,
+            return InstantiatedVariable(
                 _type_=function,
                 _kwargs_=all_kwargs,
-                _predicate_type_=PredicateType.DecoratedMethod,
             )
         return function(*args, **kwargs)
 
     return wrapper
-
-
-@dataclass(eq=False)
-class Symbol:
-    """Base class for things that can be cached in the symbol graph."""
-
-    def __new__(cls, *args, **kwargs):
-        instance = super().__new__(cls)
-        update_cache(instance)
-        return instance
 
 
 @dataclass(eq=False)
@@ -75,18 +61,19 @@ class Predicate(Symbol, ABC):
     The super predicate class that represents a filtration operation or asserts a relation.
     """
 
-    is_expensive: ClassVar[bool] = False
+    _cache_instances_: ClassVar[bool] = False
+    """
+    Predicates should not be cached for now as they are not persisting.
+    """
 
     def __new__(cls, *args, **kwargs):
         all_kwargs = merge_args_and_kwargs(
             cls.__init__, args, kwargs, ignore_first=True
         )
         if _any_of_the_kwargs_is_a_variable(all_kwargs):
-            return Variable(
+            return InstantiatedVariable(
                 _type_=cls,
-                _name__=cls.__name__,
                 _kwargs_=all_kwargs,
-                _predicate_type_=PredicateType.SubClassOfPredicate,
             )
         return super().__new__(cls)
 
@@ -97,6 +84,9 @@ class Predicate(Symbol, ABC):
         """
 
     def __bool__(self):
+        """
+        Bool casting a predicate evaluates it.
+        """
         return bool(self.__call__())
 
 
@@ -141,44 +131,18 @@ class HasTypes(HasType):
     """
 
 
-def update_cache(instance: Symbol):
+@symbolic_function
+def length(iterable: Sized) -> int:
     """
-    Updates the cache with the given instance of a symbolic type.
-
-    :param instance: The symbolic instance to be cached.
+    :param iterable: The iterable.
+    :return: The length of the iterable.
     """
-    if not isinstance(instance, Predicate):
-        SymbolGraph().add_node(WrappedInstance(instance))
-
-
-@lru_cache
-def get_function_argument_names(function: Callable) -> List[str]:
-    """
-    :param function: A function to inspect
-    :return: The argument names of the function
-    """
-    return list(inspect.signature(function).parameters.keys())
+    return len(iterable)
 
 
-def merge_args_and_kwargs(
-    function: Callable, args, kwargs, ignore_first: bool = False
-) -> Dict[str, Any]:
+def _any_of_the_kwargs_is_a_variable(bindings: Dict[str, Any]) -> bool:
     """
-    Merge the arguments and keyword-arguments of a function into a dict of keyword-arguments.
-
-    :param function: The function to get the argument names from
-    :param args: The arguments passed to the function
-    :param kwargs: The keyword arguments passed to the function
-    :param ignore_first: Rather to ignore the first argument or not.
-    Use this when `function` contains something like `self`
-    :return: The dict of assigned keyword-arguments.
+    :param bindings: A kwarg like dict mapping strings to objects
+    :return: Rather any of the objects is a variable or not.
     """
-    starting_index = 1 if ignore_first else 0
-    all_kwargs = {
-        name: arg
-        for name, arg in zip(
-            get_function_argument_names(function)[starting_index:], args
-        )
-    }
-    all_kwargs.update(kwargs)
-    return all_kwargs
+    return any(isinstance(binding, Selectable) for binding in bindings.values())

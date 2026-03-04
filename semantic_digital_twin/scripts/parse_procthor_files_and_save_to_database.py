@@ -8,7 +8,7 @@ from typing import List
 import tqdm
 from sqlalchemy.orm import Session
 
-from krrood.entity_query_language.symbol_graph import SymbolGraph
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 from krrood.ormatic.dao import to_dao
 from krrood.ormatic.utils import drop_database, create_engine
 from krrood.utils import recursive_subclasses

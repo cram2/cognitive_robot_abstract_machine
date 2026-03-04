@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 import inspect
-from abc import ABC
 from dataclasses import dataclass, field
 from typing import get_type_hints
 
-from krrood.entity_query_language.entity import entity, contains, variable
-from krrood.entity_query_language.entity_result_processors import an, the
+from krrood.entity_query_language.factories import entity, variable, contains, an
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -22,11 +20,11 @@ from typing_extensions import (
     TypeVar,
 )
 
-from .datastructures.dataclasses import Context
-from .datastructures.partial_designator import PartialDesignator
-from .datastructures.pose import PoseStamped
-from .plan import Plan, PlanNode
-from .utils import bcolors
+from pycram.datastructures.dataclasses import Context
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.datastructures.pose import PoseStamped
+from pycram.plan import Plan, PlanNode
+from pycram.utils import bcolors
 
 
 class DesignatorError(Exception):

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from krrood.ormatic.dao import to_dao
-from krrood.ormatic.utils import create_engine
+from krrood.ormatic.utils import create_engine, drop_database
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
@@ -11,12 +11,13 @@ from pycram.datastructures.enums import (
     ApproachDirection,
     Arms,
     VerticalAlignment,
+    TaskStatus,
 )
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.pose import PyCramPose, PoseStamped
 from pycram.language import SequentialPlan, ParallelPlan
 from pycram.orm.ormatic_interface import *
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.robot_plans import (
     MoveTorsoActionDescription,
     ParkArmsAction,
@@ -35,17 +36,24 @@ from pycram.robot_plans import (
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState, GripperState
 
+# The alternative mapping needs to be imported for the stretch to work properly
+import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
+import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
+
 engine = create_engine("sqlite:///:memory:")
 
 
 @pytest.fixture(scope="function")
-def database():
+def pycram_testing_session():
+    engine = create_engine("sqlite:///:memory:")
+    # drop_database(engine)
     session = Session(engine)
     Base.metadata.create_all(bind=session.bind)
     yield session
-    Base.metadata.drop_all(session.bind)
+    drop_database(session.bind)
     session.expunge_all()
     session.close()
+    engine.dispose()
 
 
 @pytest.fixture()
@@ -82,8 +90,8 @@ def test_simple_plan(immutable_model_world):
     return plan
 
 
-def test_pose(database, test_simple_plan):
-    session = database
+def test_pose(pycram_testing_session, test_simple_plan):
+    session = pycram_testing_session
     plan = test_simple_plan
     dao = to_dao(plan)
     session.add(dao)
@@ -93,8 +101,8 @@ def test_pose(database, test_simple_plan):
     assert all([r.position is not None and r.orientation is not None for r in result])
 
 
-def test_action_to_pose(database, test_simple_plan):
-    session = database
+def test_action_to_pose(pycram_testing_session, test_simple_plan):
+    session = pycram_testing_session
     plan = test_simple_plan
     dao = to_dao(plan)
     session.add(dao)
@@ -114,8 +122,8 @@ def test_action_to_pose(database, test_simple_plan):
     )
 
 
-def test_pose_vs_pose_stamped(database, test_simple_plan):
-    session = database
+def test_pose_vs_pose_stamped(pycram_testing_session, test_simple_plan):
+    session = pycram_testing_session
     plan = test_simple_plan
     dao = to_dao(plan)
     session.add(dao)
@@ -135,8 +143,8 @@ def test_pose_vs_pose_stamped(database, test_simple_plan):
     assert pose_stamped_result[0].pose_id == pose_result[0].database_id
 
 
-def test_pose_creation(database, test_simple_plan):
-    session = database
+def test_pose_creation(pycram_testing_session, test_simple_plan):
+    session = pycram_testing_session
     plan = test_simple_plan
     pose = PyCramPose()
     pose.position.x = 1.0
@@ -167,8 +175,8 @@ def test_pose_creation(database, test_simple_plan):
 # ORM Action Designator Tests
 
 
-def test_code_designator_type(database, mutable_model_world):
-    session = database
+def test_code_designator_type(pycram_testing_session, mutable_model_world):
+    session = pycram_testing_session
     world, robot_view, context = mutable_model_world
     action = SequentialPlan(
         context,
@@ -190,8 +198,8 @@ def test_code_designator_type(database, mutable_model_world):
     # assertEqual(result[1].action.dtype, MoveMotion.__name__)
 
 
-def test_inheritance(database, mutable_model_world):
-    session = database
+def test_inheritance(pycram_testing_session, mutable_model_world):
+    session = pycram_testing_session
     world, robot_view, context = mutable_model_world
     with simulated_robot:
         sp = SequentialPlan(
@@ -221,16 +229,18 @@ def test_inheritance(database, mutable_model_world):
             ),
         )
         sp.perform()
+
     dao = to_dao(sp)
     session.add(dao)
     session.commit()
 
-    result = session.scalars(select(ActionDescriptionDAO)).all()
-    assert len(result) == 7
+    plan_row = session.scalars(select(SequentialPlanDAO)).first()
+
+    assert len(plan_row.nodes) == len(sp.nodes)
 
 
-def test_parkArmsAction(database, mutable_model_world):
-    session = database
+def test_parkArmsAction(pycram_testing_session, mutable_model_world):
+    session = pycram_testing_session
     world, robot_view, context = mutable_model_world
     action = SequentialPlan(context, ParkArmsActionDescription(Arms.BOTH))
     with simulated_robot:
@@ -243,8 +253,8 @@ def test_parkArmsAction(database, mutable_model_world):
     assert type(result[0]).original_class() == ParkArmsAction
 
 
-def test_transportAction(database, mutable_simple_pr2_world):
-    session = database
+def test_transportAction(pycram_testing_session, mutable_simple_pr2_world):
+    session = pycram_testing_session
     world, robot_view, context = mutable_simple_pr2_world
     action = SequentialPlan(
         Context.from_world(world),
@@ -268,8 +278,8 @@ def test_transportAction(database, mutable_simple_pr2_world):
     assert result is not None
 
 
-def test_pickUpAction(database, mutable_model_world):
-    session = database
+def test_pickUpAction(pycram_testing_session, mutable_model_world):
+    session = pycram_testing_session
     world, robot_view, context = mutable_model_world
     with simulated_robot:
         sp = SequentialPlan(
@@ -305,8 +315,8 @@ def test_pickUpAction(database, mutable_model_world):
     result = session.scalars(select(PickUpActionDAO)).first()
 
 
-def test_setGripperAction(database, mutable_model_world):
-    session = database
+def test_setGripperAction(pycram_testing_session, mutable_model_world):
+    session = pycram_testing_session
     world, robot_view, context = mutable_model_world
     action = SequentialPlan(
         context, SetGripperActionDescription(Arms.LEFT, GripperState.OPEN)
@@ -321,8 +331,8 @@ def test_setGripperAction(database, mutable_model_world):
     assert result[0].motion == GripperState.OPEN
 
 
-def test_open_and_closeAction(database, mutable_model_world):
-    session = database
+def test_open_and_closeAction(pycram_testing_session, mutable_model_world):
+    session = pycram_testing_session
     world, robot_view, context = mutable_model_world
     with simulated_robot:
         sp = SequentialPlan(
@@ -359,8 +369,8 @@ def test_open_and_closeAction(database, mutable_model_world):
     # assertEqual(close_result[0].object.name, "handle_cab10_t")
 
 
-def test_parallel_plan(database, mutable_model_world):
-    session = database
+def test_parallel_plan(pycram_testing_session, mutable_model_world):
+    session = pycram_testing_session
     world, robot_view, context = mutable_model_world
     plan = ParallelPlan(
         context,
@@ -370,6 +380,9 @@ def test_parallel_plan(database, mutable_model_world):
 
     with simulated_robot:
         plan.perform()
+
+    for node in plan.nodes:
+        assert node.status == TaskStatus.SUCCEEDED
 
     dao = to_dao(plan)
     session.add(dao)
@@ -421,8 +434,8 @@ def complex_plan(mutable_model_world):
     return sp
 
 
-def test_exec_creation(database, immutable_model_world):
-    session = database
+def test_exec_creation(pycram_testing_session, immutable_model_world):
+    session = pycram_testing_session
     world, robot_view, context = immutable_model_world
     plan = SequentialPlan(
         context,
@@ -441,8 +454,8 @@ def test_exec_creation(database, immutable_model_world):
     assert exec_data is not None
 
 
-def test_exec_data_pose(database, immutable_model_world):
-    session = database
+def test_exec_data_pose(pycram_testing_session, immutable_model_world):
+    session = pycram_testing_session
     world, robot_view, context = immutable_model_world
     plan = SequentialPlan(
         context,
@@ -458,7 +471,7 @@ def test_exec_data_pose(database, immutable_model_world):
     dao = to_dao(plan)
     session.add(dao)
     session.commit()
-    exec_data = session.scalars(select(ExecutionDataDAO)).all()[0]
+    exec_data = session.scalars(select(ExecutionDataDAO)).all()[-1]
     assert exec_data is not None
     assert (
         [1.5, 2.5, 0]
@@ -479,8 +492,8 @@ def test_exec_data_pose(database, immutable_model_world):
     )
 
 
-def test_manipulated_body_pose(database, complex_plan):
-    session = database
+def test_manipulated_body_pose(pycram_testing_session, complex_plan):
+    session = pycram_testing_session
     plan = complex_plan
     dao = to_dao(plan)
     session.add(dao)
@@ -527,8 +540,8 @@ def test_manipulated_body_pose(database, complex_plan):
     )
 
 
-def test_manipulated_body(database, complex_plan):
-    session = database
+def test_manipulated_body(pycram_testing_session, complex_plan):
+    session = pycram_testing_session
     plan = complex_plan
 
     dao = to_dao(plan)
@@ -545,9 +558,9 @@ def test_manipulated_body(database, complex_plan):
     assert milk.name.name == "milk.stl"
 
 
-def test_state(database, immutable_model_world):
+def test_state(pycram_testing_session, immutable_model_world):
     world, robot_view, context = immutable_model_world
-    session = database
+    session = pycram_testing_session
     plan = SequentialPlan(
         context,
         NavigateActionDescription(
@@ -571,8 +584,8 @@ def test_state(database, immutable_model_world):
 # Relational Algebra Tests
 
 
-def test_filtering(database, mutable_model_world):
-    session = database
+def test_filtering(pycram_testing_session, mutable_model_world):
+    session = pycram_testing_session
     world, robot_view, context = mutable_model_world
     with simulated_robot:
         sp = SequentialPlan(

@@ -12,20 +12,19 @@ from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
 )
-from ....datastructures.enums import AxisIdentifier, Arms
-from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import Vector3Stamped
-from ....failures import TorsoGoalNotReached, ConfigurationNotReached
-from ....has_parameters import has_parameters
-from ....language import SequentialPlan
-from ....robot_description import ViewManager
-from ....robot_plans.actions.base import ActionDescription
-from ....robot_plans.motions.gripper import MoveGripperMotion
-from ....robot_plans.motions.robot_body import MoveJointsMotion
-from ....validation.goal_validator import create_multiple_joint_goal_validator
+from pycram.datastructures.enums import AxisIdentifier, Arms
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.datastructures.pose import Vector3Stamped
+from pycram.datastructures.trajectory import PoseTrajectory
+from pycram.failures import TorsoGoalNotReached, ConfigurationNotReached
+from pycram.language import SequentialPlan
+from pycram.view_manager import ViewManager
+from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.motions.gripper import MoveGripperMotion, MoveTCPWaypointsMotion
+from pycram.robot_plans.motions.robot_body import MoveJointsMotion
+from pycram.validation.goal_validator import create_multiple_joint_goal_validator
 
 
-@has_parameters
 @dataclass
 class MoveTorsoAction(ActionDescription):
     """
@@ -80,7 +79,6 @@ class MoveTorsoAction(ActionDescription):
         )
 
 
-@has_parameters
 @dataclass
 class SetGripperAction(ActionDescription):
     """
@@ -124,7 +122,6 @@ class SetGripperAction(ActionDescription):
         )
 
 
-@has_parameters
 @dataclass
 class ParkArmsAction(ActionDescription):
     """
@@ -183,7 +180,6 @@ class ParkArmsAction(ActionDescription):
         return PartialDesignator[ParkArmsAction](cls, arm=arm)
 
 
-@has_parameters
 @dataclass
 class CarryAction(ActionDescription):
     """
@@ -308,7 +304,53 @@ class CarryAction(ActionDescription):
         )
 
 
+@dataclass
+class FollowTCPPathAction(ActionDescription):
+    """
+    Represents an action to move a robotic arm's TCP (Tool Center Point) along a
+    path of poses.
+    """
+
+    target_location: PoseTrajectory
+    """
+    Path poses for the TCP motion.
+    """
+
+    arm: Arms
+    """
+    Entry from the enum for which arm should be parked.
+    """
+
+    def execute(self) -> None:
+        target_locations = list(self.target_location.poses)
+
+        motion = MoveTCPWaypointsMotion(
+            target_locations,
+            self.arm,
+            allow_gripper_collision=True,
+        )
+
+        SequentialPlan(self.context, motion).perform()
+
+    def validate(
+        self,
+        result: Optional[Any] = None,
+        max_wait_time: timedelta = timedelta(seconds=2),
+    ):
+        pass
+
+    @classmethod
+    def description(
+        cls,
+        arm: Union[Iterable[Arms], Arms],
+        target_locations: Union[Iterable[PoseTrajectory], PoseTrajectory],
+    ) -> PartialDesignator[FollowTCPPathAction]:
+        return PartialDesignator(cls, target_location=target_locations, arm=arm)
+
+
+
 MoveTorsoActionDescription = MoveTorsoAction.description
 SetGripperActionDescription = SetGripperAction.description
 ParkArmsActionDescription = ParkArmsAction.description
 CarryActionDescription = CarryAction.description
+FollowTCPPathActionDescription = FollowTCPPathAction.description

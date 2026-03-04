@@ -332,6 +332,10 @@ class TestFloatVariable:
         with pytest.raises(HasFreeVariablesError):
             bool(v)
 
+    def test_create_with_resolver(self):
+        v = sm.FloatVariable.create_with_resolver("v", lambda: 42)
+        assert v.evaluate() == 42
+
     def test_float_casting(self):
         v = sm.FloatVariable(name="v")
         with pytest.raises(HasFreeVariablesError):

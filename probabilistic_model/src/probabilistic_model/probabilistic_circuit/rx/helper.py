@@ -1,6 +1,6 @@
-from .probabilistic_circuit import *
-from ...distributions import UniformDistribution, SymbolicDistribution, IntegerDistribution, GaussianDistribution
-from ...utils import MissingDict
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
+from probabilistic_model.distributions import UniformDistribution, SymbolicDistribution, IntegerDistribution, GaussianDistribution
+from probabilistic_model.utils import MissingDict
 
 
 def uniform_measure_of_event(event: Event) -> ProbabilisticCircuit:

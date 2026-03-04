@@ -11,7 +11,7 @@ from ..dataset.example_classes import (
     Orientation,
     Pose,
     Positions,
-    PositionTypeWrapper,
+    PositionTypeWrapper, GenericClassAssociation,
 )
 
 
@@ -40,6 +40,7 @@ def test_builtin_optional():
     assert wrapped_field.is_optional
     assert not wrapped_field.is_container
     assert wrapped_field.is_builtin_type
+    assert not wrapped_field.is_instantiation_of_generic_class
 
 
 def test_one_to_one_relationship():
@@ -62,6 +63,7 @@ def test_one_to_many_relationship():
     assert wrapped_field.container_type is list
     assert wrapped_field.contained_type is Position
     assert not wrapped_field.is_builtin_type
+    assert not wrapped_field.is_instantiation_of_generic_class
 
 
 def test_is_type_type():
@@ -70,3 +72,18 @@ def test_is_type_type():
         wrapped_class, get_field_by_name(PositionTypeWrapper, "position_type")
     )
     assert wrapped_field.is_type_type
+
+def test_is_specialized_generic():
+    wrapped_class = WrappedClass(clazz=GenericClassAssociation)
+    associated_value = WrappedField(wrapped_class, get_field_by_name(GenericClassAssociation, "associated_value"))
+    assert associated_value.is_instantiation_of_generic_class
+    associated_value_not_parametrized = WrappedField(wrapped_class, get_field_by_name(GenericClassAssociation, "associated_value_not_parametrized"))
+    assert not associated_value_not_parametrized.is_instantiation_of_generic_class
+
+    associated_value_list = WrappedField(wrapped_class, get_field_by_name(GenericClassAssociation, "associated_value_list"))
+    assert associated_value_list.is_container
+    assert associated_value_list.is_instantiation_of_generic_class
+
+    associated_value_not_parametrized_list = WrappedField(wrapped_class, get_field_by_name(GenericClassAssociation, "associated_value_not_parametrized_list"))
+    assert associated_value_not_parametrized_list.is_container
+    assert not associated_value_not_parametrized_list.is_instantiation_of_generic_class

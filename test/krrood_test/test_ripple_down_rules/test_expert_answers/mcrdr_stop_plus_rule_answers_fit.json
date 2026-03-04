@@ -1,0 +1,80 @@
+[
+  {
+    "milk": "case.milk == 1.0"
+  },
+  {
+    "aquatic": "case.aquatic == 1.0"
+  },
+  {
+    "feathers": "case.feathers == 1.0"
+  },
+  {
+    "backbone": "case.backbone == 0.0",
+    "breathes": "case.breathes == 0.0"
+  },
+  {
+    "backbone": "case.backbone == 0.0",
+    "fins": "case.fins == 0.0"
+  },
+  {
+    "milk": "case.milk == 1.0"
+  },
+  {
+    "feathers": "case.feathers == 1.0"
+  },
+  {
+    "eggs": "case.eggs == 1.0",
+    "breathes": "case.breathes == 1.0",
+    "backbone": "case.backbone == 0.0",
+    "milk": "case.milk == 0.0",
+    "fins": "case.fins == 0.0",
+    "aquatic": "case.aquatic == 0.0"
+  },
+  {
+    "breathes": "case.breathes == 1.0",
+    "fins": "case.fins == 0.0"
+  },
+  {
+    "milk": "case.milk == 1.0"
+  },
+  {
+    "backbone": "case.backbone == 0.0",
+    "aquatic": "case.aquatic == 0.0"
+  },
+  {
+    "feathers": "case.feathers == 1.0"
+  },
+  {
+    "tail": "case.tail == 1.0"
+  },
+  {
+    "milk": "case.milk == 1.0"
+  },
+  {
+    "feathers": "case.feathers == 1.0"
+  },
+  {
+    "backbone": "case.backbone == 0.0"
+  },
+  {
+    "aquatic": "case.aquatic == 1.0",
+    "breathes": "case.breathes == 0.0",
+    "fins": "case.fins == 1.0"
+  },
+  {
+    "fins": "case.fins == 0.0"
+  },
+  {
+    "legs": "case.legs == 0.0"
+  },
+  {
+    "tail": "case.tail == 0.0"
+  },
+  {
+    "backbone": "case.backbone == 0.0",
+    "breathes": "case.breathes == 1.0",
+    "fins": "case.fins == 0.0",
+    "feathers": "case.feathers == 0.0",
+    "milk": "case.milk == 0.0"
+  }
+]

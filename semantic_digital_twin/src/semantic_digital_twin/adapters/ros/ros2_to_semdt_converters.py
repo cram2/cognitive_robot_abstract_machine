@@ -7,16 +7,27 @@ import geometry_msgs.msg as geometry_msgs
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker
 
-from .msg_converter import Ros2ToSemDTConverter, InputType, OutputType
-from ...spatial_types import (
+from semantic_digital_twin.adapters.ros.msg_converter import (
+    Ros2ToSemDTConverter,
+    InputType,
+    OutputType,
+)
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,
     Quaternion,
 )
-from ...spatial_types.spatial_types import Pose
-from ...world import World
-from ...world_description.geometry import Color, Box, Scale, Cylinder, Sphere, FileMesh
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.geometry import (
+    Color,
+    Box,
+    Scale,
+    Cylinder,
+    Sphere,
+    FileMesh,
+)
 
 
 @dataclass

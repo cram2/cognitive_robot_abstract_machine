@@ -6,8 +6,8 @@ from ortools.linear_solver import pywraplp
 from scipy.spatial import ConvexHull
 from typing_extensions import Self, Tuple
 
-from .interval import closed_open
-from .product_algebra import Event, SimpleEvent, Continuous
+from random_events.interval import closed_open
+from random_events.product_algebra import Event, SimpleEvent, Continuous
 
 
 class NoOptimalSolutionError(Exception):

@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 import numpy as np
 from sqlalchemy import select
 
-from krrood.ormatic.utils import create_engine
 from sqlalchemy.orm import sessionmaker
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -37,13 +36,6 @@ class WorldConfig(ABC):
     def setup_world(self, *args, **kwargs):
         """
         Implement this method to configure the initial world using it's self. methods.
-        """
-
-    @abc.abstractmethod
-    def setup_collision_config(self):
-        """
-        This method is called after the robot is connected to the controller and connections have
-        the controlled flag.
         """
 
 

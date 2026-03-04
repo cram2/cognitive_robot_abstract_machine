@@ -7,18 +7,17 @@ parts:
 - caption: Entity Query Language
   chapters:
     - file: eql/intro
-      sections:
-        - file: eql/writing_queries
-        - file: eql/result_quantifiers
-        - file: eql/result_processors
-        - file: eql/logical_operators
-        - file: eql/comparators
-        - file: eql/domain_mapping
-        - file: eql/predicate_and_symbolic_function
-        - file: eql/cache
-        - file: eql/match
-        - file: eql/writing_rule_trees
-        - file: eql/eql_for_sql_experts
+    - file: eql/writing_queries
+    - file: eql/result_quantifiers
+    - file: eql/result_processors
+    - file: eql/logical_operators
+    - file: eql/comparators
+    - file: eql/domain_mapping
+    - file: eql/predicate_and_symbolic_function
+    - file: eql/cache
+    - file: eql/match
+    - file: eql/writing_rule_trees
+    - file: eql/eql_for_sql_experts
 - caption: ORMatic
   chapters:
     - file: ormatic/intro
@@ -28,6 +27,20 @@ parts:
     - file: ormatic/eql_for_ormatic
     - file: ormatic/tips_and_tricks
     - file: ormatic/json
+- caption: Ripple Down Rules
+  chapters:
+    - file: ripple_down_rules/intro
+    - file: ripple_down_rules/propositional_example_tutorial
+    - file: ripple_down_rules/relational_example_tutorial
+    - file: ripple_down_rules/relational_example_with_decorator_tutorial
+    - file: ripple_down_rules/test_driven_rdr_fitting_tutorial
+- caption: rustworkx_utils
+  chapters:
+    - file: rustworkx_utils/visualize_graph
+
+- caption: Miscellaneous
+  chapters:
+    - file: parametrizer
 
 - caption: References
   chapters:

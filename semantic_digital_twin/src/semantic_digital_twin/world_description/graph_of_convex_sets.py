@@ -3,11 +3,11 @@ from __future__ import annotations
 import logging
 
 import matplotlib.pyplot as plt
-from .geometry import BoundingBox
-from .shape_collection import BoundingBoxCollection
-from ..datastructures.variables import SpatialVariables
-from ..world import World
-from .world_entity import SemanticAnnotation, SemanticEnvironmentAnnotation
+from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.shape_collection import BoundingBoxCollection
+from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import SemanticAnnotation, SemanticEnvironmentAnnotation
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ from random_events.product_algebra import SimpleEvent, Event
 from rtree import index
 from sortedcontainers import SortedSet
 
-from ..spatial_types import Point3, HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import Point3, HomogeneousTransformationMatrix
 
 
 class PoseOccupiedError(Exception):

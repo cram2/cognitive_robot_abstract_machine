@@ -1,282 +1,257 @@
 from __future__ import annotations
-import pytest
-from random_events.set import Set
-from random_events.variable import Continuous, Integer, Symbolic
-from random_events.product_algebra import Event, SimpleEvent
-from krrood.class_diagrams.class_diagram import ClassDiagram
-from krrood.probabilistic_knowledge.parameterizer import Parameterizer
-from pycram.datastructures.enums import Arms
-from pycram.robot_plans import MoveTorsoAction
-from pycram.robot_plans.actions.core.navigation import NavigateAction
-from pycram.robot_plans.actions.core.pick_up import PickUpAction
-from pycram.robot_plans.actions.core.placing import PlaceAction
-from pycram.datastructures.grasp import GraspDescription
 
-from pycram.datastructures.pose import (
-    PoseStamped,
-    PyCramPose,
-    PyCramVector3,
-    PyCramQuaternion,
-    Header,
+import datetime
+
+from krrood.entity_query_language.factories import variable_from, variable
+from krrood.ormatic.dao import to_dao
+from krrood.probabilistic_knowledge.object_access_variable import ObjectAccessVariable
+from krrood.probabilistic_knowledge.parameterizer import (
+    DataAccessObjectParameterizer,
+    Parameterization,
 )
-
-from semantic_digital_twin.datastructures.definitions import TorsoState
-from test.krrood_test.dataset.example_classes import (
+from random_events.set import Set
+from random_events.variable import Continuous, Symbolic
+from ..dataset.example_classes import (
     Position,
-    Orientation,
     Pose,
+    Orientation,
+    Positions,
+    ListOfEnum,
+    TestEnum,
     Atom,
     Element,
 )
 
 
-@pytest.fixture
-def parameterizer() -> Parameterizer:
-    """
-    Fixture for the Parameterizer instance.
-    """
-    return Parameterizer()
-
-
-def test_parameterize_position(parameterizer: Parameterizer):
+def test_parameterize_position():
     """
     Test parameterization of the Position class.
     """
-    class_diagram = ClassDiagram([Position])
-    wrapped_position = class_diagram.get_wrapped_class(Position)
-    variables = parameterizer(wrapped_position)
+    position = Position(..., ..., ...)
+    dao = to_dao(position)
+    position_dao_variable = variable(type(dao), [dao])
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
     expected_variables = [
-        Continuous("Position.x"),
-        Continuous("Position.y"),
-        Continuous("Position.z"),
+        ObjectAccessVariable(
+            Continuous(position_dao_variable.x._name_),
+            position_dao_variable.x,
+        ),
+        ObjectAccessVariable(
+            Continuous(position_dao_variable.y._name_),
+            position_dao_variable.y,
+        ),
+        ObjectAccessVariable(
+            Continuous(position_dao_variable.z._name_),
+            position_dao_variable.z,
+        ),
     ]
-    assert variables == expected_variables
+    assert parameterization.variables == expected_variables
 
 
-def test_parameterize_orientation(parameterizer: Parameterizer):
+def test_parameterize_position_skip_none_field():
+    """
+    Test parameterization of the Position class.
+    """
+    position = Position(None, None, None)
+    dao = to_dao(position)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
+    assert parameterization.variables == []
+
+
+def test_parameterize_orientation_mixed_none():
     """
     Test parameterization of the Orientation class.
     """
-    class_diagram = ClassDiagram([Orientation])
-    wrapped_orientation = class_diagram.get_wrapped_class(Orientation)
-    variables = parameterizer(wrapped_orientation)
+    orientation = Orientation(..., None, ..., None)
+    dao = to_dao(orientation)
+    orientation_dao_variable = variable(type(dao), [dao])
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
+
     expected_variables = [
-        Continuous("Orientation.x"),
-        Continuous("Orientation.y"),
-        Continuous("Orientation.z"),
-        Continuous("Orientation.w"),
+        ObjectAccessVariable(
+            Continuous(orientation_dao_variable.x._name_),
+            orientation_dao_variable.x,
+        ),
+        ObjectAccessVariable(
+            Continuous(orientation_dao_variable.z._name_),
+            orientation_dao_variable.z,
+        ),
     ]
 
-    assert variables == expected_variables
+    assert parameterization.variables == expected_variables
 
 
-def test_parameterize_pose(parameterizer: Parameterizer):
+def test_parameterize_pose():
     """
     Test parameterization of the Pose class.
     """
-    class_diagram = ClassDiagram([Pose, Position, Orientation])
-    wrapped_pose = class_diagram.get_wrapped_class(Pose)
-    variables = parameterizer(wrapped_pose)
+    pose = Pose(
+        position=Position(..., ..., ...),
+        orientation=Orientation(..., ..., ..., None),
+    )
+
+    dao = to_dao(pose)
+    pose_dao_variable = variable(type(dao), [dao])
+
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
     expected_variables = [
-        Continuous("Pose.position.x"),
-        Continuous("Pose.position.y"),
-        Continuous("Pose.position.z"),
-        Continuous("Pose.orientation.x"),
-        Continuous("Pose.orientation.y"),
-        Continuous("Pose.orientation.z"),
-        Continuous("Pose.orientation.w"),
+        ObjectAccessVariable(
+            Continuous(pose_dao_variable.position.x._name_),
+            pose_dao_variable.position.x,
+        ),
+        ObjectAccessVariable(
+            Continuous(pose_dao_variable.position.y._name_),
+            pose_dao_variable.position.y,
+        ),
+        ObjectAccessVariable(
+            Continuous(pose_dao_variable.position.z._name_),
+            pose_dao_variable.position.z,
+        ),
+        ObjectAccessVariable(
+            Continuous(pose_dao_variable.orientation.x._name_),
+            pose_dao_variable.orientation.x,
+        ),
+        ObjectAccessVariable(
+            Continuous(pose_dao_variable.orientation.y._name_),
+            pose_dao_variable.orientation.y,
+        ),
+        ObjectAccessVariable(
+            Continuous(pose_dao_variable.orientation.z._name_),
+            pose_dao_variable.orientation.z,
+        ),
     ]
 
-    assert variables == expected_variables
+    assert parameterization.variables == expected_variables
 
 
-def test_parameterize_atom(parameterizer: Parameterizer):
-    """
-    Test parameterization of the Atom class.
-    """
-    class_diagram = ClassDiagram([Atom, Element])
-    wrapped_atom = class_diagram.get_wrapped_class(Atom)
-    variables = parameterizer(wrapped_atom)
-    expected_variables = [
-        Symbolic("Atom.element", Set.from_iterable(Element)),
-        Integer("Atom.type"),
-        Continuous("Atom.charge"),
-    ]
-
-    assert [(type(v), v.name) for v in variables] == [
-        (type(v), v.name) for v in expected_variables
-    ]
-
-
-def test_create_fully_factorized_distribution(parameterizer: Parameterizer):
+def test_create_fully_factorized_distribution():
     """
     Test for a fully factorized distribution.
     """
     variables = [
-        Continuous("Variable.A"),
-        Continuous("Variable.B"),
+        ObjectAccessVariable(Continuous("Variable.A"), variable_from([])),
+        ObjectAccessVariable(Continuous("Variable.B"), variable_from([])),
     ]
-    probabilistic_circuit = parameterizer.create_fully_factorized_distribution(
-        variables
-    )
+    parameterization = Parameterization(variables)
+    probabilistic_circuit = parameterization.create_fully_factorized_distribution()
     assert len(probabilistic_circuit.variables) == 2
-    assert set(probabilistic_circuit.variables) == set(variables)
+    assert set(probabilistic_circuit.variables) == set(
+        parameterization.random_events_variables
+    )
 
 
-def test_parameterize_movetorse_navigate(parameterizer: Parameterizer):
+def test_parameterize_object_with_given_values():
     """
-    Test parameterization of a potential robot plan consisting of: MoveTorso - Navigate - MoveTorso.
-
-    This test verifies:
-    1. Parameterization of simple robot action plan
-    2. Sampling from the constrained distribution and validation of constraints.
+    Test parameterization of a single object via Parameterizer.parameterize.
     """
+    position = Position(x=1.0, y=2.0, z=3.0)
+    dao = to_dao(position)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
 
-    plan_classes = [
-        MoveTorsoAction, NavigateAction, PoseStamped, PyCramPose,
-        PyCramVector3, PyCramQuaternion, Header
+    [x, y, z] = parameterization.variables
+
+    result_by_hand = {
+        x: 1.0,
+        y: 2.0,
+        z: 3.0,
+    }
+
+    assert parameterization.assignments == result_by_hand
+
+
+def test_parameterize_nested_object():
+    """
+    Test parameterization of a nested object via Parameterizer.parameterize.
+    """
+    pose = Pose(
+        position=Position(x=1.0, y=2.0, z=3.0),
+        orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
+    )
+    dao = to_dao(pose)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
+
+    [px, py, pz, ox, oy, oz, ow] = parameterization.variables
+
+    result_by_hand = {
+        px: 1.0,
+        py: 2.0,
+        pz: 3.0,
+        ox: 0.0,
+        oy: 0.0,
+        oz: 0.0,
+        ow: 1.0,
+    }
+    assert parameterization.assignments == result_by_hand
+
+
+def test_one_to_many_and_collection_of_builtins():
+    p = Positions([Position(1, 2, 3), Position(4, 5, 6)], ["a", ...])
+    dao = to_dao(p)
+    parameters = DataAccessObjectParameterizer(dao).parameterize()
+
+    [p0_x, p0_y, p0_z, p1_x, p1_y, p1_z] = parameters.variables
+
+    result_by_hand = {
+        p0_x: 1.0,
+        p0_y: 2.0,
+        p0_z: 3.0,
+        p1_x: 4.0,
+        p1_y: 5.0,
+        p1_z: 6.0,
+    }
+
+    assert parameters.assignments == result_by_hand
+
+
+def test_symbolic_variables():
+    obj = ListOfEnum([..., ...])
+    dao = to_dao(obj)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
+
+    test_enum_set = Set.from_iterable(TestEnum)
+    assert parameterization.random_events_variables == [
+        Symbolic("ListOfEnumDAO.list_of_enum[0]", test_enum_set),
+        Symbolic("ListOfEnumDAO.list_of_enum[1]", test_enum_set),
     ]
-    class_diagram = ClassDiagram(plan_classes)
-    wrapped_move_torso = class_diagram.get_wrapped_class(MoveTorsoAction)
-    wrapped_navigate = class_diagram.get_wrapped_class(NavigateAction)
-
-    movetorso_variables1 = parameterizer.parameterize(wrapped_move_torso, prefix="MoveTorsoAction_1")
-    navigate_variables = parameterizer(wrapped_navigate)
-    movetorso_variables2 = parameterizer.parameterize(wrapped_move_torso, prefix="MoveTorsoAction_2")
-
-    all_variables = movetorso_variables1 + navigate_variables + movetorso_variables2
-    variables = {v.name: v for v in all_variables}
-
-    expected_names = {
-        "MoveTorsoAction_1.torso_state", "MoveTorsoAction_2.torso_state",
-        "NavigateAction.keep_joint_states", "NavigateAction.target_location.header.sequence",
-        "NavigateAction.target_location.pose.position.x", "NavigateAction.target_location.pose.position.y",
-        "NavigateAction.target_location.pose.position.z", "NavigateAction.target_location.pose.orientation.x",
-        "NavigateAction.target_location.pose.orientation.y", "NavigateAction.target_location.pose.orientation.z",
-        "NavigateAction.target_location.pose.orientation.w",
-    }
-
-    assert set(variables.keys()) == expected_names
-
-    probabilistic_circuit = parameterizer.create_fully_factorized_distribution(all_variables)
-
-    expected_distribution_names = expected_names - {"NavigateAction.target_location.header.sequence"}
-    assert {v.name for v in probabilistic_circuit.variables} == expected_distribution_names
-
-    torso_1 = variables["MoveTorsoAction_1.torso_state"]
-    torso_2 = variables["MoveTorsoAction_2.torso_state"]
-
-    consistency_events = [SimpleEvent({torso_1: [state], torso_2: [state]}) for state in TorsoState]
-    restricted_distribution, _ = probabilistic_circuit.truncated(Event(*consistency_events))
-    restricted_distribution.normalize()
-
-    pose_constraints = {
-        variables["NavigateAction.target_location.pose.position.x"]: 1.5,
-        variables["NavigateAction.target_location.pose.position.y"]: -2.0,
-        variables["NavigateAction.target_location.pose.orientation.x"]: 0.0,
-        variables["NavigateAction.target_location.pose.orientation.y"]: 0.0,
-        variables["NavigateAction.target_location.pose.orientation.z"]: 0.0,
-        variables["NavigateAction.target_location.pose.orientation.w"]: 1.0,
-    }
-    
-    final_distribution, _ = restricted_distribution.conditional(pose_constraints)
-    final_distribution.normalize()
-
-    target_x, target_y = 1.5, -2.0
-    nav_x = variables["NavigateAction.target_location.pose.position.x"]
-    nav_y = variables["NavigateAction.target_location.pose.position.y"]
-
-    for sample_values in final_distribution.sample(10):
-        sample = dict(zip(final_distribution.variables, sample_values))
-        assert sample[torso_1] == sample[torso_2]
-        assert sample[nav_x] == target_x
-        assert sample[nav_y] == target_y
+    assert parameterization.assignments_for_conditioning == {}
 
 
-def test_parameterize_pickup_navigate_place(parameterizer: Parameterizer):
-    """
-    Test parameterization of a potential robot plan consisting of: PickUp - Navigate - Place.
-
-    This test verifies:
-    1. Parameterization of pick up, navigate, placing robot action plan
-    2. Creating and sampling from a constrained distribution over the plan variables.
-    """
-
-    plan_classes = [
-        PickUpAction, NavigateAction, PlaceAction,
-        GraspDescription, PoseStamped, PyCramPose,
-        PyCramVector3, PyCramQuaternion, Header
+def test_not_follow_none_relationships():
+    p = Pose(position=Position(..., ..., ...), orientation=None)
+    dao = to_dao(p)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
+    variables = [
+        Continuous("PoseDAO.position.x"),
+        Continuous("PoseDAO.position.y"),
+        Continuous("PoseDAO.position.z"),
     ]
-    class_diagram = ClassDiagram(plan_classes)
 
-    wrapped_pickup = class_diagram.get_wrapped_class(PickUpAction)
-    wrapped_navigate = class_diagram.get_wrapped_class(NavigateAction)
-    wrapped_place = class_diagram.get_wrapped_class(PlaceAction)
-
-    pickup_variables = parameterizer.parameterize(wrapped_pickup, prefix="PickUpAction")
-    navigate_variables = parameterizer.parameterize(wrapped_navigate, prefix="NavigateAction")
-    place_variables = parameterizer.parameterize(wrapped_place, prefix="PlaceAction")
-
-    all_variables = pickup_variables + navigate_variables + place_variables
-    variables = {v.name: v for v in all_variables}
-
-    expected_variables = {
-        "PickUpAction.arm",
-        "PickUpAction.grasp_description.approach_direction",
-        "PickUpAction.grasp_description.vertical_alignment",
-        "PickUpAction.grasp_description.rotate_gripper",
-        "PickUpAction.grasp_description.manipulation_offset",
-        "NavigateAction.keep_joint_states",
-        "NavigateAction.target_location.header.sequence",
-        "NavigateAction.target_location.pose.position.x",
-        "NavigateAction.target_location.pose.position.y",
-        "NavigateAction.target_location.pose.position.z",
-        "NavigateAction.target_location.pose.orientation.x",
-        "NavigateAction.target_location.pose.orientation.y",
-        "NavigateAction.target_location.pose.orientation.z",
-        "NavigateAction.target_location.pose.orientation.w",
-        "PlaceAction.arm",
-        "PlaceAction.target_location.header.sequence",
-        "PlaceAction.target_location.pose.position.x",
-        "PlaceAction.target_location.pose.position.y",
-        "PlaceAction.target_location.pose.position.z",
-        "PlaceAction.target_location.pose.orientation.x",
-        "PlaceAction.target_location.pose.orientation.y",
-        "PlaceAction.target_location.pose.orientation.z",
-        "PlaceAction.target_location.pose.orientation.w",
-    }
-
-    assert set(variables.keys()) == expected_variables
-
-    probabilistic_distribution = parameterizer.create_fully_factorized_distribution(all_variables)
-
-    expected_distribution = expected_variables - {"NavigateAction.target_location.header.sequence", "PlaceAction.target_location.header.sequence"}
-    assert {v.name for v in probabilistic_distribution.variables} == expected_distribution
-
-    arm_pickup = variables["PickUpAction.arm"]
-    arm_place = variables["PlaceAction.arm"]
-
-    arm_consistency_events = [SimpleEvent({arm_pickup: [arm], arm_place: [arm]}) for arm in Arms]
-    restricted_dist, _ = probabilistic_distribution.truncated(Event(*arm_consistency_events))
-    restricted_dist.normalize()
-
-    nav_target_x = 2.0
-    nav_target_y = 3.0
-    pose_constraints = {
-        variables["NavigateAction.target_location.pose.position.x"]: nav_target_x,
-        variables["NavigateAction.target_location.pose.position.y"]: nav_target_y,
-    }
-
-    final_distribution, _ = restricted_dist.conditional(pose_constraints)
-    final_distribution.normalize()
-
-    v_nav_x = variables["NavigateAction.target_location.pose.position.x"]
-    v_nav_y = variables["NavigateAction.target_location.pose.position.y"]
-
-    for sample_values in final_distribution.sample(10):
-        sample = dict(zip(final_distribution.variables, sample_values))
-        assert sample[arm_pickup] == sample[arm_place]
-        assert sample[v_nav_x] == nav_target_x
-        assert sample[v_nav_y] == nav_target_y
+    assert parameterization.random_events_variables == variables
+    assert parameterization.assignments == {}
 
 
+def test_parameterize_object_from_sample():
+    obj = Atom(..., ..., ..., datetime.datetime.now())
+    dao = to_dao(obj)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
+    distribution = parameterization.create_fully_factorized_distribution()
+    sample = distribution.sample(1)[0]
+    sample_dict = parameterization.create_assignment_from_variables_and_sample(
+        distribution.variables, sample
+    )
+
+    parameterized_obj: Atom = parameterization.parameterize_object_with_sample(
+        obj, sample_dict
+    )
+    assert parameterized_obj.timestamp == obj.timestamp
+    assert isinstance(parameterized_obj.charge, float)
+    assert isinstance(parameterized_obj.element, Element)

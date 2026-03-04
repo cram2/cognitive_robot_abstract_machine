@@ -1906,7 +1906,7 @@
   <joint name="gripper_left_grasping_frame_joint" type="fixed">
     <parent link="gripper_left_link"/>
     <child link="gripper_left_grasping_frame"/>
-    <origin rpy="-1.5708 1.5708 0" xyz="0 0 -0.12"/>
+    <origin rpy="-1.5708 1.5708 0" xyz="0 0 -0.15"/>
   </joint>
   <link name="gripper_left_grasping_frame">
     <inertial>
@@ -2503,7 +2503,7 @@
   <joint name="gripper_right_grasping_frame_joint" type="fixed">
     <parent link="gripper_right_link"/>
     <child link="gripper_right_grasping_frame"/>
-    <origin rpy="-1.5708 1.5708 0" xyz="0 0 -0.12"/>
+    <origin rpy="-1.5708 1.5708 0" xyz="0 0 -0.15"/>
   </joint>
   <link name="gripper_right_grasping_frame">
     <inertial>
