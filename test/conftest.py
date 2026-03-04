@@ -5,11 +5,15 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
+
+from semantic_digital_twin.adapters.package_resolver import PathResolver
+from semantic_digital_twin.collision_checking.collision_matrix import (
+    MaxAvoidedCollisionsOverride,
+)
 from typing_extensions import Type
 
 from krrood.class_diagrams import ClassDiagram
-from krrood.entity_query_language.predicate import Symbol
-from krrood.entity_query_language.symbol_graph import SymbolGraph
+from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
@@ -26,7 +30,7 @@ from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.utils import rclpy_installed, tracy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -34,12 +38,17 @@ from semantic_digital_twin.world_description.connections import (
     DiffDrive,
     FixedConnection,
     Connection6DoF,
+    RevoluteConnection,
 )
-from semantic_digital_twin.world_description.geometry import Box, Scale, Cylinder
+from semantic_digital_twin.world_description.geometry import (
+    Box,
+    Scale,
+    Cylinder,
+    Sphere,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import (
     Body,
-    CollisionCheckingConfig,
 )
 
 ###############################
@@ -124,9 +133,6 @@ def cylinder_bot_world():
         robot = Body(
             name=PrefixedName("bot"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.1, height=0.5)]),
-            collision_config=CollisionCheckingConfig(
-                buffer_zone_distance=0.05, violated_distance=0.0, max_avoided_bodies=3
-            ),
         )
         robot_world.add_body(robot)
         MinimalRobot.from_world(robot_world)
@@ -148,11 +154,137 @@ def cylinder_bot_world():
         )
         world.add_connection(env_connection)
 
+        environment2 = Body(
+            name=PrefixedName("environment2"),
+            collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.5)]),
+        )
+        env_connection2 = FixedConnection(
+            parent=body,
+            child=environment2,
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                y=0.5
+            ),
+        )
+        world.add_connection(env_connection2)
+
         connection = OmniDrive.create_with_dofs(
             world=world, parent=body, child=robot_world.root
         )
         world.merge_world(robot_world, connection)
         connection.has_hardware_interface = True
+
+        world.collision_manager.max_avoided_bodies_rules.append(
+            MaxAvoidedCollisionsOverride(2, {robot})
+        )
+
+    return world
+
+
+@pytest.fixture()
+def self_collision_bot_world():
+    world = World()
+    with world.modify_world():
+        robot = Body(
+            name=PrefixedName("map"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+        l_shoulder = Body(
+            name=PrefixedName("l_shoulder"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+        l_tip = Body(
+            name=PrefixedName("l_tip"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+        l_thumb = Body(
+            name=PrefixedName("l_thumb"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+        r_shoulder = Body(
+            name=PrefixedName("r_shoulder"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+        r_tip = Body(
+            name=PrefixedName("r_tip"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+        r_thumb = Body(
+            name=PrefixedName("r_thumb"),
+            collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+            visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
+        )
+
+        world.add_connection(
+            RevoluteConnection.create_with_dofs(
+                parent=robot,
+                child=l_shoulder,
+                axis=Vector3.Z(),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.2, y=0.2
+                ),
+                world=world,
+            )
+        )
+        world.add_connection(
+            RevoluteConnection.create_with_dofs(
+                parent=l_shoulder,
+                child=l_tip,
+                axis=Vector3.Z(),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.2
+                ),
+                world=world,
+            )
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=l_tip,
+                child=l_thumb,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    y=-0.05, z=0.1
+                ),
+            )
+        )
+
+        world.add_connection(
+            RevoluteConnection.create_with_dofs(
+                parent=robot,
+                child=r_shoulder,
+                axis=Vector3.Z(),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.2,
+                    y=-0.2,
+                ),
+                world=world,
+            )
+        )
+        world.add_connection(
+            RevoluteConnection.create_with_dofs(
+                parent=r_shoulder,
+                child=r_tip,
+                axis=Vector3.Z(),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.2
+                ),
+                world=world,
+            )
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=r_tip,
+                child=r_thumb,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    y=0.05, z=0.1
+                ),
+            )
+        )
+        MinimalRobot.from_world(world)
 
     return world
 
@@ -164,9 +296,6 @@ def cylinder_bot_diff_world():
         robot = Body(
             name=PrefixedName("bot"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.1, height=0.5)]),
-            collision_config=CollisionCheckingConfig(
-                buffer_zone_distance=0.05, violated_distance=0.0, max_avoided_bodies=3
-            ),
         )
         robot_world.add_body(robot)
         MinimalRobot.from_world(robot_world)
@@ -201,12 +330,16 @@ def world_with_urdf_factory(
     urdf_path: str,
     robot_semantic_annotation: Type[AbstractRobot] | None,
     drive_connection_type: Type[OmniDrive | DiffDrive],
+    robot_starting_pose: HomogeneousTransformationMatrix | None = None,
+    urdf_path_resolver: PathResolver | None = None,
 ):
     """
     Builds this tree:
     map -> odom_combined -> "urdf tree"
     """
-    urdf_parser = URDFParser.from_file(file_path=urdf_path)
+    urdf_parser = URDFParser.from_file(
+        file_path=urdf_path, path_resolver=urdf_path_resolver
+    )
     world_with_urdf = urdf_parser.parse()
     if robot_semantic_annotation is not None:
         robot_semantic_annotation.from_world(world_with_urdf)
@@ -226,6 +359,9 @@ def world_with_urdf_factory(
             world=world_with_urdf,
         )
         world_with_urdf.add_connection(c_root_bf)
+        c_root_bf.has_hardware_interface = True
+        if robot_starting_pose is not None:
+            c_root_bf.origin = robot_starting_pose
 
     return world_with_urdf
 
@@ -234,6 +370,13 @@ def world_with_urdf_factory(
 def pr2_world_setup():
     urdf_dir = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     return world_with_urdf_factory(urdf_dir, PR2, OmniDrive)
+
+
+@pytest.fixture(scope="function")
+def pr2_world_copy(pr2_world_setup):
+    result = deepcopy(pr2_world_setup)
+    PR2.from_world(result)
+    return result
 
 
 @pytest.fixture(scope="session")
@@ -330,7 +473,9 @@ def apartment_world_setup():
             2.37, 1.8, 1.05, reference_frame=apartment_world.root
         ),
     )
-    milk_view = Milk(root=apartment_world.get_body_by_name("milk.stl"))
+    milk_view = Milk(
+        root=apartment_world.get_body_by_name("milk.stl"), _world=apartment_world
+    )
     with apartment_world.modify_world():
         apartment_world.add_semantic_annotation(milk_view)
 
@@ -533,9 +678,9 @@ def tiago_apartment_world(tiago_world, apartment_world_setup):
 def pr2_world_state_reset(pr2_world_setup):
     world = deepcopy(pr2_world_setup)
     PR2.from_world(world)
-    state = deepcopy(world.state.data)
+    state = world.state.data.copy()
     yield world
-    world.state.data = state
+    world.state.data[:] = state
 
 
 ###############################

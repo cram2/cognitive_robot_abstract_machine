@@ -3,9 +3,9 @@ from os.path import dirname
 
 from typing_extensions import Optional, List, Dict, Any, Type, Callable, ClassVar
 
-from ..world import World
-from ..world_description.world_entity import SemanticAnnotation
-from .reasoner import CaseReasoner
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
+from semantic_digital_twin.reasoning.reasoner import CaseReasoner
 
 
 @dataclass
@@ -69,10 +69,7 @@ class WorldReasoner:
         for attr_name, attr_value in self.reasoner.result.items():
             if isinstance(getattr(self.world, attr_name), list):
                 attr_value = list(attr_value)
-            if attr_name == "semantic_annotations":
-                for semantic_annotation in attr_value:
-                    self.world.add_semantic_annotation(semantic_annotation)
-            else:
+            if attr_name != "semantic_annotations":
                 setattr(self.world, attr_name, attr_value)
 
     def fit_semantic_annotations(

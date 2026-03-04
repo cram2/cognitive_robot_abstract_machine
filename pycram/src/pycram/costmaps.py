@@ -27,9 +27,9 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Tuple, List, Optional, Iterator, Callable
 
-from .datastructures.pose import PoseStamped
-from .datastructures.pose import TransformStamped
-from .tf_transformations import quaternion_from_euler, quaternion_multiply
+from pycram.datastructures.pose import PoseStamped
+from pycram.datastructures.pose import TransformStamped
+from pycram.tf_transformations import quaternion_from_euler, quaternion_multiply
 
 try:
     from nav_msgs.msg import OccupancyGrid, MapMetaData

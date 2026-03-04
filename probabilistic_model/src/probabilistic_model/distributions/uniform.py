@@ -1,7 +1,7 @@
 import numpy as np
 
-from .distributions import *
-from ..constants import PADDING_FACTOR_FOR_X_AXIS_IN_PLOT, EXPECTATION_TRACE_NAME, MODE_TRACE_NAME, MODE_TRACE_COLOR, \
+from probabilistic_model.distributions.distributions import *
+from probabilistic_model.constants import PADDING_FACTOR_FOR_X_AXIS_IN_PLOT, EXPECTATION_TRACE_NAME, MODE_TRACE_NAME, MODE_TRACE_COLOR, \
     PDF_TRACE_NAME, CDF_TRACE_NAME, CDF_TRACE_COLOR, PDF_TRACE_COLOR
 
 

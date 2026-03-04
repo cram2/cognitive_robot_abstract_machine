@@ -16,12 +16,18 @@ from krrood.symbolic_math.symbolic_math import (
     Scalar,
     VariableParameters,
 )
-from ..spatial_types import HomogeneousTransformationMatrix, RotationMatrix, Vector3
-from ..world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    RotationMatrix,
+    Vector3,
+)
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 if TYPE_CHECKING:
-    from ..world import World
-    from ..world_description.world_entity import KinematicStructureEntity
+    from semantic_digital_twin.world import World
+    from semantic_digital_twin.world_description.world_entity import (
+        KinematicStructureEntity,
+    )
 
 _large_value = np.inf
 """
@@ -242,7 +248,7 @@ class InverseKinematicsSolver:
         sense[-6:] = 5  # equality constraints
 
         # Solve QP
-        (xstar, fval, exitflag, info) = daqp.solve(
+        xstar, fval, exitflag, info = daqp.solve(
             qp_matrices.H,
             qp_matrices.g,
             qp_matrices.A,

@@ -2,7 +2,7 @@
 
 from enum import Enum, auto, IntEnum
 
-from ..failures import UnsupportedJointType
+from pycram.failures import UnsupportedJointType
 
 
 class AdjacentBodyMethod(Enum):

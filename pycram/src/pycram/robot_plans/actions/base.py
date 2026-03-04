@@ -6,8 +6,8 @@ from dataclasses import dataclass
 
 from typing_extensions import Any, Optional, Callable, TypeVar
 
-from ...designator import DesignatorDescription
-from ...failures import PlanFailure
+from pycram.designator import DesignatorDescription
+from pycram.failures import PlanFailure
 
 logger = logging.getLogger(__name__)
 

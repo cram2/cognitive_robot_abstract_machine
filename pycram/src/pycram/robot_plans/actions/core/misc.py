@@ -12,10 +12,10 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
-from ....perception import PerceptionQuery
-from ....datastructures.enums import DetectionTechnique, DetectionState
-from ....datastructures.partial_designator import PartialDesignator
-from ....robot_plans.actions.base import ActionDescription
+from pycram.perception import PerceptionQuery
+from pycram.datastructures.enums import DetectionTechnique, DetectionState
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.robot_plans.actions.base import ActionDescription
 
 
 @dataclass

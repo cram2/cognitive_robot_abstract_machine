@@ -10,22 +10,22 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
-from ...motions.gripper import MoveGripperMotion, MoveTCPMotion
-from ....config.action_conf import ActionConfig
-from ....datastructures.enums import (
+from pycram.robot_plans.motions.gripper import MoveGripperMotion, MoveTCPMotion
+from pycram.config.action_conf import ActionConfig
+from pycram.datastructures.enums import (
     Arms,
     MovementType,
     FindBodyInRegionMethod,
 )
-from ....datastructures.grasp import GraspDescription
-from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
-from ....failures import ObjectNotGraspedError
-from ....failures import ObjectNotInGraspingArea
-from ....language import SequentialPlan
-from ....view_manager import ViewManager
-from ....robot_plans.actions.base import ActionDescription
-from ....utils import translate_pose_along_local_axis
+from pycram.datastructures.grasp import GraspDescription
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.datastructures.pose import PoseStamped
+from pycram.failures import ObjectNotGraspedError
+from pycram.failures import ObjectNotInGraspingArea
+from pycram.language import SequentialPlan
+from pycram.view_manager import ViewManager
+from pycram.robot_plans.actions.base import ActionDescription
+from pycram.utils import translate_pose_along_local_axis
 
 logger = logging.getLogger(__name__)
 

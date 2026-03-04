@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict
 from uuid import UUID
 
@@ -16,24 +16,26 @@ from typing_extensions import (
 
 from krrood.adapters.exceptions import JSONSerializationError
 from krrood.utils import DataclassException
-from .datastructures.definitions import JointStateType
-from .datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.definitions import JointStateType
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
-    from .world import World
-    from .world_description.geometry import Scale
-    from .world_description.world_entity import (
+    from semantic_digital_twin.world import World
+    from semantic_digital_twin.world_description.geometry import Scale
+    from semantic_digital_twin.world_description.world_entity import (
         SemanticAnnotation,
         WorldEntity,
         KinematicStructureEntity,
     )
-    from .spatial_types.spatial_types import (
+    from semantic_digital_twin.spatial_types.spatial_types import (
         FloatVariable,
         SymbolicMathType,
         SpatialType,
     )
-    from .spatial_types import Vector3
-    from .world_description.degree_of_freedom import DegreeOfFreedomLimits
+    from semantic_digital_twin.spatial_types import Vector3
+    from semantic_digital_twin.world_description.degree_of_freedom import (
+        DegreeOfFreedomLimits,
+    )
 
 
 @dataclass
@@ -70,6 +72,26 @@ class LogicalError(DataclassException):
     """
     An error that happens due to mistake in the logical operation or usage of the API during runtime.
     """
+
+
+@dataclass
+class NegativeConnectionVelocity(DataclassException):
+    """
+    An error that happens when a negative velocity limit is provided for a connection.
+    """
+
+    connection_name: Union[str, PrefixedName]
+    """
+    The name of the connection for which the velocity limit is negative.
+    """
+
+    velocity: float
+    """
+    The negative velocity limit.
+    """
+
+    def __post_init__(self):
+        self.message = f"Velocity limit must be non-negative, got {self.velocity} for joint {self.connection_name}"
 
 
 @dataclass
@@ -254,6 +276,14 @@ class AddingAnExistingSemanticAnnotationError(UsageError):
 
 
 @dataclass
+class SemanticAnnotationNotInWorldError(UsageError):
+    semantic_annotation: SemanticAnnotation
+
+    def __post_init__(self):
+        self.message = f"Semantic annotation {self.semantic_annotation} does not belong to a world."
+
+
+@dataclass
 class MissingWorldModificationContextError(UsageError):
     function: Callable
 
@@ -405,3 +435,42 @@ class AmbiguousNameError(ValueError):
 
 class UnresolvedNameError(ValueError):
     """Raised when no semantic annotation class matches a given name."""
+
+
+@dataclass
+class CollisionCheckingError(DataclassException):
+    message: str = field(kw_only=True, default=None, init=False)
+
+
+@dataclass
+class InvalidCollisionCheckError(CollisionCheckingError):
+    collision_check: CollisionCheck
+
+
+@dataclass
+class NegativeCollisionCheckingDistanceError(InvalidCollisionCheckError):
+    def __post_init__(self):
+        super().__post_init__()
+        self.message = f"Distance must be positive, got {self.collision_check.distance}"
+
+
+@dataclass
+class InvalidBodiesInCollisionCheckError(InvalidCollisionCheckError):
+    def __post_init__(self):
+        super().__post_init__()
+        self.message = f"Body_a and body_b must be different, got {self.collision_check.body_a} and {self.collision_check.body_b}"
+
+
+@dataclass
+class BodyHasNoGeometryError(InvalidCollisionCheckError):
+    def __post_init__(self):
+        super().__post_init__()
+        self.message = ""
+        if not self.collision_check.body_a.has_collision():
+            self.message += (
+                f"Body {self.collision_check.body_a.name} has collision geometry."
+            )
+        if not self.collision_check.body_b.has_collision():
+            self.message += (
+                f"Body {self.collision_check.body_b.name} has collision geometry."
+            )

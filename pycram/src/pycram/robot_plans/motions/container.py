@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from giskardpy.motion_statechart.goals.open_close import Open, Close
 from semantic_digital_twin.world_description.world_entity import Body
 
-from .base import BaseMotion
-from ...datastructures.enums import Arms
-from ...view_manager import ViewManager
+from pycram.robot_plans.motions.base import BaseMotion
+from pycram.datastructures.enums import Arms
+from pycram.view_manager import ViewManager
 
 
 @dataclass

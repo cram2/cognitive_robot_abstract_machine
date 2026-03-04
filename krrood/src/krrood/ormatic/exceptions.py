@@ -5,7 +5,7 @@ from typing_extensions import Type, Any
 
 from sqlalchemy.orm import RelationshipProperty
 
-from ..utils import DataclassException
+from krrood.utils import DataclassException
 
 
 @dataclass

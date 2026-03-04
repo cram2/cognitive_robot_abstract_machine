@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Self
 
-from .robot_mixins import HasNeck, HasArms
-from ..datastructures.definitions import StaticJointState, GripperState, TorsoState
-from ..datastructures.joint_state import JointState
-from ..datastructures.prefixed_name import PrefixedName
-from ..robots.abstract_robot import (
+from semantic_digital_twin.robots.robot_mixins import HasNeck, HasArms
+from semantic_digital_twin.datastructures.definitions import StaticJointState, GripperState, TorsoState
+from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.abstract_robot import (
     Neck,
     Finger,
     ParallelGripper,
@@ -17,9 +17,9 @@ from ..robots.abstract_robot import (
     Torso,
     AbstractRobot,
 )
-from ..spatial_types import Quaternion, Vector3
-from ..world import World
-from ..world_description.connections import FixedConnection
+from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import FixedConnection
 
 
 @dataclass(eq=False)

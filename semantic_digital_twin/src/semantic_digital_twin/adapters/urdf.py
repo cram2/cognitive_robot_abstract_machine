@@ -5,23 +5,33 @@ from dataclasses import dataclass, field
 from typing_extensions import Optional, Tuple, Union, List
 from urdf_parser_py import urdf as urdfpy
 
-from .package_resolver import CompositePathResolver, PathResolver
-from ..datastructures.prefixed_name import PrefixedName
-from ..spatial_types.derivatives import Derivatives, DerivativeMap
-from ..spatial_types.spatial_types import HomogeneousTransformationMatrix, Vector3
-from ..utils import (
+from semantic_digital_twin.adapters.package_resolver import (
+    CompositePathResolver,
+    PathResolver,
+)
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import NegativeConnectionVelocity
+from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
+from semantic_digital_twin.utils import (
     suppress_stdout_stderr,
     hacky_urdf_parser_fix,
     robot_name_from_urdf_string,
 )
-from ..world import World
-from ..world_description.connections import (
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
     FixedConnection,
 )
-from ..world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
-from ..world_description.geometry import (
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
+from semantic_digital_twin.world_description.geometry import (
     Box,
     Sphere,
     Cylinder,
@@ -29,8 +39,8 @@ from ..world_description.geometry import (
     Scale,
     Color,
 )
-from ..world_description.shape_collection import ShapeCollection
-from ..world_description.world_entity import Body, Connection
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body, Connection
 
 connection_type_map = {  # 'unknown': JointType.UNKNOWN,
     "revolute": RevoluteConnection,
@@ -79,6 +89,11 @@ def urdf_joint_to_limits(
         upper_limits.position = upper
 
     velocity = getattr(limit, "velocity", None) if limit is not None else None
+
+    if velocity is not None and velocity < 0:
+        raise NegativeConnectionVelocity(
+            connection_name=urdf_joint.name, velocity=velocity
+        )
     lower_limits.velocity = -velocity if velocity is not None else None
     upper_limits.velocity = velocity if velocity is not None else None
 
@@ -132,17 +147,26 @@ class URDFParser:
             self.prefix = robot_name_from_urdf_string(self.urdf)
 
     @classmethod
-    def from_file(cls, file_path: str, prefix: Optional[str] = None) -> URDFParser:
+    def from_file(
+        cls,
+        file_path: str,
+        prefix: Optional[str] = None,
+        path_resolver: Optional[PathResolver] = None,
+    ) -> URDFParser:
         if file_path.endswith(".xacro"):
             return cls.from_xacro(file_path, prefix)
 
-        file_path = CompositePathResolver().resolve(file_path)
+        path_resolver = path_resolver or CompositePathResolver()
+
+        file_path = path_resolver.resolve(file_path)
         if file_path is not None:
             with open(file_path, "r") as file:
                 # Since parsing URDF causes a lot of warning messages which can't be deactivated, we suppress them
                 with suppress_stdout_stderr():
                     urdf = file.read()
-        return URDFParser(urdf=urdf, prefix=prefix)
+        urdf_parser = URDFParser(urdf=urdf, prefix=prefix)
+        urdf_parser.path_resolver = path_resolver
+        return urdf_parser
 
     @classmethod
     def from_xacro(cls, xacro_path: str, prefix: Optional[str] = None) -> URDFParser:
@@ -323,7 +347,7 @@ class URDFParser:
                 res.append(
                     Cylinder(
                         origin=origin_transform,
-                        width=geom.geometry.radius,
+                        width=geom.geometry.radius * 2,
                         height=geom.geometry.length,
                         color=color,
                     )

@@ -6,13 +6,13 @@ from datetime import timedelta
 import numpy as np
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
-from ..core.navigation import LookAtActionDescription, NavigateActionDescription
-from ....config.action_conf import ActionConfig
-from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
-from ....language import SequentialPlan
-from ....robot_plans.actions.base import ActionDescription
-from ....tf_transformations import quaternion_from_euler
+from pycram.robot_plans.actions.core.navigation import LookAtActionDescription, NavigateActionDescription
+from pycram.config.action_conf import ActionConfig
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.datastructures.pose import PoseStamped
+from pycram.language import SequentialPlan
+from pycram.robot_plans.actions.base import ActionDescription
+from pycram.tf_transformations import quaternion_from_euler
 
 
 @dataclass

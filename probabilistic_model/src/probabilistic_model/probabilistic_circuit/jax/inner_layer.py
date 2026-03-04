@@ -18,8 +18,8 @@ from random_events.variable import Variable
 from sortedcontainers import SortedSet
 from typing_extensions import List, Iterator, Tuple, Union, Type, Dict, Any, Self, Optional
 
-from .utils import copy_bcoo
-from ..rx.probabilistic_circuit import (SumUnit, ProductUnit, Unit, ProbabilisticCircuit as NXProbabilisticCircuit)
+from probabilistic_model.probabilistic_circuit.jax.utils import copy_bcoo
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (SumUnit, ProductUnit, Unit, ProbabilisticCircuit as NXProbabilisticCircuit)
 
 
 def inverse_class_of(clazz: Type[Unit]) -> Type[Layer]:

@@ -3,8 +3,6 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from itertools import product
-from typing import Dict, Any
 
 from typing_extensions import (
     Iterable,
@@ -16,41 +14,36 @@ from typing_extensions import (
     List,
 )
 
-from ..datastructures.definitions import JointStateType
-from krrood.adapters.json_serializer import (
-    SubclassJSONSerializer,
-    DataclassJSONSerializer,
-)
-from ..collision_checking.collision_detector import CollisionCheck
-from ..datastructures.joint_state import GripperState, JointState
-from ..datastructures.prefixed_name import PrefixedName
-from ..exceptions import NoJointStateWithType
-from ..spatial_types.derivatives import DerivativeMap
-from ..spatial_types.spatial_types import (
+from semantic_digital_twin.datastructures.definitions import JointStateType
+from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import NoJointStateWithType
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.spatial_types.spatial_types import (
     Vector3,
     Quaternion,
 )
-from ..world_description.connections import (
+from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     OmniDrive,
     ActiveConnection1DOF,
 )
-from ..world_description.geometry import BoundingBox
-from ..world_description.shape_collection import BoundingBoxCollection
-from ..world_description.world_entity import (
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.shape_collection import BoundingBoxCollection
+from semantic_digital_twin.world_description.world_entity import (
     Body,
     RootedSemanticAnnotation,
     Agent,
     Connection,
-    CollisionCheckingConfig,
 )
-from ..world_description.world_entity import (
+from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
     Region,
 )
 
 if TYPE_CHECKING:
-    from ..world import World
+    from semantic_digital_twin.world import World
 
 
 @dataclass
@@ -65,7 +58,7 @@ class SemanticRobotAnnotation(RootedSemanticAnnotation, ABC):
     The robot this semantic annotation belongs to
     """
 
-    joint_states: List[JointState] = field(default_factory=list)
+    joint_states: list[JointState] = field(default_factory=list)
     """
     Fixed joint states that are defined for this manipulator, like open and close. 
     """
@@ -126,7 +119,7 @@ class KinematicChain(SemanticRobotAnnotation, ABC):
     A collection of sensors in the kinematic chain, such as cameras or other sensors.
     """
 
-    joint_states: List[JointState] = field(default_factory=list)
+    joint_states: list[JointState] = field(default_factory=list)
     """
     A list of pre-defined joint positions that this kinematic chain can perform, for example "park" for an arm.
     """
@@ -270,7 +263,7 @@ class Finger(KinematicChain):
 @dataclass
 class ParallelGripper(Manipulator):
     """
-    Represents a gripper of a robot. Contains a collection of fingers and a thumb. The thumb is a specific finger
+    Represents a parallel gripper of a robot. Contains a finger and a thumb. The thumb is a specific finger
     that always needs to touch an object when grasping it, ensuring a stable grasp.
     """
 
@@ -281,6 +274,38 @@ class ParallelGripper(Manipulator):
         """
         Assigns the parallel gripper to the given robot and calls the appropriate methods for the its finger and thumb.
          This method ensures that the parallel gripper is only assigned to one robot at a time, and raises an error if
+         it is already assigned to another
+        """
+        if self._robot is not None and self._robot != robot:
+            raise ValueError(
+                f"ParallelGripper {self.name} is already part of another robot: {self._robot.name}."
+            )
+        if self._robot is not None:
+            return
+        self._robot = robot
+
+    def __hash__(self):
+        """
+        Returns the hash of the kinematic chain, which is based on the root and tip bodies.
+        This allows for proper comparison and storage in sets or dictionaries.
+        """
+        return hash((self.name, self.root, self.tool_frame))
+
+
+@dataclass
+class HumanoidGripper(Manipulator):
+    """
+    Represents a human-like gripper of a robot. Contains a collection of fingers and a thumb. The thumb is a specific finger
+    that always needs to touch an object when grasping it, ensuring a stable grasp.
+    """
+
+    fingers: List[Finger] = field(default_factory=list)
+    thumb: Finger = field(default=None)
+
+    def assign_to_robot(self, robot: AbstractRobot):
+        """
+        Assigns the humanoid gripper to the given robot and calls the appropriate methods for the its finger and thumb.
+         This method ensures that the humanoid gripper is only assigned to one robot at a time, and raises an error if
          it is already assigned to another
         """
         if self._robot is not None and self._robot != robot:
@@ -433,7 +458,7 @@ class Base(KinematicChain):
 
 
 @dataclass(eq=False)
-class AbstractRobot(Agent):
+class AbstractRobot(Agent, ABC):
     """
     Specification of an abstract robot. A robot consists of:
     - a root body, which is the base of the robot
@@ -474,22 +499,10 @@ class AbstractRobot(Agent):
     A collection of all kinematic chains containing a sensor, such as a camera.
     """
 
-    default_collision_config: CollisionCheckingConfig = field(
-        kw_only=True,
-        default_factory=lambda: CollisionCheckingConfig(buffer_zone_distance=0.05),
-    )
-
     full_body_controlled: bool = field(default=False, kw_only=True)
     """
     Whether this robots needs full-body control to be able to operate effectively 
     """
-
-    @abstractmethod
-    def setup_collision_config(self):
-        """
-        Loads the SRDF file for the robot, if it exists. This method is expected to be implemented in subclasses.
-        """
-        ...
 
     @property
     def controlled_connections(self) -> Set[ActiveConnection]:
@@ -498,8 +511,24 @@ class AbstractRobot(Agent):
         """
         return set(self._world.controlled_connections) & set(self.connections)
 
+    @property
+    def degrees_of_freedom_with_hardware_interface(self) -> List[DegreeOfFreedom]:
+        """
+        The number of degrees of freedom of the robot, which is the sum of the degrees of freedom of all its manipulators.
+        """
+        dofs = []
+        for connection in self.connections:
+            if isinstance(connection, ActiveConnection):
+                dofs.extend(
+                    [
+                        dof
+                        for dof in connection.active_dofs
+                        if dof.has_hardware_interface
+                    ]
+                )
+        return dofs
+
     @classmethod
-    @abstractmethod
     def from_world(cls, world: World) -> Self:
         """
         Creates a robot semantic annotation from the given world.
@@ -510,7 +539,34 @@ class AbstractRobot(Agent):
 
         :return: A robot semantic annotation.
         """
-        raise NotImplementedError("This method should be implemented in subclasses.")
+        with world.modify_world():
+            robot = cls._init_empty_robot(world)
+            robot._setup_semantic_annotations()
+            world.add_semantic_annotation(robot)
+            robot._setup_collision_rules()
+            robot._setup_velocity_limits()
+            robot._setup_hardware_interfaces()
+            robot._setup_joint_states()
+        return robot
+
+    @classmethod
+    @abstractmethod
+    def _init_empty_robot(cls, world: World) -> Self: ...
+
+    @abstractmethod
+    def _setup_semantic_annotations(self): ...
+
+    @abstractmethod
+    def _setup_collision_rules(self): ...
+
+    @abstractmethod
+    def _setup_velocity_limits(self): ...
+
+    @abstractmethod
+    def _setup_hardware_interfaces(self): ...
+
+    @abstractmethod
+    def _setup_joint_states(self): ...
 
     @property
     def drive(self) -> Optional[OmniDrive]:
@@ -604,25 +660,6 @@ class AbstractRobot(Agent):
             self.sensor_chains.append(kinematic_chain)
         self._semantic_annotations.add(kinematic_chain)
         kinematic_chain.assign_to_robot(self)
-
-    def create_collision_matrix_for_env(self) -> List[CollisionCheck]:
-        """
-        Cretaes a collision matrix between the bodies of the robot and the bodies of the environment (environment is
-        everything that is not the robot). Only bodes with collision will be used
-        """
-        all_bodies = self._world.bodies_with_enabled_collision
-        env_bodies = set(all_bodies) - set(self.bodies)
-        collision_matrx = []
-        for body_a, body_b in product(self.bodies, env_bodies):
-            collision_matrx.append(
-                CollisionCheck(
-                    body_a=body_a,
-                    body_b=body_b,
-                    distance=body_a.get_collision_config().buffer_zone_distance,
-                    _world=self._world,
-                )
-            )
-        return collision_matrx
 
     def get_default_camera(self) -> Camera:
         for sensor in self.sensors:

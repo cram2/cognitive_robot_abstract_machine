@@ -7,9 +7,9 @@ from rclpy.node import Node
 from rclpy.service import Service
 from std_srvs.srv import Trigger
 
-from ..world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
-from ...world import World
-from .messages import WorldModelSnapshot
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
+from semantic_digital_twin.world import World
+from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 
 
 @dataclass

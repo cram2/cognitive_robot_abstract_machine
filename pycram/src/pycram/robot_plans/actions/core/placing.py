@@ -8,24 +8,24 @@ from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
-from .pick_up import ReachActionDescription, PickUpAction
-from ....config.action_conf import ActionConfig
-from ...motions.gripper import MoveTCPMotion, MoveGripperMotion, ReachMotion
-from ....datastructures.enums import (
+from pycram.robot_plans.actions.core.pick_up import ReachActionDescription, PickUpAction
+from pycram.config.action_conf import ActionConfig
+from pycram.robot_plans.motions.gripper import MoveTCPMotion, MoveGripperMotion, ReachMotion
+from pycram.datastructures.enums import (
     Arms,
     ApproachDirection,
     VerticalAlignment,
 )
-from ....datastructures.grasp import GraspDescription
-from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
-from ....failures import ObjectNotPlacedAtTargetLocation, ObjectStillInContact
-from ....language import SequentialPlan
-from ....view_manager import ViewManager
-from ....robot_plans.actions.base import ActionDescription
-from ....utils import translate_pose_along_local_axis
-from ....validation.error_checkers import PoseErrorChecker
-from ....visualization import plot_rustworkx_interactive
+from pycram.datastructures.grasp import GraspDescription
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.datastructures.pose import PoseStamped
+from pycram.failures import ObjectNotPlacedAtTargetLocation, ObjectStillInContact
+from pycram.language import SequentialPlan
+from pycram.view_manager import ViewManager
+from pycram.robot_plans.actions.base import ActionDescription
+from pycram.utils import translate_pose_along_local_axis
+from pycram.validation.error_checkers import PoseErrorChecker
+from pycram.visualization import plot_rustworkx_interactive
 
 
 @dataclass

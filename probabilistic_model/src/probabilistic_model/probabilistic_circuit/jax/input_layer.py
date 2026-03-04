@@ -11,9 +11,9 @@ from random_events.variable import Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Tuple, Type, Self, Optional
 
-from .inner_layer import InputLayer, NXConverterLayer
-from ..rx.probabilistic_circuit import Unit, ProbabilisticCircuit as NXProbabilisticCircuit, UnivariateContinuousLeaf
-from ...distributions import DiracDeltaDistribution
+from probabilistic_model.probabilistic_circuit.jax.inner_layer import InputLayer, NXConverterLayer
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import Unit, ProbabilisticCircuit as NXProbabilisticCircuit, UnivariateContinuousLeaf
+from probabilistic_model.distributions import DiracDeltaDistribution
 
 
 class ContinuousLayer(InputLayer, ABC):

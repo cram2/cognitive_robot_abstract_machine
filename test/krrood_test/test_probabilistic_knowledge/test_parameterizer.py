@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import datetime
 
-from random_events.set import Set
-from random_events.variable import Continuous, Symbolic
-
-from krrood.entity_query_language.entity import variable_from
+from krrood.entity_query_language.factories import variable_from, variable
 from krrood.ormatic.dao import to_dao
 from krrood.probabilistic_knowledge.object_access_variable import ObjectAccessVariable
-from krrood.probabilistic_knowledge.parameterizer import Parameterizer, Parameterization
+from krrood.probabilistic_knowledge.parameterizer import (
+    DataAccessObjectParameterizer,
+    Parameterization,
+)
+from random_events.set import Set
+from random_events.variable import Continuous, Symbolic
 from ..dataset.example_classes import (
     Position,
     Pose,
@@ -26,20 +28,21 @@ def test_parameterize_position():
     Test parameterization of the Position class.
     """
     position = Position(..., ..., ...)
-    position_dao_variable = variable_from([to_dao(position)])
-    parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(position)
+    dao = to_dao(position)
+    position_dao_variable = variable(type(dao), [dao])
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
     expected_variables = [
         ObjectAccessVariable(
-            Continuous("PositionDAO.x"),
+            Continuous(position_dao_variable.x._name_),
             position_dao_variable.x,
         ),
         ObjectAccessVariable(
-            Continuous("PositionDAO.y"),
+            Continuous(position_dao_variable.y._name_),
             position_dao_variable.y,
         ),
         ObjectAccessVariable(
-            Continuous("PositionDAO.z"),
+            Continuous(position_dao_variable.z._name_),
             position_dao_variable.z,
         ),
     ]
@@ -51,8 +54,9 @@ def test_parameterize_position_skip_none_field():
     Test parameterization of the Position class.
     """
     position = Position(None, None, None)
-    parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(position)
+    dao = to_dao(position)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
     assert parameterization.variables == []
 
 
@@ -61,17 +65,18 @@ def test_parameterize_orientation_mixed_none():
     Test parameterization of the Orientation class.
     """
     orientation = Orientation(..., None, ..., None)
-    orientation_dao_variable = variable_from([to_dao(orientation)])
-    parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(orientation)
+    dao = to_dao(orientation)
+    orientation_dao_variable = variable(type(dao), [dao])
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
 
     expected_variables = [
         ObjectAccessVariable(
-            Continuous("OrientationDAO.x"),
+            Continuous(orientation_dao_variable.x._name_),
             orientation_dao_variable.x,
         ),
         ObjectAccessVariable(
-            Continuous("OrientationDAO.z"),
+            Continuous(orientation_dao_variable.z._name_),
             orientation_dao_variable.z,
         ),
     ]
@@ -88,33 +93,34 @@ def test_parameterize_pose():
         orientation=Orientation(..., ..., ..., None),
     )
 
-    pose_dao_variable = variable_from([to_dao(pose)])
+    dao = to_dao(pose)
+    pose_dao_variable = variable(type(dao), [dao])
 
-    parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(pose)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
     expected_variables = [
         ObjectAccessVariable(
-            Continuous("PoseDAO.position.x"),
+            Continuous(pose_dao_variable.position.x._name_),
             pose_dao_variable.position.x,
         ),
         ObjectAccessVariable(
-            Continuous("PoseDAO.position.y"),
+            Continuous(pose_dao_variable.position.y._name_),
             pose_dao_variable.position.y,
         ),
         ObjectAccessVariable(
-            Continuous("PoseDAO.position.z"),
+            Continuous(pose_dao_variable.position.z._name_),
             pose_dao_variable.position.z,
         ),
         ObjectAccessVariable(
-            Continuous("PoseDAO.orientation.x"),
+            Continuous(pose_dao_variable.orientation.x._name_),
             pose_dao_variable.orientation.x,
         ),
         ObjectAccessVariable(
-            Continuous("PoseDAO.orientation.y"),
+            Continuous(pose_dao_variable.orientation.y._name_),
             pose_dao_variable.orientation.y,
         ),
         ObjectAccessVariable(
-            Continuous("PoseDAO.orientation.z"),
+            Continuous(pose_dao_variable.orientation.z._name_),
             pose_dao_variable.orientation.z,
         ),
     ]
@@ -143,16 +149,19 @@ def test_parameterize_object_with_given_values():
     Test parameterization of a single object via Parameterizer.parameterize.
     """
     position = Position(x=1.0, y=2.0, z=3.0)
-    parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(position)
+    dao = to_dao(position)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
+
+    [x, y, z] = parameterization.variables
 
     result_by_hand = {
-        Continuous("PositionDAO.x"): 1.0,
-        Continuous("PositionDAO.y"): 2.0,
-        Continuous("PositionDAO.z"): 3.0,
+        x: 1.0,
+        y: 2.0,
+        z: 3.0,
     }
 
-    assert parameterization.assignments_for_conditioning == result_by_hand
+    assert parameterization.assignments == result_by_hand
 
 
 def test_parameterize_nested_object():
@@ -163,42 +172,48 @@ def test_parameterize_nested_object():
         position=Position(x=1.0, y=2.0, z=3.0),
         orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
-    parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(pose)
+    dao = to_dao(pose)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
+
+    [px, py, pz, ox, oy, oz, ow] = parameterization.variables
 
     result_by_hand = {
-        Continuous("PoseDAO.position.x"): 1.0,
-        Continuous("PoseDAO.position.y"): 2.0,
-        Continuous("PoseDAO.position.z"): 3.0,
-        Continuous("PoseDAO.orientation.x"): 0.0,
-        Continuous("PoseDAO.orientation.y"): 0.0,
-        Continuous("PoseDAO.orientation.z"): 0.0,
-        Continuous("PoseDAO.orientation.w"): 1.0,
+        px: 1.0,
+        py: 2.0,
+        pz: 3.0,
+        ox: 0.0,
+        oy: 0.0,
+        oz: 0.0,
+        ow: 1.0,
     }
-    assert parameterization.assignments_for_conditioning == result_by_hand
+    assert parameterization.assignments == result_by_hand
 
 
 def test_one_to_many_and_collection_of_builtins():
     p = Positions([Position(1, 2, 3), Position(4, 5, 6)], ["a", ...])
-    parameters = Parameterizer().parameterize(p)
+    dao = to_dao(p)
+    parameters = DataAccessObjectParameterizer(dao).parameterize()
+
+    [p0_x, p0_y, p0_z, p1_x, p1_y, p1_z] = parameters.variables
 
     result_by_hand = {
-        Continuous("PositionsDAO.positions[0].target.x"): 1.0,
-        Continuous("PositionsDAO.positions[0].target.y"): 2.0,
-        Continuous("PositionsDAO.positions[0].target.z"): 3.0,
-        Continuous("PositionsDAO.positions[1].target.x"): 4.0,
-        Continuous("PositionsDAO.positions[1].target.y"): 5.0,
-        Continuous("PositionsDAO.positions[1].target.z"): 6.0,
+        p0_x: 1.0,
+        p0_y: 2.0,
+        p0_z: 3.0,
+        p1_x: 4.0,
+        p1_y: 5.0,
+        p1_z: 6.0,
     }
 
-    assert parameters.assignments_for_conditioning == result_by_hand
+    assert parameters.assignments == result_by_hand
 
 
 def test_symbolic_variables():
     obj = ListOfEnum([..., ...])
-
-    parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(obj)
+    dao = to_dao(obj)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
 
     test_enum_set = Set.from_iterable(TestEnum)
     assert parameterization.random_events_variables == [
@@ -210,8 +225,9 @@ def test_symbolic_variables():
 
 def test_not_follow_none_relationships():
     p = Pose(position=Position(..., ..., ...), orientation=None)
-    parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(p)
+    dao = to_dao(p)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
     variables = [
         Continuous("PoseDAO.position.x"),
         Continuous("PoseDAO.position.y"),
@@ -224,8 +240,9 @@ def test_not_follow_none_relationships():
 
 def test_parameterize_object_from_sample():
     obj = Atom(..., ..., ..., datetime.datetime.now())
-    parameterizer = Parameterizer()
-    parameterization = parameterizer.parameterize(obj)
+    dao = to_dao(obj)
+    parameterizer = DataAccessObjectParameterizer(dao)
+    parameterization = parameterizer.parameterize()
     distribution = parameterization.create_fully_factorized_distribution()
     sample = distribution.sample(1)[0]
     sample_dict = parameterization.create_assignment_from_variables_and_sample(

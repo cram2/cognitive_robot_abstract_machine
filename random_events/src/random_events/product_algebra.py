@@ -8,8 +8,8 @@ import plotly.graph_objects as go
 from sortedcontainers import SortedDict, SortedValuesView, SortedSet
 from typing_extensions import List, TYPE_CHECKING, Union, Set as teSet
 
-from .sigma_algebra import *
-from .variable import *
+from random_events.sigma_algebra import *
+from random_events.variable import *
 
 # Type definitions
 if TYPE_CHECKING:

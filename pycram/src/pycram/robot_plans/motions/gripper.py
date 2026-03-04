@@ -9,16 +9,16 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.world_description.world_entity import Body
-from .base import BaseMotion
-from ...datastructures.enums import (
+from pycram.robot_plans.motions.base import BaseMotion
+from pycram.datastructures.enums import (
     Arms,
     MovementType,
     WaypointsMovementType,
 )
-from ...datastructures.grasp import GraspDescription
-from ...datastructures.pose import PoseStamped
-from ...view_manager import ViewManager
-from ...utils import translate_pose_along_local_axis
+from pycram.datastructures.grasp import GraspDescription
+from pycram.datastructures.pose import PoseStamped
+from pycram.view_manager import ViewManager
+from pycram.utils import translate_pose_along_local_axis
 
 
 @dataclass
@@ -207,9 +207,14 @@ class MoveTCPWaypointsMotion(BaseMotion):
     @property
     def _motion_chart(self):
         tip = ViewManager().get_end_effector_view(self.arm, self.robot_view).tool_frame
+        root = (
+            self.world.root
+            if self.robot_view.full_body_controlled
+            else self.robot_view.root
+        )
         nodes = [
             CartesianPose(
-                root_link=self.robot_view.root,
+                root_link=root,
                 tip_link=tip,
                 goal_pose=pose.to_spatial_type(),
                 # threshold=0.005,

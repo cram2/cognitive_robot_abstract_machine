@@ -7,7 +7,7 @@ from types import FunctionType
 from collections.abc import Callable
 from typing_extensions import Optional, Self
 
-from .dao import AlternativeMapping, T
+from krrood.ormatic.dao import AlternativeMapping, T
 
 
 @dataclass

@@ -22,9 +22,9 @@ from rclpy.node import Node
 # threading.Thread(target=rclpy.spin, args=(node,), daemon=True).start()
 
 
-from .data_types import *
-from .ros_tools import *
-from .action_lib import *
-from .service import *
-from .publisher import *
-from .subscriber import *
+from pycram.ros.ros2.data_types import *
+from pycram.ros.ros2.ros_tools import *
+from pycram.ros.ros2.action_lib import *
+from pycram.ros.ros2.service import *
+from pycram.ros.ros2.publisher import *
+from pycram.ros.ros2.subscriber import *

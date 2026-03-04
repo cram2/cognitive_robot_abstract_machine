@@ -5,10 +5,10 @@ import dataclasses
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import TYPE_CHECKING, Iterable, Iterator, Union
 
-from ..datastructures.partial_designator import PartialDesignator
-from ..external_interfaces.robokudo import *
-from ..plan import Plan
-from ..utils import is_iterable
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.external_interfaces.robokudo import *
+from pycram.plan import Plan
+from pycram.utils import is_iterable
 
 
 if TYPE_CHECKING:

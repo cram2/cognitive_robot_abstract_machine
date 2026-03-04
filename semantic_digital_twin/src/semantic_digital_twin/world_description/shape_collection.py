@@ -13,13 +13,15 @@ from typing_extensions import Dict, Any, Self, Optional, List, Iterator
 from typing_extensions import TYPE_CHECKING
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
-from .geometry import Shape, BoundingBox
-from ..datastructures.variables import SpatialVariables
-from ..spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.world_description.geometry import Shape, BoundingBox, Color
+from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 
 if TYPE_CHECKING:
-    from .world_entity import KinematicStructureEntity
-    from ..world import World
+    from semantic_digital_twin.world_description.world_entity import (
+        KinematicStructureEntity,
+    )
+    from semantic_digital_twin.world import World
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,14 @@ class ShapeCollection(SubclassJSONSerializer):
         if self.reference_frame is not None:
             return self.reference_frame._world
         return None
+
+    def dye_shapes(self, color: Color):
+        """
+        Dye all shapes in this collection with the given color.
+        :param color: The color to dye the shapes with.
+        """
+        for shape in self.shapes:
+            shape.color = color
 
     def transform_all_shapes_to_own_frame(self):
         """
@@ -191,6 +201,14 @@ class ShapeCollection(SubclassJSONSerializer):
             .scale
         )
 
+    @property
+    def min_point(self) -> Point3:
+        return Point3.from_iterable(self.combined_mesh.bounds[0])
+
+    @property
+    def max_point(self) -> Point3:
+        return Point3.from_iterable(self.combined_mesh.bounds[1])
+
 
 @dataclass
 class BoundingBoxCollection(ShapeCollection):
@@ -333,10 +351,9 @@ class BoundingBoxCollection(ShapeCollection):
             ), "All shapes must have the same reference frame."
 
         local_bbs = [shape.local_frame_bounding_box for shape in shapes]
-        reference_frame = shapes[0].origin.reference_frame
         return cls(
             [bb.transform_to_origin(bb.origin) for bb in local_bbs],
-            reference_frame,
+            shapes.reference_frame,
         )
 
     def as_shapes(self) -> ShapeCollection:

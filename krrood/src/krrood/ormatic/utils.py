@@ -24,7 +24,7 @@ from typing_extensions import (
     Any,
 )
 
-from ..adapters.json_serializer import to_json, from_json
+from krrood.adapters.json_serializer import to_json, from_json
 
 
 class classproperty:
@@ -56,7 +56,7 @@ def classes_of_module(module: types.ModuleType) -> List[Type]:
 
 T = TypeVar("T")
 
-leaf_types = (int, float, str, Enum, datetime.datetime, bool)
+leaf_types = (int, float, str, Enum, datetime.datetime, bool, type(Ellipsis))
 
 
 def _drop_fk_constraints(engine: Engine, tables: Iterable[str]) -> None:

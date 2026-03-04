@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from ...perception import PerceptionQuery
-from .base import BaseMotion
+from pycram.perception import PerceptionQuery
+from pycram.robot_plans.motions.base import BaseMotion
 
 
 @dataclass

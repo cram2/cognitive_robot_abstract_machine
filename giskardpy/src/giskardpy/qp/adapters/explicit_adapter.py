@@ -62,9 +62,7 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         self.free_symbols = [
             self.world_state_symbols,
             self.life_cycle_symbols,
-            self.external_collision_symbols,
-            self.self_collision_symbols,
-            self.auxiliary_variables,
+            self.float_variables,
         ]
 
         self.eq_matrix_compiled = eq_matrix.compile(
@@ -123,16 +121,12 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         self,
         world_state: np.ndarray,
         life_cycle_state: np.ndarray,
-        external_collision_data: np.ndarray,
-        self_collision_data: np.ndarray,
-        auxiliary_variables: np.ndarray,
+        float_variables: np.ndarray,
     ) -> QPData:
         args = [
             world_state,
             life_cycle_state,
-            external_collision_data,
-            self_collision_data,
-            auxiliary_variables,
+            float_variables,
         ]
         eq_matrix_np_raw = self.eq_matrix_compiled(*args)
         neq_matrix_np_raw = self.neq_matrix_compiled(*args)

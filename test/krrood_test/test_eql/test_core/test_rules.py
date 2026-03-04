@@ -1,8 +1,17 @@
-from krrood.entity_query_language.conclusion import Add
-from krrood.entity_query_language.entity import variable, entity, and_, inference
-from krrood.entity_query_language.entity_result_processors import an
+from krrood.entity_query_language.rules.conclusion import Add
+from krrood.entity_query_language.factories import (
+    entity,
+    variable,
+    and_,
+    inference,
+    an,
+    refinement,
+    alternative,
+    next_rule,
+    deduced_variable,
+)
 from krrood.entity_query_language.predicate import HasType
-from krrood.entity_query_language.rule import refinement, alternative, next_rule
+from krrood.entity_query_language.query_graph import QueryGraph
 from ...dataset.semantic_world_like_classes import (
     Container,
     Handle,
@@ -14,16 +23,50 @@ from ...dataset.semantic_world_like_classes import (
     Body,
     RevoluteConnection,
     Wardrobe,
+    Cabinet,
 )
 
 
-def test_generate_drawers(handles_and_containers_world):
+def test_generate_drawers_from_direct_condition(handles_and_containers_world):
     world = handles_and_containers_world
     container = variable(Container, domain=world.bodies)
     handle = variable(Handle, domain=world.bodies)
     fixed_connection = variable(FixedConnection, domain=world.connections)
     prismatic_connection = variable(PrismaticConnection, domain=world.connections)
-    drawers = variable(Drawer, domain=None)
+    drawers = variable(Drawer, domain=[])
+    condition = and_(
+        container == fixed_connection.parent,
+        handle == fixed_connection.child,
+        container == prismatic_connection.child,
+    )
+
+    with condition:
+        Add(drawers, inference(Drawer)(handle=handle, container=container))
+
+    # QueryGraph(condition).visualize()
+
+    assert condition._conditions_root_ is condition
+
+    solutions_gen = condition.evaluate()
+    all_solutions = list(solutions_gen)
+
+    assert (
+        len(all_solutions) == 2
+    ), "Should generate components for two possible drawer."
+    assert all(isinstance(d[drawers], Drawer) for d in all_solutions)
+    assert all_solutions[0][drawers].handle.name == "Handle3"
+    assert all_solutions[0][drawers].container.name == "Container3"
+    assert all_solutions[1][drawers].handle.name == "Handle1"
+    assert all_solutions[1][drawers].container.name == "Container1"
+
+
+def test_generate_drawers_from_query(handles_and_containers_world):
+    world = handles_and_containers_world
+    container = variable(Container, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    prismatic_connection = variable(PrismaticConnection, domain=world.connections)
+    drawers = deduced_variable(Drawer)
     query = an(
         entity(drawers).where(
             container == fixed_connection.parent,
@@ -34,6 +77,8 @@ def test_generate_drawers(handles_and_containers_world):
 
     with query:
         Add(drawers, inference(Drawer)(handle=handle, container=container))
+
+    # QueryGraph(query).visualize()
 
     solutions = query.evaluate()
     all_solutions = list(solutions)
@@ -46,38 +91,6 @@ def test_generate_drawers(handles_and_containers_world):
     assert all_solutions[0].container.name == "Container3"
     assert all_solutions[1].handle.name == "Handle1"
     assert all_solutions[1].container.name == "Container1"
-
-
-def test_add_conclusion(handles_and_containers_world):
-    world = handles_and_containers_world
-
-    container = variable(Container, domain=world.bodies)
-    handle = variable(Handle, domain=world.bodies)
-    fixed_connection = variable(FixedConnection, domain=world.connections)
-    prismatic_connection = variable(PrismaticConnection, domain=world.connections)
-    drawers = variable(Drawer, domain=None)
-    query = an(
-        entity(drawers).where(
-            container == fixed_connection.parent,
-            handle == fixed_connection.child,
-            container == prismatic_connection.child,
-        )
-    )
-    with query:
-        Add(drawers, inference(Drawer)(handle=handle, container=container))
-
-    solutions = query.evaluate()
-    all_solutions = list(solutions)
-    assert (
-        len(all_solutions) == 2
-    ), "Should generate components for two possible drawer."
-    assert all(isinstance(d, Drawer) for d in all_solutions)
-    assert all_solutions[0].handle.name == "Handle3"
-    assert all_solutions[0].container.name == "Container3"
-    assert all_solutions[1].handle.name == "Handle1"
-    assert all_solutions[1].container.name == "Container1"
-    # all_drawers = list(drawers._evaluate_())
-    # assert len(all_drawers) == 2, "Should generate components for two possible drawer."
 
 
 def test_rule_tree_with_a_refinement(doors_and_drawers_world):
@@ -85,7 +98,7 @@ def test_rule_tree_with_a_refinement(doors_and_drawers_world):
     body = variable(Body, domain=world.bodies)
     handle = variable(Handle, domain=world.bodies)
     fixed_connection = variable(FixedConnection, domain=world.connections)
-    drawers_and_doors = variable(View, domain=None, inferred=True)
+    drawers_and_doors = deduced_variable(View)
     query = an(
         entity(drawers_and_doors).where(
             body == fixed_connection.parent,
@@ -98,7 +111,7 @@ def test_rule_tree_with_a_refinement(doors_and_drawers_world):
         with refinement(body.size > 1):
             Add(drawers_and_doors, inference(Door)(handle=handle, body=body))
 
-    # query._render_tree_()
+    # QueryGraph(query).visualize()
 
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 3, "Should generate 1 drawer and 1 door."
@@ -120,7 +133,7 @@ def test_rule_tree_with_multiple_refinements(doors_and_drawers_world):
     handle = variable(Handle, domain=world.bodies)
     fixed_connection = variable(FixedConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     query = an(
         entity(views).where(
             body == fixed_connection.parent,
@@ -141,7 +154,6 @@ def test_rule_tree_with_multiple_refinements(doors_and_drawers_world):
                     inference(Wardrobe)(handle=handle, body=body, container=container),
                 )
 
-    # query._render_tree_()
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 3, "Should generate 1 drawer, 1 door and 1 wardrobe."
     assert isinstance(all_solutions[0], Door)
@@ -162,12 +174,14 @@ def test_rule_tree_with_an_alternative(doors_and_drawers_world):
     handle = variable(Handle, domain=world.bodies)
     fixed_connection = variable(FixedConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     query = an(
-        entity(views).where(
+        entity(views)
+        .where(
             body == fixed_connection.parent,
             handle == fixed_connection.child,
         )
+        .distinct()
     )
 
     with query:
@@ -177,7 +191,7 @@ def test_rule_tree_with_an_alternative(doors_and_drawers_world):
         ):
             Add(views, inference(Door)(handle=handle, body=body))
 
-    query.visualize()
+    # QueryGraph(query).visualize()
 
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 4, "Should generate 3 drawers, 1 door"
@@ -203,13 +217,15 @@ def test_rule_tree_with_multiple_alternatives(doors_and_drawers_world):
     fixed_connection = variable(FixedConnection, domain=world.connections)
     prismatic_connection = variable(PrismaticConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     query = an(
-        entity(views).where(
+        entity(views)
+        .where(
             body == fixed_connection.parent,
             handle == fixed_connection.child,
             body == prismatic_connection.child,
         )
+        .distinct()
     )
 
     with query:
@@ -228,8 +244,6 @@ def test_rule_tree_with_multiple_alternatives(doors_and_drawers_world):
                 views,
                 inference(Wardrobe)(handle=handle, body=body, container=container),
             )
-
-    # query._render_tree_()
 
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 3, "Should generate 1 drawer, 1 door and 1 wardrobe."
@@ -254,12 +268,14 @@ def test_rule_tree_with_multiple_alternatives_optimized(doors_and_drawers_world)
     fixed_connection = variable(FixedConnection, domain=world.connections)
     prismatic_connection = variable(PrismaticConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     query = an(
-        entity(views).where(
+        entity(views)
+        .where(
             HasType(fixed_connection.child, Handle),
             fixed_connection.parent == prismatic_connection.child,
         )
+        .distinct()
     )
 
     with query:
@@ -290,8 +306,6 @@ def test_rule_tree_with_multiple_alternatives_optimized(doors_and_drawers_world)
                 ),
             )
 
-    # query._render_tree_()
-
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 3, "Should generate 1 drawer, 1 door and 1 wardrobe."
     expected_solution_set = {
@@ -318,12 +332,14 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree(doors_and_drawers
     fixed_connection = variable(FixedConnection, domain=world.connections)
     prismatic_connection = variable(PrismaticConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     query = an(
-        entity(views).where(
+        entity(views)
+        .where(
             body == fixed_connection.parent,
             handle == fixed_connection.child,
         )
+        .distinct()
     )
 
     with query:
@@ -341,8 +357,6 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree(doors_and_drawers
             revolute_connection.parent == body, revolute_connection.child == handle
         ):
             Add(views, inference(Door)(handle=handle, body=body))
-
-    # query._render_tree_()
 
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 3, "Should generate 1 drawer, 1 door and 1 wardrobe."
@@ -369,11 +383,13 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree_optimized(
     fixed_connection = variable(FixedConnection, domain=world.connections)
     prismatic_connection = variable(PrismaticConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     query = an(
-        entity(views).where(
+        entity(views)
+        .where(
             HasType(fixed_connection.child, Handle),
         )
+        .distinct()
     )
 
     with query:
@@ -404,7 +420,7 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree_optimized(
                 ),
             )
 
-    # query._render_tree_()
+    # QueryGraph(query).visualize()
 
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 3, "Should generate 1 drawer, 1 door and 1 wardrobe."
@@ -422,3 +438,27 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree_optimized(
         elif isinstance(s, Wardrobe):
             solution_set.add((Wardrobe, s.handle.name, s.body.name, s.container.name))
     assert expected_solution_set == solution_set
+
+
+def test_rule_with_grouped_by(inferred_cabinets_world):
+    world = inferred_cabinets_world
+    drawer = variable(Drawer, world.views)
+    prismatic_connection = variable(PrismaticConnection, world.connections)
+    cabinets = (
+        entity(
+            inference(Cabinet)(
+                container=prismatic_connection.parent,
+                drawers=drawer,
+            )
+        )
+        .where(prismatic_connection.child == drawer.container)
+        .grouped_by(prismatic_connection.parent)
+        .tolist()
+    )
+    assert len(cabinets) == 2
+    assert cabinets[0].container.name == "Container2"
+    assert len(cabinets[0].drawers) == 2
+    assert {d.handle.name for d in cabinets[0].drawers} == {"Handle1", "Handle3"}
+    assert cabinets[1].container.name == "Container4"
+    assert len(cabinets[1].drawers) == 1
+    assert cabinets[1].drawers[0].handle.name == "Handle3"

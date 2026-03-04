@@ -1,25 +1,6 @@
 from enum import Enum, auto
 
 
-class RDREdge(Enum):
-    Refinement = "except if"
-    """
-    Refinement edge, the edge that represents the refinement of an incorrectly fired rule.
-    """
-    Alternative = "else if"
-    """
-    Alternative edge, the edge that represents the alternative to the rule that has not fired.
-    """
-    Next = "also if"
-    """
-    Next edge, the edge that represents the next rule to be evaluated.
-    """
-    Then = "then"
-    """
-    Then edge, the edge that represents the connection to the conclusion.
-    """
-
-
 class InferMode(Enum):
     """
     The infer mode of a predicate, whether to infer new relations or retrieve current relations.
@@ -54,16 +35,16 @@ class EQLMode(Enum):
     """
 
 
-class PredicateType(Enum):
+class DomainSource(Enum):
     """
-    The type of a predicate.
+    The domain source of a variable.
     """
 
-    SubClassOfPredicate = auto()
+    EXPLICIT = auto()
     """
-    The predicate is an instance of Predicate class.
+    Explicitly provided domain.
     """
-    DecoratedMethod = auto()
+    DEDUCTION = auto()
     """
-    The predicate is a method decorated with @predicate decorator.
+    Inferred using deductive reasoning.
     """

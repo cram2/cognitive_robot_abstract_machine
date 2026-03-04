@@ -10,15 +10,15 @@ from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
 
-from .tf_transformations import quaternion_from_euler
+from pycram.tf_transformations import quaternion_from_euler
 from random_events.interval import closed_open
 from typing_extensions import Optional, Type
 
-from .costmaps import Costmap, OccupancyCostmap, VisibilityCostmap
+from pycram.costmaps import Costmap, OccupancyCostmap, VisibilityCostmap
 import matplotlib.colorbar
-from .datastructures.pose import PoseStamped
-from .ros import create_publisher, Duration
-from .units import meter
+from pycram.datastructures.pose import PoseStamped
+from pycram.ros import create_publisher, Duration
+from pycram.units import meter
 
 from pint import Quantity
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event

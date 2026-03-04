@@ -17,11 +17,11 @@ from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
 )
-from .enums import ApproachDirection, VerticalAlignment, Grasp
-from .pose import PoseStamped
+from pycram.datastructures.enums import ApproachDirection, VerticalAlignment, Grasp
+from pycram.datastructures.pose import PoseStamped
 
 if TYPE_CHECKING:
-    from ..plan import Plan
+    from pycram.plan import Plan
 
 
 @dataclass

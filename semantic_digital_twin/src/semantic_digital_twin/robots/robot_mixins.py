@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import List, Type, Union
 
-from ..reasoning.predicates import LeftOf, RightOf
-from ..robots.abstract_robot import Neck, Arm
+from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
+from semantic_digital_twin.robots.abstract_robot import Neck, Arm
 
 
 @dataclass

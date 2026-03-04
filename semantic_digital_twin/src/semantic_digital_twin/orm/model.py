@@ -10,21 +10,21 @@ from typing_extensions import List
 from typing_extensions import Optional
 
 from krrood.ormatic.dao import AlternativeMapping
-from ..spatial_types import (
+from semantic_digital_twin.spatial_types import (
     RotationMatrix,
     Vector3,
     Point3,
     HomogeneousTransformationMatrix,
 )
-from ..spatial_types.spatial_types import Quaternion, Pose
-from ..world import World
-from ..world_description.connections import Connection
-from ..world_description.degree_of_freedom import DegreeOfFreedom
-from ..world_description.world_entity import (
+from semantic_digital_twin.spatial_types.spatial_types import Quaternion, Pose
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import Connection
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     KinematicStructureEntity,
 )
-from ..world_description.world_state import WorldState
+from semantic_digital_twin.world_description.world_state import WorldState
 
 
 @dataclass

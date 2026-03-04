@@ -2,7 +2,7 @@ import networkx
 import numpy as np
 from N2G import drawio_diagram
 
-from ...probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit
 
 
 class DrawIoExporter:

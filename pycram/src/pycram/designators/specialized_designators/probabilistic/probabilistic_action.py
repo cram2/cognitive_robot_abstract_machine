@@ -32,11 +32,11 @@ from semantic_digital_twin.world_description.world_entity import Body
 from sqlalchemy import select
 from typing_extensions import Optional, List
 
-from ....robot_plans import MoveAndPickUpAction
-from ....datastructures.enums import Arms, Grasp, VerticalAlignment, ApproachDirection
-from ....datastructures.grasp import GraspDescription
-from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
+from pycram.robot_plans import MoveAndPickUpAction
+from pycram.datastructures.enums import Arms, Grasp, VerticalAlignment, ApproachDirection
+from pycram.datastructures.grasp import GraspDescription
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.datastructures.pose import PoseStamped
 
 
 class Variables(enum.Enum):

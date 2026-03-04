@@ -5,12 +5,12 @@ from geometry_msgs.msg import Vector3
 
 from owlready2 import Thing
 
-from ....robot_plans import PickUpAction, PickUpAction
-from ....datastructures.pose import PoseStamped, TransformStamped
-from ....datastructures.enums import Arms, Grasp
-from ....view_manager import RobotDescription, KinematicChainDescription
-from ....designator import ObjectDesignatorDescription
-from ....logging import info
+from pycram.robot_plans import PickUpAction, PickUpAction
+from pycram.datastructures.pose import PoseStamped, TransformStamped
+from pycram.datastructures.enums import Arms, Grasp
+from pycram.view_manager import RobotDescription, KinematicChainDescription
+from pycram.designator import ObjectDesignatorDescription
+from pycram.logging import info
 
 
 class DualArmPickupAction(PickUpAction):

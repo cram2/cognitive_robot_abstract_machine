@@ -14,7 +14,7 @@ classifiers = [
 license = "MIT"
 
 dependencies = [
-    "mujoco==3.3.7",
+    "mujoco",
 ]
 
 [project.urls]

@@ -9,7 +9,6 @@ hypothesis
 pytest
 scipy
 sqlacodegen
-ripple_down_rules>=0.6.51
 pytest-order
 sqlalchemy
 embreex # Hardware acceleration for trimesh raycasting
@@ -22,8 +21,6 @@ pathlib
 probabilistic_model
 python-fcl
 manifold3d
-krrood>=2.0.2
-rustworkx_utils
 polytope
 ortools
 fbxloader
