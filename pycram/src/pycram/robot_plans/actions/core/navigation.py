@@ -30,15 +30,18 @@ class NavigateAction(ActionDescription):
     Location to which the robot should be navigated
     """
 
-    keep_joint_states: bool = ActionConfig.navigate_keep_joint_states
-    """
-    Keep the joint states of the robot the same during the navigation.
-    """
-
     def execute(self) -> None:
-        return SequentialPlan(
-            self.context, MoveMotion(self.target_location, self.keep_joint_states)
-        ).perform()
+        return SequentialPlan(self.context, MoveMotion(self.target_location)).perform()
+
+    @classmethod
+    def description(
+        cls,
+        target_location: Union[Iterable[PoseStamped], PoseStamped],
+    ) -> PartialDesignator[NavigateAction]:
+        return PartialDesignator[NavigateAction](
+            NavigateAction,
+            target_location=target_location,
+        )
 
     def validate(
         self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
@@ -48,20 +51,6 @@ class NavigateAction(ActionDescription):
             World.robot.pose, self.target_location
         ):
             raise NavigationGoalNotReachedError(World.robot.pose, self.target_location)
-
-    @classmethod
-    def description(
-        cls,
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
-        keep_joint_states: Union[
-            Iterable[bool], bool
-        ] = ActionConfig.navigate_keep_joint_states,
-    ) -> PartialDesignator[NavigateAction]:
-        return PartialDesignator[NavigateAction](
-            NavigateAction,
-            target_location=target_location,
-            keep_joint_states=keep_joint_states,
-        )
 
 
 @dataclass

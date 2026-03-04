@@ -1,7 +1,15 @@
 from dataclasses import dataclass
 from typing import Optional
 
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    UpdateTemporaryCollisionRules,
+)
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.tasks.pointing import Pointing
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
 from semantic_digital_twin.robots.abstract_robot import Camera
 
 from pycram.robot_plans.motions.base import BaseMotion
@@ -56,6 +64,12 @@ class MoveJointsMotion(BaseMotion):
             goal_state=JointState.from_mapping(dict(zip(dofs, self.positions)))
         )
 
+    @property
+    def collision_rules(self) -> list[MotionStatechartNode]:
+        return [
+            ExternalCollisionAvoidance(),
+        ]
+
 
 @dataclass
 class LookingMotion(BaseMotion):
@@ -85,3 +99,9 @@ class LookingMotion(BaseMotion):
             goal_point=self.target.to_spatial_type().to_position(),
             pointing_axis=self.camera.forward_facing_axis,
         )
+
+    @property
+    def collision_rules(self) -> list[MotionStatechartNode]:
+        return [
+            ExternalCollisionAvoidance(),
+        ]

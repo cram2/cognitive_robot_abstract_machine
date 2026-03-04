@@ -16,7 +16,6 @@ from typing_extensions import (
 
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import NoJointStateWithType
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -30,7 +29,9 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import BoundingBox
-from semantic_digital_twin.world_description.shape_collection import BoundingBoxCollection
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+)
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     RootedSemanticAnnotation,
@@ -44,6 +45,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
+    from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 
 
 @dataclass
@@ -510,6 +512,14 @@ class AbstractRobot(Agent, ABC):
         A subset of the robot's connections that are controlled by a controller.
         """
         return set(self._world.controlled_connections) & set(self.connections)
+
+    @property
+    @abstractmethod
+    def special_constraints(self) -> list[MotionStatechartNode]:
+        """
+        A list of spacial constraits that may apply to a robot when moving, that are not an explicit part of the kinematic
+        structure. Most robots so far don't need this
+        """
 
     @property
     def degrees_of_freedom_with_hardware_interface(self) -> List[DegreeOfFreedom]:

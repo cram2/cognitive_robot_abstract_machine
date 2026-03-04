@@ -98,6 +98,24 @@ class ReachMotion(BaseMotion):
         ]
         return Sequence(nodes=nodes)
 
+    @property
+    def collision_rules(self) -> list[MotionStatechartNode]:
+        manipulator_bodies = (
+            ViewManager()
+            .get_end_effector_view(self.arm, self.robot_view)
+            .bodies_with_collision
+        )
+        return [
+            ExternalCollisionAvoidance(),
+            UpdateTemporaryCollisionRules(
+                temporary_rules=[
+                    AllowCollisionBetweenGroups(
+                        [self.object_designator], manipulator_bodies
+                    )
+                ]
+            ),
+        ]
+
 
 @dataclass
 class MoveGripperMotion(BaseMotion):
@@ -131,6 +149,10 @@ class MoveGripperMotion(BaseMotion):
                 "OpenGripper" if self.motion == GripperState.OPEN else "CloseGripper"
             ),
         )
+
+    @property
+    def collision_rules(self) -> list[MotionStatechartNode]:
+        return []
 
 
 @dataclass
@@ -167,7 +189,6 @@ class MoveTCPMotion(BaseMotion):
             if self.robot_view.full_body_controlled
             else self.robot_view.root
         )
-        root = self.world.root
         task = None
         if self.movement_type == MovementType.TRANSLATION:
             task = CartesianPosition(
@@ -186,21 +207,23 @@ class MoveTCPMotion(BaseMotion):
             )
         return task
 
-    #
-    # @property
-    # def collision_rules(self) -> list[MotionStatechartNode]:
-    #     rules = [ExternalCollisionAvoidance(robot=self.robot_view)]
-    #     if self.allow_gripper_collision:
-    #         manipulator = ViewManager().get_end_effector_view(self.arm, self.robot_view)
-    #         rules.append(UpdateTemporaryCollisionRules(
-    #             temporary_rules=[
-    #                 AllowCollisionBetweenGroups(
-    #                     self.world.bodies_with_collision,
-    #                     manipulator.bodies_with_collision,
-    #                 )
-    #             ]
-    #         )
-    #     return rules
+    @property
+    def collision_rules(self) -> list[MotionStatechartNode]:
+        manipulator_bodies = (
+            ViewManager()
+            .get_end_effector_view(self.arm, self.robot_view)
+            .bodies_with_collision
+        )
+        return [
+            ExternalCollisionAvoidance(),
+            UpdateTemporaryCollisionRules(
+                temporary_rules=[
+                    AllowCollisionBetweenGroups(
+                        self.world.bodies_with_collision, manipulator_bodies
+                    )
+                ]
+            ),
+        ]
 
 
 @dataclass
@@ -244,8 +267,25 @@ class MoveTCPWaypointsMotion(BaseMotion):
                 root_link=root,
                 tip_link=tip,
                 goal_pose=pose.to_spatial_type(),
-                # threshold=0.005,
             )
             for pose in self.waypoints
         ]
         return Sequence(nodes=nodes)
+
+    @property
+    def collision_rules(self) -> list[MotionStatechartNode]:
+        manipulator_bodies = (
+            ViewManager()
+            .get_end_effector_view(self.arm, self.robot_view)
+            .bodies_with_collision
+        )
+        return [
+            ExternalCollisionAvoidance(),
+            UpdateTemporaryCollisionRules(
+                temporary_rules=[
+                    AllowCollisionBetweenGroups(
+                        self.world.bodies_with_collision, manipulator_bodies
+                    )
+                ]
+            ),
+        ]

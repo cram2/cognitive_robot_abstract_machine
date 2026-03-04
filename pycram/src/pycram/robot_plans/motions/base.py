@@ -80,11 +80,16 @@ class BaseMotion(DesignatorDescription):
     @property
     @abstractmethod
     def _motion_chart(self) -> Task:
-        pass
+        """
+        Returns the motion chart for this motion. Will be overwritten by each motion.
+        """
 
     @property
+    @abstractmethod
     def collision_rules(self) -> list[MotionStatechartNode]:
-        return []
+        """
+        Returns the collision rules for this motion. Will be overwritten by each motion.
+        """
 
     def get_alternative_motion(self) -> Optional[Type[AlternativeMotion]]:
         return AlternativeMotion.check_for_alternative(self.robot_view, self)

@@ -6,7 +6,10 @@ from datetime import timedelta
 import numpy as np
 from typing_extensions import Union, Optional, Type, Any, Iterable
 
-from pycram.robot_plans.actions.core.navigation import LookAtActionDescription, NavigateActionDescription
+from pycram.robot_plans.actions.core.navigation import (
+    LookAtActionDescription,
+    NavigateActionDescription,
+)
 from pycram.config.action_conf import ActionConfig
 from pycram.datastructures.partial_designator import PartialDesignator
 from pycram.datastructures.pose import PoseStamped
@@ -24,10 +27,6 @@ class FaceAtAction(ActionDescription):
     pose: PoseStamped
     """
     The pose to face 
-    """
-    keep_joint_states: bool = ActionConfig.face_at_keep_joint_states
-    """
-    Keep the joint states of the robot the same during the navigation.
     """
 
     def execute(self) -> None:
@@ -52,7 +51,7 @@ class FaceAtAction(ActionDescription):
         # turn robot
         SequentialPlan(
             self.context,
-            NavigateActionDescription(new_robot_pose, self.keep_joint_states),
+            NavigateActionDescription(new_robot_pose),
             # look at target
             LookAtActionDescription(self.pose),
         ).perform()
@@ -67,13 +66,8 @@ class FaceAtAction(ActionDescription):
     def description(
         cls,
         pose: Union[Iterable[PoseStamped], PoseStamped],
-        keep_joint_states: Union[
-            Iterable[bool], bool
-        ] = ActionConfig.face_at_keep_joint_states,
     ) -> PartialDesignator[FaceAtAction]:
-        return PartialDesignator(
-            FaceAtAction, pose=pose, keep_joint_states=keep_joint_states
-        )
+        return PartialDesignator(FaceAtAction, pose=pose)
 
 
 FaceAtActionDescription = FaceAtAction.description

@@ -1,6 +1,14 @@
 from dataclasses import dataclass
 
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    UpdateTemporaryCollisionRules,
+)
 from giskardpy.motion_statechart.goals.open_close import Open, Close
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 from pycram.robot_plans.motions.base import BaseMotion
@@ -30,6 +38,24 @@ class OpeningMotion(BaseMotion):
     def _motion_chart(self):
         tip = ViewManager().get_end_effector_view(self.arm, self.robot_view).tool_frame
         return Open(tip_link=tip, environment_link=self.object_part)
+
+    @property
+    def collision_rules(self) -> list[MotionStatechartNode]:
+        manipulator_bodies = (
+            ViewManager()
+            .get_end_effector_view(self.arm, self.robot_view)
+            .bodies_with_collision
+        )
+        return [
+            ExternalCollisionAvoidance(),
+            UpdateTemporaryCollisionRules(
+                temporary_rules=[
+                    AllowCollisionBetweenGroups(
+                        self.world.bodies_with_collision, manipulator_bodies
+                    )
+                ]
+            ),
+        ]
 
 
 @dataclass

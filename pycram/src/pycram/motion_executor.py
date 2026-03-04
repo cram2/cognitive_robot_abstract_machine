@@ -35,10 +35,10 @@ class MotionExecutor:
     The motions to execute
     """
 
-    # collision_rules: List[MotionStatechartNode]
-    # """
-    # The collision rules to use for the motions. This may include MotionStatechartNodes which modify existing rules
-    # """
+    collision_rules: List[MotionStatechartNode]
+    """
+    The collision rules to use for the motions. This may include MotionStatechartNodes which modify existing rules
+    """
 
     world: World
     """
@@ -61,20 +61,9 @@ class MotionExecutor:
         self.motion_state_chart = MotionStatechart()
         sequence_node = Sequence(nodes=self.motions)
         self.motion_state_chart.add_node(sequence_node)
-        # self.motion_state_chart.add_nodes(nodes=self.collision_rules)
+        self.motion_state_chart.add_nodes(nodes=self.collision_rules)
         robot = self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
         self.motion_state_chart.add_nodes(robot.special_constraints)
-        self.motion_state_chart.add_node(ExternalCollisionAvoidance())
-        self.motion_state_chart.add_node(
-            UpdateTemporaryCollisionRules(
-                temporary_rules=[
-                    AllowCollisionBetweenGroups(
-                        self.world.bodies_with_collision,
-                        [self.world.get_body_by_name("milk.stl")],
-                    )
-                ]
-            )
-        )
 
         self.motion_state_chart.add_node(EndMotion.when_true(sequence_node))
 

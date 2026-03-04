@@ -1037,9 +1037,9 @@ class ActionNode(BaseActionNode, Generic[ActionType]):
                 self.recursive_children,
             )
         )
-        collision_rules = {}
+        collision_rules = set()
         for motion_desig in motion_desigs:
-            collision_rules.update(set(motion_desig.collision_rules))
+            collision_rules.update(set(motion_desig.designator_ref.collision_rules))
         return list(collision_rules)
 
     def construct_msc(self):
@@ -1048,6 +1048,7 @@ class ActionNode(BaseActionNode, Generic[ActionType]):
         """
         self.motion_executor = MotionExecutor(
             self.collect_motions(),
+            self.collect_collision_rules(),
             self.plan.world,
             ros_node=self.plan.context.ros_node,
         )

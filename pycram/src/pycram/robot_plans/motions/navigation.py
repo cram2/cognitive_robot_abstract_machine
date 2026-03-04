@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.pointing import Pointing
@@ -19,19 +20,13 @@ class MoveMotion(BaseMotion):
     Location to which the robot should be moved
     """
 
-    keep_joint_states: bool = False
-    """
-    Keep the joint states of the robot during/at the end of the motion
-    """
-
     def perform(self):
         return
 
     @property
     def _motion_chart(self):
         return SetOdometry(base_pose=self.target.to_spatial_type())
-        # return CartesianPose(
-        #     root_link=self.world.root,
-        #     tip_link=self.robot_view.root,
-        #     goal_pose=self.target.to_spatial_type(),
-        # )
+
+    @property
+    def collision_rules(self) -> list[MotionStatechartNode]:
+        return []

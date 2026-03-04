@@ -276,7 +276,7 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                 root_link=self.root,
                 tip_link=self.torso.tip,
                 tip_normal=Vector3.Z(reference_frame=self.torso.tip),
-                goal_normal=Vector3.Z(self.root),
+                goal_normal=Vector3.Z(reference_frame=self.root),
             )
         ]
 
@@ -457,6 +457,7 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             _world=self._world,
         )
         self.add_torso(torso)
+        self.full_body_controlled = True
 
         self._world.add_semantic_annotation(self)
 
