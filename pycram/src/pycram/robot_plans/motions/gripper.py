@@ -105,7 +105,7 @@ class ReachMotion(BaseMotion):
             .get_end_effector_view(self.arm, self.robot_view)
             .bodies_with_collision
         )
-        return [
+        rules = [
             ExternalCollisionAvoidance(),
             UpdateTemporaryCollisionRules(
                 temporary_rules=[
@@ -115,6 +115,8 @@ class ReachMotion(BaseMotion):
                 ]
             ),
         ]
+        rules.extend(self.robot_view.special_constraints)
+        return rules
 
 
 @dataclass
@@ -189,7 +191,6 @@ class MoveTCPMotion(BaseMotion):
             if self.robot_view.full_body_controlled
             else self.robot_view.root
         )
-        task = None
         if self.movement_type == MovementType.TRANSLATION:
             task = CartesianPosition(
                 root_link=root,
@@ -214,7 +215,7 @@ class MoveTCPMotion(BaseMotion):
             .get_end_effector_view(self.arm, self.robot_view)
             .bodies_with_collision
         )
-        return [
+        rules = [
             ExternalCollisionAvoidance(),
             UpdateTemporaryCollisionRules(
                 temporary_rules=[
@@ -224,6 +225,8 @@ class MoveTCPMotion(BaseMotion):
                 ]
             ),
         ]
+        rules.extend(self.robot_view.special_constraints)
+        return rules
 
 
 @dataclass
@@ -279,7 +282,7 @@ class MoveTCPWaypointsMotion(BaseMotion):
             .get_end_effector_view(self.arm, self.robot_view)
             .bodies_with_collision
         )
-        return [
+        rules = [
             ExternalCollisionAvoidance(),
             UpdateTemporaryCollisionRules(
                 temporary_rules=[
@@ -289,3 +292,5 @@ class MoveTCPWaypointsMotion(BaseMotion):
                 ]
             ),
         ]
+        rules.extend(self.robot_view.special_constraints)
+        return rules

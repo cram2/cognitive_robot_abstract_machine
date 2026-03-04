@@ -46,7 +46,7 @@ class OpeningMotion(BaseMotion):
             .get_end_effector_view(self.arm, self.robot_view)
             .bodies_with_collision
         )
-        return [
+        rules = [
             ExternalCollisionAvoidance(),
             UpdateTemporaryCollisionRules(
                 temporary_rules=[
@@ -56,6 +56,8 @@ class OpeningMotion(BaseMotion):
                 ]
             ),
         ]
+        rules.extend(self.robot_view.special_constraints)
+        return rules
 
 
 @dataclass
@@ -82,3 +84,23 @@ class ClosingMotion(BaseMotion):
         return Close(
             tip_link=tip, environment_link=self.object_part, goal_joint_state=0.01
         )
+
+    @property
+    def collision_rules(self) -> list[MotionStatechartNode]:
+        manipulator_bodies = (
+            ViewManager()
+            .get_end_effector_view(self.arm, self.robot_view)
+            .bodies_with_collision
+        )
+        rules = [
+            ExternalCollisionAvoidance(),
+            UpdateTemporaryCollisionRules(
+                temporary_rules=[
+                    AllowCollisionBetweenGroups(
+                        self.world.bodies_with_collision, manipulator_bodies
+                    )
+                ]
+            ),
+        ]
+        rules.extend(self.robot_view.special_constraints)
+        return rules

@@ -62,8 +62,6 @@ class MotionExecutor:
         sequence_node = Sequence(nodes=self.motions)
         self.motion_state_chart.add_node(sequence_node)
         self.motion_state_chart.add_nodes(nodes=self.collision_rules)
-        robot = self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
-        self.motion_state_chart.add_nodes(robot.special_constraints)
 
         self.motion_state_chart.add_node(EndMotion.when_true(sequence_node))
 

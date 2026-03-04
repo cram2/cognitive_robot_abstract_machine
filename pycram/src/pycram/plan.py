@@ -785,7 +785,7 @@ class PlanNode:
         return sorted(children, key=lambda node: node.layer_index)
 
     @property
-    def recursive_children(self) -> List[PlanNode]:
+    def recursive_children(self) -> List[PlanNode | MotionNode]:
         """
         Recursively lists all children and their children.
 
@@ -1019,28 +1019,33 @@ class ActionNode(BaseActionNode, Generic[ActionType]):
         Collects all child motions of this action. A motion is considered if it is a direct child of this action node,
         i.e. there is no other action node between this action node and the motion.
         """
-        motion_desigs = list(
-            filter(
-                lambda x: x.is_leaf and x.parent_action_node == self,
-                self.recursive_children,
-            )
-        )
-        return [m.designator_ref.motion_chart for m in motion_desigs]
+        return [
+            motion_designator.designator_ref.motion_chart
+            for motion_designator in self._collect_motion_designators()
+        ]
 
     def collect_collision_rules(self) -> List[MotionStatechartNode]:
         """
         Collects all collision rules of this action.
         """
-        motion_desigs = list(
-            filter(
-                lambda x: x.is_leaf and x.parent_action_node == self,
-                self.recursive_children,
-            )
-        )
+        motion_designators = self._collect_motion_designators()
         collision_rules = set()
-        for motion_desig in motion_desigs:
-            collision_rules.update(set(motion_desig.designator_ref.collision_rules))
+        for motion_designator in motion_designators:
+            collision_rules.update(
+                set(motion_designator.designator_ref.collision_rules)
+            )
         return list(collision_rules)
+
+    def _collect_motion_designators(self) -> List[MotionNode]:
+        """
+        Collects all motion designators that are direct children of this action node.
+        """
+        motion_designators = [
+            x
+            for x in self.recursive_children
+            if x.is_leaf and x.parent_action_node == self
+        ]
+        return motion_designators
 
     def construct_msc(self):
         """
