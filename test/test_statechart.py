@@ -4,7 +4,7 @@ from typing import Dict, DefaultDict, Set
 
 import rclpy
 
-from Segmind.test import setup_contact_world, setup_support_world
+
 from krrood.symbolic_math.symbolic_math import trinary_logic_or
 from segmind.datastructures.events import (
     ContactEvent,
@@ -18,10 +18,10 @@ from segmind.detectors.atomic_event_detectors_nodes import (
     LossOfContactDetector,
     SegmindContext,
 )
-from segmind.detectors.spatial_relation_detector import (
-    SupportDetectorNode,
-    SupportDetector,
-    LossOfSupportDetector,
+
+from segmind.detectors.spatial_relation_detector_nodes import (
+SupportDetector,
+LossOfSupportDetector
 )
 from segmind.event_logger import EventLogger
 
@@ -33,10 +33,13 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
+from test import setup_contact_world, setup_support_world
 
 
 class TestMotionStatechart:
 
+
+    #ToDo: We need to add some constraints on ticking, how many time do we tick per update?
     def test_contact_detector(self):
         """
         We will test the following cases:
@@ -58,6 +61,8 @@ class TestMotionStatechart:
             logger=logger,
             latest_contact_bodies={},
         )
+
+        #ToDo: We need the EpisodeSegmenter here as an Executer and change the name of kin_sim
         kin_sim = Executor(self.context)
 
         contact_detector = ContactDetector(

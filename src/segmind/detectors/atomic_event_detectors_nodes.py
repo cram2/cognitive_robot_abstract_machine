@@ -19,20 +19,47 @@ class SegmindContext(MotionStatechartContext):
 
     Stores the latest detected contact and support relationships
     between bodies in the simulation as well as the event logger.
-
-    :param latest_contact_bodies: Dictionary mapping each body to the set of
-        bodies it is currently in contact with.
-    :param latest_support: Dictionary mapping each body to the set of bodies
-        that currently support it.
-    :param logger: Logger used to record detected events.
     ToDo:  Why circular import for EventLogger? and move this away
     """
 
-    latest_contact_bodies: Dict[Body, Set[Body]] = None
-    latest_support: Dict[Body, Set[Body]] = None
-    logger: Optional[Any] = None
+
+    IndexedBodyPairs = Dict[Body, Set[Body]]
+    """
+    Type hint for dictionaries mapping bodies to sets of bodies
+    """
 
 
+    latest_contact_bodies: IndexedBodyPairs = None
+    """
+    :param latest_contact_bodies: Dictionary mapping each body to the set of
+    bodies it is currently in contact with.
+    """
+
+    latest_support: IndexedBodyPairs = None
+    """
+    :param latest_support: Dictionary mapping each body to the set of bodies
+    that currently support it.
+    """
+
+    latest_contaiments: IndexedBodyPairs = None
+    """
+    :param latest_support: Dictionary mapping each body to the set of bodies
+    that currently support it.
+    """
+
+    logger: Any = None
+    """
+    :param latest_support: Dictionary mapping each body to the set of bodies
+    that currently support it.
+    """
+
+#ToDo: See if we can create our own MotionStatechartNode or change its name (talk to simon)
+@dataclass(repr=False, eq=False)
+class DetectorStateChartNode(MotionStatechartNode):
+    pass
+
+
+@dataclass
 class DetectorStateChart(MotionStatechart):
     """
     Statechart responsible for running the different motion detectors.
@@ -44,25 +71,30 @@ class DetectorStateChart(MotionStatechart):
     pass
 
 
+#ToDo: there is a lot of duplication with SupportDetector, so we have to make it more robust
 @dataclass(eq=False, repr=False)
-class BaseContactDetector(MotionStatechartNode, ABC):
+class BaseContactDetector(DetectorStateChartNode, ABC):
     """
     Abstract base class for contact-based detectors.
 
     Provides shared functionality for detecting contacts between
     bodies and generating events when contact relationships change.
-
-    :param tracked_object: Optional body that should be monitored.
-        If None, all trackable objects in the world are checked.
-    :param context: Segmind context containing world information,
-        contact history and logging utilities.
     """
 
     tracked_object: Optional[Body] = field(kw_only=True, default=None)
+    """
+    :param tracked_object: Optional body that should be monitored.
+    If None, all trackable objects in the world are checked.
+    """
+
     context: SegmindContext = field(kw_only=True)
+    """
+    :param context: Segmind context containing world information,
+    contact history and logging utilities.
+    """
 
     def on_tick(
-        self, context: MotionStatechartContext
+        self, context: SegmindContext
     ) -> Optional[ObservationStateValues]:
         """
         Executes one update cycle of the detector.
@@ -73,16 +105,15 @@ class BaseContactDetector(MotionStatechartNode, ABC):
 
         :param context: The statechart execution context.
         :return: ObservationStateValues.TRUE if events were triggered,
-            otherwise ObservationStateValues.FALSE.
+        otherwise ObservationStateValues.FALSE.
         """
 
-        trackable_objects = [
-            body
-            for body in self.context.world.bodies
-            if type(body.parent_connection) is Connection6DoF
-        ]
         objects_to_check = (
-            [self.tracked_object] if self.tracked_object else trackable_objects
+            [self.tracked_object] if self.tracked_object else [
+                body
+                for body in self.context.world.bodies
+                if type(body.parent_connection) is Connection6DoF
+            ]
         )
         events = self.update_latest_contact_bodies_and_trigger_events(objects_to_check)
         for e in events:
@@ -155,30 +186,10 @@ class ContactDetector(BaseContactDetector):
         latest_contact_bodies = self.context.latest_contact_bodies
         events = []
         for obj, contact_list in new_contact_pairs.items():
-            if obj not in latest_contact_bodies:
-                latest_contact_bodies[obj] = contact_list
-                for body in contact_list:
-                    events.append(
-                        ContactEvent(
-                            close_bodies=contact_list,
-                            latest_close_bodies=latest_contact_bodies,
-                            of_object=obj,
-                            with_object=body,
-                        )
-                    )
-            else:
-                new_contacts = contact_list - latest_contact_bodies[obj]
-                if new_contacts:
-                    latest_contact_bodies[obj] |= new_contacts
-                    for body in new_contacts:
-                        events.append(
-                            ContactEvent(
-                                close_bodies=contact_list,
-                                latest_close_bodies=latest_contact_bodies,
-                                of_object=obj,
-                                with_object=body,
-                            )
-                        )
+            new_contacts = contact_list if obj not in latest_contact_bodies else contact_list - latest_contact_bodies[obj]
+            if new_contacts:
+                latest_contact_bodies.setdefault(obj, set()).update(new_contacts)
+                events.extend([ContactEvent(of_object=obj, with_object=c) for c in new_contacts])
 
         return events
 
@@ -209,30 +220,9 @@ class LossOfContactDetector(BaseContactDetector):
         latest_contact_bodies = self.context.latest_contact_bodies
         events = []
         for obj, contact_list in list(latest_contact_bodies.items()):
-            if obj not in new_contact_pairs:
+            loss_contacts = contact_list if obj not in new_contact_pairs else contact_list - new_contact_pairs[obj]
+            if loss_contacts:
                 latest_contact_bodies.pop(obj)
-                for body in contact_list:
-                    events.append(
-                        LossOfContactEvent(
-                            close_bodies=contact_list,
-                            latest_close_bodies=latest_contact_bodies,
-                            of_object=obj,
-                            with_object=body,
-                        )
-                    )
-            else:
-                new_contacts = new_contact_pairs[obj]
-                lost_contacts = contact_list - new_contacts
-                if lost_contacts:
-                    latest_contact_bodies[obj] = new_contacts
-                    for body in lost_contacts:
-                        events.append(
-                            LossOfContactEvent(
-                                close_bodies=contact_list,
-                                latest_close_bodies=latest_contact_bodies,
-                                of_object=obj,
-                                with_object=body,
-                            )
-                        )
+                events.extend([LossOfContactEvent(of_object=obj, with_object=s) for s in loss_contacts])
 
         return events
