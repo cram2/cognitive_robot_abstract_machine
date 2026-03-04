@@ -11,7 +11,7 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
 from giskardpy.motion_statechart.goals.templates import Sequence
-from giskardpy.motion_statechart.graph_node import EndMotion
+from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
 from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -22,6 +22,7 @@ from pycram.datastructures.enums import ExecutionType
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionBetweenGroups,
 )
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,11 @@ class MotionExecutor:
     """
     The motions to execute
     """
+
+    # collision_rules: List[MotionStatechartNode]
+    # """
+    # The collision rules to use for the motions. This may include MotionStatechartNodes which modify existing rules
+    # """
 
     world: World
     """
@@ -55,6 +61,9 @@ class MotionExecutor:
         self.motion_state_chart = MotionStatechart()
         sequence_node = Sequence(nodes=self.motions)
         self.motion_state_chart.add_node(sequence_node)
+        # self.motion_state_chart.add_nodes(nodes=self.collision_rules)
+        robot = self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        self.motion_state_chart.add_nodes(robot.special_constraints)
         self.motion_state_chart.add_node(ExternalCollisionAvoidance())
         self.motion_state_chart.add_node(
             UpdateTemporaryCollisionRules(

@@ -7,6 +7,8 @@ from typing import Self
 
 from pkg_resources import resource_filename
 
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -15,7 +17,6 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AvoidSelfCollisions,
 )
-from semantic_digital_twin.robots.robot_mixins import HasNeck, SpecifiesLeftRightArm
 from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     GripperState,
@@ -34,8 +35,8 @@ from semantic_digital_twin.robots.abstract_robot import (
     HumanoidGripper,
     Base,
 )
+from semantic_digital_twin.robots.robot_mixins import HasNeck, SpecifiesLeftRightArm
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
-
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -266,6 +267,19 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                 ),
             ]
         )
+
+    @property
+    def special_constraints(self) -> list[MotionStatechartNode]:
+        return [
+            AngleGoal(
+                root_link=self.root,
+                tip_link=self.torso.tip,
+                tip_vector=Vector3.Z(reference_frame=self.torso.tip),
+                reference_vector=Vector3.Z(self.root),
+                lower_angle=0,
+                upper_angle=0,
+            )
+        ]
 
     def _setup_semantic_annotations(self):
         base = Base(

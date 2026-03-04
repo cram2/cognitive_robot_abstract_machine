@@ -1,8 +1,8 @@
 import os
+from typing import Type
 
 import numpy as np
 
-from conftest import world_with_urdf_factory
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms
 from pycram.datastructures.pose import PoseStamped
@@ -11,6 +11,7 @@ from pycram.motion_executor import simulated_robot
 from pycram.robot_plans import MoveTorsoActionDescription, TransportActionDescription
 from pycram.robot_plans import ParkArmsActionDescription
 from semantic_digital_twin.adapters.mesh import STLParser
+from semantic_digital_twin.adapters.package_resolver import PathResolver
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -18,7 +19,9 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.armar7 import Armar7
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl, Spoon
 from semantic_digital_twin.spatial_types import (
@@ -27,7 +30,51 @@ from semantic_digital_twin.spatial_types import (
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     OmniDrive,
+    DiffDrive,
+    Connection6DoF,
 )
+from semantic_digital_twin.world_description.world_entity import Body
+
+
+def world_with_urdf_factory(
+    urdf_path: str,
+    robot_semantic_annotation: Type[AbstractRobot] | None,
+    drive_connection_type: Type[OmniDrive | DiffDrive],
+    robot_starting_pose: HomogeneousTransformationMatrix | None = None,
+    urdf_path_resolver: PathResolver | None = None,
+):
+    """
+    Builds this tree:
+    map -> odom_combined -> "urdf tree"
+    """
+    urdf_parser = URDFParser.from_file(
+        file_path=urdf_path, path_resolver=urdf_path_resolver
+    )
+    world_with_urdf = urdf_parser.parse()
+    if robot_semantic_annotation is not None:
+        robot_semantic_annotation.from_world(world_with_urdf)
+
+    with world_with_urdf.modify_world():
+        map = Body(name=PrefixedName("map"))
+        localization_body = Body(name=PrefixedName("odom_combined"))
+
+        map_C_localization = Connection6DoF.create_with_dofs(
+            world_with_urdf, map, localization_body
+        )
+        world_with_urdf.add_connection(map_C_localization)
+
+        c_root_bf = drive_connection_type.create_with_dofs(
+            parent=localization_body,
+            child=world_with_urdf.root,
+            world=world_with_urdf,
+        )
+        world_with_urdf.add_connection(c_root_bf)
+        c_root_bf.has_hardware_interface = True
+        if robot_starting_pose is not None:
+            c_root_bf.origin = robot_starting_pose
+
+    return world_with_urdf
+
 
 robot_path = os.path.join("package://iai_kit_armar7/urdf/Armar7.urdf")
 
@@ -123,7 +170,7 @@ with world.modify_world():
 plan = SequentialPlan(
     context,
     ParkArmsActionDescription(Arms.BOTH),
-    MoveTorsoActionDescription(TorsoState.HIGH),
+    # MoveTorsoActionDescription(TorsoState.HIGH),
     TransportActionDescription(
         world.get_body_by_name("milk.stl"),
         PoseStamped.from_list([4.9, 3.3, 0.8], frame=world.root),

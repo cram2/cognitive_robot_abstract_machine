@@ -25,16 +25,20 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidCollisionRule,
     AllowCollisionRule,
 )
-from semantic_digital_twin.collision_checking.pybullet_collision_detector import BulletCollisionDetector
+from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
+    BulletCollisionDetector,
+)
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.world_description.world_modification import synchronized_attribute_modification
+from semantic_digital_twin.world_description.world_modification import (
+    synchronized_attribute_modification,
+)
 
 if TYPE_CHECKING:
     from ..world import World
 
 
-@dataclass
+@dataclass(eq=False)
 class CollisionConsumer(ABC):
     """
     Interface for classes that want to be notified about changes in the collision matrix or when collision checking is performed.
@@ -65,6 +69,9 @@ class CollisionConsumer(ABC):
         """
         Called when the collision matrix is updated.
         """
+
+    def __hash__(self):
+        return hash(id(self))
 
 
 @dataclass(eq=False)

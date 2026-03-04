@@ -113,7 +113,7 @@ class TransportAction(ActionDescription):
                 grasp_description=pickup_pose.grasp_description,
             ),
             ParkArmsActionDescription(Arms.BOTH),
-            MoveTorsoActionDescription(TorsoState.HIGH),
+            # MoveTorsoActionDescription(TorsoState.HIGH),
             NavigateActionDescription(
                 CostmapLocation(
                     target=self.target_location,

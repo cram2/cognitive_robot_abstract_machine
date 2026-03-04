@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 
@@ -28,8 +29,9 @@ class MoveMotion(BaseMotion):
 
     @property
     def _motion_chart(self):
-        return CartesianPose(
-            root_link=self.world.root,
-            tip_link=self.robot_view.root,
-            goal_pose=self.target.to_spatial_type(),
-        )
+        return SetOdometry(base_pose=self.target.to_spatial_type())
+        # return CartesianPose(
+        #     root_link=self.world.root,
+        #     tip_link=self.robot_view.root,
+        #     goal_pose=self.target.to_spatial_type(),
+        # )

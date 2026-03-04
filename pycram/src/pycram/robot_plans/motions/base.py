@@ -8,7 +8,7 @@ from typing import Optional
 
 from typing_extensions import TypeVar, ClassVar, Type
 
-from giskardpy.motion_statechart.graph_node import Task
+from giskardpy.motion_statechart.graph_node import Task, MotionStatechartNode
 from krrood.ormatic.dao import HasGeneric
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from pycram.datastructures.enums import ExecutionType
@@ -81,6 +81,10 @@ class BaseMotion(DesignatorDescription):
     @abstractmethod
     def _motion_chart(self) -> Task:
         pass
+
+    @property
+    def collision_rules(self) -> list[MotionStatechartNode]:
+        return []
 
     def get_alternative_motion(self) -> Optional[Type[AlternativeMotion]]:
         return AlternativeMotion.check_for_alternative(self.robot_view, self)

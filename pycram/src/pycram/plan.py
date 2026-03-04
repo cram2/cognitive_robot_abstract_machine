@@ -30,7 +30,7 @@ from typing_extensions import (
     ClassVar,
 )
 
-from giskardpy.motion_statechart.graph_node import Task
+from giskardpy.motion_statechart.graph_node import Task, MotionStatechartNode
 from krrood.class_diagrams.failures import ClassIsUnMappedInClassDiagram
 from krrood.ormatic.dao import get_dao_class, to_dao
 from random_events.product_algebra import SimpleEvent
@@ -1027,12 +1027,29 @@ class ActionNode(BaseActionNode, Generic[ActionType]):
         )
         return [m.designator_ref.motion_chart for m in motion_desigs]
 
+    def collect_collision_rules(self) -> List[MotionStatechartNode]:
+        """
+        Collects all collision rules of this action.
+        """
+        motion_desigs = list(
+            filter(
+                lambda x: x.is_leaf and x.parent_action_node == self,
+                self.recursive_children,
+            )
+        )
+        collision_rules = {}
+        for motion_desig in motion_desigs:
+            collision_rules.update(set(motion_desig.collision_rules))
+        return list(collision_rules)
+
     def construct_msc(self):
         """
         Builds a giskard Motion State Chart (MSC) from the collected motions of this action node.
         """
         self.motion_executor = MotionExecutor(
-            self.collect_motions(), self.plan.world, ros_node=self.plan.context.ros_node
+            self.collect_motions(),
+            self.plan.world,
+            ros_node=self.plan.context.ros_node,
         )
         self.motion_executor.construct_msc()
 

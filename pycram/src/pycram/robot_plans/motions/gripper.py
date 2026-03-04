@@ -1,12 +1,21 @@
 from dataclasses import dataclass
 from typing import Optional, List
 
+from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    UpdateTemporaryCollisionRules,
+)
 from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianPosition,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.world_description.world_entity import Body
 from pycram.robot_plans.motions.base import BaseMotion
@@ -138,7 +147,7 @@ class MoveTCPMotion(BaseMotion):
     """
     Arm with the TCP that should be moved to the target
     """
-    allow_gripper_collision: Optional[bool] = None
+    allow_gripper_collision: bool = False
     """
     If the gripper can collide with something
     """
@@ -158,6 +167,7 @@ class MoveTCPMotion(BaseMotion):
             if self.robot_view.full_body_controlled
             else self.robot_view.root
         )
+        root = self.world.root
         task = None
         if self.movement_type == MovementType.TRANSLATION:
             task = CartesianPosition(
@@ -172,8 +182,25 @@ class MoveTCPMotion(BaseMotion):
                 tip_link=tip,
                 goal_pose=self.target.to_spatial_type(),
                 name="MoveTCP",
+                weight=DefaultWeights.WEIGHT_ABOVE_CA,
             )
         return task
+
+    #
+    # @property
+    # def collision_rules(self) -> list[MotionStatechartNode]:
+    #     rules = [ExternalCollisionAvoidance(robot=self.robot_view)]
+    #     if self.allow_gripper_collision:
+    #         manipulator = ViewManager().get_end_effector_view(self.arm, self.robot_view)
+    #         rules.append(UpdateTemporaryCollisionRules(
+    #             temporary_rules=[
+    #                 AllowCollisionBetweenGroups(
+    #                     self.world.bodies_with_collision,
+    #                     manipulator.bodies_with_collision,
+    #                 )
+    #             ]
+    #         )
+    #     return rules
 
 
 @dataclass
