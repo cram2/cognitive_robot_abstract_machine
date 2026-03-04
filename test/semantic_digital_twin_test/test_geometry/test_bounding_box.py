@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -100,3 +101,5 @@ def test_bounding_box_transform_rotated():
     assert new_bb.max_y == pytest.approx(0.5, abs=0.001)
     assert new_bb.min_z == 0
     assert new_bb.max_z == 1
+
+    assert sum(bb.dimensions) == sum(new_bb.dimensions)

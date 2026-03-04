@@ -927,9 +927,9 @@ class BoundingBox:
             y=self.max_y - self.min_y,
             z=self.max_z - self.min_z,
         )
-        x = (self.max_x + self.min_x) / 2
-        y = (self.max_y + self.min_y) / 2
-        z = (self.max_z + self.min_z) / 2
+        x = (self.max_x + self.min_x) / 2 + float(self.origin.x)
+        y = (self.max_y + self.min_y) / 2 + float(self.origin.y)
+        z = (self.max_z + self.min_z) / 2 + float(self.origin.z)
         origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x, y, z, 0, 0, 0, self.origin.reference_frame
         )
