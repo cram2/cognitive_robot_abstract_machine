@@ -8,6 +8,7 @@ from typing import Self
 from pkg_resources import resource_filename
 
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
@@ -271,13 +272,11 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
     @property
     def special_constraints(self) -> list[MotionStatechartNode]:
         return [
-            AngleGoal(
+            AlignPlanes(
                 root_link=self.root,
                 tip_link=self.torso.tip,
-                tip_vector=Vector3.Z(reference_frame=self.torso.tip),
-                reference_vector=Vector3.Z(self.root),
-                lower_angle=0,
-                upper_angle=0,
+                tip_normal=Vector3.Z(reference_frame=self.torso.tip),
+                goal_normal=Vector3.Z(self.root),
             )
         ]
 
