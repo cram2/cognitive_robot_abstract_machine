@@ -18,11 +18,12 @@ from pycram.language import (
 )
 from pycram.motion_executor import simulated_robot
 from pycram.robot_plans import *
+from semantic_digital_twin.spatial_types import Point3
 
 
 def test_simplify_tree(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    act = NavigateActionDescription(PoseStamped())
+    act = NavigateActionDescription(Pose())
     act2 = MoveTorsoActionDescription(TorsoState.HIGH)
     act3 = DetectActionDescription(DetectionTechnique.TYPES)
 
@@ -36,7 +37,7 @@ def test_simplify_tree(immutable_model_world):
 
 def test_sequential_construction(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    act = NavigateActionDescription(PoseStamped())
+    act = NavigateActionDescription(Pose())
     act2 = MoveTorsoActionDescription(TorsoState.HIGH)
     act3 = DetectActionDescription(DetectionTechnique.TYPES)
 
@@ -47,7 +48,7 @@ def test_sequential_construction(immutable_model_world):
 
 def test_parallel_construction(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    act = NavigateActionDescription(PoseStamped())
+    act = NavigateActionDescription(Pose())
     act2 = MoveTorsoActionDescription(TorsoState.HIGH)
     act3 = DetectActionDescription(DetectionTechnique.TYPES)
 
@@ -58,7 +59,7 @@ def test_parallel_construction(immutable_model_world):
 
 def test_try_in_order_construction(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    act = NavigateActionDescription(PoseStamped())
+    act = NavigateActionDescription(Pose())
     act2 = MoveTorsoActionDescription(TorsoState.HIGH)
     act3 = DetectActionDescription(DetectionTechnique.TYPES)
 
@@ -72,7 +73,7 @@ def test_try_in_order_construction(immutable_model_world):
 
 def test_try_all_construction(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    act = NavigateActionDescription(PoseStamped())
+    act = NavigateActionDescription(Pose())
     act2 = MoveTorsoActionDescription(TorsoState.HIGH)
     act3 = DetectActionDescription(DetectionTechnique.TYPES)
 
@@ -84,7 +85,7 @@ def test_try_all_construction(immutable_model_world):
 
 def test_combination_construction(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    act = NavigateActionDescription(PoseStamped())
+    act = NavigateActionDescription(Pose())
     act2 = MoveTorsoActionDescription(TorsoState.HIGH)
     act3 = DetectActionDescription(DetectionTechnique.TYPES)
 
@@ -96,7 +97,7 @@ def test_combination_construction(immutable_model_world):
 
 def test_pickup_par_construction(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    act = NavigateActionDescription(PoseStamped())
+    act = NavigateActionDescription(Pose())
     act2 = PickUpActionDescription(BelieveObject(names=["milk"]), ["left"], ["front"])
 
     with pytest.raises(AttributeError):
@@ -105,7 +106,7 @@ def test_pickup_par_construction(immutable_model_world):
 
 def test_pickup_try_all_construction(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    act = NavigateActionDescription(PoseStamped())
+    act = NavigateActionDescription(Pose())
     act2 = PickUpActionDescription(BelieveObject(names=["milk"]), ["left"], ["front"])
 
     with pytest.raises(AttributeError):
@@ -232,7 +233,7 @@ def test_repeat_construction_error(immutable_model_world):
 def test_perform_desig(immutable_model_world):
     world, robot_view, context = immutable_model_world
     act = NavigateActionDescription(
-        [PoseStamped.from_list([0.3, 0.3, 0], frame=world.root)]
+        [Pose(Point3.from_iterable([0.3, 0.3, 0]), reference_frame=world.root)]
     )
     act2 = MoveTorsoActionDescription([TorsoState.HIGH])
     act3 = ParkArmsActionDescription([Arms.BOTH])
@@ -303,7 +304,7 @@ def test_exception_sequential(immutable_model_world):
     def raise_except():
         raise PlanFailure
 
-    act = NavigateActionDescription([PoseStamped().from_list(frame=world.root)])
+    act = NavigateActionDescription([Pose(reference_frame=world.root)])
     code = CodePlan(context, raise_except)
 
     plan = SequentialPlan(context, act, code)
@@ -324,7 +325,7 @@ def test_exception_try_in_order(immutable_model_world):
     def raise_except():
         raise PlanFailure
 
-    act = NavigateActionDescription([PoseStamped().from_list(frame=world.root)])
+    act = NavigateActionDescription([Pose(reference_frame=world.root)])
     code = CodePlan(context, raise_except)
 
     plan = TryInOrderPlan(context, act, code)
@@ -340,7 +341,7 @@ def test_exception_parallel(immutable_model_world):
     def raise_except():
         raise PlanFailure
 
-    act = NavigateActionDescription([PoseStamped()])
+    act = NavigateActionDescription([Pose()])
     code = CodePlan(context, raise_except)
 
     plan = ParallelPlan(context, act, code)
@@ -356,7 +357,7 @@ def test_exception_try_all(immutable_model_world):
     def raise_except():
         raise PlanFailure
 
-    act = NavigateActionDescription([PoseStamped()])
+    act = NavigateActionDescription([Pose()])
     code = CodePlan(context, raise_except)
 
     plan = TryAllPLan(context, act, code)

@@ -6,18 +6,18 @@ from krrood.ormatic.dao import to_dao
 from random_events.variable import Continuous, Symbolic, Set
 
 from krrood.probabilistic_knowledge.object_access_variable import ObjectAccessVariable
-from ..dataset.example_classes import Position, Positions
+from ..dataset.example_classes import KRROODPosition, KRROODPositions
 from ..dataset.ormatic_interface import (
-    PositionDAO,
-    PoseDAO,
-    OrientationDAO,
-    PositionsDAO,
+    KRROODPositionDAO,
+    KRROODPoseDAO,
+    KRROODOrientationDAO,
+    KRROODPositionsDAO,
 )
 
 
 def test_object_access_variable_flat():
 
-    obj = PositionDAO()
+    obj = KRROODPositionDAO()
 
     obj_variable = variable_from([obj])
 
@@ -33,9 +33,9 @@ def test_object_access_variable_flat():
 
 
 def test_object_access_variable_nested():
-    obj = PoseDAO()
-    obj.position = PositionDAO()
-    obj.orientation = OrientationDAO()
+    obj = KRROODPoseDAO()
+    obj.position = KRROODPositionDAO()
+    obj.orientation = KRROODOrientationDAO()
     obj_variable = variable_from([obj])
 
     x_variable = ObjectAccessVariable(Continuous("position.x"), obj_variable.position.x)
@@ -47,8 +47,10 @@ def test_object_access_variable_nested():
 
 
 def test_object_access_variable_container():
-    obj = Positions([Position(..., ..., ...), Position(..., ..., ...)], [...])
-    dao: PositionsDAO = to_dao(obj)
+    obj = KRROODPositions(
+        [KRROODPosition(..., ..., ...), KRROODPosition(..., ..., ...)], [...]
+    )
+    dao: KRROODPositionsDAO = to_dao(obj)
 
     dao_variable = variable_from([dao])
 

@@ -32,16 +32,25 @@ from semantic_digital_twin.exceptions import (
     MissingSemanticAnnotationError,
 )
 from semantic_digital_twin.reasoning.predicates import InsideOf
-from semantic_digital_twin.spatial_types import Point3, HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types import (
+    Point3,
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
     FixedConnection,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedomLimits
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.geometry import Scale, TriangleMesh
-from semantic_digital_twin.world_description.shape_collection import BoundingBoxCollection, ShapeCollection
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+    ShapeCollection,
+)
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     Body,
@@ -950,6 +959,12 @@ class Knife(Cuttlery):
     """
     A butter knife.
     """
+
+    @property
+    def grasp_frame(self) -> HomogeneousTransformationMatrix: ...
+
+    @property
+    def tool_frame(self) -> HomogeneousTransformationMatrix: ...
 
 
 @dataclass(eq=False)

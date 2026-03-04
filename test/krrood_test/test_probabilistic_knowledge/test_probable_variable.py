@@ -33,12 +33,12 @@ from krrood.probabilistic_knowledge.probable_variable import (
     MatchToInstanceTranslator,
 )
 
-from ..dataset.example_classes import Pose, Position, Orientation
+from ..dataset.example_classes import KRROODPose, KRROODPosition, KRROODOrientation
 from ..dataset.ormatic_interface import *  # type: ignore
 
 
 def test_parameterizer_with_where():
-    pose_variable = variable(Pose, None)
+    pose_variable = variable(KRROODPose, None)
 
     q = entity(pose_variable).where(
         pose_variable.position.y > 0.0,
@@ -53,10 +53,10 @@ def test_parameterizer_with_where():
 
     result_by_hand = SimpleEvent(
         {
-            Continuous("Pose.orientation.x"): ~singleton(1.0),
-            Continuous("Pose.position.y"): open(0.0, 10),
-            Continuous("Pose.position.z"): closed(-1.0, 1.0),
-            Continuous("Pose.position.x"): singleton(0.0),
+            Continuous("KRROODPose.orientation.x"): ~singleton(1.0),
+            Continuous("KRROODPose.position.y"): open(0.0, 10),
+            Continuous("KRROODPose.position.z"): closed(-1.0, 1.0),
+            Continuous("KRROODPose.position.x"): singleton(0.0),
         }
     )
 
@@ -64,7 +64,7 @@ def test_parameterizer_with_where():
 
 
 def test_dnf_checking():
-    pose_variable = variable(Pose, None)
+    pose_variable = variable(KRROODPose, None)
 
     q1 = entity(pose_variable).where(
         and_(
@@ -98,10 +98,10 @@ def test_dnf_checking():
     translated = t.translate()
 
     variables = [
-        Continuous("Pose.position.x"),
-        Continuous("Pose.position.y"),
-        Continuous("Pose.position.z"),
-        Continuous("Pose.orientation.z"),
+        Continuous("KRROODPose.position.x"),
+        Continuous("KRROODPose.position.y"),
+        Continuous("KRROODPose.position.z"),
+        Continuous("KRROODPose.orientation.z"),
     ]
     [p_x, p_y, p_z, o_z] = variables
 
@@ -128,8 +128,8 @@ def test_dnf_checking():
 
 
 def test_query_writing_with_match_and_copy():
-    var: ProbableVariable = probable_variable(Pose)(
-        position=probable(Position)(x=0.1, y=..., z=...), orientation=None
+    var: ProbableVariable = probable_variable(KRROODPose)(
+        position=probable(KRROODPosition)(x=0.1, y=..., z=...), orientation=None
     )
 
     translator = MatchToInstanceTranslator(var)

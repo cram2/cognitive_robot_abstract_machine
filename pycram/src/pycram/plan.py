@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from copy import deepcopy
 from dataclasses import field, dataclass
 from datetime import datetime
 from enum import IntEnum
@@ -48,7 +49,6 @@ from krrood.probabilistic_knowledge.parameterizer import (
 )
 from pycram.datastructures.dataclasses import ExecutionData, Context
 from pycram.datastructures.enums import TaskStatus
-from pycram.datastructures.pose import PoseStamped
 from pycram.failures import PlanFailure
 from pycram.motion_executor import MotionExecutor
 
@@ -1047,7 +1047,7 @@ class ActionNode(BaseActionNode, Generic[ActionType]):
         """
         Creates a ExecutionData object and logs additional information about the execution of this node.
         """
-        robot_pose = PoseStamped.from_spatial_type(self.plan.robot.root.global_pose)
+        robot_pose = deepcopy(self.plan.robot.root.global_pose).to_pose()
         exec_data = ExecutionData(robot_pose, self.plan.world.state.data)
         self.execution_data = exec_data
         self._last_mod = self.plan.world._model_manager.model_modification_blocks[-1]
@@ -1059,18 +1059,18 @@ class ActionNode(BaseActionNode, Generic[ActionType]):
 
         if manipulated_body:
             self.execution_data.manipulated_body = manipulated_body
-            self.execution_data.manipulated_body_pose_start = (
-                PoseStamped.from_spatial_type(manipulated_body.global_pose)
-            )
+            self.execution_data.manipulated_body_pose_start = deepcopy(
+                manipulated_body.global_pose
+            ).to_pose()
             self.execution_data.manipulated_body_name = str(manipulated_body.name)
 
     def log_execution_data_post_perform(self):
         """
         Writes additional information to the ExecutionData object after performing this node.
         """
-        self.execution_data.execution_end_pose = PoseStamped.from_spatial_type(
+        self.execution_data.execution_end_pose = deepcopy(
             self.plan.robot.root.global_pose
-        )
+        ).to_pose()
         self.execution_data.execution_end_world_state = self.plan.world.state.data
         new_modifications = []
         for i in range(len(self.plan.world._model_manager.model_modification_blocks)):
@@ -1085,11 +1085,9 @@ class ActionNode(BaseActionNode, Generic[ActionType]):
         self.execution_data.modifications = new_modifications[::-1]
 
         if self.execution_data.manipulated_body:
-            self.execution_data.manipulated_body_pose_end = (
-                PoseStamped.from_spatial_type(
-                    self.execution_data.manipulated_body.global_pose
-                )
-            )
+            self.execution_data.manipulated_body_pose_end = deepcopy(
+                self.execution_data.manipulated_body.global_pose
+            ).to_pose()
 
     @managed_node
     def perform(self):

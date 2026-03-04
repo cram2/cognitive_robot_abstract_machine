@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-from giskardpy.motion_statechart.goals.cartesian_goals import DiffDriveBaseGoal
+from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.goals.open_close import Close
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
@@ -28,7 +28,7 @@ class StretchMoveTCP(MoveTCPMotion, AlternativeMotion[Stretch]):
     @property
     def _motion_chart(self) -> Sequence:
         tip = ViewManager().get_end_effector_view(self.arm, self.robot_view).tool_frame
-        goal_copy = deepcopy(self.target.to_spatial_type())
+        goal_copy = deepcopy(self.target)
         goal_copy = self.world.transform(goal_copy, self.robot_view.root)
         goal_point = goal_copy.to_position()
         goal_point.z = 0
@@ -45,7 +45,7 @@ class StretchMoveTCP(MoveTCPMotion, AlternativeMotion[Stretch]):
                 CartesianPose(
                     root_link=self.world.root,
                     tip_link=tip,
-                    goal_pose=self.target.to_spatial_type(),
+                    goal_pose=self.target.to_homogeneous_matrix(),
                 ),
             ]
         )
@@ -64,8 +64,8 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
     @property
     def _motion_chart(self):
 
-        return DiffDriveBaseGoal(
-            goal_pose=self.target.to_spatial_type(),
+        return DifferentialDriveBaseGoal(
+            goal_pose=self.target.to_homogeneous_matrix(),
         )
 
 

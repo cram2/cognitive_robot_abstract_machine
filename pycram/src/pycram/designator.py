@@ -7,6 +7,7 @@ from typing import get_type_hints
 
 from krrood.entity_query_language.factories import entity, variable, contains, an
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import (
@@ -22,7 +23,6 @@ from typing_extensions import (
 
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.datastructures.pose import PoseStamped
 from pycram.plan import Plan, PlanNode
 from pycram.utils import bcolors
 
@@ -173,10 +173,10 @@ class LocationDesignatorDescription(DesignatorDescription, PartialDesignator):
         self._last_result = None
 
     @property
-    def last_result(self) -> Iterator[PoseStamped]:
+    def last_result(self) -> Iterator[Pose]:
         yield self._last_result
 
-    def ground(self) -> PoseStamped:
+    def ground(self) -> Pose:
         """
         Find a location that satisfies all constrains.
         """

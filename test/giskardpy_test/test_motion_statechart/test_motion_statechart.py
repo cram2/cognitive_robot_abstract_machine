@@ -26,7 +26,7 @@ from giskardpy.motion_statechart.exceptions import (
     NodeAlreadyBelongsToDifferentNodeError,
 )
 from giskardpy.motion_statechart.goals.cartesian_goals import (
-    DiffDriveBaseGoal,
+    DifferentialDriveBaseGoal,
     CartesianPoseStraight,
 )
 from giskardpy.motion_statechart.goals.collision_avoidance import (
@@ -1855,7 +1855,7 @@ class TestDiffDriveBaseGoal:
         bot = cylinder_bot_diff_world.get_body_by_name("bot")
         msc = MotionStatechart()
         goal_pose.reference_frame = cylinder_bot_diff_world.root
-        msc.add_node(goal := DiffDriveBaseGoal(goal_pose=goal_pose))
+        msc.add_node(goal := DifferentialDriveBaseGoal(goal_pose=goal_pose))
         msc.add_node(EndMotion.when_true(goal))
 
         kin_sim = Executor(MotionStatechartContext(world=cylinder_bot_diff_world))

@@ -12,22 +12,23 @@ from krrood.probabilistic_knowledge.parameterizer import (
 from random_events.set import Set
 from random_events.variable import Continuous, Symbolic
 from ..dataset.example_classes import (
-    Position,
-    Pose,
-    Orientation,
-    Positions,
     ListOfEnum,
     TestEnum,
     Atom,
     Element,
+    KRROODPosition,
+    KRROODPose,
+    KRROODOrientation,
+    KRROODPositions,
 )
+from krrood.probabilistic_knowledge.parameterizer import Parameterization
 
 
 def test_parameterize_position():
     """
-    Test parameterization of the Position class.
+    Test parameterization of the KRROODPosition class.
     """
-    position = Position(..., ..., ...)
+    position = KRROODPosition(..., ..., ...)
     dao = to_dao(position)
     position_dao_variable = variable(type(dao), [dao])
     parameterizer = DataAccessObjectParameterizer(dao)
@@ -53,7 +54,7 @@ def test_parameterize_position_skip_none_field():
     """
     Test parameterization of the Position class.
     """
-    position = Position(None, None, None)
+    position = KRROODPosition(None, None, None)
     dao = to_dao(position)
     parameterizer = DataAccessObjectParameterizer(dao)
     parameterization = parameterizer.parameterize()
@@ -62,9 +63,9 @@ def test_parameterize_position_skip_none_field():
 
 def test_parameterize_orientation_mixed_none():
     """
-    Test parameterization of the Orientation class.
+    Test parameterization of the KRROODOrientation class.
     """
-    orientation = Orientation(..., None, ..., None)
+    orientation = KRROODOrientation(..., None, ..., None)
     dao = to_dao(orientation)
     orientation_dao_variable = variable(type(dao), [dao])
     parameterizer = DataAccessObjectParameterizer(dao)
@@ -86,11 +87,11 @@ def test_parameterize_orientation_mixed_none():
 
 def test_parameterize_pose():
     """
-    Test parameterization of the Pose class.
+    Test parameterization of the KRROODPose class.
     """
-    pose = Pose(
-        position=Position(..., ..., ...),
-        orientation=Orientation(..., ..., ..., None),
+    pose = KRROODPose(
+        position=KRROODPosition(..., ..., ...),
+        orientation=KRROODOrientation(..., ..., ..., None),
     )
 
     dao = to_dao(pose)
@@ -148,7 +149,7 @@ def test_parameterize_object_with_given_values():
     """
     Test parameterization of a single object via Parameterizer.parameterize.
     """
-    position = Position(x=1.0, y=2.0, z=3.0)
+    position = KRROODPosition(x=1.0, y=2.0, z=3.0)
     dao = to_dao(position)
     parameterizer = DataAccessObjectParameterizer(dao)
     parameterization = parameterizer.parameterize()
@@ -168,9 +169,9 @@ def test_parameterize_nested_object():
     """
     Test parameterization of a nested object via Parameterizer.parameterize.
     """
-    pose = Pose(
-        position=Position(x=1.0, y=2.0, z=3.0),
-        orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
+    pose = KRROODPose(
+        position=KRROODPosition(x=1.0, y=2.0, z=3.0),
+        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
     dao = to_dao(pose)
     parameterizer = DataAccessObjectParameterizer(dao)
@@ -191,7 +192,7 @@ def test_parameterize_nested_object():
 
 
 def test_one_to_many_and_collection_of_builtins():
-    p = Positions([Position(1, 2, 3), Position(4, 5, 6)], ["a", ...])
+    p = KRROODPositions([KRROODPosition(1, 2, 3), KRROODPosition(4, 5, 6)], ["a", ...])
     dao = to_dao(p)
     parameters = DataAccessObjectParameterizer(dao).parameterize()
 
@@ -224,14 +225,14 @@ def test_symbolic_variables():
 
 
 def test_not_follow_none_relationships():
-    p = Pose(position=Position(..., ..., ...), orientation=None)
+    p = KRROODPose(position=KRROODPosition(..., ..., ...), orientation=None)
     dao = to_dao(p)
     parameterizer = DataAccessObjectParameterizer(dao)
     parameterization = parameterizer.parameterize()
     variables = [
-        Continuous("PoseDAO.position.x"),
-        Continuous("PoseDAO.position.y"),
-        Continuous("PoseDAO.position.z"),
+        Continuous("KRROODPoseDAO.position.x"),
+        Continuous("KRROODPoseDAO.position.y"),
+        Continuous("KRROODPoseDAO.position.z"),
     ]
 
     assert parameterization.random_events_variables == variables

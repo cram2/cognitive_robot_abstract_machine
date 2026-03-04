@@ -51,8 +51,11 @@ from krrood.entity_query_language.query_graph import QueryGraph
 from krrood.entity_query_language.utils import (
     cartesian_product_while_passing_the_bindings_around,
 )
-from pycram.orm.ormatic_interface import PosterDAO
-from ...dataset.example_classes import VectorsWithProperty, Pose, Position
+from ...dataset.example_classes import (
+    KRROODPose,
+    KRROODPosition,
+    KRROODVectorsWithProperty,
+)
 from ...dataset.semantic_world_like_classes import (
     Handle,
     Body,
@@ -1028,7 +1031,7 @@ def test_property_selection():
     """
     Test that properties can be selected from entities in a query.
     """
-    v = variable(VectorsWithProperty, None)
+    v = variable(KRROODVectorsWithProperty, None)
     q = an(entity(v).where(v.vectors[0].x == 1))
 
 

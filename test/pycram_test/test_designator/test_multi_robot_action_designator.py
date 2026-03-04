@@ -15,7 +15,6 @@ from pycram.datastructures.enums import (
     DetectionTechnique,
 )
 from pycram.datastructures.grasp import GraspDescription
-from pycram.datastructures.pose import PoseStamped
 from pycram.datastructures.trajectory import PoseTrajectory
 from pycram.language import SequentialPlan
 from pycram.motion_executor import simulated_robot
@@ -51,7 +50,12 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+    Quaternion,
+)
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 
 # The alternative mapping needs to be imported for the stretch to work properly
@@ -147,7 +151,9 @@ def test_navigate_multi(immutable_multiple_robot_apartment):
     world, view, context = immutable_multiple_robot_apartment
     plan = SequentialPlan(
         context,
-        NavigateActionDescription(PoseStamped.from_list([1, 2, 0], frame=world.root)),
+        NavigateActionDescription(
+            Pose(Point3.from_iterable([1, 2, 0]), reference_frame=world.root)
+        ),
     )
 
     with simulated_robot:
@@ -236,7 +242,9 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
         context,
         ParkArmsActionDescription(Arms.BOTH),
         ReachActionDescription(
-            target_pose=PoseStamped.from_list([1, -2, 0.8], frame=world.root),
+            target_pose=Pose(
+                Point3.from_iterable([1, -2, 0.8]), reference_frame=world.root
+            ),
             object_designator=milk_body,
             arm=Arms.LEFT,
             grasp_description=grasp_description,
@@ -260,31 +268,34 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
 
     if isinstance(robot_view, (Tiago)):
-        #do not allow since
+        # do not allow since
         robot_view.full_body_controlled = False
-        robot_view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            1.7, 1.7, 0, reference_frame=world.root
+        robot_view.root.parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                1.7, 1.7, 0, reference_frame=world.root
+            )
         )
         world.notify_state_change()
 
     if isinstance(robot_view, (Stretch)):
         # do not allow since
         robot_view.full_body_controlled = False
-        robot_view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.12, 2.2, 0, reference_frame=world.root
+        robot_view.root.parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                2.12, 2.2, 0, reference_frame=world.root
+            )
         )
         world.notify_state_change()
     # robot_view.full_body_controlled = True
     left_arm = ViewManager.get_arm_view(Arms.LEFT, robot_view)
-
 
     front_axis = tuple(
         int(v) for v in left_arm.manipulator.front_facing_axis.to_np()[:3]
     )
     grasp_axis = AxisIdentifier.from_tuple(front_axis)
 
-    pose = PoseStamped.from_spatial_type(world.get_body_by_name("milk.stl").global_pose)
-    pose_T = pose.to_spatial_type()
+    pose_T = world.get_body_by_name("milk.stl").global_pose
+    pose = pose_T.to_pose()
     if grasp_axis == AxisIdentifier.X:
         target_pose = pose
     elif grasp_axis == AxisIdentifier.Z:
@@ -293,7 +304,7 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
             angle=np.pi / 2,
             reference_frame=world.root,
         )
-        target_pose = PoseStamped.from_spatial_type(pose_T @ offset_T)
+        target_pose = (pose_T @ offset_T).to_pose()
     else:
         target_pose = pose
 
@@ -308,9 +319,7 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
         plan.perform()
 
     tip_pose = left_arm.manipulator.tool_frame.global_pose
-    dist = np.linalg.norm(
-        tip_pose.to_position().to_np()[:3] - np.array(target_pose.position.to_list())
-    )
+    dist = np.linalg.norm(tip_pose.to_position() - np.array(target_pose.to_position()))
     assert dist < 0.01
 
 
@@ -418,7 +427,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
         ),
         PlaceActionDescription(
             world.get_body_by_name("milk.stl"),
-            PoseStamped.from_list([1, -2.2, 0.6], frame=world.root),
+            Pose(Point3.from_iterable([1, -2.2, 0.6]), reference_frame=world.root),
             Arms.LEFT,
         ),
     )
@@ -443,10 +452,12 @@ def test_place_multi(mutable_multiple_robot_apartment):
 def test_look_at(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
     description = LookAtActionDescription(
-        [PoseStamped.from_list([3, 0, 1], frame=world.root)]
+        [Pose(Point3.from_iterable([3, 0, 1]), reference_frame=world.root)]
     )
-    assert description.resolve().target == PoseStamped.from_list(
-        [3, 0, 1], frame=world.root
+    assert np.allclose(
+        description.resolve().target.to_np(),
+        Pose(Point3.from_iterable([3, 0, 1]), reference_frame=world.root).to_np(),
+        atol=1e-3,
     )
 
     plan = SequentialPlan(context, description)
@@ -487,7 +498,11 @@ def test_open(immutable_multiple_robot_apartment):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0.3, 1], world.root)
+            Pose(
+                Point3.from_iterable([1.6, 1.9, 0]),
+                Quaternion.from_iterable([0, 0, 0.3, 1]),
+                reference_frame=world.root,
+            )
         ),
         OpenActionDescription(world.get_body_by_name("handle_cab10_m"), [Arms.LEFT]),
     )
@@ -509,7 +524,11 @@ def test_close(immutable_multiple_robot_apartment):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            PoseStamped.from_list([1.65, 2.0, 0], [0, 0, 0.4, 1], world.root)
+            Pose(
+                Point3.from_iterable([1.65, 2.0, 0]),
+                Quaternion.from_iterable([0, 0, 0.4, 1]),
+                reference_frame=world.root,
+            )
         ),
         CloseActionDescription(world.get_body_by_name("handle_cab10_m"), [Arms.LEFT]),
     )
@@ -524,17 +543,16 @@ def test_facing(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
 
     with simulated_robot:
-        milk_pose = PoseStamped.from_spatial_type(
-            world.get_body_by_name("milk.stl").global_pose
-        )
+        milk_pose = world.get_body_by_name("milk.stl").global_pose.to_pose()
         plan = SequentialPlan(context, FaceAtActionDescription(milk_pose, True))
         plan.perform()
         milk_in_robot_frame = world.transform(
             world.get_body_by_name("milk.stl").global_pose,
             robot_view.root,
         )
-        milk_in_robot_frame = PoseStamped.from_spatial_type(milk_in_robot_frame)
-        assert milk_in_robot_frame.position.y == pytest.approx(0.0, abs=0.01)
+        assert float(milk_in_robot_frame.to_position().y) == pytest.approx(
+            0.0, abs=0.01
+        )
 
 
 def test_transport(mutable_multiple_robot_apartment):
@@ -542,7 +560,13 @@ def test_transport(mutable_multiple_robot_apartment):
 
     description = TransportActionDescription(
         world.get_body_by_name("milk.stl"),
-        [PoseStamped.from_list([3.1, 2.2, 0.95], [0.0, 0.0, 1.0, 0.0], world.root)],
+        [
+            Pose(
+                Point3.from_iterable([3.1, 2.2, 0.95]),
+                Quaternion.from_iterable([0.0, 0.0, 1.0, 0.0]),
+                reference_frame=world.root,
+            )
+        ],
         [Arms.RIGHT],
     )
     plan = SequentialPlan(

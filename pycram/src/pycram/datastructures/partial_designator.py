@@ -5,8 +5,9 @@ from inspect import signature
 
 from typing_extensions import List, Tuple, Any, Dict, TypeVar, Iterator, Iterable, Type
 
+from krrood.adapters.json_serializer import leaf_types
 from pycram.plan import PlanNode
-from pycram.utils import is_iterable, lazy_product
+from pycram.utils import lazy_product
 
 T = TypeVar("T")
 
@@ -105,7 +106,7 @@ class PartialDesignator(Iterable[T]):
         :yields: A list with a possible permutation of the given arguments
         """
         iter_list = [
-            x if is_iterable(x) and not type(x) == str else [x]
+            x if isinstance(x, Iterable) and not type(x) == str else [x]
             for x in self.kwargs.values()
         ]
         for combination in lazy_product(

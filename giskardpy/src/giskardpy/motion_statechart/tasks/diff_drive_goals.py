@@ -17,7 +17,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class DiffDriveTangentialToPoint(Task):
+class DifferentialDriveTangentialToPoint(Task):
     goal_point: Point3
     forward: Optional[Vector3] = None
     group_name: Optional[Vector3] = None

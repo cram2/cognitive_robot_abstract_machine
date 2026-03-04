@@ -22,7 +22,7 @@ from krrood.ormatic.utils import drop_database
 from krrood.utils import recursive_subclasses
 from .dataset import example_classes, semantic_world_like_classes
 from .dataset.example_classes import (
-    PhysicalObject,
+    KRROODPhysicalObject,
     NotMappedParent,
     ChildNotMapped,
     ConceptType,
@@ -80,7 +80,7 @@ def generate_sqlalchemy_interface():
         class_dependency_graph=class_diagram,
         type_mappings=TypeDict(
             {
-                PhysicalObject: ConceptType,
+                KRROODPhysicalObject: ConceptType,
             }
         ),
         alternative_mappings=recursive_subclasses(AlternativeMapping),

@@ -17,13 +17,17 @@ from krrood.ormatic.dao import to_dao
 from krrood.probabilistic_knowledge.model_registries import DictRegistry
 from krrood.probabilistic_knowledge.parameterizer import MatchParameterizer
 from krrood.probabilistic_knowledge.probable_variable import MatchToInstanceTranslator
-from ..dataset.example_classes import Pose, Position, Orientation
+from ..dataset.example_classes import KRROODPose, KRROODPosition, KRROODOrientation
 
 
 def test_same_query_multiple_domains(session, database):
 
-    p1 = Pose(position=Position(1, 0, 0), orientation=Orientation(0, 0, 0, 1))
-    p2 = Pose(position=Position(0, 1, 0), orientation=Orientation(0, 0, 0, 1))
+    p1 = KRROODPose(
+        position=KRROODPosition(1, 0, 0), orientation=KRROODOrientation(0, 0, 0, 1)
+    )
+    p2 = KRROODPose(
+        position=KRROODPosition(0, 1, 0), orientation=KRROODOrientation(0, 0, 0, 1)
+    )
 
     python_domain = [p1, p2]
 
@@ -32,7 +36,7 @@ def test_same_query_multiple_domains(session, database):
     session.commit()
     session_maker = sessionmaker(session.bind)
 
-    pose_variable = variable(Pose, python_domain)
+    pose_variable = variable(KRROODPose, python_domain)
 
     q = an(
         entity(pose_variable).where(
@@ -48,11 +52,11 @@ def test_same_query_multiple_domains(session, database):
     result = list(database_backend.evaluate(q))
     assert len(result) == 1
 
-    probable_pose = probable_variable(Pose)
+    probable_pose = probable_variable(KRROODPose)
 
     prob_q = probable_pose(
-        position=probable(Position)(x=..., y=..., z=...),
-        orientation=probable(Orientation)(x=0.0, y=0.0, z=0.0, w=1.0),
+        position=probable(KRROODPosition)(x=..., y=..., z=...),
+        orientation=probable(KRROODOrientation)(x=0.0, y=0.0, z=0.0, w=1.0),
     ).where(probable_pose.variable.position.x > 0.5)
 
     parameters = MatchParameterizer(
@@ -60,7 +64,7 @@ def test_same_query_multiple_domains(session, database):
     ).parameterize()
     model = parameters.create_fully_factorized_distribution()
 
-    registry = DictRegistry({Pose: model})
+    registry = DictRegistry({KRROODPose: model})
 
     pm_backend = ProbabilisticBackend(registry, 10)
     values = list(pm_backend.evaluate(prob_q))

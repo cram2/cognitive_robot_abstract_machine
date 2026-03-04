@@ -7,7 +7,7 @@ from semantic_digital_twin.spatial_types import (
     Vector3,
     RotationMatrix,
 )
-from semantic_digital_twin.world_description.connections import DiffDrive
+from semantic_digital_twin.world_description.connections import DifferentialDrive
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -26,7 +26,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 
 
 @dataclass(eq=False, repr=False)
-class DiffDriveBaseGoal(Sequence):
+class DifferentialDriveBaseGoal(Sequence):
     """
     A sequence that moves the robot to a goal pose using a differential drive.
     1. Orient to goal position
@@ -34,7 +34,7 @@ class DiffDriveBaseGoal(Sequence):
     3. Orient to goal orientation
     """
 
-    diff_drive_connection: DiffDrive | None = field(kw_only=True, default=None)
+    diff_drive_connection: DifferentialDrive | None = field(kw_only=True, default=None)
     """Drive connection to use. If it is None and there is only one diff drive in the world, it will be used."""
 
     goal_pose: HomogeneousTransformationMatrix = field(kw_only=True)
@@ -47,7 +47,7 @@ class DiffDriveBaseGoal(Sequence):
 
     def expand(self, context: MotionStatechartContext) -> None:
         if self.diff_drive_connection is None:
-            diff_drives = context.world.get_connections_by_type(DiffDrive)
+            diff_drives = context.world.get_connections_by_type(DifferentialDrive)
             if len(diff_drives) == 0:
                 raise NodeInitializationError(self, "No diff drives found in world.")
             if len(diff_drives) > 1:

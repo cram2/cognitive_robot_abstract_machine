@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-from pycram.datastructures.pose import PoseStamped
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
 @dataclass()
@@ -12,7 +12,7 @@ class PoseTrajectory:
     Immutable wrapper for a sequence of waypoint poses.
     """
 
-    poses: List[PoseStamped, ...]
+    poses: List[Pose]
     """
     Ordered waypoint poses.
     """
