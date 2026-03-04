@@ -6,7 +6,8 @@ import semantic_digital_twin.orm.ormatic_interface
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
-from krrood.ormatic.utils import get_classes_of_ormatic_interface, classes_of_module
+from krrood.ormatic.utils import classes_of_module
+from krrood.ormatic.helper import get_classes_of_ormatic_interface
 from krrood.utils import recursive_subclasses
 from pycram.plan import BaseActionNode
 from semantic_digital_twin.world import WorldModelManager
@@ -54,6 +55,12 @@ from pycram.robot_plans.motions import (
 classes, alternative_mappings, type_mappings = get_classes_of_ormatic_interface(
     semantic_digital_twin.orm.ormatic_interface
 )
+
+# filter out test classes that should not be in the production ORM
+classes = [c for c in classes if not c.__module__.startswith("test.")]
+alternative_mappings = [
+    am for am in alternative_mappings if not am.__module__.startswith("test.")
+]
 
 classes = set(classes)
 

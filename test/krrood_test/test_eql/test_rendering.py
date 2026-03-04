@@ -2,8 +2,10 @@ import os
 
 import pytest
 
+from krrood.entity_query_language.query_graph import QueryGraph
+
 try:
-    from rustworkx_utils import GraphVisualizer
+    from krrood.rustworkx_utils import GraphVisualizer
 except ImportError:
     GraphVisualizer = None
 
@@ -19,17 +21,18 @@ from ..dataset.semantic_world_like_classes import (
     Door,
     Wardrobe,
 )
-from krrood.entity_query_language.entity import (
+from krrood.entity_query_language.factories import (
     entity,
     variable,
-    inference,
     and_,
+    inference,
+    an,
+    alternative,
+    deduced_variable,
 )
-from krrood.entity_query_language.entity_result_processors import an
-from krrood.entity_query_language.conclusion import Add
+from krrood.entity_query_language.rules.conclusion import Add
 
 from krrood.entity_query_language.predicate import HasType
-from krrood.entity_query_language.rule import alternative
 
 
 @pytest.mark.skipif(GraphVisualizer is None, reason="requires rustworkx_utils")
@@ -49,7 +52,7 @@ def test_render_rx_graph_as_igraph_simple(handles_and_containers_world):
     drawers = list(rule.evaluate())
     if os.path.exists("pdf_graph.pdf"):
         os.remove("pdf_graph.pdf")
-    rule.visualize()
+    QueryGraph(rule).visualize()
     assert os.path.exists("pdf_graph.pdf")
     os.remove("pdf_graph.pdf")
 
@@ -68,7 +71,7 @@ def test_render_rx_graph_as_igraph_complex(doors_and_drawers_world):
     )
     prismatic_connection = variable(PrismaticConnection, domain=world.connections)
     revolute_connection = variable(RevoluteConnection, domain=world.connections)
-    views = variable(View, domain=None, inferred=True)
+    views = deduced_variable(View)
     rule = an(
         entity(views).where(
             fixed_connection_condition,
@@ -97,6 +100,6 @@ def test_render_rx_graph_as_igraph_complex(doors_and_drawers_world):
     results = list(rule.evaluate())
     if os.path.exists("pdf_graph.pdf"):
         os.remove("pdf_graph.pdf")
-    rule.visualize()
+    QueryGraph(rule).visualize()
     assert os.path.exists("pdf_graph.pdf")
     os.remove("pdf_graph.pdf")

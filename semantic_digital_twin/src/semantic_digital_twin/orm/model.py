@@ -10,24 +10,21 @@ from typing_extensions import List
 from typing_extensions import Optional
 
 from krrood.ormatic.dao import AlternativeMapping
-from ..datastructures.prefixed_name import PrefixedName
-from ..mixin import HasSimulatorProperties
-from ..spatial_types import (
+from semantic_digital_twin.spatial_types import (
     RotationMatrix,
     Vector3,
     Point3,
     HomogeneousTransformationMatrix,
 )
-from ..spatial_types.derivatives import DerivativeMap
-from ..spatial_types.spatial_types import Quaternion, Pose
-from ..world import World
-from ..world_description.connections import Connection
-from ..world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
-from ..world_description.world_entity import (
+from semantic_digital_twin.spatial_types.spatial_types import Quaternion, Pose
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import Connection
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     KinematicStructureEntity,
 )
-from ..world_description.world_state import WorldState
+from semantic_digital_twin.world_description.world_state import WorldState
 
 
 @dataclass
@@ -232,32 +229,6 @@ class PoseMapping(AlternativeMapping[Pose]):
         )
 
 
-@dataclass
-class DegreeOfFreedomMapping(
-    AlternativeMapping[DegreeOfFreedom], HasSimulatorProperties
-):
-    name: PrefixedName
-    limits: DegreeOfFreedomLimits
-    id: UUID
-
-    @classmethod
-    def from_domain_object(cls, obj: DegreeOfFreedom):
-        return cls(
-            name=obj.name,
-            limits=obj.limits,
-            id=obj.id,
-        )
-
-    def to_domain_object(self) -> DegreeOfFreedom:
-        return DegreeOfFreedom(
-            name=self.name,
-            limits=DegreeOfFreedomLimits(
-                lower=self.limits.lower, upper=self.limits.upper
-            ),
-            id=self.id,
-        )
-
-
 class TrimeshType(TypeDecorator):
     """
     Type that casts fields that are of type `type` to their class name on serialization and converts the name
@@ -265,6 +236,7 @@ class TrimeshType(TypeDecorator):
     """
 
     impl = types.LargeBinary(4 * 1024 * 1024 * 1024 - 1)  # 4 GB max
+    cache_ok = True
 
     def process_bind_param(self, value: trimesh.Trimesh, dialect):
         # return binary version of trimesh

@@ -3,9 +3,8 @@ from dataclasses import dataclass
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 
-from .base import BaseMotion
-from ...datastructures.pose import PoseStamped
-from ...process_module import ProcessModuleManager
+from pycram.robot_plans.motions.base import BaseMotion
+from pycram.datastructures.pose import PoseStamped
 
 
 @dataclass

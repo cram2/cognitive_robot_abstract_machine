@@ -10,7 +10,7 @@ from typing_extensions import List
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
 )
-from ...world_description.world_entity import SemanticAnnotation
+from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
 
 @dataclass

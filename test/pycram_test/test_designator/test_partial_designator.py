@@ -23,7 +23,7 @@ from pycram.datastructures.enums import (
     VerticalAlignment,
 )
 from pycram.utils import is_iterable, lazy_product
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 
 

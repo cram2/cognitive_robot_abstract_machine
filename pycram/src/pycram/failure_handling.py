@@ -1,17 +1,16 @@
 from __future__ import annotations
 import logging
 
-from .datastructures.enums import TaskStatus
-from .designator import DesignatorDescription
-from .failures import PlanFailure
+from pycram.datastructures.enums import TaskStatus
+from pycram.designator import DesignatorDescription
+from pycram.failures import PlanFailure
 from threading import Lock
 from typing_extensions import Union, Any, List, Optional, Type, Callable, TYPE_CHECKING
-from .language import MonitorNode, MonitorPlan
-from .plan import Plan
-from .process_module import ProcessModule
+from pycram.language import MonitorNode, MonitorPlan
+from pycram.plan import Plan
 
 if TYPE_CHECKING:
-    from .robot_plans import BaseMotion
+    from pycram.robot_plans import BaseMotion
 
 
 class FailureHandling:

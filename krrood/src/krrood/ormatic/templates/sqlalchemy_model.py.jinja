@@ -9,7 +9,7 @@ import {{ import }}
 {% endfor %}
 
 
-from krrood.ormatic.dao import DataAccessObject
+from krrood.ormatic.dao import DataAccessObject, AssociationDataAccessObject
 from krrood.ormatic.custom_types import TypeType
 
 class Base(DeclarativeBase):
@@ -21,18 +21,22 @@ class Base(DeclarativeBase):
 
 
 # Association tables for many-to-many relationships
-{% for assoc_table in ormatic.association_tables %}
-{{ assoc_table.name }} = Table(
-    '{{ assoc_table.name }}',
-    Base.metadata,
-    Column('{{ assoc_table.left_foreign_key }}', ForeignKey('{{ assoc_table.left_primary_key }}')),
-    Column('{{ assoc_table.right_foreign_key }}', ForeignKey('{{ assoc_table.right_primary_key }}')),
-)
+{% for assoc_table in ormatic.association_objects %}
+class {{ assoc_table.name }}(Base, AssociationDataAccessObject):
+
+    __tablename__ = '{{ assoc_table.name }}'
+
+    {{ assoc_table.primary_key_name }}: Mapped[int] = mapped_column(Integer, primary_key=True)
+    {{ assoc_table.left_foreign_key }}: Mapped[int] = mapped_column(ForeignKey('{{ assoc_table.left_primary_key }}'))
+    {{ assoc_table.right_foreign_key }}: Mapped[int] = mapped_column(ForeignKey('{{ assoc_table.right_primary_key }}'))
+
+    target: Mapped[{{ assoc_table.right_table_name }}] = relationship('{{ assoc_table.right_table_name }}', foreign_keys=[{{ assoc_table.right_foreign_key }}])
+
 {% endfor %}
 
 
 {% for table in ormatic.wrapped_tables.values() %}
-class {{ table.tablename }}({{ table.base_class_name }}, DataAccessObject[{{ table.wrapped_clazz.clazz.__module__ }}.{{ table.wrapped_clazz.clazz.__name__ }}]):
+class {{ table.tablename }}({{ table.base_class_name }}, DataAccessObject[{{table.wrapped_clazz.name_with_entire_path}}]):
 
     __tablename__ = '{{ table.tablename }}'
 

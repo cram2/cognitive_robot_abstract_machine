@@ -1,9 +1,7 @@
-import time
 from copy import deepcopy
 
 import numpy as np
 import pytest
-import rclpy
 from rustworkx.rustworkx import NoEdgeBetweenNodes
 from typing_extensions import Tuple, Generator
 
@@ -11,18 +9,21 @@ from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientat
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     Arms,
+    AxisIdentifier,
     ApproachDirection,
     VerticalAlignment,
     DetectionTechnique,
 )
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.pose import PoseStamped
+from pycram.datastructures.trajectory import PoseTrajectory
 from pycram.language import SequentialPlan
-from pycram.process_module import simulated_robot
-from pycram.robot_description import ViewManager
+from pycram.motion_executor import simulated_robot
+from pycram.view_manager import ViewManager
 from pycram.robot_plans import (
     MoveTorsoAction,
     MoveTorsoActionDescription,
+    FollowTCPPathActionDescription,
     NavigateActionDescription,
     SetGripperActionDescription,
     PickUpActionDescription,
@@ -37,15 +38,12 @@ from pycram.robot_plans import (
     GraspingActionDescription,
     TransportActionDescription,
 )
-from semantic_digital_twin.adapters.ros.pose_publisher import PosePublisher
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
+
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     GripperState,
     JointStateType,
+    StaticJointState,
 )
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
@@ -55,6 +53,10 @@ from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
+
+# The alternative mapping needs to be imported for the stretch to work properly
+import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
+import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 
 
 @pytest.fixture(scope="session", params=["hsrb", "stretch", "tiago", "pr2"])
@@ -117,7 +119,7 @@ def immutable_multiple_robot_apartment(
     world, view = setup_multi_robot_apartment
     state = deepcopy(world.state.data)
     yield world, view, Context(world, view)
-    world.state.data = state
+    world.state.data[:] = state
     world.notify_state_change()
 
 
@@ -198,7 +200,7 @@ def test_park_arms_multi(immutable_multiple_robot_apartment):
     joints = []
     states = []
     for arm in robot_view.arms:
-        joint_state = arm.get_joint_state_by_type(JointStateType.PARK)
+        joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
         joints.extend(joint_state.connections)
         states.extend(joint_state.target_values)
     for connection, value in zip(joints, states):
@@ -213,6 +215,7 @@ def test_park_arms_multi(immutable_multiple_robot_apartment):
 
 def test_reach_action_multi(immutable_multiple_robot_apartment):
     world, view, context = immutable_multiple_robot_apartment
+
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
 
     grasp_description = GraspDescription(
@@ -225,7 +228,7 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
         1, -2, 0.8, reference_frame=world.root
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        0.3, -2.5, 0, reference_frame=world.root
+        0.3, -2.4, 0, reference_frame=world.root
     )
     world.notify_state_change()
 
@@ -253,6 +256,64 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
     compare_orientations(manipulator_orientation, target_orientation, decimal=2)
 
 
+def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
+    world, robot_view, context = immutable_multiple_robot_apartment
+
+    if isinstance(robot_view, (Tiago)):
+        #do not allow since
+        robot_view.full_body_controlled = False
+        robot_view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            1.7, 1.7, 0, reference_frame=world.root
+        )
+        world.notify_state_change()
+
+    if isinstance(robot_view, (Stretch)):
+        # do not allow since
+        robot_view.full_body_controlled = False
+        robot_view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            2.12, 2.2, 0, reference_frame=world.root
+        )
+        world.notify_state_change()
+    # robot_view.full_body_controlled = True
+    left_arm = ViewManager.get_arm_view(Arms.LEFT, robot_view)
+
+
+    front_axis = tuple(
+        int(v) for v in left_arm.manipulator.front_facing_axis.to_np()[:3]
+    )
+    grasp_axis = AxisIdentifier.from_tuple(front_axis)
+
+    pose = PoseStamped.from_spatial_type(world.get_body_by_name("milk.stl").global_pose)
+    pose_T = pose.to_spatial_type()
+    if grasp_axis == AxisIdentifier.X:
+        target_pose = pose
+    elif grasp_axis == AxisIdentifier.Z:
+        offset_T = HomogeneousTransformationMatrix.from_xyz_axis_angle(
+            axis=AxisIdentifier.Y.value,
+            angle=np.pi / 2,
+            reference_frame=world.root,
+        )
+        target_pose = PoseStamped.from_spatial_type(pose_T @ offset_T)
+    else:
+        target_pose = pose
+
+    waypoints = PoseTrajectory([target_pose])
+    plan = SequentialPlan(
+        context,
+        MoveTorsoActionDescription([TorsoState.HIGH]),
+        ParkArmsActionDescription(Arms.BOTH),
+        FollowTCPPathActionDescription(arm=Arms.LEFT, target_locations=waypoints),
+    )
+    with simulated_robot:
+        plan.perform()
+
+    tip_pose = left_arm.manipulator.tool_frame.global_pose
+    dist = np.linalg.norm(
+        tip_pose.to_position().to_np()[:3] - np.array(target_pose.position.to_list())
+    )
+    assert dist < 0.01
+
+
 def test_grasping(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
     left_arm = ViewManager.get_arm_view(Arms.LEFT, robot_view)
@@ -272,7 +333,7 @@ def test_grasping(immutable_multiple_robot_apartment):
     )
     robot_view.root.parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(
-            0.3, -2.5, 0, reference_frame=world.root
+            0.3, -2.4, 0, reference_frame=world.root
         )
     )
     world.notify_state_change()
@@ -303,7 +364,7 @@ def test_pick_up_multi(mutable_multiple_robot_apartment):
         1, -2, 0.6, reference_frame=world.root
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        0.3, -2.5, 0, reference_frame=world.root
+        0.3, -2.4, 0, reference_frame=world.root
     )
     world.notify_state_change()
 
@@ -345,7 +406,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
         1, -2, 0.6, reference_frame=world.root
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        0.3, -2.5, 0, reference_frame=world.root
+        0.3, -2.4, 0, reference_frame=world.root
     )
     world.notify_state_change()
 
@@ -426,7 +487,7 @@ def test_open(immutable_multiple_robot_apartment):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            PoseStamped.from_list([1.75, 1.75, 0], [0, 0, 0.5, 1], world.root)
+            PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0.3, 1], world.root)
         ),
         OpenActionDescription(world.get_body_by_name("handle_cab10_m"), [Arms.LEFT]),
     )
@@ -440,7 +501,7 @@ def test_open(immutable_multiple_robot_apartment):
 def test_close(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
 
-    world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.45
+    world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.3
     world.notify_state_change()
 
     plan = SequentialPlan(
@@ -448,7 +509,7 @@ def test_close(immutable_multiple_robot_apartment):
         MoveTorsoActionDescription([TorsoState.HIGH]),
         ParkArmsActionDescription(Arms.BOTH),
         NavigateActionDescription(
-            PoseStamped.from_list([1.75, 1.75, 0], [0, 0, 0.5, 1], world.root)
+            PoseStamped.from_list([1.65, 2.0, 0], [0, 0, 0.4, 1], world.root)
         ),
         CloseActionDescription(world.get_body_by_name("handle_cab10_m"), [Arms.LEFT]),
     )

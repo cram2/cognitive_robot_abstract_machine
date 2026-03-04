@@ -7,6 +7,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
+import logging
 import os
 import uuid
 from dataclasses import is_dataclass
@@ -23,6 +24,11 @@ import semantic_digital_twin.world_description.degree_of_freedom
 import semantic_digital_twin.world_description.geometry
 import semantic_digital_twin.world_description.shape_collection
 import semantic_digital_twin.world_description.world_entity
+import semantic_digital_twin.collision_checking.collision_groups
+import semantic_digital_twin.collision_checking.collision_rules
+import semantic_digital_twin.collision_checking.collision_detector
+import semantic_digital_twin.collision_checking.collision_manager
+import semantic_digital_twin.collision_checking.collision_variable_managers
 from krrood.adapters.json_serializer import JSONAttributeDiff
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
@@ -55,6 +61,7 @@ from semantic_digital_twin.world_description.world_modification import (
     AttributeUpdateModification,
 )
 import semantic_digital_twin.robots.hsrb
+import semantic_digital_twin.robots.pr2
 
 all_classes = set(
     classes_of_module(semantic_digital_twin.world_description.world_entity)
@@ -81,6 +88,21 @@ all_classes |= set(
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.abstract_robot))
 all_classes |= set(classes_of_module(semantic_digital_twin.datastructures.definitions))
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.hsrb))
+all_classes |= set(classes_of_module(semantic_digital_twin.robots.pr2))
+all_classes |= set(
+    classes_of_module(semantic_digital_twin.collision_checking.collision_rules)
+)
+all_classes |= set(
+    classes_of_module(semantic_digital_twin.collision_checking.collision_matrix)
+)
+all_classes |= set(
+    classes_of_module(semantic_digital_twin.collision_checking.collision_groups)
+)
+all_classes |= set(
+    classes_of_module(
+        semantic_digital_twin.collision_checking.collision_variable_managers
+    )
+)
 # classes |= set(recursive_subclasses(ViewFactory))
 all_classes |= {SimulatorAdditionalProperty}
 all_classes |= set(classes_of_module(semantic_digital_twin.reasoning.predicates))
@@ -110,12 +132,16 @@ all_classes -= {
 all_classes = {
     c for c in all_classes if is_dataclass(c) and not issubclass(c, AlternativeMapping)
 }
-all_classes |= {am.original_class() for am in recursive_subclasses(AlternativeMapping)}
+all_classes |= {
+    am.original_class()
+    for am in recursive_subclasses(AlternativeMapping)
+    if not am.__module__.startswith("test.")
+}
 
 alternative_mappings = [
     am
     for am in recursive_subclasses(AlternativeMapping)
-    if am.original_class() in all_classes
+    if am.original_class() in all_classes and not am.__module__.startswith("test.")
 ]
 
 
@@ -123,6 +149,10 @@ def generate_orm():
     """
     Generate the ORM classes for the pycram package.
     """
+
+    logging.basicConfig(level=logging.INFO)  # Or your preferred config
+    logging.getLogger("krrood").setLevel(logging.DEBUG)
+
     class_diagram = ClassDiagram(
         list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
     )
@@ -136,7 +166,6 @@ def generate_orm():
         ),
         alternative_mappings=alternative_mappings,
     )
-
     instance.make_all_tables()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))

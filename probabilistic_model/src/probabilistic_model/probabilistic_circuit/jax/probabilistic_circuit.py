@@ -12,10 +12,20 @@ from random_events.variable import Variable, Symbolic
 from sortedcontainers import SortedSet
 from typing_extensions import Tuple, Self, List, Optional
 
-from . import ProductLayer, SparseSumLayer, InputLayer, InnerLayer
-from .discrete_layer import DiscreteLayer
-from .inner_layer import Layer, NXConverterLayer
-from ..rx.probabilistic_circuit import ProbabilisticCircuit as NXProbabilisticCircuit
+from probabilistic_model.probabilistic_circuit.jax import (
+    ProductLayer,
+    SparseSumLayer,
+    InputLayer,
+    InnerLayer,
+)
+from probabilistic_model.probabilistic_circuit.jax.discrete_layer import DiscreteLayer
+from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
+    Layer,
+    NXConverterLayer,
+)
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProbabilisticCircuit as NXProbabilisticCircuit,
+)
 import jax
 import tqdm
 import networkx as nx
@@ -46,7 +56,9 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
         return self.root.log_likelihood_of_nodes(x)[:, 0]
 
     @classmethod
-    def from_nx(cls, pc: NXProbabilisticCircuit, progress_bar: bool = False) -> ProbabilisticCircuit:
+    def from_nx(
+        cls, pc: NXProbabilisticCircuit, progress_bar: bool = False
+    ) -> ProbabilisticCircuit:
         """
         Convert a probabilistic circuit to a layered circuit.
         The result expresses the same distribution as `pc`.
@@ -62,10 +74,15 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
 
         # create layers from nodes
         child_layers: List[NXConverterLayer] = []
-        for layer_index, nodes in (tqdm.tqdm(reversed_layers_to_nodes_map.items(), desc="Creating Layers") if progress_bar
-                                                     else reversed_layers_to_nodes_map.items()):
+        for layer_index, nodes in (
+            tqdm.tqdm(reversed_layers_to_nodes_map.items(), desc="Creating Layers")
+            if progress_bar
+            else reversed_layers_to_nodes_map.items()
+        ):
 
-            child_layers = Layer.create_layers_from_nodes(nodes, child_layers, progress_bar)
+            child_layers = Layer.create_layers_from_nodes(
+                nodes, child_layers, progress_bar
+            )
         root = child_layers[0].layer
 
         return cls(pc.variables, root)
@@ -94,12 +111,19 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any]) -> Self:
-        variables = SortedSet(Variable.from_json(variable) for variable in data["variables"])
+        variables = SortedSet(
+            Variable.from_json(variable) for variable in data["variables"]
+        )
         root = Layer.from_json(data["root"])
         return cls(variables, root)
 
-    def fit(self, data: jax.Array, epochs: int = 100,
-            optimizer: Optional[optax.GradientTransformation] = None, **kwargs) -> None:
+    def fit(
+        self,
+        data: jax.Array,
+        epochs: int = 100,
+        optimizer: Optional[optax.GradientTransformation] = None,
+        **kwargs,
+    ) -> None:
         """
         Fit the circuit to the data using generative training with the negative average log-likelihood as loss.
 
@@ -131,15 +155,15 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
             progress_bar.set_postfix_str(f"Neg. Avg. LL.: {loss_value}")
 
 
-
 class ClassificationCircuit(ProbabilisticCircuit):
     """
     A probabilistic circuit for classification.
     It is assumed that the root layer of the circuit has as many output units as there are classes.
     """
 
-    def as_probabilistic_circuit(self, class_variable: Symbolic,
-                                 class_probabilities: jnp.array = None) -> ProbabilisticCircuit:
+    def as_probabilistic_circuit(
+        self, class_variable: Symbolic, class_probabilities: jnp.array = None
+    ) -> ProbabilisticCircuit:
         """
         Create a full probabilistic circuit from this classification circuit.
         This is done by adding meaning to the sum units of the root layer.
@@ -152,9 +176,9 @@ class ClassificationCircuit(ProbabilisticCircuit):
         :return: The full probabilistic circuit.
         """
 
-
-        assert len(class_variable.domain.simple_sets) == self.root.number_of_nodes, \
-            "The number of classes must match the number of sum units."
+        assert (
+            len(class_variable.domain.simple_sets) == self.root.number_of_nodes
+        ), "The number of classes must match the number of sum units."
 
         number_of_classes = self.root.number_of_nodes
 
@@ -170,7 +194,11 @@ class ClassificationCircuit(ProbabilisticCircuit):
         # update variable indices
         for layer in copied_root.all_layers():
             if isinstance(layer, InputLayer):
-                updated_variable_indices = jnp.where(layer.variables >= class_variable_index, layer.variables + 1, layer.variables)
+                updated_variable_indices = jnp.where(
+                    layer.variables >= class_variable_index,
+                    layer.variables + 1,
+                    layer.variables,
+                )
                 layer.set_variables(updated_variable_indices)
             elif isinstance(layer, InnerLayer):
                 layer.reset_variables()
@@ -178,10 +206,14 @@ class ClassificationCircuit(ProbabilisticCircuit):
                 raise ValueError(f"Layer {layer} is not supported.")
 
         # create the new input layer
-        distribution_layer = DiscreteLayer(class_variable_index, jnp.log(jnp.eye(number_of_classes)))
+        distribution_layer = DiscreteLayer(
+            class_variable_index, jnp.log(jnp.eye(number_of_classes))
+        )
 
         # connect the new input layer with the respective sum units
-        edges = jnp.array([jnp.arange(number_of_classes), jnp.arange(number_of_classes)]).flatten()
+        edges = jnp.array(
+            [jnp.arange(number_of_classes), jnp.arange(number_of_classes)]
+        ).flatten()
         sparse_edges = BCOO.fromdense(jnp.ones((2, number_of_classes), dtype=int))
         sparse_edges.data = edges
         product_layer = ProductLayer([copied_root, distribution_layer], sparse_edges)
@@ -193,16 +225,23 @@ class ClassificationCircuit(ProbabilisticCircuit):
 
         # set the variables again
         for layer in root.all_layers():
-            layer.variables # trigger the setter
+            layer.variables  # trigger the setter
 
         return ProbabilisticCircuit(new_variables, root)
 
     def to_nx(self, progress_bar: bool = True) -> NXProbabilisticCircuit:
-        raise NotImplementedError("ClassificationCircuit does not support to_nx. "
-                                  "Call 'to_probabilistic_circuit' first.")
+        raise NotImplementedError(
+            "ClassificationCircuit does not support to_nx. "
+            "Call 'to_probabilistic_circuit' first."
+        )
 
-    def fit(self, data: jax.Array, labels: jax.Array, epochs: int = 100,
-                       optimizer: Optional[optax.GradientTransformation] = None) -> None:
+    def fit(
+        self,
+        data: jax.Array,
+        labels: jax.Array,
+        epochs: int = 100,
+        optimizer: Optional[optax.GradientTransformation] = None,
+    ) -> None:
         """
         Fit the circuit to the data using generative training with the cross-entropy as loss.
 

@@ -1,8 +1,7 @@
-from ripple_down_rules.utils import make_set
-from typing_extensions import Optional, Set
-from ripple_down_rules.datastructures.case import Case, create_case
-from .world_semantic_annotations_mcrdr_defs import *
-
+from krrood.ripple_down_rules.utils import make_set
+from typing_extensions import Optional, Set, Union
+from krrood.ripple_down_rules.datastructures.case import Case, create_case
+from semantic_digital_twin.reasoning.world_rdr.world_semantic_annotations_mcrdr_defs import *
 
 attribute_name = "semantic_annotations"
 conclusion_type = (

@@ -2,6 +2,7 @@ import sys
 
 from krrood.ormatic.dao import to_dao
 from ..dataset.example_classes import Person
+from ..dataset.ormatic_interface import PersonDAO
 
 
 def test_deep_person_chain_to_dao():
@@ -25,13 +26,13 @@ def test_deep_person_chain_to_dao():
 
     try:
         # This should not raise RecursionError
-        dao = to_dao(root_person)
+        dao: PersonDAO = to_dao(root_person)
     finally:
         sys.setrecursionlimit(python_recursion_limit)
 
     assert dao.name == "Person 0"
     assert len(dao.knows) == 1
-    assert dao.knows[0].name == "Person 1"
+    assert dao.knows[0].target.name == "Person 1"
 
 
 def test_deep_person_chain_from_dao():

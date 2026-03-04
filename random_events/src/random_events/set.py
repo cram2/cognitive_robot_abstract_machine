@@ -4,7 +4,7 @@ from functools import cached_property
 
 from typing_extensions import Hashable, Optional
 
-from .sigma_algebra import *
+from random_events.sigma_algebra import *
 
 # Type Definitions
 HashMap: Dict[int, Hashable]

@@ -22,7 +22,9 @@ from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import BoundingBox
-from semantic_digital_twin.world_description.graph_of_convex_sets import GraphOfConvexSets
+from semantic_digital_twin.world_description.graph_of_convex_sets import (
+    GraphOfConvexSets,
+)
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
@@ -30,11 +32,11 @@ from semantic_digital_twin.world_description.world_entity import Body
 from sqlalchemy import select
 from typing_extensions import Optional, List
 
-from ....robot_plans import MoveAndPickUpAction
-from ....datastructures.enums import Arms, Grasp, VerticalAlignment, ApproachDirection
-from ....datastructures.grasp import GraspDescription
-from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
+from pycram.robot_plans import MoveAndPickUpAction
+from pycram.datastructures.enums import Arms, Grasp, VerticalAlignment, ApproachDirection
+from pycram.datastructures.grasp import GraspDescription
+from pycram.datastructures.partial_designator import PartialDesignator
+from pycram.datastructures.pose import PoseStamped
 
 
 class Variables(enum.Enum):
@@ -94,7 +96,7 @@ class MoveAndPickUpVariables(Variables):
 @dataclass
 class MoveAndPickUpParameterizer(ProbabilisticAction):
     """
-    Action that moves the agent to an object and picks it up using probability tools to parameterize.
+    Action that moves the agent to an object and picks it up using probability tools to generate parameterizations.
     """
 
     variables = MoveAndPickUpVariables
@@ -122,7 +124,7 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
         return navigate_conditions
 
     def collision_free_event(
-            world: World, search_space: Optional[BoundingBoxCollection] = None
+        world: World, search_space: Optional[BoundingBoxCollection] = None
     ) -> Event:
         """
         Create an event that describes the free space of the world.
@@ -144,7 +146,9 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
                         np.inf,
                         np.inf,
                         np.inf,
-                        origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+                        origin=HomogeneousTransformationMatrix(
+                            reference_frame=world.root
+                        ),
                     )
                 ],
             )
@@ -159,7 +163,7 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
         free_space = free_space.marginal(xy)
 
         # create floor level
-        z_event = SimpleEvent({SpatialVariables.z.value: singleton(0.0)}).as_composite_set()
+        z_event = SimpleEvent({SpatialVariables.z.value: 0.0}).as_composite_set()
         z_event.fill_missing_variables(xy)
         free_space.fill_missing_variables(SortedSet([SpatialVariables.z.value]))
         free_space &= z_event

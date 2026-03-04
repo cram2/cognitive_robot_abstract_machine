@@ -7,12 +7,12 @@ from random_events.variable import Continuous, Symbolic
 from sortedcontainers import SortedSet
 from typing_extensions import List, Self, Type, Iterable, Union
 
-from ...distributions import GaussianDistribution
-from ...probabilistic_circuit.jax import SparseSumLayer, ProductLayer, DenseSumLayer
-from ...probabilistic_circuit.jax.discrete_layer import DiscreteLayer
-from ...probabilistic_circuit.jax.gaussian_layer import GaussianLayer
-from ...probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit, SumUnit, ProductUnit, UnivariateContinuousLeaf
-from ...probabilistic_circuit.jax.probabilistic_circuit import ProbabilisticCircuit as JPC, ClassificationCircuit
+from probabilistic_model.distributions import GaussianDistribution
+from probabilistic_model.probabilistic_circuit.jax import SparseSumLayer, ProductLayer, DenseSumLayer
+from probabilistic_model.probabilistic_circuit.jax.discrete_layer import DiscreteLayer
+from probabilistic_model.probabilistic_circuit.jax.gaussian_layer import GaussianLayer
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit, SumUnit, ProductUnit, UnivariateContinuousLeaf
+from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import ProbabilisticCircuit as JPC, ClassificationCircuit
 import jax.numpy as jnp
 import jax.random
 

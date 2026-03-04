@@ -23,8 +23,33 @@ workon cram-env
 deactivate
 ```
 
+Pull the submodules: 
+```bash
+cd cognitive_robot_abstract_machine
+git submodule update --init --recursive
+```
 
-We use poetry to manage dependencies. Install poetry if you haven't already:
+### Install using UV 
+
+To install the whole repo we use uv (https://github.com/astral-sh/uv), first to install uv:
+
+```bash 
+# On macOS and Linux.
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+then install packages:
+
+```bash
+uv sync --active
+```
+
+
+### Alternative: Poetry
+
+Alternatively you can use poetry to install all packages in the repository.
+
+Install poetry if you haven't already:
 
 ```bash
 pip install poetry
@@ -32,9 +57,7 @@ pip install poetry
 
 Install the CRAM package along with its dependencies:
 
-```bash
-cd cognitive_robot_abstract_machine
-git submodule update --init --recursive
+```bash 
 poetry install
 ```
 
@@ -104,7 +127,9 @@ Example:
 
     Import Strategy:
 
-    - Use relative importing (e.g., from . import utils) always within the package.
+    - Use absolute imports always within the package as this is easier to maintain and clearer to read and understand.
+
+    - Use relative imports always in tests when importing modules defined in the same test folder/package.
 
     - When importing types, use typing extensions instead of typing or the standard library types;
 

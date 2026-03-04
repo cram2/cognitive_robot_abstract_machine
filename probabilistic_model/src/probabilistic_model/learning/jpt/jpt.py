@@ -12,12 +12,12 @@ from random_events.utils import SubclassJSONSerializer
 from random_events.variable import Variable
 from typing_extensions import Self
 
-from .variables import Continuous, Integer, Symbolic, ScaledContinuous
-from ..nyga_distribution import NygaDistribution
-from ...distributions import (DiracDeltaDistribution, SymbolicDistribution, IntegerDistribution, UnivariateDistribution)
-from ...probabilistic_circuit.rx.probabilistic_circuit import (SumUnit, ProductUnit,
+from probabilistic_model.learning.jpt.variables import Continuous, Integer, Symbolic, ScaledContinuous
+from probabilistic_model.learning.nyga_distribution import NygaDistribution
+from probabilistic_model.distributions import (DiracDeltaDistribution, SymbolicDistribution, IntegerDistribution, UnivariateDistribution)
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (SumUnit, ProductUnit,
                                                                ProbabilisticCircuit, UnivariateDiscreteLeaf)
-from ...utils import MissingDict
+from probabilistic_model.utils import MissingDict
 
 
 class JPT(SubclassJSONSerializer):

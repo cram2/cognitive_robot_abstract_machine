@@ -3,10 +3,10 @@ from abc import abstractmethod
 import random_events_lib as rl
 from typing_extensions import Self, Dict, Any, Optional, Iterable
 
-from .interval import reals, Interval, closed, singleton, SimpleInterval
-from .set import Set, SetElement
-from .sigma_algebra import AbstractCompositeSet
-from .utils import SubclassJSONSerializer, CPPWrapper
+from random_events.interval import reals, Interval, closed, singleton, SimpleInterval
+from random_events.set import Set, SetElement
+from random_events.sigma_algebra import AbstractCompositeSet
+from random_events.utils import SubclassJSONSerializer, CPPWrapper
 
 
 class Variable(SubclassJSONSerializer, CPPWrapper):

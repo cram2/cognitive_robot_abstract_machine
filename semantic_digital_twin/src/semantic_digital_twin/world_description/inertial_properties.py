@@ -7,7 +7,7 @@ import numpy as np
 from numpy._typing import NDArray
 from typing_extensions import Self, TypeVar
 
-from ..spatial_types import Point3, RotationMatrix
+from semantic_digital_twin.spatial_types import Point3, RotationMatrix
 
 
 @dataclass

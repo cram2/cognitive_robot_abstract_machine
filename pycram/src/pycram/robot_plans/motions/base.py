@@ -11,11 +11,11 @@ from typing_extensions import TypeVar, ClassVar, Type
 from giskardpy.motion_statechart.graph_node import Task
 from krrood.ormatic.dao import HasGeneric
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from ...datastructures.enums import ExecutionType
+from pycram.datastructures.enums import ExecutionType
 from typing_extensions import TypeVar
 
-from ...designator import DesignatorDescription
-from ...process_module import ProcessModuleManager
+from pycram.designator import DesignatorDescription
+from pycram.motion_executor import MotionExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class AlternativeMotion(HasGeneric[T], ABC):
             if (
                 issubclass(alternative, motion.__class__)
                 and alternative.original_class() == robot_view.__class__
-                and ProcessModuleManager.execution_type == alternative.execution_type
+                and MotionExecutor.execution_type == alternative.execution_type
             ):
                 return alternative
         return None

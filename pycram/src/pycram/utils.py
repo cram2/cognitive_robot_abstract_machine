@@ -20,7 +20,7 @@ from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
 from semantic_digital_twin.world_description.world_entity import Body
 
-from .tf_transformations import (
+from pycram.tf_transformations import (
     quaternion_about_axis,
     quaternion_multiply,
     quaternion_matrix,
@@ -36,10 +36,10 @@ from typing_extensions import (
     Iterable,
 )
 
-from .datastructures.pose import PoseStamped
+from pycram.datastructures.pose import PoseStamped
 
 if TYPE_CHECKING:
-    from .robot_description import CameraDescription
+    from pycram.view_manager import CameraDescription
 
 
 def link_pose_for_joint_config(
@@ -225,40 +225,6 @@ def axis_angle_to_quaternion(axis: List, angle: float) -> Tuple:
     w = math.cos(angle / 2)
 
     return tuple((x, y, z, w))
-
-
-class suppress_stdout_stderr(object):
-    """
-    A context manager for doing a "deep suppression" of stdout and stderr in
-    Python, i.e. will suppress all prints, even if the print originates in a
-    compiled C/Fortran sub-function.
-
-    This will not suppress raised exceptions, since exceptions are printed
-    to stderr just before a script exits, and after the context manager has
-    exited (at least, I think that is why it lets exceptions through).
-    Copied from https://stackoverflow.com/questions/11130156/suppress-stdout-stderr-print-from-python-functions
-    """
-
-    def __init__(self):
-        # Open a pair of null files
-        self.null_fds = [os.open(os.devnull, os.O_RDWR) for _ in range(2)]
-        # Save the actual stdout (1) and stderr (2) file descriptors.
-        self.save_fds = [os.dup(1), os.dup(2)]
-
-    def __enter__(self):
-        # Assign the null pointers to stdout and stderr.
-        # This one is not needed for URDF parsing output
-        # os.dup2(self.null_fds[0], 1)
-        os.dup2(self.null_fds[1], 2)
-
-    def __exit__(self, *_):
-        # Re-assign the real stdout/stderr back to (1) and (2)
-        # This one is not needed for URDF parsing output
-        # os.dup2(self.save_fds[0], 1)
-        os.dup2(self.save_fds[1], 2)
-        # Close all file descriptors
-        for fd in self.null_fds + self.save_fds:
-            os.close(fd)
 
 
 def adjust_camera_pose_based_on_target(

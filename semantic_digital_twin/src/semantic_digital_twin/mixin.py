@@ -18,7 +18,7 @@ class HasSimulatorProperties:
     """
 
     simulator_additional_properties: List[SimulatorAdditionalProperty] = field(
-        default_factory=list, kw_only=True
+        default_factory=list, kw_only=True, repr=False
     )
     """
     A list of additional properties for the simulator, it can contain properties of multiple simulators.

@@ -7,7 +7,7 @@ from typing import Dict, Any
 import random_events_lib as rl
 from typing_extensions import Self, Iterable
 
-from . import sigma_algebra
+from random_events import sigma_algebra
 
 
 class Bound(enum.IntEnum):
@@ -34,7 +34,13 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
 
     _cpp_object: rl.SimpleInterval
 
-    def __init__(self, lower: float = 0, upper: float = 0, left: Bound = Bound.OPEN, right: Bound = Bound.OPEN):
+    def __init__(
+        self,
+        lower: float = 0,
+        upper: float = 0,
+        left: Bound = Bound.OPEN,
+        right: Bound = Bound.OPEN,
+    ):
         """
         Creates a new simple interval.
         :param lower: The lower bound of the interval.
@@ -90,7 +96,12 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
 
     @classmethod
     def _from_cpp(cls, cpp_object: rl.SimpleInterval) -> Self:
-        return cls(cpp_object.lower, cpp_object.upper, Bound(cpp_object.left.value), Bound(cpp_object.right.value))
+        return cls(
+            cpp_object.lower,
+            cpp_object.upper,
+            Bound(cpp_object.left.value),
+            Bound(cpp_object.right.value),
+        )
 
     def as_composite_set(self) -> Interval:
         return Interval(self)
@@ -100,24 +111,38 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
         # TODO: fix this when random_events_lib is fixed
         :return: True if the interval is a singleton (contains only one value), False otherwise.
         """
-        return self.lower == self.upper and self.left == Bound.CLOSED and self.right == Bound.CLOSED
+        return (
+            self.lower == self.upper
+            and self.left == Bound.CLOSED
+            and self.right == Bound.CLOSED
+        )
 
     def contains(self, item: float) -> bool:
-        return (self.lower < item < self.upper or (self.lower == item and self.left == Bound.CLOSED) or (
-                self.upper == item and self.right == Bound.CLOSED))
+        return (
+            self.lower < item < self.upper
+            or (self.lower == item and self.left == Bound.CLOSED)
+            or (self.upper == item and self.right == Bound.CLOSED)
+        )
 
     def non_empty_to_string(self) -> str:
-        left_bracket = '[' if self.left == Bound.CLOSED else '('
-        right_bracket = ']' if self.right == Bound.CLOSED else ')'
-        return f'{left_bracket}{self.lower}, {self.upper}{right_bracket}'
+        left_bracket = "[" if self.left == Bound.CLOSED else "("
+        right_bracket = "]" if self.right == Bound.CLOSED else ")"
+        return f"{left_bracket}{self.lower}, {self.upper}{right_bracket}"
 
     def to_json(self) -> Dict[str, Any]:
-        return {**super().to_json(), 'lower': self.lower, 'upper': self.upper, 'left': self.left.name,
-                'right': self.right.name}
+        return {
+            **super().to_json(),
+            "lower": self.lower,
+            "upper": self.upper,
+            "left": self.left.name,
+            "right": self.right.name,
+        }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any]) -> Self:
-        return cls(data['lower'], data['upper'], Bound[data['left']], Bound[data['right']])
+        return cls(
+            data["lower"], data["upper"], Bound[data["left"]], Bound[data["right"]]
+        )
 
     def center(self) -> float:
         """
@@ -160,11 +185,18 @@ class Interval(sigma_algebra.AbstractCompositeSet):
         Creates a new interval.
         :param simple_sets: The simple intervals that make up the interval.
         """
-        self._cpp_object = rl.Interval({simple_set._cpp_object for simple_set in simple_sets})
+        self._cpp_object = rl.Interval(
+            {simple_set._cpp_object for simple_set in simple_sets}
+        )
 
     @classmethod
     def _from_cpp(cls, cpp_object: rl.Interval) -> Self:
-        return cls(*[SimpleInterval._from_cpp(cpp_simple_interval) for cpp_simple_interval in cpp_object.simple_sets])
+        return cls(
+            *[
+                SimpleInterval._from_cpp(cpp_simple_interval)
+                for cpp_simple_interval in cpp_object.simple_sets
+            ]
+        )
 
     def is_singleton(self):
         """

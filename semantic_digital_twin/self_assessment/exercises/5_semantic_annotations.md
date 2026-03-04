@@ -27,8 +27,7 @@ Your goals:
 :tags: [remove-input]
 from dataclasses import dataclass, field
 from typing import Optional
-from krrood.entity_query_language.entity import entity, variable
-from krrood.entity_query_language.entity_result_processors import an, the
+from krrood.entity_query_language.factories import entity, variable, an, the
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix

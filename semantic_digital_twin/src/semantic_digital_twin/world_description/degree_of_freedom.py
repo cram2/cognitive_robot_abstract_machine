@@ -7,10 +7,10 @@ from typing_extensions import Dict, Any
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
-from .world_entity import WorldEntityWithID
-from ..datastructures.prefixed_name import PrefixedName
-from ..exceptions import UsageError, InvalidConnectionLimits
-from ..spatial_types.derivatives import Derivatives, DerivativeMap
+from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import UsageError, InvalidConnectionLimits
+from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 
 
 @dataclass(eq=False, init=False)
@@ -81,7 +81,7 @@ class JerkVariable(sm.FloatVariable):
         return self.dof._world.state[self.dof.id].jerk
 
 
-@dataclass(eq=False)
+@dataclass
 class DegreeOfFreedomLimits:
     """
     A class representing the limits of a degree of freedom.
@@ -152,16 +152,16 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
         Creates a variable for each derivative, that refer to the corresponding values of this dof.
         """
         assert self._world is not None
-        self.variables.data[Derivatives.position] = PositionVariable(
+        self.variables.position = PositionVariable(
             name=str(PrefixedName("position", prefix=str(self.name))), dof=self
         )
-        self.variables.data[Derivatives.velocity] = VelocityVariable(
+        self.variables.velocity = VelocityVariable(
             name=str(PrefixedName("velocity", prefix=str(self.name))), dof=self
         )
-        self.variables.data[Derivatives.acceleration] = AccelerationVariable(
+        self.variables.acceleration = AccelerationVariable(
             name=str(PrefixedName("acceleration", prefix=str(self.name))), dof=self
         )
-        self.variables.data[Derivatives.jerk] = JerkVariable(
+        self.variables.jerk = JerkVariable(
             name=str(PrefixedName("jerk", prefix=str(self.name))), dof=self
         )
 
@@ -179,6 +179,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
             "lower_limits": to_json(self.limits.lower),
             "upper_limits": to_json(self.limits.upper),
             "name": to_json(self.name),
+            "has_hardware_interface": self.has_hardware_interface,
         }
 
     @classmethod
@@ -190,6 +191,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
             name=from_json(data["name"]),
             limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
             id=uuid,
+            has_hardware_interface=data["has_hardware_interface"],
         )
 
     def __deepcopy__(self, memo):
@@ -227,23 +229,19 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
                 message="Cannot overwrite limits of mimic DOFs, use .raw_dof._overwrite_dof_limits instead."
             )
         for derivative in Derivatives.range(Derivatives.position, Derivatives.jerk):
-            if new_lower_limits.data[derivative] is not None:
-                if self.limits.lower.data[derivative] is None:
-                    self.limits.lower.data[derivative] = new_lower_limits.data[
-                        derivative
-                    ]
+            if new_lower_limits[derivative] is not None:
+                if self.limits.lower[derivative] is None:
+                    self.limits.lower[derivative] = new_lower_limits[derivative]
                 else:
-                    self.limits.lower.data[derivative] = max(
-                        new_lower_limits.data[derivative],
-                        self.limits.lower.data[derivative],
+                    self.limits.lower[derivative] = max(
+                        new_lower_limits[derivative],
+                        self.limits.lower[derivative],
                     )
-            if new_upper_limits.data[derivative] is not None:
-                if self.limits.upper.data[derivative] is None:
-                    self.limits.upper.data[derivative] = new_upper_limits.data[
-                        derivative
-                    ]
+            if new_upper_limits[derivative] is not None:
+                if self.limits.upper[derivative] is None:
+                    self.limits.upper[derivative] = new_upper_limits[derivative]
                 else:
-                    self.limits.upper.data[derivative] = min(
-                        new_upper_limits.data[derivative],
-                        self.limits.upper.data[derivative],
+                    self.limits.upper[derivative] = min(
+                        new_upper_limits[derivative],
+                        self.limits.upper[derivative],
                     )
