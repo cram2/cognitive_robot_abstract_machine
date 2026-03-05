@@ -41,7 +41,7 @@ class RetractDirection(Enum):
 
 
 def make_allow_collision_rule(
-        bodies1: List[Body], bodies2: List[Body]
+    bodies1: List[Body], bodies2: List[Body]
 ) -> UpdateTemporaryCollisionRules:
     return UpdateTemporaryCollisionRules(
         temporary_rules=[
@@ -58,21 +58,21 @@ def make_allow_collision_rule(
 
 
 @dataclass(kw_only=True)
-class PoseGraspBaseMotion(BaseMotion):
+class CollisionAwareArmMotion(BaseMotion):
     """
-    Base class for pose-grasp motions.
+    Base class for arm motions that need collision avoidance.
     Resolves the tool frame and hand bodies from the arm via ViewManager,
-    and provides shared collision avoidance infrastructure.
+    and provides optional collision avoidance with a configurable allowed-collision set.
     """
 
     arm: Arms
     """The arm performing the motion."""
 
     object_bodies: List[Body]
-    """Bodies of the object being manipulated, to allow collision with."""
+    """Bodies to allow collision with (typically the object being manipulated)."""
 
-    collision_distance: float = 0.01
-    """Minimum distance for collision avoidance."""
+    use_collision_avoidance: bool = True
+    """Whether to enable collision avoidance during the motion."""
 
     def perform(self):
         pass
@@ -92,7 +92,11 @@ class PoseGraspBaseMotion(BaseMotion):
     def _with_collision_avoidance(
         self, tasks: List[Task], minimum_success: int = 1
     ) -> Task:
-        allow_rule = self.make_allow_collision_rule(self._hand_bodies, self.object_bodies)
+        if not self.use_collision_avoidance:
+            if len(tasks) == 1:
+                return tasks[0]
+            return Parallel(tasks, minimum_success=minimum_success)
+        allow_rule = make_allow_collision_rule(self._hand_bodies, self.object_bodies)
         motion = Parallel(
             [*tasks, ExternalCollisionAvoidance(), SelfCollisionAvoidance()],
             minimum_success=minimum_success,
@@ -101,7 +105,7 @@ class PoseGraspBaseMotion(BaseMotion):
 
 
 @dataclass(kw_only=True)
-class PoseGraspMotion(PoseGraspBaseMotion):
+class PoseGraspMotion(CollisionAwareArmMotion):
     """
     Motion that moves to a grasp pose with collision avoidance.
     First moves to a pre-grasp pose (offset along the negative z-axis of the
@@ -146,11 +150,10 @@ class PoseGraspMotion(PoseGraspBaseMotion):
 
 
 @dataclass(kw_only=True)
-class RetractMotion(PoseGraspBaseMotion):
+class RetractMotion(CollisionAwareArmMotion):
     """
     Motion that retracts the gripper with collision avoidance.
     Keeps the orientation of the gripper fixed while moving.
-    Assumes the object is attached to the gripper.
 
     Supports two directions:
     - WORLD_Z: lift along the world root's positive Z axis
