@@ -4,21 +4,13 @@ from typing import Optional, List
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
-    UpdateTemporaryCollisionRules,
 )
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianPosition,
 )
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from semantic_digital_twin.collision_checking.collision_rules import (
-    AllowCollisionBetweenGroups,
-)
-from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.world_description.world_entity import Body
-from pycram.robot_plans.motions.base import BaseMotion
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from pycram.datastructures.enums import (
     Arms,
     MovementType,
@@ -26,8 +18,11 @@ from pycram.datastructures.enums import (
 )
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.pose import PoseStamped
-from pycram.view_manager import ViewManager
+from pycram.robot_plans.motions.base import BaseMotion
 from pycram.utils import translate_pose_along_local_axis
+from pycram.view_manager import ViewManager
+from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -127,14 +122,22 @@ class MoveGripperMotion(BaseMotion):
     def _motion_chart(self):
         arm = ViewManager().get_end_effector_view(self.arm_of_gripper, self.robot_view)
 
-        motion_state_chart_nodes = self._only_allow_gripper_collision_rules(self.arm_of_gripper) if self.allow_gripper_collision else [ExternalCollisionAvoidance(robot=self.robot_view)]
+        motion_state_chart_nodes = (
+            self._only_allow_gripper_collision_rules(self.arm_of_gripper)
+            if self.allow_gripper_collision
+            else [ExternalCollisionAvoidance(robot=self.robot_view)]
+        )
 
-        motion_state_chart_nodes.append(JointPositionList(
-            goal_state=arm.get_joint_state_by_type(self.motion),
-            name=(
-                "OpenGripper" if self.motion == GripperState.OPEN else "CloseGripper"
-            ),
-        ))
+        motion_state_chart_nodes.append(
+            JointPositionList(
+                goal_state=arm.get_joint_state_by_type(self.motion),
+                name=(
+                    "OpenGripper"
+                    if self.motion == GripperState.OPEN
+                    else "CloseGripper"
+                ),
+            )
+        )
         return Parallel(motion_state_chart_nodes)
 
 
@@ -188,7 +191,11 @@ class MoveTCPMotion(BaseMotion):
                 weight=DefaultWeights.WEIGHT_ABOVE_CA,
             )
 
-        motion_state_chart_nodes = self._only_allow_gripper_collision_rules(self.arm) if self.allow_gripper_collision else [ExternalCollisionAvoidance(robot=self.robot_view)]
+        motion_state_chart_nodes = (
+            self._only_allow_gripper_collision_rules(self.arm)
+            if self.allow_gripper_collision
+            else [ExternalCollisionAvoidance(robot=self.robot_view)]
+        )
         motion_state_chart_nodes.append(task)
         return Parallel(motion_state_chart_nodes)
 
@@ -237,6 +244,10 @@ class MoveTCPWaypointsMotion(BaseMotion):
             )
             for pose in self.waypoints
         ]
-        motion_state_chart_nodes = self._only_allow_gripper_collision_rules(self.arm) if self.allow_gripper_collision else [ExternalCollisionAvoidance(robot=self.robot_view)]
+        motion_state_chart_nodes = (
+            self._only_allow_gripper_collision_rules(self.arm)
+            if self.allow_gripper_collision
+            else [ExternalCollisionAvoidance(robot=self.robot_view)]
+        )
         motion_state_chart_nodes.append(Sequence(nodes=nodes))
         return Parallel(motion_state_chart_nodes)

@@ -348,7 +348,6 @@ class FollowTCPPathAction(ActionDescription):
         return PartialDesignator(cls, target_location=target_locations, arm=arm)
 
 
-
 MoveTorsoActionDescription = MoveTorsoAction.description
 SetGripperActionDescription = SetGripperAction.description
 ParkArmsActionDescription = ParkArmsAction.description

@@ -362,7 +362,7 @@ class Plan:
 
     @property
     def actions(self) -> List[ActionDescriptionNode]:
-        return [node for node in self.nodes if type(node) is ActionDescriptionNode]
+        return [node for node in self.nodes if isinstance(node, ActionDescriptionNode)]
 
     @property
     def layers(self) -> List[List[PlanNode]]:
@@ -785,7 +785,7 @@ class PlanNode:
         return sorted(children, key=lambda node: node.layer_index)
 
     @property
-    def recursive_children(self) -> List[PlanNode | MotionNode]:
+    def recursive_children(self) -> List[PlanNode]:
         """
         Recursively lists all children and their children.
 
@@ -1029,9 +1029,9 @@ class ActionNode(BaseActionNode, Generic[ActionType]):
         Collects all motion designators that are direct children of this action node.
         """
         motion_designators = [
-            x
-            for x in self.recursive_children
-            if x.is_leaf and x.parent_action_node == self
+            motion_designator
+            for motion_designator in self.recursive_children
+            if isinstance(motion_designator, MotionNode) and motion_designator.parent_action_node == self
         ]
         return motion_designators
 
