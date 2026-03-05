@@ -365,7 +365,12 @@ def cylinder_bot_diff_world():
 @pytest.fixture(scope="session")
 def pr2_world_setup():
     urdf_dir = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    return world_with_urdf_factory(urdf_dir, PR2, OmniDrive)
+    world = world_with_urdf_factory(urdf_dir, PR2, OmniDrive)
+    world.collision_manager = CollisionManager(
+        _world=world,
+        collision_detector=CollisionlessCollisionDetector(_world=world),
+    )
+    return world
 
 
 @pytest.fixture(scope="function")

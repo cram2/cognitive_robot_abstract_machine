@@ -1,11 +1,13 @@
 import numpy as np
 import pytest
-
-from krrood.ormatic.dao import to_dao
-from krrood.ormatic.utils import create_engine, drop_database
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+# The alternative mapping needs to be imported for the stretch to work properly
+import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
+import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
+from krrood.ormatic.dao import to_dao
+from krrood.ormatic.utils import create_engine, drop_database
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     ApproachDirection,
@@ -16,8 +18,8 @@ from pycram.datastructures.enums import (
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.pose import PyCramPose, PoseStamped
 from pycram.language import SequentialPlan, ParallelPlan
-from pycram.orm.ormatic_interface import *
 from pycram.motion_executor import simulated_robot
+from pycram.orm.ormatic_interface import *
 from pycram.robot_plans import (
     MoveTorsoActionDescription,
     ParkArmsAction,
@@ -35,10 +37,6 @@ from pycram.robot_plans import (
     PlaceAction,
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState, GripperState
-
-# The alternative mapping needs to be imported for the stretch to work properly
-import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
-import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 
 engine = create_engine("sqlite:///:memory:")
 
@@ -65,7 +63,6 @@ def test_simple_plan(immutable_model_world):
             Context.from_world(world),
             NavigateActionDescription(
                 PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
-                True,
             ),
             MoveTorsoActionDescription(TorsoState.HIGH),
             ParkArmsActionDescription(Arms.BOTH),
@@ -182,7 +179,6 @@ def test_code_designator_type(pycram_testing_session, mutable_model_world):
         context,
         NavigateActionDescription(
             PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
-            True,
         ),
     )
     with simulated_robot:
@@ -206,7 +202,6 @@ def test_inheritance(pycram_testing_session, mutable_model_world):
             Context.from_world(world),
             NavigateActionDescription(
                 PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
-                True,
             ),
             ParkArmsActionDescription(Arms.BOTH),
             PickUpActionDescription(
@@ -220,7 +215,6 @@ def test_inheritance(pycram_testing_session, mutable_model_world):
             ),
             NavigateActionDescription(
                 PoseStamped.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
-                True,
             ),
             PlaceActionDescription(
                 world.get_body_by_name("milk.stl"),
@@ -286,7 +280,6 @@ def test_pickUpAction(pycram_testing_session, mutable_model_world):
             Context.from_world(world),
             NavigateActionDescription(
                 PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
-                True,
             ),
             ParkArmsActionDescription(Arms.BOTH),
             PickUpActionDescription(
@@ -300,7 +293,6 @@ def test_pickUpAction(pycram_testing_session, mutable_model_world):
             ),
             NavigateActionDescription(
                 PoseStamped.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
-                True,
             ),
             PlaceActionDescription(
                 world.get_body_by_name("milk.stl"),
@@ -342,7 +334,6 @@ def test_open_and_closeAction(pycram_testing_session, mutable_model_world):
                 PoseStamped.from_list(
                     [1.81, 1.73, 0.0], [0.0, 0.0, 0.594, 0.804], world.root
                 ),
-                True,
             ),
             OpenActionDescription(
                 world.get_body_by_name("handle_cab10_t"),
@@ -406,7 +397,6 @@ def complex_plan(mutable_model_world):
             Context.from_world(world),
             NavigateActionDescription(
                 PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
-                True,
             ),
             ParkArmsActionDescription(Arms.BOTH),
             PickUpActionDescription(
@@ -420,7 +410,6 @@ def complex_plan(mutable_model_world):
             ),
             NavigateActionDescription(
                 PoseStamped.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
-                True,
             ),
             MoveTorsoActionDescription(TorsoState.HIGH),
             PlaceActionDescription(
@@ -441,7 +430,6 @@ def test_exec_creation(pycram_testing_session, immutable_model_world):
         context,
         NavigateActionDescription(
             PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
-            True,
         ),
     )
 
@@ -461,7 +449,6 @@ def test_exec_data_pose(pycram_testing_session, immutable_model_world):
         context,
         NavigateActionDescription(
             PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
-            True,
         ),
     )
 
@@ -531,10 +518,9 @@ def test_manipulated_body_pose(pycram_testing_session, complex_plan):
         [2.37, 2, 1.05], end_pose_pick.position.to_list(), decimal=1
     )
     # Check that the end_pose of pick_up and start pose of place are not equal because of navigate in between
-    for pick, place in zip(
+    assert not np.allclose(
         end_pose_pick.position.to_list(), start_pose_place.position.to_list()
-    ):
-        assert pick != place
+    )
     np.testing.assert_almost_equal(
         [2.3, 2.5, 1], end_pose_place.position.to_list(), decimal=1
     )
@@ -565,7 +551,6 @@ def test_state(pycram_testing_session, immutable_model_world):
         context,
         NavigateActionDescription(
             PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root),
-            True,
         ),
     )
     with simulated_robot:
@@ -592,7 +577,6 @@ def test_filtering(pycram_testing_session, mutable_model_world):
             context,
             NavigateActionDescription(
                 PoseStamped.from_list([1.6, 1.9, 0], [0, 0, 0, 1], world.root),
-                True,
             ),
             ParkArmsActionDescription(Arms.BOTH),
             PickUpActionDescription(
@@ -606,7 +590,6 @@ def test_filtering(pycram_testing_session, mutable_model_world):
             ),
             NavigateActionDescription(
                 PoseStamped.from_list([1.6, 2.3, 0], [0, 0, 0, 1], world.root),
-                True,
             ),
             PlaceActionDescription(
                 world.get_body_by_name("milk.stl"),
