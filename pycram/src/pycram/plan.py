@@ -1031,7 +1031,8 @@ class ActionNode(BaseActionNode, Generic[ActionType]):
         motion_designators = [
             motion_designator
             for motion_designator in self.recursive_children
-            if isinstance(motion_designator, MotionNode) and motion_designator.parent_action_node == self
+            if isinstance(motion_designator, MotionNode)
+            and motion_designator.parent_action_node == self
         ]
         return motion_designators
 
