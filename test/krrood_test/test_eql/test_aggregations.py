@@ -203,7 +203,6 @@ def test_having_with_max(handles_and_containers_world):
         .grouped_by(cabinet)
         .having(drawer_count > 1)
     )
-    # QueryGraph(query).visualize()
     results = list(query.evaluate())
     assert len(results) == 1
 
@@ -439,7 +438,6 @@ def test_average_with_condition(departments_and_employees):
         .grouped_by(department)
         .having(avg_salary > 20000)
     )
-    # QueryGraph(query).visualize()
     results = list(query.evaluate())
     assert len(results) == 1
     assert results[0][department] == next(
@@ -495,8 +493,6 @@ def test_having_node_hierarchy(departments_and_employees):
     query = a(
         set_of(department, avg_salary).grouped_by(department).having(avg_salary > 20000)
     ).build()
-
-    # QueryGraph(query).visualize()
 
     # Graph hierarchy check
     assert query._having_expression_._parent_ is query
@@ -591,12 +587,10 @@ def test_where_with_aggregation_subquery_on_different_variable():
     var1 = variable(int, domain=[1, 2, 3])
     var2 = variable(int, domain=[1, 2, 3])
     query = entity(var1).where(var1 == entity(eql.max(var2)))
-    # QueryGraph(query.build()).visualize()
     assert query.tolist() == [3]
 
 
 def test_where_with_aggregation_subquery_on_same_variable():
     var1 = variable(int, domain=[1, 2, 3])
     query = entity(var1).where(var1 == entity(eql.max(var1)))
-    # QueryGraph(query.build()).visualize()
     assert query.tolist() == [3]

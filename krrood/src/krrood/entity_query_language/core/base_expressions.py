@@ -422,16 +422,6 @@ class SymbolicExpression(ABC):
         for child in self._children_:
             yield from child._leaves_
 
-    def __and__(self, other):
-        from krrood.entity_query_language.operators.core_logical_operators import AND
-
-        return AND(self, other)
-
-    def __or__(self, other):
-        from krrood.entity_query_language.operators.core_logical_operators import OR
-
-        return OR(self, other)
-
     def _invert_(self):
         """
         Invert the symbolic expression.

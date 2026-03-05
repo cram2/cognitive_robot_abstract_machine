@@ -59,6 +59,8 @@ class QueryGraph:
             raise ModuleNotFoundError(
                 "rustworkx_utils is not installed. Please install it with `pip install rustworkx_utils`"
             )
+        if isinstance(self.query, Query):
+            self.query.build()
         self.construct_graph()
 
     def visualize(

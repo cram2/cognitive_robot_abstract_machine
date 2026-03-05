@@ -132,9 +132,6 @@ class Query(MultiArityExpressionThatPerformsACartesianProduct, ABC):
     """
 
     def __post_init__(self):
-        for var in self._selected_variables_:
-            if isinstance(var, Query):
-                var.build()
         self._operation_children_ = tuple(self._selected_variables_)
         super().__post_init__()
         self._quantifier_builder_ = QuantifierBuilder(self)

@@ -43,8 +43,6 @@ def test_generate_drawers_from_direct_condition(handles_and_containers_world):
     with condition:
         Add(drawers, inference(Drawer)(handle=handle, container=container))
 
-    # QueryGraph(condition).visualize()
-
     assert condition._conditions_root_ is condition
 
     solutions_gen = condition.evaluate()
@@ -78,8 +76,6 @@ def test_generate_drawers_from_query(handles_and_containers_world):
     with query:
         Add(drawers, inference(Drawer)(handle=handle, container=container))
 
-    # QueryGraph(query).visualize()
-
     solutions = query.evaluate()
     all_solutions = list(solutions)
 
@@ -110,8 +106,6 @@ def test_rule_tree_with_a_refinement(doors_and_drawers_world):
         Add(drawers_and_doors, inference(Drawer)(handle=handle, container=body))
         with refinement(body.size > 1):
             Add(drawers_and_doors, inference(Door)(handle=handle, body=body))
-
-    # QueryGraph(query).visualize()
 
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 3, "Should generate 1 drawer and 1 door."
@@ -190,8 +184,6 @@ def test_rule_tree_with_an_alternative(doors_and_drawers_world):
             body == revolute_connection.parent, handle == revolute_connection.child
         ):
             Add(views, inference(Door)(handle=handle, body=body))
-
-    # QueryGraph(query).visualize()
 
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 4, "Should generate 3 drawers, 1 door"
@@ -419,8 +411,6 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree_optimized(
                     handle=revolute_connection.child, body=revolute_connection.parent
                 ),
             )
-
-    # QueryGraph(query).visualize()
 
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 3, "Should generate 1 drawer, 1 door and 1 wardrobe."

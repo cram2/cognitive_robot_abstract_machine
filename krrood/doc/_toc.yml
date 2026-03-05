@@ -7,17 +7,26 @@ parts:
 - caption: Entity Query Language
   chapters:
     - file: eql/intro
-    - file: eql/writing_queries
-    - file: eql/result_quantifiers
-    - file: eql/result_processors
-    - file: eql/logical_operators
-    - file: eql/comparators
-    - file: eql/domain_mapping
-    - file: eql/predicate_and_symbolic_function
-    - file: eql/cache
-    - file: eql/match
-    - file: eql/writing_rule_trees
-    - file: eql/eql_for_sql_experts
+    - file: eql/user/index
+      sections:
+        - file: eql/user/writing_queries
+        - file: eql/user/mapped_variable
+        - file: eql/user/comparators
+        - file: eql/user/logical_operators
+        - file: eql/user/aggregators
+        - file: eql/user/result_quantifiers
+        - file: eql/user/result_processors
+        - file: eql/user/predicate_and_symbolic_function
+        - file: eql/user/match
+        - file: eql/user/eql_for_sql_experts
+        - file: eql/user/writing_rule_trees
+    - file: eql/developer/index
+      sections:
+        - file: eql/developer/architecture_overview
+        - file: eql/developer/expression_hierarchy
+        - file: eql/developer/variable_system
+        - file: eql/developer/execution_engine
+        - file: eql/developer/graph_and_visualization
 - caption: ORMatic
   chapters:
     - file: ormatic/intro
