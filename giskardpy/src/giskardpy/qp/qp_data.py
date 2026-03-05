@@ -191,11 +191,11 @@ class QPDataExplicit(QPData):
         return QPDataExplicitFactory
 
     def to_two_sided_inequality(self) -> QPDataTwoSidedInequality:
-        A2 = np.eye(len(self.box_upper_constraints))
-        if len(self.eq_matrix) > 0:
-            A2 = np.vstack((A2, self.eq_matrix))
-        if len(self.neq_matrix) > 0:
-            A2 = np.vstack((A2, self.neq_matrix))
+        A2 = sp.eye(len(self.box_upper_constraints))
+        if self.eq_matrix.shape[0] * self.eq_matrix.shape[1] != 0:
+            A2 = sp.vstack((A2, self.eq_matrix))
+        if self.neq_matrix.shape[0] * self.neq_matrix.shape[1] != 0:
+            A2 = sp.vstack((A2, self.neq_matrix))
         return QPDataTwoSidedInequality(
             quadratic_weights=self.quadratic_weights,
             linear_weights=self.linear_weights,

@@ -6,6 +6,7 @@ from giskardpy.qp.qp_data import QPDataExplicit
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.utils.decorators import memoize
+import scipy.sparse as sp
 
 
 def quaternion_multiply(quaternion1: np.ndarray, quaternion0: np.ndarray) -> np.ndarray:
@@ -281,7 +282,6 @@ def mpc(
     g[:ph] = lin_weight[0]
     g[ph : ph * 2] = lin_weight[1]
     g[-ph:] = lin_weight[2]
-    empty = np.eye(0)
     lb = np.array(lb)
     ub = np.array(ub)
     if not link_to_current_vel:
@@ -294,9 +294,9 @@ def mpc(
         linear_weights=g,
         box_lower_constraints=lb,
         box_upper_constraints=ub,
-        eq_matrix=model,
+        eq_matrix=sp.csc_matrix(model),
         eq_bounds=bE,
-        neq_matrix=empty,
+        neq_matrix=sp.csc_matrix(np.zeros((0, model.shape[0]))),
         neq_lower_bounds=np.array([]),
         neq_upper_bounds=np.array([]),
         num_eq_slack_variables=0,
