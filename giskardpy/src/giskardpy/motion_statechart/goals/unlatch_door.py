@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from giskardpy.motion_statechart.graph_node import Goal, NodeArtifacts
 from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
-from giskardpy.motion_statechart.context import BuildContext
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from krrood.symbolic_math.symbolic_math import trinary_logic_and
 
 from semantic_digital_twin.world_description.world_entity import (
@@ -19,7 +19,7 @@ class UnlatchDoor(Goal):
     handle_name: KinematicStructureEntity = field(kw_only=True)
     handle_limit: Optional[float] = field(default=None, kw_only=True)
 
-    def expand(self, context: BuildContext) -> None:
+    def expand(self, context: MotionStatechartContext) -> None:
         handle_connection = self.handle_name.get_first_parent_connection_of_type(
             ActiveConnection1DOF
         )
@@ -48,7 +48,7 @@ class UnlatchDoor(Goal):
             ]
         )
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(
             observation=trinary_logic_and(
                 *[node.observation_variable for node in self.nodes]

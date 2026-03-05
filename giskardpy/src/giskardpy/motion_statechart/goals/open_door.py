@@ -8,7 +8,7 @@ from giskardpy.motion_statechart.goals.unlatch_door import UnlatchDoor
 from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from giskardpy.motion_statechart.context import BuildContext
+from giskardpy.motion_statechart.context import MotionStatechartContext
 
 from semantic_digital_twin.datastructures.joint_state import JointState
 
@@ -41,24 +41,16 @@ class OpenDoorGoal(Goal):
     tip_normal: Optional[Vector3] = field(default=None, kw_only=True)
     goal_normal: Optional[Vector3] = field(default=None, kw_only=True)
 
-    def expand(self, context: BuildContext) -> None:
-        # Set default values for optional parameters
+    def expand(self, context: MotionStatechartContext) -> None:
         if self.tip_normal is None:
             self.tip_normal = Vector3(x=1, y=0, z=0, reference_frame=self.tip_link)
-            # NOTE (Issue 2 - left for manual fix):
-            # Original used base_link as reference_frame, not tip_link.
-            # Verify with Simon whether this should be robot base or gripper frame.
 
         if self.goal_normal is None:
             self.goal_normal = Vector3(x=0, y=0, z=-1, reference_frame=self.handle_name)
 
-        # FIX Issue 3: Use context to resolve the world root instead of manual
-        # tree traversal, which is fragile if the world root isn't reachable via
-        # parent_kinematic_structure_entity alone.
         if self.root_link is None:
             self.root_link = context.world.root
 
-        # Get door joint/connection information
         handle_connection = self.handle_name.get_first_parent_connection_of_type(
             ActiveConnection1DOF
         )
@@ -67,12 +59,10 @@ class OpenDoorGoal(Goal):
             ActiveConnection1DOF
         )
 
-        # Get joint limits for the door hinge
         if door_hinge_connection.dof.has_position_limits():
             min_limit_hinge = door_hinge_connection.dof.limits.lower.position
             max_limit_hinge = door_hinge_connection.dof.limits.upper.position
         else:
-            # For continuous joints, use reasonable defaults
             min_limit_hinge = -3.14
             max_limit_hinge = 3.14
 
@@ -81,7 +71,6 @@ class OpenDoorGoal(Goal):
         else:
             limit_hinge = max(min_limit_hinge, self.hinge_limit)
 
-        # Create unlatch door goal
         unlatch_door = UnlatchDoor(
             tip_link=self.tip_link,
             handle_name=self.handle_name,
@@ -89,7 +78,6 @@ class OpenDoorGoal(Goal):
         )
         self.add_node(unlatch_door)
 
-        # Create joint position task for door hinge (runs until unlatch completes)
         jpl = JointPositionList(
             goal_state=JointState.from_mapping(
                 {door_hinge_connection: max_limit_hinge}
@@ -100,7 +88,6 @@ class OpenDoorGoal(Goal):
         jpl.end_condition = unlatch_door.observation_variable
         self.add_node(jpl)
 
-        # Create alignment task (starts after unlatch completes)
         apl = AlignPlanes(
             root_link=self.root_link,
             tip_link=self.tip_normal.reference_frame,
@@ -111,7 +98,6 @@ class OpenDoorGoal(Goal):
         apl.start_condition = unlatch_door.observation_variable
         self.add_node(apl)
 
-        # Create open goal for hinge (starts after unlatch completes)
         open_goal2 = Open(
             tip_link=self.tip_link,
             environment_link=link_id,
@@ -121,19 +107,13 @@ class OpenDoorGoal(Goal):
         open_goal2.start_condition = unlatch_door.observation_variable
         self.add_node(open_goal2)
 
-        # Create joint position monitor (starts after unlatch completes)
         hinge_state_monitor = JointPositionReached(
             connection=door_hinge_connection, position=limit_hinge, name="HingeMonitor"
         )
         hinge_state_monitor.start_condition = unlatch_door.observation_variable
         self.add_node(hinge_state_monitor)
 
-        # Store reference so build() can use it directly (avoids re-searching self.nodes)
         self._hinge_state_monitor = hinge_state_monitor
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
-        # FIX Issue 1: The goal is complete when the hinge reaches its target position,
-        # matching the original: self.observation_expression = hinge_state_monitor.observation_expression
-        # ANDing all nodes was wrong — JointPositionList ends early and AlignPlanes
-        # has no defined terminal state, so the AND would never resolve correctly.
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=self._hinge_state_monitor.observation_variable)

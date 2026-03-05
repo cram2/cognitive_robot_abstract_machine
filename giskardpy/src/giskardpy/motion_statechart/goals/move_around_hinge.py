@@ -5,7 +5,7 @@ from enum import Enum, unique
 import krrood.symbolic_math.symbolic_math as sm
 import numpy as np
 
-from giskardpy.motion_statechart.context import BuildContext
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import (
     Goal,
@@ -44,7 +44,7 @@ class _PointReachedMonitor(MotionStatechartNode):
     root_P_goal: Point3 = field(kw_only=True)
     threshold: float = field(default=0.01, kw_only=True)
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         distance = self.root_P_tip.euclidean_distance(self.root_P_goal)
         return NodeArtifacts(observation=distance < sm.Scalar(self.threshold))
 
@@ -66,11 +66,9 @@ class _WaypointTask(Task):
     reference_angular_velocity: float = field(default=0.5, kw_only=True)
     align: bool = field(default=False, kw_only=True)
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
-        # FIX (issue #3 note): this recomputes FK independently from expand(), which is
-        # intentional — _WaypointTask.build() may be called in a different context scope.
         root_T_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
@@ -123,7 +121,7 @@ class MoveAroundHinge(Goal):
         default_factory=list, init=False, repr=False
     )
 
-    def expand(self, context: BuildContext) -> None:
+    def expand(self, context: MotionStatechartContext) -> None:
         """Create and add child tasks and monitors for each waypoint."""
 
         if self.multipliers is None:
@@ -147,7 +145,6 @@ class MoveAroundHinge(Goal):
         root_P_tip = root_T_tip.to_position()
         object_joint_angle = context.world.state[hinge_connection.dof.id].position
 
-        # axis is a Vector3 — convert to numpy for from_iterable
         object_V_object_rotation_axis = Vector3.from_iterable(
             hinge_connection.axis.to_np()
         )
@@ -155,11 +152,6 @@ class MoveAroundHinge(Goal):
             self.root_link, door_body
         )
 
-        # FIX (issue #2): offset is a Vector3 in an arbitrary frame. To apply it as
-        # a translation on root_T_door_expr, we must first express it in the root frame.
-        # HTM @ Vector3 applies only the rotation (w=0), giving us the rotated direction.
-        # We then build a pure-translation HTM from that root-frame vector and premultiply,
-        # matching the original: root_T_offset.dot(root_T_door_expr).
         if self.offset is not None:
             root_V_offset = root_T_door_expr @ self.offset
             root_T_offset = HomogeneousTransformationMatrix.from_point_rotation_matrix(
@@ -191,7 +183,7 @@ class MoveAroundHinge(Goal):
 
     def _compute_waypoints(
         self,
-        context: BuildContext,
+        context: MotionStatechartContext,
         door_body: KinematicStructureEntity,
         object_V_object_rotation_axis: Vector3,
         object_joint_angle: float,
@@ -206,9 +198,6 @@ class MoveAroundHinge(Goal):
             door_body, self.handle_name
         )
 
-        # FIX (issue #4): call .to_np() on the full Point3 (returns shape (4,1)) and
-        # slice+flatten, rather than calling .to_np() on individual sm.Scalar components
-        # (which may return 0-d or shape-(1,) arrays and produce an ambiguous stack shape).
         temp_point = door_P_handle.to_np()[:3].flatten()
 
         direction_axis = int(np.argmax(np.abs(temp_point)))
@@ -244,9 +233,6 @@ class MoveAroundHinge(Goal):
                 door_T_door_rotated.inverse() @ door_P_intermediate_point
             )
 
-            # FIX (issue #1): apply the full root_T_door_expr (translation + rotation),
-            # not just its rotation component. The previous code stripped the translation
-            # by extracting only .to_rotation_matrix(), placing all waypoints at the origin.
             root_P_top = root_T_door_expr @ door_rotated_P_top
 
             waypoints.append((root_P_top, goal_name))
@@ -329,5 +315,5 @@ class MoveAroundHinge(Goal):
 
         self.observation_expression = old_position_monitor.observation_variable
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(debug_expressions=self._waypoint_debug_expressions)

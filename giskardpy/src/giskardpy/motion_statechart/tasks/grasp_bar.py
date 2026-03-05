@@ -7,7 +7,7 @@ from giskardpy.motion_statechart.binding_policy import (
     GoalBindingPolicy,
     ForwardKinematicsBinding,
 )
-from giskardpy.motion_statechart.context import BuildContext, ExecutionContext
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import NodeArtifacts, Task
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -98,7 +98,7 @@ class GraspBar(Task):
     Forward kinematics binding for the bar axis reference frame.
     """
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Build motion constraints for grasping the bar.
 
@@ -194,10 +194,10 @@ class GraspBar(Task):
 
         return artifacts
 
-    def on_start(self, context: ExecutionContext):
+    def on_start(self, context: MotionStatechartContext):
         if self.binding_policy == GoalBindingPolicy.Bind_on_start:
-            self._fk_binding_bar_center.bind(context.world)
-            self._fk_binding_bar_axis.bind(context.world)
+            self._fk_binding_bar_center.bind(context)
+            self._fk_binding_bar_axis.bind(context)
 
 
 @dataclass
@@ -294,7 +294,7 @@ class GraspBarOffset(Task):
     Forward kinematics binding for the grasp axis offset reference frame.
     """
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Build motion constraints for grasping the bar with offset.
 
@@ -420,8 +420,8 @@ class GraspBarOffset(Task):
 
         return artifacts
 
-    def on_start(self, context: ExecutionContext):
+    def on_start(self, context: MotionStatechartContext):
         if self.binding_policy == GoalBindingPolicy.Bind_on_start:
-            self._fk_binding_handle.bind(context.world)
-            self._fk_binding_bar_axis.bind(context.world)
-            self._fk_binding_grasp_offset.bind(context.world)
+            self._fk_binding_handle.bind(context)
+            self._fk_binding_bar_axis.bind(context)
+            self._fk_binding_grasp_offset.bind(context)

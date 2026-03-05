@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from krrood.symbolic_math.symbolic_math import Scalar
-from giskardpy.motion_statechart.context import BuildContext
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import (
     Goal,
@@ -31,11 +31,10 @@ class PrePushDoor(Goal):
     reference_angular_velocity: float = 0.5
     weight: float = DefaultWeights.WEIGHT_BELOW_CA
 
-    def expand(self, context: BuildContext) -> None:
+    def expand(self, context: MotionStatechartContext) -> None:
         """
         The objective is to push the object until desired rotation is reached.
         """
-        # Get the door's rotation joint and its axis
         object_connection: ActiveConnection1DOF = (
             self.door_object.get_first_parent_connection_of_type(ActiveConnection1DOF)
         )
@@ -43,7 +42,6 @@ class PrePushDoor(Goal):
             object_connection.axis.to_np()
         )
 
-        # Compute forward kinematics
         root_T_tip = context.world._forward_kinematic_manager.compose_expression(
             self.root_link, self.tip_link
         )
@@ -54,33 +52,28 @@ class PrePushDoor(Goal):
             self.door_object, self.door_handle
         )
 
-        # Find the dominant axis from door joint to handle frame
         temp_point = np.asarray(
             [door_P_handle.x.to_np(), door_P_handle.y.to_np(), door_P_handle.z.to_np()]
         )
         door_V_v1 = np.zeros(3)
         direction_axis = np.argmax(abs(temp_point))
         door_V_v1[direction_axis] = 1
-        door_V_v2 = object_V_object_rotation_axis  # rotation axis (B)
-        door_V_v1 = Vector3.from_iterable(door_V_v1)  # handle direction axis (A)
+        door_V_v2 = object_V_object_rotation_axis
+        door_V_v1 = Vector3.from_iterable(door_V_v1)
 
-        # Project the tip onto the plane defined by the door axes
         door_Pose_tip = context.world._forward_kinematic_manager.compose_expression(
             self.door_object, self.tip_link
         )
         door_P_tip = door_Pose_tip.to_position()
         door_P_nearest, _ = door_P_tip.project_to_plane(door_V_v1, door_V_v2)
 
-        # Transform the nearest point back into the root frame
         root_P_nearest_in_rotated_door = root_T_door @ door_P_nearest
 
-        # Compute the completion condition
         dist = root_T_tip.to_position().euclidean_distance(
             root_P_nearest_in_rotated_door
         )
         self.observation_expression = dist <= Scalar(self.threshold)
 
-        # Create and register the task
         push_door_task = _PrePushDoorTask(
             name="pre push door",
             frame_P_current=root_T_tip.to_position(),
@@ -100,7 +93,7 @@ class _PrePushDoorTask(Task):
     reference_velocity: float
     weight: float
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
         artifacts.constraints.add_point_goal_constraints(
             frame_P_current=self.frame_P_current,

@@ -2614,7 +2614,6 @@ class TestGraspBarTasks:
             "base_footprint"
         )
 
-        # Create a horizontal bar in front of the robot
         bar_center = Point3(0.6, 0.0, 1.0, reference_frame=root)
         bar_axis = Vector3.X(reference_frame=root)
         bar_length = 0.3
@@ -2633,13 +2632,12 @@ class TestGraspBarTasks:
         msc.add_node(grasp_bar)
         msc.add_node(EndMotion.when_true(grasp_bar))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
         assert grasp_bar.observation_state == ObservationStateValues.TRUE
 
-        # Verify tip grasp axis is aligned with bar axis
         root_V_bar_axis = pr2_world_state_reset.transform(
             target_frame=root, spatial_object=bar_axis
         )
@@ -2653,42 +2651,37 @@ class TestGraspBarTasks:
         v_bar = root_V_bar_axis.to_np()[:3]
         v_grasp = tip_V_grasp.to_np()[:3]
 
-        # Check alignment (should be parallel or anti-parallel)
         alignment_angle = angle_between_vector(v_bar, v_grasp)
         assert (
             alignment_angle <= grasp_bar.threshold
             or abs(alignment_angle - np.pi) <= grasp_bar.threshold
         ), f"Grasp axis not aligned with bar axis: {alignment_angle:.6f} rad"
 
-    def test_grasp_bar_offset_basic(self, pr2_world_state_reset: World):
+    def test_grasp_bar_offset_basic(self, pr2_world_copy: World):
         """
         Test GraspBarOffset with handle link and grasp offset.
         This is the core functionality for grasping handles with offset.
         """
-        with pr2_world_state_reset.modify_world():
-            # Create a handle body
+        with pr2_world_copy.modify_world():
             handle = Body(
                 name=PrefixedName("test_handle"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.05, 0.3, 0.05))]),
             )
             handle_connection = FixedConnection(
-                parent=pr2_world_state_reset.root,
+                parent=pr2_world_copy.root,
                 child=handle,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=0.6, y=0.0, z=1.0, reference_frame=pr2_world_state_reset.root
+                    x=0.6, y=0.0, z=1.0, reference_frame=pr2_world_copy.root
                 ),
             )
-            pr2_world_state_reset.add_connection(handle_connection)
+            pr2_world_copy.add_connection(handle_connection)
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        handle_link = pr2_world_state_reset.get_body_by_name("test_handle")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        handle_link = pr2_world_copy.get_body_by_name("test_handle")
 
-        # Bar properties in handle frame
         bar_center = Point3(0.0, 0.0, 0.0, reference_frame=handle_link)
         bar_axis = Vector3.Y(reference_frame=handle_link)
         bar_length = 0.3
@@ -2710,7 +2703,7 @@ class TestGraspBarTasks:
         msc.add_node(grasp_bar_offset)
         msc.add_node(EndMotion.when_true(grasp_bar_offset))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
@@ -2728,7 +2721,6 @@ class TestGraspBarTasks:
             "base_footprint"
         )
 
-        # Create a bar in front of the robot
         bar_center = Point3(0.6, -0.2, 1.0, reference_frame=root)
         bar_axis = Vector3.X(reference_frame=root)
         bar_length = 0.3
@@ -2748,7 +2740,7 @@ class TestGraspBarTasks:
         msc.add_node(grasp_bar)
         msc.add_node(EndMotion.when_true(grasp_bar))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
@@ -2758,49 +2750,46 @@ class TestGraspBarTasks:
 class TestUnlatchDoor:
     """Test suite for UnlatchDoor goal."""
 
-    def test_unlatch_door_basic(self, pr2_world_state_reset: World):
+    def test_unlatch_door_basic(self, pr2_world_copy: World):
         """
         Test basic UnlatchDoor functionality with a door handle.
         Verifies that the handle is opened to its maximum limit.
         """
-        with pr2_world_state_reset.modify_world():
-            # Create a door handle
+        with pr2_world_copy.modify_world():
             handle = Body(
                 name=PrefixedName("door_handle"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.15, 0.05, 0.05))]),
             )
 
-            # Create revolute connection for handle with limits
             lower_limits = DerivativeMap()
             lower_limits.position = 0.0
             lower_limits.velocity = -1.0
             upper_limits = DerivativeMap()
-            upper_limits.position = np.pi / 4  # 45 degrees max rotation
+            upper_limits.position = np.pi / 4
             upper_limits.velocity = 1.0
 
             handle_dof = DegreeOfFreedom(
                 name=PrefixedName("handle_joint"),
                 limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
             )
-            pr2_world_state_reset.add_degree_of_freedom(handle_dof)
+            pr2_world_copy.add_degree_of_freedom(handle_dof)
 
             handle_connection = RevoluteConnection(
-                parent=pr2_world_state_reset.root,
+                parent=pr2_world_copy.root,
                 child=handle,
                 axis=Vector3.Z(),
                 dof_id=handle_dof.id,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=0.6, y=0.0, z=1.0, reference_frame=pr2_world_state_reset.root
+                    x=0.6, y=0.0, z=1.0, reference_frame=pr2_world_copy.root
                 ),
             )
-            pr2_world_state_reset.add_connection(handle_connection)
+            pr2_world_copy.add_connection(handle_connection)
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        handle_body = pr2_world_state_reset.get_body_by_name("door_handle")
+        handle_body = pr2_world_copy.get_body_by_name("door_handle")
 
-        # Test UnlatchDoor
         msc = MotionStatechart()
         unlatch = UnlatchDoor(
             tip_link=tip,
@@ -2809,58 +2798,54 @@ class TestUnlatchDoor:
         msc.add_node(unlatch)
         msc.add_node(EndMotion.when_true(unlatch))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
-        # Verify handle reached maximum position
         assert unlatch.observation_state == ObservationStateValues.TRUE
         assert np.isclose(handle_connection.position, upper_limits.position, atol=0.01)
 
-    def test_unlatch_door_with_custom_limit(self, pr2_world_state_reset: World):
+    def test_unlatch_door_with_custom_limit(self, pr2_world_copy: World):
         """
         Test UnlatchDoor with custom handle_limit parameter.
         Verifies that the handle stops at the specified limit rather than maximum.
         """
-        with pr2_world_state_reset.modify_world():
-            # Create a door handle
+        with pr2_world_copy.modify_world():
             handle = Body(
                 name=PrefixedName("door_handle_limited"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.15, 0.05, 0.05))]),
             )
 
-            # Create revolute connection with larger max limit
             lower_limits = DerivativeMap()
             lower_limits.position = 0.0
             lower_limits.velocity = -1.0
             upper_limits = DerivativeMap()
-            upper_limits.position = np.pi / 2  # 90 degrees max
+            upper_limits.position = np.pi / 2
             upper_limits.velocity = 1.0
 
             handle_dof = DegreeOfFreedom(
                 name=PrefixedName("handle_joint_limited"),
                 limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
             )
-            pr2_world_state_reset.add_degree_of_freedom(handle_dof)
+            pr2_world_copy.add_degree_of_freedom(handle_dof)
 
             handle_connection = RevoluteConnection(
-                parent=pr2_world_state_reset.root,
+                parent=pr2_world_copy.root,
                 child=handle,
                 axis=Vector3.Z(),
                 dof_id=handle_dof.id,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=0.6, y=0.0, z=1.0, reference_frame=pr2_world_state_reset.root
+                    x=0.6, y=0.0, z=1.0, reference_frame=pr2_world_copy.root
                 ),
             )
-            pr2_world_state_reset.add_connection(handle_connection)
+            pr2_world_copy.add_connection(handle_connection)
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        handle_body = pr2_world_state_reset.get_body_by_name("door_handle_limited")
+        handle_body = pr2_world_copy.get_body_by_name("door_handle_limited")
 
-        # Custom limit less than maximum
-        custom_limit = np.pi / 6  # 30 degrees instead of 90
+        custom_limit = np.pi / 6
 
         msc = MotionStatechart()
         unlatch = UnlatchDoor(
@@ -2871,28 +2856,25 @@ class TestUnlatchDoor:
         msc.add_node(unlatch)
         msc.add_node(EndMotion.when_true(unlatch))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
-        # Verify handle stopped at custom limit, not maximum
         assert unlatch.observation_state == ObservationStateValues.TRUE
         assert np.isclose(handle_connection.position, custom_limit, atol=0.01)
         assert handle_connection.position < upper_limits.position
 
-    def test_unlatch_door_with_sequence(self, pr2_world_state_reset: World):
+    def test_unlatch_door_with_sequence(self, pr2_world_copy: World):
         """
         Test UnlatchDoor as part of a sequential task.
         First move to a neutral position, then unlatch the handle.
         """
-        with pr2_world_state_reset.modify_world():
-            # Create a door handle
+        with pr2_world_copy.modify_world():
             handle = Body(
                 name=PrefixedName("door_handle_seq"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.15, 0.05, 0.05))]),
             )
 
-            # Create revolute connection for handle
             lower_limits = DerivativeMap()
             lower_limits.position = 0.0
             lower_limits.velocity = -1.0
@@ -2904,33 +2886,31 @@ class TestUnlatchDoor:
                 name=PrefixedName("handle_joint_seq"),
                 limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
             )
-            pr2_world_state_reset.add_degree_of_freedom(handle_dof)
+            pr2_world_copy.add_degree_of_freedom(handle_dof)
 
             handle_connection = RevoluteConnection(
-                parent=pr2_world_state_reset.root,
+                parent=pr2_world_copy.root,
                 child=handle,
                 axis=Vector3.Z(),
                 dof_id=handle_dof.id,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=0.6, y=0.0, z=1.0, reference_frame=pr2_world_state_reset.root
+                    x=0.6, y=0.0, z=1.0, reference_frame=pr2_world_copy.root
                 ),
             )
-            pr2_world_state_reset.add_connection(handle_connection)
+            pr2_world_copy.add_connection(handle_connection)
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        handle_body = pr2_world_state_reset.get_body_by_name("door_handle_seq")
+        handle_body = pr2_world_copy.get_body_by_name("door_handle_seq")
 
         msc = MotionStatechart()
 
-        # Create sequence: unlatch, then verify with monitor
         unlatch = UnlatchDoor(
             tip_link=tip,
             handle_name=handle_body,
         )
 
-        # Add a monitor to verify the handle stays at the target position
         handle_monitor = JointPositionReached(
             connection=handle_connection,
             position=upper_limits.position,
@@ -2942,11 +2922,10 @@ class TestUnlatchDoor:
         msc.add_node(sequence)
         msc.add_node(EndMotion.when_true(sequence))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
-        # Verify both tasks completed
         assert unlatch.observation_state == ObservationStateValues.TRUE
         assert handle_monitor.observation_state == ObservationStateValues.TRUE
         assert np.isclose(handle_connection.position, upper_limits.position, atol=0.01)
@@ -2955,19 +2934,17 @@ class TestUnlatchDoor:
 class TestOpenDoorGoal:
     """Test suite for OpenDoorGoal."""
 
-    def test_open_door_goal_expand_creates_subnodes(self, pr2_world_state_reset: World):
+    def test_open_door_goal_expand_creates_subnodes(self, pr2_world_copy: World):
         """
         Test that OpenDoorGoal.expand() creates all expected sub-nodes.
         Verifies the goal structure without full execution.
         """
-        with pr2_world_state_reset.modify_world():
-            # Create door body
+        with pr2_world_copy.modify_world():
             door = Body(
                 name=PrefixedName("door"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.8, 0.05, 2.0))]),
             )
 
-            # Create door hinge
             hinge_lower_limits = DerivativeMap()
             hinge_lower_limits.position = 0.0
             hinge_lower_limits.velocity = -1.0
@@ -2981,26 +2958,24 @@ class TestOpenDoorGoal:
                     lower=hinge_lower_limits, upper=hinge_upper_limits
                 ),
             )
-            pr2_world_state_reset.add_degree_of_freedom(hinge_dof)
+            pr2_world_copy.add_degree_of_freedom(hinge_dof)
 
             door_hinge_connection = RevoluteConnection(
-                parent=pr2_world_state_reset.root,
+                parent=pr2_world_copy.root,
                 child=door,
                 axis=Vector3.Z(),
                 dof_id=hinge_dof.id,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=1.0, y=-0.4, z=0.0, reference_frame=pr2_world_state_reset.root
+                    x=1.0, y=-0.4, z=0.0, reference_frame=pr2_world_copy.root
                 ),
             )
-            pr2_world_state_reset.add_connection(door_hinge_connection)
+            pr2_world_copy.add_connection(door_hinge_connection)
 
-            # Create door handle
             handle = Body(
                 name=PrefixedName("door_handle"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.15, 0.05, 0.05))]),
             )
 
-            # Create handle connection
             handle_lower_limits = DerivativeMap()
             handle_lower_limits.position = 0.0
             handle_lower_limits.velocity = -1.0
@@ -3014,7 +2989,7 @@ class TestOpenDoorGoal:
                     lower=handle_lower_limits, upper=handle_upper_limits
                 ),
             )
-            pr2_world_state_reset.add_degree_of_freedom(handle_dof)
+            pr2_world_copy.add_degree_of_freedom(handle_dof)
 
             handle_connection = RevoluteConnection(
                 parent=door,
@@ -3025,15 +3000,13 @@ class TestOpenDoorGoal:
                     x=0.35, y=0.0, z=1.0, reference_frame=door
                 ),
             )
-            pr2_world_state_reset.add_connection(handle_connection)
+            pr2_world_copy.add_connection(handle_connection)
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        handle_body = pr2_world_state_reset.get_body_by_name("door_handle")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        handle_body = pr2_world_copy.get_body_by_name("door_handle")
 
         msc = MotionStatechart()
         open_door = OpenDoorGoal(
@@ -3044,13 +3017,11 @@ class TestOpenDoorGoal:
         )
         msc.add_node(open_door)
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
-        # Verify all expected sub-nodes were created
         assert len(open_door.nodes) == 5, "OpenDoorGoal should create 5 sub-nodes"
 
-        # Find nodes by type
         unlatch_nodes = [n for n in open_door.nodes if isinstance(n, UnlatchDoor)]
         jpl_nodes = [n for n in open_door.nodes if isinstance(n, JointPositionList)]
         align_nodes = [n for n in open_door.nodes if isinstance(n, AlignPlanes)]
@@ -3065,39 +3036,26 @@ class TestOpenDoorGoal:
         assert len(open_nodes) == 1, "Should have 1 Open node"
         assert len(monitor_nodes) == 1, "Should have 1 JointPositionReached monitor"
 
-        # Verify start/end conditions are properly set
-        # UnlatchDoor should start immediately (has default start condition)
         assert unlatch_nodes[0].start_condition is not None
-
-        # JointPositionList should end after unlatch completes
         assert jpl_nodes[0].end_condition == unlatch_nodes[0].observation_variable
-
-        # All other nodes should start after unlatch completes
         assert align_nodes[0].start_condition == unlatch_nodes[0].observation_variable
         assert open_nodes[0].start_condition == unlatch_nodes[0].observation_variable
         assert monitor_nodes[0].start_condition == unlatch_nodes[0].observation_variable
-
-        # Verify the goal's own observation is driven by the hinge monitor only
-        # (not an AND of all sub-nodes)
         assert open_door._hinge_state_monitor is monitor_nodes[0]
 
-    def test_open_door_goal_with_custom_handle_limit(
-        self, pr2_world_state_reset: World
-    ):
+    def test_open_door_goal_with_custom_handle_limit(self, pr2_world_copy: World):
         """
         Test OpenDoorGoal with custom handle_limit parameter.
         Verifies that the handle limit is properly passed to UnlatchDoor,
         and that JointPositionList targets max_limit_hinge while Open and
         HingeMonitor target the clamped limit_hinge value.
         """
-        with pr2_world_state_reset.modify_world():
-            # Create door body
+        with pr2_world_copy.modify_world():
             door = Body(
                 name=PrefixedName("door_custom"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.8, 0.05, 2.0))]),
             )
 
-            # Create door hinge
             hinge_lower_limits = DerivativeMap()
             hinge_lower_limits.position = 0.0
             hinge_lower_limits.velocity = -1.0
@@ -3111,26 +3069,24 @@ class TestOpenDoorGoal:
                     lower=hinge_lower_limits, upper=hinge_upper_limits
                 ),
             )
-            pr2_world_state_reset.add_degree_of_freedom(hinge_dof)
+            pr2_world_copy.add_degree_of_freedom(hinge_dof)
 
             door_hinge_connection = RevoluteConnection(
-                parent=pr2_world_state_reset.root,
+                parent=pr2_world_copy.root,
                 child=door,
                 axis=Vector3.Z(),
                 dof_id=hinge_dof.id,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=1.0, y=-0.4, z=0.0, reference_frame=pr2_world_state_reset.root
+                    x=1.0, y=-0.4, z=0.0, reference_frame=pr2_world_copy.root
                 ),
             )
-            pr2_world_state_reset.add_connection(door_hinge_connection)
+            pr2_world_copy.add_connection(door_hinge_connection)
 
-            # Create door handle
             handle = Body(
                 name=PrefixedName("door_handle_custom"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.15, 0.05, 0.05))]),
             )
 
-            # Create handle connection
             handle_lower_limits = DerivativeMap()
             handle_lower_limits.position = 0.0
             handle_lower_limits.velocity = -1.0
@@ -3144,7 +3100,7 @@ class TestOpenDoorGoal:
                     lower=handle_lower_limits, upper=handle_upper_limits
                 ),
             )
-            pr2_world_state_reset.add_degree_of_freedom(handle_dof)
+            pr2_world_copy.add_degree_of_freedom(handle_dof)
 
             handle_connection = RevoluteConnection(
                 parent=door,
@@ -3155,19 +3111,17 @@ class TestOpenDoorGoal:
                     x=0.35, y=0.0, z=1.0, reference_frame=door
                 ),
             )
-            pr2_world_state_reset.add_connection(handle_connection)
+            pr2_world_copy.add_connection(handle_connection)
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        handle_body = pr2_world_state_reset.get_body_by_name("door_handle_custom")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        handle_body = pr2_world_copy.get_body_by_name("door_handle_custom")
 
         custom_handle_limit = np.pi / 6
         custom_hinge_limit = np.pi / 4
-        expected_max_limit_hinge = np.pi / 2  # upper limit of the hinge joint
+        expected_max_limit_hinge = np.pi / 2
 
         msc = MotionStatechart()
         open_door = OpenDoorGoal(
@@ -3179,18 +3133,13 @@ class TestOpenDoorGoal:
         )
         msc.add_node(open_door)
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
-        # Verify UnlatchDoor received custom handle limit
         unlatch_nodes = [n for n in open_door.nodes if isinstance(n, UnlatchDoor)]
         assert len(unlatch_nodes) == 1
         assert unlatch_nodes[0].handle_limit == custom_handle_limit
 
-        # FIX Issue 4: JointPositionList targets max_limit_hinge (the joint upper
-        # limit), NOT the clamped hinge_limit. This distinction matters: jpl keeps
-        # the door under control before unlatch, while Open/Monitor target the actual
-        # desired opening angle after unlatch.
         jpl_nodes = [n for n in open_door.nodes if isinstance(n, JointPositionList)]
         assert len(jpl_nodes) == 1
         jpl_goal_positions = dict(jpl_nodes[0].goal_state.items())
@@ -3198,33 +3147,27 @@ class TestOpenDoorGoal:
             jpl_goal_positions[door_hinge_connection], expected_max_limit_hinge
         ), "JointPositionList should target max_limit_hinge (joint upper limit), not the clamped hinge_limit"
 
-        # Open goal targets the clamped limit_hinge
         open_nodes = [n for n in open_door.nodes if isinstance(n, Open)]
         assert len(open_nodes) == 1
         assert open_nodes[0].goal_joint_state == custom_hinge_limit
 
-        # Monitor also targets the clamped limit_hinge (triggers goal completion)
         monitor_nodes = [
             n for n in open_door.nodes if isinstance(n, JointPositionReached)
         ]
         assert len(monitor_nodes) == 1
         assert monitor_nodes[0].position == custom_hinge_limit
 
-    def test_open_door_goal_default_alignment_vectors(
-        self, pr2_world_state_reset: World
-    ):
+    def test_open_door_goal_default_alignment_vectors(self, pr2_world_copy: World):
         """
         Test that OpenDoorGoal sets proper default alignment vectors when not specified.
         Also verifies that root_link defaults to the world root via context.
         """
-        with pr2_world_state_reset.modify_world():
-            # Create door body
+        with pr2_world_copy.modify_world():
             door = Body(
                 name=PrefixedName("door_default"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.8, 0.05, 2.0))]),
             )
 
-            # Create door hinge
             hinge_lower_limits = DerivativeMap()
             hinge_lower_limits.position = 0.0
             hinge_lower_limits.velocity = -1.0
@@ -3238,26 +3181,24 @@ class TestOpenDoorGoal:
                     lower=hinge_lower_limits, upper=hinge_upper_limits
                 ),
             )
-            pr2_world_state_reset.add_degree_of_freedom(hinge_dof)
+            pr2_world_copy.add_degree_of_freedom(hinge_dof)
 
             door_hinge_connection = RevoluteConnection(
-                parent=pr2_world_state_reset.root,
+                parent=pr2_world_copy.root,
                 child=door,
                 axis=Vector3.Z(),
                 dof_id=hinge_dof.id,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=1.0, y=-0.4, z=0.0, reference_frame=pr2_world_state_reset.root
+                    x=1.0, y=-0.4, z=0.0, reference_frame=pr2_world_copy.root
                 ),
             )
-            pr2_world_state_reset.add_connection(door_hinge_connection)
+            pr2_world_copy.add_connection(door_hinge_connection)
 
-            # Create door handle
             handle = Body(
                 name=PrefixedName("door_handle_default"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.15, 0.05, 0.05))]),
             )
 
-            # Create handle connection
             handle_lower_limits = DerivativeMap()
             handle_lower_limits.position = 0.0
             handle_lower_limits.velocity = -1.0
@@ -3271,7 +3212,7 @@ class TestOpenDoorGoal:
                     lower=handle_lower_limits, upper=handle_upper_limits
                 ),
             )
-            pr2_world_state_reset.add_degree_of_freedom(handle_dof)
+            pr2_world_copy.add_degree_of_freedom(handle_dof)
 
             handle_connection = RevoluteConnection(
                 parent=door,
@@ -3282,15 +3223,14 @@ class TestOpenDoorGoal:
                     x=0.35, y=0.0, z=1.0, reference_frame=door
                 ),
             )
-            pr2_world_state_reset.add_connection(handle_connection)
+            pr2_world_copy.add_connection(handle_connection)
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        handle_body = pr2_world_state_reset.get_body_by_name("door_handle_default")
+        handle_body = pr2_world_copy.get_body_by_name("door_handle_default")
 
         msc = MotionStatechart()
-        # Don't specify tip_normal, goal_normal, or root_link - test defaults
         open_door = OpenDoorGoal(
             tip_link=tip,
             handle_name=handle_body,
@@ -3298,15 +3238,13 @@ class TestOpenDoorGoal:
         )
         msc.add_node(open_door)
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
-        # Verify defaults were set
         assert open_door.tip_normal is not None, "tip_normal should have default"
         assert open_door.goal_normal is not None, "goal_normal should have default"
         assert open_door.root_link is not None, "root_link should have default"
 
-        # Verify default values are correct
         assert open_door.tip_normal.reference_frame == tip
         assert np.isclose(open_door.tip_normal.x, 1.0)
         assert np.isclose(open_door.tip_normal.y, 0.0)
@@ -3317,32 +3255,27 @@ class TestOpenDoorGoal:
         assert np.isclose(open_door.goal_normal.y, 0.0)
         assert np.isclose(open_door.goal_normal.z, -1.0)
 
-        # FIX Issue 3: root_link default should be the world root from context,
-        # not the result of manual kinematic tree traversal.
         assert (
-            open_door.root_link == pr2_world_state_reset.root
+            open_door.root_link == pr2_world_copy.root
         ), "Default root_link should be the world root resolved via context"
 
-        # Verify AlignPlanes node was created with these defaults
         align_nodes = [n for n in open_door.nodes if isinstance(n, AlignPlanes)]
         assert len(align_nodes) == 1
         assert align_nodes[0].tip_normal == open_door.tip_normal
         assert align_nodes[0].goal_normal == open_door.goal_normal
         assert align_nodes[0].root_link == open_door.root_link
 
-    def test_open_door_unlatch_only_execution(self, pr2_world_state_reset: World):
+    def test_open_door_unlatch_only_execution(self, pr2_world_copy: World):
         """
         Test just the UnlatchDoor sub-component by executing it in isolation.
         This is a simpler execution test that should complete successfully.
         """
-        with pr2_world_state_reset.modify_world():
-            # Create door body
+        with pr2_world_copy.modify_world():
             door = Body(
                 name=PrefixedName("door_unlatch"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.8, 0.05, 2.0))]),
             )
 
-            # Create door hinge
             hinge_lower_limits = DerivativeMap()
             hinge_lower_limits.position = 0.0
             hinge_lower_limits.velocity = -1.0
@@ -3356,26 +3289,24 @@ class TestOpenDoorGoal:
                     lower=hinge_lower_limits, upper=hinge_upper_limits
                 ),
             )
-            pr2_world_state_reset.add_degree_of_freedom(hinge_dof)
+            pr2_world_copy.add_degree_of_freedom(hinge_dof)
 
             door_hinge_connection = RevoluteConnection(
-                parent=pr2_world_state_reset.root,
+                parent=pr2_world_copy.root,
                 child=door,
                 axis=Vector3.Z(),
                 dof_id=hinge_dof.id,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=0.6, y=0.0, z=0.0, reference_frame=pr2_world_state_reset.root
+                    x=0.6, y=0.0, z=0.0, reference_frame=pr2_world_copy.root
                 ),
             )
-            pr2_world_state_reset.add_connection(door_hinge_connection)
+            pr2_world_copy.add_connection(door_hinge_connection)
 
-            # Create door handle
             handle = Body(
                 name=PrefixedName("door_handle_unlatch"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.15, 0.05, 0.05))]),
             )
 
-            # Create handle connection
             handle_lower_limits = DerivativeMap()
             handle_lower_limits.position = 0.0
             handle_lower_limits.velocity = -1.0
@@ -3389,7 +3320,7 @@ class TestOpenDoorGoal:
                     lower=handle_lower_limits, upper=handle_upper_limits
                 ),
             )
-            pr2_world_state_reset.add_degree_of_freedom(handle_dof)
+            pr2_world_copy.add_degree_of_freedom(handle_dof)
 
             handle_connection = RevoluteConnection(
                 parent=door,
@@ -3400,14 +3331,13 @@ class TestOpenDoorGoal:
                     x=0.35, y=0.0, z=1.0, reference_frame=door
                 ),
             )
-            pr2_world_state_reset.add_connection(handle_connection)
+            pr2_world_copy.add_connection(handle_connection)
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        handle_body = pr2_world_state_reset.get_body_by_name("door_handle_unlatch")
+        handle_body = pr2_world_copy.get_body_by_name("door_handle_unlatch")
 
-        # Test just the UnlatchDoor component
         msc = MotionStatechart()
         unlatch = UnlatchDoor(
             tip_link=tip,
@@ -3416,29 +3346,26 @@ class TestOpenDoorGoal:
         msc.add_node(unlatch)
         msc.add_node(EndMotion.when_true(unlatch))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
-        # Verify unlatch completed successfully
         assert unlatch.observation_state == ObservationStateValues.TRUE
         assert np.isclose(
             handle_connection.position, handle_upper_limits.position, atol=0.01
         )
 
-    def test_open_door_goal_with_json_serialization(self, pr2_world_state_reset: World):
+    def test_open_door_goal_with_json_serialization(self, pr2_world_copy: World):
         """
         Test that OpenDoorGoal can be serialized to JSON and deserialized correctly.
         This tests the data structure integrity and all parameter preservation.
         """
-        with pr2_world_state_reset.modify_world():
-            # Create door body
+        with pr2_world_copy.modify_world():
             door = Body(
                 name=PrefixedName("door_json"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.8, 0.05, 2.0))]),
             )
 
-            # Create door hinge
             hinge_lower_limits = DerivativeMap()
             hinge_lower_limits.position = 0.0
             hinge_lower_limits.velocity = -1.0
@@ -3452,26 +3379,24 @@ class TestOpenDoorGoal:
                     lower=hinge_lower_limits, upper=hinge_upper_limits
                 ),
             )
-            pr2_world_state_reset.add_degree_of_freedom(hinge_dof)
+            pr2_world_copy.add_degree_of_freedom(hinge_dof)
 
             door_hinge_connection = RevoluteConnection(
-                parent=pr2_world_state_reset.root,
+                parent=pr2_world_copy.root,
                 child=door,
                 axis=Vector3.Z(),
                 dof_id=hinge_dof.id,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=1.0, y=-0.4, z=0.0, reference_frame=pr2_world_state_reset.root
+                    x=1.0, y=-0.4, z=0.0, reference_frame=pr2_world_copy.root
                 ),
             )
-            pr2_world_state_reset.add_connection(door_hinge_connection)
+            pr2_world_copy.add_connection(door_hinge_connection)
 
-            # Create door handle
             handle = Body(
                 name=PrefixedName("door_handle_json"),
                 collision=ShapeCollection(shapes=[Box(scale=Scale(0.15, 0.05, 0.05))]),
             )
 
-            # Create handle connection
             handle_lower_limits = DerivativeMap()
             handle_lower_limits.position = 0.0
             handle_lower_limits.velocity = -1.0
@@ -3485,7 +3410,7 @@ class TestOpenDoorGoal:
                     lower=handle_lower_limits, upper=handle_upper_limits
                 ),
             )
-            pr2_world_state_reset.add_degree_of_freedom(handle_dof)
+            pr2_world_copy.add_degree_of_freedom(handle_dof)
 
             handle_connection = RevoluteConnection(
                 parent=door,
@@ -3496,15 +3421,13 @@ class TestOpenDoorGoal:
                     x=0.35, y=0.0, z=1.0, reference_frame=door
                 ),
             )
-            pr2_world_state_reset.add_connection(handle_connection)
+            pr2_world_copy.add_connection(handle_connection)
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        handle_body = pr2_world_state_reset.get_body_by_name("door_handle_json")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        handle_body = pr2_world_copy.get_body_by_name("door_handle_json")
 
         custom_handle_limit = np.pi / 6
         custom_hinge_limit = np.pi / 3
@@ -3519,32 +3442,27 @@ class TestOpenDoorGoal:
         )
         msc.add_node(open_door)
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
-        # Serialize to JSON
         json_data = msc.to_json()
         json_str = json.dumps(json_data)
         new_json_data = json.loads(json_str)
 
-        # Create kwargs for deserialization
         from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
             WorldEntityWithIDKwargsTracker,
         )
 
-        tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_state_reset)
+        tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_copy)
         kwargs = tracker.create_kwargs()
 
-        # Deserialize
         msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
 
-        # Verify structure is preserved
         open_door_copy = msc_copy.get_nodes_by_type(OpenDoorGoal)[0]
         assert open_door_copy.handle_limit == custom_handle_limit
         assert open_door_copy.hinge_limit == custom_hinge_limit
         assert len(open_door_copy.nodes) == 5
 
-        # Verify all sub-nodes were deserialized
         unlatch_nodes = [n for n in open_door_copy.nodes if isinstance(n, UnlatchDoor)]
         assert len(unlatch_nodes) == 1
         assert unlatch_nodes[0].handle_limit == custom_handle_limit
@@ -3631,32 +3549,30 @@ class TestPrePushDoor:
         )
         msc.add_node(seed)
         msc.add_node(EndMotion.when_true(seed))
-        kin_sim = Executor(world=world)
+        kin_sim = Executor(MotionStatechartContext(world=world))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
         return door_connection, handle_connection
 
-    def test_pre_push_door_expand_creates_task(self, pr2_world_state_reset: World):
+    def test_pre_push_door_expand_creates_task(self, pr2_world_copy: World):
         """
         Test that PrePushDoor.expand() creates exactly one child task node.
         """
         door_connection, handle_connection = self._create_door_world(
-            world=pr2_world_state_reset,
+            world=pr2_world_copy,
             door_name="door",
             handle_name="handle",
             hinge_name="hinge",
             initial_angle=0.0,
         )
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        door_body = pr2_world_state_reset.get_body_by_name("door")
-        handle_body = pr2_world_state_reset.get_body_by_name("handle")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        door_body = pr2_world_copy.get_body_by_name("door")
+        handle_body = pr2_world_copy.get_body_by_name("handle")
 
         msc = MotionStatechart()
         goal = PrePushDoor(
@@ -3668,32 +3584,30 @@ class TestPrePushDoor:
         msc.add_node(goal)
         msc.add_node(EndMotion.when_true(goal))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
         assert len(goal.nodes) == 1
         assert goal.nodes[0].name == "pre push door"
 
-    def test_pre_push_door_task_is_child_of_goal(self, pr2_world_state_reset: World):
+    def test_pre_push_door_task_is_child_of_goal(self, pr2_world_copy: World):
         """
         Test that the created task node has the goal as its parent.
         """
         door_connection, handle_connection = self._create_door_world(
-            world=pr2_world_state_reset,
+            world=pr2_world_copy,
             door_name="door2",
             handle_name="handle2",
             hinge_name="hinge2",
             initial_angle=0.0,
         )
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        door_body = pr2_world_state_reset.get_body_by_name("door2")
-        handle_body = pr2_world_state_reset.get_body_by_name("handle2")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        door_body = pr2_world_copy.get_body_by_name("door2")
+        handle_body = pr2_world_copy.get_body_by_name("handle2")
 
         msc = MotionStatechart()
         goal = PrePushDoor(
@@ -3705,34 +3619,30 @@ class TestPrePushDoor:
         msc.add_node(goal)
         msc.add_node(EndMotion.when_true(goal))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
         task = goal.nodes[0]
         assert task.parent_node == goal
 
-    def test_pre_push_door_custom_velocity_and_weight(
-        self, pr2_world_state_reset: World
-    ):
+    def test_pre_push_door_custom_velocity_and_weight(self, pr2_world_copy: World):
         """
         Test that custom reference_linear_velocity and weight are passed through correctly.
         """
         door_connection, handle_connection = self._create_door_world(
-            world=pr2_world_state_reset,
+            world=pr2_world_copy,
             door_name="door3",
             handle_name="handle3",
             hinge_name="hinge3",
             initial_angle=0.0,
         )
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        door_body = pr2_world_state_reset.get_body_by_name("door3")
-        handle_body = pr2_world_state_reset.get_body_by_name("handle3")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        door_body = pr2_world_copy.get_body_by_name("door3")
+        handle_body = pr2_world_copy.get_body_by_name("handle3")
 
         custom_velocity = 0.05
         custom_weight = 0.001
@@ -3749,7 +3659,7 @@ class TestPrePushDoor:
         msc.add_node(goal)
         msc.add_node(EndMotion.when_true(goal))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
         task = goal.nodes[0]
@@ -3832,7 +3742,6 @@ class TestAlignToPushDoor:
             )
             world.add_connection(handle_connection)
 
-        # Set initial door angle via SetSeedConfiguration
         msc = MotionStatechart()
         seed = SetSeedConfiguration(
             seed_configuration=JointState.from_mapping({door_connection: initial_angle})
@@ -3840,36 +3749,34 @@ class TestAlignToPushDoor:
         msc.add_node(seed)
         msc.add_node(EndMotion.when_true(seed))
 
-        kin_sim = Executor(world=world)
+        kin_sim = Executor(MotionStatechartContext(world=world))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
         return door_connection, handle_connection
 
     def test_align_to_push_door_raises_when_door_not_open_enough(
-        self, pr2_world_state_reset: World
+        self, pr2_world_copy: World
     ):
         """
         Test that AlignToPushDoor raises NodeInitializationError when the door
         angle is below the minimum threshold (upper_limit / 4).
         """
         door_connection, handle_connection = self._create_door_world(
-            world=pr2_world_state_reset,
+            world=pr2_world_copy,
             door_name="door_closed",
             handle_name="handle_closed",
             hinge_name="hinge_closed",
-            initial_angle=0.0,  # Door is fully closed
+            initial_angle=0.0,
             max_angle=np.pi / 2,
         )
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        door_body = pr2_world_state_reset.get_body_by_name("door_closed")
-        handle_body = pr2_world_state_reset.get_body_by_name("handle_closed")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        door_body = pr2_world_copy.get_body_by_name("door_closed")
+        handle_body = pr2_world_copy.get_body_by_name("handle_closed")
 
         msc = MotionStatechart()
         align = AlignToPushDoor(
@@ -3881,23 +3788,20 @@ class TestAlignToPushDoor:
         )
         msc.add_node(align)
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         with pytest.raises(NodeInitializationError):
             kin_sim.compile(motion_statechart=msc)
 
-    def test_align_to_push_door_raises_below_minimum_angle(
-        self, pr2_world_state_reset: World
-    ):
+    def test_align_to_push_door_raises_below_minimum_angle(self, pr2_world_copy: World):
         """
         Test that AlignToPushDoor raises NodeInitializationError when door angle
         is just below the threshold (upper_limit / 4).
         """
         max_angle = np.pi / 2
-        # Set angle just below threshold (threshold = max_angle / 4 = pi/8)
         below_threshold_angle = (max_angle / 4) - 0.01
 
         door_connection, handle_connection = self._create_door_world(
-            world=pr2_world_state_reset,
+            world=pr2_world_copy,
             door_name="door_below",
             handle_name="handle_below",
             hinge_name="hinge_below",
@@ -3905,14 +3809,12 @@ class TestAlignToPushDoor:
             max_angle=max_angle,
         )
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        door_body = pr2_world_state_reset.get_body_by_name("door_below")
-        handle_body = pr2_world_state_reset.get_body_by_name("handle_below")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        door_body = pr2_world_copy.get_body_by_name("door_below")
+        handle_body = pr2_world_copy.get_body_by_name("handle_below")
 
         msc = MotionStatechart()
         align = AlignToPushDoor(
@@ -3924,23 +3826,22 @@ class TestAlignToPushDoor:
         )
         msc.add_node(align)
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         with pytest.raises(NodeInitializationError):
             kin_sim.compile(motion_statechart=msc)
 
     def test_align_to_push_door_creates_task_when_door_open_enough(
-        self, pr2_world_state_reset: World
+        self, pr2_world_copy: World
     ):
         """
         Test that AlignToPushDoor successfully creates a child task when the
         door angle is above the minimum threshold.
         """
         max_angle = np.pi / 2
-        # Set angle above threshold (threshold = max_angle / 4 = pi/8)
         above_threshold_angle = (max_angle / 4) + 0.1
 
         door_connection, handle_connection = self._create_door_world(
-            world=pr2_world_state_reset,
+            world=pr2_world_copy,
             door_name="door_open",
             handle_name="handle_open",
             hinge_name="hinge_open",
@@ -3948,14 +3849,12 @@ class TestAlignToPushDoor:
             max_angle=max_angle,
         )
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        door_body = pr2_world_state_reset.get_body_by_name("door_open")
-        handle_body = pr2_world_state_reset.get_body_by_name("handle_open")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        door_body = pr2_world_copy.get_body_by_name("door_open")
+        handle_body = pr2_world_copy.get_body_by_name("handle_open")
 
         msc = MotionStatechart()
         align = AlignToPushDoor(
@@ -3968,11 +3867,9 @@ class TestAlignToPushDoor:
         msc.add_node(align)
         msc.add_node(EndMotion.when_true(align))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
-        # Should compile without error
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
-        # Verify child task was created
         assert len(align.nodes) == 1, "Should have 1 child task node"
         assert align.nodes[0].name == "align_to_push_door"
 
@@ -4058,33 +3955,31 @@ class TestMoveAroundHinge:
         )
         msc.add_node(seed)
         msc.add_node(EndMotion.when_true(seed))
-        kin_sim = Executor(world=world)
+        kin_sim = Executor(MotionStatechartContext(world=world))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
         return door_connection, handle_connection
 
     def test_move_around_hinge_default_multipliers_creates_three_waypoints(
-        self, pr2_world_state_reset: World
+        self, pr2_world_copy: World
     ):
         """
         Test that expand() with default multipliers creates 3 waypoint tasks and 3 monitors.
         """
         self._create_door_world(
-            world=pr2_world_state_reset,
+            world=pr2_world_copy,
             door_name="mah_door1",
             handle_name="mah_handle1",
             hinge_name="mah_hinge1",
             initial_angle=np.pi / 4,
         )
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        handle_body = pr2_world_state_reset.get_body_by_name("mah_handle1")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        handle_body = pr2_world_copy.get_body_by_name("mah_handle1")
 
         msc = MotionStatechart()
         goal = MoveAroundHinge(
@@ -4095,33 +3990,30 @@ class TestMoveAroundHinge:
         msc.add_node(goal)
         msc.add_node(EndMotion.when_true(goal))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
-        # 3 waypoint tasks + 3 monitors = 6 child nodes
         assert len(goal.nodes) == 6
         task_names = [n.name for n in goal.nodes if isinstance(n, _WaypointTask)]
         assert task_names == ["down_short", "down_long", "up_long"]
 
-    def test_move_around_hinge_custom_multipliers(self, pr2_world_state_reset: World):
+    def test_move_around_hinge_custom_multipliers(self, pr2_world_copy: World):
         """
         Test that custom multipliers produce the correct number of waypoints.
         """
         self._create_door_world(
-            world=pr2_world_state_reset,
+            world=pr2_world_copy,
             door_name="mah_door2",
             handle_name="mah_handle2",
             hinge_name="mah_hinge2",
             initial_angle=np.pi / 4,
         )
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        handle_body = pr2_world_state_reset.get_body_by_name("mah_handle2")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        handle_body = pr2_world_copy.get_body_by_name("mah_handle2")
 
         custom_multipliers = [(1.1, -0.5, "wp1"), (1.3, 0.5, "wp2")]
 
@@ -4135,36 +4027,33 @@ class TestMoveAroundHinge:
         msc.add_node(goal)
         msc.add_node(EndMotion.when_true(goal))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
-        # 2 waypoint tasks + 2 monitors = 4 child nodes
         assert len(goal.nodes) == 4
         task_names = [n.name for n in goal.nodes if isinstance(n, _WaypointTask)]
         assert task_names == ["wp1", "wp2"]
 
     def test_move_around_hinge_waypoint_start_end_conditions_chained(
-        self, pr2_world_state_reset: World
+        self, pr2_world_copy: World
     ):
         """
         Test that waypoint tasks are chained: each task starts when the previous
         monitor is true, and ends when the next monitor is true.
         """
         self._create_door_world(
-            world=pr2_world_state_reset,
+            world=pr2_world_copy,
             door_name="mah_door3",
             handle_name="mah_handle3",
             hinge_name="mah_hinge3",
             initial_angle=np.pi / 4,
         )
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        handle_body = pr2_world_state_reset.get_body_by_name("mah_handle3")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        handle_body = pr2_world_copy.get_body_by_name("mah_handle3")
 
         msc = MotionStatechart()
         goal = MoveAroundHinge(
@@ -4175,50 +4064,42 @@ class TestMoveAroundHinge:
         msc.add_node(goal)
         msc.add_node(EndMotion.when_true(goal))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
         tasks = [n for n in goal.nodes if isinstance(n, _WaypointTask)]
         monitors = [n for n in goal.nodes if isinstance(n, _PointReachedMonitor)]
 
-        # First task starts immediately (same start condition as goal)
         assert tasks[0].start_condition == goal.start_condition
-        # First task ends when first monitor is true
         assert (
             monitors[0].observation_variable in tasks[0].end_condition.free_variables()
         )
-        # Second task starts when first monitor is true
         assert (
             monitors[0].observation_variable
             in tasks[1].start_condition.free_variables()
         )
-        # Second monitor starts when first monitor is true
         assert (
             monitors[0].observation_variable
             in monitors[1].start_condition.free_variables()
         )
 
-    def test_move_around_hinge_debug_expressions_produced(
-        self, pr2_world_state_reset: World
-    ):
+    def test_move_around_hinge_debug_expressions_produced(self, pr2_world_copy: World):
         """
         Test that build() returns one debug expression per waypoint.
         """
         self._create_door_world(
-            world=pr2_world_state_reset,
+            world=pr2_world_copy,
             door_name="mah_door4",
             handle_name="mah_handle4",
             hinge_name="mah_hinge4",
             initial_angle=np.pi / 4,
         )
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        handle_body = pr2_world_state_reset.get_body_by_name("mah_handle4")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        handle_body = pr2_world_copy.get_body_by_name("mah_handle4")
 
         msc = MotionStatechart()
         goal = MoveAroundHinge(
@@ -4229,7 +4110,7 @@ class TestMoveAroundHinge:
         msc.add_node(goal)
         msc.add_node(EndMotion.when_true(goal))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
         assert len(goal._waypoint_debug_expressions) == 3
@@ -4241,26 +4122,24 @@ class TestMoveAroundHinge:
         ]
 
     def test_move_around_hinge_with_gripper_axis_align_last(
-        self, pr2_world_state_reset: World
+        self, pr2_world_copy: World
     ):
         """
         Test that with tip_gripper_axis and LAST alignment, only the last task has align=True.
         """
         self._create_door_world(
-            world=pr2_world_state_reset,
+            world=pr2_world_copy,
             door_name="mah_door5",
             handle_name="mah_handle5",
             hinge_name="mah_hinge5",
             initial_angle=np.pi / 4,
         )
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        handle_body = pr2_world_state_reset.get_body_by_name("mah_handle5")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        handle_body = pr2_world_copy.get_body_by_name("mah_handle5")
 
         msc = MotionStatechart()
         goal = MoveAroundHinge(
@@ -4273,7 +4152,7 @@ class TestMoveAroundHinge:
         msc.add_node(goal)
         msc.add_node(EndMotion.when_true(goal))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
         tasks = [n for n in goal.nodes if isinstance(n, _WaypointTask)]
@@ -4281,27 +4160,23 @@ class TestMoveAroundHinge:
         assert tasks[1].align is False
         assert tasks[2].align is True
 
-    def test_move_around_hinge_with_gripper_axis_align_all(
-        self, pr2_world_state_reset: World
-    ):
+    def test_move_around_hinge_with_gripper_axis_align_all(self, pr2_world_copy: World):
         """
         Test that with tip_gripper_axis and ALL alignment, every task has align=True.
         """
         self._create_door_world(
-            world=pr2_world_state_reset,
+            world=pr2_world_copy,
             door_name="mah_door6",
             handle_name="mah_handle6",
             hinge_name="mah_hinge6",
             initial_angle=np.pi / 4,
         )
 
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        handle_body = pr2_world_state_reset.get_body_by_name("mah_handle6")
+        root = pr2_world_copy.get_kinematic_structure_entity_by_name("base_footprint")
+        handle_body = pr2_world_copy.get_body_by_name("mah_handle6")
 
         msc = MotionStatechart()
         goal = MoveAroundHinge(
@@ -4314,7 +4189,7 @@ class TestMoveAroundHinge:
         msc.add_node(goal)
         msc.add_node(EndMotion.when_true(goal))
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_copy))
         kin_sim.compile(motion_statechart=msc)
 
         tasks = [n for n in goal.nodes if isinstance(n, _WaypointTask)]
