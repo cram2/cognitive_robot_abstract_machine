@@ -43,15 +43,6 @@ class NavigateAction(ActionDescription):
             target_location=target_location,
         )
 
-    def validate(
-        self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
-    ):
-        pose_validator = PoseErrorChecker(World.conf.get_pose_tolerance())
-        if not pose_validator.is_error_acceptable(
-            World.robot.pose, self.target_location
-        ):
-            raise NavigationGoalNotReachedError(World.robot.pose, self.target_location)
-
 
 @dataclass
 class LookAtAction(ActionDescription):
