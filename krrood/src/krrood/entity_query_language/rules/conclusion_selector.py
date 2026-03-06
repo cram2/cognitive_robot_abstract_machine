@@ -139,7 +139,7 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
     def get_operation_result_and_clear_conclusion(
         self, result: OperationResult
     ) -> Iterable[OperationResult]:
-        self._is_false_ = result.is_false
+        self._is_false_ = result.operand is self.left and result.is_false
         if result.is_true:
             self._conclusions_.update(result.operand._conclusions_)
         yield OperationResult(result.bindings, self._is_false_, self, result)

@@ -43,8 +43,7 @@ query = entity(r.parts.name).where(
 
 ## Filter Early, Filter Late
 
-In SQL, all filtering happens in the `WHERE` or `HAVING` clause. EQL maintains this distinction but applies it to
-object grouping.
+In SQL, all filtering happens in the `WHERE` or `HAVING` clause. EQL also maintains this distinction.
 
 | SQL Clause | EQL Method      | Purpose                                        |
 |:-----------|:----------------|:-----------------------------------------------|

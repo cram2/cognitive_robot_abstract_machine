@@ -1,4 +1,4 @@
-from krrood.entity_query_language.factories import inferencefrom probabilistic_model.scripts.nyga_speed_comparison import variable---
+---
 jupytext:
   text_representation:
     extension: .md
@@ -109,12 +109,12 @@ from krrood.entity_query_language.factories import (
 )
 
 @dataclass
-class ExampleConnection(Symbol):
+class ExampleConnection:
     type_code: int
     name: str
 
 @dataclass
-class ExampleView(Symbol):
+class ExampleView:
     connection: ExampleConnection
 
 @dataclass
@@ -124,29 +124,29 @@ class ExampleFixedView(ExampleView): pass
 class ExampleRevoluteView(ExampleView): pass
 
 # Data
-conns = [ExampleConnection(1, 'c1'), ExampleConnection(2, 'c2'), ExampleConnection(3, 'c3'), ExampleConnection(4, 'm4')]
-c = variable(ExampleConnection, domain=conns)
+connections = [ExampleConnection(1, 'c1'), ExampleConnection(2, 'c2'), ExampleConnection(3, 'c3'), ExampleConnection(4, 'm4')]
+connection = variable(ExampleConnection, domain=connections)
 view = deduced_variable(ExampleView)
 
 # 1. Base query
-query = entity(view).where(c.name.startswith('c'))
+query = entity(view).where(connection.name.startswith('c'))
 
 # 2. Rule Tree definition
 with query:
-    # Default case:
-    add(view, inference(ExampleView)(connection=c))
+    # Default case (when connection name starts with 'c'):
+    add(view, inference(ExampleView)(connection=connection))
     
-    # If type_code is 1, it's a ExampleFixedView
-    with refinement(c.type_code == 1):
-        add(view, inference(ExampleFixedView)(connection=c))
+    # If connection name starts with 'c' and type_code is 1, it's a ExampleFixedView
+    with refinement(connection.type_code == 1):
+        add(view, inference(ExampleFixedView)(connection=connection))
     
-    # Otherwise, if type_code is 2, it's a ExampleRevoluteView
-    with alternative(c.type_code == 2):
-        add(view, inference(ExampleRevoluteView)(connection=c))
+    # Otherwise, if connection name does not start with 'c' and the type_code is 4, it's a ExampleRevoluteView
+    with alternative(connection.type_code == 4):
+        add(view, inference(ExampleRevoluteView)(connection=connection))
 
 # 3. Execution
 results = query.tolist()
-print(f"Inferred {len(results)} views from {len(conns)} connections.")
+print(f"Inferred {len(results)} views from {len(connections)} connections.")
 print("\n".join([str(v) for v in results]))
 ```
 
