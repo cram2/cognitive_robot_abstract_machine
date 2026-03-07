@@ -79,6 +79,15 @@ def test_move_motion_chart(immutable_model_world):
     msc = motion.motion_chart
 
     assert msc
+    np.testing.assert_equal(msc.goal_pose.to_position().to_np(), np.array([1, 1, 1, 1]))
+
+    motion = MoveMotion(
+        PoseStamped.from_list([1, 1, 1], frame=world.root), teleport=True
+    )
+    SequentialPlan(context, motion)
+
+    msc = motion.motion_chart
+    assert msc
     np.testing.assert_equal(msc.base_pose.to_position().to_np(), np.array([1, 1, 1, 1]))
 
 

@@ -3,11 +3,18 @@ import os
 import numpy as np
 
 from pycram.datastructures.dataclasses import Context
-from pycram.datastructures.enums import Arms
+from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.pose import PoseStamped
+from pycram.designators.location_designator import CostmapLocation
 from pycram.language import SequentialPlan
 from pycram.motion_executor import simulated_robot, simulated_robot_without_collision
-from pycram.robot_plans import ParkArmsActionDescription
+from pycram.robot_plans import (
+    ParkArmsActionDescription,
+    NavigateActionDescription,
+    PickUpActionDescription,
+    PlaceActionDescription,
+)
 from pycram.robot_plans import TransportActionDescription
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -81,25 +88,48 @@ except ImportError:
     pass
 
 context = Context.from_world(world)
+armar7 = world.get_semantic_annotations_by_type(Armar7)[0]
 
 with world.modify_world():
     world_reasoner = WorldReasoner(world)
     world_reasoner.reason()
 
-plan = SequentialPlan(
-    context,
-    ParkArmsActionDescription(Arms.BOTH),
-    TransportActionDescription(
-        world.get_body_by_name("milk.stl"),
-        PoseStamped.from_list([4.9, 3.3, 0.8], [0, 0, -1, 1], frame=world.root),
-        Arms.LEFT,
-    ),
-    TransportActionDescription(
-        world.get_body_by_name("breakfast_cereal.stl"),
-        PoseStamped.from_list([5.1, 3.3, 0.8], [0, 0, -1, 1], frame=world.root),
-        Arms.LEFT,
-    ),
+# %% Demo
+milk_place_pose = PoseStamped.from_list(
+    [4.9, 3.3, 0.8], [0, 0, -1, 1], frame=world.root
 )
 
 with simulated_robot:
-    plan.perform()
+    SequentialPlan(
+        context,
+        ParkArmsActionDescription(Arms.BOTH),
+        NavigateActionDescription(
+            pickup_loc := CostmapLocation(
+                target=PoseStamped.from_spatial_type(
+                    world.get_body_by_name("milk.stl").global_pose
+                ),
+                reachable_arm=Arms.LEFT,
+                reachable_for=armar7,
+            ),
+        ),
+        PickUpActionDescription(
+            world.get_body_by_name("milk.stl"),
+            pickup_loc.last_result_arm,
+            pickup_loc.last_result_grasp,
+        ),
+        ParkArmsActionDescription(Arms.BOTH),
+        NavigateActionDescription(
+            place_loc := CostmapLocation(
+                target=milk_place_pose,
+                reachable_arm=pickup_loc.last_result_arm,
+                reachable_for=armar7,
+                grasp_descriptions=pickup_loc.last_result_grasp,
+            ),
+        ),
+        PlaceActionDescription(
+            world.get_body_by_name("milk.stl"),
+            milk_place_pose,
+            place_loc.last_result_arm,
+        ),
+        ParkArmsActionDescription(Arms.BOTH),
+    ).perform()

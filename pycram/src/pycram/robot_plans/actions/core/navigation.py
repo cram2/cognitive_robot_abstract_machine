@@ -30,17 +30,26 @@ class NavigateAction(ActionDescription):
     Location to which the robot should be navigated
     """
 
+    teleport: bool = False
+    """
+    If the robot should teleport to the target location instead of moving to it
+    """
+
     def execute(self) -> None:
-        return SequentialPlan(self.context, MoveMotion(self.target_location)).perform()
+        return SequentialPlan(
+            self.context, MoveMotion(self.target_location, teleport=self.teleport)
+        ).perform()
 
     @classmethod
     def description(
         cls,
         target_location: Union[Iterable[PoseStamped], PoseStamped],
+        teleport: Union[Iterable[bool], bool] = False,
     ) -> PartialDesignator[NavigateAction]:
         return PartialDesignator[NavigateAction](
             NavigateAction,
             target_location=target_location,
+            teleport=teleport,
         )
 
 
