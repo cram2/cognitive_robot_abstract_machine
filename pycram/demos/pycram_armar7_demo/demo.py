@@ -27,7 +27,7 @@ from semantic_digital_twin.world_description.utils import world_with_urdf_factor
 robot_path = os.path.join("package://iai_kit_armar7/urdf/Armar7.urdf")
 
 robot_starting_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
-    1.5, 2.5, 0, yaw=-np.pi / 2
+    3.5, 2.5, 0, yaw=np.pi / 2
 )
 
 robot_world = world_with_urdf_factory(
@@ -60,13 +60,13 @@ with world.modify_world():
     world.merge_world_at_pose(
         milk_world,
         HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.37, 2, 1.05, reference_frame=world.root
+            2.97, 2, 1.05, reference_frame=world.root
         ),
     )
     world.merge_world_at_pose(
         cereal_world,
         HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.37, 1.8, 1.05, reference_frame=world.root
+            2.97, 1.8, 1.05, reference_frame=world.root
         ),
     )
 
@@ -91,12 +91,12 @@ plan = SequentialPlan(
     ParkArmsActionDescription(Arms.BOTH),
     TransportActionDescription(
         world.get_body_by_name("milk.stl"),
-        PoseStamped.from_list([4.9, 3.3, 0.8], [0, 0, 1, 1], frame=world.root),
+        PoseStamped.from_list([4.9, 3.3, 0.8], [0, 0, -1, 1], frame=world.root),
         Arms.LEFT,
     ),
     TransportActionDescription(
         world.get_body_by_name("breakfast_cereal.stl"),
-        PoseStamped.from_list([5.1, 3.3, 0.8], [0, 0, 1, 1], frame=world.root),
+        PoseStamped.from_list([5.1, 3.3, 0.8], [0, 0, -1, 1], frame=world.root),
         Arms.LEFT,
     ),
 )
