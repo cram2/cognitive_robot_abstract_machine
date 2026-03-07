@@ -34,7 +34,7 @@ def test_underspecification_with_where():
     )
 
     t = WhereExpressionToRandomEventTranslator(
-        and_(*q._where_expressions),
+        and_(*q._where_conditions_),
     )
     r = t.translate()
 
@@ -86,7 +86,7 @@ def test_dnf_checking():
         )
     )
 
-    where_expression = and_(*q2._where_expressions)
+    where_expression = and_(*q2._where_conditions_)
     assert is_disjunctive_normal_form(where_expression)
 
     t = WhereExpressionToRandomEventTranslator(

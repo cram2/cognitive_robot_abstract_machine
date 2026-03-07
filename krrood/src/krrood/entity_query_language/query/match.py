@@ -46,7 +46,7 @@ from krrood.entity_query_language.failures import (
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.query.quantifiers import An
 from krrood.entity_query_language.utils import T
-from krrood.patterns.callable_with_kwargs import HasFactoryAndKwargs
+from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.rustworkx_utils import RWXNode
 
 if TYPE_CHECKING:
@@ -192,7 +192,7 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
     This is needed to apply where conditions directly to the match instance. 
     """
 
-    _where_expressions: List[ConditionType] = field(init=False, default_factory=list)
+    _where_conditions_: List[ConditionType] = field(init=False, default_factory=list)
     """
     A list of all conditions that have been applied to this instance using the `where` method.
     """
@@ -336,7 +336,7 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         return self.name
 
     def where(self, *conditions: ConditionType) -> Match[T]:
-        self._where_expressions.extend(conditions)
+        self._where_conditions_.extend(conditions)
         self.expression.where(*conditions)
         return self
 
@@ -519,7 +519,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
             )
         else:
 
-            final_step._apply_final_operation_set_external_instance_value_(
+            final_step._set_child_instance_value_(
                 current_value, self.assigned_variable._value_
             )
 

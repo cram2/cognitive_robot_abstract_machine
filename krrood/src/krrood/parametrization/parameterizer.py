@@ -21,9 +21,9 @@ from random_events.product_algebra import Event
 @dataclass
 class UnderspecifiedParameters:
     """
-    A class that extracts all necessary information from a `Match` and binds it together.
-    Instances of this can be used to parameterize objects with underspecified variables using generative models.
-    This generally serves as glue between `ProbabilisticModel` and `Match`.
+    A class that extracts all necessary information from a {py:class}`~krrood.entity_query_language.query.match.Match`
+    and binds it together. Instances of this can be used to parameterize objects with underspecified variables using
+    generative models. This generally serves as glue between `ProbabilisticModel` and `Match`.
     """
 
     statement: MatchVariable
@@ -47,9 +47,9 @@ class UnderspecifiedParameters:
 
     def __post_init__(self):
         self._random_event_compiler = WhereExpressionToRandomEventTranslator(
-            and_(*self.statement._where_expressions)
+            and_(*self.statement._where_conditions_)
         )
-        if self.statement._where_expressions:
+        if self.statement._where_conditions_:
             self.truncation_event = self._random_event_compiler.translate()
 
     @cached_property

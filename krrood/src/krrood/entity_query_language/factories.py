@@ -8,7 +8,10 @@ import operator
 
 from typing_extensions import Union, Iterable
 
-from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.base_expressions import (
+    SymbolicExpression,
+    TruthValueOperator,
+)
 from krrood.entity_query_language.core.mapped_variable import (
     FlatVariable,
     CanBehaveLikeAVariable,
@@ -56,7 +59,7 @@ from krrood.entity_query_language.rules.conclusion_selector import (
 from krrood.entity_query_language.utils import is_iterable
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 
-ConditionType = Union[SymbolicExpression, bool, Predicate]
+ConditionType = Union[SymbolicExpression, bool, Predicate, TruthValueOperator]
 """
 The possible types for conditions.
 """
@@ -238,7 +241,7 @@ def flat_variable(
 # %% Logical Operators
 
 
-def and_(*conditions: ConditionType) -> Union[AND, ConditionType]:
+def and_(*conditions: ConditionType) -> ConditionType:
     """
     Logical conjunction of conditions.
 
@@ -250,7 +253,7 @@ def and_(*conditions: ConditionType) -> Union[AND, ConditionType]:
     return chained_logic(AND, *conditions)
 
 
-def or_(*conditions):
+def or_(*conditions) -> ConditionType:
     """
     Logical disjunction of conditions.
 

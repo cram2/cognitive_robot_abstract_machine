@@ -50,7 +50,7 @@ class GenerativeBackend(QueryBackend, ABC):
     """
     Generative backends are backends that generate new elements.
     Generative backends have to take match expressions as input, since they need to construct new objects, and currently
-    `Match` is the only way to do so.
+    {py:class}`~krrood.entity_query_language.query.match.Match` is the only way to do so.
     """
 
     def evaluate(self, expression: Query) -> Iterable[T]:

@@ -178,7 +178,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
             result.append(current)
         return result[:-1][::-1]
 
-    def _set_external_instance_value_(self, instance: Any, value: Any):
+    def _set_external_root_instance_value_(self, instance: Any, value: Any):
         """
         Set the field of the instance at this access path to the given value.
         This modifies instance in-place.
@@ -194,11 +194,9 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         for domain_mapping in self._access_path_[:-1]:
             current = next(domain_mapping._apply_mapping_(current))
 
-        self._apply_final_operation_set_external_instance_value_(current, value)
+        self._set_child_instance_value_(current, value)
 
-    def _apply_final_operation_set_external_instance_value_(
-        self, instance: Any, value: Any
-    ):
+    def _set_child_instance_value_(self, instance: Any, value: Any):
         """
         Set the field of the instance using this operation to the given value.
         This modifies instance in-place.
@@ -242,7 +240,7 @@ class Attribute(MappedVariable):
     def _name_(self):
         return f"{self._child_._name_}.{self._attribute_name_}"
 
-    def _apply_final_operation_set_external_instance_value_(self, obj: Any, value: Any):
+    def _set_child_instance_value_(self, obj: Any, value: Any):
         setattr(obj, self._attribute_name_, value)
 
 
@@ -267,9 +265,7 @@ class Index(MappedVariable):
     def _name_(self):
         return f"{self._child_._var_._name_}[{self._key_}]"
 
-    def _apply_final_operation_set_external_instance_value_(
-        self, instance: Any, value: Any
-    ):
+    def _set_child_instance_value_(self, instance: Any, value: Any):
         instance[self._key_] = value
 
 

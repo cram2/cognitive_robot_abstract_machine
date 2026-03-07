@@ -8,12 +8,13 @@ from functools import cached_property
 from typing import assert_never, List, Dict
 
 import numpy as np
-from typing_extensions import TYPE_CHECKING
 
 import random_events
+import random_events.variable
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.entity_query_language.core.variable import Literal
+from krrood.entity_query_language.factories import ConditionType
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.core_logical_operators import OR, AND
 from krrood.parametrization.exceptions import (
@@ -21,7 +22,6 @@ from krrood.parametrization.exceptions import (
 )
 from random_events.interval import closed_open, closed, open
 from random_events.product_algebra import Event, SimpleEvent
-import random_events.variable
 
 
 @dataclass
@@ -33,7 +33,7 @@ class WhereExpressionToRandomEventTranslator:
     Check the documentation of `is_disjunctive_normal_form` for more information.
     """
 
-    conditions_root: SymbolicExpression
+    conditions_root: ConditionType
     """
     The query in disjunctive normal form to translate.
     """
@@ -122,7 +122,7 @@ class WhereExpressionToRandomEventTranslator:
 
     def comparators_grouped_by_variable(
         self, expression: SymbolicExpression
-    ) -> Dict[ParametrizationVariable, List[Comparator]]:
+    ) -> Dict[random_events.variable.Variable, List[Comparator]]:
         """
         Group comparators by their variable given an expression.
 
@@ -238,7 +238,7 @@ class WhereExpressionToRandomEventTranslator:
         )
 
 
-def is_disjunctive_normal_form(condition_root: SymbolicExpression) -> bool:
+def is_disjunctive_normal_form(condition_root: ConditionType) -> bool:
     """
     Checks if the given query is disjunctive normal form (DNF).
 
