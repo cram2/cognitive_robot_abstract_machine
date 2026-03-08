@@ -1,4 +1,8 @@
 from giskardpy.motion_statechart.goals.cartesian_goals import DiffDriveBaseGoal
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+)
+from giskardpy.motion_statechart.goals.templates import Parallel
 from pycram.datastructures.enums import ExecutionType
 from pycram.robot_plans import MoveMotion
 from pycram.robot_plans.motions.base import AlternativeMotion
@@ -17,7 +21,6 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Tiago]):
 
     @property
     def _motion_chart(self):
-
         return DiffDriveBaseGoal(
             goal_pose=self.target.to_spatial_type(),
         )

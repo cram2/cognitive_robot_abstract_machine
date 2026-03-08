@@ -176,6 +176,14 @@ class LocationDesignatorDescription(DesignatorDescription, PartialDesignator):
     def last_result(self) -> Iterator[PoseStamped]:
         yield self._last_result
 
+    @property
+    def last_result_arm(self):
+        yield self._last_result.arm
+
+    @property
+    def last_result_grasp(self):
+        yield self._last_result.grasp_description
+
     def ground(self) -> PoseStamped:
         """
         Find a location that satisfies all constrains.

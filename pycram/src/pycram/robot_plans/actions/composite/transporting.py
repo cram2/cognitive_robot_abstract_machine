@@ -106,14 +106,13 @@ class TransportAction(ActionDescription):
 
         SequentialPlan(
             self.context,
-            NavigateActionDescription(pickup_pose, True),
+            NavigateActionDescription(pickup_pose),
             PickUpActionDescription(
                 self.object_designator,
                 pickup_pose.arm,
                 grasp_description=pickup_pose.grasp_description,
             ),
             ParkArmsActionDescription(Arms.BOTH),
-            MoveTorsoActionDescription(TorsoState.HIGH),
             NavigateActionDescription(
                 CostmapLocation(
                     target=self.target_location,
@@ -121,7 +120,6 @@ class TransportAction(ActionDescription):
                     reachable_for=self.robot_view,
                     grasp_descriptions=pickup_pose.grasp_description,
                 ),
-                True,
             ),
         ).perform()
 
@@ -273,16 +271,11 @@ class MoveAndPlaceAction(ActionDescription):
     The arm to use
     """
 
-    keep_joint_states: bool = ActionConfig.navigate_keep_joint_states
-    """
-    Keep the joint states of the robot the same during the navigation.
-    """
-
     def execute(self):
         SequentialPlan(
             self.context,
-            NavigateActionDescription(self.standing_position, self.keep_joint_states),
-            FaceAtActionDescription(self.target_location, self.keep_joint_states),
+            NavigateActionDescription(self.standing_position),
+            FaceAtActionDescription(self.target_location),
             PlaceActionDescription(
                 self.object_designator, self.target_location, self.arm
             ),
@@ -301,9 +294,6 @@ class MoveAndPlaceAction(ActionDescription):
         object_designator: Union[Iterable[Body], Body],
         target_location: Union[Iterable[PoseStamped], PoseStamped],
         arm: Union[Iterable[Arms], Arms] = None,
-        keep_joint_states: Union[
-            Iterable[bool], bool
-        ] = ActionConfig.navigate_keep_joint_states,
     ) -> PartialDesignator[MoveAndPlaceAction]:
         return PartialDesignator(
             MoveAndPlaceAction,
@@ -340,11 +330,6 @@ class MoveAndPickUpAction(ActionDescription):
     The grasp to use
     """
 
-    keep_joint_states: bool = ActionConfig.navigate_keep_joint_states
-    """
-    Keep the joint states of the robot the same during the navigation.
-    """
-
     _pre_perform_callbacks = []
     """
     List to save the callbacks which should be called before performing the action.
@@ -357,8 +342,8 @@ class MoveAndPickUpAction(ActionDescription):
         obj_pose = PoseStamped.from_spatial_type(self.object_designator.global_pose)
         SequentialPlan(
             self.context,
-            NavigateActionDescription(self.standing_position, self.keep_joint_states),
-            FaceAtActionDescription(obj_pose, self.keep_joint_states),
+            NavigateActionDescription(self.standing_position),
+            FaceAtActionDescription(obj_pose),
             PickUpActionDescription(
                 self.object_designator, self.arm, self.grasp_description
             ),
@@ -377,9 +362,6 @@ class MoveAndPickUpAction(ActionDescription):
         object_designator: Union[Iterable[PoseStamped], PoseStamped],
         arm: Union[Iterable[Arms], Arms] = None,
         grasp_description: Union[Iterable[Grasp], Grasp] = None,
-        keep_joint_states: Union[
-            Iterable[bool], bool
-        ] = ActionConfig.navigate_keep_joint_states,
     ) -> PartialDesignator[MoveAndPickUpAction]:
         return PartialDesignator(
             MoveAndPickUpAction,
@@ -387,7 +369,6 @@ class MoveAndPickUpAction(ActionDescription):
             object_designator=object_designator,
             arm=arm,
             grasp_description=grasp_description,
-            keep_joint_states=keep_joint_states,
         )
 
 

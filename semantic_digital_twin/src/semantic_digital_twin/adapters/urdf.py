@@ -281,7 +281,10 @@ class URDFParser:
         name = PrefixedName(prefix=self.prefix, name=link.name)
         body = Body(name=name)
         visuals = self.parse_geometry(link.visuals, body)
-        collisions = self.parse_geometry(link.collisions, body)
+        if link.collisions:
+            collisions = self.parse_geometry(link.collisions, body)
+        else:
+            collisions = visuals
         body.visual = visuals
         body.collision = collisions
         return body

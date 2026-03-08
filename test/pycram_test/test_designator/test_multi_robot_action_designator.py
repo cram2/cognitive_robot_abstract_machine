@@ -5,6 +5,9 @@ import pytest
 from rustworkx.rustworkx import NoEdgeBetweenNodes
 from typing_extensions import Tuple, Generator
 
+# The alternative mapping needs to be imported for the stretch to work properly
+import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
+import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
@@ -19,9 +22,7 @@ from pycram.datastructures.pose import PoseStamped
 from pycram.datastructures.trajectory import PoseTrajectory
 from pycram.language import SequentialPlan
 from pycram.motion_executor import simulated_robot
-from pycram.view_manager import ViewManager
 from pycram.robot_plans import (
-    MoveTorsoAction,
     MoveTorsoActionDescription,
     FollowTCPPathActionDescription,
     NavigateActionDescription,
@@ -38,11 +39,10 @@ from pycram.robot_plans import (
     GraspingActionDescription,
     TransportActionDescription,
 )
-
+from pycram.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     GripperState,
-    JointStateType,
     StaticJointState,
 )
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
@@ -53,10 +53,6 @@ from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
-
-# The alternative mapping needs to be imported for the stretch to work properly
-import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
-import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 
 
 @pytest.fixture(scope="session", params=["hsrb", "stretch", "tiago", "pr2"])
@@ -260,23 +256,26 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
     world, robot_view, context = immutable_multiple_robot_apartment
 
     if isinstance(robot_view, (Tiago)):
-        #do not allow since
+        # do not allow since
         robot_view.full_body_controlled = False
-        robot_view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            1.7, 1.7, 0, reference_frame=world.root
+        robot_view.root.parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                1.7, 1.7, 0, reference_frame=world.root
+            )
         )
         world.notify_state_change()
 
     if isinstance(robot_view, (Stretch)):
         # do not allow since
         robot_view.full_body_controlled = False
-        robot_view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.12, 2.2, 0, reference_frame=world.root
+        robot_view.root.parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                2.12, 2.2, 0, reference_frame=world.root
+            )
         )
         world.notify_state_change()
     # robot_view.full_body_controlled = True
     left_arm = ViewManager.get_arm_view(Arms.LEFT, robot_view)
-
 
     front_axis = tuple(
         int(v) for v in left_arm.manipulator.front_facing_axis.to_np()[:3]
@@ -527,7 +526,7 @@ def test_facing(immutable_multiple_robot_apartment):
         milk_pose = PoseStamped.from_spatial_type(
             world.get_body_by_name("milk.stl").global_pose
         )
-        plan = SequentialPlan(context, FaceAtActionDescription(milk_pose, True))
+        plan = SequentialPlan(context, FaceAtActionDescription(milk_pose))
         plan.perform()
         milk_in_robot_frame = world.transform(
             world.get_body_by_name("milk.stl").global_pose,

@@ -6,8 +6,12 @@ from typing_extensions import Callable
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import LifeCycleValues
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    UpdateTemporaryCollisionRules,
+)
 from giskardpy.motion_statechart.goals.templates import Sequence
-from giskardpy.motion_statechart.graph_node import EndMotion
+from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
 from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -15,6 +19,10 @@ from giskardpy.motion_statechart.motion_statechart import (
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.ros_executor import Ros2Executor
 from pycram.datastructures.enums import ExecutionType
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 
 logger = logging.getLogger(__name__)
@@ -42,11 +50,14 @@ class MotionExecutor:
     ROS node that should be used for communication. Only relevant for real execution.
     """
 
+    with_collision_avoidance: ClassVar[bool] = True
     execution_type: ClassVar[ExecutionType] = None
 
     def construct_msc(self):
         self.motion_state_chart = MotionStatechart()
         sequence_node = Sequence(nodes=self.motions)
+        if self.with_collision_avoidance:
+            self.motion_state_chart.add_node(ExternalCollisionAvoidance())
         self.motion_state_chart.add_node(sequence_node)
 
         self.motion_state_chart.add_node(EndMotion.when_true(sequence_node))
@@ -129,6 +140,11 @@ class ExecutionEnvironment:
     Type of the execution environment before setting it, used for nested environments
     """
 
+    with_collision_avoidance: bool = field(kw_only=True, default=True)
+    """
+    Whether to use collision avoidance in the execution environment
+    """
+
     def __enter__(self):
         """
         Entering function for 'with' scope, saves the previously set :py:attr:`~MotionExecutor.execution_type` and
@@ -136,6 +152,7 @@ class ExecutionEnvironment:
         """
         self.pre = MotionExecutor.execution_type
         MotionExecutor.execution_type = self.execution_type
+        MotionExecutor.with_collision_avoidance = self.with_collision_avoidance
 
     def __exit__(self, _type, value, traceback):
         """
@@ -150,6 +167,9 @@ class ExecutionEnvironment:
 
 # These are imported, so they don't have to be initialized when executing with
 simulated_robot = ExecutionEnvironment(ExecutionType.SIMULATED)
+simulated_robot_without_collision = ExecutionEnvironment(
+    ExecutionType.SIMULATED, with_collision_avoidance=False
+)
 real_robot = ExecutionEnvironment(ExecutionType.REAL)
 semi_real_robot = ExecutionEnvironment(ExecutionType.SEMI_REAL)
 no_execution = ExecutionEnvironment(ExecutionType.NO_EXECUTION)

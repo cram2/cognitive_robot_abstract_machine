@@ -33,7 +33,12 @@ from sqlalchemy import select
 from typing_extensions import Optional, List
 
 from pycram.robot_plans import MoveAndPickUpAction
-from pycram.datastructures.enums import Arms, Grasp, VerticalAlignment, ApproachDirection
+from pycram.datastructures.enums import (
+    Arms,
+    Grasp,
+    VerticalAlignment,
+    ApproachDirection,
+)
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.partial_designator import PartialDesignator
 from pycram.datastructures.pose import PoseStamped
@@ -78,7 +83,6 @@ class ProbabilisticAction:
 
 class MoveAndPickUpVariables(Variables):
     arm = Symbolic("arm", Set.from_iterable(Arms))
-    keep_joint_states = Symbolic("keep_joint_states", Set.from_iterable([False, True]))
 
     rotate_gripper = Symbolic("rotate_gripper", Set.from_iterable([False, True]))
 
@@ -294,7 +298,6 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
             object_designator=obj,
             arm=Arms(int(sample_dict[self.variables.arm.value])),
             grasp_description=grasp_description,
-            keep_joint_states=sample_dict[self.variables.keep_joint_states.value],
         )
 
     def create_action(self):

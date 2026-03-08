@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Dict, Any, Self
@@ -25,16 +26,20 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidCollisionRule,
     AllowCollisionRule,
 )
-from semantic_digital_twin.collision_checking.pybullet_collision_detector import BulletCollisionDetector
+from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
+    BulletCollisionDetector,
+)
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.world_description.world_modification import synchronized_attribute_modification
+from semantic_digital_twin.world_description.world_modification import (
+    synchronized_attribute_modification,
+)
 
 if TYPE_CHECKING:
     from ..world import World
 
 
-@dataclass
+@dataclass(eq=False)
 class CollisionConsumer(ABC):
     """
     Interface for classes that want to be notified about changes in the collision matrix or when collision checking is performed.
@@ -65,6 +70,9 @@ class CollisionConsumer(ABC):
         """
         Called when the collision matrix is updated.
         """
+
+    def __hash__(self):
+        return hash(id(self))
 
 
 @dataclass(eq=False)
@@ -335,3 +343,10 @@ class CollisionManager(ModelChangeCallback):
         for max_avoided_bodies_rule in other.max_avoided_bodies_rules:
             if max_avoided_bodies_rule not in self.max_avoided_bodies_rules:
                 self.extend_max_avoided_bodies_rules([max_avoided_bodies_rule])
+
+    def copy_for_world(self, world: World):
+        new_collision_manager = CollisionManager(
+            _world=world,
+            collision_detector=type(self.collision_detector)(_world=world),
+        )
+        return new_collision_manager

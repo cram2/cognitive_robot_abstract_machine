@@ -1,6 +1,9 @@
 from copy import deepcopy
 
 from giskardpy.motion_statechart.goals.cartesian_goals import DiffDriveBaseGoal
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+)
 from giskardpy.motion_statechart.goals.open_close import Close
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
@@ -26,29 +29,33 @@ class StretchMoveTCP(MoveTCPMotion, AlternativeMotion[Stretch]):
         return
 
     @property
-    def _motion_chart(self) -> Sequence:
+    def _motion_chart(self):
         tip = ViewManager().get_end_effector_view(self.arm, self.robot_view).tool_frame
         goal_copy = deepcopy(self.target.to_spatial_type())
         goal_copy = self.world.transform(goal_copy, self.robot_view.root)
         goal_point = goal_copy.to_position()
         goal_point.z = 0
-        return Sequence(
-            [
-                Pointing(
-                    root_link=self.world.root,
-                    tip_link=self.robot_view.root,
-                    goal_point=goal_point,
-                    pointing_axis=Vector3(
-                        0, -1, 0, reference_frame=self.robot_view.root
+        motion_state_chart_nodes = self._only_allow_gripper_collision_rules(self.arm)
+        motion_state_chart_nodes.append(
+            Sequence(
+                [
+                    Pointing(
+                        root_link=self.world.root,
+                        tip_link=self.robot_view.root,
+                        goal_point=goal_point,
+                        pointing_axis=Vector3(
+                            0, -1, 0, reference_frame=self.robot_view.root
+                        ),
                     ),
-                ),
-                CartesianPose(
-                    root_link=self.world.root,
-                    tip_link=tip,
-                    goal_pose=self.target.to_spatial_type(),
-                ),
-            ]
+                    CartesianPose(
+                        root_link=self.world.root,
+                        tip_link=tip,
+                        goal_pose=self.target.to_spatial_type(),
+                    ),
+                ]
+            )
         )
+        return Parallel(motion_state_chart_nodes)
 
 
 class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):

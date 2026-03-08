@@ -1387,12 +1387,8 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         )
 
     def angle_between(self, other: Vector3) -> sm.Scalar:
-        return sm.acos(
-            sm.limit(
-                self @ other / (self.norm() * other.norm()),
-                lower_limit=-1,
-                upper_limit=1,
-            )
+        return sm.safe_acos(
+            self @ other / (self.norm() * other.norm()),
         )
 
     def slerp(self, other: Vector3, t: sm.ScalarData) -> Vector3:

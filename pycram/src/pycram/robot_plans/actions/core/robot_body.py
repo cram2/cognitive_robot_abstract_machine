@@ -98,7 +98,7 @@ class SetGripperAction(ActionDescription):
         arms = [Arms.LEFT, Arms.RIGHT] if self.gripper == Arms.BOTH else [self.gripper]
         for arm in arms:
             SequentialPlan(
-                self.context, MoveGripperMotion(gripper=arm, motion=self.motion)
+                self.context, MoveGripperMotion(arm_of_gripper=arm, motion=self.motion)
             ).perform()
 
     def validate(
@@ -346,7 +346,6 @@ class FollowTCPPathAction(ActionDescription):
         target_locations: Union[Iterable[PoseTrajectory], PoseTrajectory],
     ) -> PartialDesignator[FollowTCPPathAction]:
         return PartialDesignator(cls, target_location=target_locations, arm=arm)
-
 
 
 MoveTorsoActionDescription = MoveTorsoAction.description

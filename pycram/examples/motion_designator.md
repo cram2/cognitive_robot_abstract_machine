@@ -94,7 +94,7 @@ from pycram.process_module import simulated_robot
 from pycram.datastructures.enums import Arms, GripperState
 
 with simulated_robot:
-    motion_description = MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT)
+    motion_description = MoveGripperMotion(motion=GripperState.OPEN, arm_of_gripper=Arms.LEFT)
 
     SequentialPlan(context, motion_description).perform()
 ```

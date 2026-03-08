@@ -30,7 +30,7 @@ from typing_extensions import (
     ClassVar,
 )
 
-from giskardpy.motion_statechart.graph_node import Task
+from giskardpy.motion_statechart.graph_node import Task, MotionStatechartNode
 from krrood.class_diagrams.failures import ClassIsUnMappedInClassDiagram
 from krrood.ormatic.dao import get_dao_class, to_dao
 from random_events.product_algebra import SimpleEvent
@@ -362,7 +362,7 @@ class Plan:
 
     @property
     def actions(self) -> List[ActionDescriptionNode]:
-        return [node for node in self.nodes if type(node) is ActionDescriptionNode]
+        return [node for node in self.nodes if isinstance(node, ActionDescriptionNode)]
 
     @property
     def layers(self) -> List[List[PlanNode]]:
@@ -1019,20 +1019,31 @@ class ActionNode(BaseActionNode, Generic[ActionType]):
         Collects all child motions of this action. A motion is considered if it is a direct child of this action node,
         i.e. there is no other action node between this action node and the motion.
         """
-        motion_desigs = list(
-            filter(
-                lambda x: x.is_leaf and x.parent_action_node == self,
-                self.recursive_children,
-            )
-        )
-        return [m.designator_ref.motion_chart for m in motion_desigs]
+        return [
+            motion_designator.designator_ref.motion_chart
+            for motion_designator in self._collect_motion_designators()
+        ]
+
+    def _collect_motion_designators(self) -> List[MotionNode]:
+        """
+        Collects all motion designators that are direct children of this action node.
+        """
+        motion_designators = [
+            motion_designator
+            for motion_designator in self.recursive_children
+            if isinstance(motion_designator, MotionNode)
+            and motion_designator.parent_action_node == self
+        ]
+        return motion_designators
 
     def construct_msc(self):
         """
         Builds a giskard Motion State Chart (MSC) from the collected motions of this action node.
         """
         self.motion_executor = MotionExecutor(
-            self.collect_motions(), self.plan.world, ros_node=self.plan.context.ros_node
+            self.collect_motions(),
+            self.plan.world,
+            ros_node=self.plan.context.ros_node,
         )
         self.motion_executor.construct_msc()
 

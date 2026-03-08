@@ -2,12 +2,20 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
+from functools import cached_property
 
+from anyio.functools import lru_cache
 from rustworkx import rustworkx
 from typing_extensions import TYPE_CHECKING
 
-from semantic_digital_twin.collision_checking.collision_manager import CollisionManager, CollisionConsumer
-from semantic_digital_twin.world_description.world_entity import Body, KinematicStructureEntity
+from semantic_digital_twin.collision_checking.collision_manager import (
+    CollisionManager,
+    CollisionConsumer,
+)
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    KinematicStructureEntity,
+)
 
 if TYPE_CHECKING:
     from ..world import World
@@ -47,8 +55,12 @@ class CollisionGroup:
     def __contains__(self, item):
         return item == self.root or item in self.bodies
 
-    def __hash__(self):
+    @cached_property
+    def _cached_hash_(self):
         return hash((self.root, tuple(sorted(self.bodies, key=lambda b: b.id))))
+
+    def __hash__(self):
+        return self._cached_hash_
 
     def add_body(self, body: Body):
         if body.has_collision():
@@ -72,7 +84,7 @@ class CollisionGroup:
         return max(max_avoided_bodies, default=1)
 
 
-@dataclass
+@dataclass(eq=False)
 class CollisionGroupConsumer(CollisionConsumer, ABC):
     """
     A collision consumer that keeps track of collision groups instead of individual bodies.
@@ -86,6 +98,7 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
 
     def on_world_model_update(self, world: World):
         self.update_collision_groups(world)
+        self.get_collision_group.cache_clear()
 
     def update_collision_groups(self, world: World):
         """
@@ -113,6 +126,7 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
             group for group in self.collision_groups if len(group.bodies) > 0
         ]
 
+    @lru_cache
     def get_collision_group(self, body: KinematicStructureEntity) -> CollisionGroup:
         """
         Ever body belongs to at most one collision group.

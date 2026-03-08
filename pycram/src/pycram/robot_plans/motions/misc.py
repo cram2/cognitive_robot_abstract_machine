@@ -22,4 +22,4 @@ class DetectingMotion(BaseMotion):
 
     @property
     def _motion_chart(self):
-        pass
+        return

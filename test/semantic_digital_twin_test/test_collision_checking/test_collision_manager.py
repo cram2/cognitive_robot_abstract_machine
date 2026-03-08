@@ -16,6 +16,7 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
     SelfCollisionVariableManager,
 )
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world import World
 
 
@@ -269,3 +270,12 @@ def test_collision_rules_survive_merge(pr2_world_copy):
     with world.modify_world():
         world.merge_world(pr2_world_copy)
     assert len(world.collision_manager.rules) == expected
+
+
+def test_collision_copy_for_world(pr2_world_copy):
+    original_collision_manager = pr2_world_copy.collision_manager
+    world = World()
+    copied_collision_manager = original_collision_manager.copy_for_world(world)
+    assert copied_collision_manager is not original_collision_manager
+    assert type(copied_collision_manager) is type(original_collision_manager)
+    assert copied_collision_manager._world is world

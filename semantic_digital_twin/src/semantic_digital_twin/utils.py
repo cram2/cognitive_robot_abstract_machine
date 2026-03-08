@@ -5,6 +5,7 @@ import os
 import weakref
 from copy import deepcopy
 from functools import lru_cache, wraps
+from pathlib import Path
 from typing import List
 
 try:
@@ -193,3 +194,15 @@ def camel_case_split(word: str) -> List[str]:
             start = i
     result.append(word[start:])
     return result
+
+
+def get_path_to_project_root(starting_location: Path) -> Path:
+    """
+    Returns the path to the project root directory, identified by the presence of pyproject.toml.
+
+    :param starting_location: The path to start searching from. use ´Path(__file__).resolve()´ as input for your current location.
+    """
+    for parent in starting_location.parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise FileNotFoundError("Could not find pyproject.toml in any parent directory.")

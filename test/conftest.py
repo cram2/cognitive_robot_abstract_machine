@@ -2,13 +2,21 @@ import os
 import threading
 import time
 from copy import deepcopy
+from dataclasses import dataclass, field
+from typing import Optional, Any, Dict
 
 import numpy as np
 import pytest
 
 from semantic_digital_twin.adapters.package_resolver import PathResolver
+from semantic_digital_twin.collision_checking.collision_detector import (
+    CollisionDetector,
+    CollisionCheckingResult,
+)
+from semantic_digital_twin.collision_checking.collision_manager import CollisionManager
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
+    CollisionMatrix,
 )
 from typing_extensions import Type
 
@@ -21,6 +29,9 @@ from krrood.utils import recursive_subclasses
 from pycram.datastructures.dataclasses import Context  # type: ignore
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
+    BulletCollisionDetector,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
@@ -47,6 +58,7 @@ from semantic_digital_twin.world_description.geometry import (
     Sphere,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.utils import world_with_urdf_factory
 from semantic_digital_twin.world_description.world_entity import (
     Body,
 )
@@ -87,6 +99,33 @@ The structure of fixtures in this conftest:
         after the test since there is no good method to reset the model after a test has changed it. 
 
 """
+
+
+@dataclass
+class CollisionlessCollisionDetector(CollisionDetector):
+    """
+    A collision detector that does not detect any collisions, used for testing purposes to disable collision checking.
+    """
+
+    collision_manager: CollisionManager = field(init=False)
+    _last_synced_state: Optional[int] = field(default=None, init=False)
+    _last_synced_model: Optional[int] = field(default=None, init=False)
+    _collision_objects: Dict[Body, Any] = field(default_factory=dict, init=False)
+    buffer: float = field(default=0.05, init=False)
+
+    def sync_world_model(self) -> None:
+        return
+
+    def sync_world_state(self) -> None:
+        return
+
+    def check_collisions(
+        self, collision_matrix: CollisionMatrix
+    ) -> CollisionCheckingResult:
+        return CollisionCheckingResult()
+
+    def reset_cache(self):
+        pass
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -326,55 +365,31 @@ def cylinder_bot_diff_world():
     return world
 
 
-def world_with_urdf_factory(
-    urdf_path: str,
-    robot_semantic_annotation: Type[AbstractRobot] | None,
-    drive_connection_type: Type[OmniDrive | DiffDrive],
-    robot_starting_pose: HomogeneousTransformationMatrix | None = None,
-    urdf_path_resolver: PathResolver | None = None,
-):
-    """
-    Builds this tree:
-    map -> odom_combined -> "urdf tree"
-    """
-    urdf_parser = URDFParser.from_file(
-        file_path=urdf_path, path_resolver=urdf_path_resolver
-    )
-    world_with_urdf = urdf_parser.parse()
-    if robot_semantic_annotation is not None:
-        robot_semantic_annotation.from_world(world_with_urdf)
-
-    with world_with_urdf.modify_world():
-        map = Body(name=PrefixedName("map"))
-        localization_body = Body(name=PrefixedName("odom_combined"))
-
-        map_C_localization = Connection6DoF.create_with_dofs(
-            world_with_urdf, map, localization_body
-        )
-        world_with_urdf.add_connection(map_C_localization)
-
-        c_root_bf = drive_connection_type.create_with_dofs(
-            parent=localization_body,
-            child=world_with_urdf.root,
-            world=world_with_urdf,
-        )
-        world_with_urdf.add_connection(c_root_bf)
-        c_root_bf.has_hardware_interface = True
-        if robot_starting_pose is not None:
-            c_root_bf.origin = robot_starting_pose
-
-    return world_with_urdf
-
-
 @pytest.fixture(scope="session")
 def pr2_world_setup():
     urdf_dir = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    return world_with_urdf_factory(urdf_dir, PR2, OmniDrive)
+    world = world_with_urdf_factory(urdf_dir, PR2, OmniDrive)
+    world.collision_manager = CollisionManager(
+        _world=world,
+        collision_detector=CollisionlessCollisionDetector(_world=world),
+    )
+    return world
 
 
 @pytest.fixture(scope="function")
 def pr2_world_copy(pr2_world_setup):
     result = deepcopy(pr2_world_setup)
+    PR2.from_world(result)
+    return result
+
+
+@pytest.fixture(scope="function")
+def pr2_world_copy_with_collision(pr2_world_setup):
+    result = deepcopy(pr2_world_setup)
+    result.collision_manager = CollisionManager(
+        _world=result,
+        collision_detector=BulletCollisionDetector(_world=result),
+    )
     PR2.from_world(result)
     return result
 
@@ -441,6 +456,10 @@ def apartment_world_setup():
             "apartment.urdf",
         )
     ).parse()
+    apartment_world.collision_manager = CollisionManager(
+        _world=apartment_world,
+        collision_detector=CollisionlessCollisionDetector(_world=apartment_world),
+    )
     milk_world = STLParser(
         os.path.join(
             os.path.dirname(__file__),
@@ -677,6 +696,19 @@ def tiago_apartment_world(tiago_world, apartment_world_setup):
 @pytest.fixture
 def pr2_world_state_reset(pr2_world_setup):
     world = deepcopy(pr2_world_setup)
+    PR2.from_world(world)
+    state = world.state.data.copy()
+    yield world
+    world.state.data[:] = state
+
+
+@pytest.fixture
+def pr2_world_state_reset_with_collision(pr2_world_setup):
+    world = deepcopy(pr2_world_setup)
+    world.collision_manager = CollisionManager(
+        _world=world,
+        collision_detector=BulletCollisionDetector(_world=world),
+    )
     PR2.from_world(world)
     state = world.state.data.copy()
     yield world

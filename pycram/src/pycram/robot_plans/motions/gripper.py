@@ -1,15 +1,16 @@
 from dataclasses import dataclass
 from typing import Optional, List
 
-from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+)
+from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianPosition,
 )
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.world_description.world_entity import Body
-from pycram.robot_plans.motions.base import BaseMotion
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from pycram.datastructures.enums import (
     Arms,
     MovementType,
@@ -17,8 +18,11 @@ from pycram.datastructures.enums import (
 )
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.pose import PoseStamped
-from pycram.view_manager import ViewManager
+from pycram.robot_plans.motions.base import BaseMotion
 from pycram.utils import translate_pose_along_local_axis
+from pycram.view_manager import ViewManager
+from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -87,7 +91,9 @@ class ReachMotion(BaseMotion):
             )
             for pose in self._calculate_pose_sequence()
         ]
-        return Sequence(nodes=nodes)
+        motion_state_chart_nodes = self._only_allow_gripper_collision_rules(self.arm)
+        motion_state_chart_nodes.append(Sequence(nodes=nodes))
+        return Parallel(motion_state_chart_nodes)
 
 
 @dataclass
@@ -100,7 +106,7 @@ class MoveGripperMotion(BaseMotion):
     """
     Motion that should be performed, either 'open' or 'close'
     """
-    gripper: Arms
+    arm_of_gripper: Arms
     """
     Name of the gripper that should be moved
     """
@@ -114,14 +120,25 @@ class MoveGripperMotion(BaseMotion):
 
     @property
     def _motion_chart(self):
-        arm = ViewManager().get_end_effector_view(self.gripper, self.robot_view)
+        arm = ViewManager().get_end_effector_view(self.arm_of_gripper, self.robot_view)
 
-        return JointPositionList(
-            goal_state=arm.get_joint_state_by_type(self.motion),
-            name=(
-                "OpenGripper" if self.motion == GripperState.OPEN else "CloseGripper"
-            ),
+        motion_state_chart_nodes = (
+            self._only_allow_gripper_collision_rules(self.arm_of_gripper)
+            if self.allow_gripper_collision
+            else []
         )
+
+        motion_state_chart_nodes.append(
+            JointPositionList(
+                goal_state=arm.get_joint_state_by_type(self.motion),
+                name=(
+                    "OpenGripper"
+                    if self.motion == GripperState.OPEN
+                    else "CloseGripper"
+                ),
+            )
+        )
+        return Parallel(motion_state_chart_nodes)
 
 
 @dataclass
@@ -138,7 +155,7 @@ class MoveTCPMotion(BaseMotion):
     """
     Arm with the TCP that should be moved to the target
     """
-    allow_gripper_collision: Optional[bool] = None
+    allow_gripper_collision: bool = False
     """
     If the gripper can collide with something
     """
@@ -158,7 +175,6 @@ class MoveTCPMotion(BaseMotion):
             if self.robot_view.full_body_controlled
             else self.robot_view.root
         )
-        task = None
         if self.movement_type == MovementType.TRANSLATION:
             task = CartesianPosition(
                 root_link=root,
@@ -172,8 +188,16 @@ class MoveTCPMotion(BaseMotion):
                 tip_link=tip,
                 goal_pose=self.target.to_spatial_type(),
                 name="MoveTCP",
+                weight=DefaultWeights.WEIGHT_ABOVE_CA,
             )
-        return task
+
+        motion_state_chart_nodes = (
+            self._only_allow_gripper_collision_rules(self.arm)
+            if self.allow_gripper_collision
+            else []
+        )
+        motion_state_chart_nodes.append(task)
+        return Parallel(motion_state_chart_nodes)
 
 
 @dataclass
@@ -217,8 +241,13 @@ class MoveTCPWaypointsMotion(BaseMotion):
                 root_link=root,
                 tip_link=tip,
                 goal_pose=pose.to_spatial_type(),
-                # threshold=0.005,
             )
             for pose in self.waypoints
         ]
-        return Sequence(nodes=nodes)
+        motion_state_chart_nodes = (
+            self._only_allow_gripper_collision_rules(self.arm)
+            if self.allow_gripper_collision
+            else []
+        )
+        motion_state_chart_nodes.append(Sequence(nodes=nodes))
+        return Parallel(motion_state_chart_nodes)

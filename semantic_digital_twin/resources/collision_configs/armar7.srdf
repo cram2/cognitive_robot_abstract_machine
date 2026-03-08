@@ -1,0 +1,349 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<robot name="generic_robot">
+  <disable_all_collisions link="CenterArms_body_link"/>
+  <disable_self_collision link1="Ankle_body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ankle_body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="Ankle_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="ArmL3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="ArmL4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="ArmL6_Elb2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="ArmR5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="Head_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="Hip_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="Index L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="Knee_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="Middle L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="Neck_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="Platform_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="Thumb L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL1_Cla1_body_link" link2="Torso_root_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL2_Sho1_body_link" link2="Ankle_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL2_Sho1_body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL2_Sho1_body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL2_Sho1_body_link" link2="Hand L Palm_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL2_Sho1_body_link" link2="Index L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL2_Sho1_body_link" link2="Index L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL2_Sho1_body_link" link2="Knee_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL2_Sho1_body_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL2_Sho1_body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL2_Sho1_body_link" link2="Pinky L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL2_Sho1_body_link" link2="Ring L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL2_Sho1_body_link" link2="Thumb L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="Ankle_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="Hand L Palm_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="Index L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="Index L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="Knee_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="Neck_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="Pinky L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="Ring L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="Thumb L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL3_Sho2_body_link" link2="Thumb L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="ArmL3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="Hand L Palm_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="Index L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="Index L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="Neck_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="Pinky L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="Ring L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="Thumb L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL4_Sho3_body_link" link2="Thumb L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL5_Elb1_body_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL5_Elb1_body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="ArmL3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="ArmL4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="Hand L Palm_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="Index L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="Index L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="Middle L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="Pinky L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="Ring L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="Thumb L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="Thumb L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmL6_Elb2_body_link" link2="Thumb L 3 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR1_Cla1_body_link" link2="Ankle_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR1_Cla1_body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR1_Cla1_body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR1_Cla1_body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR1_Cla1_body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR1_Cla1_body_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR1_Cla1_body_link" link2="Knee_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR1_Cla1_body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR1_Cla1_body_link" link2="Pinky R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR2_Sho1_body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR2_Sho1_body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR3_Sho2_body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR4_Sho3_body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR4_Sho3_body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR4_Sho3_body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR4_Sho3_body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR4_Sho3_body_link" link2="Pinky R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR4_Sho3_body_link" link2="Ring R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="ArmR6_Elb2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="Index R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="Index R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="Neck_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="Pinky R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="Pinky R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="Ring R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="Ring R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="Thumb R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="Thumb R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR5_Elb1_body_link" link2="Thumb R 3 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR6_Elb2_body_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR6_Elb2_body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR6_Elb2_body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR6_Elb2_body_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR6_Elb2_body_link" link2="Index R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR6_Elb2_body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR6_Elb2_body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR6_Elb2_body_link" link2="Pinky R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR6_Elb2_body_link" link2="Pinky R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="ArmR6_Elb2_body_link" link2="Ring R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand L Palm_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand L Palm_link" link2="Index L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand L Palm_link" link2="Index L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand L Palm_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand L Palm_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand L Palm_link" link2="Thumb L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="ArmR5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="ArmR6_Elb2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="Index R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="Index R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="Pinky R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="Pinky R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="Ring R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="Ring R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="Thumb R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hand R Palm_link" link2="Thumb R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Head_body_link" link2="Ankle_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Head_body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Head_body_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Head_body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Head_body_link" link2="Hip_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Head_body_link" link2="Knee_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Head_body_link" link2="Platform_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Head_body_link" link2="Torso_root_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hip_body_link" link2="Ankle_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hip_body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hip_body_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hip_body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hip_body_link" link2="Knee_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hip_body_link" link2="Neck_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hip_body_link" link2="Platform_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Hip_body_link" link2="Torso_root_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index L 1 Body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index L 1 Body_link" link2="Index L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index L 1 Body_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index L 1 Body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index L 2 Body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index L 2 Body_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index L 2 Body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 1 Body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 1 Body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 1 Body_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 1 Body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 1 Body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 1 Body_link" link2="Pinky R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 1 Body_link" link2="Ring R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 2 Body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 2 Body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 2 Body_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 2 Body_link" link2="ArmR6_Elb2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 2 Body_link" link2="Index R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 2 Body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 2 Body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 2 Body_link" link2="Pinky R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 2 Body_link" link2="Pinky R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 2 Body_link" link2="Ring R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Index R 2 Body_link" link2="Ring R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Knee_body_link" link2="Ankle_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Knee_body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Knee_body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="ArmL3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="ArmL4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="Hand L Palm_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="Index L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="Index L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="Pinky L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="Ring L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="Thumb L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 1 Body_link" link2="Thumb L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle L 2 Body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle R 1 Body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle R 1 Body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Middle R 1 Body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Neck_body_link" link2="Ankle_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Neck_body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Neck_body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Neck_body_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Neck_body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Neck_body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Neck_body_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Neck_body_link" link2="Knee_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky L 2 Body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky L 2 Body_link" link2="Hand L Palm_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky L 2 Body_link" link2="Index L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky L 2 Body_link" link2="Index L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky L 2 Body_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky L 2 Body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky L 2 Body_link" link2="Ring L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky L 2 Body_link" link2="Thumb L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 1 Body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 1 Body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 1 Body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 1 Body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 1 Body_link" link2="Ring R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 2 Body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 2 Body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 2 Body_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 2 Body_link" link2="Index R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 2 Body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 2 Body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 2 Body_link" link2="Pinky R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Pinky R 2 Body_link" link2="Ring R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Platform_body_link" link2="Ankle_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Platform_body_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Platform_body_link" link2="Knee_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Platform_body_link" link2="Neck_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="ArmL1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="ArmL3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="ArmL4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="ArmL6_Elb2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="Hand L Palm_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="Index L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="Index L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="Middle L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="Pinky L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="Ring L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="Thumb L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="Thumb L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 1 Body_link" link2="Thumb L 3 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 2 Body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 2 Body_link" link2="Hand L Palm_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 2 Body_link" link2="Index L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 2 Body_link" link2="Index L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 2 Body_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 2 Body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring L 2 Body_link" link2="Thumb L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 1 Body_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 1 Body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 1 Body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 1 Body_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 1 Body_link" link2="ArmR6_Elb2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 1 Body_link" link2="Index R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 1 Body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 1 Body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 1 Body_link" link2="Pinky R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 1 Body_link" link2="Pinky R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 1 Body_link" link2="Ring R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 2 Body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 2 Body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 2 Body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Ring R 2 Body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 1 Body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 1 Body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 1 Body_link" link2="Hand L Palm_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 1 Body_link" link2="Index L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 1 Body_link" link2="Middle L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 1 Body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 1 Body_link" link2="Pinky L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 1 Body_link" link2="Ring L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 1 Body_link" link2="Thumb L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 2 Body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 2 Body_link" link2="Index L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 2 Body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 3 Body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 3 Body_link" link2="ArmL3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 3 Body_link" link2="ArmL4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 3 Body_link" link2="ArmL5_Elb1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 3 Body_link" link2="Middle L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 3 Body_link" link2="Pinky L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 3 Body_link" link2="Pinky L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 3 Body_link" link2="Ring L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 3 Body_link" link2="Thumb L 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb L 3 Body_link" link2="Thumb L 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="ArmR6_Elb2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="Index R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="Middle R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="Pinky R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="Pinky R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="Ring R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="Ring R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="Thumb R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 1 Body_link" link2="Thumb R 3 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 2 Body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 2 Body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 2 Body_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 2 Body_link" link2="ArmR6_Elb2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 2 Body_link" link2="Index R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 2 Body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 2 Body_link" link2="Pinky R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 2 Body_link" link2="Pinky R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 2 Body_link" link2="Ring R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 2 Body_link" link2="Ring R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 2 Body_link" link2="Thumb R 3 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 3 Body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 3 Body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 3 Body_link" link2="ArmR4_Sho3_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 3 Body_link" link2="ArmR6_Elb2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 3 Body_link" link2="Middle R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 3 Body_link" link2="Pinky R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 3 Body_link" link2="Pinky R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 3 Body_link" link2="Ring R 1 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Thumb R 3 Body_link" link2="Ring R 2 Body_link" reason="Unknown"/>
+  <disable_self_collision link1="Torso_root_body_link" link2="Ankle_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Torso_root_body_link" link2="ArmL2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Torso_root_body_link" link2="ArmL3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Torso_root_body_link" link2="ArmR1_Cla1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Torso_root_body_link" link2="ArmR2_Sho1_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Torso_root_body_link" link2="ArmR3_Sho2_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Torso_root_body_link" link2="Knee_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Torso_root_body_link" link2="Neck_body_link" reason="Unknown"/>
+  <disable_self_collision link1="Torso_root_body_link" link2="Platform_body_link" reason="Unknown"/>
+</robot>

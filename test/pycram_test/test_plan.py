@@ -710,7 +710,6 @@ def test_algebra_sequential_plan(mutable_model_world):
     )
     navigate_action = probable_variable(NavigateAction)(
         target_location=target_location,
-        keep_joint_states=...,
     )
 
     navigate_example = MatchToInstanceTranslator(navigate_action).translate()

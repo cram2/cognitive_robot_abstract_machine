@@ -1,9 +1,23 @@
 from __future__ import annotations
 
+import os
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Self
 
-from semantic_digital_twin.robots.robot_mixins import HasNeck, SpecifiesLeftRightArm
+from pkg_resources import resource_filename
+
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal
+from semantic_digital_twin.collision_checking.collision_matrix import (
+    MaxAvoidedCollisionsOverride,
+)
+from semantic_digital_twin.collision_checking.collision_rules import (
+    SelfCollisionMatrixRule,
+    AvoidExternalCollisions,
+    AvoidSelfCollisions,
+)
 from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     GripperState,
@@ -22,12 +36,13 @@ from semantic_digital_twin.robots.abstract_robot import (
     HumanoidGripper,
     Base,
 )
+from semantic_digital_twin.robots.robot_mixins import HasNeck, SpecifiesLeftRightArm
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
-
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     ActiveConnection1DOF,
+    ActiveConnection,
 )
 
 
@@ -161,13 +176,109 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
         self.torso.add_joint_state(torso_high)
 
     def _setup_velocity_limits(self):
-        pass
+        vel_limits = defaultdict(
+            lambda: 1.0,
+        )
+        self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
     def _setup_hardware_interfaces(self):
-        pass
+        controlled_joints = [
+            "ArmL1_Cla1",
+            "ArmL2_Sho1",
+            "ArmL3_Sho2",
+            "ArmL4_Sho3",
+            "ArmL5_Elb1",
+            "ArmL6_Elb2",
+            "ArmL7_Wrist_Hemisphere_A",
+            "ArmL8_Wrist_Hemisphere_B",
+            "ArmR1_Cla1",
+            "ArmR2_Sho1",
+            "ArmR3_Sho2",
+            "ArmR4_Sho3",
+            "ArmR5_Elb1",
+            "ArmR6_Elb2",
+            "ArmR7_Wrist_Hemisphere_A",
+            "ArmR8_Wrist_Hemisphere_B",
+            "Ankle",
+            "Knee",
+            "Hip",
+        ]
+        for joint_name in controlled_joints:
+            connection: ActiveConnection = self._world.get_connection_by_name(
+                joint_name
+            )
+            connection.has_hardware_interface = True
 
     def _setup_collision_rules(self):
-        pass
+        srdf_path = os.path.join(
+            resource_filename("semantic_digital_twin", "../../"),
+            "resources",
+            "collision_configs",
+            "armar7.srdf",
+        )
+        self._world.collision_manager.add_ignore_collision_rule(
+            SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
+        )
+
+        self._world.collision_manager.extend_default_rules(
+            [
+                AvoidExternalCollisions(
+                    buffer_zone_distance=0.1, violated_distance=0.0, robot=self
+                ),
+                AvoidExternalCollisions(
+                    buffer_zone_distance=0.05,
+                    violated_distance=0.0,
+                    robot=self,
+                    body_subset=self.left_arm.bodies_with_collision
+                    + self.right_arm.bodies_with_collision,
+                ),
+                AvoidExternalCollisions(
+                    buffer_zone_distance=0.2,
+                    violated_distance=0.05,
+                    robot=self,
+                    body_subset={self._world.get_body_by_name("Platform_body_link")},
+                ),
+                AvoidSelfCollisions(
+                    buffer_zone_distance=0.05, violated_distance=0.0, robot=self
+                ),
+            ]
+        )
+
+        self._world.collision_manager.extend_max_avoided_bodies_rules(
+            [
+                MaxAvoidedCollisionsOverride(
+                    2, bodies={self._world.get_body_by_name("Platform_body_link")}
+                ),
+                MaxAvoidedCollisionsOverride(
+                    4,
+                    bodies=set(
+                        self._world.get_direct_child_bodies_with_collision(
+                            self._world.get_body_by_name(
+                                "ArmL8_Wrist_Hemisphere_B_link"
+                            )
+                        )
+                    )
+                    | set(
+                        self._world.get_direct_child_bodies_with_collision(
+                            self._world.get_body_by_name(
+                                "ArmR8_Wrist_Hemisphere_B_link"
+                            )
+                        )
+                    ),
+                ),
+            ]
+        )
+
+    @property
+    def special_constraints(self) -> list[MotionStatechartNode]:
+        return [
+            AlignPlanes(
+                root_link=self.root,
+                tip_link=self.torso.tip,
+                tip_normal=Vector3.Z(reference_frame=self.torso.tip),
+                goal_normal=Vector3.Z(reference_frame=self.root),
+            )
+        ]
 
     def _setup_semantic_annotations(self):
         base = Base(
@@ -346,6 +457,7 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             _world=self._world,
         )
         self.add_torso(torso)
+        self.full_body_controlled = True
 
         self._world.add_semantic_annotation(self)
 

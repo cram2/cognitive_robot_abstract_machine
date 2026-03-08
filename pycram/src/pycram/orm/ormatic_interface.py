@@ -972,6 +972,23 @@ class KinematicChainDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
 
+class HumanoidGripperDAO_fingers_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "HumanoidGripperDAO_fingers_association"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_humanoidgripperdao_id: Mapped[int] = mapped_column(
+        ForeignKey("HumanoidGripperDAO.database_id")
+    )
+    target_fingerdao_id: Mapped[int] = mapped_column(
+        ForeignKey("FingerDAO.database_id")
+    )
+
+    target: Mapped[FingerDAO] = relationship(
+        "FingerDAO", foreign_keys=[target_fingerdao_id]
+    )
+
+
 class WorldModelModificationBlockDAO_modifications_association(
     Base, AssociationDataAccessObject
 ):
@@ -2209,8 +2226,6 @@ class FaceAtActionDAO(
         use_existing_column=True,
     )
 
-    keep_joint_states: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-
     pose_id: Mapped[int] = mapped_column(
         ForeignKey("PoseStampedDAO.database_id", use_alter=True),
         nullable=True,
@@ -2781,8 +2796,6 @@ class MoveAndPickUpActionDAO(
         use_existing_column=True,
     )
 
-    keep_joint_states: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-
     arm: Mapped[pycram.datastructures.enums.Arms] = mapped_column(
         krrood.ormatic.custom_types.PolymorphicEnumType,
         nullable=False,
@@ -2841,8 +2854,6 @@ class MoveAndPlaceActionDAO(
         primary_key=True,
         use_existing_column=True,
     )
-
-    keep_joint_states: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
 
     arm: Mapped[pycram.datastructures.enums.Arms] = mapped_column(
         krrood.ormatic.custom_types.PolymorphicEnumType,
@@ -2989,8 +3000,6 @@ class MoveMotionDAO(
         use_existing_column=True,
     )
 
-    keep_joint_states: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-
     target_id: Mapped[int] = mapped_column(
         ForeignKey("PoseStampedDAO.database_id", use_alter=True),
         nullable=True,
@@ -3019,7 +3028,7 @@ class MoveTCPMotionDAO(
         use_existing_column=True,
     )
 
-    allow_gripper_collision: Mapped[typing.Optional[builtins.bool]] = mapped_column(
+    allow_gripper_collision: Mapped[builtins.bool] = mapped_column(
         use_existing_column=True
     )
 
@@ -3136,8 +3145,6 @@ class NavigateActionDAO(
         primary_key=True,
         use_existing_column=True,
     )
-
-    keep_joint_states: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
 
     target_location_id: Mapped[int] = mapped_column(
         ForeignKey("PoseStampedDAO.database_id", use_alter=True),
@@ -9054,6 +9061,43 @@ class ManipulatorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ManipulatorDAO",
         "inherit_condition": database_id == SemanticRobotAnnotationDAO.database_id,
+    }
+
+
+class HumanoidGripperDAO(
+    ManipulatorDAO,
+    DataAccessObject[semantic_digital_twin.robots.abstract_robot.HumanoidGripper],
+):
+
+    __tablename__ = "HumanoidGripperDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ManipulatorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    thumb_id: Mapped[int] = mapped_column(
+        ForeignKey("FingerDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    fingers: Mapped[builtins.list[HumanoidGripperDAO_fingers_association]] = (
+        relationship(
+            "HumanoidGripperDAO_fingers_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[HumanoidGripperDAO_fingers_association.source_humanoidgripperdao_id]",
+        )
+    )
+    thumb: Mapped[FingerDAO] = relationship(
+        "FingerDAO", uselist=False, foreign_keys=[thumb_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HumanoidGripperDAO",
+        "inherit_condition": database_id == ManipulatorDAO.database_id,
     }
 
 

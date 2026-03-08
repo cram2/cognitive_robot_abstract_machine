@@ -6,16 +6,23 @@ from dataclasses import dataclass
 from inspect import signature
 from typing import Optional
 
-from typing_extensions import TypeVar, ClassVar, Type
-
-from giskardpy.motion_statechart.graph_node import Task
-from krrood.ormatic.dao import HasGeneric
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from pycram.datastructures.enums import ExecutionType
+from typing_extensions import ClassVar, Type
 from typing_extensions import TypeVar
 
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    UpdateTemporaryCollisionRules,
+)
+from giskardpy.motion_statechart.graph_node import Task, MotionStatechartNode
+from krrood.ormatic.dao import HasGeneric
+from pycram.datastructures.enums import ExecutionType, Arms
 from pycram.designator import DesignatorDescription
 from pycram.motion_executor import MotionExecutor
+from pycram.view_manager import ViewManager
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 
 logger = logging.getLogger(__name__)
 
@@ -80,10 +87,37 @@ class BaseMotion(DesignatorDescription):
     @property
     @abstractmethod
     def _motion_chart(self) -> Task:
-        pass
+        """
+        Returns the motion chart for this motion. Will be overwritten by each motion.
+        """
 
     def get_alternative_motion(self) -> Optional[Type[AlternativeMotion]]:
         return AlternativeMotion.check_for_alternative(self.robot_view, self)
+
+    def _only_allow_gripper_collision_rules(
+        self, arm: Arms
+    ) -> list[MotionStatechartNode]:
+        """
+        Returns collision rules that only allow collisions between the manipulator of an arm and the environment.
+
+        :param arm: The arm for which to get the collision rules
+        """
+        manipulator_bodies = (
+            ViewManager()
+            .get_end_effector_view(arm, self.robot_view)
+            .bodies_with_collision
+        )
+        rules = [
+            UpdateTemporaryCollisionRules(
+                temporary_rules=[
+                    AllowCollisionBetweenGroups(
+                        self.world.bodies_with_collision, manipulator_bodies
+                    )
+                ]
+            )
+        ]
+        rules.extend(self.robot_view.special_constraints)
+        return rules
 
 
 MotionType = TypeVar("MotionType", bound=BaseMotion)
