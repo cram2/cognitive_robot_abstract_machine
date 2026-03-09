@@ -5,7 +5,7 @@ import logging
 import os
 from abc import ABC
 from copy import copy
-from dataclasses import dataclass, make_dataclass, is_dataclass
+from dataclasses import dataclass, is_dataclass
 from dataclasses import field as dataclass_field, InitVar
 from functools import cached_property, lru_cache
 from typing import get_args, get_origin, _GenericAlias, Any
@@ -40,7 +40,7 @@ from krrood.class_diagrams.attribute_introspector import (
     DataclassOnlyIntrospector,
 )
 from krrood.class_diagrams.utils import get_generic_type_param
-from krrood.class_diagrams.role import Role
+from krrood.patterns.role import Role
 from krrood.class_diagrams.wrapped_field import WrappedField
 
 from krrood.class_diagrams.failures import ClassIsUnMappedInClassDiagram

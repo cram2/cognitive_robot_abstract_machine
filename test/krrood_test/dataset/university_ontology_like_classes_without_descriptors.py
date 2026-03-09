@@ -2,17 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, Field, fields
 
-from typing_extensions import Set, List, Type
+from typing_extensions import Set, List
 
-from krrood.class_diagrams.role import Role
+from krrood.patterns.role import Role
 from krrood.entity_query_language.predicate import Symbol
-from krrood.ontomatic.property_descriptor.mixins import (
-    HasInverseProperty,
-    TransitiveProperty,
-)
-from krrood.ontomatic.property_descriptor.property_descriptor import (
-    PropertyDescriptor,
-)
 
 
 @dataclass(eq=False)

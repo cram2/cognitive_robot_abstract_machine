@@ -1,5 +1,4 @@
 from krrood.class_diagrams import ClassDiagram
-from krrood.class_diagrams.role import Role
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,

@@ -1,17 +1,14 @@
-from dataclasses import is_dataclass, fields, Field
+from dataclasses import is_dataclass, fields
 from typing import Optional, List
 
 from krrood.class_diagrams.class_diagram import (
     ClassDiagram,
     WrappedSpecializedGeneric,
     make_specialized_dataclass,
-    HasRoleTaker,
-    AssociationThroughRoleTaker,
 )
 from krrood.class_diagrams.utils import classes_of_module
 from ..dataset import example_classes
 from ..dataset.example_classes import Position, GenericClassAssociation, GenericClass
-from ..dataset import university_ontology_like_classes
 
 
 def test_class_diagram_visualization():
@@ -122,35 +119,3 @@ def test_make_specialized_dataclass():
     assert value.type == float
     assert optional_value.type == Optional[float]
     assert container.type == List[float]
-
-
-def test_role_taker_associations():
-
-    classes = filter(
-        is_dataclass,
-        classes_of_module(university_ontology_like_classes),
-    )
-    diagram = ClassDiagram(classes)
-    assert len(diagram._dependency_graph.edges()) == 16
-    assert (
-        len(
-            [
-                e
-                for e in diagram._dependency_graph.edges()
-                if isinstance(e, HasRoleTaker)
-            ]
-        )
-        == 2
-    )
-    assert len(diagram._dependency_graph.nodes()) == 10
-    assert (
-        len(
-            [
-                e
-                for e in diagram._dependency_graph.edges()
-                if isinstance(e, AssociationThroughRoleTaker)
-            ]
-        )
-        == 5
-    )
-    # diagram.to_dot("class_diagram.svg")
