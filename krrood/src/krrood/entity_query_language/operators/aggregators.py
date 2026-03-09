@@ -7,6 +7,7 @@ It contains classes for counting, summing, averaging, and finding extreme values
 from __future__ import annotations
 
 import numbers
+import statistics
 import uuid
 from abc import ABC, abstractmethod
 from collections import Counter
@@ -278,11 +279,11 @@ class MultiMode(Extreme[T]):
 
 
 @dataclass(eq=False, repr=False)
-class Mode(MultiMode[T]):
+class Mode(Extreme[T]):
     """
     Find and return the mode value among the child results. Same as {py:class}`MultiMode`, but only returns the
     first mode value found.
     """
 
     def aggregation_function(self, values: Iterable) -> Iterator[T]:
-        yield next(super().aggregation_function(values))
+        yield statistics.mode(values)

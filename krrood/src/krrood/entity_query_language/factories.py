@@ -9,13 +9,17 @@ import operator
 from typing_extensions import Union, Iterable
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.mapped_variable import (
+    FlatVariable,
+    CanBehaveLikeAVariable,
+)
+from krrood.entity_query_language.core.variable import (
+    DomainType,
+    Literal,
+    ExternallySetVariable,
+)
 from krrood.entity_query_language.enums import DomainSource
 from krrood.entity_query_language.exceptions import UnsupportedExpressionTypeForDistinct
-from krrood.entity_query_language.query.match import (
-    Match,
-    MatchVariable,
-    ProbableVariable,
-)
 from krrood.entity_query_language.operators.aggregators import (
     Max,
     Min,
@@ -27,37 +31,33 @@ from krrood.entity_query_language.operators.aggregators import (
     MultiMode,
 )
 from krrood.entity_query_language.operators.comparator import Comparator
+from krrood.entity_query_language.operators.concatenation import Concatenation
 from krrood.entity_query_language.operators.core_logical_operators import (
     chained_logic,
     AND,
     OR,
 )
 from krrood.entity_query_language.operators.logical_quantifiers import ForAll, Exists
-from krrood.entity_query_language.operators.concatenation import Concatenation
+from krrood.entity_query_language.predicate import *  # type: ignore
+from krrood.entity_query_language.query.match import (
+    Match,
+    MatchVariable,
+    ProbableVariable,
+)
 from krrood.entity_query_language.query.quantifiers import (
     ResultQuantificationConstraint,
     An,
     The,
     ResultQuantifier,
 )
+from krrood.entity_query_language.query.query import Entity, SetOf, Query
 from krrood.entity_query_language.rules.conclusion import Add
 from krrood.entity_query_language.rules.conclusion_selector import (
     Refinement,
     Alternative,
     Next,
 )
-from krrood.entity_query_language.query.query import Entity, SetOf, Query
 from krrood.entity_query_language.utils import is_iterable
-from krrood.entity_query_language.core.variable import (
-    DomainType,
-    Literal,
-    ExternallySetVariable,
-)
-from krrood.entity_query_language.core.mapped_variable import (
-    FlatVariable,
-    CanBehaveLikeAVariable,
-)
-from krrood.entity_query_language.predicate import *  # type: ignore
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 
 ConditionType = Union[SymbolicExpression, bool, Predicate]
@@ -453,37 +453,33 @@ def max(
 def mode(
     variable: Selectable[T],
     default: Optional[T] = None,
-    distinct: bool = False,
 ) -> Union[T, Mode[T]]:
     """
-    Maps the variable values to their mode value. The mode is the most common value in the iterable. It is found by
+    Calculate and return the first mode from the variable values. The mode is the most common value in the iterable. It is found by
     counting the occurrences of each value and returning the one with the highest count. If there are multiple values
     with the same highest count, the first one encountered is returned. This is an aggregation function, thus the query
     will be fully evaluated before the result is returned.
 
     :param variable: The variable for which the mode value is to be found.
     :param default: The value returned when the iterable is empty.
-    :param distinct: Whether to only consider distinct values.
     :return: A Max object that can be evaluated to find the mode value.
     """
-    return Mode(variable, _default_value_=default, _distinct_=distinct)
+    return Mode(variable, _default_value_=default)
 
 
 def multimode(
     variable: Selectable[T],
     default: Optional[T] = None,
-    distinct: bool = False,
 ) -> Union[T, MultiMode[T]]:
     """
-    Maps the variable values to all equivalent mode value. Similar to :py:func:`krrood.entity_query_language.factories.mode`
+    Calculate and return all mode values from the variable values. Similar to :py:func:`krrood.entity_query_language.factories.mode`
     but returns all values that have the same mode value (i.e., all values that have the same highest count).
 
     :param variable: The variable for which the mode value is to be found.
     :param default: The value returned when the iterable is empty.
-    :param distinct: Whether to only consider distinct values.
     :return: A Max object that can be evaluated to find the mode value.
     """
-    return MultiMode(variable, _default_value_=default, _distinct_=distinct)
+    return MultiMode(variable, _default_value_=default)
 
 
 def min(
