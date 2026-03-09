@@ -37,6 +37,8 @@ jobs:
         run: |
           cd cognitive_robot_abstract_machine
           source /opt/ros/cram-env/bin/activate
+          sudo apt-get update
+          sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
           poetry install
 
       - name: Restore cache
@@ -61,6 +63,9 @@ jobs:
         run: |
           source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
+          if [[ "${{ inputs.lib }}" == "probabilistic_model" ]]; then
+            export QT_QPA_PLATFORM=offscreen
+          fi
           python -m pytest -sv cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
 
       - name: Save cache

@@ -89,13 +89,8 @@ class Executor:
 
     tmp_folder: str = field(default="/tmp/")
     """Path to safe temporary files."""
-    record_trajectory: bool = False
-    """Whether to record the trajectory of the robot."""
-    world_state_trajectory: WorldStateTrajectory = field(init=False)
-    """The trajectory of the robot's world state."""
-    trajectory_plotter: WorldStateTrajectoryPlotter = field(
-        default_factory=WorldStateTrajectoryPlotter
-    )
+
+    trajectory_plotter: WorldStateTrajectoryPlotter | None = field(default=None)
     """The trajectory plotter used to plot the robot's trajectory."""
 
     pacer: Pacer = field(default_factory=SimulationPacer)
@@ -139,9 +134,8 @@ class Executor:
         self.control_cycles = 0
         self.motion_statechart.compile(self.context)
         self._compile_qp_controller(self.context.qp_controller_config)
-        self.world_state_trajectory = WorldStateTrajectory.from_world_state(
-            self.context.world.state, time=self.time
-        )
+        if self.trajectory_plotter is not None:
+            self.trajectory_plotter.reset(self.context.world.state, self.time)
         self.context.collision_manager.update_collision_matrix()
         # do one tick to immediately active nodes whose start condition is constant true.
         self.motion_statechart.tick(self.context)
@@ -163,7 +157,10 @@ class Executor:
             self.qp_controller.config.control_dt,
             self.qp_controller.config.max_derivative,
         )
-        self.world_state_trajectory.append(self.context.world.state, self.time)
+        if self.trajectory_plotter is not None:
+            self.trajectory_plotter.world_state_trajectory.append(
+                self.context.world.state, self.time
+            )
 
     def tick_until_end(self, timeout: int = 1_000):
         """
@@ -215,4 +212,4 @@ class Executor:
             raise EmptyProblemException()
 
     def plot_trajectory(self, file_name: str = "./trajectory.pdf"):
-        self.trajectory_plotter.plot_trajectory(self.world_state_trajectory, file_name)
+        self.trajectory_plotter.plot_trajectory(file_name)

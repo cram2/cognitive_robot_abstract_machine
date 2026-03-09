@@ -10,7 +10,10 @@ matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
-from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
+from semantic_digital_twin.world_description.world_state import (
+    WorldStateTrajectory,
+    WorldState,
+)
 
 
 @dataclass
@@ -20,6 +23,9 @@ class WorldStateTrajectoryPlotter:
 
     Subplots share the x-axis (time in seconds, normalized so that the first time maps to 0).
     """
+
+    world_state_trajectory: WorldStateTrajectory = field(init=False)
+    """The trajectory of the robot's world state."""
 
     derivatives_to_plot: List[Derivatives] = field(
         default_factory=lambda: [
@@ -74,6 +80,11 @@ class WorldStateTrajectoryPlotter:
     
     Each degree of freedom will have the same color in each subplot.
     """
+
+    def reset(self, initial_state: WorldState, time: float = 0.0):
+        self.world_state_trajectory = WorldStateTrajectory.from_world_state(
+            state=initial_state, time=time
+        )
 
     def _seconds_to_inches(self, seconds: float) -> float:
         """
@@ -311,16 +322,13 @@ class WorldStateTrajectoryPlotter:
             axis.set_title(str(derivative.name).capitalize())
             axis.set_ylabel(self.y_label.get(derivative, ""))
 
-    def plot_trajectory(
-        self, world_state_trajectory: WorldStateTrajectory, file_name: str
-    ):
+    def plot_trajectory(self, file_name: str):
         """
         Plots the trajectory and saves the resulting plot to the specified file.
 
-        :param world_state_trajectory: The trajectory to plot.
         :param file_name: The name of the file where the plot will be saved.
         """
-        traj = world_state_trajectory
+        traj = self.world_state_trajectory
         if len(traj.times) == 0:
             return
         t0 = float(traj.times[0])

@@ -67,8 +67,8 @@ def _render_plot(
     # Avoid file output and figure closing during tests
     monkeypatch.setattr(plt, "savefig", lambda *args, **kwargs: None)
     monkeypatch.setattr(plt, "close", lambda *args, **kwargs: None)
-
-    plotter.plot_trajectory(traj, "/dev/null")
+    plotter.world_state_trajectory = traj
+    plotter.plot_trajectory("/dev/null")
 
     # Get the current figure created by the plotter
     fig = plt.gcf()

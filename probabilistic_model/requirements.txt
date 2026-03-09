@@ -21,3 +21,6 @@ mlflow-skinny>=2.22.0
 dnutils
 arff
 deprecated
+PySide6
+qt-material
+superqt

@@ -400,15 +400,17 @@ class WorldStateTrajectory:
     """List of DOF ids in column order."""
     _index: Dict[UUID, int] = field(default_factory=dict)
     """Maps DOF ids to column indices."""
-    times: np.ndarray = field(default_factory=lambda: np.zeros((0,), dtype=float))
-    """Array of timestamps corresponding to the recorded world states."""
-    data: np.ndarray = field(default_factory=lambda: np.zeros((0, 4, 0), dtype=float))
+    _times: List[float] = field(default_factory=list, repr=False)
+    """List of timestamps corresponding to the recorded world states."""
+    _data: List[np.ndarray] = field(default_factory=list, repr=False)
     """
-    Multidimensional array containing the recorded world state data.
-    The first dimension indexes the DOFs. 
-    The second dimension indexes the derivatives.
-    The third dimension indexes time steps.
+    List containing the recorded world state data as numpy arrays.
+    Each array has shape (4, N).
     """
+    _times_cache: Optional[np.ndarray] = field(default=None, init=False, repr=False)
+    """Cache for the numpy array of timestamps."""
+    _data_cache: Optional[np.ndarray] = field(default=None, init=False, repr=False)
+    """Cache for the numpy array of world state data."""
     _world_version: int = field(init=False)
     """
     The version of the world model at the time of trajectory creation.
@@ -417,6 +419,28 @@ class WorldStateTrajectory:
 
     def __post_init__(self):
         self._world_version = self.world.get_world_model_manager().version
+
+    @property
+    def times(self) -> np.ndarray:
+        """Array of timestamps corresponding to the recorded world states."""
+        if self._times_cache is None:
+            self._times_cache = np.array(self._times, dtype=float)
+        return self._times_cache
+
+    @property
+    def data(self) -> np.ndarray:
+        """
+        Multidimensional array containing the recorded world state data.
+        The first dimension indexes time steps.
+        The second dimension indexes the derivatives.
+        The third dimension indexes the DOFs.
+        """
+        if self._data_cache is None:
+            if not self._data:
+                # return an empty array with the correct number of dimensions
+                return np.zeros((0, 4, len(self._ids)), dtype=float)
+            self._data_cache = np.stack(self._data, axis=0)
+        return self._data_cache
 
     @classmethod
     def from_world_state(cls, state: WorldState, time: float):
@@ -431,10 +455,10 @@ class WorldStateTrajectory:
         """
         return cls(
             world=state._world,
-            _ids=state._ids,
-            _index=state._index,
-            times=np.array([time], dtype=float),
-            data=state.data[np.newaxis, :],
+            _ids=state._ids.copy(),
+            _index=state._index.copy(),
+            _times=[time],
+            _data=[state.data.copy()],
         )
 
     def append(self, state: WorldState, time: float):
@@ -453,15 +477,17 @@ class WorldStateTrajectory:
                 expected_version=self._world_version,
                 actual_version=current_world_model_version,
             )
-        if time <= self.times[-1]:
+        if self._times and time <= self._times[-1]:
             raise NonMonotonicTimeError(
-                last_time=float(self.times[-1]), attempted_time=time
+                last_time=float(self._times[-1]), attempted_time=time
             )
-        self.times = np.append(self.times, time)
-        self.data = np.vstack((self.data, state.data[np.newaxis, :]))
+        self._times.append(time)
+        self._data.append(state.data.copy())
+        self._times_cache = None
+        self._data_cache = None
 
     def keys(self) -> Iterator[float]:
-        yield from self.times
+        yield from self._times
 
     def values(self) -> Iterator[WorldStateView]:
         """
@@ -474,8 +500,8 @@ class WorldStateTrajectory:
         :yield: An iterator of `WorldStateView` objects representing the data
                 at each time step.
         """
-        for idx in range(len(self.times)):
-            yield WorldStateView(self.data[idx, :, :], self._ids, self._index)
+        for idx in range(len(self._times)):
+            yield WorldStateView(self._data[idx], self._ids, self._index)
 
     def items(self) -> Iterator[tuple[float, WorldStateView]]:
         yield from zip(self.keys(), self.values())

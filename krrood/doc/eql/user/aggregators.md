@@ -36,6 +36,9 @@ Available aggregators include:
 - `sum()`: Calculates the sum of a numeric attribute.
 - `average()`: Calculates the average of a numeric attribute.
 - `max()` and `min()`: Find the maximum or minimum value.
+- `count_all()`: Counts all records in a group, regardless of a specific variable.
+- `mode()`: Returns the most frequent value in a group.
+- `multimode()`: Returns all values that have the maximum frequency (in case of ties).
 
 Most aggregators support these optional parameters:
 - `key`: A function to extract the value for aggregation/comparison from the object.
@@ -117,8 +120,64 @@ for result in query.evaluate():
     print(f"Type: {result[r.type]} | Count: {result[c]} | Avg Battery: {result[avg_batt]}%")
 ```
 
+
+## More Aggregations ...
+
+### Counting All Records with `count_all()`
+
+The `count_all()` aggregator is used to count all records within a group, regardless of any specific variable. This is particularly useful when grouping by a variable and wanting to know the size of each resulting group.
+
+```{code-cell} ipython3
+import krrood.entity_query_language.factories as eql
+from krrood.entity_query_language.factories import variable, set_of
+
+# Given a variable with repeated values
+domain = [1, 2, 3, 2, 2, 1, 3]
+var = variable(int, domain=domain)
+
+# Count how many times each value appears
+# This groups by 'var' and counts the records in each group
+query = set_of(var, count:=eql.count_all()).grouped_by(var)
+
+# Result: [(1, 2), (2, 3), (3, 2)]
+results = query.tolist()
+print(results)
+```
+
+### Advanced: Finding the Mode using Nested Aggregations
+
+With EQL you can perform multiple nested aggregations to find the mode manually. This example uses a subquery to find
+the maximum count and then filters the groups by that count.
+
+```{note}
+This example is a bit contrived, but it demonstrates how to use multiple aggregators to find the mode.
+In practice, you would usually use a single aggregator like `mode()` or `multimode()`.
+```
+
+```{code-cell} ipython3
+import krrood.entity_query_language.factories as eql
+from krrood.entity_query_language.factories import variable, entity
+
+# Given a variable with repeated values
+domain = [1, 2, 3, 2, 2, 1, 3, 3]
+var = variable(int, domain=domain)
+
+# 1. Calculate the maximum frequency across all groups
+max_count = entity(eql.max(eql.count(var).grouped_by(var)))
+
+# 2. Find the values whose frequency equals that maximum
+mode_query = set_of(var, count:=eql.count_all()).grouped_by(var).having(count == max_count)
+
+# This will return [(2, 3), (3, 3)] as 2, and 3 are the most frequent values, each with a count of 3.
+results = [(res[var], res[count]) for res in mode_query.tolist()]
+print(results)
+```
+
 ## API Reference
 - {py:func}`~krrood.entity_query_language.factories.count`
+- {py:func}`~krrood.entity_query_language.factories.count_all`
+- {py:func}`~krrood.entity_query_language.factories.mode`
+- {py:func}`~krrood.entity_query_language.factories.multimode`
 - {py:func}`~krrood.entity_query_language.factories.sum`
 - {py:func}`~krrood.entity_query_language.factories.average`
 - {py:func}`~krrood.entity_query_language.factories.max`
