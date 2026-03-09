@@ -33,7 +33,7 @@ from krrood.entity_query_language.core.mapped_variable import (
     CanBehaveLikeAVariable,
 )
 from krrood.entity_query_language.core.variable import Literal, DomainType
-from krrood.entity_query_language.failures import (
+from krrood.entity_query_language.exceptions import (
     NoKwargsInMatchVar,
 )
 from krrood.entity_query_language.predicate import HasType

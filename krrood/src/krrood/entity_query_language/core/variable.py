@@ -33,7 +33,7 @@ from krrood.entity_query_language.core.base_expressions import (
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
 from krrood.entity_query_language.cache_data import ReEnterableLazyIterable
 from krrood.entity_query_language.enums import DomainSource
-from krrood.entity_query_language.failures import NoChildToReplace
+from krrood.entity_query_language.exceptions import NoChildToReplace
 from krrood.entity_query_language.operators.set_operations import (
     MultiArityExpressionThatPerformsACartesianProduct,
 )

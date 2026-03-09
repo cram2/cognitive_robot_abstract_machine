@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import MultipleResultsFound
 
-from krrood.entity_query_language.failures import MultipleSolutionFound
+from krrood.entity_query_language.exceptions import MultipleSolutionFound
 from ..dataset.example_classes import Position, Pose
 from ..dataset.semantic_world_like_classes import (
     World,

@@ -30,7 +30,7 @@ from typing_extensions import (
     Type,
 )
 
-from krrood.entity_query_language.failures import NoExpressionFoundForGivenID
+from krrood.entity_query_language.exceptions import NoExpressionFoundForGivenID
 from krrood.entity_query_language.utils import make_list, T, make_set, is_iterable
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 
@@ -174,6 +174,8 @@ class SymbolicExpression(ABC):
         :param old_child: The old child expression.
         :param new_child: The new child expression.
         """
+        if old_child is new_child:
+            return
         _children_ids_ = [v._id_ for v in self._children_]
         child_idx = _children_ids_.index(old_child._id_)
         self._children_[child_idx] = new_child
@@ -222,9 +224,15 @@ class SymbolicExpression(ABC):
         :param result: The result to be mapped.
         :return: The mapped result.
         """
-        return UnificationDict(
-            {self._get_expression_by_id_(id_): v for id_, v in result.bindings.items()}
-        )
+        if self._id_ in result:
+            return result[self._id_]
+        else:
+            return UnificationDict(
+                {
+                    self._get_expression_by_id_(id_): value
+                    for id_, value in result.bindings.items()
+                }
+            )
 
     def _evaluate_(
         self,
@@ -314,7 +322,8 @@ class SymbolicExpression(ABC):
         if value is None and self._parent__ is not None:
             if self._id_ in [v._id_ for v in self._parent__._children_]:
                 self._parent__._children_.remove(self)
-            self._parents_.remove(self._parent__)
+            if self._parent__ in self._parents_:
+                self._parents_.remove(self._parent__)
 
         self._parent__ = value
 

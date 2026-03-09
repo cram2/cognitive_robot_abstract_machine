@@ -12,7 +12,7 @@ from krrood.entity_query_language.factories import (
     an,
     a,
 )
-from krrood.entity_query_language.failures import NoKwargsInMatchVar
+from krrood.entity_query_language.exceptions import NoKwargsInMatchVar
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.core.base_expressions import UnificationDict
 from krrood.entity_query_language.query_graph import QueryGraph
@@ -111,7 +111,6 @@ def test_select_where(handles_and_containers_world):
             container := fixed_connection.parent, handle := fixed_connection.child
         ).where(container.size > 1)
     )
-    QueryGraph(container_and_handle.build()).visualize()
     # Method 2
     fixed_connection_2 = variable(FixedConnection, domain=world.connections)
     container_and_handle_2 = the(

@@ -21,7 +21,7 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
 )
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
-from krrood.entity_query_language.failures import (
+from krrood.entity_query_language.exceptions import (
     NegativeQuantificationError,
     QuantificationConsistencyError,
     GreaterThanExpectedNumberOfSolutions,
@@ -199,7 +199,9 @@ class ResultQuantifier(
             self._assert_satisfaction_of_quantification_constraints_(
                 result_count, done=False
             )
-            yield value
+            yield OperationResult(
+                value.bindings | {self._id_: value.value}, False, self, value
+            )
         self._assert_satisfaction_of_quantification_constraints_(
             result_count, done=True
         )

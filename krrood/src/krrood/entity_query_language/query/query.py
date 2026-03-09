@@ -35,7 +35,12 @@ from krrood.entity_query_language.query.builders import (
     QuantifierBuilder,
     OrderedByBuilder,
 )
-from krrood.entity_query_language.query.operations import Where, Having, GroupedBy
+from krrood.entity_query_language.query.operations import (
+    Where,
+    Having,
+    GroupedBy,
+    OrderedBy,
+)
 from krrood.entity_query_language.query.quantifiers import (
     ResultQuantificationConstraint,
     ResultQuantifier,
@@ -58,12 +63,12 @@ from krrood.entity_query_language.core.variable import (
     ExternallySetVariable,
 )
 from krrood.entity_query_language.enums import DomainSource
-from krrood.entity_query_language.failures import (
+from krrood.entity_query_language.exceptions import (
     UnsupportedNegation,
     TryingToModifyAnAlreadyBuiltQuery,
     NonPositiveLimitValue,
 )
-from krrood.entity_query_language.operators.aggregators import Aggregator
+from krrood.entity_query_language.operators.aggregators import Aggregator, CountAll
 from krrood.entity_query_language.operators.set_operations import (
     MultiArityExpressionThatPerformsACartesianProduct,
 )
@@ -115,7 +120,7 @@ class Query(
     """
     The builder for the `GroupedBy` expression of the query.
     """
-    _having_builder: Optional[HavingBuilder] = field(init=False, default=None)
+    _having_builder_: Optional[HavingBuilder] = field(init=False, default=None)
     """
     The builder for the `Having` expression of the query.
     """
@@ -131,6 +136,16 @@ class Query(
     _built_: bool = field(default=False, init=False)
     """
     Whether the query has built the query (wired the query operations) or not. If built already, it
+    cannot be modified further and an error will be raised if a user tries to modify the query.
+    """
+    _update_ordered_by_: bool = field(default=True, init=False)
+    """
+    Whether the query has updated the ordered by expression or not. If updated already, it
+    cannot be modified further and an error will be raised if a user tries to modify the query.
+    """
+    _update_quantifier_: bool = field(default=True, init=False)
+    """
+    Whether the query has updated the quantifier expression or not. If updated already, it
     cannot be modified further and an error will be raised if a user tries to modify the query.
     """
 
@@ -164,7 +179,10 @@ class Query(
          returning an iterator over the results.
         """
         self.build()
-        return self._expression_.evaluate()
+        if self._expression_ is not self:
+            return self._expression_.evaluate()
+        else:
+            return MultiArityExpressionThatPerformsACartesianProduct.evaluate(self)
 
     @modifies_query_structure
     def where(self, *conditions: ConditionType) -> Self:
@@ -188,10 +206,10 @@ class Query(
         :param conditions: The conditions that describe the query object.
         :return: This query.
         """
-        if self._having_builder is None:
-            self._having_builder = HavingBuilder(conditions=conditions, query=self)
+        if self._having_builder_ is None:
+            self._having_builder_ = HavingBuilder(conditions=conditions, query=self)
         else:
-            self._having_builder.conditions += conditions
+            self._having_builder_.conditions += conditions
         return self
 
     def ordered_by(
@@ -210,6 +228,7 @@ class Query(
         self._ordered_by_builder_ = OrderedByBuilder(
             self, variable, descending=descending, key=key
         )
+        self._update_ordered_by_ = True
         return self
 
     def distinct(
@@ -269,6 +288,7 @@ class Query(
         self._quantifier_builder_ = QuantifierBuilder(
             self, quantifier_type, quantification_constraint
         )
+        self._update_quantifier_ = True
         return self
 
     def __enter__(self):
@@ -287,6 +307,9 @@ class Query(
         :return: This query.
         """
         if self._built_:
+            # TODO: This is a temporary fix, a coming PR will clean it up.
+            self._update_ordered_by_expression_()
+            self._update_quantifier_expression_()
             return self
 
         self._built_ = True
@@ -295,23 +318,73 @@ class Query(
             self._grouped_by_builder_ = GroupedByBuilder(self)
 
         children = []
-        if self._having_builder is not None:
-            self._having_builder.grouped_by = self._grouped_by_builder_.expression
-            children.append(self._having_builder.expression)
+        if self._having_builder_ is not None:
+            self._having_builder_.grouped_by = self._grouped_by_builder_.expression
+            children.append(self._having_builder_.expression)
         elif self._grouped_by_builder_ is not None:
             children.append(self._grouped_by_builder_.expression)
         elif self._where_builder_ is not None:
             children.append(self._where_builder_.expression)
 
+        self._if_count_all_is_used_update_its_child_to_be_the_grouped_by_expression_()
+
         children.extend(self._selected_variables_)
 
         self.update_children(*children)
 
-        if self._ordered_by_builder_ is not None:
-            self._ordered_by_builder_.data_source = self._expression_
-            self._expression_ = self._ordered_by_builder_.expression
+        self._update_ordered_by_expression_()
 
-        self._quantifier_builder_.child = self._expression_
+        self._update_quantifier_expression_()
+
+        return self
+
+    def _if_count_all_is_used_update_its_child_to_be_the_grouped_by_expression_(
+        self,
+    ) -> None:
+        """
+        Update the child of the `CountAll` aggregator to be the `GroupedBy` expression if it exists.
+        """
+        if self._grouped_by_builder_ is None:
+            return
+        count_all = next(
+            (
+                aggregator
+                for aggregator in self._grouped_by_builder_.aggregators_and_non_aggregators[
+                    0
+                ]
+                if isinstance(aggregator, CountAll)
+            ),
+            None,
+        )
+        if count_all is None:
+            return
+        count_all._replace_child_(
+            count_all._child_, self._grouped_by_builder_.expression
+        )
+
+    # TODO: This is a temporary fix, a coming PR will clean it up.
+    def _update_ordered_by_expression_(self):
+        if (self._ordered_by_builder_ is None) or not self._update_ordered_by_:
+            return self
+        og_child = self._expression_
+        if isinstance(self._expression_, OrderedBy):
+            og_child = self._expression_._child_
+            self._remove_parent_(self._expression_)
+        self._update_ordered_by_ = False
+        self._ordered_by_builder_.data_source = og_child
+        self._expression_ = self._ordered_by_builder_.expression
+        return self
+
+    # TODO: This is a temporary fix, a coming PR will clean it up.
+    def _update_quantifier_expression_(self):
+        if (self._quantifier_builder_ is None) or not self._update_quantifier_:
+            return self
+        og_child = self._expression_
+        if isinstance(self._expression_, ResultQuantifier):
+            og_child = self._expression_._child_
+            self._remove_parent_(self._expression_)
+        self._update_quantifier_ = False
+        self._quantifier_builder_.child = og_child
         self._expression_ = self._quantifier_builder_.expression
         self._expression_._limit_ = self._limit_
         return self
@@ -359,7 +432,7 @@ class Query(
         """
         The built `Having` expression.
         """
-        return self._having_builder.expression if self._having_builder else None
+        return self._having_builder_.expression if self._having_builder_ else None
 
     @property
     def _grouped_by_expression_(self) -> Optional[GroupedBy]:
@@ -435,12 +508,10 @@ class Query(
                 aggregated_variables.append(variable)
             elif isinstance(variable, InstantiatedVariable):
                 non_aggregated_variables.extend(variable._operation_children_)
-            elif isinstance(
-                variable, ExternallySetVariable
-            ) and variable._domain_source_ in [
-                DomainSource.DEDUCTION,
-                DomainSource.GROUPING,
-            ]:
+            elif (
+                isinstance(variable, ExternallySetVariable)
+                and variable._domain_source_ == DomainSource.DEDUCTION
+            ):
                 continue
             else:
                 non_aggregated_variables.append(variable)
@@ -467,7 +538,9 @@ class Query(
         """
         Make sure to set the parent of the built expression of the query instead of the query itself.
         """
-        self.build()
+        # TODO: A hot fix for now, will be cleaned in a coming PR.
+        if not isinstance(parent, (ResultQuantifier, OrderedBy)):
+            self.build()
         if self._expression_ is not self:
             self._expression_._parent_ = parent
         else:

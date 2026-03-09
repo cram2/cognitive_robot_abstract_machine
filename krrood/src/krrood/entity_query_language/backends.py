@@ -4,7 +4,7 @@ from typing import Iterable, TypeVar
 
 from sqlalchemy.orm import sessionmaker
 
-from krrood.entity_query_language.failures import (
+from krrood.entity_query_language.exceptions import (
     NoSolutionFound,
     GenerativeBackendQueryIsNotMatch,
 )
