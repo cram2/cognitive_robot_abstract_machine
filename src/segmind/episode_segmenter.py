@@ -9,7 +9,10 @@ from giskardpy.executor import Pacer, SimulationPacer
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from segmind import logger, set_logger_level, LogLevel
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.world_description.connections import Connection6DoF, FixedConnection
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    FixedConnection,
+)
 from .datastructures.object_tracker import ObjectTracker
 from .detectors.atomic_event_detectors_nodes import SegmindContext
 from .detectors.coarse_event_detectors import *
@@ -165,9 +168,6 @@ class EpisodeSegmenter(ABC):
             translation_detector = TranslationDetector(
                 logger=self.logger, tracked_object=obj
             )
-
-
-
 
     def run_event_detectors(self) -> None:
         """
@@ -581,37 +581,36 @@ class EpisodeSegmenterExecutor:
     player: EpisodePlayer
     pacer: Pacer = field(default_factory=SimulationPacer)
     statechart: DetectorStateChart = field(init=False)
-    _control_cycle_index : int = field(init=False)
+    _control_cycle_index: int = field(init=False)
     _time_variable: FloatVariable = field(init=False)
 
-    @property
-    def control_cycles(self):
-        return self.context.float_variable_data.data[self._control_cycle_index]
-
-    @control_cycles.setter
-    def control_cycles(self, value):
-        self.context.float_variable_data.set_value(self._control_cycle_index, value)
-
-    @property
-    def time(self) -> float:
-        return self.control_cycles * self.context.qp_controller_config.control_dt
-
+    # @property
+    # def control_cycles(self):
+    #     return self.context.float_variable_data.data[self._control_cycle_index]
+    #
+    # @control_cycles.setter
+    # def control_cycles(self, value):
+    #     self.context.float_variable_data.set_value(self._control_cycle_index, value)
+    #
+    # @property
+    # def time(self) -> float:
+    #     return self.control_cycles * self.context.qp_controller_config.control_dt
 
     def compile(self, statechart: DetectorStateChart):
         self.statechart = statechart
         self.control_cycles = 0
         self.statechart.compile(self.context)
-        #self.context.collision_manager.update_collision_matrix()
+        # self.context.collision_manager.update_collision_matrix()
         # do one tick to immediately active nodes whose start condition is constant true.
         self.statechart.tick(self.context)
         self.player.start()
 
     def tick(self):
+        self.player.pause()
         self.control_cycles += 1
-        #if self.context.collision_manager.has_consumers():
-        #    self.context.collision_manager.compute_collisions()
         self.statechart.tick(self.context)
-        #ToDo: Here we need to add the state model updates.
+        self.player.resume()
+        # ToDo: Here we need to add the state model updates.
 
     def tick_until_end(self, timeout: int = 1_000):
         """
@@ -630,16 +629,11 @@ class EpisodeSegmenterExecutor:
             self.statechart.cleanup_nodes(context=self.context)
             self.context.cleanup()
 
-
     def spawn_scene(self, models_dir):
         directory = Path(models_dir)
-        models_dir="/home/sorin/dev/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/models/"
         urdf_files = [f.name for f in directory.glob("*.urdf")]
         for file in urdf_files:
-            file_path = (
-                   models_dir
-                    + file
-            )
+            file_path = models_dir + file
             obj_name = Path(file).stem
 
             if obj_name == "iCub":
