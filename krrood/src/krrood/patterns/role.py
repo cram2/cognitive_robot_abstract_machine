@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, Field
+from copy import copy
+from dataclasses import dataclass, Field, fields, MISSING
 from functools import lru_cache, cached_property
 
 from typing_extensions import Generic, Type
@@ -40,6 +41,36 @@ class Role(Generic[T], ABC):
     Thus not only allowing easy semantic access but also reducing the number of joins (searches), which further improves
      the performance.
     """
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        role_specific_attribute_names = [
+            attr_name
+            for attr_name in dir(cls)
+            if all(
+                attr_name not in dir(base)
+                for base in cls.__bases__ + (cls.get_role_taker_type(),)
+            )
+        ]
+        for attribute_name in role_specific_attribute_names:
+            attribute_value = getattr(cls, attribute_name)
+            if isinstance(attribute_value, Field):
+                if attribute_value.default is not MISSING:
+                    attribute_value = attribute_value.default
+                else:
+                    continue
+            setattr(cls.get_root_role_taker_type(), attribute_name, attribute_value)
+
+    @classmethod
+    @lru_cache(maxsize=None)
+    def get_root_role_taker_type(cls) -> Type[T]:
+        """
+        :return: The type of the role taker.
+        """
+        current_cls = cls
+        while issubclass(current_cls, Role):
+            current_cls = current_cls.get_role_taker_type()
+        return current_cls
 
     @classmethod
     @lru_cache(maxsize=None)
@@ -105,3 +136,11 @@ class Role(Generic[T], ABC):
 
     def __eq__(self, other):
         return hash(self) == hash(other)
+
+
+def role_enabled_dataclass(cls):
+    cls = dataclass(cls)
+
+    print("Fields:", [f.name for f in fields(cls)])
+
+    return cls

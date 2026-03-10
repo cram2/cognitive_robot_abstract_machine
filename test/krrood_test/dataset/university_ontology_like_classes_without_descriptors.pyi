@@ -28,36 +28,47 @@ class Course(Symbol):
 
 @dataclass(eq=False)
 class Person(Symbol):
-    name: str = field(kw_only=True, default=None)
+    name: str
     works_for: RecognizedGroup = field(kw_only=True, default=None)
     member_of: List[RecognizedGroup] = field(kw_only=True, default=None)
-    head_of: RecognizedGroup = field(kw_only=True, default=None)
-    representative_of: RecognizedGroup = field(kw_only=True, default=None)
-    delegate_of: RecognizedGroup = field(kw_only=True, default=None)
-    teacher_of: List[Course] = field(kw_only=True, default=None)
+    head_of: RecognizedGroup = field(init=False)
+    representative_of: RecognizedGroup = field(init=False)
+    delegate_of: RecognizedGroup = field(init=False)
+    teacher_of: List[Course] = field(init=False)
+
+@dataclass
+class RoleForPerson(Person):
+    person: Person
+    name: str = field(init=False)
+    works_for: RecognizedGroup = field(init=False)
+    member_of: List[RecognizedGroup] = field(init=False)
 
 @dataclass(eq=False)
-class CEOAsFirstRole(Person):
-    person: Person
+class CEOAsFirstRole(RoleForPerson):
     # Original Owner of the head_of field
     head_of: RecognizedGroup = field(kw_only=True, default=None)
 
 @dataclass(eq=False)
-class ProfessorAsFirstRole(Person):
-    person: Person
+class ProfessorAsFirstRole(RoleForPerson):
     # Original Owner of the teacher_of field
     teacher_of: List[Course] = field(default_factory=list, kw_only=True)
 
-@dataclass(eq=False)
-class RepresentativeAsSecondRole(CEOAsFirstRole):
+@dataclass
+class RoleForCEO(CEOAsFirstRole):
     ceo: CEOAsFirstRole
     person: Person = field(init=False)
+
+@dataclass(eq=False)
+class RepresentativeAsSecondRole(RoleForCEO):
     # Original Owner of the representative_of field
     representative_of: RecognizedGroup = field(kw_only=True, default=None)
 
-@dataclass(eq=False)
-class DelegateAsThirdRole(RepresentativeAsSecondRole):
+@dataclass
+class RoleForRepresentative(RepresentativeAsSecondRole):
     representative: RepresentativeAsSecondRole
     ceo: CEOAsFirstRole = field(init=False)
+
+@dataclass(eq=False)
+class DelegateAsThirdRole(RoleForRepresentative):
     # Original Owner of the delegate_of field
     delegate_of: RecognizedGroup = field(kw_only=True, default=None)

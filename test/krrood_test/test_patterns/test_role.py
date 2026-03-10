@@ -1,5 +1,6 @@
 from dataclasses import is_dataclass
 
+import pytest
 
 from krrood.class_diagrams import ClassDiagram
 from krrood.class_diagrams.class_diagram import (
@@ -52,10 +53,11 @@ def test_getting_and_setting_attribute_between_sibling_roles():
 
 def test_role_taker_associations():
 
-    classes = filter(
-        is_dataclass,
-        classes_of_module(university_ontology_like_classes),
-    )
+    classes = [
+        cls
+        for cls in classes_of_module(university_ontology_like_classes)
+        if is_dataclass(cls)
+    ]
     diagram = ClassDiagram(classes)
     assert len(diagram._dependency_graph.edges()) == 29
     assert (
@@ -82,6 +84,14 @@ def test_role_taker_associations():
     # diagram.to_dot("class_diagram.svg")
 
 
-def test_accesing_attribute_of_role_from_role_taker_when_role_does_not_exist():
+def test_accessing_attribute_of_role_from_role_taker_when_role_does_not_exist_and_the_attribute_has_default():
     person = Person(name="Bass")
     assert person.head_of is None
+    assert person.representative_of is None
+    assert person.delegate_of is None
+
+
+def test_accessing_attribute_of_role_from_role_taker_when_role_does_not_exist_and_the_attribute_has_default_factory():
+    person = Person(name="Bass")
+    with pytest.raises(AttributeError):
+        to = person.teacher_of

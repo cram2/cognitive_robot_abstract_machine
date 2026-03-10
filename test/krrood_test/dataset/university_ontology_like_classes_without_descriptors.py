@@ -55,7 +55,7 @@ class CEOAsFirstRole(Role[Person], Symbol):
 @dataclass(eq=False)
 class ProfessorAsFirstRole(Role[Person], Symbol):
     person: Person
-    teacher_of: List[Course] = field(default_factory=list)
+    teacher_of: List[Course] = field(default_factory=list, kw_only=True)
 
     @classmethod
     def role_taker_field(cls) -> Field:
@@ -65,7 +65,7 @@ class ProfessorAsFirstRole(Role[Person], Symbol):
 @dataclass(eq=False)
 class RepresentativeAsSecondRole(Role[CEOAsFirstRole], Symbol):
     ceo: CEOAsFirstRole
-    representative_of: RecognizedGroup = None
+    representative_of: RecognizedGroup = field(default=None, kw_only=True)
 
     @classmethod
     def role_taker_field(cls) -> Field:
