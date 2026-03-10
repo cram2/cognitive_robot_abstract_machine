@@ -15,6 +15,30 @@ class Role(Generic[T], ABC):
     This class serves as a container for defining roles with associated generic
     types, enabling flexibility and type safety when modeling role-specific
     behavior and data.
+
+    Roles are extensions of the role taker's behavior and data in different contexts. Roles live side-by-side with the
+     role taker, which means that roles never overwrite the role taker's behavior or data but instead only extend it.
+    ..warning:: Never overwrite the role taker's behavior or data in a role.
+
+    Setting an attribute on a role will set it on the role taker instance recursively, but the opposite is not true.
+    All attributes of all roles (except for the attributes that point to the role_taker inside the role) and the role
+    taker are accessible from any role or role taker instance.
+
+    Roles and role takers are considered the same entity, having the same hash value and are equal.
+    >>> student = Student(person=person)
+    >>> person == student
+    True
+    >>> hash(person) == hash(student)
+    True
+
+    The Role Pattern is meant for easy semantic access to attributes without having to abide to memory layout. For example
+    no need to do `PrivateSchoolStudent.Student.Person.age`, instead you can do `PrivateSchoolStudent.age`. Or even the
+    other way around when wanting to access student context attributes from person instance like:
+    >>> private_school_student = next(psc for psc in PrivateSchoolStudent if psc.name == person.name).courses
+    >>> # Instead Do:
+    >>> person.courses
+    Thus not only allowing easy semantic access but also reducing the number of joins (searches), which further improves
+     the performance.
     """
 
     @classmethod
@@ -42,6 +66,9 @@ class Role(Generic[T], ABC):
 
     @cached_property
     def root_persistent_entity(self):
+        """
+        :return: The root persistent entity in the role hierarchy.
+        """
         root = self
         while isinstance(root, Role):
             root = root.role_taker
@@ -70,6 +97,10 @@ class Role(Generic[T], ABC):
             setattr(self.role_taker, key, value)
 
     def __hash__(self):
+        """
+        A persistent entity and its roles should be considered the same entity, so we hash based on the root persistent
+         entity.
+        """
         return hash(self.root_persistent_entity)
 
     def __eq__(self, other):

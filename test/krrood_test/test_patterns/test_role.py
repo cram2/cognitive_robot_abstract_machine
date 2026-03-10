@@ -80,3 +80,8 @@ def test_role_taker_associations():
         == 9
     )
     # diagram.to_dot("class_diagram.svg")
+
+
+def test_accesing_attribute_of_role_from_role_taker_when_role_does_not_exist():
+    person = Person(name="Bass")
+    assert person.head_of is None
