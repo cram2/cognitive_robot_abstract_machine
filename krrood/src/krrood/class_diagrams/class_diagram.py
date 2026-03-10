@@ -296,6 +296,46 @@ class WrappedClass:
         """
         return self.clazz.__name__
 
+    @property
+    def is_role(self) -> bool:
+        """
+        Check if the wrapped class inherits from Role.
+        """
+        from krrood.patterns.role import Role
+        try:
+            return issubclass(self.clazz, Role)
+        except TypeError:
+            return False
+
+    @property
+    def role_taker_type(self) -> Optional[Type]:
+        """
+        Return the type of the role taker if this class is a role.
+        """
+        if not self.is_role:
+            return None
+        return self.clazz.get_role_taker_type()
+
+    @property
+    def root_role_taker_type(self) -> Optional[Type]:
+        """
+        Return the type of the root role taker if this class is a role.
+        """
+        if not self.is_role:
+            return None
+        return self.clazz.get_root_role_taker_type()
+
+    @property
+    def bases(self) -> List[str]:
+        """
+        Return the names of base classes, excluding object and Role.
+        """
+        from krrood.patterns.role import Role
+        return [
+            base.__name__ for base in self.clazz.__bases__
+            if base is not object and base is not Role and "krrood.patterns.role.Role" not in str(base)
+        ]
+
     def __hash__(self):
         return hash((self.index, self.clazz))
 
