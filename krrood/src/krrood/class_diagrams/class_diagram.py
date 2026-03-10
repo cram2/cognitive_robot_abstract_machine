@@ -31,7 +31,7 @@ from typing_extensions import (
     TYPE_CHECKING,
     TypeVar,
     get_type_hints,
-    Iterator,
+    Iterator, Generic,
 )
 
 
@@ -222,12 +222,14 @@ class ParseError(TypeError):
     pass
 
 
+T = TypeVar("T")
+
 @dataclass
-class WrappedClass:
+class WrappedClass(Generic[T]):
     """A node wrapper around a Python class used in the class diagram graph."""
 
     index: Optional[int] = dataclass_field(init=False, default=None)
-    clazz: Type
+    clazz: Type[T]
     _class_diagram: Optional[ClassDiagram] = dataclass_field(
         init=False, hash=False, default=None, repr=False
     )
@@ -295,46 +297,6 @@ class WrappedClass:
         :return: The name of the class that is wrapped.
         """
         return self.clazz.__name__
-
-    @property
-    def is_role(self) -> bool:
-        """
-        Check if the wrapped class inherits from Role.
-        """
-        from krrood.patterns.role import Role
-        try:
-            return issubclass(self.clazz, Role)
-        except TypeError:
-            return False
-
-    @property
-    def role_taker_type(self) -> Optional[Type]:
-        """
-        Return the type of the role taker if this class is a role.
-        """
-        if not self.is_role:
-            return None
-        return self.clazz.get_role_taker_type()
-
-    @property
-    def root_role_taker_type(self) -> Optional[Type]:
-        """
-        Return the type of the root role taker if this class is a role.
-        """
-        if not self.is_role:
-            return None
-        return self.clazz.get_root_role_taker_type()
-
-    @property
-    def bases(self) -> List[str]:
-        """
-        Return the names of base classes, excluding object and Role.
-        """
-        from krrood.patterns.role import Role
-        return [
-            base.__name__ for base in self.clazz.__bases__
-            if base is not object and base is not Role and "krrood.patterns.role.Role" not in str(base)
-        ]
 
     def __hash__(self):
         return hash((self.index, self.clazz))

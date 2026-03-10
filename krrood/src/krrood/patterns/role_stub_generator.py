@@ -1,21 +1,27 @@
 from __future__ import annotations
 
 import inspect
-from dataclasses import dataclass, is_dataclass, field, MISSING, Field
-from typing import Any, Type, List, Dict, Optional, Tuple, Union
+from collections import defaultdict
+from dataclasses import dataclass, MISSING
+from functools import cached_property
+from typing import Any, Type, List, Dict, Optional
 
 import jinja2
 
 from krrood.class_diagrams import ClassDiagram
-from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.utils import classes_of_module
+from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.patterns import Role
+
 
 class _Missing:
     def __repr__(self):
         return "MISSING"
 
+
 MISSING_VAL = _Missing()
+
 
 @dataclass
 class FieldAssignment:
@@ -25,14 +31,24 @@ class FieldAssignment:
     default: Any = MISSING_VAL
     default_factory: Any = MISSING_VAL
 
+    @classmethod
+    def from_wrapped_field(cls, wf: WrappedField) -> FieldAssignment:
+        """Creates a FieldAssignment instance from a WrappedField."""
+        return cls(
+            init=wf.field.init,
+            kw_only=wf.field.kw_only or (not wf.is_required and wf.field.init),
+            default=wf.field.default if wf.field.default is not MISSING else MISSING_VAL,
+            default_factory=wf.field.default_factory if wf.field.default_factory is not MISSING else MISSING_VAL
+        )
+
     def __str__(self) -> str:
         # Use the automatically generated repr and perform minimal edits
         content = repr(self).split("(", 1)[1][:-1]
-        
+
         # Filter out default flags and MISSING markers
-        parts = [p for p in content.split(", ") 
+        parts = [p for p in content.split(", ")
                  if p not in ("init=True", "kw_only=False") and "MISSING" not in p]
-        
+
         if not parts:
             return ""
 
@@ -44,6 +60,7 @@ class FieldAssignment:
         args_str = ", ".join(parts).replace("<class '", "").replace("'>", "")
         return f" = field({args_str})"
 
+
 @dataclass
 class DataclassArguments:
     """Represents arguments for the @dataclass decorator."""
@@ -51,12 +68,23 @@ class DataclassArguments:
     unsafe_hash: bool = False
     kw_only: bool = False
 
+    @classmethod
+    def from_wrapped_class(cls, wrapped_class: WrappedClass) -> DataclassArguments:
+        """Creates a DataclassArguments instance from a WrappedClass."""
+        params = getattr(wrapped_class.clazz, "__dataclass_params__", None)
+        return cls(
+            eq=params.eq if params else True,
+            unsafe_hash=params.unsafe_hash if params else False,
+            kw_only=getattr(params, "kw_only", False) if params else False
+        )
+
     def __str__(self) -> str:
         # Use repr() and filter out arguments that match standard @dataclass defaults
         content = repr(self).split("(", 1)[1][:-1]
-        parts = [p for p in content.split(", ") 
+        parts = [p for p in content.split(", ")
                  if p not in ("eq=True", "unsafe_hash=False", "kw_only=False")]
         return ", ".join(parts)
+
 
 @dataclass
 class StubFieldInfo:
@@ -64,6 +92,12 @@ class StubFieldInfo:
     name: str
     type_name: str
     assignment: FieldAssignment
+
+    @classmethod
+    def from_wrapped_field(cls, wf: WrappedField) -> StubFieldInfo:
+        """Creates a StubFieldInfo instance from a WrappedField."""
+        return cls(wf.name, wf.type_name, FieldAssignment.from_wrapped_field(wf))
+
 
 @dataclass
 class StubClassInfo:
@@ -73,6 +107,7 @@ class StubClassInfo:
     fields: List[StubFieldInfo]
     dataclass_args: DataclassArguments
 
+
 @dataclass
 class RoleTakerInfo:
     """Information about a role taker for stub generation."""
@@ -81,152 +116,137 @@ class RoleTakerInfo:
     inherited_fields: List[StubFieldInfo]
     roles: List[RoleInfo]
 
+    @classmethod
+    def from_taker_wrapped_class_and_roles(cls, taker_wc: WrappedClass, roles: List[WrappedClass[Role]]):
+        """Creates a RoleTakerInfo instance from a role taker type."""
+        role_infos = [RoleInfo.from_wrapped_class(role) for role in roles]
+
+        # Inherited fields are all fields of the taker that are init=True
+        inherited_fields = [
+            StubFieldInfo(wf.name, wf.type_name, FieldAssignment(init=False))
+            for wf in taker_wc.fields if wf.field.init
+        ]
+
+        return cls(
+            role_for_name=f"RoleFor{taker_wc.name}",
+            taker_field_name=roles[0].clazz.role_taker_field().name,
+            inherited_fields=inherited_fields,
+            roles=role_infos
+        )
+
+
 @dataclass
 class RoleInfo:
     """Information about a role for stub generation."""
     name: str
     dataclass_args: DataclassArguments
-    introduced_field: StubFieldInfo
+    introduced_field: Optional[StubFieldInfo] = None
+
+    @classmethod
+    def from_wrapped_class(cls, role: WrappedClass[Role]) -> RoleInfo:
+        """Creates a RoleInfo instance from a WrappedClass."""
+        taker_field_name = role.clazz.role_taker_field().name
+
+        intro_field_wc = next((wf for wf in role.fields if wf.name != taker_field_name), None)
+        intro_field_stub = None
+        if intro_field_wc:
+            assignment = FieldAssignment.from_wrapped_field(intro_field_wc)
+            intro_field_stub = StubFieldInfo(intro_field_wc.name, intro_field_wc.type_name, assignment)
+        dc_args = DataclassArguments.from_wrapped_class(role)
+        return cls(name=role.name, dataclass_args=dc_args, introduced_field=intro_field_stub)
+
 
 class RoleStubGenerator:
     """
     Automates the generation of stub python files (.pyi) for classes that follow the Role Pattern.
     """
 
-    def __init__(self):
+    def __init__(self, module: Any):
         """Initializes the generator with the Jinja template."""
         loader = jinja2.PackageLoader("krrood.patterns", "templates")
         self.env = jinja2.Environment(loader=loader, trim_blocks=True, lstrip_blocks=True)
         self.template = self.env.get_template("role_stub.pyi.jinja")
+        self.class_diagram = ClassDiagram(classes_of_module(module))
+        self.module = module
 
-    def generate_stub(self, module: Any) -> str:
+    def generate_stub(self) -> str:
         """
         Generates a stub file for the given module.
 
-        :param module: The Python module to analyze.
         :return: The generated stub file as a string.
         """
-        diagram = ClassDiagram(classes_of_module(module))
-        
-        # 1. Prepare Stub Classes for non-role entities
-        stub_classes = []
-        root_to_roles = self._map_root_to_roles(diagram)
-        
-        for wc in diagram.wrapped_classes:
-            if not wc.is_role:
-                stub_classes.append(self._build_stub_class(wc, root_to_roles.get(wc.name, [])))
-
-        # 2. Prepare Role Taker Hierarchy
-        role_takers_map = self._prepare_role_takers_map(diagram)
-        
         return self.template.render(
-            stub_classes=stub_classes,
-            role_takers=role_takers_map,
-            imports=self._extract_imports(module)
+            stub_classes=self._non_role_stub_classes,
+            role_takers=self._role_taker_to_info_map,
+            imports=self._extract_imports()
         )
 
-    def _map_root_to_roles(self, diagram: ClassDiagram) -> Dict[str, List[WrappedClass]]:
-        """Maps root role taker names to their roles."""
-        mapping = {}
-        for wc in diagram.wrapped_classes:
-            if wc.is_role:
-                root_type = wc.root_role_taker_type
-                root_name = root_type.__origin__.__name__ if hasattr(root_type, "__origin__") else root_type.__name__
-                mapping.setdefault(root_name, []).append(wc)
+    @cached_property
+    def _non_role_stub_classes(self) -> List[StubClassInfo]:
+        """Stub Classes for non-role entities."""
+        return [self._build_stub_class(wc)
+                for wc in self.class_diagram.wrapped_classes if not issubclass(wc.clazz, Role)]
+
+    @cached_property
+    def _root_role_taker_to_roles_map(self) -> Dict[Type, List[WrappedClass]]:
+        """Mapping from root role taker types to their roles."""
+        mapping = defaultdict(list)
+        for wc in self.class_diagram.wrapped_classes:
+            if issubclass(wc.clazz, Role):
+                mapping[wc.root_role_taker_type].append(wc)
         return mapping
 
-    def _build_stub_class(self, wrapped_class: WrappedClass, roles: List[WrappedClass]) -> StubClassInfo:
+    def _build_stub_class(self, wrapped_class: WrappedClass) -> StubClassInfo:
         """Builds stub information for a non-role class."""
-        fields = []
         # Add original fields
-        for wf in wrapped_class.fields:
-            assignment = FieldAssignment(
-                init=wf.field.init,
-                kw_only=getattr(wf.field, "kw_only", False) or (not wf.is_required and wf.field.init),
-                default=wf.field.default if wf.field.default is not MISSING else MISSING_VAL,
-                default_factory=wf.field.default_factory if wf.field.default_factory is not MISSING else MISSING_VAL
-            )
-            fields.append(StubFieldInfo(wf.name, wf.type_name, assignment))
-            
+        taker_fields = [StubFieldInfo.from_wrapped_field(wf) for wf in wrapped_class.fields]
+
         # Add role-introduced fields as init=False
-        for role_wc in roles:
+        for role_wc in self._role_taker_to_roles_map.get(wrapped_class.clazz, []):
             taker_field_name = role_wc.clazz.role_taker_field().name
-            for wf in role_wc.fields:
-                if wf.name != taker_field_name and not any(f.name == wf.name for f in fields):
-                    fields.append(StubFieldInfo(wf.name, wf.type_name, FieldAssignment(init=False)))
+            for role_wf in role_wc.fields:
+                if any(taker_wf.name == role_wf.name for taker_wf in taker_fields):
+                    raise ValueError(f"Roles should not overwrite fields defined in their role takers: {role_wf.name} in "
+                                     f"{role_wc} overwrites the one defined in {wrapped_class} with the same name")
+                if role_wf.name != taker_field_name:
+                    taker_fields.append(StubFieldInfo(role_wf.name, role_wf.type_name, FieldAssignment(init=False)))
 
-        params = getattr(wrapped_class.clazz, "__dataclass_params__", None)
-        dc_args = DataclassArguments(
-            eq=params.eq if params else True,
-            unsafe_hash=params.unsafe_hash if params else False,
-            kw_only=getattr(params, "kw_only", False) if params else False
-        )
+        dc_args = DataclassArguments.from_wrapped_class(wrapped_class)
 
-        return StubClassInfo(wrapped_class.name, wrapped_class.bases, fields, dc_args)
+        return StubClassInfo(wrapped_class.name, [clazz.__name__ for clazz in wrapped_class.clazz.__bases__],
+                             taker_fields, dc_args)
 
-    def _prepare_role_takers_map(self, diagram: ClassDiagram) -> Dict[str, RoleTakerInfo]:
+    @cached_property
+    def _role_taker_to_info_map(self) -> Dict[Type, RoleTakerInfo]:
         """Prepares role taker metadata for the template."""
-        role_classes = [wc for wc in diagram.wrapped_classes if wc.is_role]
-        taker_to_roles = {}
-        for role_wc in role_classes:
-            taker_type = role_wc.role_taker_type
-            taker_name = taker_type.__origin__.__name__ if hasattr(taker_type, "__origin__") else taker_type.__name__
-            taker_to_roles.setdefault(taker_name, []).append(role_wc)
+        return {
+            taker_type: RoleTakerInfo.from_taker_wrapped_class_and_roles(
+                self.class_diagram.get_wrapped_class(taker_type), roles)
+            for taker_type, roles in self._role_taker_to_roles_map.items()
+        }
 
-        result = {}
-        for taker_name, roles in taker_to_roles.items():
-            taker_field_name = roles[0].clazz.role_taker_field().name
-            
-            role_infos = []
-            for r in roles:
-                intro_field_wc = next((wf for wf in r.fields if wf.name != taker_field_name), None)
-                if intro_field_wc:
-                    assignment = FieldAssignment(
-                        init=intro_field_wc.field.init,
-                        kw_only=True, # Roles' introduced fields are always kw_only in stub
-                        default=intro_field_wc.field.default if intro_field_wc.field.default is not MISSING else MISSING_VAL,
-                        default_factory=intro_field_wc.field.default_factory if intro_field_wc.field.default_factory is not MISSING else MISSING_VAL
-                    )
-                    intro_field_stub = StubFieldInfo(intro_field_wc.name, intro_field_wc.type_name, assignment)
-                    
-                    params = getattr(r.clazz, "__dataclass_params__", None)
-                    dc_args = DataclassArguments(
-                        eq=params.eq if params else True,
-                        unsafe_hash=params.unsafe_hash if params else False,
-                        kw_only=getattr(params, "kw_only", False) if params else False
-                    )
-                    role_infos.append(RoleInfo(name=r.name, dataclass_args=dc_args, introduced_field=intro_field_stub))
+    @cached_property
+    def _role_taker_to_roles_map(self) -> Dict[Type, List[WrappedClass[Role]]]:
+        """Mapping from role taker types to their roles."""
+        taker_to_roles = defaultdict(list)
+        for role_wc in self._role_wrapped_classes:
+            taker_type = role_wc.clazz.get_role_taker_type()
+            taker_to_roles[taker_type].append(role_wc)
+        return taker_to_roles
 
-            # Inherited fields are all fields of the taker that are init=True
-            taker_wc = diagram.get_wrapped_class(next(c.role_taker_type for c in roles if self._get_name(c.role_taker_type) == taker_name))
-            inherited_fields = [
-                StubFieldInfo(wf.name, wf.type_name, FieldAssignment(init=False))
-                for wf in taker_wc.fields if wf.field.init
-            ]
-
-            result[taker_name] = RoleTakerInfo(
-                role_for_name=self._generate_role_for_name(taker_name),
-                taker_field_name=taker_field_name,
-                inherited_fields=inherited_fields,
-                roles=role_infos
-            )
-        return result
+    @cached_property
+    def _role_wrapped_classes(self) -> List[WrappedClass[Role]]:
+        """Returns a list of WrappedClass instances for role classes."""
+        return [wc for wc in self.class_diagram.wrapped_classes if issubclass(wc.clazz, Role)]
 
     def _get_name(self, cls_type: Type) -> str:
         """Returns the name of a class type, handling GenericAlias."""
         return cls_type.__origin__.__name__ if hasattr(cls_type, "__origin__") else cls_type.__name__
 
-    def _generate_role_for_name(self, taker_name: str) -> str:
-        """Generates the RoleFor[Class] name."""
-        name = f"RoleFor{taker_name}"
-        for suffix in ["AsFirstRole", "AsSecondRole", "AsThirdRole"]:
-            name = name.replace(suffix, "")
-        return name
-
-    def _extract_imports(self, module: Any) -> List[str]:
+    def _extract_imports(self) -> List[str]:
         """Extracts imports from module source, excluding internal role/dataclass modules."""
-        lines, _ = inspect.getsourcelines(module)
+        lines, _ = inspect.getsourcelines(self.module)
         forbidden = {"krrood.patterns.role", "dataclasses", "typing", "__future__"}
-        imports = {line.strip() for line in lines if line.strip().startswith(("from ", "import ")) 
+        imports = {line.strip() for line in lines if line.strip().startswith(("from ", "import "))
                    and not any(f in line for f in forbidden)}
         return sorted(list(imports))

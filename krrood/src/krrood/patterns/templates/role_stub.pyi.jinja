@@ -14,10 +14,10 @@ class {{ wrapped_class.name }}({{ wrapped_class.bases|join(', ') }}):
     {% if not wrapped_class.fields %}...{% endif %}
 
 {% endfor %}
-{% for taker_name, info in role_takers.items() %}
+{% for taker_type, info in role_takers.items() %}
 @dataclass
-class {{ info.role_for_name }}({{ taker_name }}):
-    {{ info.taker_field_name }}: {{ taker_name }}
+class {{ info.role_for_name }}({{ taker_type.__name__ }}):
+    {{ info.taker_field_name }}: {{ taker_type.__name__ }}
     {% for wrapped_field in info.inherited_fields %}
     {{ wrapped_field.name }}: {{ wrapped_field.type_name }} = field(init=False)
     {% endfor %}

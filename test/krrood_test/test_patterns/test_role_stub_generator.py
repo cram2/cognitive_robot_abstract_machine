@@ -5,8 +5,8 @@ from test.krrood_test.dataset import university_ontology_like_classes_without_de
 from dataclasses import fields
 
 def test_stub_generation_smoke(tmp_path):
-    generator = RoleStubGenerator()
-    stub = generator.generate_stub(university_ontology_like_classes_without_descriptors)
+    generator = RoleStubGenerator(university_ontology_like_classes_without_descriptors)
+    stub = generator.generate_stub()
     assert "class Person(Symbol):" in stub
     assert "class RoleForPerson(Person):" in stub
     assert "class CEOAsFirstRole(RoleForPerson):" in stub
@@ -17,12 +17,10 @@ def test_stub_generation_smoke(tmp_path):
         f.write(stub)
 
     generated_stub_path = tmp_path / "generated_stub.pyi"
-    print(generated_stub_path)
     assert generated_stub_path.exists()
 
 def test_role_taker_mapping():
     from test.krrood_test.dataset.university_ontology_like_classes_without_descriptors import CEOAsFirstRole, Person
-    generator = RoleStubGenerator()
     taker_type = CEOAsFirstRole.get_role_taker_type()
     assert taker_type is Person
     
