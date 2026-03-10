@@ -2686,7 +2686,10 @@ class TestOpenClose:
 
 
 class TestCollisionAvoidance:
-    def test_external_collision_avoidance(self, cylinder_bot_world: World):
+    def test_external_collision_avoidance(self, cylinder_bot_world: World, rclpy_node):
+        VizMarkerPublisher(
+            _world=cylinder_bot_world, node=rclpy_node
+        ).with_tf_publisher()
         robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
@@ -2730,13 +2733,79 @@ class TestCollisionAvoidance:
         kwargs = tracker.create_kwargs()
         msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
 
-        kin_sim = Executor(MotionStatechartContext(world=cylinder_bot_world))
+        kin_sim = Executor(
+            MotionStatechartContext(world=cylinder_bot_world),
+            pacer=SimulationPacer(real_time_factor=2),
+        )
         kin_sim.compile(motion_statechart=msc_copy)
 
         kin_sim.tick_until_end(500)
         collisions = kin_sim.context.world.collision_manager.compute_collisions()
         assert len(collisions.contacts) == 1
         assert collisions.contacts[0].distance > 0.049
+        assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
+
+    def test_external_collision_avoidance_with_weight_above_ca(
+        self, cylinder_bot_world: World, rclpy_node
+    ):
+        VizMarkerPublisher(
+            _world=cylinder_bot_world, node=rclpy_node
+        ).with_tf_publisher()
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
+        env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AvoidCollisionBetweenGroups(
+                            buffer_zone_distance=0.05,
+                            violated_distance=0.0,
+                            body_group_a=[tip],
+                            body_group_b=[env1],
+                        )
+                    ]
+                ),
+                distance_violated := ExternalCollisionDistanceMonitor(
+                    body=robot.root, threshold=0.0
+                ),
+                CartesianPose(
+                    root_link=cylinder_bot_world.root,
+                    tip_link=tip,
+                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=1, reference_frame=cylinder_bot_world.root
+                    ),
+                    weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
+                ),
+                ExternalCollisionAvoidance(robot=robot),
+                local_min := LocalMinimumReached(),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(local_min))
+        msc.add_node(CancelMotion.when_true(distance_violated))
+
+        json_data = msc.to_json()
+        json_str = json.dumps(json_data)
+        new_json_data = json.loads(json_str)
+
+        tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
+        kwargs = tracker.create_kwargs()
+        msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
+
+        kin_sim = Executor(
+            MotionStatechartContext(world=cylinder_bot_world),
+            pacer=SimulationPacer(real_time_factor=1),
+        )
+        kin_sim.compile(motion_statechart=msc_copy)
+
+        kin_sim.tick_until_end(500)
+        collisions = kin_sim.context.world.collision_manager.compute_collisions()
+        assert len(collisions.contacts) == 1
+        assert collisions.contacts[0].distance < 0.049
+        assert collisions.contacts[0].distance > 0.0
         assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
 
     def test_update_collision_matrix_later(self, cylinder_bot_world: World, rclpy_node):

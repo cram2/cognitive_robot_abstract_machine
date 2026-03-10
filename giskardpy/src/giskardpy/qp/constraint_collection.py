@@ -146,9 +146,10 @@ class ConstraintCollection:
         reference_velocity: sm.ScalarData,
         lower_error: sm.ScalarData,
         upper_error: sm.ScalarData,
-        weight: sm.ScalarData,
+        quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
         name: Optional[str] = None,
+        linear_weight: sm.ScalarData = 0,
         lower_slack_limit: sm.ScalarData = -Large_Number,
         upper_slack_limit: sm.ScalarData = Large_Number,
     ):
@@ -183,10 +184,10 @@ class ConstraintCollection:
             lower_error=lower_error,
             upper_error=upper_error,
             normalization_factor=reference_velocity,
-            quadratic_weight=weight,
+            quadratic_weight=quadratic_weight,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
-            linear_weight=0,
+            linear_weight=linear_weight,
         )
         self.add_constraint(constraint)
 

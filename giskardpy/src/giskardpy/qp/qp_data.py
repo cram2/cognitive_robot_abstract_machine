@@ -167,6 +167,14 @@ class QPDataExplicit(QPData):
     def factory(cls):
         return QPDataExplicitFactory
 
+    @property
+    def dense_eq_matrix(self) -> np.ndarray:
+        return self.eq_matrix.toarray()
+
+    @property
+    def dense_neq_matrix(self) -> np.ndarray:
+        return self.neq_matrix.toarray()
+
     def to_two_sided_inequality(self) -> QPDataTwoSidedInequality:
         A2 = sp.eye(len(self.box_upper_constraints))
         if self.eq_matrix.shape[0] * self.eq_matrix.shape[1] != 0:

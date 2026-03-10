@@ -86,26 +86,6 @@ class QPControllerDebugger:
             ):
                 print(array)
 
-    def save_all_pandas(self, folder_name: Optional[str] = None):
-        raise NotImplementedError()
-        # self.save_pandas(
-        #     [
-        #         self.p_weights,
-        #         self.p_b,
-        #         self.p_E,
-        #         self.p_bE,
-        #         self.p_A,
-        #         self.p_lbA,
-        #         self.p_ubA,
-        #         None,
-        #         self.p_xdot,
-        #     ],
-        #     ["weights", "b", "E", "bE", "A", "lbA", "ubA", "debug"],
-        #     god_map.tmp_folder,
-        #     None,
-        #     folder_name,
-        # )
-
     def save_pandas(
         self, dfs, names, path, time: float, folder_name: Optional[str] = None
     ):
@@ -137,9 +117,11 @@ class QPControllerDebugger:
 
     def _update_quadratic_weights(self, qp_data: QPDataExplicit):
         self.p_weights = pd.DataFrame(
-            qp_data.quadratic_weights,
+            {
+                "quadratic": qp_data.quadratic_weights,
+                "linear": qp_data.linear_weights,
+            },
             self.free_variable_names,
-            ["data"],
             dtype=float,
         )
 
@@ -147,7 +129,7 @@ class QPControllerDebugger:
         self.p_g = pd.DataFrame(
             qp_data.linear_weights,
             self.free_variable_names,
-            ["data"],
+            ["quadratic"],
             dtype=float,
         )
 
@@ -184,7 +166,7 @@ class QPControllerDebugger:
             self.p_bE = deepcopy(self.p_bE_raw)
             self.p_bE[
                 len(
-                    self.qp_controller.qp_adapter.equality_bounds.names_derivative_links
+                    self.qp_controller.qp_data_factory.qp_data._equality_bounds.names_derivative_links
                 ) :
             ] /= self.qp_controller.config.mpc_dt
         else:
@@ -249,29 +231,26 @@ class QPControllerDebugger:
     def _update_xdot(
         self,
         qp_data: QPDataExplicit,
-        filter,
         new_xdot_full: Optional[np.ndarray],
     ):
+        zero_quadratic_weight_filter = qp_data.quadratic_weights != 0
+        zero_quadratic_weight_filter[: -qp_data.num_slack_variables] = True
         self.p_xdot = None
         if new_xdot_full is None:
             return
 
         num_vel_constr = len(
-            self.qp_controller.qp_adapter.constraint_collection.derivative_constraints
+            self.qp_controller.constraint_collection.derivative_constraints
         ) * (self.qp_controller.config.prediction_horizon - 2)
         num_eq_vel_constr = len(
-            self.qp_controller.qp_adapter.constraint_collection.eq_derivative_constraints
+            self.qp_controller.constraint_collection.eq_derivative_constraints
         ) * (self.qp_controller.config.prediction_horizon - 2)
-        num_neq_constr = len(
-            self.qp_controller.qp_adapter.constraint_collection.neq_constraints
-        )
-        num_eq_constr = len(
-            self.qp_controller.qp_adapter.constraint_collection.eq_constraints
-        )
+        num_neq_constr = len(self.qp_controller.constraint_collection.neq_constraints)
+        num_eq_constr = len(self.qp_controller.constraint_collection.eq_constraints)
         num_constr = num_vel_constr + num_neq_constr + num_eq_constr + num_eq_vel_constr
 
         xdot_full = np.ones(qp_data.quadratic_weights.shape) * np.nan
-        xdot_full[filter.zero_quadratic_weight_filter] = new_xdot_full
+        xdot_full[zero_quadratic_weight_filter] = new_xdot_full
         self.p_xdot = pd.DataFrame(
             xdot_full, self.free_variable_names, ["data"], dtype=float
         )
@@ -281,6 +260,7 @@ class QPControllerDebugger:
         self.p_pure_xdot[-num_constr:] = 0
         self.p_xdot_slack = deepcopy(self.p_xdot)
         self.p_xdot_slack[:-num_constr] = 0
+        self.p_xdot_slack = self.p_xdot_slack.replace(np.nan, 0)
         if len(self.p_A) > 0:
             self.p_Ax = pd.DataFrame(
                 self.p_A.dot(self.p_pure_xdot),
@@ -290,7 +270,7 @@ class QPControllerDebugger:
             )
             bA_slack = self.p_A.dot(self.p_xdot_slack)
             self.p_bA_raw.insert(1, "Ax", self.p_Ax)
-            self.p_bA_raw.insert(2, "slack", bA_slack.values)
+            self.p_bA_raw.insert(2, "slack", bA_slack)
         else:
             self.p_Ax = pd.DataFrame()
         if len(self.p_E) > 0:
@@ -308,21 +288,22 @@ class QPControllerDebugger:
 
     @property
     def free_variable_names(self):
-        return self.qp_controller.qp_adapter.free_variable_bounds.names.tolist()
+        return (
+            self.qp_controller.qp_data_factory.qp_data._free_variable_bounds.names.tolist()
+        )
 
     @property
     def equality_constr_names(self):
-        return self.qp_controller.qp_adapter.equality_bounds.names
+        return self.qp_controller.qp_data_factory.qp_data._equality_bounds.names
 
     @property
     def inequality_constr_names(self):
-        return self.qp_controller.qp_adapter.inequality_bounds.names
+        return self.qp_controller.qp_data_factory.qp_data._inequality_bounds.names
 
     @profile
     def update(
         self,
         qp_data: QPDataExplicit,
-        filter,
         new_xdot_full: Optional[np.ndarray],
     ) -> None:
         self._update_quadratic_weights(qp_data)
@@ -332,7 +313,7 @@ class QPControllerDebugger:
         self._update_inequality_constraints(qp_data)
         self._update_equality_matrix(qp_data)
         self._update_inequality_matrix(qp_data)
-        self._update_xdot(qp_data, filter, new_xdot_full)
+        self._update_xdot(qp_data, new_xdot_full)
 
     def _print_iis(self):
         import pandas as pd
@@ -389,7 +370,6 @@ class QPController:
     life_cycle_variables: List[sm.FloatVariable]
     float_variables: List[sm.FloatVariable]
 
-    qp_adapter: GiskardToQPAdapter = field(default=None, init=False)
     qp_data_factory: QPDataFactory = field(default=None, init=False)
     qp_solver: QPSolver = field(default=None, init=False)
     debugger: QPControllerDebugger = field(default=None, init=False)
@@ -483,63 +463,11 @@ class QPController:
             qp_data_filtered = qp_data_filtered.apply_conditioning(conditioning)
         # 4. solve qp
         xdot_full = self.qp_solver.solver_call(qp_data_filtered)
-        # 5. if fail backup strategy
-        # 6. turn xdot into control command
+        # 5. turn xdot into control command
         if self.config.conditioning_strategy is not None:
             xdot_full = conditioning.unapply(xdot_full)
+        self.debugger.update(qp_data_raw, xdot_full)
         return self.xdot_to_control_commands(xdot_full)
-
-        qp_data_raw = self.qp_adapter.evaluate(
-            world_state,
-            life_cycle_state,
-            float_variables,
-        )
-        zero_weight_filter = ZeroWeightQPDataFilter.from_qp_data(
-            unfiltered_qp_data=qp_data_raw,
-            num_slack_variables=self.qp_adapter.num_slack_variables,
-            num_eq_slack_variables=self.qp_adapter.num_eq_slack_variables,
-            num_neq_slack_variables=self.qp_adapter.num_neq_slack_variables,
-        )
-        filtered_qp_data = zero_weight_filter.apply_filters(qp_data_raw)
-        # conditioner = HessianOneConditioning()
-        conditioner = ConditioningStrategy()
-        filtered_qp_data_conditioned = conditioner.apply(filtered_qp_data)
-        try:
-            try:
-                self.xdot_full = self.qp_solver.solver_call(
-                    filtered_qp_data_conditioned
-                )
-                self.xdot_full = conditioner.unapply(self.xdot_full)
-            except InfeasibleException as e:
-                print(filtered_qp_data_conditioned.pretty_print_problem())
-                self.xdot_full = self.qp_solver.solver_call(
-                    filtered_qp_data_conditioned
-                )
-
-                self.config.retries_with_relaxed_constraints -= 1
-                self.xdot_full = self.qp_solver.solver_call(filtered_qp_data)
-                relaxed_solution = self.qp_solver.solver_call(qp_data_raw.relaxed())
-                if self.config.retries_with_relaxed_constraints < 0:
-                    raise HardConstraintsViolatedException(
-                        f"Hard constraints were violated too often."
-                    )
-                self.xdot_full = self.qp_solver.solver_call(
-                    qp_data_raw.partially_relaxed(relaxed_solution)
-                )
-            # qp_data.filtered.analyze_well_posedness()
-            self.debugger.update(qp_data_raw, zero_weight_filter, self.xdot_full)
-            return self.xdot_to_control_commands(self.xdot_full)
-
-        except InfeasibleException as e_original:
-            self.xdot_full = None
-            self.debugger.update(qp_data_raw, zero_weight_filter, self.xdot_full)
-            # self._has_nan()
-            # self._print_iis()
-            if isinstance(e_original, HardConstraintsViolatedException):
-                raise
-            self.xdot_full = None
-            self.debugger.are_hard_limits_violated(str(e_original))
-            raise
 
     def xdot_to_control_commands(self, xdot: np.ndarray) -> np.ndarray:
         offset = len(self.active_dofs) * (self.config.prediction_horizon - 2)

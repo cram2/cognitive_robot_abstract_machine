@@ -11,6 +11,8 @@ from giskardpy.qp.qp_data import (
 from giskardpy.qp.solvers.qp_solver_gurobi import QPSolverGurobi
 from giskardpy.qp.solvers.qp_solver_qpSWIFT import QPSolverQPSwift
 from giskardpy.qp.solvers.qp_solver_qpalm import QPSolverQPalm
+from giskardpy.qp.solvers.qp_solver_piqp import QPSolverPIQP
+from giskardpy.qp.exceptions import InfeasibleException
 
 
 @pytest.fixture()
@@ -7980,3 +7982,160 @@ def test_qpalm(simple_inequality_qp):
     qp_data, expected = simple_inequality_qp
     result = QPSolverQPalm().solver_call(qp_data)
     assert np.allclose(result, expected)
+
+
+def test_collision_avoidance_soft_constraints():
+    """
+    Demonstrates how soft constraints with linear weights can handle
+    conflicting constraints where hard slack limits would fail.
+
+    Scenario:
+    A robot joint (x) wants to move to 1.0, but there's a collision constraint.
+    - Goal: x = 1.0 (Weight 1)
+    - Collision Avoidance: x <= 0.2 (Buffer zone)
+    - Violated Distance: x = 0.5 (Maximum allowed penetration)
+
+    In a hard scenario, we might set a hard limit on the slack variable.
+    If another constraint (e.g. joint limit or higher priority goal) forces x > 0.5,
+    the QP becomes infeasible.
+    """
+
+    # --- 1. Hard Slack Limit (Infeasible Case) ---
+    # Goal: x = 1.0  => x + s_goal = 1.0, minimize s_goal^2
+    # CA:   x <= 0.2 => x - s_ca <= 0.2, minimize s_ca^2, BUT s_ca <= 0.1 (Hard limit)
+    # This means x <= 0.3.
+    # If we add a constraint x >= 0.4 (e.g. from another task), it's infeasible.
+
+    # Variables: [x, s_goal, s_ca]
+    # QP: min 0.5 * [x, s_goal, s_ca]^T * H * [x, s_goal, s_ca]
+    # H = diag(0.01, 1.0, 1.0)  (small weight on x movement, high weight on goals)
+    quadratic_weights = np.array([0.01, 1.0, 1.0])
+    linear_weights = np.array([0.0, 0.0, 0.0])
+
+    # Constraints:
+    # 1. Goal: x + s_goal = 1.0  (Equality)
+    # 2. CA:   x - s_ca <= 0.2   (Inequality)
+    # 3. Conflict: x >= 0.4      (Box constraint)
+
+    eq_matrix = sp.csc_matrix([[1.0, 1.0, 0.0]])
+    eq_bounds = np.array([1.0])
+
+    neq_matrix = sp.csc_matrix([[1.0, 0.0, -1.0]])
+    neq_lower_bounds = np.array([-np.inf])
+    neq_upper_bounds = np.array([0.2])
+
+    # Hard Slack Limit: s_ca <= 0.1
+    box_lower = np.array([0.4, -np.inf, 0.0])  # x >= 0.4, s_ca >= 0
+    box_upper = np.array([np.inf, np.inf, 0.1])  # s_ca <= 0.1
+
+    qp_hard = QPDataExplicit(
+        quadratic_weights=quadratic_weights,
+        linear_weights=linear_weights,
+        box_lower_constraints=box_lower,
+        box_upper_constraints=box_upper,
+        eq_matrix=eq_matrix,
+        eq_bounds=eq_bounds,
+        neq_matrix=neq_matrix,
+        neq_lower_bounds=neq_lower_bounds,
+        neq_upper_bounds=neq_upper_bounds,
+        num_eq_slack_variables=1,
+        num_neq_slack_variables=1,
+    )
+
+    solver = QPSolverPIQP()
+    with pytest.raises(InfeasibleException):
+        solver.solver_call(qp_hard)
+
+    # --- 2. Soft Constraint with Linear Penalty (Feasible Case) ---
+    # Instead of s_ca <= 0.1, we allow s_ca to grow but at a high linear cost.
+    # Linear weight for s_ca = 1000.0
+
+    linear_weights_soft = np.array([0.0, 0.0, 1000.0])
+    box_upper_soft = np.array([np.inf, np.inf, np.inf])  # No hard limit on slack
+
+    qp_soft = QPDataExplicit(
+        quadratic_weights=quadratic_weights,
+        linear_weights=linear_weights_soft,
+        box_lower_constraints=box_lower,
+        box_upper_constraints=box_upper_soft,
+        eq_matrix=eq_matrix,
+        eq_bounds=eq_bounds,
+        neq_matrix=neq_matrix,
+        neq_lower_bounds=neq_lower_bounds,
+        neq_upper_bounds=neq_upper_bounds,
+        num_eq_slack_variables=1,
+        num_neq_slack_variables=1,
+    )
+
+    result_soft = solver.solver_call(qp_soft)
+    x_val = result_soft[0]
+    s_ca_val = result_soft[2]
+
+    # The solver should find a solution where x is as close to 0.2 as possible
+    # given the constraint x >= 0.4. So x should be exactly 0.4.
+    assert np.isclose(x_val, 0.4, atol=1e-3)
+    # Slack s_ca should be 0.2 (since 0.4 - 0.2 = 0.2)
+    assert np.isclose(s_ca_val, 0.2, atol=1e-3)
+
+    # --- 3. Buffer Zone vs Violated Distance Zone ---
+    # Scenario:
+    # Buffer zone starts at 0.5. Goal is x = 0.0.
+    # We want x >= 0.5.
+    # If x < 0.5, we pay a linear penalty (soft constraint).
+    # If we have another goal x = 0.4 with weight 10, should we violate CA?
+    # Linear weight of CA slack = 100.
+    # Violating CA by 0.1 costs 100 * 0.1 = 10.
+    # Moving x from 0.5 to 0.4 reduces goal error from 0.1 to 0.0.
+    # Quadratic cost change: 10 * (0.1^2 - 0^2) = 0.1.
+    # Total cost change: 10 (CA) - 0.1 (Goal) = 9.9 (Increase).
+    # So it should NOT violate CA just for a low-weight goal.
+
+    quadratic_weights_3 = np.array([0.0, 10.0, 1.0])  # [x, s_goal, s_ca]
+    linear_weights_3 = np.array([0.0, 0.0, 100.0])
+    # Goal: x + s_goal = 0.4
+    # CA: x - s_ca >= 0.5 => -x + s_ca <= -0.5
+    eq_matrix_3 = sp.csc_matrix([[1.0, 1.0, 0.0]])
+    eq_bounds_3 = np.array([0.4])
+
+    neq_matrix_3 = sp.csc_matrix([[-1.0, 0.0, 1.0]])
+    neq_upper_bounds_3 = np.array([-0.5])
+    neq_lower_bounds_3 = np.array([-np.inf])
+
+    box_lower_3 = np.array([-np.inf, -np.inf, 0.0])
+    box_upper_3 = np.array([np.inf, np.inf, np.inf])
+
+    qp_ca_priority = QPDataExplicit(
+        quadratic_weights=quadratic_weights_3,
+        linear_weights=linear_weights_3,
+        box_lower_constraints=box_lower_3,
+        box_upper_constraints=box_upper_3,
+        eq_matrix=eq_matrix_3,
+        eq_bounds=eq_bounds_3,
+        neq_matrix=neq_matrix_3,
+        neq_lower_bounds=neq_lower_bounds_3,
+        neq_upper_bounds=neq_upper_bounds_3,
+        num_eq_slack_variables=1,
+        num_neq_slack_variables=1,
+    )
+
+    result_3 = solver.solver_call(qp_ca_priority)
+    assert result_3[0] >= 0.5 - 1e-5  # Should respect CA because linear penalty is high
+
+    # Now make the goal very important (quadratic weight 10000)
+    quadratic_weights_4 = np.array([0.0, 10000.0, 1.0])
+    qp_goal_priority = QPDataExplicit(
+        quadratic_weights=quadratic_weights_4,
+        linear_weights=linear_weights_3,
+        box_lower_constraints=box_lower_3,
+        box_upper_constraints=box_upper_3,
+        eq_matrix=eq_matrix_3,
+        eq_bounds=eq_bounds_3,
+        neq_matrix=neq_matrix_3,
+        neq_lower_bounds=neq_lower_bounds_3,
+        neq_upper_bounds=neq_upper_bounds_3,
+        num_eq_slack_variables=1,
+        num_neq_slack_variables=1,
+    )
+
+    result_4 = solver.solver_call(qp_goal_priority)
+    assert result_4[0] < 0.5  # Should violate CA because goal is much more important

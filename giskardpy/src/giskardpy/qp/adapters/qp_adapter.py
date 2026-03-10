@@ -317,45 +317,23 @@ class Weights(ProblemDataPart):
         return (sm.abs(current_position + x_offset - limit) * a) ** exp, x_offset
 
     @profile
-    def construct_expression(
-        self,
-        quadratic_weight_gains: List[QuadraticWeightGain] = None,
-        linear_weight_gains: List[LinearWeightGain] = None,
-    ) -> Tuple[sm.Vector, sm.Vector]:
-        quadratic_weight_gains = quadratic_weight_gains or []
-        linear_weight_gains = linear_weight_gains or []
+    def construct_expression(self) -> Tuple[sm.Vector, sm.Vector]:
         components = []
-        components.extend(
-            self.free_variable_weights_expression(
-                quadratic_weight_gains=quadratic_weight_gains
-            )
-        )
+        components.extend(self.free_variable_weights_expression())
         components.append(self.equality_weight_expressions())
         components.extend(self.eq_derivative_weight_expressions())
         components.append(self.inequality_weight_expressions())
         components.extend(self.derivative_weight_expressions())
         weights, _ = self._sorter(*components)
-        weights = sm.Vector(weights)
-        linear_weights = self.linear_weights_expression(
-            linear_weight_gains=linear_weight_gains
-        )
-        if linear_weights is None:
-            linear_weights = sm.Vector.zeros(weights.shape[0])
-        else:
-            # as of now linear weights are only added for joints, therefore equality-, derivative- and inequality
-            # weights are missing. Here the missing weights are filled in with zeroes.
-            linear_weights, _ = self._sorter(*linear_weights)
-            linear_weights = sm.Matrix(linear_weights)
-            linear_weights = sm.vstack(
-                [linear_weights]
-                + [sm.Scalar(0)] * (weights.shape[0] - linear_weights.shape[0])
-            )
-        return sm.Vector(weights), linear_weights
+        quadratic_weights = []
+        linear_weights = []
+        for quadratic_weight, linear_weight in weights:
+            quadratic_weights.append(quadratic_weight)
+            linear_weights.append(linear_weight)
+        return sm.Vector(quadratic_weights), sm.Vector(linear_weights)
 
     @profile
-    def free_variable_weights_expression(
-        self, quadratic_weight_gains: List[QuadraticWeightGain]
-    ) -> List[defaultdict]:
+    def free_variable_weights_expression(self) -> List[tuple[defaultdict, defaultdict]]:
         max_derivative = self.config.max_derivative
         params = []
         weights = defaultdict(dict)  # maps order to joints
@@ -388,15 +366,7 @@ class Weights(ProblemDataPart):
                     )
                     weights[derivative][
                         f"t{t:03}/{v.variables.position.dof.name}/{derivative}"
-                    ] = normalized_weight
-                    for q_gain in quadratic_weight_gains:
-                        if (
-                            t < len(q_gain.gains)
-                            and v in q_gain.gains[t][derivative].keys()
-                        ):
-                            weights[derivative][
-                                f"t{t:03}/{v.variables.position.dof.name}/{derivative}"
-                            ] *= q_gain.gains[t][derivative][v]
+                    ] = (normalized_weight, 0)
         for _, weight in sorted(weights.items()):
             params.append(weight)
         return params
@@ -422,7 +392,8 @@ class Weights(ProblemDataPart):
                 for c in self.get_derivative_constraints(d):
                     if t < self.control_horizon:
                         derivative_constr_weights[f"t{t:03}/{c.name}"] = (
-                            c.normalized_weight()
+                            c.normalized_weight(),
+                            c.linear_weight,
                         )
             params.append(derivative_constr_weights)
         return params
@@ -436,66 +407,31 @@ class Weights(ProblemDataPart):
                 for c in self.get_eq_derivative_constraints(d):
                     if t < self.control_horizon:
                         derivative_constr_weights[f"t{t:03}/{c.name}"] = (
-                            c.normalized_weight()
+                            c.normalized_weight(),
+                            c.linear_weight,
                         )
             params.append(derivative_constr_weights)
         return params
 
     def equality_weight_expressions(self) -> dict:
         error_slack_weights = {
-            f"{c.name}/error": c.normalized_weight(self.control_horizon)
+            f"{c.name}/error": (
+                c.normalized_weight(self.control_horizon),
+                c.linear_weight,
+            )
             for c in self.constraint_collection.eq_constraints
         }
         return error_slack_weights
 
     def inequality_weight_expressions(self) -> dict:
         error_slack_weights = {
-            f"{c.name}/error": c.normalized_weight(self.control_horizon)
+            f"{c.name}/error": (
+                c.normalized_weight(self.control_horizon),
+                c.linear_weight,
+            )
             for c in self.constraint_collection.neq_constraints
         }
         return error_slack_weights
-
-    @profile
-    def linear_weights_expression(
-        self, linear_weight_gains: List[LinearWeightGain] = None
-    ):
-        if len(linear_weight_gains) > 0:
-            params = []
-            weights = defaultdict(dict)  # maps order to joints
-            for t in range(self.config.prediction_horizon):
-                for v in self.degrees_of_freedom:
-                    for derivative in Derivatives.range(
-                        Derivatives.velocity, self.config.max_derivative
-                    ):
-                        if t >= self.config.prediction_horizon - (
-                            self.config.max_derivative - derivative
-                        ):
-                            continue
-                        if (
-                            derivative == Derivatives.acceleration
-                            and not self.config.qp_formulation.has_explicit_acc_variables
-                        ):
-                            continue
-                        if (
-                            derivative == Derivatives.jerk
-                            and not self.config.qp_formulation.has_explicit_jerk_variables
-                        ):
-                            continue
-                        weights[derivative][
-                            f"t{t:03}/{v.variables.position}/{derivative}"
-                        ] = 0
-                        for l_gain in linear_weight_gains:
-                            if (
-                                t < len(l_gain.gains)
-                                and v in l_gain.gains[t][derivative].keys()
-                            ):
-                                weights[derivative][
-                                    f"t{t:03}/{v.variables.position}/{derivative}"
-                                ] += l_gain.gains[t][derivative][v]
-            for _, weight in sorted(weights.items()):
-                params.append(weight)
-            return params
-        return None
 
     def get_free_variable_symbols(self, order: Derivatives) -> List[sm.FloatVariable]:
         return self._sorter(
@@ -1835,6 +1771,13 @@ class QPDataSymbolic:
     neq_lower_bounds: Vector
     neq_upper_bounds: Vector
 
+    _weights: Weights
+    _free_variable_bounds: FreeVariableBounds
+    _equality_model: EqualityModel
+    _equality_bounds: EqualityBounds
+    _inequality_model: InequalityModel
+    _inequality_bounds: InequalityBounds
+
     @classmethod
     def from_giskard(
         cls,
@@ -1874,6 +1817,12 @@ class QPDataSymbolic:
             neq_matrix_slack=neq_matrix_slack,
             neq_lower_bounds=neq_lower_bounds,
             neq_upper_bounds=neq_upper_bounds,
+            _weights=weights,
+            _free_variable_bounds=free_variable_bounds,
+            _equality_model=equality_model,
+            _equality_bounds=equality_bounds,
+            _inequality_model=inequality_model,
+            _inequality_bounds=inequality_bounds,
         )
 
     def __hash__(self):
