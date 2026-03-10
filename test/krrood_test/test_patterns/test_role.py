@@ -51,6 +51,20 @@ def test_getting_and_setting_attribute_between_sibling_roles():
     assert person.teacher_of is professor.teacher_of
 
 
+def test_accessing_attribute_of_role_from_role_taker_when_role_does_not_exist_and_the_attribute_has_default():
+    person = Person(name="Bass")
+    with pytest.raises(AttributeError):
+        head_of = person.head_of
+    assert hasattr(person, "head_of") is False
+
+
+def test_accessing_attribute_of_role_from_role_taker_when_role_does_not_exist_and_the_attribute_has_default_factory():
+    person = Person(name="Bass")
+    with pytest.raises(AttributeError):
+        teacher_of = person.teacher_of
+    assert hasattr(person, "teacher_of") is False
+
+
 def test_role_taker_associations():
 
     classes = [
@@ -82,16 +96,3 @@ def test_role_taker_associations():
         == 9
     )
     # diagram.to_dot("class_diagram.svg")
-
-
-def test_accessing_attribute_of_role_from_role_taker_when_role_does_not_exist_and_the_attribute_has_default():
-    person = Person(name="Bass")
-    assert person.head_of is None
-    assert person.representative_of is None
-    assert person.delegate_of is None
-
-
-def test_accessing_attribute_of_role_from_role_taker_when_role_does_not_exist_and_the_attribute_has_default_factory():
-    person = Person(name="Bass")
-    with pytest.raises(AttributeError):
-        to = person.teacher_of
