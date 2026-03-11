@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-reasoner"
+version = "0.1.0"
+description = "LLM-based reasoning pipeline for robotic task planning with LangGraph"
+requires-python = ">=3.10"
+license = "MIT"
+
+dependencies = [
+    "langchain-core>=0.3",
+    "langchain-openai>=0.2",
+    "langchain-ollama>=0.2",
+    "langchain-anthropic>=0.3",
+    "langgraph>=0.2",
+    "langgraph-checkpoint-mongodb>=0.3",
+    "pydantic>=2.7",
+    "pymongo>=4.6",
+    "python-dotenv>=1.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+pycram = [
+    "pycram-robotics",
+    "semantic_digital_twin",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["llmr*"]
+
+[tool.setuptools.package-data]
+llmr = [
+    "workflows/resources/*.json",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["../test/llmr_test"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["../test/llmr_test/*"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+
+[tool.black]
+line-length = 99
+target-version = ["py310", "py311", "py312"]
