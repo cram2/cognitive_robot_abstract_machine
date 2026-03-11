@@ -85,11 +85,6 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
         return convert_args_and_kwargs_into_hashable_key(all_kwargs)
 
     def __getattr__(self, name: str) -> CanBehaveLikeAVariable[T]:
-        # Prevent debugger/private attribute lookups from being interpreted as symbolic attributes
-        if name.startswith("__") and name.endswith("__"):
-            raise AttributeError(
-                f"{self.__class__.__name__} object has no attribute {name}"
-            )
         return self._get_mapped_variable_(Attribute, name)
 
     def __getitem__(self, key) -> CanBehaveLikeAVariable[T]:

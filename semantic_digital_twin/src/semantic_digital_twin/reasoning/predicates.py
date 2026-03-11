@@ -61,7 +61,7 @@ def contact(
     :param threshold: The threshold for contact detection
     :return: True if the two objects are in contact False else
     """
-    tcd = FCLCollisionDetector(_world=body1._world)
+    tcd = body1._world.collision_manager.collision_detector
     result = tcd.check_collision_between_bodies(body1, body2)
 
     if result is None:

@@ -1,6 +1,7 @@
 import itertools
 from dataclasses import dataclass
 from math import factorial
+from typing import Dict, List
 
 import krrood.entity_query_language.factories as eql
 import pytest
@@ -48,6 +49,7 @@ from krrood.entity_query_language.query.quantifiers import (
 from krrood.entity_query_language.utils import (
     cartesian_product_while_passing_the_bindings_around,
 )
+from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 
 from ...dataset.example_classes import VectorsWithProperty
 from ...dataset.example_classes import VectorsWithProperty
@@ -1181,3 +1183,82 @@ def test_type_availability_in_mapped_variables(handles_and_containers_world):
     assert cabinet_drawers._type_ is Drawer
     assert first_drawer._type_ is Drawer
     assert first_drawer_handle._type_ is Handle
+
+
+def test_indexing_on_dict_field():
+
+    @dataclass
+    class ItemWithDictionary:
+        name: str
+        attrs: Dict[str, int]
+
+        def __hash__(self):
+            return hash(self.name)
+
+    @dataclass(eq=False)
+    class WorldWithItems:
+        items: List[ItemWithDictionary]
+
+        def __hash__(self):
+            return hash(id(self))
+
+    world = WorldWithItems(
+        [
+            ItemWithDictionary("A", {"score": 1}),
+            ItemWithDictionary("B", {"score": 2}),
+            ItemWithDictionary("C", {"score": 2}),
+        ]
+    )
+
+    i = variable(ItemWithDictionary, world.items)
+    q = an(entity(i).where(i.attrs["score"] == 2))
+    res = list(q.evaluate())
+    assert {x.name for x in res} == {"B", "C"}
+
+
+def test_indexing_2():
+    @dataclass(unsafe_hash=True)
+    class ShapeWithColor:
+        name: str
+        color: str
+
+    @dataclass
+    class BodyWithShapes:
+        shapes: List[ShapeWithColor]
+
+        def __hash__(self):
+            return id(self)
+
+    world_bodies = [
+        BodyWithShapes(
+            shapes=[
+                ShapeWithColor("shape1", color="red"),
+                ShapeWithColor("shape2", color="blue"),
+            ]
+        ),
+        BodyWithShapes(
+            shapes=[
+                ShapeWithColor("shape1", color="green"),
+                ShapeWithColor("shape2", color="black"),
+            ]
+        ),
+    ]
+
+    body = variable(BodyWithShapes, world_bodies)
+    body_tha_has_red_shape = an(
+        entity(body).where(body.shapes[0].color == "red")
+    ).evaluate()
+    body_tha_has_red_shape = list(body_tha_has_red_shape)
+    assert len(body_tha_has_red_shape) == 1
+    assert body_tha_has_red_shape[0].shapes[0].color == "red"
+
+
+def test_accessing_dunder_methods():
+    world_classes = [Body, Cabinet, Drawer, Handle, Container, Connection]
+    world_class = variable_from(world_classes)
+    world_class_starting_with_c = entity(world_class).where(
+        world_class.__name__.startswith("C")
+    )
+    results = world_class_starting_with_c.tolist()
+    assert len(results) == 3
+    assert set(results) == {c for c in world_classes if c.__name__.startswith("C")}
