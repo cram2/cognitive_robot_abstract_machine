@@ -58,7 +58,7 @@ def conclusion_331345798360792447350644865254855982739(case) -> List[Drawer]:
         handle = variable(Handle, case.semantic_annotations)
         prismatic_connection = variable(PrismaticConnection, case.connections)
         fixed_connection = match_variable(FixedConnection, case.connections)(
-            parent=prismatic_connection.child, child=handle.root
+            parent=prismatic_connection.child, child=handle
         )
         return inference(Drawer)(
             root=fixed_connection.parent, handle=fixed_connection.child
@@ -87,7 +87,7 @@ def conclusion_35528769484583703815352905256802298589(case) -> List[Wardrobe]:
                     drawers=drawer,
                 )
             )
-            .where(prismatic_connection.child == drawer.root)
+            .where(prismatic_connection.child == drawer)
             .grouped_by(prismatic_connection.parent)
             .tolist()
         )
@@ -109,7 +109,7 @@ def conclusion_59112619694893607910753808758642808601(case) -> List[Door]:
         handle = variable(Handle, case.semantic_annotations)
         revolute_connection = variable(RevoluteConnection, case.connections)
         fixed_connection = match_variable(FixedConnection, case.connections)(
-            parent=revolute_connection.child, child=handle.root
+            parent=revolute_connection.child, child=handle
         )
         return inference(Door)(
             root=fixed_connection.parent, handle=fixed_connection.child
@@ -134,8 +134,8 @@ def conclusion_10840634078579061471470540436169882059(case) -> List[Fridge]:
         return (
             entity(inference(Fridge)(root=revolute_connection.parent, doors=door))
             .where(
-                revolute_connection.child == door.root,
-                contains(door.root.name.name.lower(), "fridge"),
+                revolute_connection.child == door,
+                contains(door.name.name.lower(), "fridge"),
             )
             .grouped_by(revolute_connection.parent)
             .tolist()
