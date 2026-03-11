@@ -577,6 +577,9 @@ class InsertionEvent(AbstractAgentObjectInteractionEvent):
 class ContainmentEvent(DefaultEventWithTwoTrackedObjects):
     ...
 
+@dataclass(unsafe_hash=True)
+class LossOfContainmentEvent(DefaultEventWithTwoTrackedObjects):
+    ...
 
 # Create a type that is the union of all event types
 EventUnion = Union[NewObjectEvent,

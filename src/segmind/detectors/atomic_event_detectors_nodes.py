@@ -41,7 +41,7 @@ class SegmindContext(MotionStatechartContext):
     that currently support it.
     """
 
-    latest_contaiments: IndexedBodyPairs = None
+    latest_containments: IndexedBodyPairs = None
     """
     :param latest_support: Dictionary mapping each body to the set of bodies
     that currently support it.

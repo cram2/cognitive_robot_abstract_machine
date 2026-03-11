@@ -4,7 +4,8 @@ from typing import Optional, List, Dict, Set
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from segmind.datastructures.events import Event, SupportEvent, LossOfSupportEvent
+from segmind.datastructures.events import Event, SupportEvent, LossOfSupportEvent, ContainmentEvent, \
+    LossOfContainmentEvent
 from segmind.detectors.atomic_event_detectors_nodes import SegmindContext, DetectorStateChartNode
 from semantic_digital_twin.reasoning.predicates import is_supported_by, InsideOf
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -175,7 +176,7 @@ class BaseContainmentDetector(DetectorStateChartNode):
         objects_to_check = (
             [self.tracked_object] if self.tracked_object else trackable_objects
         )
-        events = self.update_latest_support_and_trigger_events(objects_to_check)
+        events = self.update_latest_containment_and_trigger_events(objects_to_check)
         for e in events:
             self.context.logger.log_event(e)
 
@@ -221,3 +222,29 @@ class ContainmentDetector(BaseContainmentDetector):
     ) -> List[Event]:
         new_containment_pairs = self.get_containment_pairs(objects_to_check)
         latest_containment = self.context.latest_containments
+        events = []
+        for obj, containment_list in new_containment_pairs.items():
+            new_containments= containment_list if obj not in latest_containment else containment_list - latest_containment[obj]
+            if new_containments:
+                latest_containment.setdefault(obj, set()).update(new_containments)
+                events.extend([ContainmentEvent(tracked_object=obj, with_object=c) for c in new_containments])
+
+        return events
+
+
+@dataclass(eq=False, repr=False)
+class LossOfContainmentDetector(BaseContainmentDetector):
+
+    def update_latest_containment_and_trigger_events(
+        self, objects_to_check: List[Body]
+    ) -> List[Event]:
+        new_containment_pairs = self.get_containment_pairs(objects_to_check)
+        latest_containment = self.context.latest_containments
+        events = []
+        for obj, containment_list in list(latest_containment.items()):
+            lost_containments = containment_list if obj not in new_containment_pairs else containment_list - new_containment_pairs[obj]
+            if lost_containments:
+                latest_containment.pop(obj)
+                events.extend([LossOfContainmentEvent(tracked_object=obj, with_object=c) for c in lost_containments])
+
+        return events

@@ -7,14 +7,15 @@ from unittest import TestCase
 
 import rclpy
 
-from segmind.datastructures.events import SupportEvent, ContactEvent
+from segmind.datastructures.events import SupportEvent, ContactEvent, ContainmentEvent
 from segmind.detectors.atomic_event_detectors import DetectorStateChart
 from segmind.detectors.atomic_event_detectors_nodes import (
     SegmindContext,
     ContactDetector,
     LossOfContactDetector,
 )
-from segmind.detectors.spatial_relation_detector_nodes import SupportDetector, LossOfSupportDetector
+from segmind.detectors.spatial_relation_detector_nodes import SupportDetector, LossOfSupportDetector, \
+    ContainmentDetector
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
 from segmind.event_logger import EventLogger
 from segmind.players.csv_player import CSVEpisodePlayer
@@ -62,7 +63,7 @@ class TestMultiverseEpisodeSegmenter(TestCase):
         logger = EventLogger()
 
         self.context = SegmindContext(
-            world=self.world, logger=logger, latest_contact_bodies={}, latest_support={}
+            world=self.world, logger=logger, latest_contact_bodies={}, latest_support={}, latest_containments={}
         )
 
         contact_detector = ContactDetector(
@@ -80,9 +81,18 @@ class TestMultiverseEpisodeSegmenter(TestCase):
             name="los_detector",
             context=self.context,
         )
+        containment_detector = ContainmentDetector(
+            name="containment_detector",
+            context=self.context,
+        )
 
 
-        sc.add_nodes([contact_detector, loss_of_contact_detector, support_detector,loss_of_support_detector])
+        sc.add_nodes([contact_detector, loss_of_contact_detector, support_detector,loss_of_support_detector, containment_detector])
+        support_detector.start_condition = contact_detector.observation_variable
+        loss_of_support_detector.start_condition = (
+            loss_of_contact_detector.observation_variable
+        )
+        containment_detector.start_condition = support_detector.observation_variable
         self.episode_executor.compile(sc)
         time.sleep(5)
         while self.episode_executor.player.is_alive():
@@ -91,3 +101,4 @@ class TestMultiverseEpisodeSegmenter(TestCase):
 
         assert len([i for i in logger.get_events() if isinstance(i, SupportEvent)]) > 0
         assert len([i for i in logger.get_events() if isinstance(i, ContactEvent)]) > 0
+        assert len([i for i in logger.get_events() if isinstance(i, ContainmentEvent)]) > 0

@@ -10,7 +10,7 @@ from segmind.datastructures.events import (
     ContactEvent,
     LossOfContactEvent,
     SupportEvent,
-    LossOfSupportEvent,
+    LossOfSupportEvent, LossOfContainmentEvent, ContainmentEvent,
 )
 from segmind.detectors.atomic_event_detectors_nodes import (
     DetectorStateChart,
@@ -20,8 +20,8 @@ from segmind.detectors.atomic_event_detectors_nodes import (
 )
 
 from segmind.detectors.spatial_relation_detector_nodes import (
-SupportDetector,
-LossOfSupportDetector
+    SupportDetector,
+    LossOfSupportDetector, ContainmentDetector, LossOfContainmentDetector
 )
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
 from segmind.event_logger import EventLogger
@@ -161,12 +161,12 @@ class TestMotionStatechart:
         cylinder = world.get_body_by_name("cylinder_body")
         table = world.get_body_by_name("table_body")
         cabinet = world.get_body_by_name("cabinet")
-        self.latest_contact_bodies: Dict[Body, Set[Body]] = defaultdict(set)
-        self.latest_support: Dict[Body, Set[Body]] = defaultdict(set)
+
         self.context = SegmindContext(
             world=world,
-            latest_support=self.latest_support,
-            latest_contact_bodies=self.latest_contact_bodies,
+            latest_support={},
+            latest_contact_bodies={},
+            latest_containments={},
             logger=logger,
         )
 
@@ -192,6 +192,16 @@ class TestMotionStatechart:
             context=self.context,
             tracked_object=cylinder,
         )
+        containment_detector = ContainmentDetector(
+            name="containment_detector",
+            context=self.context,
+            tracked_object=cylinder,
+        )
+        loss_of_containment_detector = LossOfContainmentDetector(
+            name="los_containment_detector",
+            context=self.context,
+            tracked_object=cylinder,
+        )
 
         sc.add_nodes(
             [
@@ -199,12 +209,17 @@ class TestMotionStatechart:
                 contact_detector,
                 loss_of_contact_detector,
                 loss_of_support_detector,
+                containment_detector,
+                loss_of_containment_detector,
             ]
         )
         support_detector.start_condition = contact_detector.observation_variable
         loss_of_support_detector.start_condition = (
             loss_of_contact_detector.observation_variable
         )
+        # Normally containment requires support, but for testing the object will float inside another obj.
+        #containment_detector.start_condition = support_detector.observation_variable
+        #loss_of_containment_detector.start_condition = (loss_of_support_detector.observation_variable)
         kin_sim.compile(motion_statechart=sc)
 
         assert len([i for i in logger.get_events() if isinstance(i, ContactEvent)]) == 0
@@ -246,12 +261,13 @@ class TestMotionStatechart:
         )
         kin_sim.tick()
         kin_sim.tick()
-        # ToDo: Ask Simon, why do i need two ticks here but not on the second test? to make it run?
         assert loss_of_support_detector.observation_state == 1
         assert (
             len([i for i in logger.get_events() if isinstance(i, LossOfContactEvent)])
             == 1
         )
+        assert len([i for i in logger.get_events() if isinstance(i, ContainmentEvent)]) == 1
+
 
         # Doing it again as sanity check
         cylinder.parent_connection.origin = (
@@ -266,6 +282,7 @@ class TestMotionStatechart:
         assert support_detector.observation_state == 1
         assert len([i for i in logger.get_events() if isinstance(i, ContactEvent)]) == 2
         assert len([i for i in logger.get_events() if isinstance(i, SupportEvent)]) == 2
+        assert len([i for i in logger.get_events() if isinstance(i, LossOfContainmentEvent)]) == 1
 
         cylinder.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(
