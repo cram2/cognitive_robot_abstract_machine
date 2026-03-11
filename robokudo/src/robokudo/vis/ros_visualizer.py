@@ -17,12 +17,6 @@ Dependencies
 * cv_bridge for ROS/OpenCV conversion
 * robokudo.annotators for annotator access
 * robokudo.vis.visualizer for base visualization interface
-
-See Also
---------
-* :mod:`robokudo.vis.visualizer` : Base visualization interface
-* :mod:`robokudo.vis.cv_visualizer` : OpenCV-based visualization
-* :mod:`robokudo.vis.o3d_visualizer` : Open3D-based visualization
 """
 
 import cv2
@@ -30,34 +24,37 @@ import numpy
 from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import Image
+from typing_extensions import Any, Dict
+import rclpy.publisher
 
+import robokudo.vis.visualizer
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.vis.visualizer import Visualizer
 
 
 class SharedROSVisualizer(Visualizer, Visualizer.Observer, Node):
-    """A single-view ROS Image Publisher. It publishes the active annotator from the SharedState.
+    """A single-view ROS Image Publisher. It publishes the active annotator from the SharedState."""
 
-    :ivar shared_visualizer_state: Shared state object for coordinating between visualizers
-    :type shared_visualizer_state: Visualizer.SharedState
-    :ivar ros_image_publisher: Publisher for the image topic
-    :type ros_image_publisher: rospy.Publisher
-    :ivar ros_image_cv_bridge: Bridge for converting between ROS and OpenCV image formats
-    :type ros_image_cv_bridge: CvBridge
-    :ivar update_output: Flag indicating if display needs updating
-    :type update_output: bool
-    """
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the shared ROS visualizer.
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the shared ROS visualizer."""
+        .. note::
+            This Visualizer works with a shared state and needs notifications
+        """
         Visualizer.__init__(self, *args, **kwargs)
-        Node.__init__(self, 'shared_ros_visualizer')
-        # This Visualizer works with a shared state and needs notifications
-        self.shared_visualizer_state.register_observer(self)
-        self.ros_image_publisher = self.create_publisher(Image, f"{self.pipeline.name}/output_image", 10)
-        self.ros_image_cv_bridge = CvBridge()
+        Node.__init__(self, "shared_ros_visualizer")
 
-    def tick(self):
+        self.shared_visualizer_state.register_observer(self)
+
+        self.ros_image_publisher: rclpy.publisher.Publisher = self.create_publisher(
+            Image, f"{self.pipeline.name}/output_image", 10
+        )
+        """Publisher for the image topic"""
+
+        self.ros_image_cv_bridge: CvBridge = CvBridge()
+        """Bridge for converting between ROS and OpenCV image formats"""
+
+    def tick(self) -> None:
         """Update the visualization display.
 
         This method:
@@ -69,8 +66,10 @@ class SharedROSVisualizer(Visualizer, Visualizer.Observer, Node):
         """
         annotator_outputs = self.get_visualized_annotator_outputs_for_pipeline()
 
-        assert (self.shared_visualizer_state.active_annotator is not None)
-        active_annotator_instance: BaseAnnotator = self.shared_visualizer_state.active_annotator
+        assert self.shared_visualizer_state.active_annotator is not None
+        active_annotator_instance: BaseAnnotator = (
+            self.shared_visualizer_state.active_annotator
+        )
 
         self.update_output_flag_for_new_data()
 
@@ -87,20 +86,28 @@ class SharedROSVisualizer(Visualizer, Visualizer.Observer, Node):
                 img = numpy.zeros((640, 480, 3), dtype="uint8")
             else:
                 img = annotator_outputs.outputs[active_annotator_instance.name].image
-            img_with_annotator_text = cv2.putText(img,
-                                                  active_annotator_instance.name,
-                                                  (15, 15),
-                                                  cv2.FONT_HERSHEY_SIMPLEX,
-                                                  0.5,
-                                                  (0, 255, 0),
-                                                  2)
-            self.ros_image_publisher.publish(self.ros_image_cv_bridge.cv2_to_imgmsg(img_with_annotator_text))
+            img_with_annotator_text = cv2.putText(
+                img,
+                active_annotator_instance.name,
+                (15, 15),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                2,
+            )
+            self.ros_image_publisher.publish(
+                self.ros_image_cv_bridge.cv2_to_imgmsg(img_with_annotator_text)
+            )
 
-    def notify(self, observable, *args, **kwargs):
+    def notify(
+        self,
+        observable: robokudo.vis.visualizer.Visualizer.Observable,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         """Handle notification of state changes.
 
         :param observable: The object that sent the notification
-        :type observable: object
         """
         self.update_output = True
 
@@ -116,23 +123,22 @@ class AllAnnotatorROSVisualizer(Visualizer, Node):
     * Image format conversion
     * Per-annotator output streams
 
-    :ivar ros_image_publishers: Mapping of annotator names to ROS publishers
-    :type ros_image_publishers: dict
-    :ivar ros_image_cv_bridge: Bridge for converting between ROS and OpenCV image formats
-    :type ros_image_cv_bridge: CvBridge
-    :type update_output: bool
-    :ivar update_output: Flag indicating if display needs updating
+    .. note::
+        This Visualizer works with a shared state and needs notifications
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the multi-view ROS visualizer."""
         Visualizer.__init__(self, *args, **kwargs)
-        Node.__init__(self, 'all_annotator_ros_visualizer')
-        # This Visualizer works with a shared state and needs notifications
-        self.ros_image_publishers = {}  # Dict of Publishers based on annotator name
-        self.ros_image_cv_bridge = CvBridge()
+        Node.__init__(self, "all_annotator_ros_visualizer")
 
-    def update_ros_image_publishers(self):
+        self.ros_image_publishers: Dict[str, rclpy.publisher.Publisher] = {}
+        """Mapping of annotator names to ROS publishers"""
+
+        self.ros_image_cv_bridge: CvBridge = CvBridge()
+        """Bridge for converting between ROS and OpenCV image formats"""
+
+    def update_ros_image_publishers(self) -> None:
         """Update ROS publishers for all annotators.
 
         This method:
@@ -148,9 +154,10 @@ class AllAnnotatorROSVisualizer(Visualizer, Node):
         for annotator in annotator_list:
             if annotator.name not in self.ros_image_publishers:
                 self.ros_image_publishers[annotator.name] = self.create_publisher(
-                    Image, f"{self.pipeline.name}/{annotator.name}/output_image", 10)
+                    Image, f"{self.pipeline.name}/{annotator.name}/output_image", 10
+                )
 
-    def tick(self):
+    def tick(self) -> None:
         """Update all visualization displays.
 
         This method:
@@ -171,12 +178,18 @@ class AllAnnotatorROSVisualizer(Visualizer, Node):
 
             for annotator_name, annotator_output in annotator_outputs.outputs.items():
                 img = annotator_output.image
-                self.ros_image_publishers[annotator_name].publish(self.ros_image_cv_bridge.cv2_to_imgmsg(img))
+                self.ros_image_publishers[annotator_name].publish(
+                    self.ros_image_cv_bridge.cv2_to_imgmsg(img)
+                )
 
-    def notify(self, observable, *args, **kwargs):
+    def notify(
+        self,
+        observable: robokudo.vis.visualizer.Visualizer.Observable,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         """Handle notification of state changes.
 
         :param observable: The object that sent the notification
-        :type observable: object
         """
         self.update_output = True

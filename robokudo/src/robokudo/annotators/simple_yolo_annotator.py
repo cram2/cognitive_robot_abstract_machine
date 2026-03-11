@@ -1,29 +1,50 @@
+from __future__ import annotations
+
 import copy
 
 import cv2
 import py_trees
 import torch
+from typing_extensions import TYPE_CHECKING
 from ultralytics import YOLO
 
 import robokudo.annotators.core
+import robokudo.types.annotation
 from robokudo.cas import CASViews
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.comparators import RoiComparator
 
+if TYPE_CHECKING:
+    import numpy as np
+    import numpy.typing as npt
+
 
 class SimpleYoloAnnotator(robokudo.annotators.core.BaseAnnotator):
 
-    def __init__(self, name="SimpleYoloAnnotator"):
+    def __init__(self, name: str = "SimpleYoloAnnotator") -> None:
         super().__init__(name=name)
+
         self.model = YOLO("yolov8n_7.pt")
+        """The YOLO model instance."""
+
         self.id2name = self.model.names
+        """The YOLO models id to name map."""
 
         self.roi_comparator = RoiComparator(1.0)
+        """A comparator for ROIs used to associate YOLO and RoboKudo ROIs."""
 
-    def update(self):
+    def update(self) -> py_trees.common.Status:
+        """Run YOLO inference on the cas color image and combine classifications with existing object hypotheses.
+
+        Runs objects detection on the image and uses the RoiComparator find the closest bounding box created for
+        an ObjectHypothesis by previous annotator. If there is a similar ROI present in an ObjectHypothesis,
+        a Classification is attached to it.
+        """
         visualization_img = copy.deepcopy(self.get_cas().get(CASViews.COLOR_IMAGE))
 
-        ohs: list[ObjectHypothesis] = self.get_cas().filter_annotations_by_type(robokudo.types.scene.ObjectHypothesis)
+        ohs: list[ObjectHypothesis] = self.get_cas().filter_annotations_by_type(
+            robokudo.types.scene.ObjectHypothesis
+        )
 
         with torch.no_grad():
             result_tensor = self.model(visualization_img, conf=0.9)[0]
@@ -60,7 +81,7 @@ class SimpleYoloAnnotator(robokudo.annotators.core.BaseAnnotator):
             if best_oh is None:
                 object_hypothesis = robokudo.types.scene.ObjectHypothesis()
                 object_hypothesis.source = self.name
-                object_hypothesis.id = obj_id
+                object_hypothesis.id = str(obj_id)
                 object_hypothesis.roi = roi
 
                 object_hypotheses.append(object_hypothesis)
@@ -68,7 +89,9 @@ class SimpleYoloAnnotator(robokudo.annotators.core.BaseAnnotator):
                 object_hypothesis = best_oh
 
             object_hypothesis.annotations.append(classification)
-            visualization_img = self.add_to_image(object_hypothesis, classification, visualization_img)
+            visualization_img = self.add_to_image(
+                object_hypothesis, classification, visualization_img
+            )
 
         self.get_cas().annotations.extend(object_hypotheses)
         self.get_annotator_output_struct().set_image(visualization_img)
@@ -76,14 +99,21 @@ class SimpleYoloAnnotator(robokudo.annotators.core.BaseAnnotator):
         return py_trees.common.Status.SUCCESS
 
     @staticmethod
-    def add_to_image(obj, classification, image):
-        x1, y1, x2, y2 = (obj.roi.roi.pos.x, obj.roi.roi.pos.y,
-                          obj.roi.roi.pos.x + obj.roi.roi.width,
-                          obj.roi.roi.pos.y + obj.roi.roi.height)
+    def add_to_image(
+        obj: robokudo.types.scene.ObjectHypothesis,
+        classification: robokudo.types.annotation.Classification,
+        image: npt.NDArray[np.uint8],
+    ) -> npt.NDArray[np.uint8]:
+        """Add the object hypothesis along with the classification name and confidence to the visualization image."""
+        x1, y1, x2, y2 = (
+            obj.roi.roi.pos.x,
+            obj.roi.roi.pos.y,
+            obj.roi.roi.pos.x + obj.roi.roi.width,
+            obj.roi.roi.pos.y + obj.roi.roi.height,
+        )
 
         vis_text = f"{classification.classname}, {classification.confidence:.2f}"
         font = cv2.FONT_HERSHEY_COMPLEX
-        image = cv2.putText(image, vis_text, (x1, y1 - 5), font, 0.5,
-                            (0, 0, 255), 1, 2)
+        image = cv2.putText(image, vis_text, (x1, y1 - 5), font, 0.5, (0, 0, 255), 1, 2)
         image = cv2.rectangle(image, (x1, y1), (x2, y2), (255, 255, 255), 2)
         return image

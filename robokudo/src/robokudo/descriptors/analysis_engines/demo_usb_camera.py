@@ -23,6 +23,7 @@ import robokudo.descriptors.camera_configs.config_cv_camera_without_depth
 import robokudo.io.camera_without_depth_interface
 
 import robokudo.idioms
+import robokudo.pipeline
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
@@ -43,15 +44,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         This can be modified using the loop_mode parameter in the camera config.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "demo_usb_camera"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Basic demo to read video data from a local usb webcam.
 
         This method constructs a simple processing pipeline that reads video data
@@ -65,20 +65,23 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         - Network stream: device = "https://example.com/video.gif"
 
         :return: The configured pipeline for video processing
-        :rtype: robokudo.pipeline.Pipeline
         """
-        cv_camera_config = robokudo.descriptors.camera_configs.config_cv_camera_without_depth.CameraConfig()
-        cv_camera_config.device = 0     # usb webcam
-        #cv_camera_config.device = "/home/user_name/Videos/my_video.webm"
-        #cv_camera_config.device = "/home/user_name/Pictures/my_image.jpg"
-        #cv_camera_config.device = "https://raw.githubusercontent.com/cram2/pycram/refs/heads/dev/doc/images/boxy.gif"
+        cv_camera_config = (
+            robokudo.descriptors.camera_configs.config_cv_camera_without_depth.CameraConfig()
+        )
+        cv_camera_config.device = 0  # usb webcam
+        # cv_camera_config.device = "/home/user_name/Videos/my_video.webm"
+        # cv_camera_config.device = "/home/user_name/Pictures/my_image.jpg"
+        # cv_camera_config.device = "https://raw.githubusercontent.com/cram2/pycram/refs/heads/dev/doc/images/boxy.gif"
 
         cv_camera_config.loop_mode = 1
         cv_camera_config.update_global_with_depth_parameter = True
         cv_config = CollectionReaderAnnotator.Descriptor(
             camera_config=cv_camera_config,
             camera_interface=robokudo.io.camera_without_depth_interface.OpenCVCameraWithoutDepthInterface(
-                cv_camera_config))
+                cv_camera_config
+            ),
+        )
 
         seq = robokudo.pipeline.Pipeline("RWPipeline")
         seq.add_children(
@@ -86,5 +89,6 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 robokudo.idioms.pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cv_config),
                 ObjectHypothesisVisualizer(),
-            ])
+            ]
+        )
         return seq

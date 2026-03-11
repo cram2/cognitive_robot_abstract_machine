@@ -70,15 +70,14 @@ class ClusterColorHistogramAnnotator(robokudo.annotators.core.BaseAnnotator):
                 self.generate_plot_output: bool = False
                 """Whether to generate histogram plots, defaults to False. Plotting takes a lot of time in matplotlib (200-500ms)"""
 
-        parameters = (
-            Parameters()
-        )  # overwrite the parameters explicitly to enable auto-completion
+        # Overwrite the parameters explicitly to enable auto-completion
+        parameters = Parameters()
 
     def __init__(
         self,
         name: str = "ClusterColorHistogramAnnotator",
         descriptor: "ClusterColorHistogramAnnotator.Descriptor" = Descriptor(),
-    ):
+    ) -> None:
         """Initialize the color histogram analyzer. Minimal one-time init!
 
         :param name: Name of this annotator instance, defaults to "ClusterColorHistogramAnnotator"

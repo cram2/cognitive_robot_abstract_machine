@@ -16,9 +16,11 @@ The module is used for:
 * Testing and debugging
 * Quick prototyping
 """
+
 import py_trees
 
-import robokudo
+import robokudo.annotators.core
+from typing_extensions import Optional, Tuple, Dict, Callable
 
 
 class LambdaFunctionAnnotator(robokudo.annotators.core.BaseAnnotator):
@@ -27,18 +29,10 @@ class LambdaFunctionAnnotator(robokudo.annotators.core.BaseAnnotator):
 
     This annotator executes a provided function with configurable arguments,
     allowing for dynamic behavior definition without creating new annotator classes.
-
-    :ivar descriptor: Configuration descriptor containing function parameters
-    :type descriptor: LambdaFunctionAnnotator.Descriptor
     """
 
     class Descriptor(robokudo.annotators.core.BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for lambda function annotator.
-
-        :ivar parameters: Function parameters
-        :type parameters: LambdaFunctionAnnotator.Descriptor.Parameters
-        """
+        """Configuration descriptor for lambda function annotator."""
 
         class Parameters:
             """
@@ -51,26 +45,30 @@ class LambdaFunctionAnnotator(robokudo.annotators.core.BaseAnnotator):
             :ivar func_kwargs: Keyword arguments for function
             :type func_kwargs: dict
             """
-            def __init__(self):
-                self.func = None
-                self.func_args = None
-                self.func_kwargs = None
 
-        parameters = Parameters()  # overwrite the parameters explicitly to enable auto-completion
+            def __init__(self) -> None:
+                self.func: Optional[Callable] = None
+                self.func_args: Optional[Tuple] = None
+                self.func_kwargs: Optional[Dict] = None
 
-    def __init__(self, name="LambdaFunctionAnnotator", descriptor=Descriptor()):
+        # Overwrite the parameters explicitly to enable auto-completion
+        parameters = Parameters()
+
+    def __init__(
+        self,
+        name: str = "LambdaFunctionAnnotator",
+        descriptor: "LambdaFunctionAnnotator.Descriptor" = Descriptor(),
+    ):
         """
         Initialize the lambda function annotator. Minimal one-time init!
 
         :param name: Annotator name, defaults to "LambdaFunctionAnnotator"
-        :type name: str, optional
         :param descriptor: Configuration descriptor, defaults to Descriptor()
-        :type descriptor: LambdaFunctionAnnotator.Descriptor, optional
         """
         super().__init__(name, descriptor)
         self.logger.debug("%s.__init__()" % self.__class__.__name__)
 
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         """
         Execute the configured function.
 
@@ -78,7 +76,6 @@ class LambdaFunctionAnnotator(robokudo.annotators.core.BaseAnnotator):
         followed by any configured positional and keyword arguments.
 
         :return: SUCCESS status
-        :rtype: py_trees.Status
         """
         func = self.descriptor.parameters.func
 
@@ -88,4 +85,4 @@ class LambdaFunctionAnnotator(robokudo.annotators.core.BaseAnnotator):
 
             func(self, *func_args, **func_kwargs)
 
-        return py_trees.Status.SUCCESS
+        return py_trees.common.Status.SUCCESS

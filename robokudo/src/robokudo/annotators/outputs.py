@@ -25,7 +25,7 @@ import logging
 import numpy as np
 import py_trees
 from py_trees.behaviour import Behaviour
-from typing_extensions import TYPE_CHECKING, Dict, List, Any
+from typing_extensions import TYPE_CHECKING, Dict, List, Any, Optional
 
 import robokudo.defs
 import robokudo.pipeline
@@ -42,23 +42,23 @@ class AnnotatorOutputStruct:
 
     This class stores and manages different types of outputs
     (e.g., images, point clouds) for a single annotator.
-
-    :ivar image: Image output data
-    :type image: numpy.ndarray
-    :ivar geometries: Open3D Geometries data. Will be passed to o3d.visualization.O3DVisualizer.add_geometry.
     """
 
-    def __init__(self):
-        """
-        Initialize an empty output structure.
-        """
-        self.image = np.zeros((640, 480, 3), dtype="uint8")
-        self.geometries = None
-        self.render_next_time = True  # render defaults on the first run
+    def __init__(self) -> None:
+        """Initialize an empty output structure."""
+        self.image: npt.NDArray[np.uint8] = np.zeros((640, 480, 3), dtype="uint8")
+        """Image output data"""
 
-    def set_image(self, img: npt.NDArray) -> None:
-        """
-        Set the image in this AnnotatorOutputStruct and instruct the GUI to render it next time.
+        self.geometries: Optional[List[Dict[str, Any]]] = None
+        """Open3D Geometries data. Will be passed to o3d.visualization.O3DVisualizer.add_geometry."""
+
+        self.render_next_time = True
+        """Whether the outputs should be rendered on the next GUI update. Defaults to True for the first run."""
+
+    def set_image(self, img: npt.NDArray[np.uint8]) -> None:
+        """Set the image in this AnnotatorOutputStruct and instruct the GUI to render it next time.
+
+        :param img: The image to be displayed on the next GUI update.
         """
         self.image = img
         self.render_next_time = True
@@ -78,33 +78,30 @@ class AnnotatorOutputStruct:
 
 
 class AnnotatorOutputs:
-    """
-    Container for all annotator outputs in a pipeline.
+    """Container for all annotator outputs in a pipeline.
 
     This class manages output structures for multiple annotators
     within a single pipeline.
-
-    :ivar outputs: Dictionary mapping annotator names to their outputs
-    :type outputs: dict[str, AnnotatorOutputStruct]
     """
 
-    def __init__(self):
-        """
-        Initialize an empty outputs container.
-        """
-        self.outputs = {}
-        self.redraw = True
+    def __init__(self) -> None:
+        """Initialize an empty outputs container."""
 
-    def init_annotator(self, annotator_name):
+        self.outputs: Dict[str, AnnotatorOutputStruct] = {}
+        """Dictionary mapping annotator names to their outputs"""
+
+        self.redraw = True
+        """Whether the outputs should be redrawn on the next GUI update. Defaults to True for the first run."""
+
+    def init_annotator(self, annotator_name: str) -> None:
         """
         Initialize the output structure for an annotator.
 
         :param annotator_name: Name of the annotator
-        :type annotator_name: str
         """
         self.outputs[annotator_name] = AnnotatorOutputStruct()
 
-    def clear_outputs(self):
+    def clear_outputs(self) -> None:
         annotator_names = [key for key in self.outputs]
         for name in annotator_names:
             self.init_annotator(name)
@@ -117,27 +114,24 @@ class AnnotatorOutputPerPipelineMap:
     This class manages output structures for all annotators across
     all pipelines in the system.
 
-    :ivar map: Dictionary mapping pipeline names to their annotator outputs
-    :type map: dict[str, AnnotatorOutputs]
+
     """
 
-    def __init__(self):
-        """
-        Initialize an empty pipeline map.
-        """
-        self.map = {}  # Key: Pipeline Name, Value: AnnotatorOutputs
+    def __init__(self) -> None:
+        """Initialize an empty pipeline map."""
+
+        self.map: Dict[str, AnnotatorOutputs] = {}
+        """Dictionary mapping pipeline names to their annotator outputs"""
 
 
 class ClearAnnotatorOutputs(Behaviour):
-    """
-    Put directly in the corresponding RK Pipeline
-    """
+    """Put directly in the corresponding RK Pipeline"""
 
-    def __init__(self, name="ClearAnnotatorOutputs"):
-        super().__init__("ClearAnnotatorOutputs")
+    def __init__(self, name: str = "ClearAnnotatorOutputs") -> None:
+        super().__init__(name)
         self.rk_logger = logging.getLogger(robokudo.defs.PACKAGE_NAME)
 
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         self.rk_logger.debug("%s.update()" % (self.__class__.__name__))
         blackboard = py_trees.blackboard.Blackboard()
         annotator_output_pipeline_map_buffer = blackboard.get(

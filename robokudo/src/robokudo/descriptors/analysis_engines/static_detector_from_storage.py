@@ -34,6 +34,7 @@ import robokudo.io.storage_reader_interface
 import robokudo.behaviours.clear_errors
 
 import robokudo.idioms
+import robokudo.pipeline
 from robokudo.annotators.static_object_detector import StaticObjectDetectorAnnotator
 
 
@@ -57,15 +58,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         based on your specific object detection requirements.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "static_detector_from_storage"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a pipeline for static object detection.
 
         This method constructs a processing pipeline that performs object
@@ -80,10 +80,15 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         :return: The configured pipeline for static object detection
         :rtype: robokudo.pipeline.Pipeline
         """
-        cr_storage_camera_config = robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        cr_storage_camera_config = (
+            robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        )
         cr_storage_config = CollectionReaderAnnotator.Descriptor(
             camera_config=cr_storage_camera_config,
-            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(cr_storage_camera_config))
+            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(
+                cr_storage_camera_config
+            ),
+        )
 
         sod = StaticObjectDetectorAnnotator.Descriptor()
         sod.parameters.bounding_box_x = 40
@@ -99,5 +104,6 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 StaticObjectDetectorAnnotator(descriptor=sod),
                 ObjectHypothesisVisualizer(),
-            ])
+            ]
+        )
         return seq

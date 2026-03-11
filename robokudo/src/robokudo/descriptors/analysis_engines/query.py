@@ -20,8 +20,8 @@ import robokudo.analysis_engine
 
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
-from robokudo.annotators.testing import SlowAnnotator
 import robokudo.annotators.query
+import robokudo.pipeline
 
 import robokudo.descriptors.camera_configs.config_kinect_robot
 import robokudo.descriptors.camera_configs.config_kinect_robot_wo_transform
@@ -51,15 +51,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         allowing external systems to send queries and receive responses.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "query"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a pipeline for query-based processing.
 
         This method constructs a processing pipeline that can handle incoming
@@ -76,17 +75,22 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         6. Check action server status
 
         :return: The configured pipeline for query processing
-        :rtype: robokudo.pipeline.Pipeline
         """
         # kinect_camera_config = robokudo.descriptors.camera_configs.config_kinect_robot.CameraConfig()
-        kinect_camera_config = robokudo.descriptors.camera_configs.config_kinect_robot_wo_transform.CameraConfig()
+        kinect_camera_config = (
+            robokudo.descriptors.camera_configs.config_kinect_robot_wo_transform.CameraConfig()
+        )
         kinect_config = CollectionReaderAnnotator.Descriptor(
             camera_config=kinect_camera_config,
-            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(kinect_camera_config))
+            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(
+                kinect_camera_config
+            ),
+        )
 
         seq = robokudo.pipeline.Pipeline("RWPipeline")
 
-        add_children_to_parent(seq,
+        add_children_to_parent(
+            seq,
             [
                 robokudo.idioms.pipeline_init(),
                 robokudo.annotators.query.QueryAnnotator(),
@@ -94,6 +98,7 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 robokudo.annotators.query.QueryReply(),
                 ActionServerCheck(),
-            ])
+            ],
+        )
 
         return seq

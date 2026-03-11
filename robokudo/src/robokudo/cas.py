@@ -125,10 +125,9 @@ class CAS:
     there can be multiple annotations for the same 'thing' in the data.
     """
 
-    def __post_init__(self):
-        dt_timestamp = (
-                datetime(1970, 1, 1, tzinfo=timezone.utc)
-                + timedelta(microseconds=self.timestamp // 1000)
+    def __post_init__(self) -> None:
+        dt_timestamp = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(
+            microseconds=self.timestamp // 1000
         )
         self.timestamp_readable = dt_timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -288,7 +287,7 @@ class CAS:
 
     @staticmethod
     def _filter_objects(
-            objects: List[Any], criteria: Dict[str, Tuple[str, Any]]
+        objects: List[Any], criteria: Dict[str, Tuple[str, Any]]
     ) -> List[Any]:
         """
         Filters a list of objects based on specified criteria.
@@ -323,10 +322,10 @@ class CAS:
         return [obj for obj in objects if matches_criteria(obj)]
 
     def filter_by_type_and_criteria(
-            self,
-            type_to_include: Type,
-            input_list: List[Any],
-            criteria: Dict[str, Tuple[str, Any]],
+        self,
+        type_to_include: Type,
+        input_list: List[Any],
+        criteria: Dict[str, Tuple[str, Any]],
     ) -> List[Any]:
         """Filters a list of objects based on specified criteria. Objects must be of type 'type_to_include'
 

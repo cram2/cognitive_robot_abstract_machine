@@ -8,6 +8,8 @@ The detector can create object hypotheses with poses, masks, and class labels.
 .. note::
    All poses are defined relative to the camera frame by default unless pose_in_world_coordinates is True.
 """
+
+from __future__ import annotations
 import copy
 from enum import Enum
 from timeit import default_timer
@@ -15,6 +17,7 @@ from timeit import default_timer
 import cv2
 import numpy as np
 import py_trees
+from typing_extensions import List, Optional, TYPE_CHECKING
 
 import robokudo
 import robokudo.annotators.core
@@ -29,9 +32,14 @@ import robokudo.utils.knowledge
 import robokudo.utils.o3d_helper
 import robokudo.utils.type_conversion
 from robokudo.cas import CASViews
+from robokudo.object_knowledge_base import ObjectKnowledge, BaseObjectKnowledgeBase
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.transform import get_rotation_matrix_from_euler_angles
 from semantic_digital_twin.world_description.world_entity import Body
+
+if TYPE_CHECKING:
+    import numpy.typing as npt
+    import open3d as o3d
 
 
 class StaticObjectMode(Enum):
@@ -69,70 +77,76 @@ class StaticObjectDetectorAnnotator(robokudo.annotators.core.BaseAnnotator):
         class Parameters:
             """Parameters controlling the static object detection behavior."""
 
-            def __init__(self):
-                self.bounding_box_x = 1
-                self.bounding_box_y = 1
-                self.bounding_box_width = 10
-                self.bounding_box_height = 10
+            def __init__(self) -> None:
+                self.bounding_box_x: int = 1
+                self.bounding_box_y: int = 1
+                self.bounding_box_width: int = 10
+                self.bounding_box_height: int = 10
 
-                # Defines the mode which mainly decide which sources of information are used to generate the Object
-                # Hypothesis
-                self.mode = StaticObjectMode.BOUNDING_BOX
+                self.mode: StaticObjectMode = StaticObjectMode.BOUNDING_BOX
+                """Defines the mode which mainly decide which sources of information are used to generate the Object Hypothesis"""
 
                 # # If setting this to True, we detect a certain object stored in the ObjectKnowledgeBase
                 # # This allows us to automatically infer the BoundingBox coordinates
                 # self.detect_object_from_object_knowledge = False
 
-                # Define the class_name which is used for the object of interest
-                # Only used for StaticObjectMode.BOUNDING_BOX and StaticObjectMode.OBJECT_KNOWLEDGE_INSTANCE
-                self.class_name = "unknown"
-                # Used for StaticObjectMode.OBJECT_KNOWLEDGE_BASE
-                self.class_names = []
+                self.class_name: str = "unknown"
+                """
+                Define the class_name which is used for the object of interest
+                Only used for StaticObjectMode.BOUNDING_BOX and StaticObjectMode.OBJECT_KNOWLEDGE_INSTANCE
+                """
 
-                # Shall we create a Pose and BoundingBox Annotation for the object?
-                # Please note that poses are defined relative to the camera frame by default
-                # Only effective in Mode=StaticObjectDetectorAnnotator.Mode.OBJECT_KNOWLEDGE_*
-                self.create_pose_annotation = False
-                self.create_bounding_box_annotation = False
+                self.class_names: List[str] = []
+                """Used for StaticObjectMode.OBJECT_KNOWLEDGE_BASE"""
 
-                # If this is a true, a mask based on the ROI will be generated that marks every pixel as ON
-                self.create_mask = True
+                self.create_pose_annotation: bool = False
+                """If True a Pose will be created for the object. Pose is relative to the camera frame by default.
 
-                # If you use SDT object knowledge to generate the detection, provide the knowledge base here
-                self.object_knowledge_base_ros_package = "robokudo"
-                self.object_knowledge_base_name = "object_knowledge_iai_kitchen"
+                Only effective in Mode=StaticObjectDetectorAnnotator.Mode.OBJECT_KNOWLEDGE_*
+                """
 
-                # If StaticObjectDetectorAnnotator.Mode.OBJECT_KNOWLEDGE_INSTANCE is used, set the desired instance here
-                self.object_knowledge_instance: Body | None = None
+                self.create_bounding_box_annotation: bool = False
+                """If True a BoundingBox will be created for the object.
 
-        parameters = Parameters()  # overwrite the parameters explicitly to enable auto-completion
+                Only effective in Mode=StaticObjectDetectorAnnotator.Mode.OBJECT_KNOWLEDGE_*
+                """
 
-    def __init__(self, name="StaticObjectDetector", descriptor=Descriptor()):
+                self.create_mask: bool = True
+                """If this is a true, a mask based on the ROI will be generated that marks every pixel as ON"""
+
+                self.object_knowledge_base_ros_package: str = "robokudo"
+                """If you use SDT object knowledge to generate the detection, provide the knowledge base package name here"""
+
+                self.object_knowledge_base_name: str = "object_knowledge_iai_kitchen"
+                """If you use SDT object knowledge to generate the detection, provide the knowledge base name here"""
+
+                self.object_knowledge_instance: Optional[Body] = None
+                """If StaticObjectDetectorAnnotator.Mode.OBJECT_KNOWLEDGE_INSTANCE is used, set the desired instance here"""
+
+        # Overwrite the parameters explicitly to enable auto-completion
+        parameters = Parameters()
+
+    def __init__(self, name: str="StaticObjectDetector", descriptor: 'StaticObjectDetectorAnnotator.Descriptor'=Descriptor()):
         """Default construction. Minimal one-time init!
 
         :param name: Name of the annotator instance, defaults to "StaticObjectDetector"
-        :type name: str
         :param descriptor: Configuration descriptor, defaults to Descriptor()
-        :type descriptor: StaticObjectDetectorAnnotator.Descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self.color = None
-        self.depth = None
-        self.cloud = None
+        self.color: Optional[npt.NDArray] = None
+        self.depth: Optional[npt.NDArray] = None
+        self.cloud: Optional[o3d.geometry.PointCloud] = None
         self.cam_intrinsics = None
-        self.object_kb = None
-        self.object_body = None
-        self.object_bodies_by_name = {}
+        self.object_kb: Optional[BaseObjectKnowledgeBase] = None
+        self.object_body: Optional[Body] = None
+        self.object_bodies_by_name: Dict[str, Body] = {}
 
-    def detect_from_bb_descriptor(self, color_rgb: np.ndarray) -> ObjectHypothesis:
+    def detect_from_bb_descriptor(self, color_rgb: npt.NDArray) -> ObjectHypothesis:
         """
         Detect only based on the BB.
 
-
         :param color_rgb: Image in RGB order
-        :type color_rgb: np.ndarray
-        :return: robokudo.types.scene.ObjectHypothesis
         """
         object_hypothesis = robokudo.types.scene.ObjectHypothesis()
         object_hypothesis.id = str(0)
@@ -261,11 +275,11 @@ class StaticObjectDetectorAnnotator(robokudo.annotators.core.BaseAnnotator):
 
         return object_hypothesis
 
-    def detect_from_body_base(self, world_to_cam_transform_matrix: np.ndarray | None = None) -> list[ObjectHypothesis]:
+    def detect_from_body_base(self, world_to_cam_transform_matrix: Optional[npt.NDArray] = None) -> List[ObjectHypothesis]:
         """
         Detect from a completed object knowledge base
 
-        :return: robokudo.types.scene.ObjectHypothesis
+        :return: A list of ObjectHypothesis objects
         """
         object_hypotheses = []
         for class_name in self.descriptor.parameters.class_names:
@@ -279,7 +293,7 @@ class StaticObjectDetectorAnnotator(robokudo.annotators.core.BaseAnnotator):
         return object_hypotheses
 
     @robokudo.utils.error_handling.catch_and_raise_to_blackboard
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         """Process current scene to detect configured static objects.
 
         Steps:
@@ -295,7 +309,6 @@ class StaticObjectDetectorAnnotator(robokudo.annotators.core.BaseAnnotator):
           * Mask if enabled
 
         :return: SUCCESS if detection completed, FAILURE if required transforms not found
-        :rtype: py_trees.common.Status
         :raises Exception: If camera parameters are invalid or missing
         """
         start_timer = default_timer()
@@ -413,22 +426,29 @@ class StaticObjectDetectorAnnotator(robokudo.annotators.core.BaseAnnotator):
         return py_trees.common.Status.SUCCESS
 
     @staticmethod
-    def add_classification_annotation(object_hypothesis: ObjectHypothesis, class_name: str):
+    def add_classification_annotation(
+        object_hypothesis: ObjectHypothesis, class_name: str
+    ) -> None:
+        """Add a classification annotation to the given object hypothesis.
+
+        :param object_hypothesis: The object hypothesis to annotate.
+        :param class_name: The name of the annotation class.
+        """
         classification_annotation = robokudo.types.annotation.Classification()
         classification_annotation.classname = class_name
         classification_annotation.source = 'StaticObjectDetectorAnnotator'
         classification_annotation.confidence = 1.0
         object_hypothesis.annotations.append(classification_annotation)
 
-    def get_rotation_list_based_on_parameters(self, rotation_x: float, rotation_y: float, rotation_z: float,
-                                              rotation_w: float) -> list:
-        """
-        Return a quaternion based on the parametrization of the Annotator.
+    def get_rotation_list_based_on_parameters(
+        self, rotation_x: float, rotation_y: float, rotation_z: float, rotation_w: float
+    ) -> List[float]:
+        """Return a quaternion based on the parametrization of the Annotator.
 
-        :param rotation_x:
-        :param rotation_y:
-        :param rotation_z:
-        :param rotation_w:
+        :param rotation_x: rotation about x-axis
+        :param rotation_y: rotation about y-axis
+        :param rotation_z: rotation about z-axis
+        :param rotation_w: rotation about w-axis
         :return: 4-dim list with Quaternion
         """
         rotation_list = None
@@ -446,10 +466,15 @@ class StaticObjectDetectorAnnotator(robokudo.annotators.core.BaseAnnotator):
                              rotation_w]
         return rotation_list
 
-    def get_cloud_from_2d_bb_roi(self, color_rgb):
+    def get_cloud_from_2d_bb_roi(
+        self, color_rgb: npt.NDArray
+    ) -> o3d.geometry.PointCloud:
         mask = np.zeros_like(self.depth, dtype=np.uint8)
         x1 = self.descriptor.parameters.bounding_box_x
-        x2 = self.descriptor.parameters.bounding_box_x + self.descriptor.parameters.bounding_box_width
+        x2 = (
+            self.descriptor.parameters.bounding_box_x
+            + self.descriptor.parameters.bounding_box_width
+        )
         y1 = self.descriptor.parameters.bounding_box_y
         y2 = self.descriptor.parameters.bounding_box_y + self.descriptor.parameters.bounding_box_height
         # Respect possible color2depth scaling also for BoundingBox coordinates

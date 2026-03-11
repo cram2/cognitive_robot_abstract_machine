@@ -4,12 +4,14 @@ This module provides an annotator for visualizing object hypotheses in both
 2D (image overlays) and 3D (point clouds) representations.
 """
 
+from __future__ import annotations
 import copy
 from timeit import default_timer
 
 import cv2
 import open3d as o3d
 import py_trees
+from typing_extensions import TYPE_CHECKING, Tuple
 
 import robokudo
 import robokudo.annotators.core
@@ -22,6 +24,10 @@ import robokudo.utils.type_conversion
 from robokudo.cas import CASViews
 from robokudo.utils.file_loader import FileLoader
 from robokudo_msgs.action import Query
+
+if TYPE_CHECKING:
+    import numpy as np
+    import numpy.typing as npt
 
 
 class ObjectHypothesisVisualizer(robokudo.annotators.core.BaseAnnotator):
@@ -38,58 +44,50 @@ class ObjectHypothesisVisualizer(robokudo.annotators.core.BaseAnnotator):
         """Configuration descriptor for object hypothesis visualization."""
 
         class Parameters:
-            """Parameters for configuring visualization behavior.
+            """Parameters for configuring visualization behavior."""
 
-            :ivar query_aware: If True, only visualize objects matching the query type
-            :type query_aware: bool
-            """
+            def __init__(self) -> None:
+                self.query_aware: bool = True
+                """If set to true, only visualize an Object that matches the 'object.type' from the Query."""
 
-            def __init__(self):
-                # If set to true, only visualize an Object that matches the 'object.type' from the Query
-                self.query_aware = True
+                self.visualize_full_cloud: bool = False
+                """If set to true, the scene cloud will be shown and the individual objects will be colored."""
 
-                # If set to true, the scene cloud will be shown and the individual objects will be colored
-                self.visualize_full_cloud = False
+        # Overwrite the parameters explicitly to enable auto-completion
+        parameters = Parameters()
 
-        parameters = (
-            Parameters()
-        )  # overwrite the parameters explicitly to enable auto-completion
-
-    def __init__(self, name="ObjectHypothesisVisualizer", descriptor=Descriptor()):
+    def __init__(
+        self,
+        name: str = "ObjectHypothesisVisualizer",
+        descriptor: "ObjectHypothesisVisualizer.Descriptor" = Descriptor(),
+    ) -> None:
         """Initialize the object hypothesis visualizer.
 
         :param name: Name of the annotator instance, defaults to "ObjectHypothesisVisualizer"
-        :type name: str, optional
         :param descriptor: Configuration descriptor, defaults to Descriptor()
-        :type descriptor: ObjectHypothesisVisualizer.Descriptor, optional
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         self._mesh_cache = {}
+        """"""
 
     def draw_text_middle(
         self,
-        image,
-        text,
-        color=(0, 0, 255),
-        font=cv2.FONT_HERSHEY_SIMPLEX,
-        font_scale=1,
-        thickness=2,
+        image: npt.NDArray[np.uint8],
+        text: str,
+        color: Tuple[int, int, int] = (0, 0, 255),
+        font: int = cv2.FONT_HERSHEY_SIMPLEX,
+        font_scale: float = 1.0,
+        thickness: int = 2,
     ):
         """Draw text in the middle of an image.
 
         :param image: Image to draw on
-        :type image: numpy.ndarray
         :param text: Text to draw
-        :type text: str
-        :param color: BGR color tuple, defaults to (0, 0, 255)
-        :type color: tuple, optional
+        :param color: BGR color tuple
         :param font: OpenCV font type, defaults to cv2.FONT_HERSHEY_SIMPLEX
-        :type font: int, optional
         :param font_scale: Font scale factor, defaults to 1
-        :type font_scale: float, optional
         :param thickness: Line thickness, defaults to 2
-        :type thickness: int, optional
         """
         # Get the size of the text
         text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
@@ -102,7 +100,7 @@ class ObjectHypothesisVisualizer(robokudo.annotators.core.BaseAnnotator):
         cv2.putText(image, text, (text_x, text_y), font, font_scale, color, thickness)
 
     @robokudo.utils.error_handling.catch_and_raise_to_blackboard
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         """Update the visualization with current object hypotheses.
 
         Creates visualizations containing:
@@ -112,7 +110,6 @@ class ObjectHypothesisVisualizer(robokudo.annotators.core.BaseAnnotator):
         * Optional filtering based on query type if query_aware is True
 
         :return: SUCCESS after creating visualizations
-        :rtype: py_trees.common.Status
         """
         start_timer = default_timer()
 

@@ -35,6 +35,7 @@ import robokudo.io.storage_reader_interface
 import robokudo.annotators.query
 
 import robokudo.idioms
+import robokudo.pipeline
 from robokudo.behaviours.action_server_checks import ActionServerCheck
 
 
@@ -59,15 +60,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         testing of query processing without live camera dependencies.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "query_demo_from_storage"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a pipeline for query-based processing of stored data.
 
         This method constructs a processing pipeline that handles queries by
@@ -88,12 +88,16 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         10. Check action server status
 
         :return: The configured pipeline for query processing
-        :rtype: robokudo.pipeline.Pipeline
         """
-        cr_storage_camera_config = robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        cr_storage_camera_config = (
+            robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        )
         cr_storage_config = CollectionReaderAnnotator.Descriptor(
             camera_config=cr_storage_camera_config,
-            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(cr_storage_camera_config))
+            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(
+                cr_storage_camera_config
+            ),
+        )
 
         seq = robokudo.pipeline.Pipeline("StoragePipeline")
         seq.add_children(
@@ -108,6 +112,7 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 ClusterColorAnnotator(),
                 robokudo.annotators.query.QueryReply(),
                 ActionServerCheck(),
-            ])
+            ]
+        )
 
         return seq

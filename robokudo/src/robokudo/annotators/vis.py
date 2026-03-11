@@ -17,6 +17,7 @@ The module is used for:
 * GUI synchronization
 * Output buffer management
 """
+
 import py_trees
 
 import robokudo.annotators.core
@@ -28,32 +29,29 @@ class Redraw(robokudo.annotators.core.BaseAnnotator):
 
     This annotator sets the redraw flag on the pipeline to make
     visualizers show the latest visualization output.
-
-    :ivar redraw: Flag indicating if visualization should be updated
-    :type redraw: bool
     """
 
-    def __init__(self, name="Redraw"):
-        """
-        Initialize the redraw annotator.
+    def __init__(self, name: str = "Redraw") -> None:
+        """Initialize the redraw annotator.
 
         :param name: Annotator name, defaults to "Redraw"
-        :type name: str, optional
         """
         super().__init__(name=name)
 
-    def update(self):
-        """
-        Set redraw flag to trigger visualization update.
+    def update(self) -> py_trees.common.Status:
+        """Set redraw flag to trigger visualization update.
 
         Gets the annotator output pipeline map and sets the redraw
         flag for the current pipeline.
 
         :return: SUCCESS status
-        :rtype: py_trees.Status
         """
         blackboard = py_trees.blackboard.Blackboard()
-        annotator_output_pipeline_map_buffer = blackboard.get("annotator_output_pipeline_map_buffer")
-        annotator_output_pipeline_map_buffer.map[self.get_parent_pipeline().name].redraw = True
+        annotator_output_pipeline_map_buffer = blackboard.get(
+            "annotator_output_pipeline_map_buffer"
+        )
+        annotator_output_pipeline_map_buffer.map[
+            self.get_parent_pipeline().name
+        ].redraw = True
 
         return py_trees.common.Status.SUCCESS

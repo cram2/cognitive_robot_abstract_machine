@@ -57,7 +57,7 @@ class BaseObjectKnowledgeBase:
     and can be accessed by its name.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize an empty object knowledge base."""
 
         """Dictionary mapping object names to their knowledge"""
@@ -99,4 +99,6 @@ class BaseObjectKnowledgeBase:
         :param object_knowledge: The object knowledge to check
         :return: True if the object has components or features
         """
-        return len(object_knowledge.features) > 0 or len(object_knowledge.components) > 0
+        return (
+            len(object_knowledge.features) > 0 or len(object_knowledge.components) > 0
+        )

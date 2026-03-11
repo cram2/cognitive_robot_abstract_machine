@@ -10,12 +10,12 @@ class CameraConfig:
     It is used for simulated camera data in Unreal Engine-based simulations.
 
     :ivar interface_type: Type of camera interface, set to "UnrealVisionBridge"
-    :type interface_type: str
 
     .. note::
         This is a minimal configuration that only specifies the interface type.
         Additional parameters may be required depending on the specific Unreal
         Engine simulation setup.
     """
+
     # camera
-    interface_type = "UnrealVisionBridge"
+    interface_type: str = "UnrealVisionBridge"

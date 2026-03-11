@@ -16,6 +16,7 @@ The plane detection uses:
 .. note::
    Plane visualization includes both inlier points and a mesh model.
 """
+
 from timeit import default_timer
 
 import numpy
@@ -48,29 +49,34 @@ class PlaneAnnotator(robokudo.annotators.core.ThreadedAnnotator):
         """Configuration descriptor for plane detection."""
 
         class Parameters:
-            """Parameters for configuring plane detection.
+            """Parameters for configuring plane detection."""
 
-            :ivar visualize_plane_model: Show plane model mesh, defaults to True
-            :type visualize_plane_model: bool
-            """
-            def __init__(self):
-                self.visualize_plane_model = True
-                self.distance_threshold = 0.02
-                self.num_iterations = 50
+            def __init__(self) -> None:
+                self.visualize_plane_model: bool = True
+                """Show plane model mesh"""
 
-        parameters = Parameters()  # overwrite the parameters explicitly to enable auto-completion
+                self.distance_threshold: float = 0.02
+                """"""
 
-    def __init__(self, name="PlaneAnnotator", descriptor=Descriptor()):
+                self.num_iterations: int = 50
+                """"""
+
+        # Overwrite the parameters explicitly to enable auto-completion
+        parameters = Parameters()
+
+    def __init__(
+        self,
+        name: str = "PlaneAnnotator",
+        descriptor: "PlaneAnnotator.Descriptor" = Descriptor(),
+    ) -> None:
         """Initialize the plane detector.
 
         :param name: Name of this annotator instance, defaults to "PlaneAnnotator"
-        :type name: str, optional
         :param descriptor: Configuration descriptor, defaults to Descriptor()
-        :type descriptor: PlaneAnnotator.Descriptor, optional
         """
         super().__init__(name, descriptor)
 
-    def compute(self):
+    def compute(self) -> py_trees.common.Status:
         """Detect and annotate dominant plane in point cloud.
 
         The method:
@@ -88,19 +94,24 @@ class PlaneAnnotator(robokudo.annotators.core.ThreadedAnnotator):
           * Optional plane model mesh
 
         :return: SUCCESS after processing
-        :rtype: py_trees.Status
         """
         self.rk_logger.info("Plane compute start")
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
-        color_image = self.get_cas().get(CASViews.COLOR_IMAGE)  # shape [H, W, 3], usually RGB
-        depth_image = self.get_cas().get(CASViews.DEPTH_IMAGE)  # shape [H, W], float or uint16
+        color_image = self.get_cas().get(
+            CASViews.COLOR_IMAGE
+        )  # shape [H, W, 3], usually RGB
+        depth_image = self.get_cas().get(
+            CASViews.DEPTH_IMAGE
+        )  # shape [H, W], float or uint16
         cam_intrinsics = self.get_cas().get(CASViews.CAM_INTRINSIC)
         # print(f"Loaded cloud with {len(cloud.points)} points")
 
-        plane_model, inliers = cloud.segment_plane(distance_threshold=self.descriptor.parameters.distance_threshold,
-                                                   ransac_n=3,
-                                                   num_iterations=self.descriptor.parameters.num_iterations)
+        plane_model, inliers = cloud.segment_plane(
+            distance_threshold=self.descriptor.parameters.distance_threshold,
+            ransac_n=3,
+            num_iterations=self.descriptor.parameters.num_iterations,
+        )
 
         [a, b, c, d] = plane_model
         # print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
@@ -119,18 +130,25 @@ class PlaneAnnotator(robokudo.annotators.core.ThreadedAnnotator):
 
         if self.descriptor.parameters.visualize_plane_model:
             # b) Show the plane model itself by a flat mesh
-            plane_model_mesh = o3d.geometry.TriangleMesh.create_box(width=1.0, height=1.0, depth=0.01)
-            plane_model_mesh.translate(numpy.array([-0.5, -0.5, 0]))  # Shift origin to center instead of corner
+            plane_model_mesh = o3d.geometry.TriangleMesh.create_box(
+                width=1.0, height=1.0, depth=0.01
+            )
+            plane_model_mesh.translate(
+                numpy.array([-0.5, -0.5, 0])
+            )  # Shift origin to center instead of corner
             plane_model_mesh.paint_uniform_color(numpy.array([1, 0, 0]))
 
-            transform = robokudo.utils.transform.get_transform_from_plane_equation(plane_model)
+            transform = robokudo.utils.transform.get_transform_from_plane_equation(
+                plane_model
+            )
             plane_model_mesh.transform(transform)
 
             visualized_geometries.append(
-                {"name": "plane_model", "geometry": plane_model_mesh})
+                {"name": "plane_model", "geometry": plane_model_mesh}
+            )
             self.get_annotator_output_struct().set_geometries(visualized_geometries)
 
         end_timer = default_timer()
-        self.feedback_message = f'Processing took {(end_timer - start_timer):.4f}s'
+        self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
         self.rk_logger.info("Plane compute end")
         return py_trees.common.Status.SUCCESS

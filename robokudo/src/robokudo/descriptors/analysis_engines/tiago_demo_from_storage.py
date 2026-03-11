@@ -38,6 +38,7 @@ import robokudo.descriptors.camera_configs.config_mongodb_playback
 import robokudo.io.storage_reader_interface
 import robokudo.tree_components.better_parallel
 import robokudo.idioms
+import robokudo.pipeline
 
 from robokudo.annotators.query import QueryReply, GenerateQueryResult
 
@@ -67,15 +68,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         can be enabled for interactive operation.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "tiago_demo_from_storage"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a pipeline for TIAGo perception with stored data.
 
         This method constructs a processing pipeline that combines sequential
@@ -97,45 +97,55 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
            * PCA pose estimation
 
         :return: The configured pipeline with parallel processing
-        :rtype: robokudo.pipeline.Pipeline
         """
-        cr_storage_camera_config = robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        cr_storage_camera_config = (
+            robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        )
         cr_storage_config = CollectionReaderAnnotator.Descriptor(
             camera_config=cr_storage_camera_config,
-            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(cr_storage_camera_config))
+            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(
+                cr_storage_camera_config
+            ),
+        )
 
-        pre = py_trees.Sequence("Preprocessing")
-        pre.add_children([
-            CollectionReaderAnnotator(descriptor=cr_storage_config),
-            ImagePreprocessorAnnotator("ImagePreprocessor"),
-        ])
+        pre = py_trees.composites.Sequence("Preprocessing")
+        pre.add_children(
+            [
+                CollectionReaderAnnotator(descriptor=cr_storage_config),
+                ImagePreprocessorAnnotator("ImagePreprocessor"),
+            ]
+        )
 
         parallel = robokudo.tree_components.better_parallel.Parallel(
-            policy=robokudo.tree_components.better_parallel.ParallelPolicy.SuccessOnAll(synchronise=True))
+            policy=robokudo.tree_components.better_parallel.ParallelPolicy.SuccessOnAll(
+                synchronise=True
+            )
+        )
         parallel.add_children(
             [
                 ClusterColorAnnotator(),
                 ClusterPosePCAAnnotator(),
             ]
         )
-        annotators = py_trees.Sequence("Annotators")
-        annotators.add_children([
-            PointcloudCropAnnotator(),
-            PlaneAnnotator(),
-            PointCloudClusterExtractor(),
-            parallel,
-        ])
+        annotators = py_trees.composites.Sequence("Annotators")
+        annotators.add_children(
+            [
+                PointcloudCropAnnotator(),
+                PlaneAnnotator(),
+                PointCloudClusterExtractor(),
+                parallel,
+            ]
+        )
 
         seq = robokudo.pipeline.Pipeline("ContPipeline")
         seq.add_children(
             [
                 robokudo.idioms.pipeline_init(),
-
                 # robokudo.annotators.query.QueryAnnotator(),
                 pre,
                 annotators,
-
                 # GenerateQueryResult(),
                 # QueryReply(),
-            ])
+            ]
+        )
         return seq

@@ -30,7 +30,7 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 import robokudo.descriptors.camera_configs.config_filereader_playback
 
 import robokudo.io.file_reader_interface
-from robokudo.annotators.pipeline_trigger import PipelineTrigger
+import robokudo.pipeline
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
@@ -55,15 +55,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         and applies specific fixes for Kinect height data.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "filereader_from_tmp"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a pipeline for processing stored RGB-D data.
 
         This method constructs a processing pipeline that reads RGB-D data from
@@ -83,19 +82,28 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
             Make sure the robokudo_test_data repository is cloned and available
             in your ROS workspace before running this pipeline.
         """
-        cr_fr_camera_config = robokudo.descriptors.camera_configs.config_filereader_playback.CameraConfig()
+        cr_fr_camera_config = (
+            robokudo.descriptors.camera_configs.config_filereader_playback.CameraConfig()
+        )
         cr_fr_camera_config.loop = True
-        cr_fr_camera_config.target_ros_package = 'robokudo_test_data' # see note above for URL
-        cr_fr_camera_config.target_dir = 'data'
+        cr_fr_camera_config.target_ros_package = (
+            "robokudo_test_data"  # see note above for URL
+        )
+        cr_fr_camera_config.target_dir = "data"
         cr_fr_camera_config.kinect_height_fix_mode = True
         cr_fr_camera_config.color2depth_ratio = (0.5, 0.5)
 
         cr_fr_config = CollectionReaderAnnotator.Descriptor(
             camera_config=cr_fr_camera_config,
-            camera_interface=robokudo.io.file_reader_interface.RGBDFileReaderInterface(cr_fr_camera_config))
+            camera_interface=robokudo.io.file_reader_interface.RGBDFileReaderInterface(
+                cr_fr_camera_config
+            ),
+        )
 
         # Restrict FOV of pointcloud to robustly get only one object
-        pc_crop_config = robokudo.annotators.pointcloud_crop.PointcloudCropAnnotator.Descriptor()
+        pc_crop_config = (
+            robokudo.annotators.pointcloud_crop.PointcloudCropAnnotator.Descriptor()
+        )
         pc_crop_config.parameters.min_x = -0.3
         pc_crop_config.parameters.max_x = 0.3
 
@@ -108,5 +116,6 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 PointcloudCropAnnotator(descriptor=pc_crop_config),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
-            ])
+            ]
+        )
         return seq

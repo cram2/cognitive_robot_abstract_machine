@@ -22,13 +22,14 @@ import logging
 import queue
 import threading
 import time
-import typing
-
 import geometry_msgs.msg
 import py_trees
 import rclpy
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
+from rclpy.action.server import ServerGoalHandle
+from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
+from typing_extensions import Any, Optional
 
 import robokudo
 import robokudo.defs
@@ -68,37 +69,30 @@ class QueryAnnotator(robokudo.annotators.core.BaseAnnotator):
     It will then annotate the CAS and put the Query into CASViews.QUERY.
     The Annotator and the Actionserver are type-agnostic, which means that you are not bound
     to a specific type of query. You can pass these from your AE to this QueryAnnotator.
-
-    :ivar feedback_instance: Feedback message template
-    :type feedback_instance: robokudo_msgs.msg.QueryFeedback
-    :ivar result_instance: Result message template
-    :type result_instance: robokudo_msgs.msg.QueryResult
-    :ivar action_server: server for action request handling
-    :type action_server: QueryActionServer or None
     """
 
-    def __init__(self, name="QueryAnnotator"):
+    def __init__(self, name: str = "QueryAnnotator") -> None:
         """Initialize the query annotator.
 
         :param name: Annotator name, defaults to "QueryAnnotator"
-        :type name: str, optional
         """
         super().__init__(name=name)
+
         self.feedback_instance = Query.Feedback()
         self.result_instance = Query.Result()
-        self.action_server = None  # Placeholder for Action Server
 
-    def setup(self, **kwargs: typing.Any):
+        self.action_server = None
+        """Action server placeholder."""
+
+    def setup(self, **kwargs: Any) -> None:
         """Ensure that the Query Server is spawned early on, directly after PPT creation."""
         self.initialise()
 
-    def initialise(self):
+    def initialise(self) -> None:
         """Initialize query handling.
 
         Sets up the action server if not already initialized.
         Stores server instance on blackboard for access by other nodes.
-
-        :return: None
         """
         self.rk_logger.debug(f"{self.__class__.__name__}.initialise()")
         blackboard = py_trees.blackboard.Blackboard()
@@ -110,14 +104,13 @@ class QueryAnnotator(robokudo.annotators.core.BaseAnnotator):
 
         self.action_server = blackboard.get(BBIdentifier.QUERY_SERVER)
 
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         """Process new queries and update CAS.
 
         Checks for new queries from action server and updates CAS if found.
         Provides feedback about query status.
 
         :return: SUCCESS if query processed, RUNNING if waiting
-        :rtype: py_trees.Status
         """
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
 
@@ -140,15 +133,20 @@ class QueryAnnotator(robokudo.annotators.core.BaseAnnotator):
 
 
 class QueryFeedback(robokudo.annotators.core.BaseAnnotator):
-    """
-    A test class which simply generates a fixed-string feedback.
-    """
+    """A test class which simply generates a fixed-string feedback."""
 
-    def __init__(self, name="QueryFeedback", feedback_str=""):
+    def __init__(self, name: str = "QueryFeedback", feedback_str: str = "") -> None:
+        """Initialize query feedback generator.
+
+        :param name: Annotator name
+        :param feedback_str: Feedback string to send to the client
+        """
         super().__init__(name=name)
-        self.feedback_str = feedback_str
 
-    def update(self):
+        self.feedback_str = feedback_str
+        """Feedback string to send to the client."""
+
+    def update(self) -> py_trees.common.Status:
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
         QueryHandler.send_feedback_str(self.feedback_str)
 
@@ -163,16 +161,28 @@ class QueryFeedbackAndCount(robokudo.annotators.core.BaseAnnotator):
 
     def __init__(
         self,
-        name="QueryFeedback",
-        count_until=20,
-        return_code=py_trees.common.Status.RUNNING,
-    ):
-        super().__init__(name=name)
-        self.i = 0
-        self.count_until = count_until
-        self.return_code = return_code
+        name: str = "QueryFeedback",
+        count_until: int = 20,
+        return_code: py_trees.common.Status = py_trees.common.Status.RUNNING,
+    ) -> None:
+        """Initialize query feedback generator.
 
-    def update(self):
+        :param name: Annotator name
+        :param count_until: Number until which to count before stopping
+        :param return_code: The return code to return while still counting
+        """
+        super().__init__(name=name)
+
+        self.i = 0
+        """The current count"""
+
+        self.count_until = count_until
+        """The number until which to count"""
+
+        self.return_code = return_code
+        """The return code to return while still counting"""
+
+    def update(self) -> py_trees.common.Status:
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
         QueryHandler.send_feedback_str(f"Count: {self.i}")
         self.i = self.i + 1
@@ -190,19 +200,15 @@ class QueryReply(robokudo.annotators.core.BaseAnnotator):
     Create a single, empty Object Designator that will be sent to the caller.
     """
 
-    def __init__(self, name="QueryReply"):
+    def __init__(self, name: str = "QueryReply"):
         """Initialize query reply generator.
 
         :param name: Annotator name, defaults to "QueryReply"
-        :type name: str, optional
         """
         super().__init__(name=name)
 
-    def initialise(self):
-        """Initialize reply generator.
-
-        :return: None
-        """
+    def initialise(self) -> None:
+        """Initialize reply generator."""
         self.rk_logger.debug(f"{self.__class__.__name__}.initialise()")
 
     def update(self) -> py_trees.common.Status:
@@ -211,7 +217,6 @@ class QueryReply(robokudo.annotators.core.BaseAnnotator):
         Creates an empty ObjectDesignator with a test pose and adds it to blackboard.
 
         :return: SUCCESS after generating response
-        :rtype: py_trees.Status
         """
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
         result = Query.Result()
@@ -247,11 +252,10 @@ class GenerateQueryResult(robokudo.annotators.core.BaseAnnotator):
     up and send it as a query reply.
     """
 
-    def __init__(self, name="GenerateQueryResult"):
+    def __init__(self, name: str = "GenerateQueryResult"):
         """Initialize query result generator.
 
         :param name: Annotator name, defaults to "GenerateQueryResult"
-        :type name: str, optional
         """
         self.rk_logger = logging.getLogger(robokudo.defs.PACKAGE_NAME)
 
@@ -284,7 +288,7 @@ class GenerateQueryResult(robokudo.annotators.core.BaseAnnotator):
 
         super().__init__(name=name)
 
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         """Generate query result from current CAS annotations.
 
         For each ObjectHypothesis in CAS:
@@ -295,7 +299,6 @@ class GenerateQueryResult(robokudo.annotators.core.BaseAnnotator):
         * Packages into query result
 
         :return: SUCCESS after generating result
-        :rtype: py_trees.Status
         """
         if QueryHandler.preempt_requested():
             QueryHandler.acknowledge_preempt_request()
@@ -349,26 +352,19 @@ class QueryActionServer(Node):
 
     Action server that listens for queries and executes them by checking blackboard
     for results generated by QueryAnnotator and QueryReply.
-
-    :ivar _action_name: Name of ROS action
-    :type _action_name: str
-    :ivar _as: Action server instance
-    :type _as: actionlib.SimpleActionServer
-    :ivar new_query: Latest received query
-    :type new_query: robokudo_msgs.msg.QueryGoal
-    :ivar query: Currently processing query
-    :type query: robokudo_msgs.msg.QueryGoal
     """
 
     def __init__(
         self,
-        name,
-        feedback_instance=Query.Feedback(),
-        result_instance=Query.Result(),
-        action_type=Query,
-    ):
+        name: str,
+        feedback_instance: Query.Feedback = Query.Feedback(),
+        result_instance: Query.Result = Query.Result(),
+        action_type: Query = Query,
+    ) -> None:
         super().__init__(name, namespace="robokudo")
         self._action_name = name
+        """Name of the ROS action"""
+
         self._as = ActionServer(
             self,
             action_type,
@@ -377,21 +373,31 @@ class QueryActionServer(Node):
             goal_callback=self.goal_cb,
             cancel_callback=self.cancel_cb,
         )
-        self.feedback_instance = feedback_instance or Query.Feedback()
-        self.result_instance = result_instance or Query.Result()
-        self.new_query = None
-        self.query = None
+        """Action server instance"""
+
+        self.feedback_instance: Query.Feedback = feedback_instance or Query.Feedback()
+        """Latest feedback message"""
+
+        self.result_instance: Query.Result = result_instance or Query.Result()
+        """Latest result message"""
+
+        self.new_query: Optional[robokudo_msgs.action.Query.Goal] = None
+        """Latest received query"""
+
+        self.query: Optional[robokudo_msgs.action.Query.Goal] = None
+        """Currently processing query"""
+
         self.reset_bookkeeping_vars()
-        self.query_processed_event = threading.Event()
+
+        self.query_processed_event: threading.Event = threading.Event()
+        """Event to signal query processing completion"""
 
         self.logger = logging.getLogger(robokudo.defs.LOGGING_IDENTIFIER_QUERY)
 
-    def reset_bookkeeping_vars(self):
+    def reset_bookkeeping_vars(self) -> None:
         """Reset internal state variables.
 
         Clears query state and blackboard variables.
-
-        :return: None
         """
         self.query = None
         self.new_query = None
@@ -402,34 +408,31 @@ class QueryActionServer(Node):
         )
         py_trees.blackboard.Blackboard().set(BBIdentifier.QUERY_PREEMPT_ACK, False)
 
-    def goal_cb(self, goal_request):
+    def goal_cb(self, goal_request: Query.Goal) -> GoalResponse:
         self.logger.info(f"Received new goal: {goal_request}")
         return GoalResponse.ACCEPT
 
-    def cancel_cb(self, goal_handle):
+    def cancel_cb(self, goal_handle: ServerGoalHandle) -> CancelResponse:
         self.logger.info(f"Received cancel request:{goal_handle}")
         py_trees.blackboard.Blackboard().set(BBIdentifier.QUERY_PREEMPT_REQUESTED, True)
         return CancelResponse.ACCEPT
 
-    def start_processing(self):
+    def start_processing(self) -> None:
         """Start processing new query.
 
         Tell the ActionServer that we are now starting the execution and it can start the monitoring/response process.
-
-        :return: None
         """
         self.logger.info("start_processing called, setting new_query to None.")
         self.new_query = None
 
-    def is_active(self):
+    def is_active(self) -> bool:
         """Check if query is being processed.
 
         :return: True if query active, False otherwise
-        :rtype: bool
         """
         return self.query is not None
 
-    async def execute_cb(self, goal_handle):
+    async def execute_cb(self, goal_handle: ServerGoalHandle) -> Optional[Query.Result]:
         """Action server execution callback.
 
         Handles:
@@ -440,8 +443,6 @@ class QueryActionServer(Node):
         * Result generation and sending
 
         :param goal_handle: Query goal from client
-        :type goal_handle:
-        :return: None
         """
         self.logger.info(f"Received query: {goal_handle.request}")
         self.new_query = goal_handle.request

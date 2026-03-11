@@ -13,7 +13,7 @@ from rclpy.action import ActionClient
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rosidl_runtime_py.convert import message_to_ordereddict
-from typing_extensions import TYPE_CHECKING, Optional
+from typing_extensions import TYPE_CHECKING, Optional, Tuple, List, Dict, Any
 
 from robokudo_msgs.action import Query
 
@@ -38,7 +38,7 @@ class RoboKudoActionClient(Node):
     Allows sending dynamic goals and handles feedback, result, and cancellation.
     """
 
-    def __init__(self, preempt_timer: Optional[float] = None):
+    def __init__(self, preempt_timer: Optional[float] = None) -> None:
         """Create a new RoboKudo action client.
 
         :param preempt_timer: Optional preempt timer to cancel the goal automatically after x seconds.
@@ -193,7 +193,7 @@ class RoboKudoActionClient(Node):
         super().destroy_node()
 
 
-def main_cli(args=None):
+def main_cli(args: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="RoboKudo Action Client")
     parser.add_argument(
         "--preempt_timer",
@@ -220,12 +220,12 @@ def main_cli(args=None):
         action_client.destroy_node()
 
 
-def main(timeout_seconds=20.0, result=Queue()):
+def main(timeout_seconds: float = 20.0, result: Queue = Queue()) -> None:
     timeout_deadline = time.monotonic() + timeout_seconds
     ctx = Context()
     rclpy.init(context=ctx)
     action_client = RoboKudoActionClient(preempt_timer=None)
-    result_dict = dict()
+    result_dict: Dict[str, Any] = dict()
     result_dict["timed_out"] = False
 
     try:

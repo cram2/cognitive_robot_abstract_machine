@@ -482,7 +482,7 @@ class KinectCameraInterface(ROSCameraInterface):
         :type cam_info: sensor_msgs.msg.CameraInfo
         """
         self.lock.acquire()
-        if self.rk_logger.is_enabled_for(logging.DEBUG):
+        if self.rk_logger.isEnabledFor(logging.DEBUG):
             self.rk_logger.debug("Received data:")
 
             color_time = Time(

@@ -25,7 +25,7 @@ import open3d as o3d
 import py_trees
 import rclpy.parameter
 import rcl_interfaces.msg
-from typing_extensions import List
+from typing_extensions import List, Dict, Type
 
 import robokudo.annotators.core
 import robokudo.io.ros
@@ -43,7 +43,7 @@ remaining copy of the old state for some point cloud.
 Authors: Sorin Arion, Naser Azizi 
 """
 
-_PYTYPE_TO_ROS_FIELD = {
+_PYTYPE_TO_ROS_FIELD: Dict[Type, str] = {
     int: "integer_value",
     float: "double_value",
     str: "string_value",

@@ -36,7 +36,7 @@ class CASCheckFunc(core.BaseAnnotator):
     def __init__(
         self,
         name: str = "CASCheckFunc",
-        func: Callable[[CAS], bool] = None,
+        func: Optional[Callable[[CAS], bool]] = None,
         raise_with_str: str = "",
     ) -> None:
         """Initialize the CAS condition checker.

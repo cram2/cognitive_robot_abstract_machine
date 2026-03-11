@@ -26,7 +26,7 @@ class SetPipelineRedraw(Behaviour):
         :class:`robokudo.pipeline.Pipeline` node.
     """
 
-    def __init__(self, name: str = "SetPipelineRedraw"):
+    def __init__(self, name: str = "SetPipelineRedraw") -> None:
         """Initialize the behavior.
 
         :param name: Name of the behavior

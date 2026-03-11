@@ -11,8 +11,6 @@ This module provides an annotator for:
 """
 
 import py_trees
-
-import robokudo.annotators
 import robokudo.annotators.core
 
 

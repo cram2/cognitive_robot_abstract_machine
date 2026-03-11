@@ -3,6 +3,7 @@
 This module provides an annotator for visualizing the poses of detected objects
 in both 2D (image overlays) and 3D (coordinate frames) representations.
 """
+
 from timeit import default_timer
 
 import numpy
@@ -29,17 +30,16 @@ class ObjectPoseVisualizer(robokudo.annotators.core.BaseAnnotator):
     * Displaying the coordinate frames alongside the point cloud
     """
 
-    def __init__(self, name="ObjectPoseVisualizer"):
+    def __init__(self, name: str = "ObjectPoseVisualizer"):
         """Initialize the object pose visualizer.
 
         :param name: Name of the annotator instance, defaults to "ObjectPoseVisualizer"
-        :type name: str, optional
         """
         super().__init__(name)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
     @robokudo.utils.error_handling.catch_and_raise_to_blackboard
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         """Update the visualization with current object poses.
 
         Creates visualizations containing:
@@ -49,27 +49,35 @@ class ObjectPoseVisualizer(robokudo.annotators.core.BaseAnnotator):
         * Point cloud data
 
         :return: SUCCESS after creating visualizations
-        :rtype: py_trees.common.Status
         """
         start_timer = default_timer()
 
         visualization_img = self.get_cas().get_copy(CASViews.COLOR_IMAGE)
         cloud = self.get_cas().get(CASViews.CLOUD)
 
-        object_hypotheses = self.get_cas().filter_annotations_by_type(robokudo.types.scene.ObjectHypothesis)
+        object_hypotheses = self.get_cas().filter_annotations_by_type(
+            robokudo.types.scene.ObjectHypothesis
+        )
 
         geometries_to_visualize = []
         object_id = 0
         for oh in object_hypotheses:
             for oh_anno in oh.annotations:
                 if isinstance(oh_anno, robokudo.types.annotation.PoseAnnotation):
-                    cluster_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2)
-                    pose_transform = robokudo.utils.transform.get_transform_matrix_from_q(
-                        numpy.asarray(oh_anno.rotation),
-                        numpy.asarray(oh_anno.translation))
+                    cluster_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
+                        size=0.2
+                    )
+                    pose_transform = (
+                        robokudo.utils.transform.get_transform_matrix_from_q(
+                            numpy.asarray(oh_anno.rotation),
+                            numpy.asarray(oh_anno.translation),
+                        )
+                    )
                     cluster_frame.transform(pose_transform)
 
-                    geometries_to_visualize.append({"name": f"Pose-Obj-{object_id}", "geometry": cluster_frame})
+                    geometries_to_visualize.append(
+                        {"name": f"Pose-Obj-{object_id}", "geometry": cluster_frame}
+                    )
 
             object_id += 1
 
@@ -82,5 +90,5 @@ class ObjectPoseVisualizer(robokudo.annotators.core.BaseAnnotator):
         self.get_annotator_output_struct().set_geometries(vis_geometries)
 
         end_timer = default_timer()
-        self.feedback_message = f'Processing took {(end_timer - start_timer):.4f}s'
+        self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
         return py_trees.common.Status.SUCCESS

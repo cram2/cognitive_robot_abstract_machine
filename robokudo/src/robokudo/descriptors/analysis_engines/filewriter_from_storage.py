@@ -26,6 +26,7 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 import robokudo.descriptors.camera_configs.config_mongodb_playback
 
 import robokudo.io.storage_reader_interface
+import robokudo.pipeline
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
@@ -46,15 +47,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         duplicate files in the filesystem.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "filewriter_from_storage"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a pipeline for writing MongoDB data to filesystem.
 
         This method constructs a processing pipeline that reads data from MongoDB
@@ -62,13 +62,17 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         perform a single pass over the stored data.
 
         :return: The configured pipeline for data transfer
-        :rtype: robokudo.pipeline.Pipeline
         """
-        cr_storage_camera_config = robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        cr_storage_camera_config = (
+            robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        )
         cr_storage_camera_config.loop = False
         cr_storage_config = CollectionReaderAnnotator.Descriptor(
             camera_config=cr_storage_camera_config,
-            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(cr_storage_camera_config))
+            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(
+                cr_storage_camera_config
+            ),
+        )
 
         seq = robokudo.pipeline.Pipeline("StoragePipeline")
         seq.add_children(
@@ -77,5 +81,6 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 FileWriter(),
-            ])
+            ]
+        )
         return seq

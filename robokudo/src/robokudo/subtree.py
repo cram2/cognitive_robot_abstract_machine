@@ -16,8 +16,8 @@ class SubtreeInterface(Protocol):
 
     def name(self) -> str:
         """Return the name of this subtree."""
-        return None
+        pass
 
     def implementation(self) -> Behaviour:
         """Return the subtree implementation."""
-        return None
+        pass

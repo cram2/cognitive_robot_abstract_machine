@@ -35,7 +35,7 @@ class AnalysisEngineInterface(Protocol):
 
         :return: The unique name identifying this Analysis Engine
         """
-        return None
+        pass
 
     def implementation(self) -> Behaviour:
         """
@@ -43,7 +43,7 @@ class AnalysisEngineInterface(Protocol):
 
         :return: The root node of the behavior tree implementing this engine
         """
-        return None
+        pass
 
 
 class SubtreeInterface(AnalysisEngineInterface):

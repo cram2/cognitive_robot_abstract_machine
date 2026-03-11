@@ -1,11 +1,8 @@
 import os
-from pathlib import Path
 from timeit import default_timer
-
-import cv2
 import numpy as np
 import py_trees.common
-from typing_extensions import Optional
+from typing_extensions import Optional, Dict, Any
 
 import robokudo.pipeline
 import robokudo.types.annotation
@@ -14,8 +11,6 @@ import robokudo.utils.annotator_helper
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.io.semantic_digital_twin import SemanticDigitalTwinAdapter, Object
 from robokudo.types.scene import ObjectHypothesis
-
-font = cv2.FONT_HERSHEY_COMPLEX
 
 
 class SemanticDigitalTwinConnector(BaseAnnotator):
@@ -26,7 +21,7 @@ class SemanticDigitalTwinConnector(BaseAnnotator):
                 self.urdf_path: Optional[str] = None
                 """Optional Path to the URDF file of the world"""
 
-        # overwrite the parameters explicitly to enable auto-completion
+        # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
 
     def __init__(
@@ -41,8 +36,14 @@ class SemanticDigitalTwinConnector(BaseAnnotator):
         self.semdt_adapter = SemanticDigitalTwinAdapter(
             self.get_cas, urdf_path=descriptor.parameters.urdf_path
         )
+        """An instance of SemanticDigitalTwinConnector used to connect to the semdt."""
 
-    def extract_data(self, oh: ObjectHypothesis) -> dict:
+    def extract_data(self, oh: ObjectHypothesis) -> Dict[str, Any]:
+        """Extracts data from an object hypothesis to a simple dictionary.
+
+        :param oh: Object hypothesis to extract data from.
+        :return: A dictionary containing the object hypothesis data in form of a dictionary.
+        """
         data = {}
         cas = self.get_cas()
 
@@ -87,6 +88,7 @@ class SemanticDigitalTwinConnector(BaseAnnotator):
         return data
 
     def update(self) -> py_trees.common.Status:
+        """Synchronise the current RoboKudo state with the current semdt state."""
         start_timer = default_timer()
 
         ohs: list[ObjectHypothesis] = self.get_cas().filter_annotations_by_type(

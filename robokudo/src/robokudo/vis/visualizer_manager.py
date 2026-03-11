@@ -30,6 +30,7 @@ from timeit import default_timer
 
 import py_trees
 from py_trees.behaviour import Behaviour
+from typing_extensions import Dict, List, Type
 
 import robokudo.defs
 import robokudo.pipeline
@@ -50,24 +51,7 @@ class VisualizationManager(Behaviour):
     * Shared visualization state
     * Visualization timing and performance monitoring
 
-    Parameters
-    ----------
-    name : str
-        Name of the behavior tree node
-
-    Attributes
-    ----------
-    pipelines : dict
-        Mapping of pipeline names to Pipeline objects
-    rk_logger : logging.Logger
-        Logger instance for this class
-    visualizer_types : list
-        List of available visualizer classes
-    visualizers : dict
-        Mapping of pipeline names to lists of active visualizers
-
-    Notes
-    -----
+    .. note::
     The manager operates in three phases:
 
     1. Pre-tick: Prepare visualizers for new data
@@ -75,57 +59,60 @@ class VisualizationManager(Behaviour):
     3. Post-tick: Cleanup and synchronization
     """
 
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         """Initialize the visualization manager.
 
-        Parameters
-        ----------
-        name : str
-            Name of the behavior tree node
+        :param name: Name of the behavior tree node
         """
         super().__init__(name=name)
-        self.pipelines = {}
-        self.rk_logger = logging.getLogger(robokudo.defs.PACKAGE_NAME)
-        self.visualizer_types = [
+
+        self.pipelines: Dict[str, robokudo.pipeline.Pipeline] = {}
+        """Mapping of pipeline names to Pipeline objects"""
+
+        self.rk_logger: logging.Logger = logging.getLogger(robokudo.defs.PACKAGE_NAME)
+        """Logger instance for this class"""
+
+        self.visualizer_types: List[Type] = [
             robokudo.vis.cv_visualizer.CVVisualizer,
             robokudo.vis.o3d_visualizer.O3DVisualizer,
             robokudo.vis.ros_visualizer.SharedROSVisualizer,
             robokudo.vis.ros_visualizer.AllAnnotatorROSVisualizer,
         ]
-        self.visualizers = {}  # key pipeline name to list of Visualizers
+        """List of available visualizer classes"""
 
-    def create_visualizers_for_pipeline(self, pipeline: robokudo.pipeline.Pipeline):
+        self.visualizers: Dict[str, List[robokudo.vis.visualizer.Visualizer]] = {}
+        """Mapping of pipeline name to list of Visualizers"""
+
+    def create_visualizers_for_pipeline(
+        self, pipeline: robokudo.pipeline.Pipeline
+    ) -> None:
         """Create visualizer instances for a pipeline.
 
-        Parameters
-        ----------
-        pipeline : robokudo.pipeline.Pipeline
-            Pipeline to create visualizers for
+        :param pipeline: Pipeline to create visualizers for
 
-        Notes
-        -----
+        .. note::
         Creates one instance of each visualizer type and associates them
         with the pipeline. All visualizers share a common visualization state.
         """
         # TODO Handle shared visualization context - Not all Visualizers need one!
         shared_state = robokudo.vis.visualizer.Visualizer.SharedState()
-        visualizers = [visclass.new_visualizer_instance(pipeline=pipeline, shared_visualizer_state=shared_state) for
-                       visclass in
-                       self.visualizer_types]
+        visualizers = [
+            visclass.new_visualizer_instance(
+                pipeline=pipeline, shared_visualizer_state=shared_state
+            )
+            for visclass in self.visualizer_types
+        ]
         self.visualizers[pipeline.name] = visualizers
 
     @staticmethod
-    def visualizer_instances():
+    def visualizer_instances() -> List[robokudo.vis.visualizer.Visualizer]:
         """Get all active visualizer instances.
 
-        Returns
-        -------
-        list
-            List of all active Visualizer instances
+        :returns: List of all active Visualizer instances
         """
         return robokudo.vis.visualizer.Visualizer.instances
 
-    def initialise(self):
+    def initialise(self) -> None:
         """Initialize the behavior tree node.
 
         This method:
@@ -134,8 +121,7 @@ class VisualizationManager(Behaviour):
         * Finds all Pipeline nodes in the behavior tree
         * Stores references to found pipelines
 
-        Notes
-        -----
+        .. note::
         The VisualizationManager should be placed one level below the top node
         (Parallel) in the behavior tree.
         """
@@ -147,7 +133,7 @@ class VisualizationManager(Behaviour):
             if isinstance(node, robokudo.pipeline.Pipeline):
                 self.pipelines[node.name] = node
 
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         """Update visualizations for all pipelines.
 
         This method:
@@ -158,13 +144,9 @@ class VisualizationManager(Behaviour):
         4. Executes pre-tick, tick, and post-tick phases
         5. Checks for termination signals
 
-        Returns
-        -------
-        py_trees.common.Status
-            FAILURE if any visualizer indicates termination, RUNNING otherwise
+        :returns: FAILURE if any visualizer indicates termination, RUNNING otherwise
 
-        Notes
-        -----
+        .. note::
         The update cycle ensures synchronized visualization across all backends
         while maintaining separation between data buffers and visualization state.
         """
@@ -172,24 +154,32 @@ class VisualizationManager(Behaviour):
         start_timer = default_timer()
 
         blackboard = py_trees.blackboard.Blackboard()
-        annotator_output_pipeline_map_buffer = blackboard.get("annotator_output_pipeline_map_buffer")  # Working buffer
+        annotator_output_pipeline_map_buffer = blackboard.get(
+            "annotator_output_pipeline_map_buffer"
+        )  # Working buffer
         annotator_output_pipeline_map_visualized = blackboard.get(
-            "annotator_output_pipeline_map_visualized")  # Vis only
+            "annotator_output_pipeline_map_visualized"
+        )  # Vis only
 
         # Create Visualized Buffer if new data is available
         for pipeline_name in annotator_output_pipeline_map_buffer.map:
             if annotator_output_pipeline_map_buffer.map[pipeline_name].redraw:
-                self.rk_logger.debug("%s.update(): Redraw flag on Pipeline %s is true. Copying data"
-                                     % (self.__class__.__name__, pipeline_name))
+                self.rk_logger.debug(
+                    "%s.update(): Redraw flag on Pipeline %s is true. Copying data"
+                    % (self.__class__.__name__, pipeline_name)
+                )
 
-                annotator_output_pipeline_map_visualized.map[pipeline_name] = \
-                    copy.deepcopy(annotator_output_pipeline_map_buffer.map[pipeline_name])
+                annotator_output_pipeline_map_visualized.map[pipeline_name] = (
+                    copy.deepcopy(
+                        annotator_output_pipeline_map_buffer.map[pipeline_name]
+                    )
+                )
 
                 annotator_output_pipeline_map_buffer.map[pipeline_name].redraw = False
 
         # Create new Visualizers based on the visualization data
         for pipeline_name in annotator_output_pipeline_map_visualized.map:
-            assert (pipeline_name in self.pipelines)
+            assert pipeline_name in self.pipelines
 
             if pipeline_name not in self.visualizers:
                 self.create_visualizers_for_pipeline(self.pipelines[pipeline_name])
@@ -200,7 +190,9 @@ class VisualizationManager(Behaviour):
                     visualizer.new_data_available()
 
                 # Visualizers have been informed
-                annotator_output_pipeline_map_visualized.map[pipeline_name].redraw = False
+                annotator_output_pipeline_map_visualized.map[pipeline_name].redraw = (
+                    False
+                )
 
         # Pre-tick
         for pipeline_name, visualizer_list in self.visualizers.items():
@@ -226,6 +218,6 @@ class VisualizationManager(Behaviour):
                 return py_trees.common.Status.FAILURE
 
         end_timer = default_timer()
-        self.feedback_message = f'Processing took {(end_timer - start_timer):.4f}s'
+        self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
 
         return py_trees.common.Status.RUNNING

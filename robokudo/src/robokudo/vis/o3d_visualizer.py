@@ -15,17 +15,12 @@ Dependencies
 * logging for status messages
 * robokudo.annotators for annotator access
 * robokudo.vis.visualizer for base visualization interface
-
-See Also
---------
-* :mod:`robokudo.vis.visualizer` : Base visualization interface
-* :mod:`robokudo.vis.cv_visualizer` : 2D visualization
-* :mod:`robokudo.vis.ros_visualizer` : ROS-based visualization
 """
 
 import logging
 
 import open3d as o3d  # this import creates a SIGINT during unit test execution....
+from typing_extensions import Any, List, Dict, Union, Optional
 
 from robokudo.annotators.core import BaseAnnotator
 import robokudo.defs
@@ -44,73 +39,51 @@ class O3DVisualizer(Visualizer, Visualizer.Observer):
     * Coordinate frame display
     * Shared visualization state
 
-    Parameters
-    ----------
-    *args
-        Variable length argument list passed to parent classes
-    **kwargs
-        Arbitrary keyword arguments passed to parent classes
-
-    Attributes
-    ----------
-    viewer3d : Viewer3D
-        Open3D viewer instance
-    shared_visualizer_state : Visualizer.SharedState
-        Shared state object for coordinating between visualizers
-    update_output : bool
-        Flag indicating if display needs updating
+    .. note::
+        This Visualizer works with a shared state and needs notifications
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the Open3D visualizer.
-
-        Parameters
-        ----------
-        *args
-            Variable length argument list passed to parent classes
-        **kwargs
-            Arbitrary keyword arguments passed to parent classes
-        """
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the Open3D visualizer."""
         super().__init__(*args, **kwargs)
-        self.viewer3d = None
-        # This Visualizer works with a shared state and needs notifications
+
+        self.viewer3d: Optional[Viewer3D] = None
+        """Open3D viewer instance"""
+
         self.shared_visualizer_state.register_observer(self)
 
-    def notify(self, observable, *args, **kwargs):
+    def notify(
+        self,
+        observable: robokudo.vis.visualizer.Visualizer.Observable,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         """Handle notification of state changes.
 
-        Parameters
-        ----------
-        observable : object
-            The object that sent the notification
-        *args
-            Variable length argument list
-        **kwargs
-            Arbitrary keyword arguments
+        :param observable: The object that sent the notification
         """
         self.update_output = True
 
-    def tick(self):
+    def tick(self) -> None:
         """Update the visualization display.
 
         This method:
-        
+
         * Initializes viewer if needed
         * Gets current annotator outputs
         * Updates display if needed
         * Handles viewer lifecycle
 
-        Returns
-        -------
-        bool
-            False if visualization should terminate, True otherwise
+        :returns: False if visualization should terminate, True otherwise
         """
         if self.viewer3d is None:
             self.viewer3d = Viewer3D(self.window_title() + "_3D")
 
         annotator_outputs = self.get_visualized_annotator_outputs_for_pipeline()
 
-        active_annotator_instance = self.shared_visualizer_state.active_annotator  # type: BaseAnnotator
+        active_annotator_instance = (
+            self.shared_visualizer_state.active_annotator
+        )  # type: BaseAnnotator
 
         self.update_output_flag_for_new_data()
 
@@ -123,18 +96,21 @@ class O3DVisualizer(Visualizer, Visualizer.Observer):
             # during construction of the tree AND don't generate cloud outputs.
             # => Fetch geometry if present
             if active_annotator_instance.name in annotator_outputs.outputs:
-                geometries = annotator_outputs.outputs[active_annotator_instance.name].geometries
+                geometries = annotator_outputs.outputs[
+                    active_annotator_instance.name
+                ].geometries
 
             self.viewer3d.update_cloud(geometries)
 
-        tick_result = self.viewer3d.tick()  # right now, this is the last update call. if that's true, the GUI is happy.
+        tick_result = (
+            self.viewer3d.tick()
+        )  # right now, this is the last update call. if that's true, the GUI is happy.
 
         if not tick_result:
             self.indicate_termination_var = True
 
     def window_title(self) -> str:
-        """Get the window title for this visualizer.
-        """
+        """Get the window title for this visualizer."""
         return self.identifier()
 
 
@@ -147,55 +123,50 @@ class Viewer3D(object):
     * Geometry updates
     * Camera control
     * Coordinate frame display
-
-    Parameters
-    ----------
-    title : str
-        Window title for the viewer
-
-    Attributes
-    ----------
-    first_cloud : bool
-        Flag indicating if this is the first cloud being displayed
-    CLOUD_NAME : str
-        Name identifier for the point cloud
-    rk_logger : logging.Logger
-        Logger instance
-    main_vis : o3d.visualization.O3DVisualizer
-        Open3D visualizer instance
-    visualized_geometries : list
-        Names of currently visualized geometries
     """
 
-    def __init__(self, title):
+    def __init__(self, title: str) -> None:
         """Initialize the 3D viewer.
 
-        Parameters
-        ----------
-        title : str
-            Window title for the viewer
+        :param title: Window title for the viewer
         """
-        self.first_cloud = True
-        self.CLOUD_NAME = 'Viewer3D'
-        self.rk_logger = logging.getLogger(robokudo.defs.PACKAGE_NAME)
-        app = o3d.visualization.gui.Application.instance
+        self.first_cloud: bool = True
+        """Flag indicating if this is the first cloud being displayed"""
+
+        self.CLOUD_NAME: str = "Viewer3D"
+        """Name identifier for the point cloud"""
+
+        self.rk_logger: logging.Logger = logging.getLogger(robokudo.defs.PACKAGE_NAME)
+        """Logger instance"""
+
+        app: o3d.visualization.gui.Application = (
+            o3d.visualization.gui.Application.instance
+        )
+        """Open3D app instance"""
+
         app.initialize()
 
-        self.rk_logger.info("Starting O3DVisualizer. 3D output might be broken if no success message follows. "
-                            "Try rebooting the machine if running local or check GPU passthrough in Docker.")
-        self.main_vis = o3d.visualization.O3DVisualizer(title)
+        self.rk_logger.info(
+            "Starting O3DVisualizer. 3D output might be broken if no success message follows. "
+            "Try rebooting the machine if running local or check GPU passthrough in Docker."
+        )
+
+        self.main_vis: o3d.visualization.O3DVisualizer = (
+            o3d.visualization.O3DVisualizer(title)
+        )
+        """Open3D visualizer instance"""
+
         self.rk_logger.info("Starting O3DVisualizer was successful")
+
         app.add_window(self.main_vis)
 
-        self.visualized_geometries = []  # names of visualized geometries
+        self.visualized_geometries: List[str] = []
+        """List of the names of the currently visualized geometries"""
 
-    def tick(self):
+    def tick(self) -> Any:
         """Update the viewer display.
 
-        Returns
-        -------
-        bool
-            False if visualization should terminate, True otherwise
+        :returns: False if visualization should terminate, True otherwise
         """
         app = o3d.visualization.gui.Application.instance
         tick_return = app.run_one_tick()
@@ -203,33 +174,26 @@ class Viewer3D(object):
             self.main_vis.post_redraw()
         return tick_return
 
-    def update_cloud(self, geometries):
+    def update_cloud(
+        self, geometries: Optional[Union[o3d.geometry.Geometry, Dict, List]]
+    ) -> None:
         """Update the displayed geometries.
 
         This method updates the Open3D visualizer based on the outputs of the annotators.
         For the first update, it also sets up the camera and coordinate frame.
 
-        Parameters
-        ----------
-        geometries : Union[o3d.geometry.Geometry3D, dict, list, None]
-            Geometries to display. Can be:
-            
-            * A single geometry object
-            * A dict with geometry configuration
-            * A list of geometries or dicts
-            * None to clear display
+        :param geometries: Geometries to display. Can be:
 
-        Notes
-        -----
-        The dict format follows Open3D's draw() convention. See:
-        https://github.com/isl-org/Open3D/blob/master/examples/python/visualization/draw.py
+        .. note::
+            The dict format follows Open3D's draw() convention. See:
+            https://github.com/isl-org/Open3D/blob/master/examples/python/visualization/draw.py
         """
         if geometries is None:
             return
 
         # local method to add a single geometry. either based on the geometry being fully
         # defined with a dict or being a plain geometry object
-        def add(g, n):
+        def add(g: Union[o3d.geometry.PointCloud, Dict, List], n: int) -> None:
             # Skip empty point clouds as they generate errors during the update
             if isinstance(g, o3d.geometry.PointCloud) and len(g.points) == 0:
                 return
@@ -245,7 +209,9 @@ class Viewer3D(object):
 
         # Add all geometries from the given parameter.
         # It is safe to either input a plain geometry object or a list of objects.
-        def add_all(geometries_to_add):
+        def add_all(
+            geometries_to_add: Union[o3d.geometry.Geometry, Dict, List],
+        ) -> None:
             n = 1
             if isinstance(geometries_to_add, list):
                 for g in geometries_to_add:
@@ -256,16 +222,20 @@ class Viewer3D(object):
 
         if self.first_cloud:
 
-            def add_first_cloud():
+            def add_first_cloud() -> None:
                 add_all(geometries)
 
                 self.main_vis.reset_camera_to_default()
-                self.main_vis.setup_camera(60,
-                                           [0, 0, 3],  # gaze coordinates
-                                           [0, 0, -1.5],  # camera position
-                                           [0, -1, 0])  # turn cloud in viewer? from tutorial
+                self.main_vis.setup_camera(
+                    60,
+                    [0, 0, 3],  # gaze coordinates
+                    [0, 0, -1.5],  # camera position
+                    [0, -1, 0],
+                )  # turn cloud in viewer? from tutorial
 
-                coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3)
+                coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
+                    size=0.3
+                )
 
                 # The origin should always stay in the window. It will not be added to the
                 # house-keeping list self.visualized_geometries
@@ -274,7 +244,8 @@ class Viewer3D(object):
             add_first_cloud()
             self.first_cloud = False
         else:
-            def update_with_cloud():
+
+            def update_with_cloud() -> None:
                 for vg in self.visualized_geometries:
                     self.main_vis.remove_geometry(vg)
                 self.visualized_geometries = []

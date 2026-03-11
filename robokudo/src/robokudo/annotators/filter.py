@@ -52,9 +52,8 @@ class FilterAnnotator(robokudo.annotators.core.BaseAnnotator):
                 self.func_kwargs: Optional[Dict] = None
                 """Keyword arguments for filter function"""
 
-        parameters = (
-            Parameters()
-        )  # overwrite the parameters explicitly to enable auto-completion
+        # overwrite the parameters explicitly to enable auto-completion
+        parameters = Parameters()
 
     def __init__(
         self,

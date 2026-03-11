@@ -349,7 +349,7 @@ def render_dot_tree(
 
 
 def write_timing_info_to_csv(
-    filename_wo_extension: str, timing_info_dict: Dict
+    filename_wo_extension: str, timing_info_dict: Dict[str, float]
 ) -> None:
     """
     Write timing information for annotators to a CSV file.

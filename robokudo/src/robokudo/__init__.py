@@ -11,4 +11,4 @@ systems using behavior trees. It includes:
 * Common data structures for perception data
 """
 
-__version__ = "1.0.0"
+__version__: str = "1.0.0"

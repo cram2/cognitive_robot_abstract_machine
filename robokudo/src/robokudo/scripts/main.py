@@ -46,10 +46,8 @@ def run_ae(
     node: rclpy.node.Node,
     ae_root: py_trees_ros.trees.BehaviourTree,
     tickrate: int = 20,
-):
-    """
-    Run an Analysis Engine (AE) by periodically ticking the Behavior Tree.
-    """
+) -> None:
+    """Run an Analysis Engine (AE) by periodically ticking the Behavior Tree."""
     logger = logging.getLogger(robokudo.defs.LOGGING_IDENTIFIER_MAIN_EXECUTABLE)
     logger.info(f"Running AE named '{ae_name}'...")
 
@@ -57,7 +55,7 @@ def run_ae(
     blackboard.set("CAS", None)
     tick_count = 0
 
-    def tick_tree():
+    def tick_tree() -> None:
         nonlocal tick_count
         try:
             logger.debug(f"--------- Tick {tick_count} ---------")
@@ -80,7 +78,7 @@ def run_ae(
     node.create_timer(1.0 / tickrate, tick_tree)
 
 
-def main():
+def main() -> None:
     """
     Entry point for the RoboKudo system, setting up ROS, parsing arguments,
     loading the requested Analysis Engine, and spinning the ROS executors.
@@ -188,7 +186,7 @@ def main():
     executor_main.add_node(node1)
     executor_asrv.add_node(query_action_server)
 
-    def spin_executor(exec_):
+    def spin_executor(exec_: rclpy.Executor) -> None:
         try:
             exec_.spin()
         except KeyboardInterrupt:

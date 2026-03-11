@@ -16,10 +16,10 @@ from robokudo.annotators.simple_yolo_annotator import SimpleYoloAnnotator
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
-    def name(self):
-        return "demo"
+    def name(self) -> str:
+        return "semdt_demo"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """
         Create a pipeline that does tabletop segmentation and integrates primary navigation
         using a YOLO annotator.
@@ -30,24 +30,31 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         # node = rclpy.create_node("semantic_world")
         # viz = VizMarkerPublisher(world=sw_connector.semdt_adapter.world, node=node)
 
-        kinect_camera_config = robokudo.descriptors.camera_configs.config_kinect_robot_wo_transform.CameraConfig()
+        kinect_camera_config = (
+            robokudo.descriptors.camera_configs.config_kinect_robot_wo_transform.CameraConfig()
+        )
         kinect_config = CollectionReaderAnnotator.Descriptor(
             camera_config=kinect_camera_config,
-            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(kinect_camera_config))
+            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(
+                kinect_camera_config
+            ),
+        )
 
         seq = robokudo.pipeline.Pipeline("RWPipeline")
-        seq.add_children([
-            robokudo.idioms.pipeline_init(),
-            CollectionReaderAnnotator(descriptor=kinect_config),
-            ImagePreprocessorAnnotator("ImagePreprocessor"),
-            PointcloudCropAnnotator(),
-            PlaneAnnotator(),
-            PointCloudClusterExtractor(),
-            ClusterColorAnnotator(),
-            ClusterColorHistogramAnnotator(),
-            ClusterPoseBBAnnotator(),
-            SimpleYoloAnnotator(),
-            sw_connector
-            # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
-        ])
+        seq.add_children(
+            [
+                robokudo.idioms.pipeline_init(),
+                CollectionReaderAnnotator(descriptor=kinect_config),
+                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                PointcloudCropAnnotator(),
+                PlaneAnnotator(),
+                PointCloudClusterExtractor(),
+                ClusterColorAnnotator(),
+                ClusterColorHistogramAnnotator(),
+                ClusterPoseBBAnnotator(),
+                SimpleYoloAnnotator(),
+                sw_connector,
+                # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
+            ]
+        )
         return seq

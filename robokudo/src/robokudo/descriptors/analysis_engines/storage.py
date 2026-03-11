@@ -26,6 +26,7 @@ import robokudo.descriptors.camera_configs.config_kinect_robot
 import robokudo.descriptors.camera_configs.config_kinect_robot_wo_transform
 import robokudo.io.camera_interface
 import robokudo.idioms
+import robokudo.pipeline
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
@@ -47,15 +48,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         transform lookup if needed.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "storage"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a pipeline for recording sensor data.
 
         This method constructs a processing pipeline that captures and stores
@@ -68,13 +68,17 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         * Kinect config without transform lookup (default)
 
         :return: The configured pipeline for data recording
-        :rtype: robokudo.pipeline.Pipeline
         """
-        kinect_camera_config = robokudo.descriptors.camera_configs.config_kinect_robot.CameraConfig()
+        kinect_camera_config = (
+            robokudo.descriptors.camera_configs.config_kinect_robot.CameraConfig()
+        )
         # kinect_camera_config = robokudo.descriptors.camera_configs.config_kinect_robot_wo_transform.CameraConfig()
         kinect_config = CollectionReaderAnnotator.Descriptor(
             camera_config=kinect_camera_config,
-            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(kinect_camera_config))
+            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(
+                kinect_camera_config
+            ),
+        )
 
         seq = robokudo.pipeline.Pipeline()
         seq.add_children(
@@ -83,5 +87,6 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 CollectionReaderAnnotator(descriptor=kinect_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 StorageWriter(),
-            ])
+            ]
+        )
         return seq

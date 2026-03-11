@@ -42,7 +42,7 @@ class ObjectKnowledgeBase(BaseObjectKnowledgeBase):
         and may need adjustment for other environments.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the IAI kitchen object knowledge base.
 
         Creates object definitions for:
@@ -53,15 +53,38 @@ class ObjectKnowledgeBase(BaseObjectKnowledgeBase):
         """
         super().__init__()
 
-        mug_opening = ObjectKnowledge(name="MugOpening",
-                                      position_x=0.0, position_y=0.0, position_z=0.08,
-                                      orientation_x=0, orientation_y=0, orientation_z=0, orientation_w=1,
-                                      x_size=0.1, y_size=0.1, z_size=0.02)
-        mug_bottom = ObjectKnowledge(name="MugBottom",
-                                     position_x=0.0, position_y=0.0, position_z=-0.08,
-                                     orientation_x=0, orientation_y=0, orientation_z=0, orientation_w=1,
-                                     x_size=0.1, y_size=0.1, z_size=0.02)
-        mug = ObjectKnowledge(name="Mug",
-                              x_size=0.1, y_size=0.1, z_size=0.18, features=[mug_opening, mug_bottom])
+        mug_opening = ObjectKnowledge(
+            name="MugOpening",
+            position_x=0.0,
+            position_y=0.0,
+            position_z=0.08,
+            orientation_x=0,
+            orientation_y=0,
+            orientation_z=0,
+            orientation_w=1,
+            x_size=0.1,
+            y_size=0.1,
+            z_size=0.02,
+        )
+        mug_bottom = ObjectKnowledge(
+            name="MugBottom",
+            position_x=0.0,
+            position_y=0.0,
+            position_z=-0.08,
+            orientation_x=0,
+            orientation_y=0,
+            orientation_z=0,
+            orientation_w=1,
+            x_size=0.1,
+            y_size=0.1,
+            z_size=0.02,
+        )
+        mug = ObjectKnowledge(
+            name="Mug",
+            x_size=0.1,
+            y_size=0.1,
+            z_size=0.18,
+            features=[mug_opening, mug_bottom],
+        )
 
         self.add_entries([mug_opening, mug, mug_bottom])

@@ -26,6 +26,7 @@ from robokudo.annotators.storage import StorageWriter
 import robokudo.descriptors.camera_configs.config_tiago
 import robokudo.io.camera_interface
 import robokudo.idioms
+import robokudo.pipeline
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
@@ -48,15 +49,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         spatial relationships in the stored data.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "tiago_storage_with_transform"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a pipeline for recording TIAGo data with transforms.
 
         This method constructs a processing pipeline that captures and stores
@@ -71,12 +71,16 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         4. Store data and transforms
 
         :return: The configured pipeline for data recording
-        :rtype: robokudo.pipeline.Pipeline
         """
-        tiago_camera_config = robokudo.descriptors.camera_configs.config_tiago.CameraConfig()
+        tiago_camera_config = (
+            robokudo.descriptors.camera_configs.config_tiago.CameraConfig()
+        )
         tiago_config = CollectionReaderAnnotator.Descriptor(
             camera_config=tiago_camera_config,
-            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(tiago_camera_config))
+            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(
+                tiago_camera_config
+            ),
+        )
 
         seq = robokudo.pipeline.Pipeline()
         seq.add_children(
@@ -85,5 +89,6 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 CollectionReaderAnnotator(descriptor=tiago_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 StorageWriter(),
-            ])
+            ]
+        )
         return seq

@@ -10,11 +10,14 @@ This module provides an annotator for:
 .. note::
    Cropping can be done in either sensor coordinates (default) or world coordinates.
 """
+
+from __future__ import annotations
 from timeit import default_timer
 
 import cv2
 import open3d as o3d
 import py_trees
+from typing_extensions import Optional, TYPE_CHECKING
 
 import robokudo.annotators
 import robokudo.annotators.core
@@ -23,6 +26,9 @@ import robokudo.utils.annotator_helper
 import robokudo.utils.error_handling
 from robokudo.cas import CASViews
 from robokudo.utils.o3d_helper import get_mask_from_pointcloud
+
+if TYPE_CHECKING:
+    import numpy.typing as npt
 
 
 class PointcloudCropAnnotator(robokudo.annotators.core.BaseAnnotator):
@@ -39,55 +45,51 @@ class PointcloudCropAnnotator(robokudo.annotators.core.BaseAnnotator):
         """Configuration descriptor for point cloud cropping."""
 
         class Parameters:
-            """Parameters for configuring point cloud cropping.
+            """Parameters for configuring point cloud cropping."""
 
-            Bounding box parameters:
+            def __init__(self) -> None:
+                self.min_x: float = -2.0
+                """Minimum X coordinate"""
 
-            :ivar min_x: Minimum X coordinate, defaults to -2.0
-            :type min_x: float
-            :ivar min_y: Minimum Y coordinate, defaults to -2.0
-            :type min_y: float
-            :ivar min_z: Minimum Z coordinate, defaults to -9.0
-            :type min_z: float
-            :ivar max_x: Maximum X coordinate, defaults to 2.0
-            :type max_x: float
-            :ivar max_y: Maximum Y coordinate, defaults to 2.0
-            :type max_y: float
-            :ivar max_z: Maximum Z coordinate, defaults to 3.0
-            :type max_z: float
+                self.min_y: float = -2.0
+                """Minimum Y coordinate"""
 
-            Coordinate frame:
+                self.min_z: float = -9.0
+                """Minimum Z coordinate"""
 
-            :ivar relative_to_world: Whether to crop in world coordinates, defaults to False
-            :type relative_to_world: bool
-            """
+                self.max_x: float = 2.0
+                """Maximum X coordinate"""
 
-            def __init__(self):
-                self.min_x = -2.0
-                self.min_y = -2.0
-                self.min_z = -9.0
-                self.max_x = 2.0
-                self.max_y = 2.0
-                self.max_z = 3.0
-                self.relative_to_world = False  # Decide if the Crop should be done in the sensor/camera coordinates
-                # or if the PC should be transformed with CASViews.VIEWPOINT_CAM_TO_WORLD first
+                self.max_y: float = 2.0
+                """Maximum Y coordinate"""
 
-        parameters = Parameters()  # overwrite the parameters explicitly to enable auto-completion
+                self.max_z: float = 3.0
+                """Maximum Z coordinate"""
 
-    def __init__(self, name="PointcloudCropAnnotator", descriptor=Descriptor()):
+                self.relative_to_world: bool = False
+                """Whether to crop the PC in camera/sensor coordinates or whether it shoudl be transformed to world coordinates beforehand."""
+
+        # Overwrite the parameters explicitly to enable auto-completion
+        parameters = Parameters()
+
+    def __init__(
+        self,
+        name: str = "PointcloudCropAnnotator",
+        descriptor: "PointcloudCropAnnotator.Descriptor" = Descriptor(),
+    ) -> None:
         """Initialize the point cloud cropper.
 
         :param name: Name of this annotator instance, defaults to "PointcloudCropAnnotator"
-        :type name: str, optional
         :param descriptor: Configuration descriptor, defaults to Descriptor()
-        :type descriptor: PointcloudCropAnnotator.Descriptor, optional
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self.color = None
+
+        self.color: Optional[npt.NDArray] = None
+        """A copy of the color image currently being worked with."""
 
     @robokudo.utils.error_handling.catch_and_raise_to_blackboard
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         """Process and crop point cloud data.
 
         The method:
@@ -100,7 +102,6 @@ class PointcloudCropAnnotator(robokudo.annotators.core.BaseAnnotator):
         * Creates combined visualization
 
         :return: SUCCESS after processing
-        :rtype: py_trees.Status
         :raises Exception: If world transform not found when needed
         """
         start_timer = default_timer()
@@ -117,45 +118,63 @@ class PointcloudCropAnnotator(robokudo.annotators.core.BaseAnnotator):
 
         if self.descriptor.parameters.relative_to_world:
             try:
-                cloud = robokudo.utils.annotator_helper.transform_cloud_from_cam_to_world(self.get_cas(), cloud)
+                cloud = (
+                    robokudo.utils.annotator_helper.transform_cloud_from_cam_to_world(
+                        self.get_cas(), cloud
+                    )
+                )
             except Exception as e:
-                self.rk_logger.warning(f"Couldn't find camera viewpoint in the CAS and relative_to_world is true. "
-                                       f"Fail. Error: {e}")
+                self.rk_logger.warning(
+                    f"Couldn't find camera viewpoint in the CAS and relative_to_world is true. "
+                    f"Fail. Error: {e}"
+                )
             return py_trees.common.Status.FAILURE
 
         #
         # Crop the point cloud
         #
-        assert (isinstance(cloud, o3d.geometry.PointCloud))
+        assert isinstance(cloud, o3d.geometry.PointCloud)
 
         abb = o3d.geometry.AxisAlignedBoundingBox(
-            [self.descriptor.parameters.min_x,
-             self.descriptor.parameters.min_y,
-             self.descriptor.parameters.min_z, ],
-            [self.descriptor.parameters.max_x,
-             self.descriptor.parameters.max_y,
-             self.descriptor.parameters.max_z, ]
+            [
+                self.descriptor.parameters.min_x,
+                self.descriptor.parameters.min_y,
+                self.descriptor.parameters.min_z,
+            ],
+            [
+                self.descriptor.parameters.max_x,
+                self.descriptor.parameters.max_y,
+                self.descriptor.parameters.max_z,
+            ],
         )
 
         cropped_cloud = cloud.crop(abb)
 
         # Transform cloud back to camera coordinates if it has been transformed to world before
         if self.descriptor.parameters.relative_to_world:
-            cropped_cloud_transformed = robokudo.utils.annotator_helper.transform_cloud_from_world_to_cam(
-                self.get_cas(), cropped_cloud)
+            cropped_cloud_transformed = (
+                robokudo.utils.annotator_helper.transform_cloud_from_world_to_cam(
+                    self.get_cas(), cropped_cloud
+                )
+            )
             cropped_cloud = cropped_cloud_transformed
 
-        assert (isinstance(cropped_cloud, o3d.geometry.PointCloud))
+        assert isinstance(cropped_cloud, o3d.geometry.PointCloud)
 
         self.get_cas().set_ref(CASViews.CLOUD, cropped_cloud)
         self.get_annotator_output_struct().set_geometries(cropped_cloud)
 
         mask_scale = 1.0 / color2depth_ratio[0]
-        mask = get_mask_from_pointcloud(cropped_cloud, self.color, pc_cam_intrinsics, mask_scale_factor=mask_scale,
-                                        crop_to_ref=True)
+        mask = get_mask_from_pointcloud(
+            cropped_cloud,
+            self.color,
+            pc_cam_intrinsics,
+            mask_scale_factor=mask_scale,
+            crop_to_ref=True,
+        )
         combined_mask_color = cv2.addWeighted(self.color, 0.5, mask, 0.5, 0)
         self.get_annotator_output_struct().set_image(combined_mask_color)
 
         end_timer = default_timer()
-        self.feedback_message = f'Processing took {(end_timer - start_timer):.4f}s'
+        self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
         return py_trees.common.Status.SUCCESS

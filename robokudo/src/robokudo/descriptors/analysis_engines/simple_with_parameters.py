@@ -26,6 +26,7 @@ import robokudo.descriptors.camera_configs.config_kinect_robot
 
 import robokudo.io.camera_interface
 import robokudo.idioms
+import robokudo.pipeline
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
@@ -47,15 +48,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         and requirements.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "simple_with_parameters"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a pipeline with custom parameter configuration.
 
         This method constructs a processing pipeline that demonstrates how to
@@ -71,10 +71,15 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         :return: The configured pipeline with custom parameters
         :rtype: robokudo.pipeline.Pipeline
         """
-        kinect_camera_config = robokudo.descriptors.camera_configs.config_kinect_robot.CameraConfig()
+        kinect_camera_config = (
+            robokudo.descriptors.camera_configs.config_kinect_robot.CameraConfig()
+        )
         kinect_config = CollectionReaderAnnotator.Descriptor(
             camera_config=kinect_camera_config,
-            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(kinect_camera_config))
+            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(
+                kinect_camera_config
+            ),
+        )
 
         image_preprocessor_config = ImagePreprocessorAnnotator.Descriptor()
         image_preprocessor_config.parameters.depth_trunc = 4.5
@@ -84,8 +89,11 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
             [
                 robokudo.idioms.pipeline_init(),
                 CollectionReaderAnnotator(descriptor=kinect_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor", descriptor=image_preprocessor_config),
+                ImagePreprocessorAnnotator(
+                    "ImagePreprocessor", descriptor=image_preprocessor_config
+                ),
                 SlowAnnotator("SlowAnnotator"),
-            ])
+            ]
+        )
 
         return seq

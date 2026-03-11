@@ -50,7 +50,7 @@ class BaseSemanticMap:
     The map can be visualized using ROS visualization markers.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Initialize an empty semantic map with visualization support.
         """

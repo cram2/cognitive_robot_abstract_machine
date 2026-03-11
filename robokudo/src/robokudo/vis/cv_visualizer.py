@@ -30,6 +30,8 @@ import sys
 import cv2
 import numpy
 import py_trees
+from typing_extensions import Any, Optional
+import robokudo.vis.visualizer
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.vis.visualizer import Visualizer
@@ -47,36 +49,16 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
     * Window management
     * Shared visualization state
 
-    Parameters
-    ----------
-    *args
-        Variable length argument list passed to parent classes
-    **kwargs
-        Arbitrary keyword arguments passed to parent classes
-
-    Attributes
-    ----------
-    shared_visualizer_state : Visualizer.SharedState
-        Shared state object for coordinating between visualizers
-    update_output : bool
-        Flag indicating if display needs updating
+    .. note::
+        This Visualizer works with a shared state and needs notifications
     """
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the OpenCV visualizer.
-
-        Parameters
-        ----------
-        *args
-            Variable length argument list passed to parent classes
-        **kwargs
-            Arbitrary keyword arguments passed to parent classes
-        """
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the OpenCV visualizer."""
         super().__init__(*args, **kwargs)
-        # This Visualizer works with a shared state and needs notifications
         self.shared_visualizer_state.register_observer(self)
 
-    def tick(self):
+    def tick(self) -> None:
         """Update the visualization display.
 
         This method:
@@ -91,7 +73,9 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
         # print(f"outputs are {annotator_outputs}")
 
         assert self.shared_visualizer_state.active_annotator is not None
-        active_annotator_instance: BaseAnnotator = self.shared_visualizer_state.active_annotator
+        active_annotator_instance: BaseAnnotator = (
+            self.shared_visualizer_state.active_annotator
+        )
         # print(f"Active annotator: {active_annotator_instance.name}")
 
         self.update_output_flag_for_new_data()
@@ -118,13 +102,15 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
             else:
                 img = annotator_outputs.outputs[active_annotator_instance.name].image
 
-            img_with_annotator_text = cv2.putText(img,
-                                                  active_annotator_instance.name,
-                                                  (15, 15),
-                                                  cv2.FONT_HERSHEY_SIMPLEX,
-                                                  0.5,
-                                                  (0, 255, 0),
-                                                  2)
+            img_with_annotator_text = cv2.putText(
+                img,
+                active_annotator_instance.name,
+                (15, 15),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                2,
+            )
             # print(f"Displaying image for {active_annotator_instance.name}")
 
             window_title = self.window_title()
@@ -133,21 +119,18 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
             cv2.setMouseCallback(window_title, self.mouse_callback_cv)
             cv2.imshow(window_title, img_with_annotator_text)
 
-    def mouse_callback_cv(self, event, x, y, flags, param):
+    def mouse_callback_cv(
+        self, event: int, x: int, y: int, flags: int, param: Any
+    ) -> None:
         """
         Mouse callback for the 2D Visualizer.
         Prints double click events and forwards every event to the active annotator.
 
         :param event: OpenCV mouse event type
-        :type event: int
         :param x: X coordinate of mouse event
-        :type x: int
         :param y: Y coordinate of mouse event
-        :type y: int
         :param flags: OpenCV event flags
-        :type flags: int
         :param param: Additional parameters (unused)
-        :type param: any
         """
         if event == cv2.EVENT_LBUTTONDBLCLK:
             print(f"2D Visualizer double-clicked at ({x},{y})")
@@ -157,20 +140,23 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
         active_annotator_instance.mouse_callback(event, x, y, flags, param)
 
     def window_title(self) -> str:
-        """Get the window title for this visualizer.
-        """
+        """Get the window title for this visualizer."""
         return self.identifier()
 
-    def notify(self, observable, *args, **kwargs):
+    def notify(
+        self,
+        observable: robokudo.vis.visualizer.Visualizer.Observable,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         """Handle notification of state changes.
 
         :param observable: The object that sent the notification
-        :type observable: object
         """
         self.update_output = True
 
     @staticmethod
-    def static_post_tick():
+    def static_post_tick() -> None:
         """Handle keyboard input after visualization update.
 
         This method:
@@ -196,25 +182,29 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
             cv_visualizer_for_key.indicate_termination_var = True
 
     @staticmethod
-    def get_gui_handler_for_detected_key():  # -> Optional[robokudo.vis.visualizer.CVVisualizer]:
+    def get_gui_handler_for_detected_key() -> Optional["CVVisualizer"]:
         """Get the visualizer instance for the focused window.
 
         :returns: The visualizer instance for the focused window, or None if not found
-        :rtype: Optional[CVVisualizer]
         """
         # Place a system call to get the title of the window that is currently focussed.
-        get_imshow_title = \
-            subprocess.run(
-                "xprop -id $(xprop -root _NET_ACTIVE_WINDOW | cut -d ' ' -f 5) WM_NAME | awk -F '\"' '{print $2}'",
-                capture_output=True, shell=True)
+        get_imshow_title = subprocess.run(
+            "xprop -id $(xprop -root _NET_ACTIVE_WINDOW | cut -d ' ' -f 5) WM_NAME | awk -F '\"' '{print $2}'",
+            capture_output=True,
+            shell=True,
+        )
         if get_imshow_title.returncode != 0:
-            print(f"GUI Handling can't call system method to get window title: {get_imshow_title.stderr}")
+            print(
+                f"GUI Handling can't call system method to get window title: {get_imshow_title.stderr.decode()}"
+            )
             sys.exit(1)
 
-        imshow_title = get_imshow_title.stdout.strip().decode('utf-8')
-        pipeline_name_of_focussed_gui = imshow_title.strip().replace('RoboKudo/', '')
+        imshow_title = get_imshow_title.stdout.strip().decode("utf-8")
+        pipeline_name_of_focussed_gui = imshow_title.strip().replace("RoboKudo/", "")
 
-        cv_visualizers = [cv for cv in Visualizer.instances if isinstance(cv, CVVisualizer)]
+        cv_visualizers = [
+            cv for cv in Visualizer.instances if isinstance(cv, CVVisualizer)
+        ]
 
         for cv_visualizer in cv_visualizers:
             if cv_visualizer.pipeline.name == pipeline_name_of_focussed_gui:
@@ -222,14 +212,12 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
 
         return None
 
-    def handle_keycallback(self, key):
+    def handle_keycallback(self, key: int) -> bool:
         """
         Handle a key-press that happened in the corresponding GUI of this GUIHandler.
 
         :param key: An ASCII char
-        :type key: int
         :return: false if GUI reports abort (right now this only happens when ESC is pressed)
-        :rtype: bool
         """
         # print(f"Key pressed: {key}")
         vis_state: Visualizer.SharedState = self.shared_visualizer_state
@@ -240,14 +228,19 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
             return False
 
         if key == 81 or key == 112:
-            vis_state.active_annotator_i = len(annotator_list) - 1 \
-                if vis_state.active_annotator_i == 0 else vis_state.active_annotator_i - 1
+            vis_state.active_annotator_i = (
+                len(annotator_list) - 1
+                if vis_state.active_annotator_i == 0
+                else vis_state.active_annotator_i - 1
+            )
 
             # If the available annotators are changing dynamically, we have to ensure
             # that we still point to a valid annotator.
             # Naive approach: Just use the last one in the list
             if vis_state.active_annotator_i < len(annotator_list):
-                vis_state.active_annotator = annotator_list[vis_state.active_annotator_i]
+                vis_state.active_annotator = annotator_list[
+                    vis_state.active_annotator_i
+                ]
             else:
                 vis_state.active_annotator_i = len(annotator_list) - 1
             self.shared_visualizer_state.notify_observers()
@@ -255,8 +248,11 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
             return True
 
         if key == 83 or key == 110:  # right arrow
-            vis_state.active_annotator_i = 0 \
-                if vis_state.active_annotator_i == len(annotator_list) - 1 else vis_state.active_annotator_i + 1
+            vis_state.active_annotator_i = (
+                0
+                if vis_state.active_annotator_i == len(annotator_list) - 1
+                else vis_state.active_annotator_i + 1
+            )
             vis_state.active_annotator = annotator_list[vis_state.active_annotator_i]
             self.shared_visualizer_state.notify_observers()
             # print(f"Right arrow key pressed. Active annotator: {vis_state.active_annotator.name}")

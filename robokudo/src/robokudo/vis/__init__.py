@@ -14,11 +14,4 @@ Dependencies
 * open3d for 3D visualization
 * rospy for ROS integration
 * py_trees for behavior tree integration
-
-See Also
---------
-* :mod:`robokudo.vis.visualizer` : Base visualization interface
-* :mod:`robokudo.vis.cv_visualizer` : OpenCV-based visualization
-* :mod:`robokudo.vis.o3d_visualizer` : Open3D-based visualization
-* :mod:`robokudo.vis.ros_visualizer` : ROS-based visualization
 """

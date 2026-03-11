@@ -17,6 +17,7 @@ The module is used for:
 * Performance testing
 * Debug visualization
 """
+
 import copy
 import time
 
@@ -26,6 +27,7 @@ import py_trees
 
 import robokudo
 import robokudo.types.scene
+import robokudo.annotators.core
 from robokudo.cas import CASViews
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
@@ -46,51 +48,57 @@ class SlowAnnotator(robokudo.annotators.core.ThreadedAnnotator):
     :type sleep_in_s: float
     """
 
-    def __init__(self, name="SlowAnnotator", sleep_in_s=1):
+    def __init__(self, name: str = "SlowAnnotator", sleep_in_s: float = 1.0) -> None:
         """
         Initialize the slow annotator.
 
-        :param name: Name of the annotator instance, defaults to "SlowAnnotator"
-        :type name: str, optional
-        :param sleep_in_s: Sleep duration in seconds, defaults to 1
-        :type sleep_in_s: float, optional
+        :param name: Name of the annotator instance
+        :param sleep_in_s: Sleep duration in seconds
         """
         super().__init__(name)
-        self.sleep_in_s = sleep_in_s
 
-    def compute(self):
+        self.sleep_in_s = sleep_in_s
+        """Sleep duration in seconds"""
+
+    def compute(self) -> py_trees.common.Status:
         """
         Perform the main computation with artificial delay.
 
         This method:
-        
+
         * Retrieves the color image from CAS
         * Adds timestamp and visual markers
         * Sleeps for configured duration
         * Sets feedback message
 
         :return: Success status after completion
-        :rtype: py_trees.Status
         """
-        self.rk_logger.debug("%s.compute(): Start doing the heavy stuff" % self.__class__.__name__)
+        self.rk_logger.debug(
+            "%s.compute(): Start doing the heavy stuff" % self.__class__.__name__
+        )
 
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
         vis = copy.deepcopy(self.color)
 
         import datetime
-        vis = cv2.putText(vis,
-                          str(datetime.datetime.now()),
-                          (50, 50),
-                          cv2.FONT_HERSHEY_SIMPLEX,
-                          0.5,
-                          (0, 255, 0),
-                          2)
+
+        vis = cv2.putText(
+            vis,
+            str(datetime.datetime.now()),
+            (50, 50),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 255, 0),
+            2,
+        )
         vis = cv2.rectangle(vis, (400, 400), (650, 650), (0, 0, 255), 2)
         self.get_annotator_output_struct().set_image(vis)
 
         time.sleep(self.sleep_in_s)  # in s
 
-        self.rk_logger.debug("%s.compute(): Stop doing the heavy stuff" % self.__class__.__name__)
+        self.rk_logger.debug(
+            "%s.compute(): Stop doing the heavy stuff" % self.__class__.__name__
+        )
         self.feedback_message = "SlowAnnotator was successful."
 
         return py_trees.common.Status.SUCCESS
@@ -102,30 +110,23 @@ class EmptyAnnotator(robokudo.annotators.core.BaseAnnotator):
 
     This annotator creates a black image and sets it as output.
     Used for testing visualization and output handling.
-
-    :ivar sleep_in_s: Sleep duration in seconds
-    :type sleep_in_s: float
     """
 
-    def __init__(self, name="EmptyAnnotator", sleep_in_s=1):
-        """
-        Initialize the empty annotator.
+    def __init__(self, name: str = "EmptyAnnotator", sleep_in_s: float = 1) -> None:
+        """Initialize the empty annotator.
 
         :param name: Annotator name, defaults to "EmptyAnnotator"
-        :type name: str, optional
         :param sleep_in_s: Sleep duration in seconds, defaults to 1
-        :type sleep_in_s: float, optional
         """
         super().__init__(name)
 
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         """
         Generate empty visual output.
 
         Creates a black image and sets it as the annotator output.
 
         :return: SUCCESS status
-        :rtype: py_trees.Status
         """
         vis = numpy.zeros((640, 480, 3), dtype="uint8")
         self.get_annotator_output_struct().set_image(vis)
@@ -139,32 +140,27 @@ class FailingAnnotator(robokudo.annotators.core.ThreadedAnnotator):
 
     This annotator alternates between success and failure states,
     with configurable delays. Used for testing error handling.
-
-    :ivar counter: Counter for alternating between success and failure
-    :type counter: int
     """
 
-    def __init__(self, name="FailingAnnotator"):
-        """
-        Initialize the failing annotator.
+    def __init__(self, name: str = "FailingAnnotator") -> None:
+        """Initialize the failing annotator.
 
         :param name: Annotator name, defaults to "FailingAnnotator"
-        :type name: str, optional
         """
         super().__init__(name)
-        self.counter = 0
 
-    def initialise(self):
-        """
-        Initialize the annotator state.
+        self.counter = 0
+        """Counter for alternating between success and failure states"""
+
+    def initialise(self) -> None:
+        """Initialize the annotator state.
 
         Called on first tick and whenever status changes from non-running.
         """
         super().initialise()
 
-    def compute(self):
-        """
-        Simulate processing with alternating success/failure.
+    def compute(self) -> py_trees.common.Status:
+        """Simulate processing with alternating success/failure.
 
         Sleeps for a fixed duration and alternates between success and failure
         states based on an internal counter.
@@ -172,7 +168,9 @@ class FailingAnnotator(robokudo.annotators.core.ThreadedAnnotator):
         :return: SUCCESS or FAILURE status
         :rtype: py_trees.Status
         """
-        self.rk_logger.debug("%s.compute(): Start doing the heavy stuff" % self.__class__.__name__)
+        self.rk_logger.debug(
+            "%s.compute(): Start doing the heavy stuff" % self.__class__.__name__
+        )
         time.sleep(0.5)  # in s
 
         if self.counter == 1:
@@ -184,7 +182,9 @@ class FailingAnnotator(robokudo.annotators.core.ThreadedAnnotator):
             self.feedback_message_queue.put("Action successful")
             return py_trees.Status.SUCCESS
 
-        self.rk_logger.debug("%s.compute(): Stop doing the heavy stuff" % self.__class__.__name__)
+        self.rk_logger.debug(
+            "%s.compute(): Stop doing the heavy stuff" % self.__class__.__name__
+        )
 
 
 class FakeCollectionReaderAnnotator(robokudo.annotators.core.BaseAnnotator):
@@ -204,39 +204,32 @@ class FakeCollectionReaderAnnotator(robokudo.annotators.core.BaseAnnotator):
     * Flow control verification
     * Feedback message handling
     * CAS creation testing
-
-    :ivar counter: Internal counter for tracking iterations
-    :type counter: int
-    :ivar collection_readers: List of collection reader descriptors
-    :type collection_readers: list
     """
 
-    def __init__(self, name="FakeCollectionReader"):
+    def __init__(self, name: str = "FakeCollectionReader") -> None:
         """
         Initialize the fake collection reader.
 
         :param name: Name of the annotator instance, defaults to "FakeCollectionReader"
-        :type name: str, optional
         """
         super().__init__(name)
         self.rk_logger.debug("%s.__init__()" % (self.__class__.__name__))
 
         self.collection_readers = [self.descriptor]
+        """List of collection reader descriptors"""
         # self.rk_logger.debug("%s" % (get_line_context(self)))
 
-    def setup(self, timeout):
+    def setup(self, timeout: float) -> bool:
         """
         Set up the collection reader.
 
         :param timeout: Maximum time to wait for setup completion
-        :type timeout: float
         :return: True if setup successful
-        :rtype: bool
         """
         self.rk_logger.debug("%s.setup()" % self.__class__.__name__)
         return True
 
-    def initialise(self):
+    def initialise(self) -> None:
         """
         Initialize the reader state.
 
@@ -247,11 +240,11 @@ class FakeCollectionReaderAnnotator(robokudo.annotators.core.BaseAnnotator):
         self.counter = 0
 
         # Clear all feedback messages when Collection Reader starts over
-        assert (isinstance(self.parent, py_trees.composites.Sequence))
+        assert isinstance(self.parent, py_trees.composites.Sequence)
         for child in self.parent.children:
-            child.feedback_message = ''
+            child.feedback_message = ""
 
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         """
         Update the reader state and generate synthetic data.
 
@@ -263,14 +256,17 @@ class FakeCollectionReaderAnnotator(robokudo.annotators.core.BaseAnnotator):
         * Updates processing status
 
         :return: Current processing status (RUNNING or SUCCESS)
-        :rtype: py_trees.common.Status
         """
         self.counter += 1
-        new_status = py_trees.common.Status.SUCCESS if self.counter == 3 else py_trees.common.Status.RUNNING
+        new_status = (
+            py_trees.common.Status.SUCCESS
+            if self.counter == 3
+            else py_trees.common.Status.RUNNING
+        )
         if new_status == py_trees.common.Status.SUCCESS:
             self.feedback_message = "Got sensor data!"
             # Create a new CAS
-            blackboard = py_trees.Blackboard()
+            blackboard = py_trees.blackboard.Blackboard()
             cas = robokudo.cas.CAS()
             cas.percepts = [time.time()]
             blackboard.set("CAS", cas)
@@ -278,17 +274,21 @@ class FakeCollectionReaderAnnotator(robokudo.annotators.core.BaseAnnotator):
         else:
             self.feedback_message = "Waiting for incoming sensor data ..."
         self.rk_logger.debug(
-            "%s.update()[%s->%s][%s]" % (self.__class__.__name__, self.status, new_status, self.feedback_message))
+            "%s.update()[%s->%s][%s]"
+            % (self.__class__.__name__, self.status, new_status, self.feedback_message)
+        )
         return new_status
 
-    def terminate(self, new_status):
+    def terminate(self, new_status: py_trees.common.Status) -> None:
         """
         Clean up when transitioning to non-running state.
 
         :param new_status: New status being transitioned to
-        :type new_status: py_trees.common.Status
         """
-        self.rk_logger.debug("%s.terminate()[%s->%s]" % (self.__class__.__name__, self.status, new_status))
+        self.rk_logger.debug(
+            "%s.terminate()[%s->%s]"
+            % (self.__class__.__name__, self.status, new_status)
+        )
 
 
 class ScopedAnnotator(robokudo.annotators.core.BaseAnnotator):
@@ -303,7 +303,7 @@ class ScopedAnnotator(robokudo.annotators.core.BaseAnnotator):
     * Manage scope parameters
 
     The annotator can operate in two modes:
-    
+
     * Object Hypothesis Analysis - processes individual object hypotheses
     * Scene Analysis - processes scene-level data
 
@@ -312,39 +312,34 @@ class ScopedAnnotator(robokudo.annotators.core.BaseAnnotator):
     """
 
     class Descriptor(robokudo.annotators.core.BaseAnnotator.Descriptor):
-        """
-        Descriptor class defining the annotator's parameters.
+        """Descriptor class defining the annotator's parameters."""
 
-        :ivar parameters: Configuration parameters for the annotator
-        :type parameters: ScopedAnnotator.Descriptor.Parameters
-        """
-        
         class Parameters:
-            """
-            Parameter class for the ScopedAnnotator.
+            """Parameter class for the ScopedAnnotator."""
 
-            :ivar analysis_scope: List of data types to analyze
-            :type analysis_scope: list
-            """
-            def __init__(self):
+            def __init__(self) -> None:
                 """Initialize parameters with default analysis scope."""
                 self.analysis_scope = [CASViews.COLOR_IMAGE, CASViews.CLOUD]
+                """ List of data types to analyze """
 
-        parameters = Parameters()  # overwrite the parameters explicitly to enable auto-completion
+        # Overwrite the parameters explicitly to enable auto-completion
+        parameters = Parameters()
 
-    def __init__(self, name="ScopedAnnotator", descriptor=Descriptor()):
+    def __init__(
+        self,
+        name: str = "ScopedAnnotator",
+        descriptor: "ScopedAnnotator.Descriptor" = Descriptor(),
+    ) -> None:
         """
         Initialize the scoped annotator.
 
         :param name: Name of the annotator instance, defaults to "ScopedAnnotator"
-        :type name: str, optional
         :param descriptor: Descriptor instance with parameters, defaults to Descriptor()
-        :type descriptor: ScopedAnnotator.Descriptor, optional
         """
         super().__init__(name, descriptor)
 
     @catch_and_raise_to_blackboard
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         """
         Process data based on the current analysis scope.
 
@@ -356,21 +351,24 @@ class ScopedAnnotator(robokudo.annotators.core.BaseAnnotator):
         * Handles scene-level analysis otherwise
 
         :return: Processing status
-        :rtype: py_trees.Status
         :raises: Any exceptions are caught and raised to the blackboard
         """
         # self.descriptor.parameters.analysis_scope = [robokudo.types.scene.ObjectHypothesis]  # test overwrite
         # self.descriptor.parameters.analysis_scope = [CASViews.COLOR_IMAGE, CASViews.CLOUD]  # test overwrite
         self.descriptor.parameters.analysis_scope = []  # test overwrite => error case
 
-        data_to_analyze = self.get_data_from_analysis_scope(self.descriptor.parameters.analysis_scope)
+        data_to_analyze = self.get_data_from_analysis_scope(
+            self.descriptor.parameters.analysis_scope
+        )
 
         # Your Annotator now has to decide which kinds of data it expects and how it would process them
         if robokudo.types.scene.ObjectHypothesis in data_to_analyze:
             print(f"Annotator is in OH-Analysis mode")
             object_hypotheses = data_to_analyze[robokudo.types.scene.ObjectHypothesis]
             for object_hypothesis in object_hypotheses:
-                assert (isinstance(object_hypothesis, robokudo.types.scene.ObjectHypothesis))
+                assert isinstance(
+                    object_hypothesis, robokudo.types.scene.ObjectHypothesis
+                )
                 print(f"OH ID: {object_hypothesis.id}")
         else:
             print(f"Annotator is in Scene-Analysis mode")

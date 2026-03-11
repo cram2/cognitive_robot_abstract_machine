@@ -40,8 +40,13 @@ import robokudo.io.storage_reader_interface
 import robokudo.annotators.query
 
 import robokudo.idioms
+import robokudo.pipeline
 from robokudo.annotators.vis import Redraw
-from robokudo.behaviours.action_server_checks import ActionServerCheck, ActionServerNoPreemptRequest, AbortGoal
+from robokudo.behaviours.action_server_checks import (
+    ActionServerCheck,
+    ActionServerNoPreemptRequest,
+    AbortGoal,
+)
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
@@ -66,15 +71,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         until failure or preemption occurs.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "query_startstop_pipeline_from_storage"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a continuous perception pipeline with external control.
 
         This method constructs a processing pipeline that runs continuously
@@ -97,36 +101,47 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         4. Handle failure by aborting goal
 
         :return: The configured pipeline with start/stop control
-        :rtype: robokudo.pipeline.Pipeline
 
         .. warning::
             The pipeline will automatically fail after 30 iterations to
             demonstrate error handling mechanisms.
         """
-        cr_storage_camera_config = robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        cr_storage_camera_config = (
+            robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        )
         cr_storage_config = CollectionReaderAnnotator.Descriptor(
             camera_config=cr_storage_camera_config,
-            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(cr_storage_camera_config))
+            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(
+                cr_storage_camera_config
+            ),
+        )
 
-        processing_sequence = py_trees.Sequence()
-        processing_sequence.add_children([
-            CollectionReaderAnnotator(descriptor=cr_storage_config),
-            ImagePreprocessorAnnotator("ImagePreprocessor"),
-            PointcloudCropAnnotator(),
-            PlaneAnnotator(),
-            PointCloudClusterExtractor(),
-            Redraw(),
-            ActionServerNoPreemptRequest(),
-            py_trees.decorators.Inverter(py_trees.behaviours.SuccessEveryN("Fail Sim after 30 iter", n=30))
-        ])
+        processing_sequence = py_trees.composites.Sequence()
+        processing_sequence.add_children(
+            [
+                CollectionReaderAnnotator(descriptor=cr_storage_config),
+                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                PointcloudCropAnnotator(),
+                PlaneAnnotator(),
+                PointCloudClusterExtractor(),
+                Redraw(),
+                ActionServerNoPreemptRequest(),
+                py_trees.decorators.Inverter(
+                    py_trees.behaviours.SuccessEveryN("Fail Sim after 30 iter", n=30)
+                ),
+            ]
+        )
 
         pipeline = robokudo.pipeline.Pipeline("StoragePipeline")
         pipeline.add_children(
             [
                 robokudo.idioms.pipeline_init(),
                 robokudo.annotators.query.QueryAnnotator(),
-                py_trees.decorators.Condition(child=processing_sequence, status=py_trees.Status.FAILURE),
+                py_trees.decorators.Condition(
+                    child=processing_sequence, status=py_trees.Status.FAILURE
+                ),
                 AbortGoal(),
-            ])
+            ]
+        )
 
         return pipeline

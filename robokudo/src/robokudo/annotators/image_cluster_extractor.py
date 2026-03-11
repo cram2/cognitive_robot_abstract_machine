@@ -22,7 +22,7 @@ import numpy
 import numpy as np
 import open3d as o3d
 import py_trees
-from typing_extensions import Optional, TYPE_CHECKING
+from typing_extensions import Optional, TYPE_CHECKING, Tuple, Dict
 
 import robokudo
 import robokudo.annotators.core
@@ -77,15 +77,17 @@ class ImageClusterExtractor(robokudo.annotators.core.BaseAnnotator):
 
             def __init__(self) -> None:
                 """Initialize default parameter values."""
-                self.hsv_min = (150, 130, 85)
-                self.hsv_max = (200, 255, 255)
-                self.erosion_iterations = 2
+                self.hsv_min: Tuple[int, int, int] = (150, 130, 85)
+                self.hsv_max: Tuple[int, int, int] = (200, 255, 255)
+                self.erosion_iterations: int = 2
 
                 # This parameter controls the filtering of the initial list of contours.
                 # It is used to avoid very small contours when calculating 3d points etc.
-                self.contour_min_size = 1000
+                self.contour_min_size: int = 1000
 
-                self.color_name_to_hsv_range = dict()
+                self.color_name_to_hsv_range: Dict[
+                    str, Dict[str, Tuple[int, int, int]]
+                ] = dict()
                 self.color_name_to_hsv_range["blue"] = {
                     "hsv_min": (150, 130, 85),
                     "hsv_max": (200, 255, 255),
@@ -95,18 +97,17 @@ class ImageClusterExtractor(robokudo.annotators.core.BaseAnnotator):
                     "hsv_max": (280, 255, 255),
                 }
 
-                self.outlier_removal = True
-                self.outlier_removal_nb_neighbors = 20
-                self.outlier_removal_std_ratio = 2.0
-                self.num_of_objects = 2
+                self.outlier_removal: bool = True
+                self.outlier_removal_nb_neighbors: int = 20
+                self.outlier_removal_std_ratio: float = 2.0
+                self.num_of_objects: int = 2
 
                 # The minimal amount of 3D points of the object's pointcloud
                 # This check is applied AFTER self.contour_min_size
-                self.min_points_threshold = 62
+                self.min_points_threshold: int = 62
 
-        parameters = (
-            Parameters()
-        )  # overwrite the parameters explicitly to enable auto-completion
+        # Overwrite the parameters explicitly to enable auto-completion
+        parameters = Parameters()
 
     # def dyn_rec_callback(self, config, level):
     #    self.rk_logger.info("Received reconf call: " + str(config))
@@ -122,7 +123,7 @@ class ImageClusterExtractor(robokudo.annotators.core.BaseAnnotator):
         self,
         name: str = "ImageClusterExtractor",
         descriptor: "ImageClusterExtractor.Descriptor" = Descriptor(),
-    ):
+    ) -> None:
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         self.color: Optional[npt.NDArray] = None

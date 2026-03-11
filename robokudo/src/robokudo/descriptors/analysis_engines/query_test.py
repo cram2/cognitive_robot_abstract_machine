@@ -1,4 +1,4 @@
-'''
+"""
 This script defines a Robokudo-based behavior tree pipeline for processing queries related to numbers.
 
 Features:
@@ -8,51 +8,53 @@ Features:
 - Incorporates a conditional selector to manage task execution with preemption handling.
 - Integrates with the Robokudo analysis engine and pipeline framework.
 - Uses a feedback mechanism to report progress dynamically.
-'''
-import robokudo
-from robokudo.cas import CASViews
-import robokudo.pipeline
-import robokudo.analysis_engine
+"""
+
 import queue
+
 import py_trees
+from py_trees.composites import Selector
+from py_trees.composites import Sequence
+from robokudo_msgs.action import Query
+from typing_extensions import List
+
+import robokudo
 import robokudo.analysis_engine
-import robokudo.pipeline
+import robokudo.analysis_engine
 import robokudo.descriptors.camera_configs.config_hsr
 import robokudo.io.camera_interface
+import robokudo.pipeline
+import robokudo.pipeline
+from robokudo.annotators.core import BaseAnnotator
 from robokudo.annotators.query import QueryAnnotator
 from robokudo.behaviours.action_server_checks import ActionServerNoPreemptRequest
-from robokudo.annotators.core import BaseAnnotator
-from robokudo.idioms import pipeline_init
-from py_trees.composites import Sequence
-from py_trees.composites import Selector
+from robokudo.cas import CASViews
 from robokudo.identifier import BBIdentifier
-from robokudo_msgs.action import Query
+from robokudo.idioms import pipeline_init
 
 
-
-class PrintNumbers(BaseAnnotator) :
-    def __init__(self, name="PrintNumbers") :
+class PrintNumbers(BaseAnnotator):
+    def __init__(self, name: str = "PrintNumbers") -> None:
         super().__init__(name)
-        self.current_number = 1
-        self.completed = False
+        self.current_number: int = 1
+        self.completed: bool = False
+        self.result: List[int] = []
+        self.result_string: str = ""
+
+    def initialise(self) -> None:
         self.result = []
         self.result_string = ""
-
-    def initialise(self) :
-        self.result = []
-        self.result_string = ""
         self.current_number = 1
         self.completed = False
 
-    def update(self) :
+    def update(self) -> py_trees.common.Status:
         blackboard = py_trees.blackboard.Blackboard()
         feedback_queue = blackboard.get(BBIdentifier.QUERY_FEEDBACK)
-        if feedback_queue is None :
+        if feedback_queue is None:
             feedback_queue = queue.Queue()
             blackboard.set(BBIdentifier.QUERY_FEEDBACK, feedback_queue)
 
-
-        if self.current_number <= 100 :
+        if self.current_number <= 100:
             # Append number and update result
             print(f"Current Number: {self.current_number}")
             self.result.append(self.current_number)
@@ -65,11 +67,10 @@ class PrintNumbers(BaseAnnotator) :
 
             self.current_number += 1
             return py_trees.common.Status.RUNNING
-        else :
+        else:
             self.completed = True
             blackboard.set(BBIdentifier.QUERY_ANSWER, self.result_string)
             return py_trees.common.Status.SUCCESS
-
 
 
 class CheckQueryType(BaseAnnotator):
@@ -77,50 +78,57 @@ class CheckQueryType(BaseAnnotator):
     Checks if the query type on the CAS is 'numbers'.
     """
 
-    def __init__(self, name="CheckQueryType"):
+    def __init__(self, name: str = "CheckQueryType") -> None:
         super().__init__(name)
 
-    def update(self):
+    def update(self) -> py_trees.common.Status:
         # Retrieve the query from the CAS
         query = self.get_cas().get(CASViews.QUERY)
 
         # Check if the query type is 'numbers'
-        if query and getattr(query.obj, 'type', None) == 'numbers':
+        if query and getattr(query.obj, "type", None) == "numbers":
             self.logger.info("Query type is 'numbers'. Proceeding.")
             return py_trees.common.Status.SUCCESS
         else:
-            self.logger.warning(f"Query type is not 'numbers' or query is missing: {query}")
+            self.logger.warning(
+                f"Query type is not 'numbers' or query is missing: {query}"
+            )
             return py_trees.common.Status.FAILURE
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
-    def name(self):
+    def name(self) -> str:
         return "test_pipeline"
 
     def implementation(self) -> robokudo.pipeline.Pipeline:
         # Define the sequence that runs the task
         task_sequence = Sequence(name="TaskSequence", memory=True)
-        task_sequence.add_children([
-            CheckQueryType(),  # Check if the query type is 'numbers'
-            PrintNumbers()     # Execute the task if the query is valid
-        ])
+        task_sequence.add_children(
+            [
+                CheckQueryType(),  # Check if the query type is 'numbers'
+                PrintNumbers(),  # Execute the task if the query is valid
+            ]
+        )
 
         # Combine preemption handling and task execution in a selector
         conditional_selector = Selector(name="ConditionalSelector", memory=False)
-        conditional_selector.add_children([
-            py_trees.decorators.Inverter(
-                name="Invert Preempt Request",
-                child=ActionServerNoPreemptRequest()
-            ),
-            task_sequence  # Run task sequence only if no preemption
-        ])
+        conditional_selector.add_children(
+            [
+                py_trees.decorators.Inverter(
+                    name="Invert Preempt Request", child=ActionServerNoPreemptRequest()
+                ),
+                task_sequence,  # Run task sequence only if no preemption
+            ]
+        )
 
         # Main Pipeline
         seq = robokudo.pipeline.Pipeline("OPExperiments")
-        seq.add_children([
-            pipeline_init(),       # Initialize the pipeline
-            QueryAnnotator(),      # Handle incoming queries
-            conditional_selector   # Preemption-aware task execution
-        ])
+        seq.add_children(
+            [
+                pipeline_init(),  # Initialize the pipeline
+                QueryAnnotator(),  # Handle incoming queries
+                conditional_selector,  # Preemption-aware task execution
+            ]
+        )
 
         return seq

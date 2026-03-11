@@ -12,6 +12,7 @@ in RoboKudo. It includes behaviors for:
 These behaviors are typically used in pipelines that interact with ROS action
 servers to ensure proper state management and error handling.
 """
+
 import logging
 
 import py_trees
@@ -29,7 +30,7 @@ class ActionServerActive(py_trees.behaviour.Behaviour):
     * FAILURE if the server is not found or not active
     """
 
-    def __init__(self, name: str = "ActionServerActive"):
+    def __init__(self, name: str = "ActionServerActive") -> None:
         """Initialize the ActionServerActive behavior.
 
         :param name: Name of the behavior node, defaults to "ActionServerActive"
@@ -72,7 +73,7 @@ class ActionServerCheck(py_trees.behaviour.Behaviour):
     is complete.
     """
 
-    def __init__(self, name: str = "ActionServerCheck"):
+    def __init__(self, name: str = "ActionServerCheck") -> None:
         """Initialize the ActionServerCheck behavior.
 
         :param name: Name of the behavior node, defaults to "ActionServerCheck"
@@ -113,7 +114,7 @@ class ActionServerNoPreemptRequest(py_trees.behaviour.Behaviour):
     :ivar name: Name of the behavior node
     """
 
-    def __init__(self, name: str = "ActionServerNoPreemptRequest"):
+    def __init__(self, name: str = "ActionServerNoPreemptRequest") -> None:
         """Initialize the ActionServerNoPreemptRequest behavior.
 
         :param name: Name of the behavior node, defaults to "ActionServerNoPreemptRequest"
@@ -148,7 +149,9 @@ class AbortGoal(py_trees.behaviour.Behaviour):
     terminate goals with a specified error message.
     """
 
-    def __init__(self, name: str = "AbortGoal", msg: str = "Goal has been aborted"):
+    def __init__(
+        self, name: str = "AbortGoal", msg: str = "Goal has been aborted"
+    ) -> None:
         """Initialize the AbortGoal behavior.
 
         :param name: Name of the behavior node, defaults to "AbortGoal"
@@ -181,7 +184,11 @@ class RunningUntilExceptionHandled(py_trees.behaviour.Behaviour):
     further processing until error conditions are resolved.
     """
 
-    def __init__(self, name: str = "RunningUntilExceptionHandled", msg: str = "Running Until Exception Handled"):
+    def __init__(
+        self,
+        name: str = "RunningUntilExceptionHandled",
+        msg: str = "Running Until Exception Handled",
+    ) -> None:
         """Initialize the RunningUntilExceptionHandled behavior.
 
         :param name: Name of the behavior node, defaults to "RunningUntilExceptionHandled"
@@ -217,7 +224,7 @@ class RunningUntilExceptionHandled(py_trees.behaviour.Behaviour):
 class ActionServerPresentAndDone(py_trees.behaviour.Behaviour):
     """A behaviour that checks whether an action server is present and represents its state."""
 
-    def __init__(self, name: str = "ActionServerPresentAndDone"):
+    def __init__(self, name: str = "ActionServerPresentAndDone") -> None:
         """Initialize the ActionServerPresentAndDone behaviour.
 
         :param name: Name of the behaviour node, defaults to "ActionServerPresentAndDone"
@@ -242,8 +249,10 @@ class ActionServerPresentAndDone(py_trees.behaviour.Behaviour):
         self.rk_logger.debug("ActionServer in pipeline!")
 
         # The Action Server has to pick up the exception and deliver it to the client. Wait until that happened.
-        if robokudo.utils.error_handling.has_blackboard_exception() and \
-                robokudo.utils.error_handling.get_blackboard_exception() is not None:
+        if (
+            robokudo.utils.error_handling.has_blackboard_exception()
+            and robokudo.utils.error_handling.get_blackboard_exception() is not None
+        ):
             self.rk_logger.info("ActionServer needs to deliver exception")
             return py_trees.common.Status.RUNNING
 

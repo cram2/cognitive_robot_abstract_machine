@@ -54,15 +54,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         version with transform lookup enabled.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "demo"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a basic pipeline for tabletop segmentation.
 
         This method constructs a processing pipeline that performs tabletop
@@ -85,25 +84,31 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
             The pipeline includes commented-out options for adding triggers
             and slow processing simulation, which can be useful for debugging.
         """
-        kinect_camera_config = robokudo.descriptors.camera_configs.config_kinect_robot_wo_transform.CameraConfig()
+        kinect_camera_config = (
+            robokudo.descriptors.camera_configs.config_kinect_robot_wo_transform.CameraConfig()
+        )
         # kinect_camera_config = robokudo.descriptors.camera_configs.config_kinect_robot.CameraConfig()
         kinect_config = CollectionReaderAnnotator.Descriptor(
             camera_config=kinect_camera_config,
-            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(kinect_camera_config))
+            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(
+                kinect_camera_config
+            ),
+        )
 
         seq = robokudo.pipeline.Pipeline("RWPipeline")
-        seq.add_children([
-            robokudo.idioms.pipeline_init(),
-            CollectionReaderAnnotator(descriptor=kinect_config),
-            ImagePreprocessorAnnotator("ImagePreprocessor"),
-            PointcloudCropAnnotator(),
-            PlaneAnnotator(),
-            # SlowAnnotator(sleep_in_s=3),
-            PointCloudClusterExtractor(),
-
-            # ClusterColorAnnotator(),
-            # ClusterColorHistogramAnnotator(),
-            # ClusterPositionAnnotator(),
-            # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
-        ])
+        seq.add_children(
+            [
+                robokudo.idioms.pipeline_init(),
+                CollectionReaderAnnotator(descriptor=kinect_config),
+                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                PointcloudCropAnnotator(),
+                PlaneAnnotator(),
+                # SlowAnnotator(sleep_in_s=3),
+                PointCloudClusterExtractor(),
+                # ClusterColorAnnotator(),
+                # ClusterColorHistogramAnnotator(),
+                # ClusterPositionAnnotator(),
+                # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
+            ]
+        )
         return seq

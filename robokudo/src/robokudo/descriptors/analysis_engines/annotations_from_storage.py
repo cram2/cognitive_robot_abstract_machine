@@ -19,6 +19,7 @@ import robokudo.analysis_engine
 import robokudo.behaviours.clear_errors
 import robokudo.descriptors.camera_configs.config_mongodb_playback
 import robokudo.idioms
+import robokudo.pipeline
 import robokudo.io.storage_reader_interface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
@@ -43,15 +44,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         the required data before running the pipeline.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "annotations_from_storage"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a pipeline for visualizing stored annotations.
 
         This method constructs a processing pipeline that reads stored data and
@@ -65,11 +65,16 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
             Make sure to store some annotated data in the MongoDB database
             before running this pipeline, or it will not display anything.
         """
-        cr_storage_camera_config = robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
-        cr_storage_camera_config.db_name = 'store_with_annotations'
+        cr_storage_camera_config = (
+            robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        )
+        cr_storage_camera_config.db_name = "store_with_annotations"
         cr_storage_config = CollectionReaderAnnotator.Descriptor(
             camera_config=cr_storage_camera_config,
-            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(cr_storage_camera_config))
+            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(
+                cr_storage_camera_config
+            ),
+        )
 
         seq = robokudo.pipeline.Pipeline("StoragePipeline")
         seq.add_children(
@@ -78,5 +83,6 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 ObjectHypothesisVisualizer(),
-            ])
+            ]
+        )
         return seq

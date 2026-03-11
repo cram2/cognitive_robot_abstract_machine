@@ -26,7 +26,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
     def name(self) -> str:
-        return "demo"
+        return "semdt_demo_from_storage"
 
     def implementation(self) -> robokudo.pipeline.Pipeline:
         """

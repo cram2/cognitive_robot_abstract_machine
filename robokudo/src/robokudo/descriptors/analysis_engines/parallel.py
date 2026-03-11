@@ -27,6 +27,9 @@ from robokudo.annotators.testing import SlowAnnotator
 import robokudo.descriptors.camera_configs.config_kinect_robot
 
 import robokudo.io.camera_interface
+import robokudo.pipeline
+import robokudo.tree_components.better_parallel
+import robokudo.annotators.outputs
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
@@ -49,15 +52,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         benefits of parallel execution compared to sequential processing.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "parallel"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a pipeline with parallel processing capabilities.
 
         This method constructs a processing pipeline that demonstrates parallel
@@ -75,23 +77,30 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         7. Final slow annotator (2s)
 
         :return: The configured pipeline with parallel processing
-        :rtype: robokudo.pipeline.Pipeline
         """
-        kinect_camera_config = robokudo.descriptors.camera_configs.config_kinect_robot.CameraConfig()
+        kinect_camera_config = (
+            robokudo.descriptors.camera_configs.config_kinect_robot.CameraConfig()
+        )
         kinect_config = CollectionReaderAnnotator.Descriptor(
             camera_config=kinect_camera_config,
-            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(kinect_camera_config))
+            camera_interface=robokudo.io.camera_interface.KinectCameraInterface(
+                kinect_camera_config
+            ),
+        )
 
         seq = robokudo.pipeline.Pipeline("RWPipeline")
         # parallel = py_trees.composites.Parallel()
         parallel = robokudo.tree_components.better_parallel.Parallel(
-            policy=robokudo.tree_components.better_parallel.ParallelPolicy.SuccessOnAll(synchronise=True))
+            policy=robokudo.tree_components.better_parallel.ParallelPolicy.SuccessOnAll(
+                synchronise=True
+            )
+        )
         parallel.add_children(
             [
                 # py_trees.behaviours.Count(name="Annotator A", fail_until=-1, running_until=30, success_until=1000),
                 # py_trees.behaviours.Count(name="Annotator B", fail_until=-1, running_until=15, success_until=1000)
                 SlowAnnotator("Slow1Annotator", sleep_in_s=4),
-                SlowAnnotator("Slow2Annotator", sleep_in_s=2)
+                SlowAnnotator("Slow2Annotator", sleep_in_s=2),
             ]
         )
 

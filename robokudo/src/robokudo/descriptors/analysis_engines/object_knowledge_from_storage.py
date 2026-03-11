@@ -20,16 +20,12 @@ The pipeline implements the following functionality:
 """
 
 import robokudo.analysis_engine
-from robokudo.annotators.camera_viewpoint_visualizer import CameraViewpointVisualizer
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.object_hypothesis_visualizer import ObjectHypothesisVisualizer
 from robokudo.annotators.object_knowledge_visualizer import ObjectKnowledgeVisualizer
-from robokudo.annotators.plane import PlaneAnnotator
-from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
-from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 
 import robokudo.descriptors.camera_configs.config_mongodb_playback
 
@@ -38,6 +34,7 @@ import robokudo.io.storage_reader_interface
 import robokudo.behaviours.clear_errors
 
 import robokudo.idioms
+import robokudo.pipeline
 from robokudo.annotators.static_object_detector import StaticObjectDetectorAnnotator
 
 
@@ -62,15 +59,14 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         pose information that should be adjusted for different objects.
     """
 
-    def name(self):
+    def name(self) -> str:
         """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
-        :rtype: str
         """
         return "object_knowledge_from_storage"
 
-    def implementation(self):
+    def implementation(self) -> robokudo.pipeline.Pipeline:
         """Create a pipeline for object detection and knowledge visualization.
 
         This method constructs a processing pipeline that reads stored camera data,
@@ -85,10 +81,15 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         :return: The configured pipeline for object detection and visualization
         :rtype: robokudo.pipeline.Pipeline
         """
-        cr_storage_camera_config = robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        cr_storage_camera_config = (
+            robokudo.descriptors.camera_configs.config_mongodb_playback.CameraConfig()
+        )
         cr_storage_config = CollectionReaderAnnotator.Descriptor(
             camera_config=cr_storage_camera_config,
-            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(cr_storage_camera_config))
+            camera_interface=robokudo.io.storage_reader_interface.StorageReaderInterface(
+                cr_storage_camera_config
+            ),
+        )
 
         sod = StaticObjectDetectorAnnotator.Descriptor()
         sod.parameters.bounding_box_x = 397
@@ -116,5 +117,6 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 ObjectHypothesisVisualizer(),
                 ObjectKnowledgeVisualizer(),
                 ClusterColorAnnotator(),
-            ])
+            ]
+        )
         return seq
