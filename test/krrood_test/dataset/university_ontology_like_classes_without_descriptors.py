@@ -5,7 +5,13 @@ from dataclasses import dataclass, field, Field, fields
 from typing_extensions import Set, List
 
 from krrood.patterns.role import Role
-from krrood.entity_query_language.predicate import Symbol
+from krrood.entity_query_language.predicate import (
+    Symbol,
+    Predicate,  # type: ignore
+    HasType,  # type: ignore
+    HasTypes,  # type: ignore
+    length,  # type: ignore
+)
 
 
 @dataclass(eq=False)

@@ -1,9 +1,9 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing_extensions import Set, List
 {% for import_statement in imports %}
 {{ import_statement }}
 {% endfor %}
+
 
 {% for wrapped_class in stub_classes %}
 @dataclass({{ wrapped_class.dataclass_args }})
@@ -12,6 +12,7 @@ class {{ wrapped_class.name }}({{ wrapped_class.bases|join(', ') }}):
     {{ wrapped_field.name }}: {{ wrapped_field.type_name }}{{ wrapped_field.assignment }}
     {% endfor %}
     {% if not wrapped_class.fields %}...{% endif %}
+
 
 {% endfor %}
 {% for taker_type, info in role_takers.items() %}
@@ -22,11 +23,13 @@ class {{ info.role_for_name }}({{ taker_type.__name__ }}):
     {{ wrapped_field.name }}: {{ wrapped_field.type_name }} = field(init=False)
     {% endfor %}
 
+
 {% for role_info in info.roles %}
 @dataclass({{ role_info.dataclass_args }})
 class {{ role_info.name }}({{ info.role_for_name }}):
     # Original Owner of the {{ role_info.introduced_field.name }} field
     {{ role_info.introduced_field.name }}: {{ role_info.introduced_field.type_name }}{{ role_info.introduced_field.assignment }}
+
 
 {% endfor %}
 {% endfor %}

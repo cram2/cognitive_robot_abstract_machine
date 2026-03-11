@@ -16,8 +16,8 @@ def test_stub_generation_smoke(tmp_path):
     assert "head_of: RecognizedGroup = field(init=False)" in stub
     assert "from __future__ import annotations" in stub
 
-    # with open("./" + "generated_stub.pyi", "w") as f:
-    #     f.write(stub)
+    with open("./" + "generated_stub.pyi", "w") as f:
+        f.write(stub)
 
     with open(tmp_path / "generated_stub.pyi", "w") as f:
         f.write(stub)

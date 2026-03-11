@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import ast
+import inspect
 import os
 import types
 from ast import Module
+from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import lru_cache
 from inspect import isclass
 from typing import Union, Type
 
-from typing_extensions import TypeVar, Type, List, Optional
+from typing_extensions import TypeVar, Type, List, Optional, _SpecialForm
 
 T = TypeVar("T")
 
@@ -92,3 +95,47 @@ def _inheritance_path_length(
 
 def module_and_class_name(t: Union[Type, _SpecialForm]) -> str:
     return f"{t.__module__}.{t.__name__}"
+
+
+def extract_imports(
+    module: types.ModuleType, exclude_libraries: Optional[List[str]] = None
+) -> List[str]:
+    """Extract imports from a module source, handling multiline imports, and merging duplicates."""
+    source = inspect.getsource(module)
+    tree = ast.parse(source)
+
+    import_modules = set()
+    from_imports = defaultdict(set)
+
+    for node in ast.walk(tree):
+
+        # import x, y
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name in exclude_libraries:
+                    continue
+                if alias.asname:
+                    import_modules.add(f"{alias.name} as {alias.asname}")
+                else:
+                    import_modules.add(alias.name)
+
+        # from x import y
+        elif isinstance(node, ast.ImportFrom):
+            if not node.module or node.module in exclude_libraries:
+                continue
+            for alias in node.names:
+                if alias.asname:
+                    from_imports[node.module].add(f"{alias.name} as {alias.asname}")
+                else:
+                    from_imports[node.module].add(alias.name)
+
+    result = set()
+
+    for module in import_modules:
+        result.add(f"import {module}")
+
+    for module, names in from_imports.items():
+        joined = ", ".join(sorted(names))
+        result.add(f"from {module} import {joined}")
+
+    return sorted(result)

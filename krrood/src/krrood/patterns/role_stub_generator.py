@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import __future__
+import dataclasses
 import inspect
 from collections import defaultdict
 from copy import copy
@@ -14,6 +16,7 @@ from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.utils import classes_of_module
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.patterns import Role
+from krrood.utils import extract_imports
 
 
 @dataclass(frozen=True)
@@ -300,12 +303,11 @@ class RoleStubGenerator:
 
     def _extract_imports(self) -> List[str]:
         """Extracts imports from module source, excluding internal role/dataclass modules."""
-        lines, _ = inspect.getsourcelines(self.module)
-        forbidden = {"krrood.patterns.role", "dataclasses", "typing", "__future__"}
-        imports = {
-            line.strip()
-            for line in lines
-            if line.strip().startswith(("from ", "import "))
-            and not any(f in line for f in forbidden)
-        }
-        return sorted(list(imports))
+        return extract_imports(
+            self.module,
+            [
+                Role.__module__,
+                __future__.__name__,
+                dataclasses.__name__,
+            ],
+        )
