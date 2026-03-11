@@ -3,6 +3,7 @@ from __future__ import annotations
 import __future__
 import dataclasses
 import inspect
+import os.path
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass, Field, field, fields
@@ -201,7 +202,8 @@ class RoleStubGenerator:
 
     def __init__(self, module: Any):
         """Initializes the generator with the Jinja template."""
-        loader = jinja2.PackageLoader("krrood.patterns", "templates")
+        this_file_package = inspect.getmodule(self).__package__
+        loader = jinja2.PackageLoader(this_file_package, "templates")
         self.env = jinja2.Environment(
             loader=loader, trim_blocks=True, lstrip_blocks=True
         )
