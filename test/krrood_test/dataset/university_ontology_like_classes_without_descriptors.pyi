@@ -1,10 +1,33 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 from krrood.entity_query_language.predicate import HasType, HasTypes, Predicate, Symbol, length
 from typing_extensions import List, Set
-if TYPE_CHECKING:
-    from .university_ontology_like_classes_without_descriptors import Company, Country, Course, RecognizedGroup
+
+
+@dataclass(eq=False)
+class RecognizedGroup(Symbol):
+    name: str
+    members: Set[Person] = field(default_factory=set)
+    sub_organization_of: List[RecognizedGroup] = field(default_factory=list)
+
+
+@dataclass(unsafe_hash=True)
+class Course(Symbol):
+    name: str
+
+
+@dataclass(eq=False)
+class Country(RecognizedGroup):
+    name: str
+    members: Set[Person] = field(default_factory=set)
+    sub_organization_of: List[RecognizedGroup] = field(default_factory=list)
+
+
+@dataclass(eq=False)
+class Company(RecognizedGroup):
+    name: str
+    members: Set[Person] = field(default_factory=set)
+    sub_organization_of: List[RecognizedGroup] = field(default_factory=list)
 
 
 @dataclass(eq=False)

@@ -1,21 +1,23 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 {% for import_statement in imports %}
 {{ import_statement }}
 {% endfor %}
-{% if normal_module_imports %}
-from .{{ module_name }} import {{ normal_module_imports|join(', ') }}
-{% endif %}
-{% if type_checking_module_imports %}
-if TYPE_CHECKING:
-    from .{{ module_name }} import {{ type_checking_module_imports|join(', ') }}
-{% endif %}
 
 
+{% for mocked_class in mocked_classes %}
+@dataclass({{ mocked_class.dataclass_args }})
+class {{ mocked_class.name }}{% if mocked_class.bases %}({{ mocked_class.bases|join(', ') }}){% endif %}:
+    {% for wrapped_field in mocked_class.fields %}
+    {{ wrapped_field.name }}: {{ wrapped_field.type_name }}{{ wrapped_field.field_representation }}
+    {% endfor %}
+    {% if not mocked_class.fields %}...{% endif %}
+
+
+{% endfor %}
 {% for wrapped_class in stub_classes %}
 @dataclass({{ wrapped_class.dataclass_args }})
-class {{ wrapped_class.name }}({{ wrapped_class.bases|join(', ') }}):
+class {{ wrapped_class.name }}{% if wrapped_class.bases %}({{ wrapped_class.bases|join(', ') }}){% endif %}:
     {% for wrapped_field in wrapped_class.fields %}
     {{ wrapped_field.name }}: {{ wrapped_field.type_name }}{{ wrapped_field.field_representation }}
     {% endfor %}
