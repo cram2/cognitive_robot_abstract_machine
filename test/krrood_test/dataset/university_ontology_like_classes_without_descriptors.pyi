@@ -10,8 +10,8 @@ from krrood.entity_query_language.predicate import Symbol
 class RecognizedGroup(Symbol):
     name: str
 
-    members: Set[Person] = field(default_factory=set)
-    sub_organization_of: List[RecognizedGroup] = field(default_factory=list)
+    members: Set[Person] = field(default_factory=set, kw_only=True)
+    sub_organization_of: List[RecognizedGroup] = field(default_factory=list, kw_only=True)
 
     def __hash__(self):
         return hash(self.name)
@@ -30,7 +30,7 @@ class Course(Symbol):
 class Person(Symbol):
     name: str
     works_for: RecognizedGroup = field(kw_only=True, default=None)
-    member_of: List[RecognizedGroup] = field(kw_only=True, default=None)
+    member_of: List[RecognizedGroup] = field(kw_only=True, default_factory=list)
     head_of: RecognizedGroup = field(init=False)
     representative_of: RecognizedGroup = field(init=False)
     delegate_of: RecognizedGroup = field(init=False)
@@ -54,21 +54,23 @@ class ProfessorAsFirstRole(RoleForPerson):
     teacher_of: List[Course] = field(default_factory=list, kw_only=True)
 
 @dataclass
-class RoleForCEO(CEOAsFirstRole):
+class RoleForCEOAsFirstRole(CEOAsFirstRole):
     ceo: CEOAsFirstRole
     person: Person = field(init=False)
+    head_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class RepresentativeAsSecondRole(RoleForCEO):
+class RepresentativeAsSecondRole(RoleForCEOAsFirstRole):
     # Original Owner of the representative_of field
     representative_of: RecognizedGroup = field(default=None, kw_only=True)
 
 @dataclass
-class RoleForRepresentative(RepresentativeAsSecondRole):
+class RoleForRepresentativeAsSecondRole(RepresentativeAsSecondRole):
     representative: RepresentativeAsSecondRole
     ceo: CEOAsFirstRole = field(init=False)
+    representative_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class DelegateAsThirdRole(RoleForRepresentative):
+class DelegateAsThirdRole(RoleForRepresentativeAsSecondRole):
     # Original Owner of the delegate_of field
     delegate_of: RecognizedGroup = field(default=None, kw_only=True)

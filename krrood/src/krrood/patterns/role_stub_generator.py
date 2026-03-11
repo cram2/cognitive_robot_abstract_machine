@@ -84,11 +84,23 @@ class FieldRepresentation:
         :return: The string representation of the field.
         """
         non_default_field_assignments = []
+        from dataclasses import MISSING
+
         default_field = field()
         field_arguments = inspect.signature(field).parameters
         for parameter in field_arguments.values():
             current_value = getattr(self.current_field, parameter.name)
-            if current_value != getattr(default_field, parameter.name):
+            default_value = getattr(default_field, parameter.name)
+
+            # Avoid adding kw_only=False as it is the default behavior and MISSING in field signature
+            if (
+                parameter.name == "kw_only"
+                and current_value is False
+                and default_value is MISSING
+            ):
+                continue
+
+            if current_value != default_value:
                 non_default_field_assignments.append(
                     Assignment(parameter.name, current_value)
                 )
@@ -334,20 +346,39 @@ class RoleStubGenerator:
 
         :return: A string containing the generated stub file data.
         """
+        # Sort role takers to ensure they are defined after their dependencies
+        role_takers = self._role_taker_to_info_map
+        sorted_taker_types = [
+            wc.clazz
+            for wc in reversed(
+                self.class_diagram.wrapped_classes_of_role_associations_subgraph_in_topological_order
+            )
+            if wc.clazz in role_takers
+        ]
+
+        # In case some taker types are not in the topological sort
+        for taker_type in role_takers:
+            if taker_type not in sorted_taker_types:
+                sorted_taker_types.append(taker_type)
+
+        sorted_role_takers = {
+            taker_type: role_takers[taker_type] for taker_type in sorted_taker_types
+        }
+
         return self.template.render(
             stub_classes=self._non_role_stub_classes,
-            role_takers=self._role_taker_to_info_map,
+            role_takers=sorted_role_takers,
             imports=self._extract_imports(),
         )
 
     @cached_property
     def _non_role_stub_classes(self) -> List[StubClassInfo]:
         """
-        :return: Stub information for non-role classes.
+        :return: Stub information for non-role classes in topological order.
         """
         return [
             self._build_stub_class(wc)
-            for wc in self.class_diagram.wrapped_classes
+            for wc in self.class_diagram.wrapped_classes_of_inheritance_subgraph_in_topological_order
             if not issubclass(wc.clazz, Role)
         ]
 
@@ -425,11 +456,11 @@ class RoleStubGenerator:
     @cached_property
     def _role_wrapped_classes(self) -> List[WrappedClass[Role]]:
         """
-        :return: Wrapped class instances for role classes.
+        :return: Wrapped class instances for role classes in topological order.
         """
         return [
             wc
-            for wc in self.class_diagram.wrapped_classes
+            for wc in self.class_diagram.wrapped_classes_of_inheritance_subgraph_in_topological_order
             if issubclass(wc.clazz, Role)
         ]
 
