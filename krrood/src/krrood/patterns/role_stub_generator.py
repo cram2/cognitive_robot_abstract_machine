@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
+from typing_extensions import Tuple
+
 """
 This module provides functionality to generate Python stub files (.pyi) for classes following the Role pattern.
 """
@@ -11,7 +14,7 @@ from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass, Field, field, fields
 from functools import cached_property
-from typing import Any, Type, List, Dict, Optional
+from typing import Any, Type, List, Dict, Optional, Set, TYPE_CHECKING
 
 import jinja2
 
@@ -339,12 +342,13 @@ class RoleStubGenerator:
         self.template = self.env.get_template("role_stub.pyi.jinja")
         self.class_diagram = ClassDiagram(classes_of_module(module))
         self.module = module
+        self.path = Path(self.module.__file__).parent / f"{self.module.__name__.split('.')[-1]}.pyi"
 
-    def generate_stub(self) -> str:
+    def generate_stub(self, write: bool = False) -> str:
         """
         Generate a stub file for the module.
 
-        :return: A string containing the generated stub file data.
+        :return: A string representation of the generated stub file.
         """
         # Sort role takers to ensure they are defined after their dependencies
         role_takers = self._role_taker_to_info_map
@@ -365,11 +369,18 @@ class RoleStubGenerator:
             taker_type: role_takers[taker_type] for taker_type in sorted_taker_types
         }
 
-        return self.template.render(
+        data = self.template.render(
             stub_classes=self._non_role_stub_classes,
             role_takers=sorted_role_takers,
             imports=self._extract_imports(),
+            normal_module_imports=self._normal_module_imports,
+            type_checking_module_imports=self._type_checking_module_imports,
+            module_name=self.module.__name__.split(".")[-1],
         )
+        if write:
+            with open(self.path, "w") as f:
+                f.write(data)
+        return data
 
     @cached_property
     def _non_role_stub_classes(self) -> List[StubClassInfo]:
@@ -379,8 +390,55 @@ class RoleStubGenerator:
         return [
             self._build_stub_class(wc)
             for wc in self.class_diagram.wrapped_classes_of_inheritance_subgraph_in_topological_order
-            if not issubclass(wc.clazz, Role)
+            if not issubclass(wc.clazz, Role) and wc.clazz in self._role_takers
         ]
+
+    @cached_property
+    def _role_takers(self) -> Set[Type]:
+        """
+        :return: A set of role taker types.
+        """
+        return set(self._role_taker_to_roles_map.keys())
+
+    @cached_property
+    def _to_be_defined_classes(self) -> Set[Type]:
+        """
+        :return: A set of classes that should be defined in the stub.
+        """
+        return self._role_takers | {wc.clazz for wc in self._role_wrapped_classes}
+
+    @cached_property
+    def _to_be_imported_classes(self) -> Set[Type]:
+        """
+        :return: A set of classes from the module that should be imported.
+        """
+        module_classes = set(classes_of_module(self.module))
+        return module_classes - self._to_be_defined_classes
+
+    @cached_property
+    def _normal_module_imports(self) -> List[str]:
+        """
+        :return: A sorted list of class names from the module that should be imported normally.
+        """
+        normal = set()
+        for clazz in self._to_be_imported_classes:
+            is_base = any(
+                issubclass(defined_class, clazz)
+                for defined_class in self._to_be_defined_classes
+                if defined_class != clazz
+            )
+            if is_base:
+                normal.add(clazz.__name__)
+        return sorted(list(normal))
+
+    @cached_property
+    def _type_checking_module_imports(self) -> List[str]:
+        """
+        :return: A sorted list of class names from the module that should be imported under TYPE_CHECKING.
+        """
+        all_imported = {clazz.__name__ for clazz in self._to_be_imported_classes}
+        normal = set(self._normal_module_imports)
+        return sorted(list(all_imported - normal))
 
     @cached_property
     def _root_role_taker_to_roles_map(self) -> Dict[Type, List[WrappedClass]]:

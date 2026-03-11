@@ -1,8 +1,16 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 {% for import_statement in imports %}
 {{ import_statement }}
 {% endfor %}
+{% if normal_module_imports %}
+from .{{ module_name }} import {{ normal_module_imports|join(', ') }}
+{% endif %}
+{% if type_checking_module_imports %}
+if TYPE_CHECKING:
+    from .{{ module_name }} import {{ type_checking_module_imports|join(', ') }}
+{% endif %}
 
 
 {% for wrapped_class in stub_classes %}

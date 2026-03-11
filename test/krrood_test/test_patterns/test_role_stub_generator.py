@@ -141,7 +141,7 @@ def stub_comparator():
         os.path.dirname(__file__),
         "..",
         "dataset",
-        "university_ontology_like_classes_without_descriptors.pyi",
+        "ground_truth_university_ontology_like_classes_without_descriptors.pyi",
     )
     with open(expected_stub_path, "r") as f:
         expected_stub_content = f.read()
@@ -156,24 +156,11 @@ def stub_comparator():
     sys.modules.pop("generated_stub", None)
     sys.modules.pop("expected_stub", None)
 
-
-def test_stub_generation_smoke(tmp_path):
+@pytest.mark.order("first")
+def test_stub_generation_smoke():
     generator = RoleStubGenerator(university_ontology_like_classes_without_descriptors)
-    stub = generator.generate_stub()
-    assert "class Person(Symbol):" in stub
-    assert "class RoleForPerson(Person):" in stub
-    assert "class CEOAsFirstRole(RoleForPerson):" in stub
-    assert "head_of: RecognizedGroup = field(init=False)" in stub
-    assert "from __future__ import annotations" in stub
-
-    with open("./" + "generated_stub.pyi", "w") as f:
-        f.write(stub)
-
-    with open(tmp_path / "generated_stub.pyi", "w") as f:
-        f.write(stub)
-
-    generated_stub_path = tmp_path / "generated_stub.pyi"
-    assert generated_stub_path.exists()
+    stub = generator.generate_stub(write=True)
+    assert generator.path.exists()
 
 
 def test_full_stub_comparison_class_existence(stub_comparator):
