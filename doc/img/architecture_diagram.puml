@@ -1,0 +1,69 @@
+@startuml
+skinparam componentStyle uml2
+package "PyCRAM" <<Component>> {
+    [Plans] as Plans
+    [Designators] as Designators
+    [Motion Executor] as MotionExecutor
+}
+package "Semantic Digital Twin" <<Component>> {
+    [World Model] as WorldModel
+    [Semantic Annotations] as Annotations
+    [Geometry / Collision] as Geometry
+    [World State] as WorldState
+    [Robots] as Robots
+}
+package "GiskardPy" <<Component>> {
+    [Motion Statechart] as Statechart
+    [QP Controller] as QPController
+    [ROS Executor] as RosExecutor
+}
+package "KRROOD" <<Component>> {
+    [Entity Query Language] as EQL
+    [ORMatic] as ORM
+    [Probabilistic Model] as PM
+    [Parameterizer] as Parameterizer
+}
+package "Simulators" <<Component>> {
+    [Physics Simulator] as MultiSim
+    [MuJoCo Connector] as Mujoco
+}
+package "Real World" <<Component>> {
+    [ROS] as ROS
+    [Multiverse] as Multiverse
+    [Real World] as RealWorld
+}
+package "RoboKudo" <<Component>> {
+[Perception Pipeline Trees] as Pipeline
+[Annotators] as Annotators
+}
+' Relationships
+Plans ..> Designators : uses
+Plans ..> Parameterizer : is parameterized by
+Pipeline ..> Annotators : builds hypothesis using
+Parameterizer ..> ORM : learns from
+Designators ..> MotionExecutor: uses
+MotionExecutor ..> Statechart : constructs
+MotionExecutor ..> RosExecutor : runs
+WorldModel ..> ORM : persists via
+WorldModel ..> Annotations : contains
+WorldModel ..> Geometry : manages
+WorldModel ..> WorldState : manages
+GiskardPy ..> WorldState : updates
+RoboKudo ..> WorldState : updates
+Annotations ..> Robots : defines
+Designators ..> EQL : define questions
+QPController ..> Statechart : is constructed using
+QPController ..> WorldModel : is constructed using
+Designators ..> Pipeline : commands
+EQL ..> ORM : reasons with
+EQL ..> PM : reasons with
+EQL ..> WorldModel : reasons with
+EQL ..> GiskardPy : reasons with
+RosExecutor ..> ROS : Read/Write
+ROS ..> RealWorld : Read/Write
+ROS ..> Multiverse : Read/Write
+MultiSim ..> Mujoco : uses
+WorldModel ..> MultiSim : synchronizes with
+Pipeline ..> ROS : Fetch Images
+Pipeline ..> WorldModel : Update
+@enduml
