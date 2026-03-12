@@ -19,7 +19,8 @@ dependencies = [
   "krrood",
   "random-events",
   "probabilistic_model",
-  "multiverse_simulators"
+  "multiverse_simulators",
+  "llm-reasoner",
 ]
 
 [tool.uv.workspace]
@@ -30,7 +31,8 @@ members = [
   "krrood",
   "random_events",
   "probabilistic_model",
-  "multiverse_simulators"
+  "multiverse_simulators",
+  "llmr",
 ]
 
 [tool.uv.sources]
@@ -41,6 +43,7 @@ krrood                = { workspace = true }
 probabilistic_model   = { workspace = true }
 random_events         = { workspace = true }
 multiverse_simulators = { workspace = true }
+llm-reasoner          = { workspace = true }
 
 [tool.poetry]
 package-mode = false
@@ -53,6 +56,7 @@ krrood = { path = "krrood", develop = true }
 random_events = { path = "random_events", develop = true }
 probabilistic_model = { path = "probabilistic_model", develop = true }
 multiverse_simulators = { path = "multiverse_simulators", develop = true }
+llm-reasoner = { path = "llmr", develop = true }
 
 [tool.setuptools]
 packages = []
