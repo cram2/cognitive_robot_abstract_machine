@@ -111,6 +111,13 @@ class TestMultiverseEpisodeSegmenter(TestCase):
         translation_events = [i for i in logger.get_events() if isinstance(i, TranslationEvent)]
         stop_translation_events = [i for i in logger.get_events() if isinstance(i, StopTranslationEvent)]
 
+        print(f"Number of translation events: {len(translation_events)}")
+        print(f"Number of stop translation events: {len(stop_translation_events)}")
+        for e in translation_events:
+            print(f"Translation Event: {e}")
+
+        for e in stop_translation_events:
+            print(f"Stop Translation Event: {e}")
         assert len([i for i in logger.get_events() if isinstance(i, SupportEvent)]) > 0
         assert len([i for i in logger.get_events() if isinstance(i, ContactEvent)]) > 0
         assert len([i for i in logger.get_events() if isinstance(i, ContainmentEvent)]) > 0

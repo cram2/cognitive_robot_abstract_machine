@@ -262,6 +262,12 @@ class MotionDetector(DetectorStateChartNode, ABC):
     """
     window_size: int = 4
 
+    distance_threshold: float = 0.005
+    """
+    Threshold for the distance between two poses to be considered movement.
+    """
+
+
     def on_tick(
             self, context: SegmindContext
     ) -> Optional[ObservationStateValues]:
@@ -315,9 +321,8 @@ class MotionDetector(DetectorStateChartNode, ABC):
         :param obj: The body to check.
         :return: An Event if movement/stop is detected, otherwise None.
         """
-        latest_poses = self.context.latest_poses[obj]
-        # Simple movement check: is the last pose different from the previous one?
-        is_moving = not np.allclose(latest_poses[-1].to_position().to_list(), latest_poses[-2].to_position().to_list())
+        # Determine movement based on current detector type.
+        is_moving = self._calculate_is_moving(obj)
         self.context.object_moving_status[obj] = is_moving
         return self._check_movement_and_trigger_event(obj)
 
@@ -331,6 +336,12 @@ class MotionDetector(DetectorStateChartNode, ABC):
         """
         pass
 
+    @abstractmethod
+    def _calculate_is_moving(self, obj: Body) -> bool:
+        """
+        Calculates if the object is currently moving based on the latest poses.
+        """
+        pass
 
 @dataclass(eq=False, repr=False)
 class TranslationDetector(MotionDetector):
@@ -363,6 +374,12 @@ class TranslationDetector(MotionDetector):
 
         return None
 
+    def _calculate_is_moving(self, obj: Body) -> bool:
+        latest_poses = self.context.latest_poses[obj]
+        p1 = np.array(latest_poses[-1].to_position().to_list())
+        p2 = np.array(latest_poses[-2].to_position().to_list())
+        distance = np.linalg.norm(p1 - p2)
+        return distance > self.distance_threshold
 
 @dataclass(eq=False, repr=False)
 class StopTranslationDetector(MotionDetector):
@@ -370,6 +387,13 @@ class StopTranslationDetector(MotionDetector):
     Detector for stop translation events.
     Triggers a StopTranslationEvent when an object that was moving stops.
     """
+
+    def _calculate_is_moving(self, obj: Body) -> bool:
+        latest_poses = self.context.latest_poses[obj]
+        p1 = np.array(latest_poses[-1].to_position().to_list())
+        p2 = np.array(latest_poses[-2].to_position().to_list())
+        distance = np.linalg.norm(p1 - p2)
+        return distance > self.distance_threshold
 
     def _check_movement_and_trigger_event(self, obj: Body) -> Optional[Event]:
         latest_motion_event = self.context.latest_motion_events.get(obj)
@@ -384,7 +408,11 @@ class StopTranslationDetector(MotionDetector):
                 return None
 
             # Check if ALL poses in the window are the same.
-            all_poses_same = all(np.allclose(p.to_list(), latest_poses[0].to_list()) for p in latest_poses)
+            # Check if ALL poses in the window are within the threshold of the last pose.
+            # This ensures the object has truly stayed still for the entire window.
+            p_last = np.array(latest_poses[-1].to_position().to_list())
+            all_poses_same = all(np.linalg.norm(np.array(p.to_position().to_list()) - p_last) < self.distance_threshold
+                                 for p in latest_poses)
             if all_poses_same:
                 stop_event = StopTranslationEvent(
                     tracked_object=obj,
