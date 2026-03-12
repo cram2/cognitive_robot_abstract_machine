@@ -3822,7 +3822,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
         frame_P_current=Point3(0, 0, 0, reference_frame=tip),
         frame_P_goal=Point3(0, 0, 0, reference_frame=tip),
         reference_velocity=0.1,
-        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
     )
     assert len(col.eq_constraints) >= 3
 
@@ -3830,7 +3830,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
         col.add_equality_constraint(
             reference_velocity=0.1 * i,
             equality_bound=0.0,
-            weight=DefaultWeights.WEIGHT_BELOW_CA,
+            quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
             task_expression=expr,
         )
 
@@ -3848,7 +3848,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
             name="same_name",
             reference_velocity=0.2,
             equality_bound=0.0,
-            weight=DefaultWeights.WEIGHT_BELOW_CA,
+            quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
             task_expression=expr,
         )
 
@@ -3857,7 +3857,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
         name="same_name",
         reference_velocity=0.2,
         equality_bound=0.0,
-        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
     )
 
@@ -3872,7 +3872,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
         name="same_name",
         reference_velocity=0.2,
         equality_bound=0.0,
-        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
     )
     constraint = EqualityConstraint(

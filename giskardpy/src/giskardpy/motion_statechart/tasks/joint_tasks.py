@@ -63,7 +63,7 @@ class JointPositionList(Task):
                 name=str(connection.name),
                 reference_velocity=velocity,
                 equality_bound=error,
-                weight=self.weight,
+                quadratic_weight=self.weight,
                 task_expression=current,
             )
             errors.append(sm.abs(error) < self.threshold)

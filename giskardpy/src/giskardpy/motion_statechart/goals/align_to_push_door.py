@@ -104,14 +104,14 @@ class AlignToPushDoor(Goal):
                 frame_P_current=root_T_tip.to_position(),
                 frame_P_goal=root_P_top,
                 reference_velocity=self.reference_linear_velocity,
-                weight=self.weight,
+                quadratic_weight=self.weight,
             )
 
             align_to_push_task.add_vector_goal_constraints(
                 frame_V_current=root_V_tip_grasp_axis,
                 frame_V_goal=root_V_object_rotation_axis,
                 reference_velocity=self.reference_angular_velocity,
-                weight=self.weight,
+                quadratic_weight=self.weight,
             )
 
         else:
