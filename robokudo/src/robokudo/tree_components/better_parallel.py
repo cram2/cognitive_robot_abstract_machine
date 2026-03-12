@@ -15,11 +15,15 @@ The module is primarily used for:
 * Robust failure handling
 """
 
+from typing import Any, Generator
+
 # thanks to simon
 # https://github.com/SemRoCo/giskardpy/blob/devel/src/giskardpy/tree/composites/better_parallel.py
 
 import py_trees.composites
+from py_trees.behaviour import Behaviour
 from py_trees.common import Status
+from typing_extensions import List, Union, Optional, Iterator
 
 
 class ParallelPolicy(object):
@@ -27,9 +31,6 @@ class ParallelPolicy(object):
 
     This class provides policy configurations that determine how parallel
     behaviors complete based on their children's status.
-
-    :ivar synchronise: Whether to synchronize child execution
-    :type synchronise: bool
     """
 
     class Base(object):
@@ -37,32 +38,25 @@ class ParallelPolicy(object):
 
         .. warning::
            Should never be used directly. Use derived policy classes instead.
-
-        :ivar synchronise: Whether to stop ticking successful children
-        :type synchronise: bool
         """
-        def __init__(self, synchronise=False):
-            """Initialize base policy.
 
-            :param synchronise: Stop ticking successful children until policy met
-            :type synchronise: bool
-            """
-            self.synchronise = synchronise
+        def __init__(self, synchronise: bool = False) -> None:
+            """Initialize base policy."""
+
+            self.synchronise: bool = synchronise
+            """Stop ticking successful children until policy met"""
 
     class SuccessOnAll(Base):
         """Policy requiring all children to succeed.
 
         Returns SUCCESS only when each child returns SUCCESS. With synchronization,
         successful children are skipped until all succeed or one fails.
-
-        :ivar synchronise: Whether to stop ticking successful children
-        :type synchronise: bool
         """
-        def __init__(self, synchronise=True):
+
+        def __init__(self, synchronise: bool = True) -> None:
             """Initialize SuccessOnAll policy.
 
             :param synchronise: Stop ticking successful children until all succeed
-            :type synchronise: bool
             """
             super().__init__(synchronise=synchronise)
 
@@ -70,11 +64,9 @@ class ParallelPolicy(object):
         """Policy requiring only one child to succeed.
 
         Returns SUCCESS when at least one child succeeds and others are RUNNING.
-
-        :ivar synchronise: Always False for this policy
-        :type synchronise: bool
         """
-        def __init__(self):
+
+        def __init__(self) -> None:
             """Initialize SuccessOnOne policy.
 
             No configuration needed as synchronization is always disabled.
@@ -86,19 +78,13 @@ class ParallelPolicy(object):
 
         Returns SUCCESS when all specified children succeed. With synchronization,
         successful children are skipped until all specified succeed or one fails.
-
-        :ivar synchronise: Whether to stop ticking successful children
-        :type synchronise: bool
-        :ivar children: List of children that must succeed
-        :type children: list
         """
-        def __init__(self, children, synchronise=True):
+
+        def __init__(self, children: List[Behaviour], synchronise: bool = True) -> None:
             """Initialize SuccessOnSelected policy.
 
             :param children: List of children that must succeed
-            :type children: list
             :param synchronise: Stop ticking successful children until specified succeed
-            :type synchronise: bool
             """
             super().__init__(synchronise=synchronise)
             self.children = children
@@ -108,16 +94,16 @@ class Parallel(py_trees.composites.Parallel):
     """Enhanced parallel behavior tree node.
 
     This class extends py_trees.composites.Parallel with:
-    
+
     * Improved policy handling
     * Better child status management
     * Proper interrupt propagation
-    
+
     .. note::
        Children are ticked in sequence but may run concurrently.
     """
 
-    def tick(self):
+    def tick(self) -> Iterator[Union[py_trees.composites.Parallel, Any]]:
         """Tick all children according to policy.
 
         This method:
@@ -127,7 +113,6 @@ class Parallel(py_trees.composites.Parallel):
         * Handles interrupts for running children
 
         :yield: Reference to self or children during traversal
-        :rtype: :class:`~py_trees.behaviour.Behaviour`
         """
         if self.status != Status.RUNNING:
             # subclass (user) handling

@@ -12,17 +12,20 @@ import typing
 from typing import Optional, Callable
 
 import py_trees
+from robokudo_msgs.action import Query
+from typing_extensions import Dict, Any
 
 import robokudo.annotators.core
 import robokudo.tree_components.task_scheduler
 import robokudo.utils.tree
 from robokudo.cas import CASViews
 from robokudo.utils.tree import add_child_to_parent
-from robokudo_msgs.action import Query
 
 
-class QueryBasedScheduler(robokudo.tree_components.task_scheduler.TaskSchedulerBase,
-                          robokudo.annotators.core.BaseAnnotator):
+class QueryBasedScheduler(
+    robokudo.tree_components.task_scheduler.TaskSchedulerBase,
+    robokudo.annotators.core.BaseAnnotator,
+):
     """A Task Scheduler that checks the active Query in the CAS to infer which perception subtree to execute.
     You can apply a function to infer per use-case which perception tree you want to incorporate.
 
@@ -34,28 +37,29 @@ class QueryBasedScheduler(robokudo.tree_components.task_scheduler.TaskSchedulerB
     :type filter_fn: Callable[[QueryGoal], str]
     """
 
-    def __init__(self, name="QueryBasedScheduler", tasks=None, filter_fn: Callable[[Query.Goal], str] = None):
+    def __init__(
+        self,
+        name: str = "QueryBasedScheduler",
+        tasks: Optional[Dict[str, py_trees.composites.Composite]] = None,
+        filter_fn: Optional[Callable[[Query.Goal], str]] = None,
+    ) -> None:
         """Initialize the query-based scheduler.
 
         Tasks should be a dict with key='task-identifier' and value a py_trees.Behaviour)
 
         :param name: Name of the scheduler node
-        :type name: str
         :param tasks: Dictionary mapping task IDs to behavior trees
-        :type tasks: dict
         :param: filter_fn a callable/function which returns a string with the identifier of the subtree to include.
         This function will receive the CASViews.QUERY and can then decide which subtree identifier is the desired one.
-        :type filter_fn: Callable[[QueryGoal], str]
         """
         super().__init__(name)
         if tasks is None:
             tasks = dict()
-        self.tasks = tasks
-        self.filter_fn = filter_fn
+        self.tasks: Dict[str, py_trees.composites.Composite] = tasks
+        self.filter_fn: Optional[Callable[[Query.Goal], str]] = filter_fn
 
-    def setup(self, **kwargs: typing.Any):
-        """Set up all task trees.
-        """
+    def setup(self, **kwargs: Any) -> bool:
+        """Set up all task trees."""
         for task in self.tasks:
             robokudo.utils.tree.setup_with_descendants_on_behavior(self.tasks[task])
         return True
@@ -69,10 +73,9 @@ class QueryBasedScheduler(robokudo.tree_components.task_scheduler.TaskSchedulerB
         * Creates a new sequence with the selected task
 
         :return: New job sequence containing selected task, or None if no task found
-        :rtype: Optional[py_trees.Sequence]
         """
         parent = self.parent
-        assert (isinstance(parent, py_trees.composites.Sequence))
+        assert isinstance(parent, py_trees.composites.Sequence)
 
         new_job = py_trees.composites.Sequence("Task", memory=True)
 

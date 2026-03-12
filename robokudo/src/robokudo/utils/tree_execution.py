@@ -67,7 +67,7 @@ def run_tree_once(
     final_status = None
     timer = None
 
-    def tick_tree():
+    def tick_tree() -> None:
         nonlocal tick_count, final_status, timer
         ae_root.tick()
         tick_count += 1

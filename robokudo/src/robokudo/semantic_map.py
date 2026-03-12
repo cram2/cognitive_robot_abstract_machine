@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from rclpy.node import Node
-from typing_extensions import TYPE_CHECKING, Set, Tuple, List, Dict
+from typing_extensions import TYPE_CHECKING, Set, Tuple, List, Dict, Optional
 from visualization_msgs.msg import Marker, MarkerArray
 
 from . import defs
@@ -38,7 +38,7 @@ class SemanticMapEntry(defs.Region3DWithName):
     type: str = ""
     """The semantic type of this region (e.g. "CounterTop")"""
 
-    plane_equation: List[float] = None
+    plane_equation: Optional[List[float]] = None
     """Plane equation coefficients"""
 
 
@@ -87,7 +87,7 @@ class BaseSemanticMap:
 
     def publish_visualization_markers(
         self,
-        highlighted: Set[str] = None,
+        highlighted: Optional[Set[str]] = None,
         highlight_color: Tuple[float, float, float] = (0.0, 1.0, 0.0),
         default_color: Tuple[float, float, float] = (0.0, 0.0, 0.7),
     ) -> None:
@@ -104,7 +104,6 @@ class BaseSemanticMap:
 
         highlighted = highlighted or set()
 
-        entry = None  # type: SemanticMapEntry
         for name, entry in self.entries.items():
             marker = Marker()
 

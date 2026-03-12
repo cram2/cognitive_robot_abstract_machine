@@ -190,7 +190,7 @@ class BaseAnnotator(py_trees.behaviour.Behaviour):
             % (self.__class__.__name__, event, x, y)
         )
 
-    def get_cas(self) -> Optional[robokudo.cas.CAS]:
+    def get_cas(self) -> robokudo.cas.CAS:
         """Get the CAS from the parent RoboKudo pipeline.
 
         :return: The Common Analysis Structure (CAS) instance or None if not found

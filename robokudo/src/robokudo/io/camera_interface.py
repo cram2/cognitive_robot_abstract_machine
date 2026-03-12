@@ -20,68 +20,71 @@ The module handles:
 * Format conversions
 """
 
+from __future__ import annotations
+
 import logging
 import struct
 import threading
 
 import builtin_interfaces.msg
 import cv2
+import message_filters
 import numpy as np
 import open3d as o3d
 import rclpy
+import sensor_msgs.msg
+import tf2_ros
 from cv_bridge import CvBridge
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 from rclpy.duration import Duration
-from rclpy.impl import rcutils_logger
 from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import CompressedImage, CameraInfo, Image
+from typing_extensions import Optional, List, Any, TYPE_CHECKING, Union, Tuple
 
 import robokudo.cas
+import robokudo.defs
 import robokudo.io.tf_listener_proxy
 import robokudo.types.tf
 from robokudo.cas import CASViews
-
 from robokudo.world import setup_world_for_camera_frame, world_instance
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
+if TYPE_CHECKING:
+    import numpy.typing as npt
+
 
 class CameraInterface(object):
-    """
-    Base class for all camera interfaces in RoboKudo.
+    """Base class for all camera interfaces in RoboKudo.
 
     This class defines the basic interface that all camera implementations
     must provide. It handles configuration and data availability tracking.
-
-    :ivar _has_new_data: Whether new data is available
-    :type _has_new_data: bool
-    :ivar camera_config: Camera configuration object
-    :type camera_config: Any
-    :ivar rk_logger: RoboKudo logger instance
-    :type rk_logger: logging.Logger
     """
 
-    def __init__(self, camera_config):
+    def __init__(self, camera_config: Any) -> None:
         """
         Initialize the camera interface.
 
         :param camera_config: Configuration for the camera
-        :type camera_config: Any
         """
-        self._has_new_data = False
-        self.camera_config = camera_config
-        self.rk_logger = logging.getLogger(robokudo.defs.PACKAGE_NAME)
+        self._has_new_data: bool = False
+        """Whether new data is available"""
 
-    def has_new_data(self):
+        self.camera_config: Any = camera_config
+        """Camera configuration object"""
+
+        self.rk_logger: logging.Logger = logging.getLogger(robokudo.defs.PACKAGE_NAME)
+        """RoboKudo logger instance"""
+
+    def has_new_data(self) -> bool:
         """
         Check if new data is available.
 
         :return: True if new data is available, False otherwise
-        :rtype: bool
         """
         return self._has_new_data
 
-    def set_data(self, cas: robokudo.cas.CAS):
+    def set_data(self, cas: robokudo.cas.CAS) -> None:
         """
         This method is supposed to read in, convert (if needed) and put the data into the CAS.
         If you are running a CameraInterface which is getting data via callback methods, please make sure
@@ -89,62 +92,58 @@ class CameraInterface(object):
         Callbacks should be short.
 
         :param cas: The CAS where the data should be placed in
-        :type cas: robokudo.cas.CAS
         """
         raise NotImplementedError
 
 
 class ROSCameraInterface(CameraInterface):
-    """
-    Base class for ROS-based camera interfaces.
+    """Base class for ROS-based camera interfaces.
 
     This class extends the base camera interface with ROS-specific
     functionality like transform lookups and camera intrinsics handling.
-
-    :ivar lookup_viewpoint: Whether to look up camera transforms
-    :type lookup_viewpoint: bool
-    :ivar tf_from: Transform source frame
-    :type tf_from: str
-    :ivar tf_to: Transform target frame
-    :type tf_to: str
-    :ivar cam_translation: Camera translation from TF
-    :type cam_translation: Optional[list[float]]
-    :ivar cam_quaternion: Camera rotation from TF
-    :type cam_quaternion: Optional[list[float]]
-    :ivar transform_listener: ROS transform listener
-    :type transform_listener: tf.TransformListener
     """
 
-    def __init__(self, camera_config, node=None):
-        """
-        Initialize the ROS camera interface.
+    def __init__(
+        self, camera_config: Any, node: Optional[rclpy.node.Node] = None
+    ) -> None:
+        """Initialize the ROS camera interface.
 
         :param camera_config: Configuration for the ROS camera
-        :type camera_config: Any
         :param node: A ROS node for transform lookups
-        :type node: rclpy.node.Node
         """
         super().__init__(camera_config)
-        self.node = node if node is not None else Node("ros_camera_node")
-        if hasattr(self.camera_config, "lookup_viewpoint"):
-            self.lookup_viewpoint = self.camera_config.lookup_viewpoint
-            self.tf_from = camera_config.tf_from
-            self.tf_to = camera_config.tf_to
-        else:
-            self.lookup_viewpoint = False
 
-        self.cam_translation = None
-        self.cam_quaternion = None
+        self.node = node if node is not None else Node("ros_camera_node")
+        """ROS node for communication with ROS"""
+
+        if hasattr(self.camera_config, "lookup_viewpoint"):
+            self.lookup_viewpoint: bool = self.camera_config.lookup_viewpoint
+
+            self.tf_from: str = camera_config.tf_from
+            """Transform source frame"""
+
+            self.tf_to: str = camera_config.tf_to
+            """Transform target frame"""
+        else:
+            self.lookup_viewpoint: bool = False
+            """Whether to look up camera transforms"""
+
+        self.cam_translation: Optional[List[float]] = None
+        """Camera translation from TF"""
+
+        self.cam_quaternion: Optional[List[float]] = None
+        """Camera rotation from TF"""
 
         if self.lookup_viewpoint:
-            self.transform_listener = robokudo.io.tf_listener_proxy.instance(self.node)
+            self.transform_listener: tf2_ros.Buffer = (
+                robokudo.io.tf_listener_proxy.instance(self.node)
+            )
+            """ROS transform listener"""
 
-    def lookup_transform(self):
-        """
-        Look up the camera transform from TF.
+    def lookup_transform(self) -> bool:
+        """Look up the camera transform from TF.
 
         :return: True if transform lookup succeeded, False otherwise
-        :rtype: bool
         """
         if self.lookup_viewpoint:
             time = Time()
@@ -175,10 +174,10 @@ class ROSCameraInterface(CameraInterface):
     def store_cam_to_world_transform(
         self, cas: robokudo.cas.CAS, timestamp: builtin_interfaces.msg.Time
     ) -> None:
-        """
-        If the camera is configured to look up transforms, store the camera transform in the CAS.
+        """If the camera is configured to look up transforms, store the camera transform in the CAS.
 
-        :return: None
+        :param cas: The CAS to store the transform in
+        :param timestamp: The timestamp of the transform
         """
         if self.lookup_viewpoint:
             # # Set legacy transform
@@ -212,8 +211,9 @@ class ROSCameraInterface(CameraInterface):
 
     @staticmethod
     def store_legacy_cam_to_world_transform_from_cas(cas: robokudo.cas.CAS) -> None:
-        """
-        Create legacy StampedTransform from CAS cam_to_world_transform and data_timestamp.
+        """Create legacy StampedTransform from CAS cam_to_world_transform and data_timestamp.
+
+        :param cas: The CAS to store the transform in
         """
         cam_to_world_transform = cas.cam_to_world_transform
         if cam_to_world_transform is None:
@@ -248,9 +248,8 @@ class ROSCameraInterface(CameraInterface):
         st.timestamp = timestamp
         cas.set(CASViews.VIEWPOINT_CAM_TO_WORLD, st)
 
-    def set_o3d_cam_intrinsics_from_ros_cam_info(self):
-        """
-        Convert ROS camera info to Open3D camera intrinsics.
+    def set_o3d_cam_intrinsics_from_ros_cam_info(self) -> None:
+        """Convert ROS camera info to Open3D camera intrinsics.
 
         Creates an Open3D camera intrinsics object from the ROS camera
         calibration parameters.
@@ -266,17 +265,14 @@ class ROSCameraInterface(CameraInterface):
         self.cam_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
 
 
-def depth_convert_workaround(msg):
-    """
-    Convert compressed depth image to proper depth format.
+def depth_convert_workaround(msg: sensor_msgs.msg.CompressedImage) -> npt.NDArray:
+    """Convert compressed depth image to proper depth format.
 
     This is a workaround for handling compressed depth images in ROS.
     Source: https://answers.ros.org/question/249775/display-compresseddepth-image-python-cv2/
 
     :param msg: Compressed depth image message
-    :type msg: sensor_msgs.msg.CompressedImage
     :return: Depth image as numpy array
-    :rtype: numpy.ndarray
     :raises Exception: If compression type is wrong or decoding fails
     """
     # 'msg' as type CompressedImage
@@ -327,72 +323,41 @@ def depth_convert_workaround(msg):
 
 
 class KinectCameraInterface(ROSCameraInterface):
-    """
-    Interface for Kinect-style RGB-D cameras using ROS.
+    """Interface for Kinect-style RGB-D cameras using ROS.
 
     This class implements a camera interface for RGB-D cameras that publish
     color and depth images through ROS topics. It supports both raw and
     compressed image formats.
-
-    :ivar color_subscriber: Color image subscriber
-    :type color_subscriber: message_filters.Subscriber
-    :ivar depth_subscriber: Depth image subscriber
-    :type depth_subscriber: message_filters.Subscriber
-    :ivar cam_info_subscriber: Camera info subscriber
-    :type cam_info_subscriber: message_filters.Subscriber
-    :ivar color: Latest color image
-    :type color: numpy.ndarray
-    :ivar depth: Latest depth image
-    :type depth: numpy.ndarray
-    :ivar cam_info: Latest camera calibration
-    :type cam_info: sensor_msgs.msg.CameraInfo
-    :ivar cam_intrinsic: Open3D camera intrinsics
-    :type cam_intrinsic: o3d.camera.PinholeCameraIntrinsic
-    :ivar color2depth_ratio: Ratio between color and depth image sizes
-    :type color2depth_ratio: tuple
-    :ivar timestamp: Latest message timestamp
-    :type timestamp: rospy.Time
-    :ivar lock: Thread synchronization lock
-    :type lock: threading.Lock
     """
 
-    def __init__(self, camera_config):
-        """
-        Initialize the Kinect camera interface.
+    def __init__(self, camera_config: Any) -> None:
+        """Initialize the Kinect camera interface.
 
         Sets up ROS subscribers and synchronization for color, depth,
         and camera info topics.
 
         :param camera_config: Configuration for the Kinect camera
-        :type camera_config: Any
         """
         super().__init__(camera_config, node=Node("kinect_camera_node"))
 
-        if self.compressed_color_configured():
-            self.color_subscriber = Subscriber(
-                self.node, CompressedImage, camera_config.topic_color
-            )
-            # self.color_topic_sub = self.node.create_subscription(CompressedImage, camera_config.topic_color,
-            #                                                      self.blackhole_callback, 10)
-        else:
-            self.color_subscriber = Subscriber(
-                self.node, Image, camera_config.topic_color
-            )
+        self.color_subscriber: message_filters.Subscriber = Subscriber(
+            self.node,
+            CompressedImage if self.compressed_color_configured() else Image,
+            camera_config.topic_color,
+        )
+        """Color image subscriber"""
 
-        if self.compressed_depth_configured():
-            self.depth_subscriber = Subscriber(
-                self.node, CompressedImage, camera_config.topic_depth
-            )
-        else:
-            self.depth_subscriber = Subscriber(
-                self.node, Image, camera_config.topic_depth
-            )
-            # self.depth_topic_sub = self.node.create_subscription(Image, camera_config.topic_depth,
-            #                                                      self.blackhole_callback, 10)
+        self.depth_subscriber: message_filters.Subscriber = Subscriber(
+            self.node,
+            CompressedImage if self.compressed_depth_configured() else Image,
+            camera_config.topic_depth,
+        )
+        """Depth image subscriber"""
 
-        self.cam_info_subscriber = Subscriber(
+        self.cam_info_subscriber: message_filters.Subscriber = Subscriber(
             self.node, CameraInfo, camera_config.topic_cam_info
         )
+        """Camera info subscriber"""
         # self.cam_info_sub = self.node.create_subscription(CameraInfo, camera_config.topic_cam_info,
         #                                                   self.blackhole_callback, 10)
 
@@ -408,13 +373,26 @@ class KinectCameraInterface(ROSCameraInterface):
         self.rk_logger.info(f"  {camera_config.topic_depth}")
         self.rk_logger.info(f"  {camera_config.topic_cam_info}")
 
-        self.color = None
-        self.depth = None
-        self.cam_info = None
-        self.cam_intrinsic = None
-        self.color2depth_ratio = None
-        self.timestamp = None
-        self.lock = threading.Lock()
+        self.color: Optional[npt.NDArray] = None
+        """Latest color image"""
+
+        self.depth: Optional[npt.NDArray] = None
+        """Latest depth image"""
+
+        self.cam_info: Optional[sensor_msgs.msg.CameraInfo] = None
+        """Latest camera info message"""
+
+        self.cam_intrinsic: Optional[o3d.camera.PinholeCameraIntrinsic] = None
+        """Open3D camera intrinsics"""
+
+        self.color2depth_ratio: Optional[Tuple[float, float]] = None
+        """Ratio between color and depth image sizes"""
+
+        self.timestamp: Optional[float] = None
+        """Latest message timestamp"""
+
+        self.lock: threading.Lock = threading.Lock()
+        """Thread synchronization lock"""
         # rclpy.spin_once(self.node)
 
         threading.Thread(
@@ -426,45 +404,46 @@ class KinectCameraInterface(ROSCameraInterface):
 
         # threading.Thread(target=rclpy.spin_once(self.node), args=(self.node,), daemon=True).start()
 
-    def compressed_depth_configured(self):
-        """
-        Check if compressed depth images are configured.
+    def compressed_depth_configured(self) -> bool:
+        """Check if compressed depth images are configured.
 
         :return: True if compressed depth is configured, False otherwise
-        :rtype: bool
         """
         return (
             hasattr(self.camera_config, "depth_hints")
             and self.camera_config.depth_hints == "compressedDepth"
         )
 
-    def compressed_color_configured(self):
-        """
-        Check if compressed color images are configured.
+    def compressed_color_configured(self) -> bool:
+        """Check if compressed color images are configured.
 
         :return: True if compressed color is configured, False otherwise
-        :rtype: bool
         """
         return (
             hasattr(self.camera_config, "color_hints")
             and self.camera_config.color_hints == "compressed"
         )
 
-    def get_node(self):
+    def get_node(self) -> rclpy.node.Node:
         return self.node
 
-    def blackhole_callback(self, data):
-        """
-        This callback is just a dummy to receive data coming from a workaround subscription to handle problems with
+    def blackhole_callback(self, data: Any) -> None:
+        """This callback is just a dummy to receive data coming from a workaround subscription to handle problems with
         the ApproximateTimeSynchronizer
-        :param data:
-        :return:
+
+        :param data: Dummy data
         """
         pass
 
-    def callback(self, color_data, depth_data=None, cam_info=None):
-        """
-        Process synchronized camera data.
+    def callback(
+        self,
+        color_data: Union[sensor_msgs.msg.Image, sensor_msgs.msg.CompressedImage],
+        depth_data: Optional[
+            Union[sensor_msgs.msg.Image, sensor_msgs.msg.CompressedImage]
+        ] = None,
+        cam_info: Optional[sensor_msgs.msg.CameraInfo] = None,
+    ) -> None:
+        """Process synchronized camera data.
 
         This callback handles incoming color, depth, and camera info messages.
         It converts the data to OpenCV format and stores it for later use.
@@ -475,11 +454,8 @@ class KinectCameraInterface(ROSCameraInterface):
         Startpoint can be found at the bottom of this method.
 
         :param color_data: Color image message
-        :type color_data: sensor_msgs.msg.Image or sensor_msgs.msg.CompressedImage
         :param depth_data: Depth image message
-        :type depth_data: sensor_msgs.msg.Image or sensor_msgs.msg.CompressedImage
         :param cam_info: Camera calibration message
-        :type cam_info: sensor_msgs.msg.CameraInfo
         """
         self.lock.acquire()
         if self.rk_logger.isEnabledFor(logging.DEBUG):
@@ -534,7 +510,7 @@ class KinectCameraInterface(ROSCameraInterface):
         self._has_new_data = True
         self.lock.release()
 
-    def set_data(self, cas: robokudo.cas.CAS):
+    def set_data(self, cas: robokudo.cas.CAS) -> None:
         if not self.has_new_data():
             return
 

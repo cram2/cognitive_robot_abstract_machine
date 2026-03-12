@@ -17,9 +17,11 @@ The module is primarily used for:
 * Offline data analysis
 * Visualization of stored data
 """
+
 import json
 
 import open3d as o3d
+from typing_extensions import Any
 
 import robokudo.io.camera_interface
 import robokudo.io.storage
@@ -27,47 +29,47 @@ import robokudo.world
 from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.cas import CASViews
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.world import World
 
 
 class StorageReaderInterface(robokudo.io.camera_interface.CameraInterface):
-    """
-    A camera interface for reading data from MongoDB storage.
+    """A camera interface for reading data from MongoDB storage.
 
     This interface reads sensor data and annotations that were previously stored
     using the StorageWriter annotator. It handles data deserialization and
     restoration of the Common Analysis Structure (CAS) views.
-
-    :ivar storage: MongoDB storage interface
-    :type storage: robokudo.io.storage.Storage
-    :ivar reader: List-based reader for MongoDB data
-    :type reader: robokudo.io.storage.Storage.ListReader
     """
 
-    def __init__(self, camera_config):
-        """
-        Initialize the storage reader interface.
+    def __init__(self, camera_config: Any) -> None:
+        """Initialize the storage reader interface.
 
         Sets up MongoDB connection and creates a list reader for the specified
         database.
 
         :param camera_config: Configuration containing database settings
-        :type camera_config: Any
         """
         super().__init__(camera_config)
-        self.storage = robokudo.io.storage.Storage(camera_config.db_name)
-        self.reader = self.storage.ListReader(camera_config.db_name)
 
-    def has_new_data(self):
-        """
-        Check if more data is available to read.
+        self.storage: robokudo.io.storage.Storage = robokudo.io.storage.Storage(
+            camera_config.db_name
+        )
+        """MongoDB storage interface"""
+
+        self.reader: robokudo.io.storage.Storage.ListReader = self.storage.ListReader(
+            camera_config.db_name
+        )
+        """List-based reader for MongoDB data"""
+
+    def has_new_data(self) -> bool:
+        """Check if more data is available to read.
 
         Handles looping behavior based on camera configuration and
         maintains cursor position in the data sequence.
 
         :return: True if more data is available, False otherwise
-        :rtype: bool
         """
         # Check if we have to reinitialize the cursor after we hit the end of the recorded data
         if self.camera_config.loop and not self.reader.cursor_has_frames():
@@ -75,9 +77,8 @@ class StorageReaderInterface(robokudo.io.camera_interface.CameraInterface):
 
         return self.reader.cursor_has_frames()
 
-    def set_data(self, cas: robokudo.cas.CAS):
-        """
-        Update the Common Analysis Structure with data from storage.
+    def set_data(self, cas: robokudo.cas.CAS) -> None:
+        """Update the Common Analysis Structure with data from storage.
 
         This method:
         * Retrieves the next frame from storage
@@ -86,21 +87,21 @@ class StorageReaderInterface(robokudo.io.camera_interface.CameraInterface):
         * Sets depth availability flag
 
         :param cas: Common Analysis Structure to update
-        :type cas: robokudo.cas.CAS
         """
         cas_frame = self.reader.get_next_frame()
         # Restore the world first to get back references to KinematicStructureEntities
         tracker = robokudo.world.init_world_with_entity_tracker()
         kwargs = tracker.create_kwargs()
-        WorldModelSnapshot.apply_to_json_snapshot_to_world(robokudo.world.world_instance(),
-                                                           json.loads(cas_frame['world']), **kwargs)
+        WorldModelSnapshot.apply_to_json_snapshot_to_world(
+            robokudo.world.world_instance(), json.loads(cas_frame["world"]), **kwargs
+        )
 
         # Restore the views from the individual documents
-        cas_frame['views'] = {}
+        cas_frame["views"] = {}
         self.storage.load_views_from_mongo_in_cas(cas_frame)
 
         # Bring flat CAS representation into the proper CAS class
-        for view_name, view_content in cas_frame['views'].items():
+        for view_name, view_content in cas_frame["views"].items():
             cas.set(view_name, view_content)
 
         # Restore annotations
@@ -117,8 +118,8 @@ class StorageReaderInterface(robokudo.io.camera_interface.CameraInterface):
         # TODO this can be unified with the cam intrinsic creation in the cam interface. Check
         #  ROSCamInterface.set_o3d_cam_intrinsics_from_ros_cam_info
         #  => type_conversion.o3d_cam_intrinsics_from_ros_cam_info(cam_info):
-        if "cam_info" in cas_frame['views']:
-            cam_info = cas_frame['views']["cam_info"]
+        if "cam_info" in cas_frame["views"]:
+            cam_info = cas_frame["views"]["cam_info"]
 
             if cam_info is None:
                 # nothing to do
@@ -130,5 +131,7 @@ class StorageReaderInterface(robokudo.io.camera_interface.CameraInterface):
             cx = cam_info.k[2]
             fy = cam_info.k[4]
             cy = cam_info.k[5]
-            cam_intrinsic = o3d.camera.PinholeCameraIntrinsic(width, height, fx, fy, cx, cy)
+            cam_intrinsic = o3d.camera.PinholeCameraIntrinsic(
+                width, height, fx, fy, cx, cy
+            )
             cas.set(CASViews.CAM_INTRINSIC, cam_intrinsic)

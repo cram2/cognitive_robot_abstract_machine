@@ -47,8 +47,8 @@ class Pipeline(Sequence):
         self,
         name: str = "Sequence",
         children: Optional[List[Behaviour]] = None,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         super().__init__(name, memory=True, children=children)
         """Initialize the pipeline.
@@ -57,10 +57,10 @@ class Pipeline(Sequence):
         :param children: List of child behaviors, defaults to None
         """
 
-        self.cas: Optional[cas.CAS] = None
+        self.cas: cas.CAS = None
         """The Common Analysis Structure for this pipeline."""
 
-        self.cas_start_timer: Optional[timeit.default_timer] = None
+        self.cas_start_timer: timeit.default_timer = None
         """Timer for measuring pipeline execution time."""
 
         self.rk_logger = logging.getLogger(defs.PACKAGE_NAME)

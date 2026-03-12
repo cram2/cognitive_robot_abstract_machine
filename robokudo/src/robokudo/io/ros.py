@@ -1,7 +1,7 @@
 import threading
 import rclpy
 import rclpy.node
-from typing_extensions import Optional
+from typing_extensions import Optional, Any
 
 _rk_node = None
 """Central RoboKudo ROS node."""
@@ -10,7 +10,7 @@ _rk_node_lock = threading.Lock()
 """Lock for safe creation of the central ROS node."""
 
 
-def init_node(node_name: str, *args, **kwargs) -> rclpy.node.Node:
+def init_node(node_name: str, *args: Any, **kwargs: Any) -> rclpy.node.Node:
     """Initialize the central RoboKudo ROS node. Args and kwargs are passed directly to rclpy.create_node().
 
     Initializes the global rk_node variable if not already initialized. The node can simply be accessed through

@@ -3,9 +3,10 @@ import dataclasses
 import importlib
 import uuid
 from collections.abc import Iterable
+from typing import Self
 
 import numpy as np
-from typing_extensions import Callable, List, Protocol, Dict, Any
+from typing_extensions import Callable, List, Protocol, Dict, Any, Optional, Set
 
 import robokudo.cas
 from random_events.utils import recursive_subclasses
@@ -45,6 +46,7 @@ from semantic_digital_twin.world_description.world_modification import (
     RemoveConnectionModification,
     RemoveDegreeOfFreedomModification,
     AddKinematicStructureEntityModification,
+    WorldModelModification,
 )
 
 
@@ -55,7 +57,9 @@ class Object:
     data: Dict[str, Any]
     """The actual data that is used for comparison."""
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Object):
+            return False
         for key, value in self.data.items():
             if key not in other.data:
                 return False
@@ -85,7 +89,9 @@ class TrackedObject:
     uid: uuid.UUID = dataclasses.field(default_factory=lambda: uuid.uuid4())
     """Unique identifier for the tracked object."""
 
-    def __eq__(self, other: "TrackedObject") -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TrackedObject):
+            return False
         obj_eq = self.obj == other.obj
         body_eq = self.body == other.body
 
@@ -105,7 +111,7 @@ class TrackedObject:
         return obj_eq and body_eq and semantic_annotations_eq and conns_eq
 
 
-class AddCollisionCommand:
+class AddCollisionCommand(WorldModelModification):
     def __init__(self, body: Body, new_collision: Shape) -> None:
         """Instantiate a new AddCollisionCommand.
 
@@ -115,14 +121,21 @@ class AddCollisionCommand:
         self.body = body
         self.new_collision = new_collision
 
+    @classmethod
+    def from_kwargs(cls, kwargs: Dict[str, Any]) -> Self:
+        return cls(
+            body=kwargs["body"],
+            new_collision=kwargs["new_collision"],
+        )
+
     def apply(self, world: World) -> None:
         self.body.collision.append(self.new_collision)
 
     def undo(self, world: World) -> None:
-        self.body.collision.remove(self.new_collision)
+        self.body.collision.shapes.remove(self.new_collision)
 
 
-class UpdateCollisionCommand:
+class UpdateCollisionCommand(WorldModelModification):
     def __init__(self, old_collision: Shape, new_collision: Shape) -> None:
         """Instantiate a new UpdateCollisionCommand.
 
@@ -135,6 +148,13 @@ class UpdateCollisionCommand:
 
         if type(self.old_collision) != type(self.new_collision):
             raise ValueError("cannot update collision to different shape type")
+
+    @classmethod
+    def from_kwargs(cls, kwargs: Dict[str, Any]) -> Self:
+        return cls(
+            old_collision=kwargs["old_collision"],
+            new_collision=kwargs["new_collision"],
+        )
 
     def apply(self, world: World) -> None:
         old_fields = dataclasses.fields(self.old_collision)
@@ -155,8 +175,8 @@ class UpdateCollisionCommand:
                 setattr(self.collision, field.name, old_value)
 
 
-class RemoveCollisionCommand:
-    def __init__(self, body: Body, old_collision: Shape):
+class RemoveCollisionCommand(WorldModelModification):
+    def __init__(self, body: Body, old_collision: Shape) -> None:
         """Instantiate a new RemoveCollisionCommand.
 
         :param body: Body to remove the collision from.
@@ -165,8 +185,15 @@ class RemoveCollisionCommand:
         self.body = body
         self.old_collision = old_collision
 
+    @classmethod
+    def from_kwargs(cls, kwargs: Dict[str, Any]) -> Self:
+        return cls(
+            body=kwargs["body"],
+            old_collision=kwargs["old_collision"],
+        )
+
     def apply(self, world: World) -> None:
-        self.body.collision.remove(self.old_collision)
+        self.body.collision.shapes.remove(self.old_collision)
 
     def undo(self, world: World) -> None:
         self.body.collision.append(self.old_collision)
@@ -183,7 +210,9 @@ class WorldDiff(Protocol):
 
 
 class AddObjectDiff:
-    def __init__(self, adapter: "SemanticDigitalTwinAdapter", new_object: Object):
+    def __init__(
+        self, adapter: "SemanticDigitalTwinAdapter", new_object: Object
+    ) -> None:
         """Create a new AddObjectDiff instance.
 
         :param adapter: The SemanticDigitalTwinAdapter instance that is used to store the diff.
@@ -193,7 +222,7 @@ class AddObjectDiff:
         self.new_object = new_object
         self.tracked_object = self.adapter.object_to_tracked_object(new_object)
 
-        self.commands = list()
+        self.commands: List[WorldModelModification] = list()
 
         self.commands.append(
             AddKinematicStructureEntityModification(
@@ -265,7 +294,7 @@ class UpdateObjectDiff:
         self.new_object = new_object
         self.tracked_object = self.adapter.object_to_tracked_object(new_object)
 
-        self.commands = list()
+        self.commands: List[WorldModelModification] = list()
 
         # Assume a single simple body as collision for perceived, dynamic objects
         if (
@@ -316,7 +345,7 @@ class UpdateObjectDiff:
 class RemoveObjectDiff:
     def __init__(
         self, adapter: "SemanticDigitalTwinAdapter", old_object: TrackedObject
-    ):
+    ) -> None:
         """Create a new RemoveObjectDiff instance.
 
         :param adapter: The SemanticDigitalTwinAdapter instance that is used to store the diff.
@@ -325,17 +354,17 @@ class RemoveObjectDiff:
         self.adapter = adapter
         self.old_object = old_object
 
-        self.commands = list()
+        self.commands: List[WorldModelModification] = list()
 
         self.commands.append(RemoveBodyModification(body_id=old_object.body.id))
 
         for connection in self.old_object.conns:
             self.commands.append(
                 RemoveConnectionModification(
-                    parent_id=connection.id, child_id=old_object.body.id
+                    parent_id=connection.parent.id, child_id=old_object.body.id
                 )
             )
-            for dof in connection.dofs.values():
+            for dof in connection.dofs:
                 self.commands.append(RemoveDegreeOfFreedomModification(dof_id=dof.id))
 
         for semantic_annotation in self.old_object.semantic_annotations:
@@ -364,8 +393,8 @@ class SemanticDigitalTwinAdapter:
     def __init__(
         self,
         cas_fn: Callable[..., robokudo.cas.CAS],
-        urdf_path: str = None,
-        semantic_annotation_sources: list = None,
+        urdf_path: Optional[str] = None,
+        semantic_annotation_sources: Optional[List] = None,
     ) -> None:
         """Create a SemanticDigitalTwinAdapter instance.
 
@@ -433,7 +462,7 @@ class SemanticDigitalTwinAdapter:
         :return: List of diffs between the current tracked objects and the novel objects provided.
         """
 
-        diffs = []
+        diffs: List[WorldDiff] = []
         # Old objects that were already matched to a new object
         matched_objects: set[uuid.UUID] = set()
         for new_object in new_objects:
@@ -474,8 +503,8 @@ class SemanticDigitalTwinAdapter:
         if len(comparable_data) == 0:
             return 0.0
 
-        total_similarity = 0
-        total_weight = 0
+        total_similarity = 0.0
+        total_weight = 0.0
 
         for key in comparable_data:
             comparator = self.comparators.get(key, AdditionalDataComparator(1.0))
@@ -496,7 +525,7 @@ class SemanticDigitalTwinAdapter:
 
         body = Body()
 
-        semantic_annotations = list()
+        semantic_annotations: List[SemanticAnnotation] = list()
 
         if "semantic_color" in obj.data:
             color = self.semantic_color_to_rgb[obj.data["semantic_color"].color]
@@ -544,7 +573,9 @@ class SemanticDigitalTwinAdapter:
         )
 
     @staticmethod
-    def class_to_semantic_annotation(class_name: str, **kwargs) -> SemanticAnnotation:
+    def class_to_semantic_annotation(
+        class_name: str, **kwargs: Any
+    ) -> SemanticAnnotation:
         """Convert a classification name to a SemanticWorld SemanticAnnotation.
 
         :param class_name: Class to convert to a semantic annotation.
@@ -558,7 +589,7 @@ class SemanticDigitalTwinAdapter:
                 "no semantic_annotations available for conversion from class name"
             )
 
-        class_map = {
+        class_map: Dict[str, str] = {
             "Cornflakes": "Cereal",
             "Salt": "SaltContainer",
             # "Cup": "Cup",
@@ -577,8 +608,8 @@ class SemanticDigitalTwinAdapter:
                 class_candidates.append(semantic_annotation_cls)
 
         for class_candidate in class_candidates:
-            required_fields = set()
-            optional_fields = set()
+            required_fields: Set[str] = set()
+            optional_fields: Set[str] = set()
             for field in dataclasses.fields(class_candidate):
                 if (
                     field.default == dataclasses.MISSING

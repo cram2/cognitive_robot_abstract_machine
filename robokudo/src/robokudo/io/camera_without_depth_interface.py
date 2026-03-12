@@ -17,12 +17,19 @@ The module is used for:
 * Video file playback
 * Image sequence processing
 """
+
+from __future__ import annotations
+from typing_extensions import Optional, TYPE_CHECKING, Any
+
 from robokudo.io.camera_interface import CameraInterface
 import robokudo.cas
 from robokudo.cas import CASViews
 from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 
 import cv2
+
+if TYPE_CHECKING:
+    import numpy.typing as npt
 
 
 TYPE_VIDEO: int = 0
@@ -45,70 +52,69 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
     * Configurable frame looping
     * Image normalization
     * Static camera calibration
-
-    :ivar video_capture: OpenCV video capture object
-    :type video_capture: cv2.VideoCapture
-    :ivar device_driver_flag: OpenCV-specific driver flags
-    :type device_driver_flag: int
-    :ivar stream_type: Type of input (video/camera/image)
-    :type stream_type: int
-    :ivar _loop_counter: Number of remaining playback loops
-    :type _loop_counter: int
-    :ivar _backup_color: Backup of image for single-image mode
-    :type _backup_color: numpy.ndarray or None
     """
 
-    def __init__(self, camera_config):
-        """
-        Initialize the OpenCV camera interface.
+    def __init__(self, camera_config: Any) -> None:
+        """Initialize the OpenCV camera interface.
 
         Opens the video capture device and configures stream parameters based
         on the input type (camera/video/image).
 
-        :param camera_config: Configuration for the camera interface
-        :type camera_config: Any
         :raises IOError: If video stream/file cannot be opened
         """
         super().__init__(camera_config)
 
         # open video stream
         device = camera_config.device
-        self.video_capture = cv2.VideoCapture(device, camera_config.api_preference)
+
+        self.video_capture: cv2.VideoCapture = cv2.VideoCapture(
+            device, camera_config.api_preference
+        )
+        """OpenCV video capture object"""
+
         if self.video_capture is None or not self.video_capture.isOpened():
             raise IOError("Could not open video stream/file:<{}>.".format(device))
 
-        self.device_driver_flag = camera_config.device_driver_flag
+        self.device_driver_flag: int = camera_config.device_driver_flag
+        """OpenCV-specific driver flags"""
 
         max_frames = self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
-        self.stream_type = TYPE_VIDEO if max_frames >= 0.0 else (TYPE_CAMERA if max_frames == -1.0 else TYPE_IMAGE)
 
-        # can only loop on video/image files
-        self._loop_counter = self.stream_type != TYPE_CAMERA and camera_config.loop_mode
+        self.stream_type: int = (
+            TYPE_VIDEO
+            if max_frames >= 0.0
+            else (TYPE_CAMERA if max_frames == -1.0 else TYPE_IMAGE)
+        )
+        """Type of input (video/camera/image)"""
 
-        # backup for image file case
-        self._backup_color = None
+        self._loop_counter: int = (
+            self.stream_type != TYPE_CAMERA and camera_config.loop_mode
+        )
+        """Number of remaining playback loops. Only works on video/image files."""
+
+        self._backup_color: Optional[npt.NDArray] = None
+        """Backup of image for single-image file mode"""
 
         self.rk_logger.info("OpenCVCameraWithoutDepthInterface initialized")
 
-    def has_new_data(self):
-        """
-        Check if new frame data is available.
+    def has_new_data(self) -> bool:
+        """Check if new frame data is available.
 
         For video/camera streams, attempts to grab the next frame.
         For single images, checks if backup image is available.
 
         :return: True if new data is available, False otherwise
-        :rtype: bool
         """
         if not self._has_new_data:
             # try to grab next frame
-            self._has_new_data = self.video_capture.grab() or self._backup_color is not None
+            self._has_new_data = (
+                self.video_capture.grab() or self._backup_color is not None
+            )
 
         return self._has_new_data
 
-    def set_data(self, cas: robokudo.cas.CAS):
-        """
-        Update the Common Analysis Structure with latest frame data.
+    def set_data(self, cas: robokudo.cas.CAS) -> None:
+        """Update the Common Analysis Structure with latest frame data.
 
         This method:
         * Retrieves the next frame from video/camera or backup
@@ -117,7 +123,6 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         * Updates the CAS with frame and camera data
 
         :param cas: Common Analysis Structure to update
-        :type cas: robokudo.cas.CAS
         """
         if not self.has_new_data():
             # no new frame available
@@ -132,8 +137,12 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
             color = self._backup_color
             retval = True
 
-        self.rk_logger.debug("loaded frame {} of {}".format(
-            self.video_capture.get(cv2.CAP_PROP_POS_FRAMES), self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT)))
+        self.rk_logger.debug(
+            "loaded frame {} of {}".format(
+                self.video_capture.get(cv2.CAP_PROP_POS_FRAMES),
+                self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT),
+            )
+        )
 
         self._has_new_data = False
         self._backup_color = None
@@ -146,7 +155,9 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         # handle loop behavior
         frame_index = self.video_capture.get(cv2.CAP_PROP_POS_FRAMES)
 
-        if self._loop_counter and frame_index >= self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT):
+        if self._loop_counter and frame_index >= self.video_capture.get(
+            cv2.CAP_PROP_FRAME_COUNT
+        ):
             if self.stream_type == TYPE_IMAGE:
                 # single image
                 # store first/only image

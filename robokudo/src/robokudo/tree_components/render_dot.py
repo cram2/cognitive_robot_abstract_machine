@@ -12,26 +12,26 @@ The module provides:
 """
 
 import os
-from timeit import default_timer
 from concurrent.futures import ThreadPoolExecutor
+from timeit import default_timer
 
 import py_trees
+from typing_extensions import Optional, List, Union
 
 import robokudo.display
 import robokudo.utils.tree
 
 
-def create_dir_if_not_exists(path):
+def create_dir_if_not_exists(path: str) -> None:
     """Create directory if it doesn't exist.
 
     :param path: Directory path to create
-    :type path: str
     """
     if not os.path.exists(path):
         os.makedirs(path)
 
 
-def render_now(behaviour: py_trees.Behaviour):
+def render_now(behaviour: Union["RenderTreeToDot", "RenderTreeToDotDecorator"]) -> None:
     """Generate behavior tree snapshot and save to disk.
 
     This method:
@@ -41,7 +41,6 @@ def render_now(behaviour: py_trees.Behaviour):
     * Updates rendering statistics
 
     :param behaviour: Behavior node requesting the render
-    :type behaviour: py_trees.Behaviour
     """
     start_timer = default_timer()
 
@@ -51,55 +50,55 @@ def render_now(behaviour: py_trees.Behaviour):
     # Go up until we find the root
     root = robokudo.utils.tree.find_root(behaviour)
 
-    robokudo.display.render_dot_tree(root, name=f'RKTree{behaviour.suffix}-{behaviour.counter}',
-                                     threadpool_executor=behaviour.executor, path_prefix=behaviour.path)
+    robokudo.display.render_dot_tree(
+        root,
+        name=f"RKTree{behaviour.suffix}-{behaviour.counter}",
+        threadpool_executor=behaviour.executor,
+        path_prefix=behaviour.path,
+    )
 
     behaviour.counter += 1
     end_timer = default_timer()
-    behaviour.feedback_message = f'Processing took {(end_timer - start_timer):.4f}s'
+    behaviour.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
 
 
-class RenderTreeToDot(py_trees.Behaviour):
+class RenderTreeToDot(py_trees.behaviour.Behaviour):
     """Behavior that renders tree to DOT format when ticked.
 
     This behavior renders the entire tree to DOT format each time it is ticked,
     saving the output to the specified directory.
-
-    :ivar path: Output directory path
-    :type path: str
-    :ivar counter: Number of renders performed
-    :type counter: int
-    :ivar create_dir_for_path: Whether to create output directory
-    :type create_dir_for_path: bool
-    :ivar executor: Thread pool for rendering
-    :type executor: ThreadPoolExecutor
-    :ivar suffix: Suffix to append to output filenames
-    :type suffix: str
     """
 
-    def __init__(self, path=None, suffix=""):
+    def __init__(self, path: Optional[str] = None, suffix: str = "") -> None:
         """Initialize render behavior.
 
         :param path: Output directory path
-        :type path: str
         :param suffix: Suffix for output filenames
-        :type suffix: str
         """
         super().__init__(name="RenderToDot")
-        self.path = path  # This should be a directory.
-        self.counter = 0
-        self.create_dir_for_path = True
-        self.executor = ThreadPoolExecutor(max_workers=10)
-        self.suffix = suffix
 
-    def update(self):
+        self.path: Optional[str] = path
+        """Output directory path"""
+
+        self.counter: int = 0
+        """Number of renders performed"""
+
+        self.create_dir_for_path: bool = True
+        """Whether to create output directory"""
+
+        self.executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=10)
+        """Thread pool for rendering"""
+
+        self.suffix: str = suffix
+        """Suffix to append to output filenames"""
+
+    def update(self) -> py_trees.common.Status:
         """Render tree on each tick.
 
         :return: Always returns SUCCESS
-        :rtype: :class:`py_trees.common.Status`
         """
         render_now(self)
-        return py_trees.Status.SUCCESS
+        return py_trees.common.Status.SUCCESS
 
 
 class RenderTreeToDotDecorator(py_trees.decorators.Decorator):
@@ -107,50 +106,54 @@ class RenderTreeToDotDecorator(py_trees.decorators.Decorator):
 
     This decorator monitors its child's status and triggers a tree render
     when the status matches configured triggers.
-
-    :ivar path: Output directory path
-    :type path: str
-    :ivar counter: Number of renders performed
-    :type counter: int
-    :ivar create_dir_for_path: Whether to create output directory
-    :type create_dir_for_path: bool
-    :ivar executor: Thread pool for rendering
-    :type executor: ThreadPoolExecutor
-    :ivar suffix: Suffix to append to output filenames
-    :type suffix: str
-    :ivar trigger_when_status_is: List of status values that trigger rendering
-    :type trigger_when_status_is: list
     """
 
-    def __init__(self, child=None, path=None, suffix="", trigger_when_status_is=None):
+    def __init__(
+        self,
+        child: Optional[py_trees.behaviour.Behaviour] = None,
+        path: Optional[str] = None,
+        suffix: str = "",
+        trigger_when_status_is: Optional[List[py_trees.common.Status]] = None,
+    ) -> None:
         """Initialize render decorator.
 
         :param child: Child behavior to monitor
-        :type child: py_trees.Behaviour
         :param path: Output directory path
-        :type path: str
         :param suffix: Suffix for output filenames
-        :type suffix: str
         :param trigger_when_status_is: Status values that trigger rendering
-        :type trigger_when_status_is: list
         """
         super().__init__(name="RenderToDotDecorator", child=child)
 
         if trigger_when_status_is is None:
-            trigger_when_status_is = [py_trees.Status.SUCCESS, py_trees.Status.FAILURE]
-        self.trigger_when_status_is = trigger_when_status_is
+            trigger_when_status_is = [
+                py_trees.common.Status.SUCCESS,
+                py_trees.common.Status.FAILURE,
+            ]
 
-        self.path = path  # This should be a directory.
-        self.counter = 0
-        self.create_dir_for_path = True
-        self.executor = ThreadPoolExecutor(max_workers=10)
-        self.suffix = suffix
+        self.trigger_when_status_is: List[py_trees.common.Status] = (
+            trigger_when_status_is
+        )
+        """List of status values that trigger rendering"""
 
-    def update(self):
+        self.path: str = path
+        """Output directory path"""
+
+        self.counter: int = 0
+        """Number of renders performed"""
+
+        self.create_dir_for_path: bool = True
+        """Whether to create output directory"""
+
+        self.executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=10)
+        """Thread pool for rendering"""
+
+        self.suffix: str = suffix
+        """Suffix to append to output filenames"""
+
+    def update(self) -> py_trees.common.Status:
         """Check child status and render if triggered.
 
         :return: Status of decorated child
-        :rtype: :class:`py_trees.common.Status`
         """
         if self.decorated.status in self.trigger_when_status_is:
             render_now(self)
