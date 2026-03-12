@@ -408,7 +408,7 @@ class RoleStubGenerator:
             self._build_stub_class(wc)
             for wc in self.class_diagram.wrapped_classes_of_inheritance_subgraph_in_topological_order
             if not isinstance(wc, WrappedSpecializedGeneric)
-            and Role not in wc.clazz.__bases__
+            and not issubclass(wc.clazz, Role)
             and wc.clazz in self._role_takers
         ]
 
@@ -433,9 +433,8 @@ class RoleStubGenerator:
         """
         mapping = defaultdict(list)
         for wc in self.class_diagram.wrapped_classes:
-            if (
-                not isinstance(wc, WrappedSpecializedGeneric)
-                and Role in wc.clazz.__bases__
+            if not isinstance(wc, WrappedSpecializedGeneric) and issubclass(
+                wc.clazz, Role
             ):
                 mapping[wc.clazz.get_root_role_taker_type()].append(wc)
         return mapping
@@ -478,10 +477,11 @@ class RoleStubGenerator:
         ]
 
         # Add role-introduced fields as init=False
+        taker_fields_cp = copy(taker_fields)
         for role_wc in self._root_role_taker_to_roles_map.get(wrapped_class.clazz, []):
             taker_field_name = role_wc.clazz.role_taker_field().name
             for role_wf in role_wc.fields:
-                if any(taker_wf.name == role_wf.name for taker_wf in taker_fields):
+                if any(taker_wf.name == role_wf.name for taker_wf in taker_fields_cp):
                     raise ValueError(
                         f"Roles should not overwrite fields defined in their role takers: {role_wf.name} in "
                         f"{role_wc} overwrites the one defined in {wrapped_class} with the same name"
@@ -536,7 +536,7 @@ class RoleStubGenerator:
             wc
             for wc in self.class_diagram.wrapped_classes_of_inheritance_subgraph_in_topological_order
             if not isinstance(wc, WrappedSpecializedGeneric)
-            and Role in wc.clazz.__bases__
+            and issubclass(wc.clazz, Role)
         ]
 
     def _extract_imports(self) -> List[str]:

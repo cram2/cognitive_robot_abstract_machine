@@ -52,6 +52,9 @@ class ProfessorAsFirstRole(RoleForPerson):
     # Original Owner of the teacher_of field
     teacher_of: List[Course] = field(default_factory=list, kw_only=True)
 
+@dataclass(eq=False)
+class AssociateProfessorAsSubClassOfARoleInSameModule(ProfessorAsFirstRole): ...
+
 @dataclass
 class RoleForCEOAsFirstRole(CEOAsFirstRole):
     ceo: CEOAsFirstRole

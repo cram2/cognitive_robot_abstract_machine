@@ -28,15 +28,11 @@ class Company(RecognizedGroup):
 
 
 @dataclass(eq=False)
-class AssociateProfessorAsSubClassOfARoleInSameModule(ProfessorAsFirstRole):
-    ...
-
-
-@dataclass(eq=False)
 class Person(Symbol):
     name: str
     works_for: RecognizedGroup = field(default=None, kw_only=True)
     member_of: List[RecognizedGroup] = field(default_factory=list, kw_only=True)
+    teacher_of: List[Course] = field(init=False)
     head_of: RecognizedGroup = field(init=False)
     delegate_of: RecognizedGroup = field(init=False)
     teacher_of: List[Course] = field(init=False)
@@ -61,6 +57,12 @@ class ProfessorAsFirstRole(RoleForPerson):
 class CEOAsFirstRole(RoleForPerson):
     # Original Owner of the head_of field
     head_of: RecognizedGroup = field(default=None, kw_only=True)
+
+
+@dataclass(eq=False)
+class AssociateProfessorAsSubClassOfARoleInSameModule(RoleForPerson):
+    # Original Owner of the teacher_of field
+    teacher_of: List[Course] = field(default_factory=list, kw_only=True)
 
 
 @dataclass
