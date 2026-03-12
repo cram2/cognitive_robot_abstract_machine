@@ -29,7 +29,6 @@ class Person(Symbol):
     name: str
     works_for: RecognizedGroup = field(default=None, kw_only=True)
     member_of: List[RecognizedGroup] = field(default_factory=list, kw_only=True)
-    teacher_of: List[Course] = field(init=False)
     head_of: RecognizedGroup = field(init=False)
     delegate_of: RecognizedGroup = field(init=False)
     teacher_of: List[Course] = field(init=False)

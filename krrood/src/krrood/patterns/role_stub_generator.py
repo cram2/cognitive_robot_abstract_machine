@@ -545,11 +545,12 @@ class RoleStubGenerator:
         ]
 
         # Add role-introduced fields as init=False
-        taker_fields_cp = copy(taker_fields)
         for role_wc in self._root_role_taker_to_roles_map.get(wrapped_class.clazz, []):
+            if Role not in role_wc.clazz.__bases__:
+                continue
             taker_field_name = role_wc.clazz.role_taker_field().name
             for role_wf in role_wc.fields:
-                if any(taker_wf.name == role_wf.name for taker_wf in taker_fields_cp):
+                if any(taker_wf.name == role_wf.name for taker_wf in taker_fields):
                     raise ValueError(
                         f"Roles should not overwrite fields defined in their role takers: {role_wf.name} in "
                         f"{role_wc} overwrites the one defined in {wrapped_class} with the same name"
