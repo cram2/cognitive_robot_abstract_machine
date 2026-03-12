@@ -29,8 +29,12 @@ class SegmindContext(MotionStatechartContext):
     """
     Type hint for dictionaries mapping bodies to sets of bodies
     """
-
-
+    
+    object_moving_status: Dict[Body, bool] = None
+    """
+    
+    """
+    
     latest_contact_bodies: IndexedBodyPairs = None
     """
     :param latest_contact_bodies: Dictionary mapping each body to the set of
@@ -317,29 +321,29 @@ class MotionDetector(DetectorStateChartNode, ABC):
         latest_poses = self.context.latest_poses[obj]
 
         if is_moving:
-            # 1. Check the latest poses for movement -> If there was never an MotionEvent with the obj, create a new MotionEvent.
-            # 2. If there IS a MotionEvent, remove it and replace it with the new one (continuation).
-            if latest_motion_event is not None and latest_motion_event.current_pose == latest_poses[-1]:
+            # If the object is moving:
+            # 1. If it wasn't moving before, create a new MotionEvent.
+            # 2. If it was already moving, update the current_pose but don't return a new event.
+            if latest_motion_event is None:
+                new_event = motion_event_type(
+                    tracked_object=obj,
+                    start_pose=latest_poses[0],
+                    current_pose=latest_poses[-1]
+                )
+                self.context.latest_motion_events[obj] = new_event
+                return new_event
+            else:
+                # Update current pose of the existing event
+                latest_motion_event.current_pose = latest_poses[-1]
                 return None
-
-            new_event = motion_event_type(
-                tracked_object=obj,
-                start_pose=latest_poses[0],
-                current_pose=latest_poses[-1]
-            )
-            self.context.latest_motion_events[obj] = new_event
-            return new_event
         else:
-            # 3. If there is no Motion:
-            # 3.1 If there was no MotionEvent of that object before, do nothing.
+            # If the object is not moving:
+            # 1. If it was moving before, check if it truly stopped (all poses in window are same).
+            # 2. If it stopped, create a StopMotionEvent and clear the active event.
             if latest_motion_event is None:
                 return None
             
-            # 3.2 If there was a MotionEvent before, create a StopMotionEvent when all 4 Poses are not showing any difference.
-            # We already know is_moving is false, but we need to check if ALL poses in the window are the same.
-            # The window size is self.window_size + 1 (because we append then check then pop).
-            # Actually update_latest_pose_and_trigger_events pops AFTER check_obj_movement.
-            # So latest_poses has window_size + 1 elements.
+            # Check if ALL poses in the window are the same.
             all_poses_same = all(np.allclose(p.to_list(), latest_poses[0].to_list()) for p in latest_poses)
             if all_poses_same:
                 stop_event = stop_motion_event_type(
@@ -366,6 +370,11 @@ class TranslationDetector(MotionDetector):
         )
 
 
+@dataclass(eq=False, repr=False)
+class StopTranslationDetector(MotionDetector):
+    def check_obj_movement(self, obj: Body) -> Optional[Event]:
+        latest_poses = self.context.latest_poses[obj]
+        
 @dataclass(eq=False, repr=False)
 class RotationDetector(MotionDetector):
     def check_obj_movement(self, obj: Body) -> Optional[Event]:

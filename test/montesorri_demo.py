@@ -7,12 +7,13 @@ from unittest import TestCase
 
 import rclpy
 
-from segmind.datastructures.events import SupportEvent, ContactEvent, ContainmentEvent
+from segmind.datastructures.events import SupportEvent, ContactEvent, ContainmentEvent, TranslationEvent, \
+    StopTranslationEvent
 from segmind.detectors.atomic_event_detectors import DetectorStateChart
 from segmind.detectors.atomic_event_detectors_nodes import (
     SegmindContext,
     ContactDetector,
-    LossOfContactDetector,
+    LossOfContactDetector, TranslationDetector,
 )
 from segmind.detectors.spatial_relation_detector_nodes import SupportDetector, LossOfSupportDetector, \
     ContainmentDetector
@@ -85,9 +86,16 @@ class TestMultiverseEpisodeSegmenter(TestCase):
             name="containment_detector",
             context=self.context,
         )
+        translation_detector = TranslationDetector(
+            name="translation_detector", context=self.context, window_size=4
+        )
 
+        # stop_translation_detector = StopTranslationDetector(
+        #     name="stop_translation_detector", context=self.context, window_size=4
+        # )
 
-        sc.add_nodes([contact_detector, loss_of_contact_detector, support_detector,loss_of_support_detector, containment_detector])
+        sc.add_nodes([contact_detector, loss_of_contact_detector, support_detector,loss_of_support_detector,
+                      translation_detector,containment_detector])
         support_detector.start_condition = contact_detector.observation_variable
         loss_of_support_detector.start_condition = (
             loss_of_contact_detector.observation_variable
@@ -96,8 +104,21 @@ class TestMultiverseEpisodeSegmenter(TestCase):
         self.episode_executor.compile(sc)
         time.sleep(5)
         while self.episode_executor.player.is_alive():
-             time.sleep(0.01)
+             time.sleep(0.1)
              self.episode_executor.tick()
+
+
+        translation_events = [i for i in logger.get_events() if isinstance(i, TranslationEvent)]
+        stop_translation_events = [i for i in logger.get_events() if isinstance(i, StopTranslationEvent)]
+
+        print(f"Number of translation events: {len(translation_events)}")
+        print(f"Number of stop translation events: {len(stop_translation_events)}")
+        for e in translation_events:
+            print(f"Translation Event: {e}")
+
+        for e in stop_translation_events:
+            print(f"Stop Translation Event: {e}")
+
 
         assert len([i for i in logger.get_events() if isinstance(i, SupportEvent)]) > 0
         assert len([i for i in logger.get_events() if isinstance(i, ContactEvent)]) > 0
