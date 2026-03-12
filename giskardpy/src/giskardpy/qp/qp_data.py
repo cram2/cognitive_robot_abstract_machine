@@ -1,25 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 import scipy.sparse as sp
 from scipy.sparse import issparse
-from typing_extensions import Self, TYPE_CHECKING, Generic, TypeVar, get_args
-
-from krrood.symbolic_math.symbolic_math import (
-    CompiledFunctionWithViews,
-    VariableParameters,
-    Matrix,
-    hstack,
-    CompiledFunction,
-    FloatVariable,
-    vstack,
-)
-
-if TYPE_CHECKING:
-    from giskardpy.qp.adapters.qp_adapter import QPDataSymbolic
+from typing_extensions import Self
 
 
 @dataclass
@@ -307,9 +294,6 @@ class QPDataTwoSidedInequality(QPData):
     inequality_lower_bounds: np.ndarray
     inequality_upper_bounds: np.ndarray
 
-    num_equality_slack_variables: int
-    num_inequality_slack_variables: int
-
     @property
     def num_box_constraints(self) -> int:
         return self.quadratic_weights.shape[0]
@@ -349,7 +333,7 @@ class QPDataTwoSidedInequality(QPData):
         zero_quadratic_weight_filter = self.quadratic_weights != 0
         zero_quadratic_weight_filter[: -self.num_slack_variables] = True
 
-        slack_part = zero_quadratic_weight_filter[-(self.num_slack_variables) :]
+        slack_part = zero_quadratic_weight_filter[-self.num_slack_variables :]
         bE_part = slack_part[: self.num_equality_slack_variables]
         if len(bE_part) > 0:
             bE_filter_view[-len(bE_part) :] = bE_part
