@@ -2,7 +2,65 @@
 
 Monorepo for the CRAM cognitive architecture. 
 
-## Installation 
+## Installation
+
+### Prerequisites
+**1. Install ROS 2 Jazzy**
+
+Follow the official installation guide: https://docs.ros.org/en/jazzy/Installation.html
+**2. Install system dependencies**
+
+```bash
+sudo apt install python3.12-venv ros-jazzy-xacro ros-jazzy-navigation2 python3-vcstool git ros-dev-tools default-jre graphviz graphviz-dev ros-jazzy-rclpy-message-converter pip python3-colcon-common-extensions -y
+```
+
+
+### Clone the repo and its submodules
+Pull the submodules:
+```bash
+git clone https://github.com/cram2/cognitive_robot_abstract_machine.git
+cd cognitive_robot_abstract_machine
+git submodule update --init --recursive
+```
+
+### ROS 2 Workspace Setup
+
+Create a ROS 2 workspace and clone the required robot description packages:
+
+```bash
+mkdir -p ~/ros2_ws/src && cd ~/ros2_ws/src && \
+git clone -b ros-jazzy --single-branch https://github.com/code-iai/iai_maps.git && \
+git clone -b ros-jazzy-main --single-branch https://github.com/code-iai/iai_pr2.git && \
+git clone -b ros2-jazzy --single-branch https://github.com/code-iai/hsr_description.git && \
+git clone -b ros2-jazzy --single-branch https://github.com/code-iai/iai_tracy.git && \
+    rm -rf iai_tracy/iai_tracy_bringup iai_tracy/iai_tracy_ur && \
+git clone --single-branch https://github.com/maltehue/ros2_robotiq_gripper.git && \
+    rm -rf ros2_robotiq_gripper/robotiq_controllers ros2_robotiq_gripper/robotiq_drivers \
+           ros2_robotiq_gripper/robotiq_hardware_tests ros2_robotiq_gripper/robotiq_driver && \
+git clone -b jazzy --single-branch https://github.com/UniversalRobots/Universal_Robots_ROS2_Description.git && \
+git clone -b ros2-jazzy --single-branch https://github.com/code-iai/iai_stretch.git && \
+    rm -rf iai_stretch/iai_stretch_bringup && \
+git clone -b ros2-master --single-branch https://github.com/realsenseai/realsense-ros.git && \
+    rm -rf realsense-ros/realsense2_camera realsense-ros/realsense2_camera_msgs \
+           realsense-ros/realsense2_rgbd_plugin realsense-ros/realsense2_ros_mqtt_bridge && \
+git clone -b ros2-main --single-branch https://github.com/code-iai/iai_tiago_description.git && \
+git clone -b humble-devel --single-branch https://github.com/pal-robotics/pmb2_robot.git && \
+    rm -rf pmb2_robot/pmb2_bringup pmb2_robot/pmb2_controller_configuration && \
+git clone -b humble-devel --single-branch https://github.com/pal-robotics/pal_gripper.git && \
+    rm -rf pal_gripper/pal_grippper_controller_configuration pal_gripper/pal_gripper_gazeboo \
+           pal_gripper/pal_gripper_simulation pal_gripper/pal_parallel_gripper_wrapper
+```
+
+Then build the workspace and source it:
+
+```bash
+cd ~/ros2_ws && colcon build --merge-install && \
+grep -qxF 'source ~/ros2_ws/install/setup.bash' ~/.bashrc || \
+    echo 'source ~/ros2_ws/install/setup.bash' >> ~/.bashrc && \
+source ~/.bashrc
+```
+
+### CRAM Architecture Installation
 
 To install the CRAM architecture, follow these steps:
 
@@ -14,19 +72,13 @@ grep -qxF 'export WORKON_HOME=$HOME/.virtualenvs' ~/.bashrc || echo 'export WORK
 grep -qxF 'export VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3' ~/.bashrc || echo 'export VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3' >> ~/.bashrc && \
 grep -qxF 'source /usr/share/virtualenvwrapper/virtualenvwrapper.sh' ~/.bashrc || echo 'source /usr/share/virtualenvwrapper/virtualenvwrapper.sh' >> ~/.bashrc && \
 source ~/.bashrc && \
-mkvirtualenv cram-env
+mkvirtualenv cram-env --system-site-packages
 ```
 Activate / deactivate
 
 ```
 workon cram-env
 deactivate
-```
-
-Pull the submodules: 
-```bash
-cd cognitive_robot_abstract_machine
-git submodule update --init --recursive
 ```
 
 ### Install using UV 
