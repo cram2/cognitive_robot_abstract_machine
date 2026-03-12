@@ -9,8 +9,14 @@ from krrood.symbolic_math.float_variable_data import (
     FloatVariableData,
 )
 from krrood.symbolic_math.symbolic_math import FloatVariable, SymbolicMathType
-from semantic_digital_twin.collision_checking.collision_detector import CollisionCheckingResult, ClosestPoints
-from semantic_digital_twin.collision_checking.collision_groups import CollisionGroupConsumer, CollisionGroup
+from semantic_digital_twin.collision_checking.collision_detector import (
+    CollisionCheckingResult,
+    ClosestPoints,
+)
+from semantic_digital_twin.collision_checking.collision_groups import (
+    CollisionGroupConsumer,
+    CollisionGroup,
+)
 from semantic_digital_twin.spatial_types import Vector3, Point3
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -87,10 +93,7 @@ class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
         cache_key = (method_name, *identifier)
         if cache_key not in self._symbol_cache:
             symbol = creator_func()
-            if isinstance(symbol, SymbolicMathType):
-                self.float_variable_data.add_variables_of_expression(symbol)
-            else:
-                self.float_variable_data.add_variable(symbol)
+            self.float_variable_data.register_expression(symbol)
             self._symbol_cache[cache_key] = symbol
         return self._symbol_cache[cache_key]
 

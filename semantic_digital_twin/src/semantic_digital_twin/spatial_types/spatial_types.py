@@ -224,7 +224,8 @@ class HomogeneousTransformationMatrix(
                     name=f"{cls.__name__}_{name}[{row},{column}]",
                 )
                 transformation_matrix[row, column] = variable
-                variable.resolve = lambda: resolver()[row, column]
+                if resolver is not None:
+                    variable.resolve = lambda: resolver()[row, column]
         return transformation_matrix
 
     def to_json(self) -> Dict[str, Any]:

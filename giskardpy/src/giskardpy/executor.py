@@ -117,17 +117,19 @@ class Executor:
 
     def _create_control_cycles_variable(self):
         self.context.control_cycle_variable = FloatVariable("control_cycles")
-        self._control_cycle_index = self.context.float_variable_data.add_variable(
+        self.context.float_variable_data.register_expression(
             self.context.control_cycle_variable
         )
 
     @property
-    def control_cycles(self):
-        return self.context.float_variable_data.data[self._control_cycle_index]
+    def control_cycles(self) -> float:
+        return float(self.context.control_cycle_variable.evaluate()[0])
 
     @control_cycles.setter
     def control_cycles(self, value):
-        self.context.float_variable_data.set_value(self._control_cycle_index, value)
+        self.context.float_variable_data.set_value(
+            self.context.control_cycle_variable, value
+        )
 
     def compile(self, motion_statechart: MotionStatechart):
         self.motion_statechart = motion_statechart

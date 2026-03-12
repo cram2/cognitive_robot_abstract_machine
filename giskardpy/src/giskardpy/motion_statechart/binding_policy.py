@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field, InitVar
 from enum import Enum
 
+from krrood.symbolic_math.float_variable_data import FloatVariableData
+from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -33,8 +36,10 @@ class ForwardKinematicsBinding:
     ..warning:: Ensure to keep a reference to this instance in the MotionStatechartNode.
     """
 
-    build_context: InitVar[MotionStatechartContext]
-    """Current context of the build() of a MotionStatechartNode."""
+    float_variable_data: FloatVariableData
+    """
+    Reference to the FloatVariableData used for storing variables for the forward kinematics.
+    """
     name: PrefixedName
     """
     Name of the Binding. It is used for naming the auxiliary variables.
@@ -45,38 +50,31 @@ class ForwardKinematicsBinding:
     tip: KinematicStructureEntity
     """Tip of the kinematic chain."""
 
-    _matrix_index: int = field(init=False)
-    """The current state of the TransformationMatrix root_T_tip."""
     _root_T_tip_expr: HomogeneousTransformationMatrix | None = field(
         default=None, init=False
     )
     """The TransformationMatrix root_T_tip, represented using auxiliary variables."""
 
-    def __post_init__(self, build_context: MotionStatechartContext):
+    def __post_init__(self):
         self._root_T_tip_expr = HomogeneousTransformationMatrix.create_with_variables(
             str(self.name)
         )
         self._root_T_tip_expr.reference_frame = self.root
         self._root_T_tip_expr.child_frame = self.tip
-        self._matrix_index = (
-            build_context.float_variable_data.add_variables_of_expression(
-                self._root_T_tip_expr
-            )
+        self._matrix_index = self.float_variable_data.register_expression(
+            self._root_T_tip_expr
         )
-        self.bind(build_context)
 
     @property
     def root_T_tip(self):
         return self._root_T_tip_expr
 
-    def bind(self, context: MotionStatechartContext):
+    def bind(self, world: World):
         """
         Will update root_T_tip to the current state of the kinematic chain.
         Call during on_start() etc. of a MotionStatechartNode.
         :param world: The world used for computing the forward kinematics.
         """
-        context.float_variable_data.data[
-            self._matrix_index : self._matrix_index + 12
-        ] = context.world.compute_forward_kinematics_np(self.root, self.tip)[
-            :3, :4
-        ].T.flatten()
+        root_T_tip = world.compute_forward_kinematics_np(self.root, self.tip)
+        root_T_tip_flat = root_T_tip[:3, :4].T.flatten()
+        self.float_variable_data.set_value(self._root_T_tip_expr, root_T_tip_flat)

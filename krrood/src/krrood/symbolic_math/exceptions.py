@@ -12,7 +12,7 @@ from typing_extensions import (
 from krrood.utils import DataclassException
 
 if TYPE_CHECKING:
-    from krrood.symbolic_math.symbolic_math import FloatVariable
+    from krrood.symbolic_math.symbolic_math import FloatVariable, SymbolicMathType
 
 
 @dataclass
@@ -89,6 +89,21 @@ class HasFreeVariablesError(SymbolicMathError):
         super().__post_init__()
 
 
+@dataclass
+class NoFreeVariablesError(SymbolicMathError):
+    """
+    Raised when an operation can't be performed on an expression with NO free variables.
+    """
+
+    message: str = field(init=False)
+
+    def __post_init__(self):
+        self.message = (
+            f"Operation can't be performed on expression with NO free variables."
+        )
+        super().__post_init__()
+
+
 class ExpressionEvaluationError(SymbolicMathError):
     """
     Represents an exception raised during the evaluation of a symbolic mathematical expression.
@@ -122,4 +137,55 @@ class DuplicateVariablesError(SymbolicMathError):
 
     def __post_init__(self):
         self.message = f"Operation failed due to duplicate variables: {self.variables}. All variables must be unique."
+        super().__post_init__()
+
+
+@dataclass
+class FloatVariableDataError(DataclassException):
+    """
+    Represents an error specific to FloatVariableData operations.
+    """
+
+    message: str = field(init=False)
+
+
+@dataclass
+class FloatVariableAlreadyHasResolveError(FloatVariableDataError):
+    """
+    Raised when a symbolic math expression is not registered for evaluation.
+    """
+
+    variable: FloatVariable
+    message: str = field(init=False)
+
+    def __post_init__(self):
+        self.message = f"Cannot register an expression which has a FloatVariable ({self.variable}) that already has a resolver."
+        super().__post_init__()
+
+
+@dataclass
+class SymbolicMathExpressionNotRegisteredError(FloatVariableDataError):
+    """
+    Raised when a symbolic math expression is not registered for evaluation.
+    """
+
+    expression: SymbolicMathType
+    message: str = field(init=False)
+
+    def __post_init__(self):
+        self.message = f"Symbolic math expression '{self.expression}' is not registered to FloatVariableData."
+        super().__post_init__()
+
+
+@dataclass
+class SymbolicMathExpressionAlreadyRegisteredError(FloatVariableDataError):
+    """
+    Raised when a symbolic math expression is already registered for evaluation.
+    """
+
+    expression: SymbolicMathType
+    message: str = field(init=False)
+
+    def __post_init__(self):
+        self.message = f"Symbolic math expression '{self.expression}' is already registered to FloatVariableData."
         super().__post_init__()

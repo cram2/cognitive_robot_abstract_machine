@@ -35,7 +35,12 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.world_description.geometry import Color
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import LifeCycleValues, ObservationStateValues, TransitionKind
+from giskardpy.motion_statechart.data_types import (
+    LifeCycleValues,
+    ObservationStateValues,
+    TransitionKind,
+    DefaultWeights,
+)
 from giskardpy.motion_statechart.exceptions import (
     NotInMotionStatechartError,
     EndMotionInGoalError,
@@ -881,6 +886,9 @@ class Task(MotionStatechartNode):
     """
     Tasks are MotionStatechartNodes that add motion constraints.
     """
+
+    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
+    """Task priority relative to other tasks."""
 
     plot_specs: NodePlotSpec = field(
         default_factory=NodePlotSpec.create_task_style, kw_only=True, init=False
