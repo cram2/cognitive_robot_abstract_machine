@@ -411,6 +411,18 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
 
 
 @dataclass(eq=False)
+class HasGraspPose(HasRootBody, ABC):
+    """
+    A mixin class for semantic annotations that have a grasp pose.
+    """
+
+    grasp_pose: HomogeneousTransformationMatrix = field(kw_only=True, default=None)
+    """
+    The grasp pose of the semantic annotation
+    """
+
+
+@dataclass(eq=False)
 class HasApertures(HasRootBody, ABC):
     """
     A mixin class for semantic annotations that have apertures.

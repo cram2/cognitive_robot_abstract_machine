@@ -3,4 +3,5 @@ from pycram.robot_plans.actions.core.pick_up import *
 from pycram.robot_plans.actions.core.misc import *
 from pycram.robot_plans.actions.core.navigation import *
 from pycram.robot_plans.actions.core.placing import *
+from pycram.robot_plans.actions.core.pose_grasp import *
 from pycram.robot_plans.actions.core.robot_body import *
