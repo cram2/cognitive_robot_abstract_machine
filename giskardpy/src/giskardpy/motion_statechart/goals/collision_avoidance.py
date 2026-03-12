@@ -25,7 +25,11 @@ from semantic_digital_twin.world_description.world_entity import (
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.exceptions import NodeInitializationError
-from giskardpy.motion_statechart.graph_node import Goal, MotionStatechartNode, NodeArtifacts
+from giskardpy.motion_statechart.graph_node import (
+    Goal,
+    MotionStatechartNode,
+    NodeArtifacts,
+)
 from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 
@@ -230,16 +234,8 @@ class _ExternalCollisionAvoidanceTask(_ExternalCollisionAvoidanceNode):
             reference_velocity=self.max_velocity,
             lower_error=lower_limit,
             upper_error=float("inf"),
-            weight=self.create_weight(context),
+            quadratic_weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
             task_expression=a_projected_on_normal,
-            lower_slack_limit=-float("inf"),
-            upper_slack_limit=self.create_upper_slack(
-                context=context,
-                max_velocity=self.max_velocity,
-                buffer_zone_expr=self.buffer_zone_distance,
-                violated_distance=self.violated_distance,
-                distance_expression=sm.Scalar(self.contact_distance),
-            ),
         )
 
         return artifacts
@@ -349,6 +345,8 @@ class ExternalCollisionAvoidance(Goal):
                 self.external_collision_manager.register_group_of_body(body)
 
         for group in self.external_collision_manager.registered_groups:
+            if group.root not in self.robot.bodies:
+                continue
             max_avoided_bodies = group.get_max_avoided_bodies(context.collision_manager)
             for index in range(max_avoided_bodies):
                 distance_monitor = _ExternalCollisionHasData(
@@ -522,7 +520,7 @@ class _SelfCollisionAvoidanceTask(_SelfCollisionAvoidanceNode):
             reference_velocity=self.max_velocity,
             lower_error=lower_limit,
             upper_error=float("inf"),
-            weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
+            quadratic_weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
             task_expression=a_projected_on_normal,
             lower_slack_limit=-float("inf"),
             upper_slack_limit=self.create_upper_slack(

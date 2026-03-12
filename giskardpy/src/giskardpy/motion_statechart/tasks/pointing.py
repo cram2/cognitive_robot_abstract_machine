@@ -74,7 +74,7 @@ class Pointing(Task):
             frame_V_current=root_V_pointing_axis,
             frame_V_goal=root_V_goal_axis,
             reference_velocity=self.max_velocity,
-            weight=self.weight,
+            quadratic_weight=self.weight,
         )
         artifacts.observation = (
             root_V_pointing_axis.angle_between(root_V_goal_axis) <= self.threshold
@@ -193,7 +193,7 @@ class PointingCone(Task):
             frame_V_current=root_V_pointing_axis,
             frame_V_goal=root_V_goal_axis_proj,
             reference_velocity=self.max_velocity,
-            weight=self.weight,
+            quadratic_weight=self.weight,
         )
         artifacts.observation = (
             root_V_pointing_axis.angle_between(root_V_goal_axis_proj) <= self.threshold

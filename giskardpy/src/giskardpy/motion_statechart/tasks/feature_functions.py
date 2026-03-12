@@ -153,7 +153,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
         artifacts.constraints.add_equality_constraint(
             reference_velocity=self.maximum_velocity,
             equality_bound=0 - expr,
-            weight=self.weight,
+            quadratic_weight=self.weight,
             task_expression=expr,
             name=f"{self.name}_constraint",
         )
@@ -207,7 +207,7 @@ class HeightGoal(FeatureFunctionGoal):
             reference_velocity=self.maximum_velocity,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
-            weight=self.weight,
+            quadratic_weight=self.weight,
             task_expression=expr,
             name=f"{self.name}_constraint",
         )
@@ -266,7 +266,7 @@ class DistanceGoal(FeatureFunctionGoal):
             reference_velocity=self.maximum_velocity,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
-            weight=self.weight,
+            quadratic_weight=self.weight,
             task_expression=expr,
             name=f"{self.name}_constraint",
         )
@@ -277,7 +277,7 @@ class DistanceGoal(FeatureFunctionGoal):
                 reference_velocity=self.maximum_velocity,
                 lower_error=0,
                 upper_error=0,
-                weight=self.weight,
+                quadratic_weight=self.weight,
                 task_expression=root_V_diff[i],
                 name=f"{self.name}_extra_{axis_name}",
             )
@@ -336,7 +336,7 @@ class AngleGoal(FeatureFunctionGoal):
             reference_velocity=self.maximum_velocity,
             upper_error=self.upper_angle - expr,
             lower_error=self.lower_angle - expr,
-            weight=self.weight,
+            quadratic_weight=self.weight,
             task_expression=expr,
             name=f"{self.name}_constraint",
         )

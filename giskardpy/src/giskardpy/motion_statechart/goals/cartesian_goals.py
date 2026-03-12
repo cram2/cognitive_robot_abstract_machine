@@ -144,37 +144,3 @@ class CartesianPoseStraight(Parallel):
             ),
         ]
         super().expand(context)
-
-
-@dataclass(eq=False, repr=False)
-class RelativePositionSequence(Goal):
-    goal1: HomogeneousTransformationMatrix = field(kw_only=True)
-    goal2: HomogeneousTransformationMatrix = field(kw_only=True)
-    root_link: Body = field(kw_only=True)
-    tip_link: Body = field(kw_only=True)
-
-    def __post_init__(self):
-        """
-        Only meant for testing.
-        """
-        name1 = f"{self.name}/goal1"
-        name2 = f"{self.name}/goal2"
-        task1 = CartesianPose(
-            root_link=self.root_link,
-            tip_link=self.tip_link,
-            goal_pose=self.goal1,
-            name=name1,
-            absolute=True,
-        )
-        self.add_task(task1)
-        task2 = CartesianPose(
-            root_link=self.root_link,
-            tip_link=self.tip_link,
-            goal_pose=self.goal2,
-            name=name2,
-            absolute=True,
-        )
-        self.add_task(task2)
-        task2.start_condition = task1
-        task1.end_condition = task1
-        self.observation_expression = task2.observation_expression

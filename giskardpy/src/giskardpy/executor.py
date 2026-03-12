@@ -147,7 +147,7 @@ class Executor:
         self.motion_statechart.tick(self.context)
         if self.qp_controller is None:
             return
-        next_cmd = self.qp_controller.get_cmd(
+        next_cmd = self.qp_controller.compute_command(
             world_state=self.context.world.state.data,
             life_cycle_state=self.motion_statechart.life_cycle_state.data,
             float_variables=self.context.float_variable_data.data,

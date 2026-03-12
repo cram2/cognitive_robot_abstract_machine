@@ -5,10 +5,9 @@ import logging
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Tuple, List, Union, Dict, TYPE_CHECKING, DefaultDict, Optional, Type
+from typing import Tuple, List, Dict, TYPE_CHECKING, DefaultDict, Type
 
 import numpy as np
-from line_profiler import profile
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.constraint import (
@@ -21,18 +20,16 @@ from giskardpy.qp.exceptions import (
     VelocityLimitUnreachableException,
 )
 from giskardpy.qp.pos_in_vel_limits import b_profile
-from giskardpy.qp.qp_data import QPData
 from giskardpy.qp.solvers.qp_solver import QPSolver
-from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.utils.decorators import memoize
 from giskardpy.utils.math import mpc
+from krrood.symbolic_math.symbolic_math import Vector, Matrix
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    import scipy.sparse as sp
     from giskardpy.qp.qp_controller_config import QPControllerConfig
 
 
@@ -212,7 +209,6 @@ class ProblemDataPart(ABC):
         free_variable_model.remove([], column_ids)
         return free_variable_model
 
-    @profile
     def velocity_limit(
         self, v: DegreeOfFreedom, max_derivative: Derivatives
     ) -> Tuple[sm.Vector, sm.Vector]:
@@ -316,46 +312,22 @@ class Weights(ProblemDataPart):
         x_offset = sm.solve_for(f, target_value)
         return (sm.abs(current_position + x_offset - limit) * a) ** exp, x_offset
 
-    @profile
-    def construct_expression(
-        self,
-        quadratic_weight_gains: List[QuadraticWeightGain] = None,
-        linear_weight_gains: List[LinearWeightGain] = None,
-    ) -> Tuple[sm.Vector, sm.Vector]:
-        quadratic_weight_gains = quadratic_weight_gains or []
-        linear_weight_gains = linear_weight_gains or []
+    def construct_expression(self) -> Tuple[sm.Vector, sm.Vector]:
         components = []
-        components.extend(
-            self.free_variable_weights_expression(
-                quadratic_weight_gains=quadratic_weight_gains
-            )
-        )
+        components.extend(self.free_variable_weights_expression())
         components.append(self.equality_weight_expressions())
         components.extend(self.eq_derivative_weight_expressions())
         components.append(self.inequality_weight_expressions())
         components.extend(self.derivative_weight_expressions())
         weights, _ = self._sorter(*components)
-        weights = sm.Vector(weights)
-        linear_weights = self.linear_weights_expression(
-            linear_weight_gains=linear_weight_gains
-        )
-        if linear_weights is None:
-            linear_weights = sm.Vector.zeros(weights.shape[0])
-        else:
-            # as of now linear weights are only added for joints, therefore equality-, derivative- and inequality
-            # weights are missing. Here the missing weights are filled in with zeroes.
-            linear_weights, _ = self._sorter(*linear_weights)
-            linear_weights = sm.Matrix(linear_weights)
-            linear_weights = sm.vstack(
-                [linear_weights]
-                + [sm.Scalar(0)] * (weights.shape[0] - linear_weights.shape[0])
-            )
-        return sm.Vector(weights), linear_weights
+        quadratic_weights = []
+        linear_weights = []
+        for quadratic_weight, linear_weight in weights:
+            quadratic_weights.append(quadratic_weight)
+            linear_weights.append(linear_weight)
+        return sm.Vector(quadratic_weights), sm.Vector(linear_weights)
 
-    @profile
-    def free_variable_weights_expression(
-        self, quadratic_weight_gains: List[QuadraticWeightGain]
-    ) -> List[defaultdict]:
+    def free_variable_weights_expression(self) -> List[tuple[defaultdict, defaultdict]]:
         max_derivative = self.config.max_derivative
         params = []
         weights = defaultdict(dict)  # maps order to joints
@@ -388,15 +360,7 @@ class Weights(ProblemDataPart):
                     )
                     weights[derivative][
                         f"t{t:03}/{v.variables.position.dof.name}/{derivative}"
-                    ] = normalized_weight
-                    for q_gain in quadratic_weight_gains:
-                        if (
-                            t < len(q_gain.gains)
-                            and v in q_gain.gains[t][derivative].keys()
-                        ):
-                            weights[derivative][
-                                f"t{t:03}/{v.variables.position.dof.name}/{derivative}"
-                            ] *= q_gain.gains[t][derivative][v]
+                    ] = (normalized_weight, 0)
         for _, weight in sorted(weights.items()):
             params.append(weight)
         return params
@@ -422,7 +386,8 @@ class Weights(ProblemDataPart):
                 for c in self.get_derivative_constraints(d):
                     if t < self.control_horizon:
                         derivative_constr_weights[f"t{t:03}/{c.name}"] = (
-                            c.normalized_weight()
+                            c.normalized_weight(),
+                            c.linear_weight,
                         )
             params.append(derivative_constr_weights)
         return params
@@ -436,66 +401,31 @@ class Weights(ProblemDataPart):
                 for c in self.get_eq_derivative_constraints(d):
                     if t < self.control_horizon:
                         derivative_constr_weights[f"t{t:03}/{c.name}"] = (
-                            c.normalized_weight()
+                            c.normalized_weight(),
+                            c.linear_weight,
                         )
             params.append(derivative_constr_weights)
         return params
 
     def equality_weight_expressions(self) -> dict:
         error_slack_weights = {
-            f"{c.name}/error": c.normalized_weight(self.control_horizon)
+            f"{c.name}/error": (
+                c.normalized_weight(self.control_horizon),
+                c.linear_weight,
+            )
             for c in self.constraint_collection.eq_constraints
         }
         return error_slack_weights
 
     def inequality_weight_expressions(self) -> dict:
         error_slack_weights = {
-            f"{c.name}/error": c.normalized_weight(self.control_horizon)
+            f"{c.name}/error": (
+                c.normalized_weight(self.control_horizon),
+                c.linear_weight,
+            )
             for c in self.constraint_collection.neq_constraints
         }
         return error_slack_weights
-
-    @profile
-    def linear_weights_expression(
-        self, linear_weight_gains: List[LinearWeightGain] = None
-    ):
-        if len(linear_weight_gains) > 0:
-            params = []
-            weights = defaultdict(dict)  # maps order to joints
-            for t in range(self.config.prediction_horizon):
-                for v in self.degrees_of_freedom:
-                    for derivative in Derivatives.range(
-                        Derivatives.velocity, self.config.max_derivative
-                    ):
-                        if t >= self.config.prediction_horizon - (
-                            self.config.max_derivative - derivative
-                        ):
-                            continue
-                        if (
-                            derivative == Derivatives.acceleration
-                            and not self.config.qp_formulation.has_explicit_acc_variables
-                        ):
-                            continue
-                        if (
-                            derivative == Derivatives.jerk
-                            and not self.config.qp_formulation.has_explicit_jerk_variables
-                        ):
-                            continue
-                        weights[derivative][
-                            f"t{t:03}/{v.variables.position}/{derivative}"
-                        ] = 0
-                        for l_gain in linear_weight_gains:
-                            if (
-                                t < len(l_gain.gains)
-                                and v in l_gain.gains[t][derivative].keys()
-                            ):
-                                weights[derivative][
-                                    f"t{t:03}/{v.variables.position}/{derivative}"
-                                ] += l_gain.gains[t][derivative][v]
-            for _, weight in sorted(weights.items()):
-                params.append(weight)
-            return params
-        return None
 
     def get_free_variable_symbols(self, order: Derivatives) -> List[sm.FloatVariable]:
         return self._sorter(
@@ -527,7 +457,6 @@ class FreeVariableBounds(ProblemDataPart):
     names_eq_slack: np.ndarray = field(default=None)
     evaluated: bool = field(default=True)
 
-    @profile
     def free_variable_bounds(
         self,
     ) -> Tuple[List[Dict[str, sm.ScalarData]], List[Dict[str, sm.ScalarData]]]:
@@ -583,8 +512,16 @@ class FreeVariableBounds(ProblemDataPart):
                         ):
                             continue
                         index = t + self.config.prediction_horizon * (derivative - 1)
-                        lb[derivative][f"t{t:03}/{v.name}/{derivative}"] = lb_[index]
-                        ub[derivative][f"t{t:03}/{v.name}/{derivative}"] = ub_[index]
+                        if derivative == Derivatives.jerk:
+                            multiplier = 1  # self.config.mpc_dt**2
+                        else:
+                            multiplier = 1
+                        lb[derivative][f"t{t:03}/{v.name}/{derivative}"] = (
+                            lb_[index] * multiplier
+                        )
+                        ub[derivative][f"t{t:03}/{v.name}/{derivative}"] = (
+                            ub_[index] * multiplier
+                        )
         lb_params = []
         ub_params = []
         for derivative, name_to_bound_map in sorted(lb.items()):
@@ -641,7 +578,6 @@ class FreeVariableBounds(ProblemDataPart):
             for c in self.constraint_collection.neq_constraints
         }
 
-    @profile
     def construct_expression(
         self,
     ) -> Tuple[sm.Vector, sm.Vector]:
@@ -753,7 +689,6 @@ class EqualityBounds(ProblemDataPart):
                     bound[f"t{t:03}/{c.name}"] = c.bound[t] * self.config.mpc_dt
         return bound
 
-    @profile
     def construct_expression(
         self,
     ) -> sm.Vector:
@@ -943,7 +878,6 @@ class InequalityBounds(ProblemDataPart):
                         ub_jerk[f"t{t:03}/{v.name}/{Derivatives.jerk}"] = j_max
         return [lb_acc, lb_jerk], [ub_acc, ub_jerk]
 
-    @profile
     def construct_expression(
         self,
     ) -> Tuple[sm.Vector, sm.Vector]:
@@ -1106,7 +1040,6 @@ class EqualityModel(ProblemDataPart):
             result += jerk_columns
         return result
 
-    @profile
     def derivative_link_model(self, max_derivative: Derivatives) -> sm.Matrix:
         """
         Layout for prediction horizon 5
@@ -1162,7 +1095,6 @@ class EqualityModel(ProblemDataPart):
         )
         return derivative_link_model
 
-    @profile
     def derivative_link_model_no_acc(self, max_derivative: Derivatives) -> sm.Matrix:
         """
         Layout for prediction horizon 5
@@ -1230,7 +1162,6 @@ class EqualityModel(ProblemDataPart):
         derivative_link_model.remove(row_ids, [])
         return derivative_link_model
 
-    @profile
     def equality_constraint_model(self) -> Tuple[sm.Matrix, sm.Matrix]:
         """
         |   t1   |   t2   |   t1   |   t2   |   t1   |   t2   |   t1   |   t2   | prediction horizon
@@ -1329,7 +1260,6 @@ class EqualityModel(ProblemDataPart):
                 return model, slack_model
         return sm.Matrix(), sm.Matrix()
 
-    @profile
     def construct_expression(
         self,
     ) -> Tuple[sm.Matrix, sm.Matrix]:
@@ -1599,7 +1529,6 @@ class InequalityModel(ProblemDataPart):
             return model, slack_model
         return sm.Matrix(), sm.Matrix()
 
-    @profile
     def inequality_constraint_model(
         self, max_derivative: Derivatives
     ) -> Tuple[sm.Matrix, sm.Matrix]:
@@ -1763,7 +1692,6 @@ class InequalityModel(ProblemDataPart):
         slack_model = sm.Matrix.zeros(model.shape[0], self.number_ineq_slack_variables)
         return model, slack_model
 
-    @profile
     def construct_expression(
         self,
     ) -> Tuple[sm.Matrix, sm.Matrix]:
@@ -1811,21 +1739,7 @@ class InequalityModel(ProblemDataPart):
 
 
 @dataclass
-class GiskardToQPAdapter:
-    world_state_symbols: List[sm.FloatVariable]
-    life_cycle_symbols: List[sm.FloatVariable]
-    float_variables: List[sm.FloatVariable]
-
-    degrees_of_freedom: List[DegreeOfFreedom]
-    constraint_collection: ConstraintCollection
-    config: QPControllerConfig
-    sparse: bool = field(default=True)
-
-    qp_data_raw: QPData = None
-
-    compute_nI_I: bool = True
-    _nAi_Ai_cache: dict = field(default_factory=dict)
-
+class QPDataSymbolic:
     """
     Takes free variables and constraints and converts them to a QP problem in the following format, depending on the
     class attributes:
@@ -1837,45 +1751,73 @@ class GiskardToQPAdapter:
           lbA <= Aslack x <= ubA_slack  (lower/upper inequality constraints)
     """
 
-    def __post_init__(self):
-        kwargs = {
-            "degrees_of_freedom": self.degrees_of_freedom,
-            "constraint_collection": self.constraint_collection,
-            "config": self.config,
-        }
-        self.weights = Weights(**kwargs)
-        self.free_variable_bounds = FreeVariableBounds(**kwargs)
-        self.equality_model = EqualityModel(**kwargs)
-        self.equality_bounds = EqualityBounds(**kwargs)
-        self.inequality_model = InequalityModel(**kwargs)
-        self.inequality_bounds = InequalityBounds(**kwargs)
+    quadratic_weights: Vector
+    linear_weights: Vector
 
-        quadratic_weights, linear_weights = self.weights.construct_expression()
+    box_lower_constraints: Vector
+    box_upper_constraints: Vector
+
+    eq_matrix_dofs: Matrix
+    eq_matrix_slack: Matrix
+    eq_bounds: Vector
+
+    neq_matrix_dofs: Matrix
+    neq_matrix_slack: Matrix
+    neq_lower_bounds: Vector
+    neq_upper_bounds: Vector
+
+    _weights: Weights
+    _free_variable_bounds: FreeVariableBounds
+    _equality_model: EqualityModel
+    _equality_bounds: EqualityBounds
+    _inequality_model: InequalityModel
+    _inequality_bounds: InequalityBounds
+
+    @classmethod
+    def from_giskard(
+        cls,
+        degrees_of_freedom: List[DegreeOfFreedom],
+        constraint_collection: ConstraintCollection,
+        config: QPControllerConfig,
+    ):
+        kwargs = {
+            "degrees_of_freedom": degrees_of_freedom,
+            "constraint_collection": constraint_collection,
+            "config": config,
+        }
+        weights = Weights(**kwargs)
+        free_variable_bounds = FreeVariableBounds(**kwargs)
+        equality_model = EqualityModel(**kwargs)
+        equality_bounds = EqualityBounds(**kwargs)
+        inequality_model = InequalityModel(**kwargs)
+        inequality_bounds = InequalityBounds(**kwargs)
+
+        quadratic_weights, linear_weights = weights.construct_expression()
         box_lower_constraints, box_upper_constraints = (
-            self.free_variable_bounds.construct_expression()
+            free_variable_bounds.construct_expression()
         )
-        eq_matrix_dofs, self.eq_matrix_slack = (
-            self.equality_model.construct_expression()
-        )
-        eq_bounds = self.equality_bounds.construct_expression()
-        neq_matrix_dofs, self.neq_matrix_slack = (
-            self.inequality_model.construct_expression()
-        )
-        neq_lower_bounds, neq_upper_bounds = (
-            self.inequality_bounds.construct_expression()
-        )
-        self.general_qp_to_specific_qp(
+        eq_matrix_dofs, eq_matrix_slack = equality_model.construct_expression()
+        eq_bounds = equality_bounds.construct_expression()
+        neq_matrix_dofs, neq_matrix_slack = inequality_model.construct_expression()
+        neq_lower_bounds, neq_upper_bounds = inequality_bounds.construct_expression()
+        return cls(
             quadratic_weights=quadratic_weights,
             linear_weights=linear_weights,
             box_lower_constraints=box_lower_constraints,
             box_upper_constraints=box_upper_constraints,
             eq_matrix_dofs=eq_matrix_dofs,
-            eq_matrix_slack=self.eq_matrix_slack,
+            eq_matrix_slack=eq_matrix_slack,
             eq_bounds=eq_bounds,
             neq_matrix_dofs=neq_matrix_dofs,
-            neq_matrix_slack=self.neq_matrix_slack,
+            neq_matrix_slack=neq_matrix_slack,
             neq_lower_bounds=neq_lower_bounds,
             neq_upper_bounds=neq_upper_bounds,
+            _weights=weights,
+            _free_variable_bounds=free_variable_bounds,
+            _equality_model=equality_model,
+            _equality_bounds=equality_bounds,
+            _inequality_model=inequality_model,
+            _inequality_bounds=inequality_bounds,
         )
 
     def __hash__(self):
@@ -1908,79 +1850,3 @@ class GiskardToQPAdapter:
     @property
     def num_non_slack_variables(self) -> int:
         return self.num_free_variable_constraints - self.num_slack_variables
-
-    def general_qp_to_specific_qp(
-        self,
-        quadratic_weights: sm.Vector,
-        linear_weights: sm.Vector,
-        box_lower_constraints: sm.Vector,
-        box_upper_constraints: sm.Vector,
-        eq_matrix_dofs: sm.Matrix,
-        eq_matrix_slack: sm.Matrix,
-        eq_bounds: sm.Vector,
-        neq_matrix_dofs: sm.Matrix,
-        neq_matrix_slack: sm.Matrix,
-        neq_lower_bounds: sm.Vector,
-        neq_upper_bounds: sm.Vector,
-    ):
-        raise NotImplementedError()
-
-    def evaluate(
-        self,
-        world_state: np.ndarray,
-        life_cycle_state: np.ndarray,
-        float_variables: np.ndarray,
-    ) -> QPData:
-        raise NotImplementedError()
-
-    @profile
-    def _direct_limit_model(
-        self,
-        dimensions_after_zero_filter: int,
-        Ai_inf_filter: Optional[np.ndarray] = None,
-        two_sided: bool = False,
-    ) -> Union[np.ndarray, sp.csc_matrix]:
-        """
-        These models are often identical, yet the computation is expensive. Caching to the rescue
-        """
-        if Ai_inf_filter is None:
-            key = hash(dimensions_after_zero_filter)
-        else:
-            key = hash((dimensions_after_zero_filter, Ai_inf_filter.tobytes()))
-        if key not in self._nAi_Ai_cache:
-            nI_I = self._cached_eyes(dimensions_after_zero_filter, two_sided)
-            if Ai_inf_filter is None:
-                self._nAi_Ai_cache[key] = nI_I
-            else:
-                self._nAi_Ai_cache[key] = nI_I[Ai_inf_filter]
-        return self._nAi_Ai_cache[key]
-
-    @memoize
-    def _cached_eyes(
-        self, dimensions: int, two_sided: bool = False
-    ) -> Union[np.ndarray, sp.csc_matrix]:
-        if self.sparse:
-            from scipy import sparse as sp
-
-            if two_sided:
-                data = np.ones(dimensions, dtype=float)
-                row_indices = np.arange(dimensions)
-                col_indices = np.arange(dimensions + 1)
-                return sp.csc_matrix((data, row_indices, col_indices))
-            else:
-                d2 = dimensions * 2
-                data = np.ones(d2, dtype=float)
-                data[::2] *= -1
-                r1 = np.arange(dimensions)
-                r2 = np.arange(dimensions, d2)
-                row_indices = np.empty((d2,), dtype=int)
-                row_indices[0::2] = r1
-                row_indices[1::2] = r2
-                col_indices = np.arange(0, d2 + 1, 2)
-                return sp.csc_matrix((data, row_indices, col_indices))
-        else:
-            I = np.eye(dimensions)
-            if two_sided:
-                return I
-            else:
-                return np.concatenate([-I, I])

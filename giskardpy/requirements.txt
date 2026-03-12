@@ -8,10 +8,9 @@ matplotlib>=3.6.2
 trimesh>=3.20.2
 lxml>=4.5.0
 sortedcontainers>=2.4.0
-qpalm>=1.1.4
+piqp
 pycollada>=0.7.2
 line_profiler>=4.1.3
 urdf-parser-py>=0.0.4
-qpSWIFT_sparse_bindings>=1.0.2
 giskardpy_bullet_bindings==1.0.1
 PyQT5>=5.15.11

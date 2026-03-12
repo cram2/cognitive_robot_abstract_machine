@@ -17,11 +17,18 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
 )
-from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy, ForwardKinematicsBinding
+from giskardpy.motion_statechart.binding_policy import (
+    GoalBindingPolicy,
+    ForwardKinematicsBinding,
+)
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.templates import Parallel
-from giskardpy.motion_statechart.graph_node import NodeArtifacts, DebugExpression, MotionStatechartNode
+from giskardpy.motion_statechart.graph_node import (
+    NodeArtifacts,
+    DebugExpression,
+    MotionStatechartNode,
+)
 from giskardpy.motion_statechart.graph_node import Task
 
 
@@ -92,7 +99,7 @@ class CartesianPosition(Task):
             frame_P_goal=root_P_goal,
             frame_P_current=root_P_current,
             reference_velocity=self.reference_velocity,
-            weight=self.weight,
+            quadratic_weight=self.weight,
         )
 
         # Success condition: distance below threshold
@@ -217,7 +224,7 @@ class CartesianPositionStraight(Task):
                 name=name,
                 reference_velocity=self.reference_velocity,
                 equality_bound=bound,
-                weight=DefaultWeights.WEIGHT_ABOVE_CA * weight_mult,
+                quadratic_weight=DefaultWeights.WEIGHT_ABOVE_CA * weight_mult,
                 task_expression=expr_p[i],
             )
 
@@ -310,7 +317,7 @@ class CartesianOrientation(Task):
             frame_R_current=root_R_current,
             frame_R_goal=root_R_goal,
             reference_velocity=self.reference_velocity,
-            weight=self.weight,
+            quadratic_weight=self.weight,
         )
 
         # Success condition: rotation error below threshold
@@ -411,7 +418,7 @@ class CartesianPose(Task):
             frame_P_goal=root_P_goal,
             frame_P_current=root_P_current,
             reference_velocity=self.reference_linear_velocity,
-            weight=self.weight,
+            quadratic_weight=self.weight,
         )
 
         distance_to_goal = root_P_goal.euclidean_distance(root_P_current)
@@ -425,7 +432,7 @@ class CartesianPose(Task):
             frame_R_current=root_R_current,
             frame_R_goal=root_R_goal,
             reference_velocity=self.reference_angular_velocity,
-            weight=self.weight,
+            quadratic_weight=self.weight,
         )
 
         artifacts.debug_expressions.append(
@@ -511,7 +518,7 @@ class CartesianPositionVelocityLimit(Task):
         artifacts.constraints.add_translational_velocity_limit(
             frame_P_current=root_P_tip,
             max_velocity=self.max_linear_velocity,
-            weight=self.weight,
+            quadratic_weight=self.weight,
         )
 
         position_variables: List[PositionVariable] = root_P_tip.free_variables()
@@ -567,7 +574,7 @@ class CartesianRotationVelocityLimit(Task):
         artifacts.constraints.add_rotational_velocity_limit(
             frame_R_current=root_R_tip,
             max_velocity=self.max_angular_velocity,
-            weight=self.weight,
+            quadratic_weight=self.weight,
         )
 
         _, angle = root_R_tip.to_axis_angle()
