@@ -204,9 +204,9 @@ class ProbabilisticModel(abc.ABC):
 
     def conditional(self, point: Dict[Variable, Any]) -> Tuple[Optional[Self], float]:
         """
-        Calculate the truncated distribution P(*| point) and the probability of the event.
+        Calculate the conditioned distribution P(*| point) and the probability of the event.
 
-        :param point: A partial point to calculate the truncated distribution on.
+        :param point: A partial point to calculate the conditioned distribution on.
         :return: The conditioned distribution and the log-probability of the point.
         """
         conditional, log_probability = self.log_conditional(point)
@@ -217,10 +217,10 @@ class ProbabilisticModel(abc.ABC):
         self, point: Dict[Variable, Any]
     ) -> Tuple[Optional[Self], float]:
         """
-        Calculate the truncated distribution P(*| point) and the probability of the event.
+        Calculate the conditioned distribution P(*| point) and the probability of the event.
         Check the documentation of `conditional` for more information.
 
-        :param point: A partial point to calculate the truncated distribution on.
+        :param point: A partial point to calculate the conditioned distribution on.
         :return: The conditioned distribution and the log-probability of the point.
         """
         raise NotImplementedError

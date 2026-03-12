@@ -1213,7 +1213,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         # clean the circuit up
         root = self.root
         [
-            self.graph.remove_node(node)
+            self.graph.remove_node(node.index)
             for layer in reversed(self.layers)
             for node in layer
             if node.result_of_current_query == -np.inf
