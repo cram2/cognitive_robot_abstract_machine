@@ -432,7 +432,9 @@ class RoleStubGenerator:
                     rendered_items.append(role_for_info)
                     rendered_role_for.add(wc.clazz)
 
-            elif issubclass(wc.clazz, Role):
+            elif not isinstance(wc, WrappedSpecializedGeneric) and issubclass(
+                wc.clazz, Role
+            ):
                 # Role subclass (not primary)
                 rendered_items.append(
                     self._build_stub_class(wc, role_related_class=True)
@@ -541,7 +543,7 @@ class RoleStubGenerator:
         # Add original fields
         taker_fields = [
             StubFieldInfo.from_wrapped_field(wf, role_related_class)
-            for wf in wrapped_class.own_fields
+            for wf in wrapped_class.fields
         ]
 
         # Add role-introduced fields as init=False

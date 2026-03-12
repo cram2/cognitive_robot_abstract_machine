@@ -10,8 +10,11 @@ from dataset.role_and_ontology.role_taker_for_university_ontology import (
 from krrood.entity_query_language.predicate import Symbol
 
 @dataclass(eq=False)
-class RecognizedGroup(Symbol):
+class HasName:
     name: str
+
+@dataclass(eq=False)
+class RecognizedGroup(HasName, Symbol):
     members: Set[Person] = field(default_factory=set)
     sub_organization_of: List[RecognizedGroup] = field(default_factory=list)
 
@@ -22,12 +25,10 @@ class Company(RecognizedGroup): ...
 class Country(RecognizedGroup): ...
 
 @dataclass(unsafe_hash=True)
-class Course(Symbol):
-    name: str
+class Course(HasName, Symbol): ...
 
 @dataclass(eq=False)
-class Person(Symbol):
-    name: str
+class Person(HasName, Symbol):
     works_for: RecognizedGroup = field(kw_only=True, default=None)
     member_of: List[RecognizedGroup] = field(kw_only=True, default_factory=list)
     head_of: RecognizedGroup = field(init=False)
@@ -41,6 +42,14 @@ class RoleForPerson(Person):
     name: str = field(init=False)
     works_for: RecognizedGroup = field(init=False)
     member_of: List[RecognizedGroup] = field(init=False)
+
+@dataclass(eq=False)
+class DirectDiamondShapedInheritanceWhereOneIsRole(RoleForPerson, HasName): ...
+
+@dataclass(eq=False)
+class InDirectDiamondShapedInheritanceWhereOneIsRole(
+    RecognizedGroup, RoleForPerson
+): ...
 
 @dataclass(eq=False)
 class CEOAsFirstRole(RoleForPerson):

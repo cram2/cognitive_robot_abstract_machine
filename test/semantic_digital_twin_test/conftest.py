@@ -37,5 +37,5 @@ def pytest_configure(config):
         except TypeError as e:
             continue
     for module in modules_with_roles:
-        generator = RoleStubGenerator(module, class_diagram=class_diagram)
+        generator = RoleStubGenerator(module)
         stub = generator.generate_stub(write=True)

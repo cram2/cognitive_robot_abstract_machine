@@ -16,14 +16,20 @@ from krrood.entity_query_language.predicate import (
 
 
 @dataclass(eq=False)
-class RecognizedGroup(Symbol):
+class HasName:
     name: str
-
-    members: Set[Person] = field(default_factory=set)
-    sub_organization_of: List[RecognizedGroup] = field(default_factory=list)
 
     def __hash__(self):
         return hash(self.name)
+
+    def __eq__(self, other):
+        return self.name == other.name
+
+
+@dataclass(eq=False)
+class RecognizedGroup(HasName, Symbol):
+    members: Set[Person] = field(default_factory=set)
+    sub_organization_of: List[RecognizedGroup] = field(default_factory=list)
 
 
 @dataclass(eq=False)
@@ -35,24 +41,37 @@ class Country(RecognizedGroup): ...
 
 
 @dataclass(unsafe_hash=True)
-class Course(Symbol):
-    name: str
+class Course(HasName, Symbol): ...
 
 
 @dataclass(eq=False)
-class Person(Symbol):
-    name: str
+class Person(HasName, Symbol):
     works_for: RecognizedGroup = None
     member_of: List[RecognizedGroup] = field(default_factory=list)
-
-    def __hash__(self):
-        return hash(self.name)
 
 
 @dataclass(eq=False)
 class CEOAsFirstRole(Role[Person], Symbol):
     person: Person
     head_of: RecognizedGroup = None
+
+    @classmethod
+    def role_taker_field(cls) -> Field:
+        return [f for f in fields(cls) if f.name == "person"][0]
+
+
+@dataclass(eq=False)
+class DirectDiamondShapedInheritanceWhereOneIsRole(Role[Person], HasName):
+    person: Person
+
+    @classmethod
+    def role_taker_field(cls) -> Field:
+        return [f for f in fields(cls) if f.name == "person"][0]
+
+
+@dataclass(eq=False)
+class InDirectDiamondShapedInheritanceWhereOneIsRole(RecognizedGroup, Role[Person]):
+    person: Person = field(kw_only=True)
 
     @classmethod
     def role_taker_field(cls) -> Field:

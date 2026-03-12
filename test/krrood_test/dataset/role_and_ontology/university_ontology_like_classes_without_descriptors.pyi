@@ -18,15 +18,18 @@ class Student(RoleForPersonAsRoleTakerInAnotherModule):
 
 
 @dataclass(eq=False)
-class RecognizedGroup(Symbol):
+class HasName:
     name: str
+
+
+@dataclass(eq=False)
+class RecognizedGroup(HasName, Symbol):
     members: Set[Person] = field(default_factory=set)
     sub_organization_of: List[RecognizedGroup] = field(default_factory=list)
 
 
 @dataclass(eq=False)
-class Person(Symbol):
-    name: str
+class Person(HasName, Symbol):
     works_for: RecognizedGroup = field(default=None, kw_only=True)
     member_of: List[RecognizedGroup] = field(default_factory=list, kw_only=True)
     head_of: RecognizedGroup = field(init=False)
@@ -49,9 +52,19 @@ class ProfessorAsFirstRole(RoleForPerson):
     teacher_of: List[Course] = field(default_factory=list, kw_only=True)
 
 
+@dataclass(eq=False)
+class InDirectDiamondShapedInheritance(RecognizedGroup, Person):
+    ...
+
+
+@dataclass(eq=False)
+class DirectDiamondShapedInheritance(Person, HasName):
+    ...
+
+
 @dataclass(unsafe_hash=True)
-class Course(Symbol):
-    name: str
+class Course(HasName, Symbol):
+    ...
 
 
 @dataclass(eq=False)
