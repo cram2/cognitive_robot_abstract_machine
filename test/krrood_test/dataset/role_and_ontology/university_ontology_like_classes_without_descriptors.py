@@ -50,7 +50,8 @@ class Person(HasName, Symbol):
 
 
 @dataclass(eq=False)
-class ManAsSubclassOfARoleTaker(Person): ...
+class SubclassOfARoleTaker(Person):
+    introduced_attribute: str = field(default="", kw_only=True)
 
 
 TPerson = TypeVar("TPerson", bound=Person)
@@ -62,18 +63,18 @@ class CEOAsFirstRole(Role[TPerson], Symbol):
     head_of: RecognizedGroup = None
 
     @classmethod
-    def role_taker_field(cls) -> Field:
+    def role_taker_attribute(cls) -> Field:
         return [f for f in fields(cls) if f.name == "person"][0]
 
 
-TManAsSubclassOfARoleTaker = TypeVar(
-    "TManAsSubclassOfARoleTaker", bound=ManAsSubclassOfARoleTaker
+TSubclassOfARoleTaker = TypeVar(
+    "TSubclassOfARoleTaker", bound=SubclassOfARoleTaker
 )
 
 
 @dataclass(eq=False)
 class SubclassOfRoleThatUpdatesRoleTakerType(
-    CEOAsFirstRole[TManAsSubclassOfARoleTaker]
+    CEOAsFirstRole[TSubclassOfARoleTaker]
 ): ...
 
 
@@ -82,7 +83,7 @@ class DirectDiamondShapedInheritanceWhereOneIsRole(Role[TPerson], HasName):
     person: TPerson = field(kw_only=True)
 
     @classmethod
-    def role_taker_field(cls) -> Field:
+    def role_taker_attribute(cls) -> Field:
         return [f for f in fields(cls) if f.name == "person"][0]
 
 
@@ -91,7 +92,7 @@ class InDirectDiamondShapedInheritanceWhereOneIsRole(RecognizedGroup, Role[TPers
     person: TPerson = field(kw_only=True)
 
     @classmethod
-    def role_taker_field(cls) -> Field:
+    def role_taker_attribute(cls) -> Field:
         return [f for f in fields(cls) if f.name == "person"][0]
 
 
@@ -101,7 +102,7 @@ class ProfessorAsFirstRole(Role[TPerson], Symbol):
     teacher_of: List[Course] = field(default_factory=list, kw_only=True)
 
     @classmethod
-    def role_taker_field(cls) -> Field:
+    def role_taker_attribute(cls) -> Field:
         return [f for f in fields(cls) if f.name == "person"][0]
 
 
@@ -120,7 +121,7 @@ class RepresentativeAsSecondRole(Role[TCEOAsFirstRole], Symbol):
     representative_of: RecognizedGroup = field(default=None, kw_only=True)
 
     @classmethod
-    def role_taker_field(cls) -> Field:
+    def role_taker_attribute(cls) -> Field:
         return [f for f in fields(cls) if f.name == "ceo"][0]
 
 
@@ -136,5 +137,5 @@ class DelegateAsThirdRole(Role[TRepresentativeAsSecondRole], Symbol):
     delegate_of: RecognizedGroup = field(kw_only=True, default=None)
 
     @classmethod
-    def role_taker_field(cls) -> Field:
+    def role_taker_attribute(cls) -> Field:
         return [f for f in fields(cls) if f.name == "representative"][0]

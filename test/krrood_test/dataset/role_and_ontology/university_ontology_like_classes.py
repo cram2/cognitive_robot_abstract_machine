@@ -50,7 +50,7 @@ class CEOAsFirstRole(Role[Person], Symbol):
     head_of: RecognizedGroup = None
 
     @classmethod
-    def role_taker_field(cls) -> Field:
+    def role_taker_attribute(cls) -> Field:
         return [f for f in fields(cls) if f.name == "person"][0]
 
 
@@ -60,7 +60,7 @@ class RepresentativeAsSecondRole(Role[CEOAsFirstRole], Symbol):
     representative_of: RecognizedGroup = None
 
     @classmethod
-    def role_taker_field(cls) -> Field:
+    def role_taker_attribute(cls) -> Field:
         return [f for f in fields(cls) if f.name == "ceo"][0]
 
 
@@ -71,7 +71,7 @@ class DelegateAsThirdRole(Role[RepresentativeAsSecondRole], Symbol):
     delegate_of: RecognizedGroup = field(kw_only=True, default=None)
 
     @classmethod
-    def role_taker_field(cls) -> Field:
+    def role_taker_attribute(cls) -> Field:
         return [f for f in fields(cls) if f.name == "representative"][0]
 
 

@@ -17,6 +17,8 @@ from typing_extensions import (
 )
 
 from krrood.class_diagrams.utils import T
+from krrood.entity_query_language.core.mapped_variable import Attribute
+from krrood.entity_query_language.factories import variable, variable_from
 from krrood.ormatic.utils import classproperty
 from probabilistic_model.distributions import GaussianDistribution
 from probabilistic_model.probabilistic_circuit.rx.helper import (
@@ -29,7 +31,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     leaf,
 )
 
-from krrood.patterns import Role
+from krrood.patterns.role import Role
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
@@ -97,8 +99,8 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, Role[KinematicStructur
     """
 
     @classmethod
-    def role_taker_field(cls) -> Field:
-        return next(f for f in fields(cls) if f.name == "root")
+    def role_taker_attribute(cls) -> KinematicStructureEntity:
+        return variable(cls, None).root
 
     @property
     def scale(self) -> Scale:

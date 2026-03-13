@@ -1,15 +1,18 @@
 from abc import ABC, abstractmethod
-from copy import copy
-from dataclasses import dataclass, Field, fields, MISSING, field
+from dataclasses import dataclass, field
 from functools import lru_cache, cached_property
+from typing import List
 
-from typing_extensions import Generic, Type
+from typing_extensions import Type
 
-from krrood.class_diagrams.utils import T, get_generic_type_param
+from krrood.class_diagrams.utils import T
+from krrood.entity_query_language.core.mapped_variable import Attribute
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from krrood.utils import get_generic_type_param
 
 
 @dataclass
-class Role(Generic[T], ABC):
+class Role(SubClassSafeGeneric[T], ABC):
     """
     Represents a role with generic typing. This is used in Role Design Pattern in OOP.
 
@@ -73,7 +76,7 @@ class Role(Generic[T], ABC):
         """
         from ..symbol_graph.helpers import get_field_type_endpoint
 
-        return get_field_type_endpoint(cls, cls.role_taker_field().name)
+        return get_field_type_endpoint(cls, cls.role_taker_attribute_name())
 
     @classmethod
     @lru_cache
@@ -85,19 +88,32 @@ class Role(Generic[T], ABC):
         )
 
     @classmethod
+    def get_attributes_using_generic_type(cls) -> List[Attribute]:
+        if cls.role_taker_attribute() is None:
+            return []
+        return [cls.role_taker_attribute()]
+
+    @classmethod
     @abstractmethod
-    def role_taker_field(cls) -> Field:
+    def role_taker_attribute(cls) -> Attribute:
         """
-        :return: the field that holds the role taker instance.
+        :return: The symbolic representation of the attribute that holds the role taker instance.
         """
         ...
+
+    @classmethod
+    def role_taker_attribute_name(cls) -> str:
+        """
+        :return: The name of the attribute that holds the role taker instance.
+        """
+        return cls.role_taker_attribute()._attribute_name_
 
     @cached_property
     def role_taker(self) -> T:
         """
         :return: The role taker instance.
         """
-        return getattr(self, self.role_taker_field().name)
+        return getattr(self, self.role_taker_attribute_name())
 
     @cached_property
     def root_persistent_entity(self):
@@ -131,12 +147,12 @@ class Role(Generic[T], ABC):
         Set an attribute on the role taker instance if the role taker has this attribute,
          otherwise set on this instance directly.
         """
-        if key == self.role_taker_field().name:
+        if key == self.role_taker_attribute_name():
             self._role_taker_field_set = True
             object.__setattr__(self, "_direct_role_taker", value)
-        if key != self.role_taker_field().name and self._role_taker_field_set:
+        if key != self.role_taker_attribute_name() and self._role_taker_field_set:
             setattr(self.role_taker, key, value)
-        if key == self.role_taker_field().name or hasattr(self, key):
+        if key == self.role_taker_attribute_name() or hasattr(self, key):
             super().__setattr__(key, value)
 
     def __hash__(self):
@@ -148,11 +164,3 @@ class Role(Generic[T], ABC):
 
     def __eq__(self, other):
         return hash(self) == hash(other)
-
-
-def role_enabled_dataclass(cls):
-    cls = dataclass(cls)
-
-    print("Fields:", [f.name for f in fields(cls)])
-
-    return cls

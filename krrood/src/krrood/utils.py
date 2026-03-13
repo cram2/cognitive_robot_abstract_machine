@@ -16,7 +16,9 @@ from os.path import dirname
 from pathlib import Path
 from typing import Union, Type, Optional, Callable, Tuple, List, Iterable
 
-from typing_extensions import TypeVar, Type, List, Optional, _SpecialForm, Iterable, Dict
+from typing_extensions import TypeVar, Type, List, Optional, _SpecialForm, Iterable, Dict, get_origin, get_args
+
+from krrood.class_diagrams.utils import T
 
 T = TypeVar("T")
 
@@ -517,3 +519,61 @@ def run_ruff_on_file(filename: str):
     """
     command = ["ruff", "check", "--fix", filename]
     subprocess.run(command, capture_output=True, text=True, check=True)
+
+
+def get_generic_type_param(cls, generic_base: Type[T]) -> Optional[List[Type[T]]]:
+    """
+    Given a subclass and its generic base, return the concrete type parameter(s).
+
+    Example:
+        get_generic_type_param(Employee, Role) -> (<class '__main__.Person'>,)
+    """
+    for base in getattr(cls, "__orig_bases__", []):
+        base_origin = get_origin(base)
+        if base_origin is None:
+            continue
+        if issubclass(base_origin, generic_base):
+            args = get_args(base)
+            return list(args) if args else None
+    return None
+
+
+import libcst as cst
+
+
+class TypeCheckingImportCollector(cst.CSTVisitor):
+    def __init__(self):
+        self.imports = []
+
+    def visit_If(self, node: cst.If):
+        if self.is_type_checking(node.test):
+            for stmt in node.body.body:
+                if isinstance(stmt, cst.SimpleStatementLine):
+                    for small in stmt.body:
+                        if isinstance(small, (cst.Import, cst.ImportFrom)):
+                            self.imports.append(small)
+
+    def is_type_checking(self, test):
+        # if TYPE_CHECKING
+        if isinstance(test, cst.Name):
+            return test.value == "TYPE_CHECKING"
+
+        # if typing.TYPE_CHECKING
+        if isinstance(test, cst.Attribute):
+            if isinstance(test.value, cst.Name):
+                return (
+                    test.value.value in ["typing", "typing_extensions"]
+                    and test.attr.value == "TYPE_CHECKING"
+                )
+
+        return False
+
+
+def get_type_checking_imports(file_path):
+    with open(file_path) as f:
+        module = cst.parse_module(f.read())
+
+    visitor = TypeCheckingImportCollector()
+    module.visit(visitor)
+
+    return visitor.imports

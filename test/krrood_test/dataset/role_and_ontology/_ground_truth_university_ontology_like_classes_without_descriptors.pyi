@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, Field
 
-from typing_extensions import Set, List
+from typing_extensions import Set, List, TypeVar
 
+from krrood.patterns import Role
 from krrood.symbol_graph.symbol_graph import Symbol
 
 @dataclass(eq=False)
@@ -25,7 +26,7 @@ class Country(RecognizedGroup): ...
 class Course(HasName, Symbol): ...
 
 @dataclass(eq=False)
-class Person(HasName, Symbol):
+class PersonMixin(HasName, Symbol):
     works_for: RecognizedGroup = field(default=None, kw_only=True)
     member_of: List[RecognizedGroup] = field(default_factory=list, kw_only=True)
     head_of: RecognizedGroup = field(init=False)
@@ -36,18 +37,28 @@ class Person(HasName, Symbol):
     representative_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class ManAsSubclassOfARoleTaker(Person): ...
+class Person(PersonMixin):
+    ...
 
+@dataclass(eq=False)
+class SubclassOfARoleTaker(Person):
+    introduced_attribute: str = field(default="", kw_only=True)
+
+TPerson = TypeVar("TPerson", bound=Person)
 @dataclass
-class RoleForPerson(Person):
-    person: Person = field(kw_only=True)
+class RoleForPerson(Role[TPerson], PersonMixin):
+    person: TPerson = field(kw_only=True)
     name: str = field(init=False)
     works_for: RecognizedGroup = field(init=False)
     member_of: List[RecognizedGroup] = field(init=False)
 
+    @classmethod
+    def role_taker_attribute(cls) -> Field: ...
+
+TSubclassOfARoleTaker = TypeVar('TSubclassOfARoleTaker', bound=SubclassOfARoleTaker)
 @dataclass
-class RoleForManAsSubclassOfARoleTaker(RoleForPerson):
-    person: ManAsSubclassOfARoleTaker = field(kw_only=True)
+class RoleForManAsSubclassOfARoleTaker(RoleForPerson[TSubclassOfARoleTaker]):
+    introduced_attribute: str = field(default="", kw_only=True)
 
 @dataclass(eq=False)
 class DirectDiamondShapedInheritanceWhereOneIsRole(RoleForPerson): ...
@@ -58,7 +69,7 @@ class InDirectDiamondShapedInheritanceWhereOneIsRole(
 ): ...
 
 @dataclass(eq=False)
-class CEOAsFirstRole(RoleForPerson):
+class CEOAsFirstRole(RoleForPerson[TPerson]):
     # Original Owner of the head_of field
     head_of: RecognizedGroup = field(default=None, kw_only=True)
 

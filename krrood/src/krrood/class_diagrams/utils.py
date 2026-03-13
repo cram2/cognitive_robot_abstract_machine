@@ -1,12 +1,12 @@
 import inspect
 import sys
 from enum import Enum
-from typing import Any, Callable
+from typing import Callable
 from uuid import UUID
 
 import typing_extensions
-from typing_extensions import List, Type, Generic, TYPE_CHECKING, Optional
-from typing_extensions import TypeVar, get_origin, get_args
+from typing_extensions import List, Type
+from typing_extensions import TypeVar
 
 
 def classes_of_module(module) -> List[Type]:
@@ -39,23 +39,6 @@ def is_builtin_class(clazz: Type) -> bool:
 
 
 T = TypeVar("T")
-
-
-def get_generic_type_param(cls, generic_base: Type[T]) -> Optional[List[Type[T]]]:
-    """
-    Given a subclass and its generic base, return the concrete type parameter(s).
-
-    Example:
-        get_generic_type_param(Employee, Role) -> (<class '__main__.Person'>,)
-    """
-    for base in getattr(cls, "__orig_bases__", []):
-        base_origin = get_origin(base)
-        if base_origin is None:
-            continue
-        if issubclass(get_origin(base), generic_base):
-            args = get_args(base)
-            return list(args) if args else None
-    return None
 
 
 def get_type_hint_of_keyword_argument(callable_: Callable, name: str):

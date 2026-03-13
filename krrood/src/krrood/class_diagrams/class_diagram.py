@@ -13,7 +13,7 @@ from typing import get_args, get_origin, _GenericAlias, Any
 import rustworkx as rx
 
 from krrood import logger
-from krrood.utils import module_and_class_name, own_dataclass_fields
+from krrood.utils import module_and_class_name, own_dataclass_fields, get_generic_type_param
 
 try:
     from krrood.rustworkx_utils import RWXNode
@@ -40,7 +40,6 @@ from krrood.class_diagrams.attribute_introspector import (
     AttributeIntrospector,
     DataclassOnlyIntrospector,
 )
-from krrood.class_diagrams.utils import get_generic_type_param
 from krrood.class_diagrams.wrapped_field import WrappedField
 
 from krrood.class_diagrams.failures import ClassIsUnMappedInClassDiagram

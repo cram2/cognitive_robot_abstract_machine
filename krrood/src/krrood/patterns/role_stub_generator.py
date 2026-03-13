@@ -313,7 +313,7 @@ class RoleForInfo(AbstractStubClassInfo):
             for wf in taker_wc.fields
             if wf.field.init
         ]
-        taker_field_name = roles[0].clazz.role_taker_field().name
+        taker_field_name = roles[0].clazz.role_taker_attribute().name
         wrapped_field = next(f for f in roles[0].fields if f.name == taker_field_name)
         taker_field = StubFieldInfo(
             taker_field_name,
@@ -366,7 +366,7 @@ class RoleInfo(AbstractStubClassInfo):
         :param role: The wrapped class of the role.
         :param role_for_name: The name of the role-for class.
         """
-        taker_field_name = role.clazz.role_taker_field().name
+        taker_field_name = role.clazz.role_taker_attribute().name
         taker_field_names = [f.name for f in fields(role.clazz.get_role_taker_type())]
 
         intro_field_wc = next(
@@ -613,7 +613,7 @@ class RoleStubGenerator:
         for role_wc in self._root_role_taker_to_roles_map.get(wrapped_class.clazz, []):
             if Role not in role_wc.clazz.__bases__:
                 continue
-            taker_field_name = role_wc.clazz.role_taker_field().name
+            taker_field_name = role_wc.clazz.role_taker_attribute().name
             for role_wf in role_wc.fields:
                 is_owned_field = role_wf in role_wc.own_fields
                 if is_owned_field and role_wf.name in taker_fields:
