@@ -50,4 +50,3 @@ Below you may find solutions to the exercises.
 - [](semantic-annotations-exercise)
 - [](world-state-manipulation-exercise)
 - [](regions-exercise)
-- [](multiverse-exercise)

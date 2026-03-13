@@ -1,0 +1,22 @@
+[project]
+name = "physics_simulators"
+version = "0.0.16"
+authors = [
+  { name="Giang Nguyen", email="hoanggia@uni-bremen.de" },
+]
+description = "A collection of physics simulators."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+
+dependencies = [
+    "mujoco",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
