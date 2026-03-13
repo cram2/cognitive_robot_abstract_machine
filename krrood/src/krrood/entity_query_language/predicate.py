@@ -113,7 +113,7 @@ class HasType(Predicate):
     def __call__(self) -> bool:
         return isinstance(self.variable, self.type_) or (
             isinstance(self.variable, Role)
-            and issubclass(self.variable.get_role_taker_type(), self.type_)
+            and issubclass(self.variable.get_role_generic_type(), self.type_)
         )
 
 

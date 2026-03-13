@@ -314,9 +314,7 @@ class RoleForInfo(AbstractStubClassInfo):
             if wf.field.init
         ]
         taker_field_name = roles[0].clazz.role_taker_field().name
-        wrapped_field = next(
-            f for f in roles[0].own_fields if f.name == taker_field_name
-        )
+        wrapped_field = next(f for f in roles[0].fields if f.name == taker_field_name)
         taker_field = StubFieldInfo(
             taker_field_name,
             taker_wc.name,
@@ -556,6 +554,7 @@ class RoleStubGenerator:
             role_wc.clazz
             for role_wc in self._role_wrapped_classes
             if Role in role_wc.clazz.__bases__
+            or role_wc.clazz.updates_role_taker_type()
         }
 
     @cached_property

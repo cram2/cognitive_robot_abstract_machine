@@ -43,6 +43,7 @@ class Role(Generic[T], ABC):
     ..warning:: Always check if the attribute exists before accessing it if it is an attribute that is introduced by a
     Role, because if no Role instance exists, the attribute will not be accessible.
     """
+
     _role_taker_field_set: bool = field(default=False, init=False)
 
     @classmethod
@@ -57,12 +58,31 @@ class Role(Generic[T], ABC):
         return current_cls
 
     @classmethod
-    @lru_cache(maxsize=None)
-    def get_role_taker_type(cls) -> Type[T]:
+    @lru_cache
+    def get_role_generic_type(cls) -> Type[T]:
         """
         :return: The type of the role taker.
         """
         return get_generic_type_param(cls, Role)[0]
+
+    @classmethod
+    @lru_cache
+    def get_role_taker_type(cls) -> Type[T]:
+        """
+        :return: The type of the role taker.
+        """
+        from ..symbol_graph.helpers import get_field_type_endpoint
+
+        return get_field_type_endpoint(cls, cls.role_taker_field().name)
+
+    @classmethod
+    @lru_cache
+    def updates_role_taker_type(cls) -> bool:
+        return (cls.get_role_taker_type() is not cls.get_role_generic_type()) and any(
+            parent.get_root_role_taker_type() is not cls.get_role_taker_type()
+            for parent in cls.__bases__
+            if issubclass(parent, Role)
+        )
 
     @classmethod
     @abstractmethod
