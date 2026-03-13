@@ -4,7 +4,10 @@ import ast
 from pathlib import Path
 from types import ModuleType
 
-from krrood.ripple_down_rules.utils import get_scope_from_imports, get_imports_from_scope
+from krrood.ripple_down_rules.utils import (
+    get_scope_from_imports,
+    get_imports_from_scope,
+)
 
 """
 This module provides functionality to generate Python stub files (.pyi) for classes following the Role pattern.
@@ -27,7 +30,12 @@ from krrood.class_diagrams.class_diagram import WrappedClass, WrappedSpecialized
 from krrood.class_diagrams.utils import classes_of_module
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.patterns import Role
-from krrood.utils import extract_imports_from_module, get_imports_from_types, run_black_on_file, run_ruff_on_file
+from krrood.utils import (
+    extract_imports_from_module,
+    get_imports_from_types,
+    run_black_on_file,
+    run_ruff_on_file,
+)
 
 
 @dataclass(frozen=True)
@@ -66,7 +74,7 @@ class FieldRepresentation:
 
     @classmethod
     def from_wrapped_field(
-            cls, wrapped_field: WrappedField, role_related_class: bool = True
+        cls, wrapped_field: WrappedField, role_related_class: bool = True
     ) -> FieldRepresentation:
         """
         Creates a FieldRepresentation from a WrappedField.
@@ -77,7 +85,7 @@ class FieldRepresentation:
         current_field = copy(wrapped_field.field)
         if role_related_class:
             current_field.kw_only = wrapped_field.field.kw_only or (
-                    not wrapped_field.is_required and wrapped_field.field.init
+                not wrapped_field.is_required and wrapped_field.field.init
             )
         return cls(current_field)
 
@@ -105,9 +113,9 @@ class FieldRepresentation:
 
             # Avoid adding kw_only=False as it is the default behavior and MISSING in field signature
             if (
-                    parameter.name == "kw_only"
-                    and current_value is False
-                    and default_value is MISSING
+                parameter.name == "kw_only"
+                and current_value is False
+                and default_value is MISSING
             ):
                 continue
 
@@ -121,8 +129,8 @@ class FieldRepresentation:
 
         # Handle simple assignment (e.g., " = value")
         if (
-                len(non_default_field_assignments) == 1
-                and non_default_field_assignments[0].name == "default"
+            len(non_default_field_assignments) == 1
+            and non_default_field_assignments[0].name == "default"
         ):
             return f" = {non_default_field_assignments[0].value}"
 
@@ -210,7 +218,7 @@ class StubFieldInfo:
 
     @classmethod
     def from_wrapped_field(
-            cls, wrapped_field: WrappedField, role_related_class: bool = True
+        cls, wrapped_field: WrappedField, role_related_class: bool = True
     ) -> StubFieldInfo:
         """
         Creates StubFieldInfo from a WrappedField.
@@ -224,6 +232,7 @@ class StubFieldInfo:
             FieldRepresentation.from_wrapped_field(wrapped_field, role_related_class),
             wrapped_field=wrapped_field,
         )
+
 
 @dataclass
 class AbstractStubClassInfo:
@@ -239,6 +248,7 @@ class AbstractStubClassInfo:
     """
     The fields of the class.
     """
+
 
 @dataclass
 class StubClassInfo(AbstractStubClassInfo):
@@ -284,7 +294,7 @@ class RoleForInfo(AbstractStubClassInfo):
 
     @classmethod
     def from_taker_wrapped_class_and_roles(
-            cls, taker_wc: WrappedClass, roles: List[WrappedClass[Role]]
+        cls, taker_wc: WrappedClass, roles: List[WrappedClass[Role]]
     ):
         """
         Creates RoleForInfo from a role taker and its roles.
@@ -294,14 +304,25 @@ class RoleForInfo(AbstractStubClassInfo):
         """
         # Inherited fields are all fields of the taker that are init=True
         inherited_fields = [
-            StubFieldInfo(wf.name, wf.type_name, FieldRepresentation(field(init=False)), wrapped_field=wf)
+            StubFieldInfo(
+                wf.name,
+                wf.type_name,
+                FieldRepresentation(field(init=False)),
+                wrapped_field=wf,
+            )
             for wf in taker_wc.fields
             if wf.field.init
         ]
         taker_field_name = roles[0].clazz.role_taker_field().name
-        wrapped_field = next(f for f in roles[0].own_fields if f.name == taker_field_name)
-        taker_field = StubFieldInfo(taker_field_name, taker_wc.name,
-                                    FieldRepresentation.from_wrapped_field(wrapped_field), wrapped_field=wrapped_field)
+        wrapped_field = next(
+            f for f in roles[0].own_fields if f.name == taker_field_name
+        )
+        taker_field = StubFieldInfo(
+            taker_field_name,
+            taker_wc.name,
+            FieldRepresentation.from_wrapped_field(wrapped_field),
+            wrapped_field=wrapped_field,
+        )
         return cls(
             name=f"RoleFor{taker_wc.name}",
             taker_name=taker_wc.name,
@@ -339,7 +360,7 @@ class RoleInfo(AbstractStubClassInfo):
 
     @classmethod
     def from_wrapped_class(
-            cls, role: WrappedClass[Role], role_for_name: str
+        cls, role: WrappedClass[Role], role_for_name: str
     ) -> RoleInfo:
         """
         Creates RoleInfo from a WrappedClass.
@@ -351,13 +372,21 @@ class RoleInfo(AbstractStubClassInfo):
         taker_field_names = [f.name for f in fields(role.clazz.get_role_taker_type())]
 
         intro_field_wc = next(
-            (wf for wf in role.own_fields if wf.name != taker_field_name and wf.name not in taker_field_names), None
+            (
+                wf
+                for wf in role.own_fields
+                if wf.name != taker_field_name and wf.name not in taker_field_names
+            ),
+            None,
         )
         intro_field_stub = None
         if intro_field_wc:
             assignment = FieldRepresentation.from_wrapped_field(intro_field_wc)
             intro_field_stub = StubFieldInfo(
-                intro_field_wc.name, intro_field_wc.type_name, assignment, wrapped_field=intro_field_wc
+                intro_field_wc.name,
+                intro_field_wc.type_name,
+                assignment,
+                wrapped_field=intro_field_wc,
             )
 
         # Logic to determine bases
@@ -396,7 +425,7 @@ class RoleStubGenerator:
     """
 
     def __init__(
-            self, module: ModuleType, class_diagram: Optional[ClassDiagram] = None
+        self, module: ModuleType, class_diagram: Optional[ClassDiagram] = None
     ):
         """
         Initializes the generator with a module.
@@ -414,8 +443,8 @@ class RoleStubGenerator:
         )
         self.module = module
         self.path = (
-                Path(self.module.__file__).parent
-                / f"{self.module.__name__.split('.')[-1]}.pyi"
+            Path(self.module.__file__).parent
+            / f"{self.module.__name__.split('.')[-1]}.pyi"
         )
 
     def generate_stub(self, write: bool = False) -> str:
@@ -481,7 +510,7 @@ class RoleStubGenerator:
                     rendered_role_for.add(wc.clazz)
 
             elif not isinstance(wc, WrappedSpecializedGeneric) and issubclass(
-                    wc.clazz, Role
+                wc.clazz, Role
             ):
                 # Role subclass (not primary)
                 rendered_items.append(
@@ -523,7 +552,11 @@ class RoleStubGenerator:
         """
         :return: A set of primary role types.
         """
-        return {role_wc.clazz for role_wc in self._role_wrapped_classes if Role in role_wc.clazz.__bases__}
+        return {
+            role_wc.clazz
+            for role_wc in self._role_wrapped_classes
+            if Role in role_wc.clazz.__bases__
+        }
 
     @cached_property
     def _role_takers(self) -> Set[Type]:
@@ -547,7 +580,7 @@ class RoleStubGenerator:
         mapping = defaultdict(list)
         for wc in self.class_diagram.wrapped_classes:
             if not isinstance(wc, WrappedSpecializedGeneric) and issubclass(
-                    wc.clazz, Role
+                wc.clazz, Role
             ):
                 mapping[wc.clazz.get_root_role_taker_type()].append(wc)
         return mapping
@@ -557,14 +590,12 @@ class RoleStubGenerator:
         :param clazz: The class to get base names for.
         :return: A list of base class names, excluding 'object'.
         """
-        try:
-            return [base.__name__ for base in clazz.__bases__ if base is not object]
-        except AttributeError:
-            # no __bases__ attribute
+        if not hasattr(clazz, "__bases__"):
             return []
+        return [base.__name__ for base in clazz.__bases__ if base is not object]
 
     def _build_stub_class(
-            self, wrapped_class: WrappedClass, role_related_class: bool = True
+        self, wrapped_class: WrappedClass, role_related_class: bool = True
     ) -> StubClassInfo:
         """
         :param wrapped_class: The wrapped class to build info for.
@@ -572,10 +603,10 @@ class RoleStubGenerator:
         :return: Stub information for the non-role class.
         """
         # Add original fields
-        taker_fields = {wf.name:
-                            StubFieldInfo.from_wrapped_field(wf, role_related_class)
-                        for wf in wrapped_class.fields
-                        }
+        taker_fields = {
+            wf.name: StubFieldInfo.from_wrapped_field(wf, role_related_class)
+            for wf in wrapped_class.fields
+        }
         taker_field_names = [wf.name for wf in wrapped_class.own_fields]
 
         # Add role-introduced fields as init=False
@@ -591,7 +622,10 @@ class RoleStubGenerator:
                         f"Roles should not overwrite fields defined in their role takers: {role_wf.name} in "
                         f"{role_wc} overwrites the one defined in {wrapped_class} with the same name"
                     )
-                if role_wf.name != taker_field_name and role_wf.name not in taker_fields:
+                if (
+                    role_wf.name != taker_field_name
+                    and role_wf.name not in taker_fields
+                ):
                     stub_field = StubFieldInfo(
                         role_wf.name,
                         role_wf.type_name,
@@ -607,8 +641,12 @@ class RoleStubGenerator:
             wrapped_class.name,
             self._get_base_names(wrapped_class.clazz),
             dc_args,
-            fields= [stub_field for name, stub_field in taker_fields.items() if name in taker_field_names] + list(
-                introduced_fields.values()),
+            fields=[
+                stub_field
+                for name, stub_field in taker_fields.items()
+                if name in taker_field_names
+            ]
+            + list(introduced_fields.values()),
         )
 
     @cached_property
@@ -645,7 +683,7 @@ class RoleStubGenerator:
             wc
             for wc in self.class_diagram.wrapped_classes_of_inheritance_subgraph_in_topological_order
             if not isinstance(wc, WrappedSpecializedGeneric)
-               and issubclass(wc.clazz, Role)
+            and issubclass(wc.clazz, Role)
         ]
 
     @cached_property
@@ -657,7 +695,9 @@ class RoleStubGenerator:
         """
 
         name_space = get_scope_from_imports(self.module.__file__)
-        name_space_from_types = get_scope_from_imports(tree=ast.parse("\n".join(self._imports_from_field_types)))
+        name_space_from_types = get_scope_from_imports(
+            tree=ast.parse("\n".join(self._imports_from_field_types))
+        )
 
         for name, value in name_space_from_types.items():
             if name in name_space:
@@ -684,6 +724,10 @@ class RoleStubGenerator:
 
         field_types = {field_.wrapped_field.type_endpoint for field_ in stub_fields}
         # Remove types that are already defined in the module
-        field_types = {field_type for field_type in field_types if field_type.__name__ not in classes}
+        field_types = {
+            field_type
+            for field_type in field_types
+            if field_type.__name__ not in classes
+        }
 
         return get_imports_from_types(field_types)
