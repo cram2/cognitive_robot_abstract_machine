@@ -20,6 +20,7 @@ from giskardpy.qp.exceptions import (
 )
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.utils.utils import create_path
+from semantic_digital_twin import utils
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 logger = logging.getLogger(__name__)

@@ -4,13 +4,17 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 import numpy as np
-from typing_extensions import Union, Optional, Type, Any, Iterable
+from typing_extensions import Union, Optional, Type, Any, Iterable, Dict
 
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.factories import and_
+from semantic_digital_twin.reasoning.robot_predicates import is_pose_free_for_robot
 from semantic_digital_twin.robots.abstract_robot import Camera
-from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
 from pycram.robot_plans.motions.robot_body import LookingMotion
 from pycram.robot_plans.motions.navigation import MoveMotion
 from pycram.config.action_conf import ActionConfig
+from ....datastructures.dataclasses import Context
 from pycram.datastructures.partial_designator import PartialDesignator
 from pycram.datastructures.pose import PoseStamped
 from pycram.failures import LookAtGoalNotReached
@@ -40,21 +44,35 @@ class NavigateAction(ActionDescription):
             self.context, MoveMotion(self.target_location, self.keep_joint_states)
         ).perform()
 
-    def validate(
-        self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
-    ):
-        pose_validator = PoseErrorChecker(World.conf.get_pose_tolerance())
-        if not pose_validator.is_error_acceptable(
-            World.robot.pose, self.target_location
-        ):
-            raise NavigationGoalNotReachedError(World.robot.pose, self.target_location)
+    @staticmethod
+    def pre_condition(
+        variables, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
+        return and_(
+            is_pose_free_for_robot(
+                context.robot, variables["target_location"].to_spatial_type()
+            ),
+            context.robot.drive is not None,
+        )
+
+    @staticmethod
+    def post_condition(
+        variables, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
+        return and_(
+            np.allclose(
+                context.robot.root.global_pose,
+                kwargs["target_location"].to_spatial_type(),
+                atol=0.03,
+            )
+        )
 
     @classmethod
     def description(
         cls,
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
-        keep_joint_states: Union[
-            Iterable[bool], bool
+        target_location: DescriptionType[PoseStamped],
+        keep_joint_states: DescriptionType[
+            bool
         ] = ActionConfig.navigate_keep_joint_states,
     ) -> PartialDesignator[NavigateAction]:
         return PartialDesignator[NavigateAction](
@@ -86,20 +104,11 @@ class LookAtAction(ActionDescription):
             self.context, LookingMotion(target=self.target, camera=camera)
         ).perform()
 
-    def validate(
-        self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
-    ):
-        """
-        Check if the robot is looking at the target location by spawning a virtual object at the target location and
-        creating a ray from the camera and checking if it intersects with the object.
-        """
-        return
-
     @classmethod
     def description(
         cls,
-        target: Union[Iterable[PoseStamped], PoseStamped],
-        camera: Optional[Union[Iterable[Camera], Camera]] = None,
+        target: DescriptionType[PoseStamped],
+        camera: DescriptionType[Camera] = None,
     ) -> PartialDesignator[LookAtAction]:
         return PartialDesignator[LookAtAction](
             LookAtAction, target=target, camera=camera

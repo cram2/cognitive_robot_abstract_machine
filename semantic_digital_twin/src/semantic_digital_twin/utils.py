@@ -5,7 +5,7 @@ import os
 import weakref
 from copy import deepcopy
 from functools import lru_cache, wraps
-from typing import List
+from typing import List, Callable
 
 try:
     from ament_index_python import PackageNotFoundError
@@ -13,7 +13,7 @@ except ModuleNotFoundError:
     PackageNotFoundError = None
 from xml.etree import ElementTree as ET
 
-from typing_extensions import Any, Tuple
+from typing_extensions import Any, Tuple, TypeVar
 
 
 class IDGenerator:

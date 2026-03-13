@@ -50,6 +50,11 @@ class Context:
     A ROS node that should be used for communication in this plan
     """
 
+    evaluate_conditions: bool = field(default=True)
+    """
+    Should pre -and postconditions of actions be evaluated in this plan
+    """
+
     @classmethod
     def from_world(cls, world: World, super_plan: Optional[Plan] = None):
         """

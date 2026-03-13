@@ -15,7 +15,7 @@ from pycram.datastructures.pose import PoseStamped
 from pycram.designators.location_designator import CostmapLocation
 from pycram.failures import PerceptionObjectNotFound
 from pycram.language import TryInOrderPlan, SequentialPlan
-from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
 
 
 @dataclass
@@ -99,8 +99,8 @@ class SearchAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
-        object_type: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
+        target_location: DescriptionType[ PoseStamped],
+        object_type: DescriptionType[SemanticAnnotation],
     ) -> PartialDesignator[SearchAction]:
         return PartialDesignator(
             SearchAction, target_location=target_location, object_type=object_type

@@ -29,7 +29,7 @@ class StretchMoveTCP(MoveTCPMotion, AlternativeMotion[Stretch]):
     def _motion_chart(self) -> Sequence:
         tip = ViewManager().get_end_effector_view(self.arm, self.robot_view).tool_frame
         goal_copy = deepcopy(self.target.to_spatial_type())
-        goal_copy = self.world.transform(goal_copy, self.robot_view.root)
+        goal_copy = self.world.transform(goal_copy, self.world.root)
         goal_point = goal_copy.to_position()
         goal_point.z = 0
         return Sequence(

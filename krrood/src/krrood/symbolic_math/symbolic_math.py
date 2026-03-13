@@ -24,6 +24,7 @@ import copy
 import math
 import operator
 import sys
+import weakref
 from abc import ABC, abstractmethod
 from collections import Counter
 from dataclasses import field, dataclass
@@ -974,7 +975,9 @@ class FloatVariable(Scalar):
 
     name: str = field(kw_only=True)
 
-    _registry: ClassVar[Dict[ca.SX, FloatVariable]] = {}
+    _registry: ClassVar[weakref.WeakValueDictionary[ca.SX, FloatVariable]] = (
+        weakref.WeakValueDictionary()
+    )
     """
     Keeps track of which FloatVariable instances are associated with which which casadi.SX instances.
     Needed to recreate the FloatVariables from a casadi expression.
@@ -1157,6 +1160,7 @@ class Matrix(SymbolicMathType):
     ):
         if data is None:
             data = []
+        self.__original_data__ = data
         self.casadi_sx = to_sx(data)
 
     @classmethod

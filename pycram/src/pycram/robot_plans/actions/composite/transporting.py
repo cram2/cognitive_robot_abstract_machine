@@ -6,12 +6,16 @@ from typing import List
 
 import numpy as np
 
-from krrood.entity_query_language.factories import an, entity, variable
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.factories import an, entity, variable, and_
+from pycram.datastructures.dataclasses import Context
+from pycram.querying.predicates import GripperIsFree
+from pycram.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import Union, Optional, Type, Any, Iterable
+from typing_extensions import Union, Optional, Type, Any, Iterable, Dict
 
 from pycram.robot_plans.actions.composite.facing import FaceAtActionDescription
 from pycram.robot_plans.actions.core import (
@@ -35,7 +39,7 @@ from pycram.designators.location_designator import (
 from pycram.designators.object_designator import BelieveObject
 from pycram.failures import ObjectUnfetchable, ConfigurationNotReached
 from pycram.language import SequentialPlan
-from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
 
 
 @dataclass
@@ -65,9 +69,6 @@ class TransportAction(ActionDescription):
     """
     List to save the callbacks which should be called before performing the action.
     """
-
-    def __post_init__(self):
-        super().__post_init__()
 
     def inside_container(self) -> List[Body]:
         bodies = []
@@ -159,12 +160,29 @@ class TransportAction(ActionDescription):
         # The validation of each core action is done in the action itself, so no more validation needed here.
         pass
 
+    @staticmethod
+    def pre_condition(
+        variables: Dict, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
+        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        return and_(GripperIsFree(manipulator))
+
+    @staticmethod
+    def post_condition(
+        variables, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression | bool:
+        return np.allclose(
+            kwargs["object_designator"].global_pose,
+            kwargs["target_location"].to_spatial_type(),
+            atol=1e-2,
+        )
+
     @classmethod
     def description(
         cls,
-        object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
-        arm: Union[Iterable[Arms], Arms] = None,
+        object_designator: DescriptionType[Body],
+        target_location: DescriptionType[PoseStamped],
+        arm: DescriptionType[Arms] = None,
         place_rotation_agnostic: Optional[bool] = False,
     ) -> PartialDesignator[TransportAction]:
         return PartialDesignator(
@@ -203,9 +221,6 @@ class PickAndPlaceAction(ActionDescription):
     List to save the callbacks which should be called before performing the action.
     """
 
-    def __post_init__(self):
-        super().__post_init__()
-
     def execute(self) -> None:
         SequentialPlan(
             self.context,
@@ -233,9 +248,9 @@ class PickAndPlaceAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
-        arm: Union[Iterable[Arms], Arms] = None,
+        object_designator: DescriptionType[Body],
+        target_location: DescriptionType[PoseStamped],
+        arm: DescriptionType[Arms] = None,
         grasp_description=GraspDescription,
     ) -> PartialDesignator[PickAndPlaceAction]:
         return PartialDesignator(
@@ -297,12 +312,12 @@ class MoveAndPlaceAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        standing_position: Union[Iterable[PoseStamped], PoseStamped],
-        object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
-        arm: Union[Iterable[Arms], Arms] = None,
-        keep_joint_states: Union[
-            Iterable[bool], bool
+        standing_position: DescriptionType[PoseStamped],
+        object_designator: DescriptionType[Body],
+        target_location: DescriptionType[PoseStamped],
+        arm: DescriptionType[Arms] = None,
+        keep_joint_states: DescriptionType[
+            bool
         ] = ActionConfig.navigate_keep_joint_states,
     ) -> PartialDesignator[MoveAndPlaceAction]:
         return PartialDesignator(
@@ -311,6 +326,7 @@ class MoveAndPlaceAction(ActionDescription):
             object_designator=object_designator,
             target_location=target_location,
             arm=arm,
+            keep_joint_states=keep_joint_states,
         )
 
 
@@ -350,9 +366,6 @@ class MoveAndPickUpAction(ActionDescription):
     List to save the callbacks which should be called before performing the action.
     """
 
-    def __post_init__(self):
-        super().__post_init__()
-
     def execute(self):
         obj_pose = PoseStamped.from_spatial_type(self.object_designator.global_pose)
         SequentialPlan(
@@ -373,12 +386,12 @@ class MoveAndPickUpAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        standing_position: Union[Iterable[PoseStamped], PoseStamped],
-        object_designator: Union[Iterable[PoseStamped], PoseStamped],
-        arm: Union[Iterable[Arms], Arms] = None,
-        grasp_description: Union[Iterable[Grasp], Grasp] = None,
-        keep_joint_states: Union[
-            Iterable[bool], bool
+        standing_position: DescriptionType[PoseStamped],
+        object_designator: DescriptionType[PoseStamped],
+        arm: DescriptionType[Arms] = None,
+        grasp_description: DescriptionType[Grasp] = None,
+        keep_joint_states: DescriptionType[
+            bool
         ] = ActionConfig.navigate_keep_joint_states,
     ) -> PartialDesignator[MoveAndPickUpAction]:
         return PartialDesignator(
@@ -478,8 +491,8 @@ class EfficientTransportAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
+        object_designator: DescriptionType[Body],
+        target_location: DescriptionType[PoseStamped],
     ) -> PartialDesignator[EfficientTransportAction]:
         return PartialDesignator(
             cls, object_designator=object_designator, target_location=target_location

@@ -6,6 +6,8 @@ import logging
 import threading
 from dataclasses import dataclass, field, is_dataclass, fields, MISSING
 from functools import lru_cache
+
+from krrood.utils import memoize
 from typing import _GenericAlias
 
 import sqlalchemy.inspection
@@ -30,7 +32,7 @@ from typing_extensions import (
 )
 
 
-@lru_cache(maxsize=None)
+@lru_cache
 def _get_type_hints_cached(clazz: Type) -> Dict[str, Any]:
     """
     Get type hints for a class.
@@ -314,7 +316,7 @@ class HasGeneric(Generic[T]):
     """
 
     @classmethod
-    @lru_cache(maxsize=None)
+    @memoize
     def original_class(cls) -> T:
         """
         Get the concrete generic argument.
@@ -328,7 +330,7 @@ class HasGeneric(Generic[T]):
         return tp
 
     @classmethod
-    @lru_cache(maxsize=None)
+    @memoize
     def constructable_original_class(cls) -> T:
         """
         Return the constructable original class. Use this for object allocation in from_dao cycles, as Generic Aliases
@@ -1261,7 +1263,7 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
         raise NotImplementedError
 
 
-@lru_cache(maxsize=None)
+@memoize
 def _get_clazz_by_original_clazz(
     base_clazz: Type, original_clazz: Type
 ) -> Optional[Type]:
@@ -1281,7 +1283,7 @@ def _get_clazz_by_original_clazz(
     return None
 
 
-@lru_cache(maxsize=None)
+@lru_cache
 def get_dao_class(
     original_clazz: Type, expected_type: Optional[Type] = None
 ) -> Optional[Type[DataAccessObject]]:
@@ -1319,7 +1321,7 @@ def get_dao_class(
     return None
 
 
-@lru_cache(maxsize=None)
+@lru_cache
 def get_alternative_mapping(
     original_clazz: Type,
 ) -> Optional[Type[AlternativeMapping]]:

@@ -218,6 +218,7 @@ class HomogeneousTransformationMatrix(
         :return: TransformationMatrix object with float variables.
         """
         transformation_matrix = HomogeneousTransformationMatrix()
+        transformation_matrix.__variables__ = []
         for row in range(3):
             for column in range(4):
                 variable = sm.FloatVariable(
@@ -225,6 +226,7 @@ class HomogeneousTransformationMatrix(
                 )
                 transformation_matrix[row, column] = variable
                 variable.resolve = lambda: resolver()[row, column]
+                transformation_matrix.__variables__.append(variable)
         return transformation_matrix
 
     def to_json(self) -> Dict[str, Any]:
@@ -911,6 +913,7 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             z=z,
             reference_frame=None,
         )
+        result.__variables__ = [x, y, z]
         if resolver is not None:
             x.resolve = lambda: resolver()[0]
             y.resolve = lambda: resolver()[1]
@@ -1220,6 +1223,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             z=z,
             reference_frame=None,
         )
+        result.__variables__ = [x, y, z]
         if resolver is not None:
             x.resolve = lambda: resolver()[0]
             y.resolve = lambda: resolver()[1]
@@ -1947,7 +1951,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         )
 
 
-@sm.substitution_cache
+# @sm.substitution_cache #TODO: Fix me pls
 def rotation_matrix_to_quaternion(r: Matrix):
     """
     This method constructs a quaternion representation of the provided rotation matrix. It is designed to handle

@@ -33,6 +33,7 @@ from typing_extensions import (
 from krrood.entity_query_language.exceptions import NoExpressionFoundForGivenID
 from krrood.entity_query_language.utils import make_list, T, make_set, is_iterable
 from krrood.symbol_graph.symbol_graph import SymbolGraph
+from krrood.utils import memoize
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.rules.conclusion import Conclusion
@@ -108,7 +109,7 @@ class SymbolicExpression(ABC):
     def __post_init__(self):
         self._expression_ = self
 
-    @lru_cache
+    @memoize
     def _get_expression_by_id_(self, id_: uuid.UUID) -> SymbolicExpression:
         try:
             return next(

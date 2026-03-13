@@ -1,28 +1,35 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
-from datetime import timedelta
 
-from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.world_description.world_entity import Body, Connection
-from typing_extensions import Union, Optional, Type, Any, Iterable
+import numpy as np
+from typing_extensions import Any, Dict
 
-from pycram.robot_plans.actions.core.pick_up import GraspingActionDescription
-from pycram.robot_plans.motions.container import OpeningMotion, ClosingMotion
-from pycram.robot_plans.motions.gripper import MoveGripperMotion
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.factories import and_
 from pycram.config.action_conf import ActionConfig
+from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     Arms,
-    ContainerManipulationType,
     ApproachDirection,
     VerticalAlignment,
 )
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.failures import ContainerManipulationError
+from pycram.datastructures.pose import PoseStamped
 from pycram.language import SequentialPlan
+from pycram.pose_validator import reachability_validator
+from pycram.querying.predicates import GripperIsFree
+from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
+from pycram.robot_plans.actions.core.pick_up import GraspingActionDescription
+from pycram.robot_plans.motions.container import OpeningMotion, ClosingMotion
+from pycram.robot_plans.motions.gripper import MoveGripperMotion
 from pycram.view_manager import ViewManager
-from pycram.robot_plans.actions.base import ActionDescription
+from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -65,22 +72,50 @@ class OpenAction(ActionDescription):
             ),
         ).perform()
 
-    def validate(
-        self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
-    ):
-        """
-        Check if the container is opened, this assumes that the container state can be read accurately from the
-        real world.
-        """
-        validate_close_open(self.object_designator, self.arm, OpenAction)
+    @staticmethod
+    def pre_condition(
+        variables, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
+        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        test_world = deepcopy(context.world)
+
+        return and_(
+            GripperIsFree(manipulator),
+            reachability_validator(
+                PoseStamped.from_spatial_type(kwargs["object_designator"].global_pose),
+                manipulator.tool_frame,
+                context.robot.from_world(test_world),
+                test_world,
+                context.robot.full_body_controlled,
+            ),
+        )
+
+    @staticmethod
+    def post_condition(
+        variables, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression | bool:
+        manipulator = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
+        parent_connection = kwargs[
+            "object_designator"
+        ].get_first_parent_connection_of_type(ActiveConnection1DOF)
+        return (
+            is_body_in_gripper(kwargs["object_designator"], manipulator) > 0.9
+            or np.allclose(
+                kwargs["object_designator"].global_pose.to_position(),
+                ViewManager.get_end_effector_view(
+                    kwargs["arm"], context.robot
+                ).tool_frame.global_pose.to_position(),
+                atol=3e-2,
+            )
+        ) and bool(parent_connection.position > 0.3)
 
     @classmethod
     def description(
         cls,
-        object_designator_description: Union[Iterable[Body], Body],
-        arm: Union[Iterable[Arms], Arms] = None,
-        grasping_prepose_distance: Union[
-            Iterable[float], float
+        object_designator_description: DescriptionType[Body],
+        arm: DescriptionType[Arms] = None,
+        grasping_prepose_distance: DescriptionType[
+            float
         ] = ActionConfig.grasping_prepose_distance,
     ) -> PartialDesignator[OpenAction]:
         return PartialDesignator[OpenAction](
@@ -131,22 +166,23 @@ class CloseAction(ActionDescription):
             ),
         ).perform()
 
-    def validate(
-        self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
-    ):
-        """
-        Check if the container is closed, this assumes that the container state can be read accurately from the
-        real world.
-        """
-        validate_close_open(self.object_designator, self.arm, CloseAction)
+    @staticmethod
+    def post_condition(
+        variables, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression | bool:
+        close_connection = kwargs[
+            "object_designator"
+        ].get_first_parent_connection_of_type(ActiveConnection1DOF)
+
+        return bool(close_connection.position < 0.1)
 
     @classmethod
     def description(
         cls,
-        object_designator_description: Union[Iterable[Body], Body],
-        arm: Union[Iterable[Arms], Arms] = None,
-        grasping_prepose_distance: Union[
-            Iterable[float], float
+        object_designator_description: DescriptionType[Body],
+        arm: DescriptionType[Arms] = None,
+        grasping_prepose_distance: DescriptionType[
+            float
         ] = ActionConfig.grasping_prepose_distance,
     ) -> PartialDesignator[CloseAction]:
         return PartialDesignator[CloseAction](

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
+from semantic_digital_twin.reasoning.predicates import visible
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
@@ -10,12 +11,12 @@ from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     SemanticEnvironmentAnnotation,
 )
-from typing_extensions import Union, Optional, Type, Any, Iterable
+from typing_extensions import Union, Optional, Type, Any, Iterable, Dict
 
 from pycram.perception import PerceptionQuery
 from pycram.datastructures.enums import DetectionTechnique, DetectionState
 from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
 
 
 @dataclass
@@ -42,9 +43,6 @@ class DetectAction(ActionDescription):
     """
     The region in which the object should be detected
     """
-
-    def __post_init__(self):
-        super().__post_init__()
 
     def execute(self) -> None:
         if not self.object_sem_annotation and self.region:
@@ -76,21 +74,12 @@ class DetectAction(ActionDescription):
 
         return query.from_world()
 
-    def validate(
-        self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
-    ):
-        return
-        # if not result:
-        #     raise PerceptionObjectNotFound(self.object_designator, self.technique, self.region)
-
     @classmethod
     def description(
         cls,
-        technique: Union[Iterable[DetectionTechnique], DetectionTechnique],
-        state: Union[Iterable[DetectionState], DetectionState] = None,
-        object_sem_annotation: Union[
-            Iterable[Type[SemanticAnnotation]], Type[SemanticAnnotation]
-        ] = None,
+        technique: DescriptionType[DetectionTechnique],
+        state: DescriptionType[DetectionState] = None,
+        object_sem_annotation: DescriptionType[Type[SemanticAnnotation]] = None,
         region: Union[Iterable[Region], Region] = None,
     ) -> PartialDesignator[DetectAction]:
         return PartialDesignator[DetectAction](

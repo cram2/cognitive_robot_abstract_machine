@@ -9,11 +9,12 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 from typing_extensions import Optional, Union, List
 
+from semantic_digital_twin import utils
 from semantic_digital_twin.robots.abstract_robot import Manipulator, AbstractRobot
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 from pycram.datastructures.dataclasses import Rotations
-from pycram.datastructures.enums import Grasp, AxisIdentifier, ApproachDirection, VerticalAlignment
+from pycram.datastructures.enums import AxisIdentifier, ApproachDirection, VerticalAlignment
 from pycram.datastructures.pose import PoseStamped, PyCramVector3
 from pycram.tf_transformations import quaternion_multiply
 from pycram.utils import translate_pose_along_local_axis
@@ -377,6 +378,8 @@ class GraspDescription:
 
         return primary_face, secondary_face
 
+    def __hash__(self):
+        return id(self)
 
 @dataclass
 class PreferredGraspAlignment:

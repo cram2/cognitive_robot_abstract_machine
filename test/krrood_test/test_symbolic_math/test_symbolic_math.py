@@ -414,7 +414,7 @@ class TestFloatVariable:
 class TestExpression:
 
     def test_free_variables(self):
-        m = sm.Vector(sm.create_float_variables(["a", "b", "c", "d"]))
+        m = sm.Vector(v := sm.create_float_variables(["a", "b", "c", "d"]))
         assert len(m.free_variables()) == 4
         a = sm.FloatVariable(name="a")
         assert a.equivalent(a.free_variables()[0])
@@ -906,7 +906,7 @@ class TestVector:
         assert v.to_list() == data.tolist()
 
     def test_to_list_raises_on_variables(self):
-        v = sm.Vector([sm.FloatVariable(name="a"), 2.0])
+        v = sm.Vector(vec := [sm.FloatVariable(name="a"), 2.0])
         with pytest.raises(HasFreeVariablesError):
             _ = v.to_list()
 

@@ -1,30 +1,27 @@
-import pytest
 import numpy as np
+import pytest
 
+from pycram.datastructures.enums import (
+    Arms,
+    ApproachDirection,
+    VerticalAlignment,
+)
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.partial_designator import PartialDesignator
 from pycram.datastructures.pose import PoseStamped
+from pycram.designators.object_designator import BelieveObject
 from pycram.language import SequentialPlan
+from pycram.motion_executor import simulated_robot
 from pycram.robot_plans import (
     PickUpAction,
-    PickUpAction,
     SetGripperAction,
-    MoveTorsoAction,
-    NavigateAction,
     MoveTorsoActionDescription,
     NavigateActionDescription,
     PickUpActionDescription,
 )
-from pycram.designators.object_designator import BelieveObject
-from pycram.datastructures.enums import (
-    Arms,
-    Grasp,
-    ApproachDirection,
-    VerticalAlignment,
-)
 from pycram.utils import is_iterable, lazy_product
-from pycram.motion_executor import simulated_robot
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 
 def test_partial_desig_construction():
@@ -158,13 +155,13 @@ def test_partial_navigate_action_perform(immutable_model_world):
         move1 = SequentialPlan(
             context,
             NavigateActionDescription(
-                PoseStamped.from_list([1, 0, 0], frame=world.root)
+                PoseStamped.from_list([1, -1, 0], frame=world.root)
             ),
         )
         move1.perform()
         np.testing.assert_almost_equal(
             list(robot_view.root.global_pose.to_np()[:3, 3]),
-            [1, 0, 0],
+            [1, -1, 0],
             decimal=1,
         )
 
@@ -173,12 +170,12 @@ def test_partial_navigate_action_multiple(immutable_model_world):
     world, robot_view, context = immutable_model_world
     nav = NavigateActionDescription(
         [
-            PoseStamped.from_list([1, 0, 0], frame=world.root),
-            PoseStamped.from_list([2, 0, 0], frame=world.root),
-            PoseStamped.from_list([3, 0, 0], frame=world.root),
+            PoseStamped.from_list([1, -1, 0], frame=world.root),
+            PoseStamped.from_list([2, -1, 0], frame=world.root),
+            PoseStamped.from_list([3, -1, 0], frame=world.root),
         ]
     )
-    nav_goals = [[1, 0, 0], [2, 0, 0], [3, 0, 0]]
+    nav_goals = [[1, -1, 0], [2, -1, 0], [3, -1, 0]]
     for i, action in enumerate(nav):
         with simulated_robot:
             SequentialPlan(context, action).perform()

@@ -5,6 +5,8 @@ from pathlib import Path
 
 from typing_extensions import TYPE_CHECKING, List, Optional, Type
 
+from krrood.entity_query_language.entity import get_false_statements
+
 if TYPE_CHECKING:
     from pycram.datastructures.pose import PoseStamped
     from pycram.datastructures.enums import (
@@ -19,6 +21,7 @@ if TYPE_CHECKING:
     from pycram.validation.goal_validator import MultiJointPositionGoalValidator
     from pycram.designator import ObjectDesignatorDescription
     from pycram.designators.location_designator import Location
+    from .robot_plans import ActionDescription
 
 
 class PlanFailure(Exception):
@@ -27,6 +30,22 @@ class PlanFailure(Exception):
     def __init__(self, *args, **kwargs):
         """Create a new plan failure."""
         Exception.__init__(self, *args, **kwargs)
+
+
+class ConditionNotSatisfied(PlanFailure):
+
+    def __init__(
+        self,
+        pre_condition: bool,
+        action: Type[ActionDescription],
+        condition: ConditionType,
+    ):
+        if isinstance(condition, bool):
+            msg = f"{"Pre" if pre_condition else "Post"}-Condition for Action is not satisfied"
+        else:
+            false_statements = get_false_statements(condition)
+            msg = f"{"Pre" if pre_condition else "Post"}-Condition for Action '{action.__name__}' is not satisfied, following statements are false: {[s._name_ for s in false_statements]}"
+        super().__init__(msg)
 
 
 class KnowledgeNotAvailable(PlanFailure):

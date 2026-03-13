@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
+import rclpy
 from rustworkx import NoEdgeBetweenNodes
 
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
@@ -202,7 +203,7 @@ def test_grasping(immutable_tracy_block_world):
     assert dist < 0.01
 
 
-def test_pick_up_multi(mutable_tracy_block_world):
+def test_pick_up_tracy(mutable_tracy_block_world):
     world, view, context = mutable_tracy_block_world
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
@@ -234,13 +235,13 @@ def test_pick_up_multi(mutable_tracy_block_world):
     assert len(plan.edges) == len(plan.all_nodes) - 1
 
 
-def test_place_multi(mutable_tracy_block_world):
+def test_place_tracy(mutable_tracy_block_world):
     world, view, context = mutable_tracy_block_world
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
+        VerticalAlignment.TOP,
         left_arm.manipulator,
     )
 
@@ -273,6 +274,7 @@ def test_place_multi(mutable_tracy_block_world):
     assert len(plan.nodes) == len(plan.all_nodes)
     assert len(plan.edges) == len(plan.all_nodes) - 1
 
+
 def test_move_tcp_follows_sine_waypoints(immutable_tracy_block_world):
     world, view, context = immutable_tracy_block_world
     right_arm = ViewManager.get_arm_view(Arms.RIGHT, view)
@@ -300,6 +302,4 @@ def test_move_tcp_follows_sine_waypoints(immutable_tracy_block_world):
     expected = waypoints.poses[-1]
 
     assert tip_position[:3] == pytest.approx(expected.position.to_list(), abs=0.03)
-    compare_orientations(
-        tip_orientation, expected.orientation.to_numpy(), decimal=1
-    )
+    compare_orientations(tip_orientation, expected.orientation.to_numpy(), decimal=1)

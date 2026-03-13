@@ -1,10 +1,7 @@
-from giskardpy.motion_statechart.tasks.pointing import Pointing
-
 try:
     from nav2_msgs.action import NavigateToPose
 except ModuleNotFoundError:
     NavigateToPose = None
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
     NavigateActionServerTask,
 )

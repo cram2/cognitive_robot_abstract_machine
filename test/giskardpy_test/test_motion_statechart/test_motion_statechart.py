@@ -1358,8 +1358,6 @@ class TestCartesianTasks:
         """
         Test CartesianPose sequence with Bind_at_build policy.
         """
-        tf_publisher = TFPublisher(node=rclpy_node, _world=pr2_world_state_reset)
-        viz = VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "base_footprint"
         )
@@ -1869,6 +1867,7 @@ class TestDiffDriveBaseGoal:
             goal_pose,
             atol=1e-2,
         )
+        goal_pose.reference_frame = None
 
 
 class TestFeatureFunctions:

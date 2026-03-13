@@ -188,14 +188,23 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
         return {
             **super().to_json(),
             "robot": to_json(self.robot.id),
-            "body_subset": to_json(self.body_subset),
+            "body_subset": to_json(
+                {b.id for b in self.body_subset} if self.body_subset else None
+            ),
         }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
-        robot = tracker.get_world_entity_with_id(id=from_json(data["robot"]))
-        return cls(robot=robot, body_subset=from_json(data["body_subset"], **kwargs))
+        robot = tracker.get_world_entity_with_id(id=from_json(data["robot"], **kwargs))
+        body_subset_ids = from_json(data["body_subset"], **kwargs)
+        body_subset = None
+        if body_subset_ids is not None:
+            body_subset = {
+                tracker.get_world_entity_with_id(id=body_id)
+                for body_id in body_subset_ids
+            }
+        return cls(robot=robot, body_subset=body_subset)
 
 
 @dataclass

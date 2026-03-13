@@ -232,7 +232,7 @@ def test_repeat_construction_error(immutable_model_world):
 def test_perform_desig(immutable_model_world):
     world, robot_view, context = immutable_model_world
     act = NavigateActionDescription(
-        [PoseStamped.from_list([0.3, 0.3, 0], frame=world.root)]
+        [PoseStamped.from_list([0.3, -1.3, 0], frame=world.root)]
     )
     act2 = MoveTorsoActionDescription([TorsoState.HIGH])
     act3 = ParkArmsActionDescription([Arms.BOTH])
@@ -241,7 +241,7 @@ def test_perform_desig(immutable_model_world):
     with simulated_robot:
         plan.perform()
     np.testing.assert_almost_equal(
-        robot_view.root.global_pose.to_np()[:3, 3], [0.3, 0.3, 0], decimal=1
+        robot_view.root.global_pose.to_np()[:3, 3], [0.3, -1.3, 0], decimal=1
     )
     assert world.state[
         world.get_degree_of_freedom_by_name("torso_lift_joint").id
@@ -249,6 +249,21 @@ def test_perform_desig(immutable_model_world):
 
     assert len(plan.nodes) == len(plan.all_nodes)
     assert len(plan.edges) == len(plan.all_nodes) - 1
+
+
+def test_perform_parallel_desig(immutable_model_world):
+    world, robot_view, context = immutable_model_world
+    plan = ParallelPlan(
+        context,
+        ParkArmsActionDescription(Arms.BOTH),
+        MoveTorsoActionDescription(TorsoState.HIGH),
+    )
+
+    with simulated_robot:
+        plan.perform()
+
+    for node in plan.nodes:
+        assert node.status == TaskStatus.SUCCEEDED
 
 
 def test_perform_single_designator(immutable_model_world):
@@ -279,6 +294,9 @@ def test_perform_parallel(immutable_model_world):
     plan = ParallelPlan(context, act, act2, act3)
     with simulated_robot:
         plan.perform()
+
+    for node in plan.nodes:
+        assert node.status == TaskStatus.SUCCEEDED
 
 
 def test_perform_repeat(immutable_model_world):
@@ -356,7 +374,9 @@ def test_exception_try_all(immutable_model_world):
     def raise_except():
         raise PlanFailure
 
-    act = NavigateActionDescription([PoseStamped()])
+    act = NavigateActionDescription(
+        [PoseStamped.from_list([1, -2, 0], frame=world.root)]
+    )
     code = CodePlan(context, raise_except)
 
     plan = TryAllPLan(context, act, code)

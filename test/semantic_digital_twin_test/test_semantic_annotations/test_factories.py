@@ -1,6 +1,12 @@
 import time
 import unittest
 from dataclasses import dataclass
+
+import rclpy
+
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from semantic_digital_twin.orm.ormatic_interface import *
 
 import numpy as np

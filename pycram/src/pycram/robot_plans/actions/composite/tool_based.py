@@ -22,7 +22,7 @@ from pycram.datastructures.enums import (
     ApproachDirection,
     VerticalAlignment,
 )
-from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
 
 
 @dataclass
@@ -71,9 +71,9 @@ class MixingAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        object_: Union[Iterable[Body], Body],
-        tool: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
-        arm: Optional[Union[Iterable[Arms], Arms]] = None,
+        object_: DescriptionType[Body],
+        tool: DescriptionType[SemanticAnnotation],
+        arm: DescriptionType[Arms] = None,
         technique: Optional[Union[Iterable[str], str]] = None,
     ):
         return PartialDesignator(
@@ -159,11 +159,11 @@ class PouringAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        object_: Union[Iterable[Body], Body],
-        tool: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
-        arm: Optional[Union[Iterable[Arms], Arms]] = None,
-        technique: Optional[Union[Iterable[str], str]] = None,
-        angle: Optional[Union[Iterable[float], float]] = 90,
+        object_: DescriptionType[Body],
+        tool: DescriptionType[SemanticAnnotation],
+        arm: DescriptionType[Arms] = None,
+        technique: DescriptionType[str] = None,
+        angle: DescriptionType[float] = 90,
     ):
         return PartialDesignator(
             cls, object_=object_, tool=tool, arm=arm, technique=technique, angle=angle
@@ -241,10 +241,10 @@ class CuttingAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        object_: Union[Iterable[Body], Body],
-        tool: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
-        arm: Optional[Union[Iterable[Arms], Arms]] = None,
-        technique: Optional[Union[Iterable[str], str]] = None,
+        object_: DescriptionType[Body],
+        tool: DescriptionType[SemanticAnnotation],
+        arm: DescriptionType[Arms] = None,
+        technique: DescriptionType[str] = None,
         slice_thickness: Optional[float] = 0.03,
     ):
         return PartialDesignator(

@@ -1,6 +1,7 @@
 import logging
 from copy import deepcopy
 
+import rclpy
 from typing_extensions import List, Union
 
 from giskardpy.executor import Executor
@@ -10,6 +11,10 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from krrood.entity_query_language.predicate import symbolic_function
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from semantic_digital_twin.collision_checking.collision_detector import (
     ClosestPoints,
 )
@@ -32,6 +37,13 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
 )
+from .alternative_motion_mapping import AlternativeMotion
+from .datastructures.dataclasses import Context
+from .datastructures.enums import Arms
+from .datastructures.pose import PoseStamped
+from .plan import PlanNode, Plan
+from .robot_plans.motions.gripper import MoveTCPMotion
+from .view_manager import ViewManager
 from pycram.datastructures.pose import PoseStamped
 
 logger = logging.getLogger("pycram")
@@ -84,6 +96,7 @@ def visibility_validator(
     return hit_bodies[0] == gen_body if len(hit_bodies) > 0 else False
 
 
+@symbolic_function
 def reachability_validator(
     target_pose: PoseStamped,
     tip_link: KinematicStructureEntity,
@@ -106,6 +119,7 @@ def reachability_validator(
     )
 
 
+@symbolic_function
 def pose_sequence_reachability_validator(
     target_sequence: List[PoseStamped],
     tip_link: KinematicStructureEntity,
@@ -125,18 +139,37 @@ def pose_sequence_reachability_validator(
     old_state = deepcopy(world.state.data)
     root = robot_view.root if not use_fullbody_ik else world.root
 
-    msc = MotionStatechart()
-    msc.add_node(
-        cart_sequence := Sequence(
-            [
-                CartesianPose(
-                    root_link=root, tip_link=tip_link, goal_pose=pose.to_spatial_type()
-                )
-                for pose in target_sequence
-            ]
-        )
+    alternative_motion = AlternativeMotion.check_for_alternative(
+        robot_view, MoveTCPMotion
     )
-    msc.add_node(EndMotion.when_true(cart_sequence))
+    if alternative_motion:
+        correct_arm = None
+        for arm in Arms:
+            if (
+                tip_link
+                == ViewManager.get_end_effector_view(arm, robot_view).tool_frame
+            ):
+                correct_arm = arm
+        sequence = []
+        for pose in target_sequence:
+            motion = alternative_motion(pose, correct_arm, True)
+            node = PlanNode()
+            # Image a plan for  the motion node
+            Plan(node, Context(world, robot_view))
+            motion.plan_node = node
+            sequence.append(motion._motion_chart)
+
+    else:
+        sequence = [
+            CartesianPose(
+                root_link=root, tip_link=tip_link, goal_pose=pose.to_spatial_type()
+            )
+            for pose in target_sequence
+        ]
+
+    msc = MotionStatechart()
+    msc.add_node(n := Sequence(sequence))
+    msc.add_node(EndMotion.when_true(n))
 
     executor = Executor(
         context=MotionStatechartContext(

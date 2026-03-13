@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 import math
 import trimesh.boolean
+from trimesh.collision import CollisionManager
+
 from krrood.entity_query_language.predicate import (
     Predicate,
     Symbol,
@@ -13,7 +15,9 @@ from krrood.entity_query_language.predicate import (
 from random_events.interval import Interval
 from typing_extensions import List, TYPE_CHECKING, Iterable, Type
 
-from semantic_digital_twin.collision_checking.trimesh_collision_detector import FCLCollisionDetector
+from semantic_digital_twin.collision_checking.trimesh_collision_detector import (
+    FCLCollisionDetector,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_computations.ik_solver import (
@@ -22,11 +26,17 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
 )
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import Vector3, Point3
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
-from semantic_digital_twin.world_description.geometry import TriangleMesh
-from semantic_digital_twin.world_description.world_entity import Body, Region, KinematicStructureEntity
+from semantic_digital_twin.world_description.geometry import TriangleMesh, BoundingBox
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    Region,
+    KinematicStructureEntity,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.robots.abstract_robot import (
@@ -479,3 +489,53 @@ class ContainsType(Predicate):
 
     def __call__(self) -> bool:
         return any(isinstance(obj, self.obj_type) for obj in self.iterable)
+
+
+@symbolic_function
+def is_region_occupied(
+    region: BoundingBox, world: World, allowed_bodies: List[Body] = None
+) -> bool:
+    """
+    Checks if the given region (as a box at its pose) intersects with any collidable
+    object in the world, excluding `allowed_bodies`.
+
+    The region is converted to a box mesh at the region pose and tested against
+    each body's world-aligned collision mesh using trimesh's collision manager.
+
+    :param region: The region (axis-aligned box in its own local frame with pose in `region.origin`).
+    :param world: The world providing bodies with enabled collisions.
+    :param allowed_bodies: Bodies to ignore during the check.
+    :return: True if any collision is found, False otherwise.
+    """
+    allowed_bodies = set(allowed_bodies or [])
+
+    # Build a mesh for the region box at its current pose
+    region_box_shape = region.as_shape()  # returns a Box centered at the region
+    region_mesh = region_box_shape.mesh.copy()
+    # region_mesh.apply_transform(region_box_shape.origin.to_np())
+    region_mesh.apply_transform(
+        world.transform(region_box_shape.origin, world.root).to_np()
+    )
+
+    # Prepare collision manager with the region mesh
+    cm = CollisionManager()
+    cm.add_object("region", region_mesh)
+
+    # Iterate over collidable bodies and test collision
+    for body in world.bodies_with_collision:
+        if body in allowed_bodies:
+            continue
+
+        mesh_local = getattr(body.collision, "combined_mesh", None)
+        if mesh_local is None or getattr(mesh_local, "is_empty", False):
+            continue
+
+        # Transform body mesh into world frame
+        body_mesh = mesh_local.copy()
+        body_mesh.apply_transform(body.global_pose.to_np())
+
+        # Early exit on first collision
+        if cm.in_collision_single(body_mesh):
+            return True
+
+    return False

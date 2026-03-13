@@ -1,8 +1,11 @@
 import unittest
 from datetime import timedelta
 
-from pycram.robot_plans import ActionDescription
-from pycram.robot_plans import ParkArmsAction, ParkArmsActionDescription
+from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.core.robot_body import (
+    ParkArmsAction,
+    ParkArmsActionDescription,
+)
 from pycram.datastructures.enums import Arms
 from pycram.failure_handling import Retry
 from pycram.failures import PlanFailure

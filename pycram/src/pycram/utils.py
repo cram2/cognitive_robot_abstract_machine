@@ -9,10 +9,11 @@ GeneratorList -- implementation of generator list wrappers.
 
 from __future__ import annotations
 
-from copy import deepcopy
-from inspect import isgeneratorfunction
-import os
 import math
+import os
+from copy import deepcopy
+from enum import Enum
+from inspect import isgeneratorfunction
 from typing import Union, Iterator
 
 import numpy as np
@@ -34,9 +35,18 @@ from typing_extensions import (
     Sequence,
     Any,
     Iterable,
+    Type,
 )
 
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+)
 from pycram.datastructures.pose import PoseStamped
+from .tf_transformations import (
+    quaternion_about_axis,
+    quaternion_multiply,
+    quaternion_matrix,
+)
 
 if TYPE_CHECKING:
     from pycram.view_manager import CameraDescription
@@ -486,3 +496,7 @@ def translate_pose_along_local_axis(
     return PoseStamped.from_list(
         list(scaled_translation_vector), pose.orientation.to_list(), pose.frame_id
     )
+
+
+def get_all_values_in_enum(enum: Type[Enum]) -> List[Any]:
+    return [enum(e.value) for e in enum]

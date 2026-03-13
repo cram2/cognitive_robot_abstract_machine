@@ -1,15 +1,20 @@
 import itertools
 
 import numpy as np
+from typing_extensions import Self, Any, Iterable, List, Optional, Tuple, Dict
+
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    SymbolicDistribution,
+    ProductUnit,
+    SumUnit,
+    ProbabilisticCircuit,
+    leaf,
+)
+from probabilistic_model.probabilistic_model import ProbabilisticModel
+from probabilistic_model.utils import MissingDict
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.utils import SubclassJSONSerializer
 from random_events.variable import Symbolic, Variable
-from typing_extensions import Self, Any, Iterable, List, Optional, Tuple, Dict
-
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import SymbolicDistribution, UnivariateDiscreteLeaf, ProductUnit, \
-    SumUnit, ProbabilisticCircuit, leaf
-from probabilistic_model.probabilistic_model import ProbabilisticModel
-from probabilistic_model.utils import MissingDict
 
 
 class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
@@ -29,7 +34,9 @@ class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
     the probabilities are initialized with ones.
     """
 
-    def __init__(self, variables: Iterable[Symbolic], probabilities: Optional[np.ndarray] = None):
+    def __init__(
+        self, variables: Iterable[Symbolic], probabilities: Optional[np.ndarray] = None
+    ):
         super().__init__()
         self._variables = tuple(variables)
 
@@ -40,8 +47,11 @@ class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
             probabilities /= probabilities.sum()
 
         if shape != probabilities.shape:
-            raise ValueError("The number of variables must match the number of dimensions in the probability array."
-                             "Variables: {}".format(self.variables), "Dimensions: {}".format(probabilities.shape))
+            raise ValueError(
+                "The number of variables must match the number of dimensions in the probability array."
+                "Variables: {}".format(self.variables),
+                "Dimensions: {}".format(probabilities.shape),
+            )
         self.probabilities = probabilities
 
     @property
@@ -58,7 +68,11 @@ class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
     def marginal(self, variables: Iterable[Symbolic]) -> Self:
 
         # calculate which variables to marginalize over as the difference between variables and self.variables
-        axis = tuple(self.variables.index(variable) for variable in self.variables if variable not in variables)
+        axis = tuple(
+            self.variables.index(variable)
+            for variable in self.variables
+            if variable not in variables
+        )
 
         # marginalize the probabilities over the axis
         probabilities = np.sum(self.probabilities, axis=axis)
@@ -69,15 +83,24 @@ class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
 
     def log_mode(self) -> Tuple[Event, float]:
         likelihood = np.max(self.probabilities)
-        indices_of_maximum = np.transpose(np.asarray(self.probabilities == likelihood).nonzero())
+        indices_of_maximum = np.transpose(
+            np.asarray(self.probabilities == likelihood).nonzero()
+        )
 
-        hash_map_variable_values = {variable: list(variable.domain.hash_map.values()) for variable in self.variables}
+        hash_map_variable_values = {
+            variable: list(variable.domain.hash_map.values())
+            for variable in self.variables
+        }
 
         mode = None
         for index_of_maximum in indices_of_maximum:
 
-            current_mode = SimpleEvent({variable: hash_map_variable_values[variable][value] for
-                                        variable, value in zip(self.variables, index_of_maximum)}).as_composite_set()
+            current_mode = SimpleEvent(
+                {
+                    variable: hash_map_variable_values[variable][value]
+                    for variable, value in zip(self.variables, index_of_maximum)
+                }
+            ).as_composite_set()
             if mode is None:
                 mode = current_mode
             else:
@@ -85,7 +108,9 @@ class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
 
         return mode, np.log(likelihood)
 
-    def log_conditional(self, point: Dict[Variable, Any]) -> Tuple[Optional[Self], float]:
+    def log_conditional(
+        self, point: Dict[Variable, Any]
+    ) -> Tuple[Optional[Self], float]:
         event = SimpleEvent(point)
         event.fill_missing_variables(self.variables)
         return self.log_truncated(event.as_composite_set())
@@ -107,6 +132,7 @@ class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
         if id_self in memo:
             return memo[id_self]
         import copy
+
         variables = copy.deepcopy(self.variables, memo)
         probabilities = copy.deepcopy(self.probabilities, memo)
         result = MultinomialDistribution(variables, probabilities)
@@ -120,21 +146,35 @@ class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
         functions are equal and the order of dimensions are equal.
 
         """
-        return (isinstance(other,
-                           self.__class__) and self.variables == other.variables and self.probabilities.shape == other.probabilities.shape and np.allclose(
-            self.probabilities, other.probabilities))
+        return (
+            isinstance(other, self.__class__)
+            and self.variables == other.variables
+            and self.probabilities.shape == other.probabilities.shape
+            and np.allclose(self.probabilities, other.probabilities)
+        )
 
     def __str__(self):
-        return "P({}): \n".format(", ".join(var.name for var in self.variables)) + str(self.probabilities)
+        return "P({}): \n".format(", ".join(var.name for var in self.variables)) + str(
+            self.probabilities
+        )
 
     def to_tabulate(self) -> List[List[str]]:
         """
         :return: a pretty table of the distribution.
         """
         columns = [[var.name for var in self.variables] + ["P"]]
-        events = list(list(event) for event in itertools.product(
-            *[[simple_set.element for simple_set in var.domain.simple_sets] for var in self.variables]))
-        events = np.concatenate((events, self.probabilities.reshape(-1, 1)), axis=1).tolist()
+        events = list(
+            list(event)
+            for event in itertools.product(
+                *[
+                    [simple_set.element for simple_set in var.domain.simple_sets]
+                    for var in self.variables
+                ]
+            )
+        )
+        events = np.concatenate(
+            (events, self.probabilities.reshape(-1, 1)), axis=1
+        ).tolist()
         table = columns + events
         return table
 
@@ -166,9 +206,16 @@ class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
         :param event: The simple event.
         :return: The indices.
         """
-        hash_map_variable_keys = {variable: list(variable.domain.hash_map) for variable in self.variables}
-        return tuple([hash_map_variable_keys[variable].index(hash(simple_set))
-                      for simple_set in event[variable]] for variable in self.variables)
+        hash_map_variable_keys = {
+            variable: list(variable.domain.hash_map) for variable in self.variables
+        }
+        return tuple(
+            [
+                hash_map_variable_keys[variable].index(hash(simple_set))
+                for simple_set in event[variable]
+            ]
+            for variable in self.variables
+        )
 
     def probabilities_from_simple_event(self, event: SimpleEvent) -> np.ndarray:
         """
@@ -203,8 +250,12 @@ class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
         result = SumUnit(probabilistic_circuit=pc)
 
         # iterate through all states of this distribution
-        for event in itertools.product(*[list(range(len(variable.domain.simple_sets)))
-                                         for variable in self.variables]):
+        for event in itertools.product(
+            *[
+                list(range(len(variable.domain.simple_sets)))
+                for variable in self.variables
+            ]
+        ):
 
             # create a product unit for the current state
             product_unit = ProductUnit(probabilistic_circuit=pc)
@@ -213,7 +264,7 @@ class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
             for variable, value in zip(self.variables, event):
                 # create probabilities for the current variables state as one hot encoding
                 weights = MissingDict(float)
-                weights[hash(value)] = 1.
+                weights[hash(value)] = 1.0
 
                 # create a distribution for the current variable
                 distribution = SymbolicDistribution(variable, weights)
@@ -235,7 +286,9 @@ class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
         :param event: The event to encode.
         :return: The encoded event.
         """
-        return [variable.encode(value) for variable, value in zip(self.variables, event)]
+        return [
+            variable.encode(value) for variable, value in zip(self.variables, event)
+        ]
 
     def fit(self, data: np.ndarray) -> Self:
         """
@@ -251,9 +304,11 @@ class MultinomialDistribution(ProbabilisticModel, SubclassJSONSerializer):
         return self
 
     def to_json(self) -> Dict[str, Any]:
-        return {**SubclassJSONSerializer.to_json(self),
-                "variables": [variable.to_json() for variable in self.variables],
-                "probabilities": self.probabilities.tolist()}
+        return {
+            **SubclassJSONSerializer.to_json(self),
+            "variables": [variable.to_json() for variable in self.variables],
+            "probabilities": self.probabilities.tolist(),
+        }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any]) -> Self:

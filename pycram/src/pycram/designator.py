@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import inspect
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, Field, fields
 from typing import get_type_hints
 
 from krrood.entity_query_language.factories import entity, variable, contains, an
@@ -116,11 +116,26 @@ class DesignatorDescription:
     def context(self) -> Context:
         return Context(self.world, self.robot_view, self.plan)
 
-    def __init__(self):
+    @classmethod
+    @property
+    def fields(cls) -> List[Field]:
         """
-        Create a Designator description.
+        The fields of this action, returns only the fields defined in the class and not inherit fields of parents
+
+        :return: The fields of this action
         """
-        pass
+        self_fields = list(fields(cls))
+        [
+            self_fields.remove(parent_field)
+            for parent_field in fields(DesignatorDescription)
+        ]
+        for field in self_fields:
+            field.type = cls.get_type_hints()[field.name]
+        return self_fields
+
+    @property
+    def slots(self) -> Dict[str, Any]:
+        return {f.name: getattr(self, f.name) for f in self.fields}
 
     def resolve(self):
         return self.ground()

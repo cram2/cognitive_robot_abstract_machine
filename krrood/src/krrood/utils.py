@@ -3,12 +3,13 @@ from __future__ import annotations
 import os
 import types
 from ast import Module
+from copy import deepcopy
 from dataclasses import dataclass, field
-from functools import lru_cache
+from functools import lru_cache, wraps
 from inspect import isclass
-from typing import Union, Type
+from typing import Union, Type, Any
 
-from typing_extensions import TypeVar, Type, List, Optional
+from typing_extensions import TypeVar, Type, List, Optional, Callable
 
 T = TypeVar("T")
 
@@ -92,3 +93,49 @@ def _inheritance_path_length(
 
 def module_and_class_name(t: Union[Type, _SpecialForm]) -> str:
     return f"{t.__module__}.{t.__name__}"
+
+
+T = TypeVar("T", bound=Callable[..., Any])
+
+
+def memoize(function: T) -> T:
+
+    @wraps(function)
+    def wrapper(self, *args: Any, **kwargs: Any) -> T:
+        if not hasattr(self, "__memo__"):
+            self.__memo__ = {}
+        memo = self.__memo__
+
+        key = (function, self, args, frozenset(kwargs.items()))
+        try:
+            return memo[key]
+        except KeyError:
+            rv = function(self, *args, **kwargs)
+            memo[key] = rv
+            return rv
+
+    return wrapper  # type: ignore
+
+
+def copy_memoize(function: T) -> T:
+
+    @wraps(function)
+    def wrapper(self, *args, **kwargs):
+        if not hasattr(self, "__memo__"):
+            self.__memo__ = {}
+        memo = self.__memo__
+
+        key = (function, self, args, frozenset(kwargs.items()))
+        try:
+            return deepcopy(memo[key])
+        except KeyError:
+            rv = function(self, *args, **kwargs)
+            memo[key] = rv
+            return deepcopy(rv)
+
+    return wrapper
+
+
+def clear_memoization_cache(instance):
+    if hasattr(instance, "__memo__"):
+        instance.__memo__.clear()

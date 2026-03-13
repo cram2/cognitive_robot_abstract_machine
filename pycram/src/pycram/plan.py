@@ -21,10 +21,8 @@ from typing_extensions import (
     Type,
     Tuple,
     Iterator,
-    Union,
     Generic,
     TypeVar,
-    ClassVar,
 )
 
 from giskardpy.motion_statechart.graph_node import Task
@@ -80,18 +78,18 @@ class Plan:
     The node, of the current_plan, that is currently being performed
     """
 
-    on_start_callback: ClassVar[
-        Dict[Optional[Union[Type[ActionDescription], Type[PlanNode]]], List[Callable]]
-    ] = {}
-    """
-    Callbacks to be called when a node of the given type is started.
-    """
-    on_end_callback: ClassVar[
-        Dict[Optional[Union[Type[ActionDescription], Type[PlanNode]]], List[Callable]]
-    ] = {}
-    """
-    Callbacks to be called when a node of the given type is ended.
-    """
+    # on_start_callback: ClassVar[
+    #     Dict[Optional[Union[Type[ActionDescription], Type[PlanNode]]], List[Callable]]
+    # ] = {}
+    # """
+    # Callbacks to be called when a node of the given type is started.
+    # """
+    # on_end_callback: ClassVar[
+    #     Dict[Optional[Union[Type[ActionDescription], Type[PlanNode]]], List[Callable]]
+    # ] = {}
+    # """
+    # Callbacks to be called when a node of the given type is ended.
+    # """
 
     def __init__(self, root: PlanNode, context: Context):
         super().__init__()
@@ -647,18 +645,18 @@ def managed_node(func: Callable) -> Callable:
 
         node.status = TaskStatus.RUNNING
         node.start_time = datetime.now()
-        on_start_callbacks = (
-            Plan.on_start_callback.get(node.designator_type, [])
-            + Plan.on_start_callback.get(None, [])
-            + Plan.on_start_callback.get(node.__class__, [])
-        )
-        on_end_callbacks = (
-            Plan.on_end_callback.get(node.designator_type, [])
-            + Plan.on_end_callback.get(None, [])
-            + Plan.on_end_callback.get(node.__class__, [])
-        )
-        for call_back in on_start_callbacks:
-            call_back(node)
+        # on_start_callbacks = (
+        #     Plan.on_start_callback.get(node.designator_type, [])
+        #     + Plan.on_start_callback.get(None, [])
+        #     + Plan.on_start_callback.get(node.__class__, [])
+        # )
+        # on_end_callbacks = (
+        #     Plan.on_end_callback.get(node.designator_type, [])
+        #     + Plan.on_end_callback.get(None, [])
+        #     + Plan.on_end_callback.get(node.__class__, [])
+        # )
+        # for call_back in on_start_callbacks:
+        #     call_back(node)
         result = None
         try:
             node.plan.current_node = node
@@ -672,8 +670,8 @@ def managed_node(func: Callable) -> Callable:
         finally:
             node.end_time = datetime.now()
             node.plan.current_node = node.parent
-            for call_back in on_end_callbacks:
-                call_back(node)
+            # for call_back in on_end_callbacks:
+            #     call_back(node)
         return result
 
     return wrapper
@@ -1069,6 +1067,9 @@ class ActionNode(BaseActionNode, Generic[ActionType]):
         self.execute_msc()
 
         self.log_execution_data_post_perform()
+
+        if self.plan.context.evaluate_conditions:
+            self.designator_ref.evaluate_post_condition()
 
         return result
 

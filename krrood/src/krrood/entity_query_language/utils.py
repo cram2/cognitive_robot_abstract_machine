@@ -3,6 +3,8 @@ from __future__ import annotations
 import inspect
 from functools import lru_cache
 
+from krrood.utils import memoize
+
 """
 Utilities for hashing, rendering, and general helpers used by the
 symbolic query engine.
@@ -54,7 +56,7 @@ class IDGenerator:
     The counter of the unique IDs.
     """
 
-    # @lru_cache(maxsize=None)
+    # @memoize
     def __call__(self, obj: Any) -> int:
         """
         Creates a unique ID and caches it for every object this is called on.

@@ -27,6 +27,7 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     OmniDrive,
     ActiveConnection1DOF,
+    DiffDrive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import BoundingBox
@@ -575,7 +576,7 @@ class AbstractRobot(Agent, ABC):
         """
         try:
             parent_connection = self.root.parent_connection
-            if isinstance(parent_connection, OmniDrive):
+            if isinstance(parent_connection, (OmniDrive, DiffDrive)):
                 return parent_connection
         except AttributeError:
             pass

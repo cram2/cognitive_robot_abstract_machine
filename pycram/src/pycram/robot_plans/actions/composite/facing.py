@@ -11,7 +11,7 @@ from pycram.config.action_conf import ActionConfig
 from pycram.datastructures.partial_designator import PartialDesignator
 from pycram.datastructures.pose import PoseStamped
 from pycram.language import SequentialPlan
-from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
 from pycram.tf_transformations import quaternion_from_euler
 
 
@@ -66,7 +66,7 @@ class FaceAtAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        pose: Union[Iterable[PoseStamped], PoseStamped],
+        pose: DescriptionType[ PoseStamped],
         keep_joint_states: Union[
             Iterable[bool], bool
         ] = ActionConfig.face_at_keep_joint_states,

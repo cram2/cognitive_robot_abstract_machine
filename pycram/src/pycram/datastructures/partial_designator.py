@@ -3,12 +3,17 @@ from __future__ import annotations
 
 from inspect import signature
 
-from typing_extensions import List, Tuple, Any, Dict, TypeVar, Iterator, Iterable, Type
+from typing_extensions import List, Tuple, Any, Dict, TypeVar, Iterator, Iterable, Type, TYPE_CHECKING
 
 from pycram.plan import PlanNode
 from pycram.utils import is_iterable, lazy_product
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    from ..robot_plans import ActionDescription
+else:
+    ActionDescription = TypeVar("ActionDescription")
+
+T = TypeVar("T", bound=ActionDescription)
 
 
 class PartialDesignator(Iterable[T]):
@@ -47,6 +52,8 @@ class PartialDesignator(Iterable[T]):
     Reference to the PlanNode that is used to execute the performable
     """
 
+    kwarg_types: Dict[str, Any] = None
+
     def __init__(self, performable: Type[T], *args, **kwargs):
         self.performable = performable
         # We use the init of the performable class since typing for the whole class messes up the signature of the class.
@@ -66,6 +73,8 @@ class PartialDesignator(Iterable[T]):
         for key in dict(signature(self.performable).parameters).keys():
             if key not in self.kwargs.keys():
                 self.kwargs[key] = None
+        self.kwarg_types = {f.name: f.type for f in self.performable.fields}
+
 
     def __call__(self, *fargs, **fkwargs):
         """
@@ -119,8 +128,13 @@ class PartialDesignator(Iterable[T]):
 
         :return: A list of parameter names that are missing from the performable
         """
-        missing = {k: v for k, v in self.kwargs.items() if v is None}
+        missing = {k: v for k, v in self.kwargs.items() if v is None or v == Ellipsis}
         return list(missing.keys())
+
+
+    def create_unbound_variables(self):
+        return self.plan.parameter_infeerer.plan_domain.designator_domains[self].create_variables()
+
 
     def resolve(self) -> T:
         """
@@ -184,3 +198,7 @@ class PartialDesignator(Iterable[T]):
         for key, value in self.kwargs.items():
             if "DesignatorDescription" in [c.__name__ for c in value.__class__.__mro__]:
                 value.plan_node = self._plan_node
+
+    @property
+    def plan(self):
+        return self._plan_node.plan
