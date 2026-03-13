@@ -436,6 +436,17 @@ class AmbiguousNameError(ValueError):
 class UnresolvedNameError(ValueError):
     """Raised when no semantic annotation class matches a given name."""
 
+@dataclass
+class RootNodeNotFoundError(DataclassException):
+    """
+    Raised when the root node cannot be found or is ambiguous in a scene graph.
+    """
+
+    candidates: List[str]
+    """The candidate node names that were considered as potential roots."""
+
+    def __post_init__(self):
+        self.message = f"Could not determine unique root node. Candidates: {self.candidates}"
 
 @dataclass
 class CollisionCheckingError(DataclassException):
