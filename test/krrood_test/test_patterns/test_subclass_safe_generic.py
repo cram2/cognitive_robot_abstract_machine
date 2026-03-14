@@ -5,7 +5,7 @@ from typing_extensions import get_type_hints, List, get_args, get_origin, Forwar
 from dataset.classes_with_generic import (
     SubClassGenericThatUpdatesGenericTypeToBuiltInType,
     SubClassGenericThatUpdatesGenericTypeToTypeDefinedInSameModule,
-    SubClassGenericThatUpdatesGenericTypeToAForwardReferencedClass,
+    SubClassGenericThatUpdatesGenericTypeToAnotherTypeVar,
     SubClassGenericThatUpdatesGenericTypeToTypeDefinedInImportedModuleOfThisLibrary,
 )
 from krrood.class_diagrams.utils import resolve_type
@@ -37,18 +37,14 @@ def test_resolve_generic_type_subclass_with_type_defined_in_imported_module_of_t
     _assert_generic_type_is_resolved(cls)
 
 
-def test_resolve_generic_type_subclass_with_forward_referenced_type_as_generic_type():
-    cls = SubClassGenericThatUpdatesGenericTypeToAForwardReferencedClass
+def test_resolve_generic_type_subclass_with_new_type_var_as_generic_type():
+    cls = SubClassGenericThatUpdatesGenericTypeToAnotherTypeVar
     _assert_generic_type_is_resolved(cls)
 
 
 def _assert_generic_type_is_resolved(cls):
     resolved_hints = get_type_hints(cls, include_extras=True)
     generic_type = get_generic_type_param(cls, SubClassSafeGeneric)[0]
-    if isinstance(generic_type, ForwardRef):
-        generic_type = eval(
-            generic_type.__forward_arg__, inspect.getmodule(cls).__dict__
-        )
     assert (
         resolved_hints[variable_from(cls).attribute_using_generic._attribute_name_]
         is generic_type
