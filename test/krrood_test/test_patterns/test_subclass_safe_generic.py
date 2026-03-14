@@ -1,6 +1,4 @@
-import inspect
-
-from typing_extensions import get_type_hints, List, get_args, get_origin, ForwardRef
+from typing_extensions import get_type_hints, get_args, get_origin
 
 from dataset.classes_with_generic import (
     SubClassGenericThatUpdatesGenericTypeToBuiltInType,
@@ -8,11 +6,9 @@ from dataset.classes_with_generic import (
     SubClassGenericThatUpdatesGenericTypeToAnotherTypeVar,
     SubClassGenericThatUpdatesGenericTypeToTypeDefinedInImportedModuleOfThisLibrary,
 )
-from krrood.class_diagrams.utils import resolve_type
-from krrood.entity_query_language.core.mapped_variable import MappedVariable
-from krrood.entity_query_language.factories import variable, variable_from
+from krrood.entity_query_language.factories import variable_from
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from krrood.utils import T, get_generic_type_param
+from krrood.utils import get_generic_type_param
 from ..dataset.classes_with_generic import FirstGeneric
 
 
