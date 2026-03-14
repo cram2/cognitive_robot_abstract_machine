@@ -81,17 +81,11 @@ class Role(SubClassSafeGeneric[T], ABC):
     @classmethod
     @lru_cache
     def updates_role_taker_type(cls) -> bool:
-        return (cls.get_role_taker_type() is not cls.get_role_generic_type()) and any(
-            parent.get_root_role_taker_type() is not cls.get_role_taker_type()
+        return any(
+            parent.get_role_taker_type() is not cls.get_role_taker_type()
             for parent in cls.__bases__
             if issubclass(parent, Role)
         )
-
-    @classmethod
-    def get_attributes_using_generic_type(cls) -> List[Attribute]:
-        if cls.role_taker_attribute() is None:
-            return []
-        return [cls.role_taker_attribute()]
 
     @classmethod
     @abstractmethod

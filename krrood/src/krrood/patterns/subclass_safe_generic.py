@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import inspect
-import sys
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from abc import ABC
+from dataclasses import dataclass, Field, field, fields
 from functools import lru_cache
 
 from typing_extensions import (
@@ -12,22 +10,17 @@ from typing_extensions import (
     Type,
     List,
     TYPE_CHECKING,
-    get_type_hints,
     Optional,
+    ClassVar,
 )
 
-from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (
-    get_type_hints_of_object,
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
-    resolve_type,
+    get_type_hints_of_object,
 )
 from krrood.utils import (
     get_generic_type_param,
     T,
-    get_type_checking_imports,
-    extract_imports_from,
-    get_scope_from_imports,
 )
 
 if TYPE_CHECKING:
@@ -61,13 +54,14 @@ class SubClassSafeGeneric(Generic[T], ABC):
         old_generic_type = cls._get_old_generic_type()
         if not old_generic_type:
             return
-        resolved_types = (
+        resolved_types, type_hints = (
             get_and_resolve_generic_type_hints_of_object_using_substitutions(
                 cls, {old_generic_type: cls.get_generic_type()}
             )
         )
-        for name in cls.get_names_of_attributes_using_generic_type():
-            cls.__annotations__[name] = resolved_types[name]
+        for name, resolved_type in resolved_types.items():
+            if str(old_generic_type) in str(type_hints[name]):
+                cls.__annotations__[name] = resolved_type
 
     @classmethod
     def _get_old_generic_type(cls) -> Optional[Type[T]]:
@@ -97,21 +91,3 @@ class SubClassSafeGeneric(Generic[T], ABC):
         if generic_types:
             return generic_types[0]
         return None
-
-    @classmethod
-    def get_names_of_attributes_using_generic_type(cls) -> List[str]:
-        """
-        :return: The names of the attributes that use the generic type.
-        """
-        return [
-            attribute._attribute_name_
-            for attribute in cls.get_attributes_using_generic_type()
-        ]
-
-    @classmethod
-    @abstractmethod
-    def get_attributes_using_generic_type(cls) -> List[Attribute]:
-        """
-        :return: The symbolic representation of the attributes that use the generic type.
-        """
-        return []

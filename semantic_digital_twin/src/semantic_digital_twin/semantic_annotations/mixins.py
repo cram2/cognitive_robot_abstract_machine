@@ -88,7 +88,9 @@ class IsPerceivable:
 
 
 @dataclass(eq=False)
-class HasRootKinematicStructureEntity(SemanticAnnotation, Role[KinematicStructureEntity], ABC):
+class HasRootKinematicStructureEntity(
+    SemanticAnnotation, Role[KinematicStructureEntity], ABC
+):
     """
     Base class for shared method for HasRootBody and HasRootRegion.
     """

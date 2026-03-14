@@ -7,7 +7,7 @@ from typing import Callable, Any, Dict, get_args, get_origin, Union
 from uuid import UUID
 
 import typing_extensions
-from typing_extensions import List, Type, Any, Dict, TypeVar
+from typing_extensions import List, Type, Any, Dict, TypeVar, Tuple
 from typing_extensions import TypeVar
 
 from krrood.class_diagrams.exceptions import CouldNotResolveType
@@ -63,19 +63,20 @@ def get_type_hint_of_keyword_argument(callable_: Callable, name: str):
 
 def get_and_resolve_generic_type_hints_of_object_using_substitutions(
     object_: Any, substitution: Dict[TypeVar, Type]
-) -> Dict[str, Type]:
+) -> Tuple[Dict[str, Type], Dict[str, Type]]:
     """
     Resolve generic type hints of an object using a substitution dictionary.
 
     :param object_: The object to resolve generic type hints of.
     :param substitution: The substitution dictionary to use for resolving generic type hints.
-    :return: A dictionary mapping type variable names to resolved types.
+    :return: A tuple containing two dictionaries: the first maps type variable names to resolved types, and the second
+     maps type variable names to original type hints.
     """
     type_hints = get_type_hints_of_object(object_)
     resolved_types = {}
     for name, hint in type_hints.items():
         resolved_types[name] = resolve_type(hint, substitution)
-    return resolved_types
+    return resolved_types, type_hints
 
 
 def get_type_hints_of_object(object_: Any) -> Dict[str, Any]:

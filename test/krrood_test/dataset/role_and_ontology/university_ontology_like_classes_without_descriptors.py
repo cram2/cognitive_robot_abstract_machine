@@ -4,6 +4,7 @@ from dataclasses import dataclass, field, Field, fields
 
 from typing_extensions import Set, List, TypeVar
 
+from krrood.entity_query_language.factories import variable_from
 from krrood.entity_query_language.predicate import (
     Symbol,
     Predicate,  # type: ignore
@@ -63,19 +64,15 @@ class CEOAsFirstRole(Role[TPerson], Symbol):
     head_of: RecognizedGroup = None
 
     @classmethod
-    def role_taker_attribute(cls) -> Field:
-        return [f for f in fields(cls) if f.name == "person"][0]
+    def role_taker_attribute(cls) -> TPerson:
+        return variable_from(cls).person
 
 
-TSubclassOfARoleTaker = TypeVar(
-    "TSubclassOfARoleTaker", bound=SubclassOfARoleTaker
-)
+TSubclassOfARoleTaker = TypeVar("TSubclassOfARoleTaker", bound=SubclassOfARoleTaker)
 
 
 @dataclass(eq=False)
-class SubclassOfRoleThatUpdatesRoleTakerType(
-    CEOAsFirstRole[TSubclassOfARoleTaker]
-): ...
+class SubclassOfRoleThatUpdatesRoleTakerType(CEOAsFirstRole[TSubclassOfARoleTaker]): ...
 
 
 @dataclass(eq=False)
@@ -83,8 +80,8 @@ class DirectDiamondShapedInheritanceWhereOneIsRole(Role[TPerson], HasName):
     person: TPerson = field(kw_only=True)
 
     @classmethod
-    def role_taker_attribute(cls) -> Field:
-        return [f for f in fields(cls) if f.name == "person"][0]
+    def role_taker_attribute(cls) -> TPerson:
+        return variable_from(cls).person
 
 
 @dataclass(eq=False)
@@ -92,8 +89,8 @@ class InDirectDiamondShapedInheritanceWhereOneIsRole(RecognizedGroup, Role[TPers
     person: TPerson = field(kw_only=True)
 
     @classmethod
-    def role_taker_attribute(cls) -> Field:
-        return [f for f in fields(cls) if f.name == "person"][0]
+    def role_taker_attribute(cls) -> TPerson:
+        return variable_from(cls).person
 
 
 @dataclass(eq=False)
@@ -102,8 +99,8 @@ class ProfessorAsFirstRole(Role[TPerson], Symbol):
     teacher_of: List[Course] = field(default_factory=list, kw_only=True)
 
     @classmethod
-    def role_taker_attribute(cls) -> Field:
-        return [f for f in fields(cls) if f.name == "person"][0]
+    def role_taker_attribute(cls) -> TPerson:
+        return variable_from(cls).person
 
 
 @dataclass(eq=False)
@@ -121,8 +118,8 @@ class RepresentativeAsSecondRole(Role[TCEOAsFirstRole], Symbol):
     representative_of: RecognizedGroup = field(default=None, kw_only=True)
 
     @classmethod
-    def role_taker_attribute(cls) -> Field:
-        return [f for f in fields(cls) if f.name == "ceo"][0]
+    def role_taker_attribute(cls) -> TCEOAsFirstRole:
+        return variable_from(cls).ceo
 
 
 TRepresentativeAsSecondRole = TypeVar(
@@ -137,5 +134,5 @@ class DelegateAsThirdRole(Role[TRepresentativeAsSecondRole], Symbol):
     delegate_of: RecognizedGroup = field(kw_only=True, default=None)
 
     @classmethod
-    def role_taker_attribute(cls) -> Field:
-        return [f for f in fields(cls) if f.name == "representative"][0]
+    def role_taker_attribute(cls) -> TRepresentativeAsSecondRole:
+        return variable_from(cls).representative

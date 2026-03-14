@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, Field
 
 from typing_extensions import Set, List, TypeVar
 
-from krrood.patterns import Role
+from krrood.patterns.role import Role
 from krrood.symbol_graph.symbol_graph import Symbol
 
 @dataclass(eq=False)
@@ -37,14 +37,14 @@ class PersonMixin(HasName, Symbol):
     representative_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class Person(PersonMixin):
-    ...
+class Person(PersonMixin): ...
 
 @dataclass(eq=False)
 class SubclassOfARoleTaker(Person):
     introduced_attribute: str = field(default="", kw_only=True)
 
 TPerson = TypeVar("TPerson", bound=Person)
+
 @dataclass
 class RoleForPerson(Role[TPerson], PersonMixin):
     person: TPerson = field(kw_only=True)
@@ -55,7 +55,8 @@ class RoleForPerson(Role[TPerson], PersonMixin):
     @classmethod
     def role_taker_attribute(cls) -> Field: ...
 
-TSubclassOfARoleTaker = TypeVar('TSubclassOfARoleTaker', bound=SubclassOfARoleTaker)
+TSubclassOfARoleTaker = TypeVar("TSubclassOfARoleTaker", bound=SubclassOfARoleTaker)
+
 @dataclass
 class RoleForManAsSubclassOfARoleTaker(RoleForPerson[TSubclassOfARoleTaker]):
     introduced_attribute: str = field(default="", kw_only=True)

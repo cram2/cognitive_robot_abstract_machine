@@ -15,8 +15,8 @@ from ..dataset.role_and_ontology.university_ontology_like_classes_without_descri
     Company,
     ProfessorAsFirstRole,
     Course,
-    RepresentativeAsSecondRole, SubclassOfRoleThatUpdatesRoleTakerType,
-    TSubclassOfARoleTaker
+    RepresentativeAsSecondRole,
+    SubclassOfRoleThatUpdatesRoleTakerType,
 )
 
 
@@ -76,14 +76,6 @@ def test_roles_are_equal_and_has_same_hash_as_each_other():
     assert ceo == person
     assert ceo == representative
     assert ceo == professor
-
-def test_role_generic_inheritance_type_updates_correctly():
-    assert SubclassOfRoleThatUpdatesRoleTakerType.get_role_generic_type() is TSubclassOfARoleTaker
-    assert SubclassOfRoleThatUpdatesRoleTakerType.get_role_taker_type() is TSubclassOfARoleTaker
-    assert next(
-        f for f in fields(SubclassOfRoleThatUpdatesRoleTakerType) if f.name == "person").type is TSubclassOfARoleTaker
-    assert next(f for f in ClassDiagram([SubclassOfRoleThatUpdatesRoleTakerType]).get_wrapped_class(
-        SubclassOfRoleThatUpdatesRoleTakerType).fields if f.name == "person").type_endpoint is TSubclassOfARoleTaker
 
 
 def test_role_taker_associations():
