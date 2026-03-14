@@ -4,6 +4,7 @@ import ast
 from pathlib import Path
 from types import ModuleType
 
+from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 from krrood.ripple_down_rules.utils import (
     get_imports_from_scope,
 )
@@ -313,7 +314,7 @@ class RoleForInfo(AbstractStubClassInfo):
             for wf in taker_wc.fields
             if wf.field.init
         ]
-        taker_field_name = roles[0].clazz.role_taker_attribute().name
+        taker_field_name = roles[0].clazz.role_taker_attribute_name()
         wrapped_field = next(f for f in roles[0].fields if f.name == taker_field_name)
         taker_field = StubFieldInfo(
             taker_field_name,
@@ -366,7 +367,7 @@ class RoleInfo(AbstractStubClassInfo):
         :param role: The wrapped class of the role.
         :param role_for_name: The name of the role-for class.
         """
-        taker_field_name = role.clazz.role_taker_attribute().name
+        taker_field_name = role.clazz.role_taker_attribute_name()
         taker_field_names = [f.name for f in fields(role.clazz.get_role_taker_type())]
 
         intro_field_wc = next(
@@ -475,8 +476,9 @@ class RoleStubGenerator:
         for taker_type, roles in self._role_taker_to_roles_map.items():
             try:
                 taker_wc = self.class_diagram.get_wrapped_class(taker_type)
-            except Exception:
-                # Taker might be in another module
+            except ClassIsUnMappedInClassDiagram:
+                # Ignore classes that are not in the class diagram,
+                # would mean that the role-taker class is defined in another module
                 continue
             for role_wc in roles:
                 graph.add_edge(taker_wc.index, role_wc.index, None)
@@ -613,7 +615,7 @@ class RoleStubGenerator:
         for role_wc in self._root_role_taker_to_roles_map.get(wrapped_class.clazz, []):
             if Role not in role_wc.clazz.__bases__:
                 continue
-            taker_field_name = role_wc.clazz.role_taker_attribute().name
+            taker_field_name = role_wc.clazz.role_taker_attribute_name()
             for role_wf in role_wc.fields:
                 is_owned_field = role_wf in role_wc.own_fields
                 if is_owned_field and role_wf.name in taker_fields:
