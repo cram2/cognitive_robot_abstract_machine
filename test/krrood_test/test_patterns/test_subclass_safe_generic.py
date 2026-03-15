@@ -1,5 +1,5 @@
 import sys
-from dataclasses import fields, MISSING
+from dataclasses import fields
 
 from typing_extensions import (
     get_type_hints,
@@ -13,6 +13,8 @@ from dataset.classes_with_generic import (
     SubClassGenericThatUpdatesGenericTypeToAnotherTypeVar,
     SubClassGenericThatUpdatesGenericTypeToTypeDefinedInImportedModuleOfThisLibrary,
     SubClassGenericThatRecreatesAField,
+    SubClassGenericThatRecreatesAFieldWithAnotherVar,
+    SubClassGenericThatRecreatesAFieldWithNonBuiltInType,
 )
 from krrood.entity_query_language.factories import variable_from
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -39,24 +41,29 @@ def test_resolving_generic_type_preserves_field_kwargs():
 
 def test_resolving_generic_type_preserves_parent_field_kwargs():
     cls = FirstGeneric
-    field_name = variable_from(cls).generic_attribute_using_generic._attribute_name_
-    field_ = next(f for f in fields(cls) if f.name == field_name)
-    assert field_.default_factory is list
-    assert field_.kw_only
-    evaluated_type = eval(field_.type, sys.modules[cls.__module__].__dict__)
-    assert get_origin(evaluated_type) is list
-    assert (
-        get_args(evaluated_type)[0]
-        is get_generic_type_param(cls, SubClassSafeGeneric)[0]
-    )
+    assert_field_kwargs_are_preserved_when_resolving_generic_type(cls, kw_only=True)
 
 
-def test_recreated_field_is_preserved_when_resolving_generic_type():
+def test_recreated_field_with_built_in_type_is_preserved_when_resolving_generic_type():
     cls = SubClassGenericThatRecreatesAField
+    assert_field_kwargs_are_preserved_when_resolving_generic_type(cls)
+
+
+def test_recreated_field_with_non_builtin_type_is_preserved_when_resolving_generic_type():
+    cls = SubClassGenericThatRecreatesAFieldWithNonBuiltInType
+    assert_field_kwargs_are_preserved_when_resolving_generic_type(cls)
+
+
+def test_recreated_field_with_var_type_is_preserved_when_resolving_generic_type():
+    cls = SubClassGenericThatRecreatesAFieldWithAnotherVar
+    assert_field_kwargs_are_preserved_when_resolving_generic_type(cls)
+
+
+def assert_field_kwargs_are_preserved_when_resolving_generic_type(cls, kw_only=False):
     field_name = variable_from(cls).generic_attribute_using_generic._attribute_name_
     field_ = next(f for f in fields(cls) if f.name == field_name)
     assert field_.default_factory is list
-    assert not field_.kw_only
+    assert field_.kw_only == kw_only
     evaluated_type = eval(field_.type, sys.modules[cls.__module__].__dict__)
     assert get_origin(evaluated_type) is list
     assert (

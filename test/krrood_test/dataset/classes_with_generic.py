@@ -26,6 +26,11 @@ class SubClassGenericThatRecreatesAField(FirstGeneric[int]):
 
 
 @dataclass
+class SubClassGenericThatRecreatesAFieldWithNonBuiltInType(FirstGeneric[FirstGeneric]):
+    generic_attribute_using_generic: List[FirstGeneric] = field(default_factory=list)
+
+
+@dataclass
 class SubClassGenericThatUpdatesGenericTypeToTypeDefinedInSameModule(
     FirstGeneric[FirstGeneric]
 ): ...
@@ -44,3 +49,8 @@ NewTypeVar = TypeVar("NewTypeVar", bound=FirstGeneric)
 class SubClassGenericThatUpdatesGenericTypeToAnotherTypeVar(
     FirstGeneric[NewTypeVar]
 ): ...
+
+
+@dataclass
+class SubClassGenericThatRecreatesAFieldWithAnotherVar(FirstGeneric[NewTypeVar]):
+    generic_attribute_using_generic: List[NewTypeVar] = field(default_factory=list)
