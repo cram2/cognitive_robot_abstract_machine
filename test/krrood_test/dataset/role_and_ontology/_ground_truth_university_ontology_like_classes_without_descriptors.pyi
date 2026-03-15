@@ -40,8 +40,11 @@ class PersonMixin(HasName, Symbol):
 class Person(PersonMixin): ...
 
 @dataclass(eq=False)
-class SubclassOfARoleTaker(Person):
+class SubclassOfARoleTakerMixin(Person):
     introduced_attribute: str = field(default="", kw_only=True)
+
+@dataclass(eq=False)
+class SubclassOfARoleTaker(SubclassOfARoleTakerMixin): ...
 
 TPerson = TypeVar("TPerson", bound=Person)
 
@@ -55,18 +58,12 @@ class RoleForPerson(Role[TPerson], PersonMixin):
     @classmethod
     def role_taker_attribute(cls) -> Field: ...
 
-TSubclassOfARoleTaker = TypeVar("TSubclassOfARoleTaker", bound=SubclassOfARoleTaker)
-
-@dataclass
-class RoleForManAsSubclassOfARoleTaker(RoleForPerson[TSubclassOfARoleTaker]):
-    introduced_attribute: str = field(default="", kw_only=True)
-
 @dataclass(eq=False)
-class DirectDiamondShapedInheritanceWhereOneIsRole(RoleForPerson): ...
+class DirectDiamondShapedInheritanceWhereOneIsRole(RoleForPerson[TPerson]): ...
 
 @dataclass(eq=False)
 class InDirectDiamondShapedInheritanceWhereOneIsRole(
-    RoleForPerson,
+    RoleForPerson[TPerson],
     RecognizedGroup,
 ): ...
 
@@ -75,10 +72,17 @@ class CEOAsFirstRole(RoleForPerson[TPerson]):
     # Original Owner of the head_of field
     head_of: RecognizedGroup = field(default=None, kw_only=True)
 
+TSubclassOfARoleTaker = TypeVar("TSubclassOfARoleTaker", bound=SubclassOfARoleTaker)
+
+@dataclass
+class CEOAsFirstRoleAsRoleForSubClassOfARoleTaker(
+    CEOAsFirstRole[TSubclassOfARoleTaker], SubclassOfARoleTakerMixin
+):
+    introduced_attribute: str = field(init=False)
+
 @dataclass(eq=False)
 class SubclassOfRoleThatUpdatesRoleTakerType(
-    RoleForManAsSubclassOfARoleTaker,
-    CEOAsFirstRole,
+    CEOAsFirstRoleAsRoleForSubClassOfARoleTaker
 ): ...
 
 @dataclass(eq=False)
