@@ -61,12 +61,6 @@ class SubClassSafeGeneric(Generic[T], ABC):
         )
         for name, result in resolution_results.items():
             if result.resolved:
-                # if str(old_generic_type) in str(type_hints[name]) and (
-                #     str(type_hints[name]).replace(
-                #         str(old_generic_type), str(cls.get_generic_type())
-                #     )
-                #     == str(resolved_type)
-                # ):
                 cls.__annotations__[name] = result.resolved_type
 
     @classmethod

@@ -131,89 +131,35 @@ def get_type_hints_of_object(object_: Any) -> Dict[str, Any]:
 def resolve_type(
     type_to_resolve: Any,
     substitution: Dict[TypeVar, Any],
-    resolved: bool = False,
 ) -> TypeHintResolutionResult:
     """
-    Resolve type variables and forward references in a type.
+    Resolve type variables in a type.
 
     :param type_to_resolve: The type to resolve.
-    :param substitution: Mapping of TypeVar to concrete types.
-    :param resolved: Whether any substitutions have been made so far. Defaults to False.
+    :param substitution: Mapping of TypeVars to other types that will substitute the TypeVars.
     :return: A TypeHintResolutionResult object containing the resolved type and a boolean indicating whether any
     substitutions were made.
     """
-    # Also map by TypeVar name to handle postponed annotations ('T')
-    name_substitution = {p.__name__: a for p, a in substitution.items()}
-    # Resolve string forward refs and TypeVar names
-    if isinstance(type_to_resolve, str):
-        if type_to_resolve in name_substitution:
-            return TypeHintResolutionResult(
-                name_substitution[type_to_resolve], True, type_to_resolve
-            )
-        return TypeHintResolutionResult(type_to_resolve, resolved, type_to_resolve)
-
     if isinstance(type_to_resolve, TypeVar):
-        if type_to_resolve in substitution:
-            return TypeHintResolutionResult(
-                substitution[type_to_resolve], True, type_to_resolve
-            )
-        return TypeHintResolutionResult(type_to_resolve, resolved, type_to_resolve)
-
-    # Get arguments and recursively resolve them
-    args = get_args(type_to_resolve)
-    if not args:
-        # Not a string, Not TypeVar, and Not a container. Example: int, float, bool, NoneType, etc.
-        return TypeHintResolutionResult(type_to_resolve, resolved, type_to_resolve)
-
-    resolved_args = []
-    for arg in args:
-        arg_resolution = resolve_type(arg, substitution, resolved)
-        resolved = arg_resolution.resolved
-        resolved_args.append(arg_resolution.resolved_type)
-    resolved_args = tuple(resolved_args)
+        if type_to_resolve not in substitution:
+            return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
+        return TypeHintResolutionResult(
+            substitution[type_to_resolve], True, type_to_resolve
+        )
 
     # If the type itself can be indexed (like List[T] or Optional[T])
     params = getattr(type_to_resolve, "__parameters__", None)
     if hasattr(type_to_resolve, "__getitem__") and params:
-        if len(params) < len(resolved_args):
-            # Filter out NoneType if it's an Optional/Union and we have more args than parameters
-            new_args = tuple(arg for arg in resolved_args if arg is not type(None))
-            if len(new_args) == len(params):
-                if len(params) == 1:
-                    return TypeHintResolutionResult(
-                        type_to_resolve[new_args[0]], resolved, type_to_resolve
-                    )
-                return TypeHintResolutionResult(
-                    type_to_resolve[new_args], resolved, type_to_resolve
-                )
-
-        if len(params) == 1 and len(resolved_args) == 1:
-            return TypeHintResolutionResult(
-                type_to_resolve[resolved_args[0]], resolved, type_to_resolve
-            )
+        new_params = []
+        resolved: bool = False  # whether any substitutions were made
+        for param in params:
+            if param in substitution:
+                new_params.append(substitution[param])
+                resolved = True
+            else:
+                new_params.append(param)
         return TypeHintResolutionResult(
-            type_to_resolve[resolved_args], resolved, type_to_resolve
+            type_to_resolve[*new_params], resolved, type_to_resolve
         )
 
-    # Fallback: re-construct from origin (e.g. for Union/Optional or built-in generics)
-    origin = get_origin(type_to_resolve)
-    if origin is not None:
-        # Special case for Union which might be represented as typing.Union
-        # and needs to be indexed.
-        if origin is Union:
-            return TypeHintResolutionResult(
-                origin[resolved_args], resolved, type_to_resolve
-            )
-        try:
-            return TypeHintResolutionResult(
-                origin[resolved_args], resolved, type_to_resolve
-            )
-        except TypeError:
-            # Some origins might not be indexable directly or might need single arg
-            if len(resolved_args) == 1:
-                return TypeHintResolutionResult(
-                    origin[resolved_args[0]], resolved, type_to_resolve
-                )
-            raise
-
-    return TypeHintResolutionResult(type_to_resolve, resolved, type_to_resolve)
+    return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
