@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from typing_extensions import List, TypeVar
 
@@ -13,11 +13,16 @@ from krrood.utils import T
 @dataclass
 class FirstGeneric(SubClassSafeGeneric[T]):
     attribute_using_generic: T
-    generic_attribute_using_generic: List[T]
+    generic_attribute_using_generic: List[T] = field(default_factory=list, kw_only=True)
 
 
 @dataclass
 class SubClassGenericThatUpdatesGenericTypeToBuiltInType(FirstGeneric[int]): ...
+
+
+@dataclass
+class SubClassGenericThatRecreatesAField(FirstGeneric[int]):
+    generic_attribute_using_generic: List[int] = field(default_factory=list)
 
 
 @dataclass

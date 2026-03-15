@@ -1,12 +1,10 @@
+import sys
+from dataclasses import fields, MISSING
+
 from typing_extensions import (
     get_type_hints,
     get_args,
     get_origin,
-    TypeVar,
-    List,
-    Tuple,
-    Optional,
-    Union,
 )
 
 from dataset.classes_with_generic import (
@@ -14,8 +12,8 @@ from dataset.classes_with_generic import (
     SubClassGenericThatUpdatesGenericTypeToTypeDefinedInSameModule,
     SubClassGenericThatUpdatesGenericTypeToAnotherTypeVar,
     SubClassGenericThatUpdatesGenericTypeToTypeDefinedInImportedModuleOfThisLibrary,
+    SubClassGenericThatRecreatesAField,
 )
-from krrood.class_diagrams.utils import resolve_type
 from krrood.entity_query_language.factories import variable_from
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_param
@@ -29,6 +27,42 @@ def test_resolve_generic_type_same_class():
 def test_resolve_generic_type_subclass_with_built_in_type_as_generic_type():
     cls = SubClassGenericThatUpdatesGenericTypeToBuiltInType
     _assert_generic_type_is_resolved(cls)
+
+
+def test_resolving_generic_type_preserves_field_kwargs():
+    cls = SubClassGenericThatUpdatesGenericTypeToBuiltInType
+    field_name = variable_from(cls).generic_attribute_using_generic._attribute_name_
+    field_ = next(f for f in fields(cls) if f.name == field_name)
+    assert field_.default_factory is list
+    assert field_.kw_only
+
+
+def test_resolving_generic_type_preserves_parent_field_kwargs():
+    cls = FirstGeneric
+    field_name = variable_from(cls).generic_attribute_using_generic._attribute_name_
+    field_ = next(f for f in fields(cls) if f.name == field_name)
+    assert field_.default_factory is list
+    assert field_.kw_only
+    evaluated_type = eval(field_.type, sys.modules[cls.__module__].__dict__)
+    assert get_origin(evaluated_type) is list
+    assert (
+        get_args(evaluated_type)[0]
+        is get_generic_type_param(cls, SubClassSafeGeneric)[0]
+    )
+
+
+def test_recreated_field_is_preserved_when_resolving_generic_type():
+    cls = SubClassGenericThatRecreatesAField
+    field_name = variable_from(cls).generic_attribute_using_generic._attribute_name_
+    field_ = next(f for f in fields(cls) if f.name == field_name)
+    assert field_.default_factory is list
+    assert not field_.kw_only
+    evaluated_type = eval(field_.type, sys.modules[cls.__module__].__dict__)
+    assert get_origin(evaluated_type) is list
+    assert (
+        get_args(evaluated_type)[0]
+        is get_generic_type_param(cls, SubClassSafeGeneric)[0]
+    )
 
 
 def test_resolve_generic_type_subclass_with_type_defined_in_same_module_as_generic_type():

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
+from copy import copy
 from dataclasses import dataclass, Field, field, fields
 from functools import lru_cache
 
@@ -60,8 +61,19 @@ class SubClassSafeGeneric(Generic[T], ABC):
             )
         )
         for name, result in resolution_results.items():
-            if result.resolved:
-                cls.__annotations__[name] = result.resolved_type
+            if not result.resolved:
+                continue
+            if hasattr(cls, name):
+                # First check if there's a new created field that is yet to be processed
+                attribute_value = getattr(cls, name)
+                attribute_value.type = result.resolved_type
+            else:
+                # If not, check if there's an existing field that needs to be updated
+                field_ = copy(next((f for f in fields(cls) if f.name == name), None))
+                if field_ is not None:
+                    field_.type = result.resolved_type
+                    setattr(cls, field_.name, field_)
+            cls.__annotations__[name] = result.resolved_type
 
     @classmethod
     def _get_old_generic_type_if_different(cls) -> Optional[Type[T]]:
