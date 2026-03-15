@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, Field, fields
 from typing import Tuple
 
 import numpy as np
@@ -14,8 +14,12 @@ from typing_extensions import (
     Self,
     Iterable,
     Type,
+    TypeVar,
 )
 
+from krrood.class_diagrams.utils import T
+from krrood.entity_query_language.core.mapped_variable import Attribute
+from krrood.entity_query_language.factories import variable, variable_from
 from krrood.ormatic.utils import classproperty
 from probabilistic_model.distributions import GaussianDistribution
 from probabilistic_model.probabilistic_circuit.rx.helper import (
@@ -27,6 +31,8 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
+
+from krrood.patterns.role import Role
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
@@ -82,16 +88,27 @@ class IsPerceivable:
     """
 
 
+TKinematicStructureEntity = TypeVar(
+    "TKinematicStructureEntity", bound=KinematicStructureEntity
+)
+
+
 @dataclass(eq=False)
-class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
+class HasRootKinematicStructureEntity(
+    SemanticAnnotation, Role[TKinematicStructureEntity], ABC
+):
     """
     Base class for shared method for HasRootBody and HasRootRegion.
     """
 
-    root: KinematicStructureEntity = field(kw_only=True)
+    root: TKinematicStructureEntity = field(kw_only=True)
     """
     The root kinematic structure entity of the semantic annotation.
     """
+
+    @classmethod
+    def role_taker_attribute(cls) -> TKinematicStructureEntity:
+        return variable(cls, None).root
 
     @property
     def scale(self) -> Scale:
@@ -286,8 +303,11 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         return self.root.global_pose
 
 
+TBody = TypeVar("TBody", bound=Body)
+
+
 @dataclass(eq=False)
-class HasRootBody(HasRootKinematicStructureEntity, ABC):
+class HasRootBody(HasRootKinematicStructureEntity[TBody], ABC):
     """
     Abstract base class for all household objects. Each semantic annotation refers to a single Body.
     Each subclass automatically derives a MatchRule from its own class name and
@@ -295,7 +315,7 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
     naturally more specific than their bases.
     """
 
-    root: Body = field(kw_only=True)
+    # root: Body = field(kw_only=True)
     """
     The root body of the semantic annotation.
     """
@@ -354,13 +374,16 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
         )
 
 
+TRegion = TypeVar("TRegion", bound=Region)
+
+
 @dataclass(eq=False)
-class HasRootRegion(HasRootKinematicStructureEntity, ABC):
+class HasRootRegion(HasRootKinematicStructureEntity[TRegion], ABC):
     """
     A mixin class for semantic annotations that have a region.
     """
 
-    root: Region = field(kw_only=True)
+    # root: Region = field(kw_only=True)
     """
     The root region of the semantic annotation.
     """
