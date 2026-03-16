@@ -39,7 +39,7 @@ class AbstractInteractionDetector(DetectorStateChartNode, ABC):
     contact history and logging utilities.
     """
 
-    shift_threshold: float = 10
+    shift_threshold: float = 15
 
     placing_pairs: set = field(default_factory=set)
 
@@ -89,6 +89,7 @@ class PlacingDetector(AbstractInteractionDetector):
 
                     if abs(i.timestamp - j.timestamp) < self.shift_threshold:
 
+                        # needs to be reworked, it doesnt work
                         key = (id(i), id(j))
 
                         # ✅ exclusivity check
