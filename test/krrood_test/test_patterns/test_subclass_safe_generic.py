@@ -7,7 +7,11 @@ from typing_extensions import (
     get_origin,
 )
 
-from dataset.classes_with_generic import (
+from krrood.entity_query_language.factories import variable_from
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from krrood.utils import get_generic_type_param
+from ..dataset.classes_with_generic import (
+    FirstGeneric,
     SubClassGenericThatUpdatesGenericTypeToBuiltInType,
     SubClassGenericThatUpdatesGenericTypeToTypeDefinedInSameModule,
     SubClassGenericThatUpdatesGenericTypeToAnotherTypeVar,
@@ -16,10 +20,6 @@ from dataset.classes_with_generic import (
     SubClassGenericThatRecreatesAFieldWithAnotherVar,
     SubClassGenericThatRecreatesAFieldWithNonBuiltInType,
 )
-from krrood.entity_query_language.factories import variable_from
-from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from krrood.utils import get_generic_type_param
-from ..dataset.classes_with_generic import FirstGeneric
 
 
 def test_resolve_generic_type_same_class():
@@ -67,8 +67,8 @@ def assert_field_kwargs_are_preserved_when_resolving_generic_type(cls, kw_only=F
     evaluated_type = eval(field_.type, sys.modules[cls.__module__].__dict__)
     assert get_origin(evaluated_type) is list
     assert (
-        get_args(evaluated_type)[0]
-        is get_generic_type_param(cls, SubClassSafeGeneric)[0]
+            get_args(evaluated_type)[0]
+            is get_generic_type_param(cls, SubClassSafeGeneric)[0]
     )
 
 
@@ -93,13 +93,13 @@ def _assert_generic_type_is_resolved(cls):
     resolved_hints = get_type_hints(cls, include_extras=True)
     generic_type = get_generic_type_param(cls, SubClassSafeGeneric)[0]
     assert (
-        resolved_hints[variable_from(cls).attribute_using_generic._attribute_name_]
-        is generic_type
+            resolved_hints[variable_from(cls).attribute_using_generic._attribute_name_]
+            is generic_type
     )
     nested_generic_type = resolved_hints[
         variable_from(cls).generic_attribute_using_generic._attribute_name_
     ]
     assert (
-        get_origin(nested_generic_type) is list
-        and get_args(nested_generic_type)[0] is generic_type
+            get_origin(nested_generic_type) is list
+            and get_args(nested_generic_type)[0] is generic_type
     )

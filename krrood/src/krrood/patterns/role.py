@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from functools import lru_cache, cached_property
 from typing import List, TypeVar
 
-from typing_extensions import Type, get_origin
+from typing_extensions import Type, get_origin, Any, Dict
 
 from krrood.class_diagrams.utils import T, get_type_hints_of_object
 from krrood.entity_query_language.core.mapped_variable import Attribute
@@ -48,6 +48,7 @@ class Role(SubClassSafeGeneric[T], ABC):
     """
 
     _role_taker_field_set: bool = field(default=False, init=False)
+    _to_set_in_role_taker: Dict[str, Any] = field(default_factory=dict, init=False)
 
     @classmethod
     @lru_cache(maxsize=None)
@@ -121,9 +122,15 @@ class Role(SubClassSafeGeneric[T], ABC):
     @cached_property
     def role_taker(self) -> T:
         """
-        :return: The role taker instance.
+        Retrieves the role taker instance.
+
+        Uses object.__getattribute__ to avoid triggering __getattr__ recursion.
         """
-        return getattr(self, self.role_taker_attribute_name())
+        attr_name = self.role_taker_attribute_name()
+        try:
+            return object.__getattribute__(self, attr_name)
+        except AttributeError:
+            raise AttributeError(f"Role taker attribute '{attr_name}' not found.")
 
     @cached_property
     def root_persistent_entity(self):
@@ -132,7 +139,7 @@ class Role(SubClassSafeGeneric[T], ABC):
         """
         curr = self
         while isinstance(curr, Role):
-            rt = getattr(curr, "_direct_role_taker", None)
+            rt = getattr(curr, self.role_taker_attribute_name())
             if rt is not None:
                 curr = rt
             else:
@@ -146,8 +153,14 @@ class Role(SubClassSafeGeneric[T], ABC):
         :param item: The attribute name to retrieve.
         :return: The attribute value if found in the role taker, otherwise raises AttributeError.
         """
-        if self._role_taker_field_set and hasattr(self.role_taker, item):
-            return getattr(self.role_taker, item)
+        # Avoid recursion when looking up the role taker attribute itself
+        if item == self.role_taker_attribute_name():
+            raise AttributeError(item)
+
+        if self._role_taker_field_set:
+            rt = self.role_taker
+            return getattr(rt, item)
+
         raise AttributeError(
             f"'{self.__class__.__name__}' object has no attribute '{item}'"
         )
@@ -157,13 +170,28 @@ class Role(SubClassSafeGeneric[T], ABC):
         Set an attribute on the role taker instance if the role taker has this attribute,
          otherwise set on this instance directly.
         """
-        if key == self.role_taker_attribute_name():
-            self._role_taker_field_set = True
-            object.__setattr__(self, "_direct_role_taker", value)
-        if key != self.role_taker_attribute_name() and self._role_taker_field_set:
-            setattr(self.role_taker, key, value)
-        if key == self.role_taker_attribute_name() or hasattr(self, key):
+        role_taker_attr = self.role_taker_attribute_name()
+
+        if key == role_taker_attr:
+            object.__setattr__(self, "_role_taker_field_set", True)
+            # Also set the actual attribute defined in the dataclass
             super().__setattr__(key, value)
+
+            for attribute_name, attribute_value in self._to_set_in_role_taker.items():
+                setattr(value, attribute_name, attribute_value)
+            self._to_set_in_role_taker.clear()
+        elif self._role_taker_field_set:
+            setattr(self.role_taker, key, value)
+            # Ensure the attribute is also set on this instance if it's a field
+            # of the Role itself (and not just intended for delegation).
+            # This is important for dataclasses to work correctly.
+            if key in [f.name for f in fields(self)]:
+                super().__setattr__(key, value)
+        else:
+            super().__setattr__(key, value)
+            if key not in ["_to_set_in_role_taker"]:
+                self._to_set_in_role_taker[key] = value
+
 
     def __hash__(self):
         """

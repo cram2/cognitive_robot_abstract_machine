@@ -4,6 +4,7 @@ import ast
 import dataclasses
 import inspect
 import sys
+from collections import defaultdict
 from copy import copy
 from pathlib import Path
 from types import ModuleType
@@ -39,8 +40,6 @@ class StubTransformer(ast.NodeTransformer):
         self._role_taker_to_roles_map = self._build_role_taker_to_roles_map()
 
     def _build_role_taker_to_roles_map(self) -> Dict[Type, List[WrappedClass]]:
-        from collections import defaultdict
-
         mapping = defaultdict(list)
         for wrapped_class in self.diagram.wrapped_classes:
             if issubclass(wrapped_class.clazz, Role):
