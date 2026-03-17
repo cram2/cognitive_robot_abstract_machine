@@ -287,3 +287,6 @@ def test_contains(session, database):
     result = translator.evaluate()
 
     assert body1 == result[0]
+
+def test_order_by(session, database):
+    pass
