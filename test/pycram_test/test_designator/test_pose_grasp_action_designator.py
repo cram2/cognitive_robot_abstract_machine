@@ -37,11 +37,8 @@ class GraspableBox(HasGraspPose):
         super().__post_init__()
         if self.grasp_pose is None:
             self.grasp_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
-                y=0.05,
-                z=0.05,
                 roll=numpy.pi / 2,
-                pitch=numpy.pi / 2,
-                yaw=0,
+                pitch=numpy.pi,
                 reference_frame=self.root,
             )
 
@@ -54,8 +51,8 @@ def pose_grasp_world(tracy_world):
 
     box = Body(
         name=PrefixedName("grasp_box"),
-        collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
-        visual=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
+        collision=ShapeCollection([Box(scale=Scale(0.07, 0.07, 0.1))]),
+        visual=ShapeCollection([Box(scale=Scale(0.07, 0.07, 0.1))]),
     )
     with copy_world.modify_world():
         connection = Connection6DoF.create_with_dofs(

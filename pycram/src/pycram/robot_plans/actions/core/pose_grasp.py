@@ -46,7 +46,7 @@ class PoseGraspAction(ActionDescription):
             PoseGraspMotion(
                 arm=self.arm,
                 grasp_pose=self.target.grasp_pose,
-                object_bodies=list(self.target.bodies),
+                allowed_collision_bodies=list(self.target.bodies),
                 pre_grasp_distance=self.pre_grasp_distance,
                 use_collision_avoidance=self.use_collision_avoidance,
             ),
@@ -133,7 +133,7 @@ class PoseGraspAndLiftAction(ActionDescription):
             self.context,
             RetractMotion(
                 arm=self.arm,
-                object_bodies=list(self.target.bodies),
+                allowed_collision_bodies=list(self.target.bodies),
                 distance=self.retract_distance,
                 direction=self.retract_direction,
                 reference_velocity=self.max_retract_velocity,

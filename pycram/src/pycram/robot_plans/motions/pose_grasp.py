@@ -69,7 +69,7 @@ class CollisionAwareArmMotion(BaseMotion):
     arm: Arms
     """The arm performing the motion."""
 
-    object_bodies: List[Body]
+    allowed_collision_bodies: List[Body]
     """Bodies to allow collision with (typically the object being manipulated)."""
 
     use_collision_avoidance: bool = True
@@ -98,7 +98,7 @@ class CollisionAwareArmMotion(BaseMotion):
                 return tasks[0]
             return Parallel(tasks, minimum_success=minimum_success)
         allow_rule = make_rule_for_allowing_collision_between_two_groups(
-            self._hand_bodies, self.object_bodies
+            self._hand_bodies, self.allowed_collision_bodies
         )
         motion = Parallel(
             [*tasks, ExternalCollisionAvoidance(), SelfCollisionAvoidance()],
