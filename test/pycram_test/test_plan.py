@@ -11,21 +11,19 @@ from krrood.entity_query_language.factories import (
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
-
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import TaskStatus
 from pycram.language import ParallelPlan, CodeNode
 from pycram.motion_executor import simulated_robot
 from pycram.orm.ormatic_interface import *  # type: ignore
 from pycram.plan import PlanNode, Plan, ActionDescriptionNode, ActionNode, MotionNode
-from pycram.orm.ormatic_interface import *
-from pycram.plan import PlanNode, Plan, ActionDescriptionNode, ActionNode, MotionNode
 from pycram.robot_plans import *
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.orm.model import Point3Mapping, QuaternionMapping
 from semantic_digital_twin.robots.abstract_robot import (
     Manipulator,
 )
-from semantic_digital_twin.spatial_types import Quaternion, Point3
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Quaternion, Point3
 
 
 @pytest.fixture(scope="session")
@@ -689,9 +687,9 @@ def test_algebra_sequential_plan(mutable_model_world):
     """
     world, robot_view, context = mutable_model_world
 
-    target_location = underspecified(Pose)(
-        position=underspecified(Point3)(x=..., y=..., z=0),
-        orientation=underspecified(Quaternion)(x=0, y=0, z=0, w=1),
+    target_location = underspecified(Pose.from_point_mapping_quaternion_mapping)(
+        point_mapping=underspecified(Point3Mapping)(x=..., y=..., z=0.0),
+        quaternion_mapping=QuaternionMapping(x=0, y=0, z=0, w=1),
         reference_frame=variable_from([robot_view.root]),
     )
 
@@ -702,6 +700,8 @@ def test_algebra_sequential_plan(mutable_model_world):
     navigate_action.resolve()
     parameters = UnderspecifiedParameters(navigate_action)
 
+    print(parameters.variables)
+
     model = fully_factorized(parameters.variables.values())
 
     registry = DictRegistry({NavigateAction: model})
@@ -709,6 +709,7 @@ def test_algebra_sequential_plan(mutable_model_world):
     pm_backend = ProbabilisticBackend(registry, 10)
 
     resolved_navigate = next(pm_backend.evaluate(navigate_action))
+
     plan = SequentialPlan(context, MoveTorsoAction(TorsoState.LOW), resolved_navigate)
 
     with simulated_robot:
