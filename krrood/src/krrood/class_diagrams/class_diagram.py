@@ -764,8 +764,6 @@ class ClassDiagram:
                     self.add_relation(relation)
 
     def _create_association_relations(self):
-        from krrood.patterns.role import Role
-
         """
         Creates association relations between wrapped classes and their fields.
 
@@ -777,6 +775,8 @@ class ClassDiagram:
 
         :raises: This method does not explicitly raise any exceptions.
         """
+        from krrood.patterns.role.role import Role
+
         for clazz in self.wrapped_classes:
             for wrapped_field in clazz.fields:
                 target_type = wrapped_field.type_endpoint

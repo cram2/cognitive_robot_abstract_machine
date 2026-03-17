@@ -22,7 +22,7 @@ from typing_extensions import (
     Dict,
 )
 
-from krrood.patterns.role import Role
+from krrood.patterns.role.role import Role
 from krrood.entity_query_language.utils import T, merge_args_and_kwargs
 from krrood.entity_query_language.core.variable import Variable, InstantiatedVariable
 from krrood.entity_query_language.core.base_expressions import Selectable

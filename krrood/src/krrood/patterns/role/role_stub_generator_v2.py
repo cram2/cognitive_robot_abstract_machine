@@ -2,20 +2,23 @@ from __future__ import annotations
 
 import ast
 import dataclasses
-import inspect
 import sys
 from collections import defaultdict
 from copy import copy
+from functools import cached_property
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Dict, List, Optional, Set, Type, Union, TypeVar
+from typing import Dict, List, Optional, Set, Type, Union, TypeVar, Callable
+
+from black.handle_ipynb_magics import lru_cache
 
 from krrood.class_diagrams import ClassDiagram
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.utils import classes_of_module
 from krrood.class_diagrams.wrapped_field import WrappedField
-from krrood.patterns.role import Role
-from krrood.patterns.role_stub_generator import (
+from krrood.patterns.role.meta_data import RoleType
+from krrood.patterns.role.role import Role
+from krrood.patterns.role.role_stub_generator import (
     DataclassArguments,
     FieldRepresentation,
 )
@@ -35,7 +38,6 @@ class StubTransformer(ast.NodeTransformer):
     def __init__(self, diagram: ClassDiagram, module: ModuleType):
         self.diagram = diagram
         self.module = module
-        self.role_takers: Set[Type] = self._identify_role_takers()
         self.needed_role_for_classes: Set[Type] = set()
         self._role_taker_to_roles_map = self._build_role_taker_to_roles_map()
 
@@ -43,22 +45,16 @@ class StubTransformer(ast.NodeTransformer):
         mapping = defaultdict(list)
         for wrapped_class in self.diagram.wrapped_classes:
             if issubclass(wrapped_class.clazz, Role):
-                try:
-                    taker = wrapped_class.clazz.get_role_taker_type()
-                    mapping[taker].append(wrapped_class)
-                except Exception:
-                    continue
+                taker = wrapped_class.clazz.get_role_taker_type()
+                mapping[taker].append(wrapped_class)
         return dict(mapping)
 
-    def _identify_role_takers(self) -> Set[Type]:
+    @property
+    def role_takers(self) -> Set[Type]:
         """
-        Identifies all classes that act as role takers.
+        :return: A set of all classes that act as role takers.
         """
-        takers = set()
-        for wrapped_class in self.diagram.wrapped_classes:
-            if issubclass(wrapped_class.clazz, Role):
-                takers.add(wrapped_class.clazz.get_role_taker_type())
-        return takers
+        return set(self._role_taker_to_roles_map.keys())
 
     def visit_Module(self, node: ast.Module) -> ast.Module:
         """
@@ -85,29 +81,31 @@ class StubTransformer(ast.NodeTransformer):
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
         return self.visit_FunctionDef(node)
 
-    def _has_regular_primary_role(self, taker_type: Type) -> bool:
+    @lru_cache
+    def _has_primary_role(self, taker_type: Type) -> bool:
         """
         Checks if there is at least one primary role targeting this taker
         that does not update its taker type.
         """
         roles = self._role_taker_to_roles_map.get(taker_type, [])
-        for role_wrapped in roles:
-            role_type = self._get_role_type(role_wrapped)
-            if (
-                role_type == "PRIMARY"
-                and not role_wrapped.clazz.updates_role_taker_type()
-            ):
-                return True
-        return False
+        return any(RoleType.get_role_type(role_wrapped) == RoleType.PRIMARY for role_wrapped in roles)
+
+    @lru_cache
+    def _get_primary_roles(self, taker_type: Type) -> List[WrappedClass[Role]]:
+        """
+        :return: A list of all primary roles targeting this taker.
+        """
+        roles = self._role_taker_to_roles_map.get(taker_type, [])
+        return [role_wrapped for role_wrapped in roles if RoleType.get_role_type(role_wrapped) == RoleType.PRIMARY]
 
     def visit_Assign(self, node: ast.Assign) -> Union[ast.Assign, List[ast.stmt]]:
         """
         Detects TypeVar definitions and inserts RoleFor classes after them if they are for a taker.
         """
         if (
-            isinstance(node.value, ast.Call)
-            and isinstance(node.value.func, ast.Name)
-            and node.value.func.id == "TypeVar"
+                isinstance(node.value, ast.Call)
+                and isinstance(node.value.func, ast.Name)
+                and node.value.func.id == TypeVar.__name__
         ):
             bound_name = None
             for kw in node.value.keywords:
@@ -119,7 +117,7 @@ class StubTransformer(ast.NodeTransformer):
 
             if bound_name and bound_name in self.module.__dict__:
                 clazz = self.module.__dict__[bound_name]
-                if clazz in self.role_takers and self._has_regular_primary_role(clazz):
+                if clazz in self.role_takers and self._has_primary_role(clazz):
                     role_for_class = self._synthesize_role_for(clazz)
                     return [node, role_for_class]
         return node
@@ -148,14 +146,14 @@ class StubTransformer(ast.NodeTransformer):
         node.decorator_list = self._transform_decorators(node, wrapped_class)
 
         is_taker = wrapped_class.clazz in self.role_takers
-        role_type = self._get_role_type(wrapped_class)
+        role_type = RoleType.get_role_type(wrapped_class)
 
         result_nodes = [node]
 
-        if role_type == "PRIMARY" and wrapped_class.clazz.updates_role_taker_type():
+        if role_type == RoleType.PRIMARY and wrapped_class.clazz.updates_role_taker_type():
             # transform_specialized_role returns [specialized_class, node]
             result_nodes = self._transform_specialized_role(node, wrapped_class)
-        elif role_type != "NOT_A_ROLE":
+        elif role_type != RoleType.NOT_A_ROLE:
             self._transform_role(node, wrapped_class, role_type)
 
         if is_taker:
@@ -178,7 +176,7 @@ class StubTransformer(ast.NodeTransformer):
         return self._get_type_var_name(taker_type) is not None
 
     def _transform_specialized_role(
-        self, node: ast.ClassDef, wrapped_class: WrappedClass
+            self, node: ast.ClassDef, wrapped_class: WrappedClass
     ) -> List[ast.stmt]:
         """
         Handles a primary role that updates its taker type by synthesizing a specialized RoleFor base.
@@ -234,8 +232,9 @@ class StubTransformer(ast.NodeTransformer):
 
         return [specialized_class, node]
 
+    @staticmethod
     def _transform_decorators(
-        self, node: ast.ClassDef, wrapped_class: WrappedClass
+            node: ast.ClassDef, wrapped_class: WrappedClass
     ) -> List[ast.expr]:
         """
         Ensures @dataclass decorator is present with correct arguments.
@@ -268,18 +267,8 @@ class StubTransformer(ast.NodeTransformer):
 
         return [dec_node] + other_decorators
 
-    def _get_role_type(self, wrapped_class: WrappedClass) -> str:
-        """
-        Determines the role type of a wrapped class.
-        """
-        from krrood.patterns.role_stub_generator import RoleStubGenerator
-
-        # Reusing the logic from the original generator
-        role_type_enum = RoleStubGenerator._get_role_type(wrapped_class)
-        return role_type_enum.name
-
     def _transform_role_taker(
-        self, node: ast.ClassDef, wrapped_class: WrappedClass
+            self, node: ast.ClassDef, wrapped_class: WrappedClass
     ) -> List[ast.stmt]:
         """
         Transforms a role taker class into a Mixin and a re-entry class.
@@ -328,14 +317,14 @@ class StubTransformer(ast.NodeTransformer):
         return False
 
     def _transform_role(
-        self, node: ast.ClassDef, wrapped_class: WrappedClass, role_type: str
+            self, node: ast.ClassDef, wrapped_class: WrappedClass, role_type: RoleType
     ) -> ast.ClassDef:
         """
         Transforms a role class by adjusting its bases and filtering fields.
         """
         taker_type = wrapped_class.clazz.get_role_taker_type()
 
-        if role_type == "PRIMARY":
+        if role_type == RoleType.PRIMARY:
             # Adjust bases to RoleFor<Taker>
             role_for_name = f"RoleFor{taker_type.__name__}"
 
@@ -410,8 +399,8 @@ class StubTransformer(ast.NodeTransformer):
             taker_attr_name = role_wrapped.clazz.role_taker_attribute_name()
             for role_field in role_wrapped.fields:
                 if (
-                    role_field.name != taker_attr_name
-                    and role_field.name not in seen_field_names
+                        role_field.name != taker_attr_name
+                        and role_field.name not in seen_field_names
                 ):
                     fields_to_inject.append(
                         self._create_field_node(role_field, init=False)
@@ -458,11 +447,11 @@ class StubTransformer(ast.NodeTransformer):
         return re.sub(r"(?<!\.)\b\w+\b(?!\.)", replace_tv, type_name)
 
     def _create_field_node(
-        self,
-        wrapped_field: WrappedField,
-        init: bool = True,
-        kw_only: Optional[bool] = None,
-        available_type_vars: Optional[Set[str]] = None,
+            self,
+            wrapped_field: WrappedField,
+            init: bool = True,
+            kw_only: Optional[bool] = None,
+            available_type_vars: Optional[Set[str]] = None,
     ) -> ast.AnnAssign:
         """
         Creates an AST AnnAssign node for a field.
@@ -477,7 +466,7 @@ class StubTransformer(ast.NodeTransformer):
         else:
             # Match FieldRepresentation logic for role-related classes
             f_copy.kw_only = f_copy.kw_only or (
-                not wrapped_field.is_required and f_copy.init
+                    not wrapped_field.is_required and f_copy.init
             )
 
         if kw_only is not None:
@@ -514,16 +503,12 @@ class StubTransformer(ast.NodeTransformer):
         Synthesizes a RoleFor<Taker> class.
         """
         taker_name = taker_type.__name__
-        role_for_name = f"RoleFor{taker_name}"
 
         # Find the TypeVar for the taker if it's a Role
         type_var_name = self._get_type_var_name(taker_type)
         if not type_var_name:
-            # Fallback to T<TakerName> or TPerson if Person
-            if taker_name == "Person":
-                type_var_name = "TPerson"
-            else:
-                type_var_name = f"T{taker_name}"
+            # Fallback to T<TakerName>
+            type_var_name = f"T{taker_name}"
 
         # Base classes: TakerMixin, Role[T]
         # Matching GT order: RoleForPerson(Role[TPerson], PersonMixin) but RoleForCEOAsFirstRole(CEOAsFirstRoleMixin, Role[TCEOAsFirstRole])
@@ -534,44 +519,42 @@ class StubTransformer(ast.NodeTransformer):
         wrapped_taker = self.diagram.get_wrapped_class(taker_type)
         mixin_inherits_from_role = issubclass(taker_type, Role)
 
+        mixin_base_class_name = f"{taker_name}Mixin"
+        role_base_class_name = f"{Role.__name__}[{type_var_name}]"
         if mixin_inherits_from_role:
-            bases_str = f"{taker_name}Mixin, Role[{type_var_name}]"
+            bases = [mixin_base_class_name, role_base_class_name]
         else:
-            bases_str = f"Role[{type_var_name}], {taker_name}Mixin"
+            bases = [role_base_class_name, mixin_base_class_name]
 
         body = []
         # 1. Add role taker attribute (e.g. person: TPerson = field(kw_only=True))
-        roles = self._role_taker_to_roles_map.get(taker_type, [])
-        if roles:
-            for role_wrapped in roles:
-                taker_attr_name = role_wrapped.clazz.role_taker_attribute_name()
-                try:
-                    # Use own_fields to find the role taker attribute
-                    wrapped_field = next(
-                        f for f in role_wrapped.own_fields if f.name == taker_attr_name
-                    )
-                    body.append(
-                        self._create_field_node(
-                            wrapped_field,
-                            kw_only=True,
-                            available_type_vars=available_type_vars,
-                        )
-                    )
-                    break
-                except StopIteration:
-                    continue
+        # TODO: This should be added to the classes that inherit from RoleFor class, not in here, as the role taker
+        # attribute name could be different for different primary roles.
+        primary_role_wrapped = self._get_primary_roles(taker_type)[0]
+        taker_attr_name = primary_role_wrapped.clazz.role_taker_attribute_name()
+        # Use own_fields to find the role taker attribute
+        wrapped_field = next(
+            f for f in primary_role_wrapped.own_fields if f.name == taker_attr_name
+        )
+        body.append(
+            self._create_field_node(
+                wrapped_field,
+                kw_only=True,
+                available_type_vars=available_type_vars,
+            )
+        )
 
         # 2. Add fields from Taker as init=False
         # Only exclude fields from roles targeting THIS taker
         roles_targeting_taker_fields = set()
-        for r_wrapped in roles:
-            for f in r_wrapped.own_fields:
+        roles = self._role_taker_to_roles_map.get(taker_type, [])
+        for role_wrapped in roles:
+            for f in role_wrapped.own_fields:
                 roles_targeting_taker_fields.add(f.name)
-
         for field_ in wrapped_taker.fields:
             if field_.name in roles_targeting_taker_fields:
                 continue
-            if field_.name == "_role_taker_field_set":
+            if field_.name in self._base_role_class_field_names:
                 continue
             body.append(
                 self._create_field_node(
@@ -580,28 +563,83 @@ class StubTransformer(ast.NodeTransformer):
             )
 
         # 3. Add @classmethod role_taker_attribute
-        method_str = "@classmethod\ndef role_taker_attribute(cls) -> Field: ..."
-        method_node = ast.parse(method_str).body[0]
+        method_node = ast.FunctionDef(
+            name=Role.role_taker_attribute_name.__name__,
+            args=self.make_ast_args("cls"),
+            body=[self.make_ellipsis_expression()],
+            decorator_list=[self.to_ast_name(classmethod)],
+            returns=self.to_ast_name(taker_type),
+            type_comment=None,
+            type_params=[],
+        )
         body.append(method_node)
 
         return ast.ClassDef(
-            name=role_for_name,
-            bases=[ast.parse(b.strip()).body[0].value for b in bases_str.split(",")],
+            name=f"RoleFor{taker_name}",
+            bases=list(map(self.to_ast_name, bases)),
             keywords=[],
-            body=body if body else [ast.Expr(value=ast.Constant(value=Ellipsis))],
-            decorator_list=[
-                ast.Call(
-                    func=ast.Name(id="dataclass", ctx=ast.Load()),
-                    args=[],
-                    keywords=(
-                        [ast.keyword(arg="eq", value=ast.Constant(value=False))]
-                        if taker_name != "RepresentativeAsSecondRole"
-                        else []
-                    ),  # Matching GT
-                )
-            ],
+            body=body if body else [self.make_ellipsis_expression()],
+            decorator_list=[self._dataclass_decorator],
         )
 
+    @staticmethod
+    def make_class_method(name: str, args: Optional[List[str]] = None,
+                          returns: Type | Callable | str = None) -> ast.FunctionDef:
+        """
+        :return: AST FunctionDef object for the given class method.
+        """
+        args = ["cls"] + (args or [])
+        return ast.FunctionDef(
+            name=name,
+            args=StubTransformer.make_ast_args(*args),
+            body=[StubTransformer.make_ellipsis_expression()],
+            decorator_list=[StubTransformer.to_ast_name(classmethod)],
+            returns=StubTransformer.to_ast_name(returns),
+            type_comment=None,
+            type_params=[],
+        )
+
+    @staticmethod
+    def to_ast_name(has_name: Type | Callable | str) -> ast.Name:
+        """
+        :return: AST Name object for the given name.
+        """
+        name = has_name if isinstance(has_name, str) else has_name.__name__
+        return ast.Name(id=name, ctx=ast.Load())
+
+    @staticmethod
+    def make_ast_args(*names) -> ast.arguments:
+        """
+        :return: AST arguments object for the given names.
+        """
+        return ast.arguments(
+            posonlyargs=[],
+            args=[ast.arg(arg=n) for n in names],
+            kwonlyargs=[],
+            kw_defaults=[],
+            defaults=[]
+        )
+
+    @cached_property
+    def _dataclass_decorator(self) -> ast.expr:
+        return ast.Call(
+            func=ast.Name(id="dataclass", ctx=ast.Load()),
+            args=[],
+            keywords=[ast.keyword(arg="eq", value=False)]
+        )
+
+    @staticmethod
+    def make_ellipsis_expression() -> ast.Expr:
+        return ast.Expr(value=ast.Constant(value=Ellipsis))
+
+    @cached_property
+    def _base_role_class_field_names(self):
+        """
+        :return: List of field names for the base Role class.
+        """
+        return [f.name for f in dataclasses.fields(Role)]
+
+    @lru_cache
     def _get_type_var_name(self, clazz: Type) -> Optional[str]:
         """
         Finds a TypeVar bound to the given class.
@@ -611,6 +649,9 @@ class StubTransformer(ast.NodeTransformer):
                 if getattr(value, "__bound__", None) == clazz:
                     return name
         return None
+
+    def __hash__(self):
+        return hash((self.__class__, self.module))
 
 
 @dataclasses.dataclass
@@ -624,28 +665,23 @@ class RoleStubGeneratorV2:
 
     def __post_init__(self):
         if self.path is None:
-            module_file = sys.modules[self.module.__name__].__file__
-            self.path = Path(module_file).with_suffix(".pyi")
+            self.path = Path(self.module_file_path).with_suffix(".pyi")
         self._build_diagram()
 
     def _build_diagram(self):
         classes = classes_of_module(self.module)
         for clazz in classes:
             if issubclass(clazz, Role):
-                try:
-                    role_taker_type = clazz.get_role_taker_type()
-                    if role_taker_type not in classes:
-                        classes.append(role_taker_type)
-                except Exception:
-                    continue
+                role_taker_type = clazz.get_role_taker_type()
+                if role_taker_type not in classes:
+                    classes.append(role_taker_type)
         self.class_diagram = ClassDiagram(classes)
 
     def generate_stub(self, write: bool = False) -> str:
         """
         Generates the stub file content.
         """
-        source_path = Path(sys.modules[self.module.__name__].__file__)
-        with open(source_path, "r") as f:
+        with open(self.module_file_path, "r") as f:
             source = f.read()
 
         tree = ast.parse(source)
@@ -662,3 +698,10 @@ class RoleStubGeneratorV2:
             run_black_on_file(str(self.path))
 
         return stub_content
+
+    @property
+    def module_file_path(self) -> Path:
+        """
+        :return: Path to the module file.
+        """
+        return Path(sys.modules[self.module.__name__].__file__)

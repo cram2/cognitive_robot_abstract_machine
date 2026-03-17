@@ -78,7 +78,7 @@ class Role(SubClassSafeGeneric[T], ABC):
         """
         :return: The type of the role taker.
         """
-        from ..symbol_graph.helpers import get_field_type_endpoint
+        from krrood.symbol_graph.helpers import get_field_type_endpoint
 
         type_ = get_field_type_endpoint(cls, cls.role_taker_attribute_name())
         if isinstance(type_, TypeVar):

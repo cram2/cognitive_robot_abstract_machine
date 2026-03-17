@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import ast
-import enum
 import sys
 from pathlib import Path
 from types import ModuleType
 
 from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
+from krrood.patterns.role.meta_data import RoleType
 from krrood.ripple_down_rules.utils import (
     get_imports_from_scope,
 )
@@ -15,7 +15,6 @@ from krrood.ripple_down_rules.utils import (
 This module provides functionality to generate Python stub files (.pyi) for classes following the Role pattern.
 """
 
-import __future__
 import dataclasses
 import inspect
 from inspect import isclass
@@ -23,7 +22,7 @@ from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass, Field, field, fields
 from functools import cached_property, lru_cache
-from typing import Any, Type, List, Dict, Optional, Set, Union, TypeVar
+from typing import Any, Type, List, Dict, Optional, Set, TypeVar
 from typing_extensions import get_origin, get_args, Tuple
 
 import jinja2
@@ -36,9 +35,8 @@ from krrood.class_diagrams import ClassDiagram
 from krrood.class_diagrams.class_diagram import WrappedClass, WrappedSpecializedGeneric
 from krrood.class_diagrams.utils import classes_of_module
 from krrood.class_diagrams.wrapped_field import WrappedField
-from krrood.patterns.role import Role
+from krrood.patterns.role.role import Role
 from krrood.utils import (
-    extract_imports_from,
     get_imports_from_types,
     run_black_on_file,
     run_ruff_on_file,
@@ -72,32 +70,6 @@ class StubGenerationContext:
         if item.name not in self.rendered_names:
             self.rendered_items.append(item)
             self.rendered_names.add(item.name)
-
-
-class RoleType(enum.Enum):
-    """
-    Enum representing the different types of roles.
-    """
-
-    PRIMARY = enum.auto()
-    """
-    A primary role that directly inherits from Role or updates the role taker type.
-    """
-
-    SUB_ROLE = enum.auto()
-    """
-    A role that inherits from another role.
-    """
-
-    SPECIALIZED_ROLE_FOR = enum.auto()
-    """
-    A synthetic role created when a role updates its taker type.
-    """
-
-    NOT_A_ROLE = enum.auto()
-    """
-    A class that is not a role.
-    """
 
 
 @dataclass(frozen=True)
@@ -797,7 +769,7 @@ class RoleStubGenerator:
             return
 
         # 2. Handle the class itself
-        role_type = self._get_role_type(wrapped_class)
+        role_type = RoleType.get_role_type(wrapped_class)
         if role_type != RoleType.NOT_A_ROLE:
             self._handle_role_element(wrapped_class, role_type, context)
         else:

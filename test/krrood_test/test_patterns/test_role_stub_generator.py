@@ -5,7 +5,7 @@ from typing import Dict, Any, Type
 
 import pytest
 
-from krrood.patterns.role_stub_generator import RoleStubGenerator
+from krrood.patterns.role.role_stub_generator import RoleStubGenerator
 from ..dataset.role_and_ontology import (
     university_ontology_like_classes_without_descriptors,
 )

@@ -12,7 +12,7 @@ from krrood.entity_query_language.predicate import (
     HasTypes,  # type: ignore
     length,  # type: ignore
 )
-from krrood.patterns.role import Role
+from krrood.patterns.role.role import Role
 
 
 @dataclass(eq=False)
