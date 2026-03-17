@@ -217,34 +217,82 @@ class PlanNode(PlanEntity):
         """
         self.status = TaskStatus.SLEEPING
 
-    @abstractmethod
+    def add_child(self, child: PlanNode):
+        self.plan.add_edge(self, child)
+
     def perform(self):
         """
-        Perform the node.
+        Perform the node and update the fields of this node.
+        """
+        self.status = TaskStatus.RUNNING
+        try:
+            self.result = self._perform()
+        except PlanFailure as e:
+            self.status = TaskStatus.FAILED
+            self.reason = e
+            raise e
+        finally:
+            self.end_time = datetime.now()
+        self.status = TaskStatus.SUCCEEDED
+        return self.result
+
+    def mount_subplan(self, root: PlanNode):
+        """
+        Mount an entire plan as a child of to this node.
+        :param root: The root node of the plan to be mounted
+        """
+        self.plan._migrate_nodes_from_plan(root.plan)
+        self.add_child(root)
+
+    def simplify(self):
+        """
+        Simplifies the plan by merging nodes that are semantically equivalent.
+        This modifies the plan in-place.
+        Only implement this if it makes sense for your class to have this ability.
+        """
+        pass
+
+    @abstractmethod
+    def _perform(self):
+        """
+        Perform the node without managing the fields of this node.
         """
 
 
-@dataclass(eq=False)
-class UnderspecifiedActionNode(PlanNode):
+@dataclass(eq=False, repr=False)
+class UnderspecifiedNode(PlanNode):
     """
-    An action that is described by an `underspecified(...)` statement.
-    This node is used to generate fully specified actions.
+    An action or language expression that is described by an `underspecified(...)` statement.
+    This node is used to generate fully specified actions  or language expressions.
+    The semantics are: try until it succeeds or fails if the underspecified action is exhausted.
+    If you want to limit the number of attempts, add a limit clause to the underspecified action.
     """
 
     underspecified_action: Match = field(kw_only=True)
 
-    action_iterator: Iterator[ActionDescription] = field(default_factory=None)
+    action_iterator: Iterator[ActionDescription] = field(default=None, kw_only=True)
 
     @property
     def designator_type(self) -> Type:
         return self.underspecified_action.type
 
-    def perform(self):
+    def _perform(self):
         if self.action_iterator is None:
             self.action_iterator = self.plan.context.query_backend.evaluate(
                 self.underspecified_action
             )
-        new_action = ActionNode(designator=next(self.action_iterator))
+
+        for grounded_action in self.action_iterator:
+            new_child = ActionNode(designator=grounded_action)
+            self.add_child(new_child)
+            try:
+                new_child.perform()
+            except PlanFailure:
+                continue
+            return
+
+    def __repr__(self):
+        return f"{type(self)}"
 
 
 @dataclass
@@ -342,7 +390,7 @@ class ActionNode(DesignatorNode):
             ]
         )
 
-    def perform(self):
+    def _perform(self):
         self.create_execution_data_pre_perform()
 
         result = self.action.perform()
@@ -366,7 +414,7 @@ class MotionNode(DesignatorNode):
     def motion(self) -> BaseMotion:
         return self.designator
 
-    def perform(self):
+    def _perform(self):
         """
         Performs this node by performing the respective MotionDesignator. Additionally, checks if one of the parents has
         the status INTERRUPTED and aborts the perform if that is the case.

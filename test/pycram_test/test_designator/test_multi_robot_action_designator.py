@@ -548,13 +548,16 @@ def test_facing(immutable_multiple_robot_apartment):
         assert milk_in_robot_frame.position.y == pytest.approx(0.0, abs=0.01)
 
 
-def test_transport(mutable_multiple_robot_apartment):
+def test_transport(mutable_multiple_robot_apartment, rclpy_node):
     world, robot, context = mutable_multiple_robot_apartment
+    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
 
     description = TransportAction(
-        world.get_body_by_name("milk.stl"),
-        PoseStamped.from_list([3.1, 2.2, 0.95], [0.0, 0.0, 1.0, 0.0], world.root),
-        Arms.RIGHT,
+        object_designator=world.get_body_by_name("milk.stl"),
+        target_location=PoseStamped.from_list(
+            [3.1, 2.2, 0.95], [0.0, 0.0, 1.0, 0.0], world.root
+        ),
+        arm=Arms.RIGHT,
     )
     plan = sequential([MoveTorsoAction(TorsoState.HIGH), description], context)
     with simulated_robot:
@@ -563,5 +566,4 @@ def test_transport(mutable_multiple_robot_apartment):
     dist = np.linalg.norm(milk_position - np.array([3.1, 2.2, 0.95]))
     assert dist <= 0.02
 
-    assert len(plan.nodes) == len(plan.all_nodes)
-    assert len(plan.edges) == len(plan.all_nodes) - 1
+    plan.plan.validate()

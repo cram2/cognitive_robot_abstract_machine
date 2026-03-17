@@ -70,7 +70,7 @@ class Plan:
     """
 
     plan_graph: rx.PyDiGraph[PlanNode] = field(
-        default_factory=rx.PyDiGraph, init=False, repr=False
+        default_factory=lambda: rx.PyDiGraph(multigraph=False), init=False, repr=False
     )
     """
     A directed graph representation of the plan structure.
@@ -134,20 +134,6 @@ class Plan:
     def remove_plan_entity(self, entity: PlanEntity):
         entity.plan = None
 
-    def mount(self, other: Plan, mount_node: PlanNode = None):
-        """
-        Mounts another plan to this plan. The other plan will be added as a child of the mount_node.
-
-        :param other: The plan to be mounted
-        :param mount_node: A node of this plan to which the other plan will be mounted. If None, the root of this plan will be used.
-        """
-        mount_node = mount_node or self.root
-        self.add_edge(mount_node, other.root)
-        self.add_edges_from(other.edges)
-        for node in self.nodes:
-            node.execute = self
-            node.world = self.world
-
     def merge_nodes(self, node1: PlanNode, node2: PlanNode):
         """
         Merges two nodes into one. The node2 will be removed and all its children will be added to node1.
@@ -165,7 +151,8 @@ class Plan:
 
         :param node_for_removal: Node to be removed
         """
-        if node_for_removal in self.nodes:
+
+        if node_for_removal.plan is self:
             self.plan_graph.remove_node(node_for_removal.index)
             node_for_removal.index = -1
             node_for_removal.plan = None
@@ -195,8 +182,11 @@ class Plan:
         If the target_index is given, the target node will be inserted at the given index in the source's children and
         the later children are shifted to the right.
         """
-        self.add_node(source)
-        self.add_node(target)
+
+        if source.plan is not self:
+            self.add_node(source)
+        if target.plan is not self:
+            self.add_node(target)
 
         self.plan_graph.add_edge(
             source.index,
@@ -299,6 +289,19 @@ class Plan:
             if isinstance(node, DesignatorNode) and isinstance(node.designator, args)
         ]
 
+    def simplify(self):
+        """
+        Simplifies the plan by merging language nodes that are semantically equivalent.
+        This modifies the plan in-place.
+        """
+        for _, successors in reversed(
+            rustworkx.bfs_successors(self.plan_graph, self.root.index)
+        ):
+            for node in successors:
+                node.simplify()
+
+        self.root.simplify()
+
     # %% Plotting functions
 
     def bfs_layout(
@@ -362,3 +365,6 @@ class Plan:
         plt.gca().invert_yaxis()
         plt.gca().invert_xaxis()
         plt.show()
+
+    def __repr__(self):
+        return f"Plan with {len(self.nodes)} nodes"

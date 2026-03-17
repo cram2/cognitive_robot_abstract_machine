@@ -7,7 +7,7 @@ from typing_extensions import (
     Any,
 )
 
-from krrood.entity_query_language.backends import QueryBackend
+from krrood.entity_query_language.backends import QueryBackend, EntityQueryLanguageBackend
 from pycram.plans.plan import Plan
 from pycram.plans.plan_entity import PlanEntity
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
@@ -35,7 +35,7 @@ class Context(PlanEntity):
     A ROS node that should be used for communication in this plan
     """
 
-    query_backend: Optional[QueryBackend] = None
+    query_backend: Optional[QueryBackend] = field(default_factory=EntityQueryLanguageBackend)
     """
     The backend used to answer queries about underspecified statements.
     """

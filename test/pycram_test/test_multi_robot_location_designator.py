@@ -1,11 +1,10 @@
 from copy import deepcopy
 
 import pytest
-import rclpy
 from typing_extensions import Generator, Tuple
 
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import underspecified, variable_from
+from krrood.entity_query_language.factories import underspecified
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms
 from pycram.datastructures.pose import PoseStamped
@@ -15,14 +14,8 @@ from pycram.locations.locations import (
     GiskardLocation,
 )
 from pycram.motion_executor import simulated_robot
-from pycram.plans.factories import sequential, execute_single
-from pycram.plans.plan import Plan
-from pycram.robot_plans.actions.core.navigation import NavigateAction
+from pycram.plans.factories import sequential
 from pycram.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB

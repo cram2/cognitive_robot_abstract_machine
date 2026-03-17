@@ -30,7 +30,7 @@ from pycram.plans.plan_node import (
     PlanNode,
     ActionNode,
     MotionNode,
-    UnderspecifiedActionNode,
+    UnderspecifiedNode,
 )
 from pycram.robot_plans import *
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -189,34 +189,40 @@ def test_add_edge_with_layer_index():
 #     assert node2.parent == node
 #
 #
-# def test_plan_all_parents(urdf_context):
-#     world, context = urdf_context
-#     node = PlanNode()
-#     plan = Plan(node, context)
-#     node2 = PlanNode()
-#     plan.add_edge(node, node2)
-#     node3 = PlanNode()
-#     plan.add_edge(node2, node3)
+def test_plan_all_parents(urdf_context):
+    world, context = urdf_context
+
+    plan = Plan(context=context)
+    node = PlanNode()
+    node2 = PlanNode()
+    plan.add_edge(node, node2)
+    node3 = PlanNode()
+    plan.add_edge(node2, node3)
+
+    assert node.path == []
+    assert node2.path == [node]
+    assert node3.path == [node2, node]
+
+
 #
-#     assert node.path == []
-#     assert node2.path == [node]
-#     assert node3.path == [node2, node]
 #
-#
-# def test_plan_node_children(urdf_context):
-#     world, context = urdf_context
-#     node = PlanNode()
-#     plan = Plan(node, context)
-#
-#     assert [] == node.children
-#
-#     node2 = PlanNode()
-#     plan.add_edge(node, node2)
-#     assert [node2] == node.children
-#
-#     node3 = PlanNode()
-#     plan.add_edge(node, node3)
-#     assert [node2, node3] == node.children
+def test_plan_node_children(urdf_context):
+    world, context = urdf_context
+
+    plan = Plan(context=context)
+    node = PlanNode()
+    plan.add_node(node)
+    assert [] == node.children
+
+    node2 = PlanNode()
+    plan.add_edge(node, node2)
+    assert [node2] == node.children
+
+    node3 = PlanNode()
+    plan.add_edge(node, node3)
+    assert [node2, node3] == node.children
+
+
 #
 #
 # def test_plan_node_recursive_children(urdf_context):
@@ -292,7 +298,7 @@ def test_get_action_node_by_type(urdf_context):
     plan = SequentialPlan(
         context,
     )
-    nav_node = UnderspecifiedActionNode(
+    nav_node = UnderspecifiedNode(
         underspecified_action=underspecified(NavigateAction)(),
     )
     plan.add_edge(plan.root, nav_node)

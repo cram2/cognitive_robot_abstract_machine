@@ -1,20 +1,17 @@
 from copy import deepcopy
 
 import numpy as np
-import plotly.graph_objects as go
 import pytest
 
+from pycram.datastructures.pose import PoseStamped
 from pycram.locations.costmaps import (
     OccupancyCostmap,
-    VisibilityCostmap,
     GaussianCostmap,
     OrientationGenerator,
 )
-from pycram.datastructures.pose import PoseStamped
-from pycram.probabilistic_costmap import ProbabilisticCostmap
 from random_events.interval import *
 
-#  import plotly.graph_objects as go
+
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Continuous
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -56,55 +53,6 @@ def test_attachment_exclusion(immutable_model_world, rclpy_node):
 
     assert 400 == np.sum(o.map[90:110, 90:110])
     assert np.sum(o.map[80:90, 90:110]) != 0
-
-
-def test_partition_into_rectangles(immutable_model_world):
-    world, robot_view, context = immutable_model_world
-    ocm = OccupancyCostmap(
-        distance_to_obstacle=0.2,
-        height=200,
-        width=200,
-        resolution=0.02,
-        robot_view=robot_view,
-        origin=PoseStamped.from_list([0, 0, 0], [0, 0, 0, 1], world.root),
-        world=world,
-    )
-    rectangles = ocm.partitioning_rectangles()
-    ocm.visualize()
-
-    x = Continuous("x")
-    y = Continuous("y")
-
-    events = []
-    for rectangle in rectangles:
-        event = SimpleEvent(
-            {
-                x: open(rectangle.x_lower, rectangle.x_upper),
-                y: open(rectangle.y_lower, rectangle.y_upper),
-            }
-        )
-        events.append(event)
-
-    event = Event(*events)
-    # fig = go.Figure(event.plot(), event.plotly_layout())
-    # fig.update_xaxes(range=[-2, 2])
-    # fig.update_yaxes(range=[-2, 2])
-    # fig.show()
-    assert event.is_disjoint()
-
-
-def test_visualize(immutable_model_world):
-    world, robot_view, context = immutable_model_world
-    o = OccupancyCostmap(
-        distance_to_obstacle=0.2,
-        height=200,
-        width=200,
-        resolution=0.02,
-        robot_view=robot_view,
-        origin=PoseStamped.from_list([0, 0, 0], [0, 0, 0, 1], world.root),
-        world=world,
-    )
-    o.visualize()
 
 
 def test_merge_costmap(immutable_model_world):

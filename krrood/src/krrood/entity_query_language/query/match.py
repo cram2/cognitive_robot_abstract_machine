@@ -622,3 +622,11 @@ def construct_graph_and_get_root(
         child_node = construct_graph_and_get_root(child, graph=graph)
         child_node.parent = node
     return node
+
+
+def is_underspecified(instance: Any) -> bool:
+    """
+    :param instance: The instance to check.
+    :return: Rather, it's an underspecified statement or not.
+    """
+    return isinstance(instance, Match) and not isinstance(instance, MatchVariable)

@@ -1,15 +1,13 @@
 from __future__ import annotations
-from typing_extensions import List, assert_never, Union, Optional, TYPE_CHECKING
 
-from krrood.entity_query_language.backends import QueryBackend
-from krrood.entity_query_language.query.match import Match
+from typing_extensions import List, assert_never, Optional, TYPE_CHECKING, Type, TypeVar
+
+from krrood.entity_query_language.query.match import is_underspecified
 from pycram.datastructures.dataclasses import Context
-
 from pycram.plans.plan import Plan
 
-
 if TYPE_CHECKING:
-    from pycram.language import SequentialNode
+    from pycram.language import SequentialNode, LanguageNode, ParallelNode
     from pycram.plans.plan_node import ActionLike, PlanNode
 
 
@@ -30,18 +28,44 @@ def sequential(
 ) -> SequentialNode:
     from pycram.language import SequentialNode
 
-    root = SequentialNode()
+    return _make_plan_from_type_and_children(SequentialNode, children, context)
+
+
+def parallel(
+    children: List[ActionLike],
+    context: Optional[Context] = None,
+) -> ParallelNode:
+    from pycram.language import ParallelNode
+
+    return _make_plan_from_type_and_children(ParallelNode, children, context)
+
+
+T = TypeVar("T")
+
+
+def _make_plan_from_type_and_children(
+    type_: Type[T], children: List[ActionLike], context: Optional[Context]
+) -> T:
+    from pycram.language import LanguageNode
+
+    root = type_()
     plan = Plan(context=context)
     plan.add_node(root)
+
     for action_like in children:
-        plan.add_edge(root, make_node(action_like))
+        child = make_node(action_like)
+        if isinstance(child, LanguageNode):
+            root.mount_subplan(child)
+        else:
+            root.add_child(child)
+    plan.simplify()
     return root
 
 
 def make_node(action_like: ActionLike) -> PlanNode:
     from pycram.plans.plan_node import (
         PlanNode,
-        UnderspecifiedActionNode,
+        UnderspecifiedNode,
         ActionNode,
         MotionNode,
     )
@@ -50,10 +74,8 @@ def make_node(action_like: ActionLike) -> PlanNode:
 
     if isinstance(action_like, PlanNode):
         return action_like
-    elif isinstance(action_like, Match):
-        underspecified_action = UnderspecifiedActionNode(
-            underspecified_action=action_like
-        )
+    elif is_underspecified(action_like):
+        underspecified_action = UnderspecifiedNode(underspecified_action=action_like)
         return underspecified_action
     elif isinstance(action_like, ActionDescription):
         return ActionNode(designator=action_like)

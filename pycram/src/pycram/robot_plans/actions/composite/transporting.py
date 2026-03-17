@@ -32,7 +32,7 @@ from pycram.config.action_conf import ActionConfig
 from pycram.datastructures.enums import Arms, Grasp, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
 
-from pycram.datastructures.pose import PoseStamped
+from pycram.datastructures.pose import PoseStamped, GraspPose
 
 from pycram.failures import ObjectUnfetchable, ConfigurationNotReached
 from pycram.robot_plans.actions.base import ActionDescription
@@ -118,20 +118,8 @@ class TransportAction(ActionDescription):
                     ),
                     ParkArmsAction(Arms.BOTH),
                     MoveTorsoAction(TorsoState.HIGH),
-                    underspecified(NavigateAction)(
-                        target_location=variable(
-                            PoseStamped,
-                            domain=iter(
-                                CostmapLocation(
-                                    target=self.target_location,
-                                    reachable_arm=self.arm,
-                                    reachable=True,
-                                    context=self.context,
-                                    grasp_descriptions=pickup_pose.grasp_description,
-                                ),
-                            ),
-                        ),
-                        keep_joint_states=True,
+                    self._make_navigate_action_for_placing(
+                        pickup_pose.grasp_description
                     ),
                 ]
             )
@@ -147,6 +135,37 @@ class TransportAction(ActionDescription):
                 ]
             )
         ).perform()
+
+    def _make_place_plan(self, pickup_pose: GraspPose):
+
+        return underspecified(sequential)(
+            children=[
+                self._make_navigate_action_for_placing(pickup_pose.grasp_description),
+                PlaceAction(
+                    self.object_designator, self.target_location, pickup_pose.arm
+                ),
+                ParkArmsAction(Arms.BOTH),
+            ]
+        )
+
+    def _make_navigate_action_for_placing(self, grasp_description: GraspDescription):
+        """
+        :param grasp_description: The grasp description that should be used for placing the object.
+        :return: The navigate action that will be used to place the object.
+        """
+        return underspecified(NavigateAction)(
+            target_location=variable(
+                PoseStamped,
+                domain=CostmapLocation(
+                    target=self.target_location,
+                    reachable_arm=self.arm,
+                    reachable=True,
+                    context=self.plan.context,
+                    grasp_description=grasp_description,
+                ),
+            ),
+            keep_joint_states=True,
+        )
 
     def validate(
         self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
