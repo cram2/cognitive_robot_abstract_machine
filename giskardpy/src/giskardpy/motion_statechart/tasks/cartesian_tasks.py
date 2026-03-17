@@ -555,7 +555,7 @@ class CartesianRotationVelocityLimit(Task):
     """Root link of the kinematic chain. Defines the reference frame from which the tip's motion is measured."""
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """Tip link of the kinematic chain. The translational velocity of this link (expressed in the root link frame) is constrained."""
-    max_angular_velocity: float = field(default=0.5, kw_only=True)
+    max_angular_velocity: float = field(default=0.4, kw_only=True)
     """Maximum allowed angular speed. Interpreted in radians per second (rad/s).
     The enforcement ensures the magnitude of the instantaneous
     rotation rate does not exceed this threshold."""
@@ -611,7 +611,7 @@ class CartesianVelocityLimit(Parallel):
     """Maximum allowed linear speed of the tip in meters per second (m/s).
     Default: 0.1 m/s. The enforcement ensures the Euclidean norm of the
     tip-frame translational velocity does not exceed this value."""
-    max_angular_velocity: float = field(default=0.5, kw_only=True)
+    max_angular_velocity: float = field(default=0.4, kw_only=True)
     """Maximum allowed angular speed. Interpreted in radians per second (rad/s).
     Default: 0.5 rad/s. The enforcement ensures the magnitude of the instantaneous
     rotation rate does not exceed this threshold."""
