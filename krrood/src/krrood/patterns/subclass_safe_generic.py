@@ -2,22 +2,19 @@ from __future__ import annotations
 
 from abc import ABC
 from copy import copy
-from dataclasses import dataclass, Field, field, fields
+from dataclasses import dataclass, fields
 from functools import lru_cache
 
 from typing_extensions import (
     Generic,
     TypeVar,
     Type,
-    List,
     TYPE_CHECKING,
     Optional,
-    ClassVar,
 )
 
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
-    get_type_hints_of_object,
 )
 from krrood.utils import (
     get_generic_type_param,
@@ -25,7 +22,7 @@ from krrood.utils import (
 )
 
 if TYPE_CHECKING:
-    from krrood.entity_query_language.core.mapped_variable import Attribute
+    pass
 
 
 @dataclass
@@ -38,9 +35,6 @@ class SubClassSafeGeneric(Generic[T], ABC):
          >>> @dataclass
          >>> class MyClass(SubClassSafeGeneric[T]):
          >>>     my_attribute: T
-         >>>     @classmethod
-         >>>     def get_attributes_using_generic_type(cls) -> List[Attribute]:
-         >>>         return [variable(cls, None).my_attribute]
          >>>
          >>> @dataclass
          >>> class MyClass2(SubClassSafeGeneric[int]): ...
@@ -63,17 +57,27 @@ class SubClassSafeGeneric(Generic[T], ABC):
         for name, result in resolution_results.items():
             if not result.resolved:
                 continue
-            if hasattr(cls, name):
-                # First check if there's a new created field that is yet to be processed
-                attribute_value = getattr(cls, name)
-                attribute_value.type = result.resolved_type
-            else:
-                # If not, check if there's an existing field that needs to be updated
-                field_ = copy(next((f for f in fields(cls) if f.name == name), None))
-                if field_ is not None:
-                    field_.type = result.resolved_type
-                    setattr(cls, field_.name, field_)
-            cls.__annotations__[name] = result.resolved_type
+            cls._update_generic_field_with_resolved_type(name, result.resolved_type)
+
+    @classmethod
+    def _update_generic_field_with_resolved_type(cls, name: str, resolved_type: Type | TypeVar):
+        """
+        Update the field type with the resolved type.
+
+        :param name: The name of the field.
+        :param resolved_type: The resolved type that replaces the generic type.
+        """
+        if hasattr(cls, name):
+            # First check if there's a new created field that is yet to be processed
+            attribute_value = getattr(cls, name)
+            attribute_value.type = resolved_type
+        else:
+            # If not, check if there's an existing field that needs to be updated
+            field_ = copy(next((f for f in fields(cls) if f.name == name), None))
+            if field_ is not None:
+                field_.type = resolved_type
+                setattr(cls, field_.name, field_)
+        cls.__annotations__[name] = resolved_type
 
     @classmethod
     def _get_old_generic_type_if_different(cls) -> Optional[Type[T]]:
