@@ -42,7 +42,7 @@ class PyCRAMQuaternionMapping(AlternativeMapping[PyCramQuaternion]):
 
     @classmethod
     def from_domain_object(cls, obj: T):
-        return cls(float(obj.x), float(obj.y), float(obj.z), float(obj.w))
+        return cls(obj.x, obj.y, obj.z, obj.w)
 
     def to_domain_object(self) -> T:
         return PyCramQuaternion(self.x, self.y, self.z, self.w)
