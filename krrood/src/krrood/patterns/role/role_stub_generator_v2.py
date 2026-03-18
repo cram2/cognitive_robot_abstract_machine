@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import dataclasses
 import sys
 from collections import defaultdict
@@ -8,8 +7,20 @@ from copy import copy
 from functools import cached_property
 from pathlib import Path
 from types import ModuleType
-from typing import Dict, List, Optional, Set, Type, Union, TypeVar, Callable
+from typing import (
+    Dict,
+    List,
+    Optional,
+    Set,
+    Type,
+    Union,
+    TypeVar,
+    Callable,
+    Sequence,
+    assert_never,
+)
 
+import libcst
 from black.handle_ipynb_magics import lru_cache
 
 from krrood.class_diagrams import ClassDiagram
@@ -30,13 +41,14 @@ from krrood.utils import (
 )
 
 
-class StubTransformer(ast.NodeTransformer):
+class StubTransformer(libcst.CSTTransformer):
     """
     Transforms a Python module AST into a stub file AST by pruning methods
     and applying the Role pattern transformations.
     """
 
     def __init__(self, diagram: ClassDiagram, module: ModuleType):
+        super().__init__()
         self.diagram = diagram
         self.module = module
         self.needed_role_for_classes: Set[Type] = set()
@@ -57,30 +69,15 @@ class StubTransformer(ast.NodeTransformer):
         """
         return set(self._role_taker_to_roles_map.keys())
 
-    def visit_Module(self, node: ast.Module) -> ast.Module:
-        """
-        Transforms the module: visits all children.
-        """
-        new_body = []
-        for item in node.body:
-            transformed = self.visit(item)
-            if isinstance(transformed, list):
-                new_body.extend(transformed)
-            elif transformed is not None:
-                new_body.append(transformed)
-
-        node.body = new_body
-        return node
-
-    def visit_FunctionDef(self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]):
+    def leave_FunctionDef(
+        self, original_node: libcst.FunctionDef, updated_node: libcst.FunctionDef
+    ) -> libcst.FunctionDef:
         """
         Prunes function bodies, replacing them with '...'.
         """
-        node.body = [ast.Expr(value=ast.Constant(value=Ellipsis))]
-        return node
-
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
-        return self.visit_FunctionDef(node)
+        return updated_node.with_changes(
+            body=libcst.IndentedBlock(body=[self.make_ellipsis_expression()])
+        )
 
     @lru_cache
     def _has_primary_role(self, taker_type: Type) -> bool:
@@ -106,67 +103,98 @@ class StubTransformer(ast.NodeTransformer):
             if RoleType.get_role_type(role_wrapped) == RoleType.PRIMARY
         ]
 
-    def visit_Assign(self, node: ast.Assign) -> Union[ast.Assign, List[ast.stmt]]:
+    def leave_SimpleStatementLine(
+        self,
+        original_node: libcst.SimpleStatementLine,
+        updated_node: libcst.SimpleStatementLine,
+    ) -> (
+        libcst.SimpleStatementLine | libcst.FlattenSentinel[libcst.SimpleStatementLine]
+    ):
         """
         Detects TypeVar definitions and inserts RoleFor classes after them if they are for a taker.
         """
-        if (
-            isinstance(node.value, ast.Call)
-            and isinstance(node.value.func, ast.Name)
-            and node.value.func.id == TypeVar.__name__
+        if len(updated_node.body) != 1:
+            return updated_node
+        node = updated_node.body[0]
+        if not (
+            isinstance(node, libcst.Assign)
+            and isinstance(node.value, libcst.Call)
+            and isinstance(node.value.func, libcst.Name)
+            and node.value.func.value == TypeVar.__name__
         ):
-            bound_name = None
-            for kw in node.value.keywords:
-                if kw.arg == "bound":
-                    if isinstance(kw.value, ast.Name):
-                        bound_name = kw.value.id
-                    elif isinstance(kw.value, ast.Constant):
-                        bound_name = kw.value.value
+            return updated_node
 
-            if bound_name and bound_name in self.module.__dict__:
-                clazz = self.module.__dict__[bound_name]
-                if clazz in self.role_takers and self._has_primary_role(clazz):
-                    role_for_class = self._synthesize_role_for(clazz)
-                    return [node, role_for_class]
-        return node
+        bound_value = self.get_keyword_value_from_call(node.value, "bound")
+        bound_name = self.unparse_type_value(bound_value) if bound_value else None
 
-    def visit_ClassDef(self, node: ast.ClassDef) -> Union[ast.ClassDef, List[ast.stmt]]:
+        if bound_name and bound_name in self.module.__dict__:
+            clazz = self.module.__dict__[bound_name]
+            if clazz in self.role_takers and self._has_primary_role(clazz):
+                role_for_class = self._synthesize_role_for(clazz)
+                return libcst.FlattenSentinel([updated_node, role_for_class])
+        return updated_node
+
+    @classmethod
+    def unparse_type_value(cls, value: libcst.BaseExpression) -> Optional[str]:
+        """
+        Unparses a libcst expression to get the type name as a string.
+        """
+        if isinstance(value, libcst.Name):
+            return value.value
+        elif isinstance(value, libcst.SimpleString):
+            return value.evaluated_value
+        else:
+            raise ValueError(f"Unsupported type value: {value}")
+
+    @classmethod
+    def get_keyword_value_from_call(
+        cls, call: libcst.Call, keyword: str
+    ) -> Optional[libcst.BaseExpression]:
+        for kw in call.args:
+            if kw.keyword and kw.keyword.value == keyword:
+                return kw.value
+        return None
+
+    def leave_ClassDef(
+        self, original_node: libcst.ClassDef, updated_node: libcst.ClassDef
+    ) -> libcst.ClassDef | libcst.FlattenSentinel[libcst.BaseCompoundStatement]:
         """
         Transforms class definitions: prunes methods, renames takers, and adjusts roles.
         """
-        if node.name not in self.module.__dict__:
-            return node
-        clazz = self.module.__dict__[node.name]
+        if updated_node.name.value not in self.module.__dict__:
+            return updated_node
+        clazz = self.module.__dict__[updated_node.name.value]
         try:
             wrapped_class = self.diagram.get_wrapped_class(clazz)
         except ClassIsUnMappedInClassDiagram:
-            return node
+            return updated_node
 
         # Prune methods and non-essential nodes
-        node.body = [
-            self.visit(item)
-            for item in node.body
-            if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
-        ]
-        node.body = [item for item in node.body if item is not None]
+        new_body_list = [item.visit(self) for item in updated_node.body.body]
+        updated_node = updated_node.with_changes(
+            body=updated_node.body.with_changes(body=new_body_list)
+        )
 
         # Update decorators for dataclass preservation
-        node.decorator_list = self._transform_decorators(node, wrapped_class)
+        updated_node = updated_node.with_changes(
+            decorators=self._transform_decorators(updated_node, wrapped_class)
+        )
 
         is_taker = wrapped_class.clazz in self.role_takers
         role_type = RoleType.get_role_type(wrapped_class)
 
-        result_nodes = [node]
+        result_nodes = [updated_node]
 
         if role_type == RoleType.SPECIALIZED_ROLE_FOR:
             # transform_specialized_role returns [specialized_class, node]
-            result_nodes = self._transform_specialized_role(node, wrapped_class)
+            result_nodes = self._transform_specialized_role(updated_node, wrapped_class)
         elif role_type != RoleType.NOT_A_ROLE:
-            self._transform_role(node, wrapped_class, role_type)
+            updated_node = self._transform_role(updated_node, wrapped_class, role_type)
+            result_nodes = [updated_node]
 
         if is_taker:
             # transform_role_taker returns [Mixin, original_class]
-            taker_nodes = self._transform_role_taker(node, wrapped_class)
+            taker_nodes = self._transform_role_taker(updated_node, wrapped_class)
             result_nodes = [taker_nodes[0], taker_nodes[1]]
             # If no TypeVar is found later, we might miss RoleFor.
             # But the ground truth suggests RoleFor is after TypeVar if it exists.
@@ -175,7 +203,9 @@ class StubTransformer(ast.NodeTransformer):
                 role_for_class = self._synthesize_role_for(wrapped_class.clazz)
                 result_nodes.append(role_for_class)
 
-        return result_nodes
+        if len(result_nodes) > 1:
+            return libcst.FlattenSentinel(result_nodes)
+        return result_nodes[0]
 
     def _has_type_var_for_taker(self, taker_type: Type) -> bool:
         """
@@ -184,8 +214,8 @@ class StubTransformer(ast.NodeTransformer):
         return self._get_type_var_name(taker_type) is not None
 
     def _transform_specialized_role(
-        self, node: ast.ClassDef, wrapped_class: WrappedClass
-    ) -> List[ast.stmt]:
+        self, node: libcst.ClassDef, wrapped_class: WrappedClass
+    ) -> List[libcst.ClassDef]:
         """
         Handles a primary role that updates its taker type by synthesizing a specialized RoleFor base.
         """
@@ -219,42 +249,47 @@ class StubTransformer(ast.NodeTransformer):
                 )
             )
 
-        specialized_class = ast.ClassDef(
-            name=specialized_name,
-            bases=[ast.parse(b.strip()).body[0].value for b in specialized_bases],
-            keywords=[],
-            body=body if body else [ast.Expr(value=ast.Constant(value=Ellipsis))],
-            decorator_list=[
-                ast.Call(
-                    func=ast.Name(id="dataclass", ctx=ast.Load()),
-                    args=[],
-                    keywords=[ast.keyword(arg="eq", value=ast.Constant(value=False))],
+        specialized_class = libcst.ClassDef(
+            name=libcst.Name(specialized_name),
+            bases=[
+                libcst.Arg(value=libcst.parse_expression(b.strip()))
+                for b in specialized_bases
+            ],
+            body=libcst.IndentedBlock(
+                body=body if body else [self.make_ellipsis_expression()]
+            ),
+            decorators=[
+                libcst.Decorator(
+                    decorator=libcst.parse_expression("dataclass(eq=False)")
                 )
             ],
         )
 
         # Current class inherits from specialized base
-        node.bases = [ast.Name(id=specialized_name, ctx=ast.Load())]
-        # Keep body empty (already pruned)
-        node.body = [ast.Expr(value=ast.Constant(value=Ellipsis))]
+        node = node.with_changes(
+            bases=[libcst.Arg(value=libcst.Name(specialized_name))],
+            body=libcst.IndentedBlock(body=[self.make_ellipsis_expression()]),
+        )
 
         return [specialized_class, node]
 
     @staticmethod
     def _transform_decorators(
-        node: ast.ClassDef, wrapped_class: WrappedClass
-    ) -> List[ast.expr]:
+        node: libcst.ClassDef, wrapped_class: WrappedClass
+    ) -> List[libcst.Decorator]:
         """
         Ensures @dataclass decorator is present with correct arguments.
         """
         # Find if @dataclass is already there
         other_decorators = []
-        for dec in node.decorator_list:
+        for dec in node.decorators:
             name = ""
-            if isinstance(dec, ast.Name):
-                name = dec.id
-            elif isinstance(dec, ast.Call) and isinstance(dec.func, ast.Name):
-                name = dec.func.id
+            if isinstance(dec.decorator, libcst.Name):
+                name = dec.decorator.value
+            elif isinstance(dec.decorator, libcst.Call) and isinstance(
+                dec.decorator.func, libcst.Name
+            ):
+                name = dec.decorator.func.value
 
             if name != "dataclass":
                 other_decorators.append(dec)
@@ -265,68 +300,57 @@ class StubTransformer(ast.NodeTransformer):
 
         # Build new decorator
         if arg_str:
-            dec_node = (
-                ast.parse(f"@dataclass({arg_str})\nclass X: pass")
-                .body[0]
-                .decorator_list[0]
+            dec_node = libcst.Decorator(
+                decorator=libcst.parse_expression(f"dataclass({arg_str})")
             )
         else:
-            dec_node = ast.Name(id="dataclass", ctx=ast.Load())
+            dec_node = libcst.Decorator(decorator=libcst.Name("dataclass"))
 
         return [dec_node] + other_decorators
 
     def _transform_role_taker(
-        self, node: ast.ClassDef, wrapped_class: WrappedClass
-    ) -> List[ast.stmt]:
+        self, node: libcst.ClassDef, wrapped_class: WrappedClass
+    ) -> List[libcst.ClassDef]:
         """
         Transforms a role taker class into a Mixin and a re-entry class.
         """
-        original_name = node.name
-        node.name = f"{original_name}Mixin"
+        original_name = node.name.value
+        node = node.with_changes(name=libcst.Name(f"{original_name}Mixin"))
 
         # Reconstruct body: own fields (kw_only=True) + propagated fields (init=False)
         new_body = []
-        taker_attr_name = (
-            wrapped_class.clazz.role_taker_attribute_name()
-            if issubclass(wrapped_class.clazz, Role)
-            else None
-        )
-
         for field_ in wrapped_class.own_fields:
-            if field_.name == taker_attr_name:
-                continue
             new_body.append(self._create_field_node(field_, kw_only=True))
 
         propagated_fields = self._get_propagated_fields(wrapped_class)
         new_body.extend(propagated_fields)
 
-        node.body = new_body
+        node = node.with_changes(body=node.body.with_changes(body=new_body))
 
         # Create the original class inheriting from Mixin
-        reentry_class = ast.ClassDef(
-            name=original_name,
-            bases=[ast.Name(id=node.name, ctx=ast.Load())],
-            keywords=[],
-            body=[ast.Expr(value=ast.Constant(value=Ellipsis))],
-            decorator_list=node.decorator_list,
+        reentry_class = libcst.ClassDef(
+            name=libcst.Name(original_name),
+            bases=[libcst.Arg(value=libcst.Name(node.name.value))],
+            body=libcst.IndentedBlock(body=[self.make_ellipsis_expression()]),
+            decorators=node.decorators,
         )
 
         return [node, reentry_class]
 
-    def _is_role_base(self, base_node: ast.expr) -> bool:
+    def _is_role_base(self, base_node: libcst.BaseExpression) -> bool:
         """
         Checks if a base node is the 'Role' class or 'Role[T]'.
         """
-        if isinstance(base_node, ast.Name):
-            return base_node.id == "Role"
-        if isinstance(base_node, ast.Subscript):
-            if isinstance(base_node.value, ast.Name):
-                return base_node.value.id == "Role"
+        if isinstance(base_node, libcst.Name):
+            return base_node.value == "Role"
+        if isinstance(base_node, libcst.Subscript):
+            if isinstance(base_node.value, libcst.Name):
+                return base_node.value.value == "Role"
         return False
 
     def _transform_role(
-        self, node: ast.ClassDef, wrapped_class: WrappedClass, role_type: RoleType
-    ) -> ast.ClassDef:
+        self, node: libcst.ClassDef, wrapped_class: WrappedClass, role_type: RoleType
+    ) -> libcst.ClassDef:
         """
         Transforms a role class by adjusting its bases and filtering fields.
         """
@@ -349,45 +373,60 @@ class StubTransformer(ast.NodeTransformer):
             new_bases = []
 
             # Reconstruct RoleFor class name (without generics) for MRO check
-            role_for_origin = f"RoleFor{taker_type.__name__}"
+            # role_for_origin = f"RoleFor{taker_type.__name__}"
 
-            # We need the actual RoleFor class to check its MRO.
-            # But we haven't synthesized it yet, or it's not in the module.
-            # For now, let's just use a heuristic: remove if it's in taker's MRO.
             taker_mro_names = {c.__name__ for c in taker_type.mro()}
 
             for base in node.bases:
-                if self._is_role_base(base):
+                if self._is_role_base(base.value):
                     continue
 
                 # If it's a simple name and in taker's MRO, it's covered by RoleFor<Taker>
-                if isinstance(base, ast.Name) and base.id in taker_mro_names:
+                if (
+                    isinstance(base.value, libcst.Name)
+                    and base.value.value in taker_mro_names
+                ):
                     continue
 
                 new_bases.append(base)
 
-            new_bases.insert(0, ast.parse(role_for_name).body[0].value)
-            node.bases = new_bases
+            new_bases.insert(
+                0, libcst.Arg(value=libcst.parse_expression(role_for_name))
+            )
+            node = node.with_changes(bases=new_bases)
 
         # Filter fields: keep only introduced fields
         taker_attr_name = wrapped_class.clazz.role_taker_attribute_name()
 
         new_body = []
-        for item in node.body:
-            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
-                if item.target.id == taker_attr_name:
-                    new_body.append(item)
-                elif any(f.name == item.target.id for f in wrapped_class.own_fields):
+        for item in node.body.body:
+            if (
+                isinstance(item, libcst.SimpleStatementLine)
+                and len(item.body) == 1
+                and isinstance(item.body[0], libcst.AnnAssign)
+            ):
+                ann_assign = item.body[0]
+                if isinstance(ann_assign.target, libcst.Name):
+                    if ann_assign.target.value == taker_attr_name:
+                        new_body.append(item)
+                    elif any(
+                        f.name == ann_assign.target.value
+                        for f in wrapped_class.own_fields
+                    ):
+                        new_body.append(item)
+                else:
                     new_body.append(item)
             else:
                 new_body.append(item)
-        node.body = new_body
+        node = node.with_changes(body=node.body.with_changes(body=new_body))
 
         return node
 
-    def _get_propagated_fields(self, wrapped_class: WrappedClass) -> List[ast.stmt]:
+    def _get_propagated_fields(
+        self, wrapped_class: WrappedClass
+    ) -> List[libcst.BaseStatement]:
         """
-        Gets AST nodes for fields propagated from roles to the taker.
+        Gets libcst nodes for fields propagated from roles to the taker.
         """
         # Only propagate to root takers
         root_taker = wrapped_class.clazz
@@ -460,9 +499,9 @@ class StubTransformer(ast.NodeTransformer):
         init: bool = True,
         kw_only: Optional[bool] = None,
         available_type_vars: Optional[Set[str]] = None,
-    ) -> ast.AnnAssign:
+    ) -> libcst.SimpleStatementLine:
         """
-        Creates an AST AnnAssign node for a field.
+        Creates a libcst SimpleStatementLine node for a field.
         """
         f_copy = copy(wrapped_field.field)
         if not init:
@@ -486,11 +525,11 @@ class StubTransformer(ast.NodeTransformer):
         if rep_str.startswith("="):
             val_str = rep_str[1:].strip()
             try:
-                value_ast = ast.parse(val_str).body[0].value
+                value_cst = libcst.parse_expression(val_str)
             except Exception:
-                value_ast = ast.Constant(value=None)
+                value_cst = libcst.Name("None")
         else:
-            value_ast = None
+            value_cst = None
 
         type_str = wrapped_field.type_name
         if available_type_vars is not None:
@@ -498,14 +537,19 @@ class StubTransformer(ast.NodeTransformer):
 
         type_str = type_str.replace("typing.", "").replace("typing_extensions.", "")
 
-        return ast.AnnAssign(
-            target=ast.Name(id=wrapped_field.name, ctx=ast.Store()),
-            annotation=self.to_ast_name(type_str),
-            value=value_ast,
-            simple=1,
+        return libcst.SimpleStatementLine(
+            body=[
+                libcst.AnnAssign(
+                    target=libcst.Name(wrapped_field.name),
+                    annotation=libcst.Annotation(
+                        annotation=self.to_cst_expression(type_str)
+                    ),
+                    value=value_cst,
+                )
+            ]
         )
 
-    def _synthesize_role_for(self, taker_type: Type) -> ast.ClassDef:
+    def _synthesize_role_for(self, taker_type: Type) -> libcst.ClassDef:
         """
         Synthesizes a RoleFor<Taker> class.
         """
@@ -534,24 +578,7 @@ class StubTransformer(ast.NodeTransformer):
             bases = [role_base_class_name, mixin_base_class_name]
 
         body = []
-        # 1. Add role taker attribute (e.g. person: TPerson = field(kw_only=True))
-        # TODO: This should be added to the classes that inherit from RoleFor class, not in here, as the role taker
-        # attribute name could be different for different primary roles.
-        primary_role_wrapped = self._get_primary_roles(taker_type)[0]
-        taker_attr_name = primary_role_wrapped.clazz.role_taker_attribute_name()
-        # Use own_fields to find the role taker attribute
-        wrapped_field = next(
-            f for f in primary_role_wrapped.own_fields if f.name == taker_attr_name
-        )
-        body.append(
-            self._create_field_node(
-                wrapped_field,
-                kw_only=True,
-                available_type_vars=available_type_vars,
-            )
-        )
-
-        # 2. Add fields from Taker as init=False
+        # 1. Add fields from Taker as init=False
         # Only exclude fields from roles targeting THIS taker
         roles_targeting_taker_fields = set()
         roles = self._role_taker_to_roles_map.get(taker_type, [])
@@ -569,9 +596,9 @@ class StubTransformer(ast.NodeTransformer):
                 )
             )
 
-        # 3. Add @classmethod role_taker_attribute
+        # 2. Add @classmethod role_taker_attribute
         method_node = self.make_class_method(
-            Role.role_taker_attribute_name.__name__, returns=taker_type
+            Role.role_taker_attribute.__name__, returns=taker_type
         )
         body.append(method_node)
 
@@ -582,21 +609,21 @@ class StubTransformer(ast.NodeTransformer):
         cls,
         name: str,
         bases: Optional[List[Type | str]] = None,
-        body: Optional[List[ast.stmt]] = None,
-    ) -> ast.ClassDef:
+        body: Optional[List[libcst.BaseStatement]] = None,
+    ) -> libcst.ClassDef:
         """
         :param name: Name of the dataclass.
         :param bases: Base classes of the dataclass.
         :param body: Body of the dataclass.
-        :return: AST ClassDef object for the given dataclass.
+        :return: libcst ClassDef object for the given dataclass.
         """
-        return ast.ClassDef(
-            name=name,
-            bases=list(map(cls.to_ast_name, bases)),
-            keywords=[],
-            body=body if body else [cls.make_ellipsis_expression()],
-            decorator_list=[cls.make_dataclass_decorator()],
-            type_params=[],
+        return libcst.ClassDef(
+            name=libcst.Name(name),
+            bases=[libcst.Arg(value=cls.to_cst_expression(b)) for b in (bases or [])],
+            body=libcst.IndentedBlock(
+                body=body if body else [cls.make_ellipsis_expression()]
+            ),
+            decorators=[libcst.Decorator(decorator=cls.make_dataclass_decorator())],
         )
 
     @classmethod
@@ -605,55 +632,55 @@ class StubTransformer(ast.NodeTransformer):
         name: str,
         args: Optional[List[str]] = None,
         returns: Type | Callable | str = None,
-    ) -> ast.FunctionDef:
+    ) -> libcst.FunctionDef:
         """
-        :return: AST FunctionDef object for the given class method.
+        :return: libcst FunctionDef object for the given class method.
         """
-        args = ["cls"] + (args or [])
-        return ast.FunctionDef(
-            name=name,
-            args=cls.make_ast_args(*args),
-            body=[cls.make_ellipsis_expression()],
-            decorator_list=[cls.to_ast_name(classmethod)],
-            returns=cls.to_ast_name(returns),
-            type_comment=None,
-            type_params=[],
-            lineno=1,
+        params = ["cls"] + (args or [])
+        return libcst.FunctionDef(
+            name=libcst.Name(name),
+            params=cls.make_cst_args(*params),
+            body=libcst.IndentedBlock(body=[cls.make_ellipsis_expression()]),
+            decorators=[libcst.Decorator(decorator=libcst.Name("classmethod"))],
+            returns=(
+                libcst.Annotation(annotation=cls.to_cst_expression(returns))
+                if returns
+                else None
+            ),
         )
 
     @classmethod
-    def to_ast_name(cls, has_name: Type | Callable | str) -> ast.Name:
+    def to_cst_expression(
+        cls, has_name: Type | Callable | str
+    ) -> libcst.BaseExpression:
         """
         :param has_name: An object that has a `__name__` attribute, one of class, method, or function.
-        :return: AST Name object for the given name.
+        :return: libcst Expression object for the given name.
         """
-        name = has_name if isinstance(has_name, str) else has_name.__name__
-        return ast.Name(id=name, ctx=ast.Load())
+        if isinstance(has_name, str):
+            try:
+                return libcst.parse_expression(has_name)
+            except Exception:
+                return libcst.Name(has_name)
+        name = has_name.__name__
+        return libcst.Name(name)
 
     @classmethod
-    def make_ast_args(cls, *names) -> ast.arguments:
+    def make_cst_args(cls, *names) -> libcst.Parameters:
         """
-        :return: AST arguments object for the given names.
+        :return: libcst Parameters object for the given names.
         """
-        return ast.arguments(
-            posonlyargs=[],
-            args=[ast.arg(arg=n) for n in names],
-            kwonlyargs=[],
-            kw_defaults=[],
-            defaults=[],
+        return libcst.Parameters(
+            params=[libcst.Param(name=libcst.Name(n)) for n in names]
         )
 
     @classmethod
-    def make_dataclass_decorator(cls) -> ast.expr:
-        return ast.Call(
-            func=ast.Name(id="dataclass", ctx=ast.Load()),
-            args=[],
-            keywords=[ast.keyword(arg="eq", value=ast.Constant(value=False))],
-        )
+    def make_dataclass_decorator(cls) -> libcst.BaseExpression:
+        return libcst.parse_expression("dataclass(eq=False)")
 
     @classmethod
-    def make_ellipsis_expression(cls) -> ast.Expr:
-        return ast.Expr(value=ast.Constant(value=Ellipsis))
+    def make_ellipsis_expression(cls) -> libcst.SimpleStatementLine:
+        return libcst.SimpleStatementLine(body=[libcst.Expr(value=libcst.Ellipsis())])
 
     @cached_property
     def _base_role_class_field_names(self):
@@ -707,12 +734,12 @@ class RoleStubGeneratorV2:
         with open(self.module_file_path, "r") as f:
             source = f.read()
 
-        tree = ast.parse(source)
+        tree = libcst.parse_module(source)
 
         transformer = StubTransformer(self.class_diagram, self.module)
-        transformed_tree = transformer.visit(tree)
+        transformed_tree = tree.visit(transformer)
 
-        stub_content = ast.unparse(transformed_tree)
+        stub_content = transformed_tree.code
 
         if write:
             with open(self.path, "w") as f:

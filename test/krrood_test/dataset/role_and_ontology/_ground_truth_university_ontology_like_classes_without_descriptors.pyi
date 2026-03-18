@@ -50,7 +50,6 @@ TPerson = TypeVar("TPerson", bound=Person)
 
 @dataclass(eq=False)
 class RoleForPerson(Role[TPerson], PersonMixin):
-    person: TPerson = field(kw_only=True)
     name: str = field(init=False)
     works_for: RecognizedGroup = field(init=False)
     member_of: List[RecognizedGroup] = field(init=False)
@@ -59,21 +58,24 @@ class RoleForPerson(Role[TPerson], PersonMixin):
     def role_taker_attribute(cls) -> Field: ...
 
 @dataclass(eq=False)
-class DirectDiamondShapedInheritanceWhereOneIsRole(RoleForPerson[TPerson]): ...
+class DirectDiamondShapedInheritanceWhereOneIsRole(RoleForPerson[TPerson]):
+    person: TPerson = field(kw_only=True)
 
 @dataclass(eq=False)
 class InDirectDiamondShapedInheritanceWhereOneIsRole(
     RoleForPerson[TPerson],
     RecognizedGroup,
-): ...
+):
+    person: TPerson = field(kw_only=True)
 
 @dataclass(eq=False)
 class CEOAsFirstRoleMixin(RoleForPerson[TPerson]):
+    person: TPerson = field(kw_only=True)
     # Original Owner of the head_of field
     head_of: RecognizedGroup = field(default=None, kw_only=True)
 
 @dataclass(eq=False)
-class CEOAsFirstRole(CEOAsFirstRoleMixin): ...
+class CEOAsFirstRole(CEOAsFirstRoleMixin[TPerson]): ...
 
 TSubclassOfARoleTaker = TypeVar("TSubclassOfARoleTaker", bound=SubclassOfARoleTaker)
 
@@ -90,6 +92,7 @@ class SubclassOfRoleThatUpdatesRoleTakerType(
 
 @dataclass(eq=False)
 class ProfessorAsFirstRole(RoleForPerson[TPerson]):
+    person: TPerson = field(kw_only=True)
     # Original Owner of the teacher_of field
     teacher_of: List[Course] = field(default_factory=list, kw_only=True)
 
@@ -102,17 +105,17 @@ TCEOAsFirstRole = TypeVar("TCEOAsFirstRole", bound=CEOAsFirstRole)
 
 @dataclass(eq=False)
 class RoleForCEOAsFirstRole(CEOAsFirstRoleMixin, Role[TCEOAsFirstRole]):
-    ceo: TCEOAsFirstRole = field(kw_only=True)
     person: Person = field(init=False)
     head_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
 class RepresentativeAsSecondRoleMixin(RoleForCEOAsFirstRole[TCEOAsFirstRole]):
+    ceo: TCEOAsFirstRole = field(kw_only=True)
     # Original Owner of the representative_of field
     representative_of: RecognizedGroup = field(default=None, kw_only=True)
 
 @dataclass(eq=False)
-class RepresentativeAsSecondRole(RepresentativeAsSecondRoleMixin): ...
+class RepresentativeAsSecondRole(RepresentativeAsSecondRoleMixin[TCEOAsFirstRole]): ...
 
 TRepresentativeAsSecondRole = TypeVar(
     "TRepresentativeAsSecondRole", bound=RepresentativeAsSecondRole
@@ -122,7 +125,6 @@ TRepresentativeAsSecondRole = TypeVar(
 class RoleForRepresentativeAsSecondRole(
     RepresentativeAsSecondRoleMixin, Role[TRepresentativeAsSecondRole]
 ):
-    representative: TRepresentativeAsSecondRole = field(kw_only=True)
     ceo: CEOAsFirstRole = field(init=False)
     representative_of: RecognizedGroup = field(init=False)
 
@@ -130,5 +132,6 @@ class RoleForRepresentativeAsSecondRole(
 class DelegateAsThirdRole(
     RoleForRepresentativeAsSecondRole[TRepresentativeAsSecondRole]
 ):
+    representative: TRepresentativeAsSecondRole = field(kw_only=True)
     # Original Owner of the delegate_of field
     delegate_of: RecognizedGroup = field(default=None, kw_only=True)
