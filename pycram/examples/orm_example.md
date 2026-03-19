@@ -1,4 +1,4 @@
-from pycram.orm.ormatic_interface import ResolvedActionNodeMappingDAOfrom pycram.orm.model import ResolvedActionNodeMapping---
+---
 jupyter:
   jupytext:
     text_representation:
@@ -40,26 +40,29 @@ Next, we will write a simple plan where the robot parks its arms, moves somewher
 ```python
 from pycram.robot_plans import *
 from pycram.designators.location_designator import *
-from pycram.process_module import simulated_robot
-from pycram.datastructures.enums import Arms, ObjectType, Grasp, WorldMode, TorsoState
+from pycram.motion_executor import simulated_robot
+from pycram.datastructures.enums import Arms, Grasp
+from semantic_digital_twin.datastructures.definitions import TorsoState
 from pycram.designators.object_designator import *
 from pycram.datastructures.pose import PoseStamped
 from pycram.language import SequentialPlan
 from pycram.testing import setup_world
 from semantic_digital_twin.robots.pr2 import PR2
 from pycram.datastructures.dataclasses import Context
+from pycram.view_manager import ViewManager
 
 world = setup_world()
 pr2_view = PR2.from_world(world)
 context = Context(world, pr2_view)
+manipulator = ViewManager.get_arm_view(Arms.LEFT, pr2_view).manipulator
 
 with simulated_robot:
     sp = SequentialPlan(context,
-        NavigateActionDescription(PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1]), True),
+        NavigateActionDescription(PoseStamped.from_list([0.6, 0.4, 0], [0, 0, 0, 1], world.root), True),
         ParkArmsActionDescription(Arms.BOTH),
-        PickUpActionDescription(world.get_body_by_name("milk.stl"), Arms.LEFT, GraspDescription(ApproachDirection.FRONT, VerticalAlignment.NoAlignment, False)),
+        PickUpActionDescription(world.get_body_by_name("milk.stl"), Arms.LEFT, GraspDescription(ApproachDirection.FRONT, VerticalAlignment.NoAlignment, manipulator)),
         NavigateActionDescription(PoseStamped.from_list([1.3, 1, 0.], [0, 0, 0, 1], world.root), True),
-        PlaceActionDescription(world.get_body_by_name("milk.stl"), PoseStamped.from_list([2.0, 1.6, 0.9], [0, 0, 0, 1], world.root),
+        PlaceActionDescription(world.get_body_by_name("milk.stl"), PoseStamped.from_list([2.0, 1.6, 0.9], [0, 0, 0, 1]),
                                Arms.LEFT))
     sp.perform()
 ```

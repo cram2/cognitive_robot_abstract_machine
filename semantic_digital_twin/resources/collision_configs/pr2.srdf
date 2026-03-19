@@ -14,15 +14,12 @@
   <disable_all_collisions link="fr_caster_rotation_link"/>
   <disable_all_collisions link="l_elbow_flex_link"/>
   <disable_all_collisions link="l_forearm_roll_link"/>
-  <disable_all_collisions link="l_torso_lift_side_item_profile_link"/>
   <disable_all_collisions link="l_upper_arm_roll_link"/>
   <disable_all_collisions link="l_wrist_flex_link"/>
   <disable_all_collisions link="l_wrist_roll_link"/>
   <disable_all_collisions link="laser_tilt_mount_link"/>
-  <disable_all_collisions link="m_torso_lift_side_item_profile_link"/>
   <disable_all_collisions link="r_elbow_flex_link"/>
   <disable_all_collisions link="r_forearm_roll_link"/>
-  <disable_all_collisions link="r_torso_lift_side_item_profile_link"/>
   <disable_all_collisions link="r_upper_arm_roll_link"/>
   <disable_all_collisions link="r_wrist_flex_link"/>
   <disable_all_collisions link="r_wrist_roll_link"/>
@@ -40,12 +37,10 @@
   <disable_self_collision link1="base_bellow_link" link2="fr_caster_l_wheel_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="fr_caster_r_wheel_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="fr_caster_rotation_link" reason="Never"/>
-  <disable_self_collision link1="base_bellow_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="head_tilt_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="base_bellow_link" link2="l_force_torque_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="l_forearm_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="l_gripper_l_finger_link" reason="Unknown"/>
@@ -55,13 +50,11 @@
   <disable_self_collision link1="base_bellow_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="base_bellow_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="base_bellow_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -72,12 +65,10 @@
   <disable_self_collision link1="base_bellow_link" link2="r_gripper_r_finger_tip_link" reason="Unknown"/>
   <disable_self_collision link1="base_bellow_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="base_bellow_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="base_bellow_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="base_bellow_link" link2="torso_lift_link" reason="Default"/>
   <disable_self_collision link1="base_link" link2="base_link" reason="Adjacent"/>
   <disable_self_collision link1="base_link" link2="bl_caster_l_wheel_link" reason="Default"/>
@@ -92,28 +83,22 @@
   <disable_self_collision link1="base_link" link2="fr_caster_l_wheel_link" reason="Default"/>
   <disable_self_collision link1="base_link" link2="fr_caster_r_wheel_link" reason="Default"/>
   <disable_self_collision link1="base_link" link2="fr_caster_rotation_link" reason="Default"/>
-  <disable_self_collision link1="base_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="head_tilt_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="base_link" link2="l_force_torque_link" reason="Unknown"/>
   <disable_self_collision link1="base_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="base_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="base_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="r_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="base_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="base_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="base_link" link2="torso_lift_link" reason="Default"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="bl_caster_l_wheel_link" reason="Adjacent"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="bl_caster_r_wheel_link" reason="Never"/>
@@ -127,24 +112,20 @@
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="fr_caster_l_wheel_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="fr_caster_r_wheel_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="fr_caster_rotation_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_l_wheel_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="head_tilt_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_l_wheel_link" link2="l_force_torque_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="l_forearm_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_l_wheel_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_l_wheel_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -155,12 +136,10 @@
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_l_wheel_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_l_wheel_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_l_wheel_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="bl_caster_r_wheel_link" reason="Adjacent"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="bl_caster_rotation_link" reason="AlmostAlways"/>
@@ -173,12 +152,10 @@
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="fr_caster_l_wheel_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="fr_caster_r_wheel_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="fr_caster_rotation_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_r_wheel_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="head_tilt_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_force_torque_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_forearm_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_gripper_palm_link" reason="Never"/>
@@ -186,13 +163,11 @@
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_r_wheel_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -203,12 +178,10 @@
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_r_wheel_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_r_wheel_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_r_wheel_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="bl_caster_rotation_link" reason="Adjacent"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="br_caster_l_wheel_link" reason="Never"/>
@@ -220,7 +193,6 @@
   <disable_self_collision link1="bl_caster_rotation_link" link2="fr_caster_l_wheel_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="fr_caster_r_wheel_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="fr_caster_rotation_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_rotation_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="head_tilt_link" reason="Never"/>
@@ -228,12 +200,10 @@
   <disable_self_collision link1="bl_caster_rotation_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_rotation_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_rotation_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -244,12 +214,10 @@
   <disable_self_collision link1="bl_caster_rotation_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_rotation_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="bl_caster_rotation_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="bl_caster_rotation_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="br_caster_l_wheel_link" reason="Adjacent"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="br_caster_r_wheel_link" reason="Never"/>
@@ -260,12 +228,10 @@
   <disable_self_collision link1="br_caster_l_wheel_link" link2="fr_caster_l_wheel_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="fr_caster_r_wheel_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="fr_caster_rotation_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_l_wheel_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="head_tilt_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_l_wheel_link" link2="l_force_torque_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="l_forearm_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="l_gripper_l_finger_link" reason="Never"/>
@@ -275,13 +241,11 @@
   <disable_self_collision link1="br_caster_l_wheel_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_l_wheel_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_l_wheel_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -292,12 +256,10 @@
   <disable_self_collision link1="br_caster_l_wheel_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_l_wheel_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_l_wheel_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="br_caster_l_wheel_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="br_caster_r_wheel_link" reason="Adjacent"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="br_caster_rotation_link" reason="AlmostAlways"/>
@@ -307,12 +269,10 @@
   <disable_self_collision link1="br_caster_r_wheel_link" link2="fr_caster_l_wheel_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="fr_caster_r_wheel_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="fr_caster_rotation_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_r_wheel_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="head_tilt_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_r_wheel_link" link2="l_force_torque_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="l_forearm_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="l_gripper_l_finger_link" reason="Never"/>
@@ -322,13 +282,11 @@
   <disable_self_collision link1="br_caster_r_wheel_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_r_wheel_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_r_wheel_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -339,12 +297,10 @@
   <disable_self_collision link1="br_caster_r_wheel_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_r_wheel_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_r_wheel_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="br_caster_r_wheel_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="br_caster_rotation_link" reason="Adjacent"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="fl_caster_l_wheel_link" reason="Never"/>
@@ -353,12 +309,10 @@
   <disable_self_collision link1="br_caster_rotation_link" link2="fr_caster_l_wheel_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="fr_caster_r_wheel_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="fr_caster_rotation_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_rotation_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="head_tilt_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_rotation_link" link2="l_force_torque_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="l_forearm_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="l_gripper_l_finger_link" reason="Never"/>
@@ -368,21 +322,17 @@
   <disable_self_collision link1="br_caster_rotation_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_rotation_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_rotation_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="r_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_rotation_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="br_caster_rotation_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="br_caster_rotation_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="fl_caster_l_wheel_link" reason="Adjacent"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="fl_caster_r_wheel_link" reason="Never"/>
@@ -390,7 +340,6 @@
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="fr_caster_l_wheel_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="fr_caster_r_wheel_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="fr_caster_rotation_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_l_wheel_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="head_tilt_link" reason="Never"/>
@@ -398,12 +347,10 @@
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_l_wheel_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_l_wheel_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -414,19 +361,16 @@
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_l_wheel_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_l_wheel_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_l_wheel_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="fl_caster_r_wheel_link" reason="Adjacent"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="fl_caster_rotation_link" reason="AlmostAlways"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="fr_caster_l_wheel_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="fr_caster_r_wheel_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="fr_caster_rotation_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_r_wheel_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="head_tilt_link" reason="Never"/>
@@ -434,11 +378,9 @@
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_r_wheel_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_r_wheel_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -449,18 +391,15 @@
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_r_wheel_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_r_wheel_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_r_wheel_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="fl_caster_rotation_link" reason="Adjacent"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="fr_caster_l_wheel_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="fr_caster_r_wheel_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="fr_caster_rotation_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_rotation_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="head_tilt_link" reason="Never"/>
@@ -468,29 +407,23 @@
   <disable_self_collision link1="fl_caster_rotation_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_rotation_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_rotation_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="r_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_rotation_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="fl_caster_rotation_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fl_caster_rotation_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="fr_caster_l_wheel_link" reason="Adjacent"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="fr_caster_r_wheel_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="fr_caster_rotation_link" reason="AlmostAlways"/>
-  <disable_self_collision link1="fr_caster_l_wheel_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="head_tilt_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_force_torque_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_forearm_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_gripper_l_finger_link" reason="Never"/>
@@ -498,30 +431,24 @@
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_gripper_palm_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_l_wheel_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="r_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_l_wheel_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_l_wheel_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_l_wheel_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="fr_caster_r_wheel_link" reason="Adjacent"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="fr_caster_rotation_link" reason="AlmostAlways"/>
-  <disable_self_collision link1="fr_caster_r_wheel_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="head_tilt_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_force_torque_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_forearm_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_gripper_l_finger_link" reason="Never"/>
@@ -531,26 +458,21 @@
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_r_wheel_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="r_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_r_wheel_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_r_wheel_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_r_wheel_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="fr_caster_rotation_link" reason="Adjacent"/>
-  <disable_self_collision link1="fr_caster_rotation_link" link2="head_mount_kinect2_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="head_mount_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="head_tilt_link" reason="Never"/>
@@ -558,64 +480,20 @@
   <disable_self_collision link1="fr_caster_rotation_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_rotation_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_rotation_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="r_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_rotation_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="fr_caster_rotation_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="fr_caster_rotation_link" link2="torso_lift_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="head_mount_kinect2_link" reason="Adjacent"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="head_mount_link" reason="Adjacent"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="head_pan_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="head_tilt_link" reason="Adjacent"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_force_torque_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_forearm_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_forearm_roll_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_gripper_l_finger_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_gripper_l_finger_tip_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_gripper_palm_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_gripper_r_finger_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_upper_arm_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_wrist_flex_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="l_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_forearm_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_forearm_roll_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_gripper_l_finger_link" reason="Unknown"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_gripper_l_finger_tip_link" reason="Unknown"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_gripper_palm_link" reason="Unknown"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_gripper_r_finger_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_upper_arm_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_wrist_flex_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_kinect2_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="head_mount_link" reason="Adjacent"/>
   <disable_self_collision link1="head_mount_link" link2="head_pan_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="head_tilt_link" reason="Adjacent"/>
   <disable_self_collision link1="head_mount_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_link" link2="l_force_torque_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="l_forearm_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="l_gripper_l_finger_link" reason="Never"/>
@@ -625,13 +503,11 @@
   <disable_self_collision link1="head_mount_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -642,7 +518,6 @@
   <disable_self_collision link1="head_mount_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="head_mount_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="head_mount_link" link2="r_wrist_flex_link" reason="Never"/>
@@ -651,20 +526,17 @@
   <disable_self_collision link1="head_pan_link" link2="head_pan_link" reason="Adjacent"/>
   <disable_self_collision link1="head_pan_link" link2="head_tilt_link" reason="Default"/>
   <disable_self_collision link1="head_pan_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="head_pan_link" link2="l_force_torque_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="l_forearm_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="l_gripper_l_finger_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="l_gripper_palm_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="head_pan_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="head_pan_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -672,16 +544,13 @@
   <disable_self_collision link1="head_pan_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="head_pan_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="head_pan_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="head_pan_link" link2="torso_lift_link" reason="Default"/>
   <disable_self_collision link1="head_tilt_link" link2="head_tilt_link" reason="Adjacent"/>
   <disable_self_collision link1="head_tilt_link" link2="l_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="head_tilt_link" link2="l_force_torque_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="l_forearm_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="l_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="l_gripper_l_finger_link" reason="Never"/>
@@ -691,13 +560,11 @@
   <disable_self_collision link1="head_tilt_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="head_tilt_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="head_tilt_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -705,15 +572,12 @@
   <disable_self_collision link1="head_tilt_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="head_tilt_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="head_tilt_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="head_tilt_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="l_elbow_flex_link" reason="Adjacent"/>
-  <disable_self_collision link1="l_elbow_flex_link" link2="l_force_torque_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="l_forearm_link" reason="Default"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="l_forearm_roll_link" reason="Default"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="l_gripper_l_finger_link" reason="Never"/>
@@ -723,47 +587,17 @@
   <disable_self_collision link1="l_elbow_flex_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="l_elbow_flex_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="l_upper_arm_link" reason="Default"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="l_elbow_flex_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="l_elbow_flex_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_elbow_flex_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_elbow_flex_link" link2="torso_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_force_torque_link" reason="Adjacent"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_forearm_link" reason="Default"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_forearm_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_gripper_l_finger_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_gripper_l_finger_tip_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_gripper_palm_link" reason="Adjacent"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_gripper_r_finger_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_shoulder_pan_link" reason="Unknown"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_upper_arm_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_wrist_flex_link" reason="AlmostAlways"/>
-  <disable_self_collision link1="l_force_torque_link" link2="l_wrist_roll_link" reason="Adjacent"/>
-  <disable_self_collision link1="l_force_torque_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="r_forearm_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="r_shoulder_lift_link" reason="Unknown"/>
-  <disable_self_collision link1="l_force_torque_link" link2="r_shoulder_pan_link" reason="Unknown"/>
-  <disable_self_collision link1="l_force_torque_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="l_force_torque_link" link2="torso_lift_link" reason="Unknown"/>
   <disable_self_collision link1="l_forearm_link" link2="l_forearm_link" reason="Adjacent"/>
   <disable_self_collision link1="l_forearm_link" link2="l_forearm_roll_link" reason="Adjacent"/>
   <disable_self_collision link1="l_forearm_link" link2="l_gripper_l_finger_link" reason="Never"/>
@@ -772,16 +606,12 @@
   <disable_self_collision link1="l_forearm_link" link2="l_gripper_r_finger_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_link" link2="l_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_forearm_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_link" link2="l_wrist_flex_link" reason="Default"/>
   <disable_self_collision link1="l_forearm_link" link2="l_wrist_roll_link" reason="AlmostAlways"/>
   <disable_self_collision link1="l_forearm_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="l_forearm_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_link" link2="r_shoulder_lift_link" reason="Unknown"/>
-  <disable_self_collision link1="l_forearm_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="l_forearm_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="l_forearm_roll_link" reason="Adjacent"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="l_gripper_l_finger_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="l_gripper_l_finger_tip_link" reason="Never"/>
@@ -790,21 +620,17 @@
   <disable_self_collision link1="l_forearm_roll_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="l_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="l_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="l_forearm_roll_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="l_forearm_roll_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="l_forearm_roll_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_forearm_roll_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_forearm_roll_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_link" link2="l_gripper_l_finger_link" reason="Adjacent"/>
   <disable_self_collision link1="l_gripper_l_finger_link" link2="l_gripper_l_finger_tip_link" reason="Default"/>
@@ -812,157 +638,101 @@
   <disable_self_collision link1="l_gripper_l_finger_link" link2="l_gripper_r_finger_link" reason="Default"/>
   <disable_self_collision link1="l_gripper_l_finger_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_link" link2="l_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_l_finger_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_link" link2="l_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_l_finger_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_l_finger_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_l_finger_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="l_gripper_l_finger_tip_link" reason="Adjacent"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="l_gripper_palm_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="l_gripper_r_finger_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="l_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="r_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="r_gripper_r_finger_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_l_finger_tip_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_palm_link" link2="l_gripper_palm_link" reason="Adjacent"/>
   <disable_self_collision link1="l_gripper_palm_link" link2="l_gripper_r_finger_link" reason="Default"/>
   <disable_self_collision link1="l_gripper_palm_link" link2="l_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_palm_link" link2="l_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_palm_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_palm_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_palm_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_palm_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_palm_link" link2="l_wrist_roll_link" reason="Adjacent"/>
-  <disable_self_collision link1="l_gripper_palm_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_palm_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_palm_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_link" link2="l_gripper_r_finger_link" reason="Adjacent"/>
   <disable_self_collision link1="l_gripper_r_finger_link" link2="l_gripper_r_finger_tip_link" reason="Default"/>
   <disable_self_collision link1="l_gripper_r_finger_link" link2="l_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_r_finger_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_link" link2="l_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_r_finger_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_r_finger_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_r_finger_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="l_gripper_r_finger_tip_link" reason="Adjacent"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="l_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="l_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="l_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="l_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="r_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="r_gripper_l_finger_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="r_gripper_r_finger_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_gripper_r_finger_tip_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="l_shoulder_lift_link" reason="Adjacent"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="l_shoulder_pan_link" reason="Default"/>
-  <disable_self_collision link1="l_shoulder_lift_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="l_upper_arm_link" reason="AlmostAlways"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="l_upper_arm_roll_link" reason="Default"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="l_shoulder_lift_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="r_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="l_shoulder_lift_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_shoulder_lift_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_lift_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_pan_link" link2="l_shoulder_pan_link" reason="Adjacent"/>
-  <disable_self_collision link1="l_shoulder_pan_link" link2="l_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_pan_link" link2="l_upper_arm_link" reason="Default"/>
   <disable_self_collision link1="l_shoulder_pan_link" link2="l_upper_arm_roll_link" reason="AlmostAlways"/>
   <disable_self_collision link1="l_shoulder_pan_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="l_shoulder_pan_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_pan_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_pan_link" link2="r_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_pan_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_shoulder_pan_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_pan_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_pan_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_shoulder_pan_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_shoulder_pan_link" link2="torso_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="l_torso_lift_side_item_profile_link" reason="Adjacent"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="l_upper_arm_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="l_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="l_wrist_flex_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="l_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="m_torso_lift_side_item_profile_link" reason="Adjacent"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_forearm_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_forearm_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_gripper_l_finger_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_gripper_palm_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_gripper_r_finger_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_torso_lift_side_item_profile_link" reason="Adjacent"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_upper_arm_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_wrist_flex_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="t_torso_lift_side_item_profile_link" reason="Adjacent"/>
-  <disable_self_collision link1="l_torso_lift_side_item_profile_link" link2="torso_lift_link" reason="Adjacent"/>
   <disable_self_collision link1="l_upper_arm_link" link2="l_upper_arm_link" reason="Adjacent"/>
   <disable_self_collision link1="l_upper_arm_link" link2="l_upper_arm_roll_link" reason="Adjacent"/>
   <disable_self_collision link1="l_upper_arm_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="l_upper_arm_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="l_upper_arm_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_upper_arm_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="l_upper_arm_roll_link" reason="Adjacent"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="l_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="l_wrist_roll_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="l_upper_arm_roll_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -971,35 +741,26 @@
   <disable_self_collision link1="l_upper_arm_roll_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="l_upper_arm_roll_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_upper_arm_roll_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_upper_arm_roll_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="l_wrist_flex_link" link2="l_wrist_flex_link" reason="Adjacent"/>
   <disable_self_collision link1="l_wrist_flex_link" link2="l_wrist_roll_link" reason="Default"/>
   <disable_self_collision link1="l_wrist_flex_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="l_wrist_flex_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_wrist_flex_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_wrist_flex_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
-  <disable_self_collision link1="l_wrist_flex_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_wrist_flex_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_wrist_flex_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_wrist_roll_link" link2="l_wrist_roll_link" reason="Adjacent"/>
   <disable_self_collision link1="l_wrist_roll_link" link2="laser_tilt_mount_link" reason="Never"/>
-  <disable_self_collision link1="l_wrist_roll_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_wrist_roll_link" link2="r_forearm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_wrist_roll_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_wrist_roll_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="l_wrist_roll_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="l_wrist_roll_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="l_wrist_roll_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="l_wrist_roll_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="l_wrist_roll_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="l_wrist_roll_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="laser_tilt_mount_link" link2="laser_tilt_mount_link" reason="Adjacent"/>
-  <disable_self_collision link1="laser_tilt_mount_link" link2="m_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="laser_tilt_mount_link" link2="r_elbow_flex_link" reason="Never"/>
   <disable_self_collision link1="laser_tilt_mount_link" link2="r_forearm_link" reason="Never"/>
   <disable_self_collision link1="laser_tilt_mount_link" link2="r_forearm_roll_link" reason="Never"/>
@@ -1008,31 +769,11 @@
   <disable_self_collision link1="laser_tilt_mount_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="laser_tilt_mount_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="laser_tilt_mount_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="laser_tilt_mount_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="laser_tilt_mount_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="laser_tilt_mount_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="laser_tilt_mount_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="laser_tilt_mount_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="laser_tilt_mount_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="laser_tilt_mount_link" link2="torso_lift_link" reason="Default"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="m_torso_lift_side_item_profile_link" reason="Adjacent"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_elbow_flex_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_forearm_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_forearm_roll_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_gripper_l_finger_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_gripper_palm_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_gripper_r_finger_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_torso_lift_side_item_profile_link" reason="Adjacent"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_upper_arm_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_wrist_flex_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="t_torso_lift_side_item_profile_link" reason="Adjacent"/>
-  <disable_self_collision link1="m_torso_lift_side_item_profile_link" link2="torso_lift_link" reason="Adjacent"/>
   <disable_self_collision link1="r_elbow_flex_link" link2="r_elbow_flex_link" reason="Adjacent"/>
   <disable_self_collision link1="r_elbow_flex_link" link2="r_forearm_link" reason="Default"/>
   <disable_self_collision link1="r_elbow_flex_link" link2="r_forearm_roll_link" reason="Default"/>
@@ -1043,12 +784,10 @@
   <disable_self_collision link1="r_elbow_flex_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="r_elbow_flex_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="r_elbow_flex_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="r_elbow_flex_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_elbow_flex_link" link2="r_upper_arm_link" reason="Default"/>
   <disable_self_collision link1="r_elbow_flex_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="r_elbow_flex_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="r_elbow_flex_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="r_elbow_flex_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_elbow_flex_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_link" link2="r_forearm_link" reason="Adjacent"/>
   <disable_self_collision link1="r_forearm_link" link2="r_forearm_roll_link" reason="Adjacent"/>
@@ -1058,12 +797,10 @@
   <disable_self_collision link1="r_forearm_link" link2="r_gripper_r_finger_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="r_forearm_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_link" link2="r_wrist_flex_link" reason="Default"/>
   <disable_self_collision link1="r_forearm_link" link2="r_wrist_roll_link" reason="AlmostAlways"/>
-  <disable_self_collision link1="r_forearm_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_roll_link" link2="r_forearm_roll_link" reason="Adjacent"/>
   <disable_self_collision link1="r_forearm_roll_link" link2="r_gripper_l_finger_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_roll_link" link2="r_gripper_l_finger_tip_link" reason="Never"/>
@@ -1072,12 +809,10 @@
   <disable_self_collision link1="r_forearm_roll_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_roll_link" link2="r_shoulder_lift_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_roll_link" link2="r_shoulder_pan_link" reason="Never"/>
-  <disable_self_collision link1="r_forearm_roll_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_roll_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_roll_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_roll_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_roll_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="r_forearm_roll_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_forearm_roll_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_link" link2="r_gripper_l_finger_link" reason="Adjacent"/>
   <disable_self_collision link1="r_gripper_l_finger_link" link2="r_gripper_l_finger_tip_link" reason="Default"/>
@@ -1085,89 +820,62 @@
   <disable_self_collision link1="r_gripper_l_finger_link" link2="r_gripper_r_finger_link" reason="Default"/>
   <disable_self_collision link1="r_gripper_l_finger_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="r_gripper_l_finger_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="r_gripper_l_finger_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_tip_link" link2="r_gripper_l_finger_tip_link" reason="Adjacent"/>
   <disable_self_collision link1="r_gripper_l_finger_tip_link" link2="r_gripper_palm_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_tip_link" link2="r_gripper_r_finger_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_tip_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_tip_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="r_gripper_l_finger_tip_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_tip_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_tip_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_tip_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_l_finger_tip_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="r_gripper_l_finger_tip_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_palm_link" link2="r_gripper_palm_link" reason="Adjacent"/>
   <disable_self_collision link1="r_gripper_palm_link" link2="r_gripper_r_finger_link" reason="Default"/>
   <disable_self_collision link1="r_gripper_palm_link" link2="r_gripper_r_finger_tip_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_palm_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="r_gripper_palm_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_palm_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_palm_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_palm_link" link2="r_wrist_flex_link" reason="Default"/>
   <disable_self_collision link1="r_gripper_palm_link" link2="r_wrist_roll_link" reason="Adjacent"/>
-  <disable_self_collision link1="r_gripper_palm_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_r_finger_link" link2="r_gripper_r_finger_link" reason="Adjacent"/>
   <disable_self_collision link1="r_gripper_r_finger_link" link2="r_gripper_r_finger_tip_link" reason="Default"/>
   <disable_self_collision link1="r_gripper_r_finger_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="r_gripper_r_finger_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_r_finger_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_r_finger_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_r_finger_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_r_finger_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="r_gripper_r_finger_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_r_finger_tip_link" link2="r_gripper_r_finger_tip_link" reason="Adjacent"/>
   <disable_self_collision link1="r_gripper_r_finger_tip_link" link2="r_shoulder_lift_link" reason="Never"/>
-  <disable_self_collision link1="r_gripper_r_finger_tip_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_r_finger_tip_link" link2="r_upper_arm_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_r_finger_tip_link" link2="r_upper_arm_roll_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_r_finger_tip_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="r_gripper_r_finger_tip_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="r_gripper_r_finger_tip_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_shoulder_lift_link" link2="r_shoulder_lift_link" reason="Adjacent"/>
   <disable_self_collision link1="r_shoulder_lift_link" link2="r_shoulder_pan_link" reason="Default"/>
-  <disable_self_collision link1="r_shoulder_lift_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_shoulder_lift_link" link2="r_upper_arm_link" reason="AlmostAlways"/>
   <disable_self_collision link1="r_shoulder_lift_link" link2="r_upper_arm_roll_link" reason="Default"/>
   <disable_self_collision link1="r_shoulder_lift_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="r_shoulder_lift_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="r_shoulder_lift_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_shoulder_lift_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="r_shoulder_pan_link" link2="r_shoulder_pan_link" reason="Adjacent"/>
-  <disable_self_collision link1="r_shoulder_pan_link" link2="r_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_shoulder_pan_link" link2="r_upper_arm_link" reason="Default"/>
   <disable_self_collision link1="r_shoulder_pan_link" link2="r_upper_arm_roll_link" reason="AlmostAlways"/>
-  <disable_self_collision link1="r_shoulder_pan_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_shoulder_pan_link" link2="torso_lift_link" reason="Never"/>
-  <disable_self_collision link1="r_torso_lift_side_item_profile_link" link2="r_torso_lift_side_item_profile_link" reason="Adjacent"/>
-  <disable_self_collision link1="r_torso_lift_side_item_profile_link" link2="r_upper_arm_link" reason="Never"/>
-  <disable_self_collision link1="r_torso_lift_side_item_profile_link" link2="r_upper_arm_roll_link" reason="Never"/>
-  <disable_self_collision link1="r_torso_lift_side_item_profile_link" link2="r_wrist_flex_link" reason="Never"/>
-  <disable_self_collision link1="r_torso_lift_side_item_profile_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="r_torso_lift_side_item_profile_link" link2="t_torso_lift_side_item_profile_link" reason="Adjacent"/>
-  <disable_self_collision link1="r_torso_lift_side_item_profile_link" link2="torso_lift_link" reason="Adjacent"/>
   <disable_self_collision link1="r_upper_arm_link" link2="r_upper_arm_link" reason="Adjacent"/>
   <disable_self_collision link1="r_upper_arm_link" link2="r_upper_arm_roll_link" reason="Adjacent"/>
   <disable_self_collision link1="r_upper_arm_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="r_upper_arm_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="r_upper_arm_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_upper_arm_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="r_upper_arm_roll_link" link2="r_upper_arm_roll_link" reason="Adjacent"/>
   <disable_self_collision link1="r_upper_arm_roll_link" link2="r_wrist_flex_link" reason="Never"/>
   <disable_self_collision link1="r_upper_arm_roll_link" link2="r_wrist_roll_link" reason="Never"/>
-  <disable_self_collision link1="r_upper_arm_roll_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_upper_arm_roll_link" link2="torso_lift_link" reason="Never"/>
   <disable_self_collision link1="r_wrist_flex_link" link2="r_wrist_flex_link" reason="Adjacent"/>
   <disable_self_collision link1="r_wrist_flex_link" link2="r_wrist_roll_link" reason="Default"/>
-  <disable_self_collision link1="r_wrist_flex_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
   <disable_self_collision link1="r_wrist_roll_link" link2="r_wrist_roll_link" reason="Adjacent"/>
-  <disable_self_collision link1="r_wrist_roll_link" link2="t_torso_lift_side_item_profile_link" reason="Never"/>
-  <disable_self_collision link1="t_torso_lift_side_item_profile_link" link2="t_torso_lift_side_item_profile_link" reason="Adjacent"/>
-  <disable_self_collision link1="t_torso_lift_side_item_profile_link" link2="torso_lift_link" reason="Adjacent"/>
   <disable_self_collision link1="torso_lift_link" link2="torso_lift_link" reason="Adjacent"/>
 </robot>

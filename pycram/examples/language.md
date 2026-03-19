@@ -3,7 +3,7 @@ jupyter:
   jupytext:
     text_representation:
       extension: .md
-      format_name: myst
+      format_name: markdown
       format_version: '1.3'
       jupytext_version: 1.16.3
   kernelspec:
@@ -66,7 +66,7 @@ from pycram.datastructures.pose import PoseStamped
 from pycram.datastructures.enums import Arms
 from pycram.language import SequentialPlan
 
-navigate = NavigateActionDescription(PoseStamped.from_list([1, 1, 0]))
+navigate = NavigateActionDescription(PoseStamped.from_list([1, 1, 0], frame=world.root))
 park = ParkArmsActionDescription([Arms.BOTH])
 
 plan = SequentialPlan(context, navigate, park)
@@ -86,7 +86,7 @@ The plan can be executed by wrapping it inside a ```with simulated_robot``` envi
 plan.
 
 ```python
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 
 with simulated_robot:
     plan.perform()
@@ -104,7 +104,7 @@ Besides the described difference in behaviour this language expression can be us
 from pycram.robot_plans import *
 from pycram.datastructures.pose import PoseStamped
 from pycram.datastructures.enums import Arms
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.language import TryAllPLan
 
 navigate = NavigateActionDescription(PoseStamped.from_list([1, 1, 0]))
@@ -141,10 +141,10 @@ Using the parallel expressions works like Sequential and TryInOrder.
 from pycram.robot_plans import *
 from pycram.datastructures.pose import PoseStamped
 from pycram.datastructures.enums import Arms
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.language import ParallelPlan
 
-navigate = NavigateActionDescription(PoseStamped.from_list([1, 1, 0]))
+navigate = NavigateActionDescription(PoseStamped.from_list([1, 1, 0], frame=world.root))
 park = ParkArmsActionDescription([Arms.BOTH])
 
 plan = ParallelPlan(context, navigate, park)
@@ -164,10 +164,10 @@ TryAll can be used like any other language expression.
 from pycram.robot_plans import *
 from pycram.datastructures.pose import PoseStamped
 from pycram.datastructures.enums import Arms
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.language import TryAllPLan
 
-navigate = NavigateActionDescription(PoseStamped.from_list([1, 1, 0]))
+navigate = NavigateActionDescription(PoseStamped.from_list([1, 1, 0], frame=world.root))
 park = ParkArmsActionDescription([Arms.BOTH])
 
 plan = TryAllPLan(context, navigate, park)
@@ -192,10 +192,10 @@ with Sequential. You can try this yourself in the following cell.
 from pycram.robot_plans import *
 from pycram.datastructures.pose import PoseStamped
 from pycram.datastructures.enums import Arms
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.language import SequentialPlan, ParallelPlan
 
-navigate = NavigateActionDescription([PoseStamped.from_list([1, 1, 0])])
+navigate = NavigateActionDescription([PoseStamped.from_list([1, 1, 0], frame=world.root)])
 park = ParkArmsActionDescription([Arms.BOTH])
 move_torso = MoveTorsoActionDescription([TorsoState.HIGH])
 
@@ -219,7 +219,7 @@ other parts of the plan.
 ```python
 from pycram.robot_plans import *
 from pycram.datastructures.enums import Arms
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.language import CodePlan, ParallelPlan
 
 
@@ -245,7 +245,7 @@ will be caught and saved to a dictionary. In general all designators in a langua
 of exceptions raised, the only exception from this is the Sequential expression which stops after it encountered an
 exception.
 
-The language will only catch exceptions that are of type {class}`~pycram.plan_failures.PlanFailure` meaning errors that are defined in
+The language will only catch exceptions that are of type `PlanFailure` meaning errors that are defined in
 plan_failures.py in PyCRAM. This also means normal Python errors, such as KeyError, will interrupt the execution of your
 designators.
 
@@ -253,7 +253,7 @@ We will see how exceptions are handled at a simple example.
 
 ```python
 from pycram.robot_plans import *
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.language import CodePlan, ParallelPlan
 from pycram.failures import PlanFailure
 
@@ -262,7 +262,7 @@ def code_test():
     raise PlanFailure
 
 
-navigate = NavigateActionDescription([PoseStamped.from_list([1, 1, 0])])
+navigate = NavigateActionDescription([PoseStamped.from_list([1, 1, 0], frame=world.root)])
 code_func = CodePlan(context, code_test)
 
 plan = ParallelPlan(context, navigate, code_func)
@@ -285,8 +285,8 @@ You can see an example of how to use Repeat below.
 
 ```python
 from pycram.robot_plans import *
-from pycram.process_module import simulated_robot
-from pycram.datastructures.enums import TorsoState
+from pycram.motion_executor import simulated_robot
+from semantic_digital_twin.datastructures.definitions import TorsoState
 from pycram.language import SequentialPlan, RepeatPlan
 
 move_torso_up = MoveTorsoActionDescription([TorsoState.HIGH, TorsoState.MID, TorsoState.LOW])
@@ -311,10 +311,10 @@ Monitor to interrupt the execution after 2 seconds instead of executing the whol
 
 ```python
 from pycram.robot_plans import *
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.language import MonitorPlan, RepeatPlan, SequentialPlan
 import time
-from pycram.datastructures.enums import TorsoState
+from semantic_digital_twin.datastructures.definitions import TorsoState
 
 move_torso_up = MoveTorsoActionDescription([TorsoState.HIGH, TorsoState.MID, TorsoState.LOW])
 move_torso_down = MoveTorsoActionDescription([TorsoState.LOW, TorsoState.MID, TorsoState.HIGH])
@@ -338,9 +338,9 @@ If the `behavior` is set to `resume`, the plan will be launched in a paused stat
 
 ```python
 from pycram.robot_plans.actions.core import MoveTorsoActionDescription
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.language import MonitorPlan, RepeatPlan, SequentialPlan
-from pycram.datastructures.enums import TorsoState
+from semantic_digital_twin.datastructures.definitions import TorsoState
 import time
 
 def monitor_func():

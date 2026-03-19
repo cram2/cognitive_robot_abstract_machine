@@ -48,7 +48,7 @@ pr2_view = PR2.from_world(world)
 context = Context(world, pr2_view)
 ```
 
-Next up we will create the location designator description, the {meth}`~pycram.designators.location_designator.CostmapLocation` that we will be using needs a
+Next up we will create the location designator description, the `CostmapLocation` that we will be using needs a
 target as a parameter. This target describes what the location designator is for, this could either be a pose or object
 that the robot should be able to see or reach.
 
@@ -81,7 +81,7 @@ Since a robot is needed we will use the PR2 and use a milk as a target point for
 PR2 will be set to 0.2 since otherwise the arms of the robot will be too low to reach on the countertop.
 
 ```python
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.language import SequentialPlan
 from pycram.robot_plans.actions import ParkArmsActionDescription, MoveTorsoActionDescription
 from pycram.datastructures.enums import Arms, TorsoState

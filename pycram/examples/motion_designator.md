@@ -1,4 +1,4 @@
-from pycram.language import SequentialPlan---
+---
 jupyter:
   jupytext:
     text_representation:
@@ -43,7 +43,7 @@ designator.
 ```python
 from pycram.datastructures.pose import PoseStamped
 from pycram.robot_plans.motions import MoveMotion
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.language import SequentialPlan
 
 with simulated_robot:
@@ -59,7 +59,7 @@ Like any designator we start by creating a description and then resolving and pe
 
 ```python
 from pycram.robot_plans.motions import MoveTCPMotion
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.datastructures.enums import Arms
 
 with simulated_robot:
@@ -75,10 +75,10 @@ motion designator takes the target as position and orientation, in reality only 
 
 ```python
 from pycram.robot_plans.motions import LookingMotion
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 
 with simulated_robot:
-    motion_description = LookingMotion(target=PoseStamped.from_list([1, 1, 1], [0, 0, 0, 1], world.root))
+    motion_description = LookingMotion(target=PoseStamped.from_list([1, 1, 1], [0, 0, 0, 1]), camera=pr2_view.get_default_camera())
 
     SequentialPlan(context, motion_description).perform()
 ```
@@ -90,8 +90,9 @@ and close the gripper respectively.
 
 ```python
 from pycram.robot_plans.motions import MoveGripperMotion
-from pycram.process_module import simulated_robot
-from pycram.datastructures.enums import Arms, GripperState
+from pycram.motion_executor import simulated_robot
+from pycram.datastructures.enums import Arms
+from semantic_digital_twin.datastructures.definitions import GripperState
 
 with simulated_robot:
     motion_description = MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT)
@@ -110,7 +111,7 @@ Since we need an object that we can detect, we will spawn a milk for this.
 
 ```python
 # from pycram.robot_plans.motions import DetectingMotion, LookingMotion
-# from pycram.process_module import simulated_robot
+# from pycram.motion_executor import simulated_robot
 # from pycram.datastructures.pose import PoseStamped
 # from pycram.datastructures.enums import DetectionTechnique, DetectionState
 # from pycram.designators.object_designator import BelieveObject
@@ -134,11 +135,11 @@ This motion designator moves one or both arms. Movement targets are a dictionary
 as value.
 
 ```python
-from pycram.robot_plans.motions import MoveArmJointsMotion
-from pycram.process_module import simulated_robot
+from pycram.robot_plans.motions import MoveJointsMotion
+from pycram.motion_executor import simulated_robot
 
 with simulated_robot:
-    motion_description = MoveArmJointsMotion(right_arm_poses={"r_shoulder_pan_joint": -0.7})
+    motion_description = MoveJointsMotion(names=["r_shoulder_pan_joint"], positions=[-0.7])
 
     SequentialPlan(context, motion_description).perform()
 ```
@@ -150,7 +151,7 @@ the names of all joints that should be moved and the second list are the positio
 
 ```python
 from pycram.robot_plans.motions import MoveJointsMotion
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 
 with simulated_robot:
     motion_description = MoveJointsMotion(names=["torso_lift_joint", "r_shoulder_pan_joint"], positions=[0.2, -1.2])
