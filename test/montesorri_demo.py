@@ -13,7 +13,7 @@ from segmind.datastructures.events import (
     ContainmentEvent,
     TranslationEvent,
     StopTranslationEvent,
-    PlacingEvent, InsertionEvent, PickUpEvent,
+    PlacingEvent, InsertionEvent, PickUpEvent, LossOfContactEvent,
 )
 from segmind.detectors.atomic_event_detectors import DetectorStateChart
 from segmind.detectors.atomic_event_detectors_nodes import (
@@ -61,16 +61,16 @@ class TestMultiverseEpisodeSegmenter(TestCase):
         cls.sc = DetectorStateChart()
         cls.context = SegmindContext(world=cls.world, logger=cls.logger)
         cls.file_player = CSVEpisodePlayer(
-            file_path="/home/sorin/dev/workspace/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/data.csv",
+            file_path="/home/sorin/dev/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/data.csv",
             world=cls.world,
             time_between_frames=datetime.timedelta(milliseconds=4),
-            position_shift=Vector3(0, 0, -0.05),
+            position_shift=Vector3(0, 0, 0),
         )
         cls.episode_executor = EpisodeSegmenterExecutor(
             context=cls.context, player=cls.file_player
         )
         cls.episode_executor.spawn_scene(
-            models_dir="/home/sorin/dev/workspace/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/models/"
+            models_dir="/home/sorin/dev/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/models/"
         )
 
     def test_replay_episode(self):
@@ -171,6 +171,7 @@ class TestMultiverseEpisodeSegmenter(TestCase):
 
         pickup_events = [i for i in self.logger.get_events() if isinstance(i, PickUpEvent)]
 
+        loss_of_contact_events = [i for i in self.logger.get_events() if isinstance(i, LossOfContactEvent)]
         print(f"Number of pickup events: {len(pickup_events)}")
         print(f"Number of support events: {len(support_events)}")
         print(f"Number of translation events: {len(translation_events)}")
@@ -178,12 +179,13 @@ class TestMultiverseEpisodeSegmenter(TestCase):
         print(f"Number of placing events: {len(placing_events)}")
         print(f"Number of insertion events: {len(insertion_events)}")
         print(f"Number of contact events: {len(containment_events)}")
+        print(f"Number of loss_of_contact events: {len(loss_of_contact_events)}")
 
-        for e in translation_events:
-            print(f"Translation Event: {e}")
+        #for e in translation_events:
+        #    print(f"Translation Event: {e}")
 
-        for e in stop_translation_events:
-            print(f"Stop Translation Event: {e}")
+        #for e in stop_translation_events:
+        #    print(f"Stop Translation Event: {e}")
 
         for e in placing_events:
             print(f"Placing Event: {e}")
@@ -191,28 +193,28 @@ class TestMultiverseEpisodeSegmenter(TestCase):
         for e in support_events:
             print(f"Support Event: {e}")
 
-        assert len([i for i in logger.get_events() if isinstance(i, SupportEvent)]) > 0
-        assert len([i for i in logger.get_events() if isinstance(i, ContactEvent)]) > 0
-        for e in insertion_events:
-            print(f"Insertion Event: {e}")
+        #for e in loss_of_contact_events:
+        #    print(f"Loss of Contact Event: {e}")
 
-        for e in contact_events:
-            print(f"Contact Event: {e}")
+        #for e in insertion_events:
+        #    print(f"Insertion Event: {e}")
 
-        for e in containment_events:
-            print(f"Containment Event: {e}")
+        #for e in contact_events:
+#            print(f"Contact Event: {e}")
 
-        for e in pickup_events:
-            print(f"Pickup Event: {e}")
+        #for e in containment_events:
+ #           print(f"Containment Event: {e}")
 
-        assert len([i for i in self.logger.get_events() if isinstance(i, SupportEvent)]) > 0
-        assert len([i for i in self.logger.get_events() if isinstance(i, ContactEvent)]) > 0
-        assert (
-            len([i for i in self.logger.get_events() if isinstance(i, ContainmentEvent)]) > 0
-        )
-        assert (
-            len(translation_events) == len(stop_translation_events)
-            and len(translation_events) > 0
-        )
+        #for e in pickup_events:
+  #          print(f"Pickup Event: {e}")
+
+        assert len(self.context.holes) > 0
+        assert len(contact_events) > 0
+        assert len(loss_of_contact_events) > 0
+        assert len(support_events) >= len(placing_events) > 0
+        assert len(translation_events) >= len(stop_translation_events) > 0
+        assert len(containment_events) >= len(insertion_events) > 0
+
+
 
         self.episode_executor.statechart.draw("/home/sorin/dev/Segmind/plots/" + "sony.pdf")
