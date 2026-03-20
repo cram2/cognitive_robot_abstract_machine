@@ -81,6 +81,12 @@ class SegmindContext(MotionStatechartContext):
     """
     holes : List[Body] = field(default_factory=list)
 
+    """
+    List of insertion pairs
+    """
+    insertion_pairs: set = field(default_factory=set)
+
+
 # ToDo: See if we can create our own MotionStatechartNode or change its name (talk to simon)
 @dataclass(repr=False, eq=False)
 class DetectorStateChartNode(MotionStatechartNode):

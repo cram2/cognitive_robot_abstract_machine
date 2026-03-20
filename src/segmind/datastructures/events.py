@@ -547,7 +547,7 @@ class InsertionEvent(AbstractAgentObjectInteractionEvent):
         super().__init__(tracked_object=inserted_object, agent=agent,
                          timestamp=timestamp, end_timestamp=end_timestamp, with_object=through_hole)
         self.inserted_into_objects: List[Body] = inserted_into_objects
-        self.inserted_into_objects_frozen_cp: List[BodyDAO] = [obj.frozen_copy() for obj in inserted_into_objects]
+        self.inserted_into_objects_frozen_cp: List[BodyDAO] = [obj for obj in inserted_into_objects]
 
     @property
     def through_hole(self) -> Body:
@@ -565,8 +565,8 @@ class InsertionEvent(AbstractAgentObjectInteractionEvent):
         return hash_tuple
 
     def __str__(self):
-        with_object_name = " - " + f" - ".join([obj.name for obj in self.inserted_into_objects])
-        return f"{self.__class__.__name__}: {self.tracked_object.name}{with_object_name} - {self.timestamp}"
+        with_object_name = " - " + f" - ".join([obj.name.name for obj in self.inserted_into_objects])
+        return f"{self.__class__.__name__}: {self.tracked_object.name.name}{with_object_name} - {self.timestamp}"
 
     @property
     def color(self) -> Color:

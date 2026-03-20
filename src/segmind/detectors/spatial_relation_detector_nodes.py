@@ -9,7 +9,7 @@ from segmind.datastructures.events import (
     SupportEvent,
     LossOfSupportEvent,
     ContainmentEvent,
-    LossOfContainmentEvent,
+    LossOfContainmentEvent, ContactEvent, InsertionEvent,
 )
 from segmind.detectors.atomic_event_detectors_nodes import (
     SegmindContext,
@@ -296,8 +296,51 @@ class LossOfContainmentDetector(BaseContainmentDetector):
 
 @dataclass(eq=False, repr=False)
 class InsertionDetector(MotionStatechartNode):
-    tracked_object: Body = field(kw_only=True)
+    tracked_object: Optional[Body] = field(kw_only=True, default=None)
     context: SegmindContext = field(kw_only=True)
+    shift_threshold: float = 15.0
 
     def on_tick(self, context: SegmindContext) -> Optional[ObservationStateValues]:
-        print(self.tracked_object.name)
+        objects_to_check = (
+            [self.tracked_object]
+            if self.tracked_object
+            else [
+                body
+                for body in self.context.world.bodies
+                if type(body.parent_connection) is Connection6DoF
+            ]
+        )
+        events = self.update_and_trigger_events(objects_to_check)
+        for e in events:
+            self.context.logger.log_event(e)
+        return ObservationStateValues.TRUE if events else ObservationStateValues.FALSE
+
+
+    def update_and_trigger_events(self, tracked_objs: List[Body]) -> List[Event]:
+        events = []
+
+        contact_events = [i for i in self.context.logger.get_events() if isinstance(i, ContactEvent)]
+        contact_events_with_holes = [i for i in contact_events if i.with_object in self.context.holes]
+        containment_event = [i for i in self.context.logger.get_events() if isinstance(i, ContainmentEvent)]
+
+
+
+        for i in contact_events_with_holes:
+            for j in containment_event:
+                if i.tracked_object == j.tracked_object:
+                    if abs(i.timestamp - j.timestamp) < self.shift_threshold:
+
+                        # needs to be reworked, it doesnt work
+                        key = (id(i), id(j))
+
+                        # ✅ exclusivity check
+                        if key in self.context.insertion_pairs:
+                            continue
+
+                        self.context.insertion_pairs.add(key)
+
+                        e = InsertionEvent(i.tracked_object, [j.with_object], i.with_object, timestamp=i.timestamp)
+
+                        events.append(e)
+                        break
+        return events

@@ -8,7 +8,7 @@ from segmind.datastructures.events import (
     SupportEvent,
     ContainmentEvent,
     Event,
-    PlacingEvent,
+    PlacingEvent, TranslationEvent, LossOfSupportEvent, PickUpEvent,
 )
 from segmind.detectors.atomic_event_detectors_nodes import (
     SegmindContext,
@@ -98,6 +98,46 @@ class PlacingDetector(AbstractInteractionDetector):
                         self.context.placing_pairs.add(key)
 
                         e = PlacingEvent(
+                            tracked_object=i.tracked_object,
+                            with_object=j.with_object,
+                            timestamp=i.timestamp,
+                        )
+
+                        events.append(e)
+                        break
+        return events
+
+
+@dataclass
+class PickUpDetector(AbstractInteractionDetector):
+    def check_and_trigger_events(self, obj: Body) -> List[Event]:
+
+        translation_event = [
+            i
+            for i in self.context.logger.get_events()
+            if isinstance(i, TranslationEvent)
+        ]
+        loss_of_support_event = [
+            i for i in self.context.logger.get_events() if isinstance(i, LossOfSupportEvent)
+        ]
+
+        events = []
+        # Now we need to check if the stop translation event and the support event are close enough timestamp wise
+        for i in translation_event:
+            for j in loss_of_support_event:
+                if i.tracked_object == j.tracked_object:
+                    if abs(i.timestamp - j.timestamp) < self.shift_threshold:
+
+                        # needs to be reworked, it doesnt work
+                        key = (id(i), id(j))
+
+                        # ✅ exclusivity check
+                        if key in self.context.placing_pairs:
+                            continue
+
+                        self.context.placing_pairs.add(key)
+
+                        e = PickUpEvent(
                             tracked_object=i.tracked_object,
                             with_object=j.with_object,
                             timestamp=i.timestamp,
