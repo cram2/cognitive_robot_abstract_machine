@@ -74,6 +74,12 @@ class SegmindContext(MotionStatechartContext):
     The event logger used to record detected events.
     """
 
+    placing_pairs: set = field(default_factory=set)
+
+    """
+    List of holes
+    """
+    holes : List[Body] = field(default_factory=list)
 
 # ToDo: See if we can create our own MotionStatechartNode or change its name (talk to simon)
 @dataclass(repr=False, eq=False)

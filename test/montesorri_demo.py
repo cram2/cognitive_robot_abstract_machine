@@ -168,3 +168,5 @@ class TestMultiverseEpisodeSegmenter(TestCase):
             len(translation_events) == len(stop_translation_events)
             and len(translation_events) > 0
         )
+        print(f"Number of holes: {len(self.episode_executor.context.holes)}")
+        assert len(self.episode_executor.context.holes) > 0

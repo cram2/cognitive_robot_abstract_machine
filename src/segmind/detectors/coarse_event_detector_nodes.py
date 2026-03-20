@@ -41,7 +41,6 @@ class AbstractInteractionDetector(DetectorStateChartNode, ABC):
 
     shift_threshold: float = 15
 
-    placing_pairs: set = field(default_factory=set)
 
     def on_tick(self, context: SegmindContext) -> Optional[ObservationStateValues]:
         objects_to_check = (
@@ -93,10 +92,10 @@ class PlacingDetector(AbstractInteractionDetector):
                         key = (id(i), id(j))
 
                         # ✅ exclusivity check
-                        if key in self.placing_pairs:
+                        if key in self.context.placing_pairs:
                             continue
 
-                        self.placing_pairs.add(key)
+                        self.context.placing_pairs.add(key)
 
                         e = PlacingEvent(
                             tracked_object=i.tracked_object,
@@ -105,5 +104,5 @@ class PlacingDetector(AbstractInteractionDetector):
                         )
 
                         events.append(e)
-
+                        break
         return events

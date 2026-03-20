@@ -603,8 +603,15 @@ class EpisodeSegmenterExecutor:
         # self.context.collision_manager.update_collision_matrix()
         # do one tick to immediately active nodes whose start condition is constant true.
         self.statechart.tick(self.context)
+        self.fill_holes()
         if self.player:
             self.player.start()
+
+
+    def fill_holes(self):
+        for o in self.context.world.bodies:
+            if "hole" in o.name.name:
+                self.context.holes.append(o)
 
     def tick(self):
         #self.player.pause()

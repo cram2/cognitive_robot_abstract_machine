@@ -291,3 +291,13 @@ class LossOfContainmentDetector(BaseContainmentDetector):
                 )
 
         return events
+
+
+
+@dataclass(eq=False, repr=False)
+class InsertionDetector(MotionStatechartNode):
+    tracked_object: Body = field(kw_only=True)
+    context: SegmindContext = field(kw_only=True)
+
+    def on_tick(self, context: SegmindContext) -> Optional[ObservationStateValues]:
+        print(self.tracked_object.name)
