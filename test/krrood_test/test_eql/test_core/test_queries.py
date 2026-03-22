@@ -1270,3 +1270,10 @@ def test_accessing_dunder_methods():
     results = world_class_starting_with_c.tolist()
     assert len(results) == 3
     assert set(results) == {c for c in world_classes if c.__name__.startswith("C")}
+
+
+def test_debugger_issue():
+    # a normal query using a property
+    var = variable(int, [1, 2, 3])
+    with pytest.raises(TypeError):
+        list(var)
