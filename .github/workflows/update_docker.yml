@@ -17,6 +17,7 @@ on:
     paths:
       - '.github/docker/Dockerfile'
       - '.github/docker/entrypoint.sh'
+      - '.github/docker/setup_ros_workspace.sh'
 
 jobs:
   build_and_push_docker_image:

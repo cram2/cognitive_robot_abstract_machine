@@ -93,7 +93,7 @@ The structure of fixtures in this conftest:
 def cleanup_after_test():
     # We need to pass the class diagram, since otherwise some names are not found anymore after clearing the symbol graph
     # for the first time, since World is not a symbol
-    SymbolGraph().clear()
+    SymbolGraph.clear()
     class_diagram = ClassDiagram(
         recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),
@@ -102,7 +102,7 @@ def cleanup_after_test():
     # runs BEFORE each test
     yield
     # runs AFTER each test (even if the test fails or errors)
-    SymbolGraph().clear()
+    SymbolGraph.clear()
 
 
 @pytest.fixture(autouse=True, scope="session")

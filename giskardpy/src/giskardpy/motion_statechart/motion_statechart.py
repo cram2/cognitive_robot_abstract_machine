@@ -6,7 +6,6 @@ from typing import Dict, Any
 
 import numpy as np
 import rustworkx as rx
-from line_profiler.explicit_profiler import profile
 from typing_extensions import List, MutableMapping, ClassVar, Self, Type
 
 import krrood.symbolic_math.symbolic_math as sm
@@ -16,7 +15,10 @@ from giskardpy.motion_statechart.plotters.gantt_chart_plotter import (
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.symbolic_math.symbolic_math import VariableParameters
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import LifeCycleValues, ObservationStateValues
+from giskardpy.motion_statechart.data_types import (
+    LifeCycleValues,
+    ObservationStateValues,
+)
 from giskardpy.motion_statechart.exceptions import EmptyMotionStatechartError
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
@@ -158,7 +160,6 @@ class LifeCycleState(State):
     def __getitem__(self, node: MotionStatechartNode) -> LifeCycleValues:
         return LifeCycleValues(super().__getitem__(node))
 
-    @profile
     def update_state(self):
         np.copyto(self.data, self._compiled_updater.evaluate())
 
@@ -217,7 +218,6 @@ class ObservationState(State):
             arg_idx=3, numpy_array=context.float_variable_data.data
         )
 
-    @profile
     def update_state(self):
         np.copyto(self.data, self._compiled_updater.evaluate())
 
