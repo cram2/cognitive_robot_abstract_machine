@@ -26,10 +26,7 @@ class Country(RecognizedGroup): ...
 class Course(HasName, Symbol): ...
 
 @dataclass(eq=False)
-class PersonMixin(HasName, Symbol):
-    name: str = field(init=False)
-    works_for: RecognizedGroup = field(init=False)
-    member_of: List[RecognizedGroup] = field(init=False)
+class PersonRoleAttributes:
     head_of: RecognizedGroup = field(init=False)
     delegate_of: RecognizedGroup = field(init=False)
     members: Set[Person] = field(init=False)
@@ -38,17 +35,22 @@ class PersonMixin(HasName, Symbol):
     representative_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class Person(HasName, Symbol, PersonMixin):
-    works_for: RecognizedGroup = field(default=None, kw_only=True)
-    member_of: List[RecognizedGroup] = field(default_factory=list, kw_only=True)
+class PersonMixin(PersonRoleAttributes, HasName, Symbol):
+    name: str = field(init=False)
+    works_for: RecognizedGroup = field(init=False)
+    member_of: List[RecognizedGroup] = field(init=False)
+
+@dataclass(eq=False)
+class Person(PersonRoleAttributes, HasName, Symbol):
+    works_for: RecognizedGroup = None
+    member_of: List[RecognizedGroup] = field(default_factory=list)
 
 @dataclass(eq=False)
 class SubclassOfARoleTakerMixin(PersonMixin):
     introduced_attribute: str = field(init=False)
-    head_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class SubclassOfARoleTaker(Person, SubclassOfARoleTakerMixin):
+class SubclassOfARoleTaker(Person):
     introduced_attribute: str = field(default="", kw_only=True)
 
 TPerson = TypeVar("TPerson", bound=Person)
@@ -77,10 +79,10 @@ class CEOAsFirstRoleMixin(PersonMixin, Role[TPerson], Symbol):
     head_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class CEOAsFirstRole(CEOAsFirstRoleMixin[TPerson]):
+class CEOAsFirstRole(PersonMixin, Role[TPerson], Symbol):
     person: TPerson = field(kw_only=True)
     # Original Owner of the head_of field
-    head_of: RecognizedGroup = field(default=None, kw_only=True)
+    head_of: RecognizedGroup = None
 
     @classmethod
     def role_taker_attribute(cls) -> TPerson: ...
@@ -117,7 +119,7 @@ class RepresentativeAsSecondRoleMixin(
     representative_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class RepresentativeAsSecondRole(RepresentativeAsSecondRoleMixin[TCEOAsFirstRole]):
+class RepresentativeAsSecondRole(CEOAsFirstRoleMixin, Role[TCEOAsFirstRole], Symbol):
     ceo: TCEOAsFirstRole = field(kw_only=True)
     # Original Owner of the representative_of field
     representative_of: RecognizedGroup = field(default=None, kw_only=True)

@@ -31,10 +31,7 @@ class Country(RecognizedGroup): ...
 class Course(HasName, Symbol): ...
 
 @dataclass(eq=False)
-class PersonMixin(HasName, Symbol):
-    name: str = field(init=False)
-    works_for: RecognizedGroup = field(init=False)
-    member_of: List[RecognizedGroup] = field(init=False)
+class PersonRoleAttributes:
     teacher_of: List[Course] = field(init=False)
     members: Set[Person] = field(init=False)
     sub_organization_of: List[RecognizedGroup] = field(init=False)
@@ -43,17 +40,22 @@ class PersonMixin(HasName, Symbol):
     delegate_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class Person(PersonMixin):
+class PersonMixin(PersonRoleAttributes, HasName, Symbol):
+    name: str = field(init=False)
+    works_for: RecognizedGroup = field(init=False)
+    member_of: List[RecognizedGroup] = field(init=False)
+
+@dataclass(eq=False)
+class Person(PersonRoleAttributes, HasName, Symbol):
     works_for: RecognizedGroup = None
     member_of: List[RecognizedGroup] = field(default_factory=list)
 
 @dataclass(eq=False)
 class SubclassOfARoleTakerMixin(PersonMixin):
     introduced_attribute: str = field(init=False)
-    head_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class SubclassOfARoleTaker(SubclassOfARoleTakerMixin):
+class SubclassOfARoleTaker(Person):
     introduced_attribute: str = field(default="", kw_only=True)
 
 TPerson = TypeVar("TPerson", bound=Person)
@@ -64,7 +66,7 @@ class CEOAsFirstRoleMixin(PersonMixin, Role[TPerson], Symbol):
     head_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class CEOAsFirstRole(CEOAsFirstRoleMixin[TPerson]):
+class CEOAsFirstRole(PersonMixin, Role[TPerson], Symbol):
     person: TPerson = field(kw_only=True)
     head_of: RecognizedGroup = None
 
@@ -74,7 +76,9 @@ class CEOAsFirstRole(CEOAsFirstRoleMixin[TPerson]):
 TSubclassOfARoleTaker = TypeVar("TSubclassOfARoleTaker", bound=SubclassOfARoleTaker)
 
 @dataclass(eq=False)
-class SubclassOfRoleThatUpdatesRoleTakerType(CEOAsFirstRole[TSubclassOfARoleTaker]): ...
+class SubclassOfRoleThatUpdatesRoleTakerType(
+    SubclassOfARoleTakerMixin, CEOAsFirstRole[TSubclassOfARoleTaker]
+): ...
 
 @dataclass(eq=False)
 class DirectDiamondShapedInheritanceWhereOneIsRole(
@@ -121,7 +125,7 @@ class RepresentativeAsSecondRoleMixin(
     representative_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class RepresentativeAsSecondRole(RepresentativeAsSecondRoleMixin[TCEOAsFirstRole]):
+class RepresentativeAsSecondRole(CEOAsFirstRoleMixin, Role[TCEOAsFirstRole], Symbol):
     ceo: TCEOAsFirstRole = field(kw_only=True)
     representative_of: RecognizedGroup = field(default=None, kw_only=True)
 

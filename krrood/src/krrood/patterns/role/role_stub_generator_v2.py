@@ -146,15 +146,8 @@ class StubTransformer(libcst.CSTTransformer):
 
         if is_taker:
             # transform_role_taker returns [Mixin, original_class]
-            taker_nodes = self._transform_role_taker(updated_node, wrapped_class)
-            result_nodes = [taker_nodes[0], taker_nodes[1]]
+            result_nodes = self._transform_role_taker(updated_node, wrapped_class)
             return libcst.FlattenSentinel(result_nodes)
-        #     # If no TypeVar is found later, we might miss RoleFor.
-        #     # But the ground truth suggests RoleFor is after TypeVar if it exists.
-        #     # If no TypeVar exists for this taker, we should probably add it here.
-        #     if not self._has_type_var_for_taker(wrapped_class.clazz):
-        #         role_for_class = self._synthesize_role_for(wrapped_class.clazz)
-        #         result_nodes.append(role_for_class)
         else:
             result_nodes = [updated_node]
 
@@ -163,16 +156,16 @@ class StubTransformer(libcst.CSTTransformer):
         match role_type:
             case RoleType.NOT_A_ROLE:
                 ...
-            # case RoleType.SPECIALIZED_ROLE_FOR:
-            #     # transform_specialized_role returns [specialized_class, node]
-            #     result_nodes = self._transform_specialized_role(
-            #         updated_node, wrapped_class
-            #     )
             case _:
                 updated_node = self._transform_role(
                     updated_node, wrapped_class, role_type
                 )
-                result_nodes = [updated_node]
+                old_node = next(
+                    (rn for rn in result_nodes if rn.name == updated_node.name), None
+                )
+                if old_node is not None:
+                    result_nodes.remove(old_node)
+                result_nodes.append(updated_node)
 
         if len(result_nodes) > 1:
             return libcst.FlattenSentinel(result_nodes)
@@ -242,15 +235,20 @@ class StubTransformer(libcst.CSTTransformer):
         """
         original_name = node.name.value
         mixin_name = f"{original_name}Mixin"
-        mixin_node = self.get_renamed_node(node, mixin_name)
-
-        # Reconstruct body: own fields + propagated fields (init=False)
-        mixin_body = []
+        role_attributes_name = f"{original_name}RoleAttributes"
         bases_that_are_takers = {
             b.__name__: b
             for b in wrapped_class.clazz.__bases__
             if b in self.diagram.role_takers
         }
+        make_role_attributes = not (
+            any(self._is_role_base(base.value) for base in node.bases)
+            or bases_that_are_takers
+        )
+        mixin_node = self.get_renamed_node(node, mixin_name)
+
+        # Reconstruct body: own fields + propagated fields (init=False)
+        mixin_body = []
         all_taker_fields = []
         for base_name, taker_type in bases_that_are_takers.items():
             wrapped_taker = self.diagram.get_wrapped_class(taker_type)
@@ -262,13 +260,20 @@ class StubTransformer(libcst.CSTTransformer):
                 mixin_body.append(self._create_field_node(field_, init=False))
 
         propagated_fields = self._get_propagated_fields(wrapped_class)
-        mixin_body.extend(propagated_fields)
+        role_attributes_node = None
+        if make_role_attributes:
+            role_attributes_node = self.make_dataclass(
+                role_attributes_name, body=propagated_fields
+            )
 
-        new_bases = []
+        mixin_node = self.get_node_with_new_body(mixin_node, mixin_body)
+        mixin_bases = []
+        reentry_node_bases = []
         for base in node.bases:
             base_name = self.get_name_from_base_node(base.value)
             if base_name in bases_that_are_takers:
-                new_bases.append(
+                reentry_node_bases.append(base)
+                mixin_bases.append(
                     self.make_argument(
                         self._get_mixin_name(
                             bases_that_are_takers[base_name], wrapped_class
@@ -278,29 +283,24 @@ class StubTransformer(libcst.CSTTransformer):
                 continue
             if self._is_role_base(base.value) and issubclass(wrapped_class.clazz, Role):
                 taker_type = wrapped_class.clazz.get_role_taker_type()
-                new_bases.append(
-                    self.make_argument(
-                        self._get_mixin_name(taker_type, wrapped_class, False)
-                    )
+                taker_mixin = self.make_argument(
+                    self._get_mixin_name(taker_type, wrapped_class, False)
                 )
-            new_bases.append(base)
-
-        mixin_node = self.get_node_with_new_body(mixin_node, mixin_body)
-        mixin_node = mixin_node.with_changes(bases=new_bases)
+                mixin_bases.append(taker_mixin)
+                reentry_node_bases.append(taker_mixin)
+            mixin_bases.append(base)
+            reentry_node_bases.append(base)
+        if make_role_attributes:
+            mixin_bases.insert(0, self.make_argument(role_attributes_name))
+            reentry_node_bases.insert(0, self.make_argument(role_attributes_name))
+        mixin_node = mixin_node.with_changes(bases=mixin_bases)
 
         # Create the original class inheriting from Mixin
-        reentry_class = libcst.ClassDef(
-            name=libcst.Name(original_name),
-            bases=[
-                self.make_argument(
-                    self._get_mixin_name(wrapped_class.clazz, wrapped_class)
-                )
-            ],
-            body=node.body,
-            decorators=node.decorators,
-        )
-
-        return [mixin_node, reentry_class]
+        reentry_class = node.with_changes(bases=reentry_node_bases)
+        if make_role_attributes:
+            return [role_attributes_node, mixin_node, reentry_class]
+        else:
+            return [mixin_node, reentry_class]
 
     @classmethod
     def get_node_with_new_body(
@@ -413,8 +413,12 @@ class StubTransformer(libcst.CSTTransformer):
         # Filter out original Role bases and redundant bases
         new_bases = []
 
-        taker_mro_names = {c.__name__ for c in taker_type.mro()}
-
+        taker_mro_names = {c.__name__: c for c in taker_type.mro()}
+        role_bases = {
+            base.__name__: base
+            for base in wrapped_class.clazz.__bases__
+            if issubclass(base, Role)
+        }
         for base in node.bases:
 
             # If it's a simple name and in taker's MRO, it's covered by RoleFor<Taker>
@@ -424,7 +428,10 @@ class StubTransformer(libcst.CSTTransformer):
             ):
                 continue
 
-            if self._is_role_base(base.value):
+            if (
+                self._is_role_base(base.value)
+                or self.get_name_from_base_node(base.value) in role_bases
+            ):
                 new_bases.append(
                     self.make_argument(
                         self._get_mixin_name(taker_type, wrapped_class, False)

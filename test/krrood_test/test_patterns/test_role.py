@@ -1,4 +1,4 @@
-from dataclasses import is_dataclass, fields
+from dataclasses import is_dataclass
 
 import pytest
 
@@ -16,7 +16,6 @@ from ..dataset.role_and_ontology.university_ontology_like_classes_without_descri
     ProfessorAsFirstRole,
     Course,
     RepresentativeAsSecondRole,
-    SubclassOfRoleThatUpdatesRoleTakerType,
 )
 
 
