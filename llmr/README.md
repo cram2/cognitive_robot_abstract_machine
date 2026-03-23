@@ -1,74 +1,88 @@
 # llmr — LLM-based Reasoner
 
-A pipeline that converts natural language instructions into executable PyCRAM robot actions using LLM-driven reasoning and LangGraph workflows.
+A pipeline that converts natural language instructions into executable PyCRAM robot actions using LLM-driven slot filling, entity grounding, motion precondition planning, and recovery handling.
 
 ## Workflow
 
 ```
 Natural Language Instruction
         ↓
-   NL → structured intent (IntentType + roles)
+   TaskDecomposer              (task_decomposer.py)
+   Compound instruction → ordered list of atomic steps
         ↓
-   Action Decomposition Graph   (graphs/ad_graph.py)
-   1. Field Extraction    — extract semantic roles from instruction
-   2. Semantic Enrichment — add object properties (size, material, etc.)
-   3. CRAM Plan Generation — fill LISP-style plan template
+   ActionPipeline              (pipeline/action_pipeline.py)
+   1. Slot Filling     — classify action type and extract parameters via LLM
+   2. Entity Grounding — resolve object names to live world Body objects
+   3. Action Dispatch  — build typed PyCRAM ActionDescription
         ↓
-   CRAM Plan String
-   e.g. (an action (type PickingUp) (object (:tag cup (an object (type Artifact)...))))
+   MotionPreconditionPlanner   (planning/motion_precondition_planner.py)
+   Compute preparatory actions (navigate, park arms, raise torso)
         ↓
-   CRAMToPyCRAMSerializer    (adapters/cram_to_pycram.py)
-   Parse S-expression → CRAMActionPlan (intermediate representation)
+   PyCRAM SequentialPlan
+   Execute preconditions + action on the robot
         ↓
-   SimulationBridge          (adapters/simulation_bridge.py)
-   Resolve symbolic names → live world Body objects → PartialDesignator
-        ↓
-   PyCRAM Execution
+   RecoveryHandler             (recovery_handler.py)
+   On failure: LLM proposes replan or abort
 ```
-
 
 ## Structure
 
 ```
 src/llmr/
-├── parsers/        LLM agent nodes (intent parser, pycram mapper)
-├── graphs/         LangGraph workflows (ad_graph)
-├── models/         Pydantic schemas (intents, CRAM actions, PyCRAM models)
-├── prompts/        LangChain prompt templates
-├── adapters/    CRAM → PyCRAM conversion and simulation bridge
-├── states/         LangGraph state definitions
-├── lg_memory/      Long-term memory and semantic cache (MongoDB)
-└── workflows/      LLM configuration and utilities
+├── execution_loop.py       Top-level orchestrator (run instructions end-to-end)
+├── task_decomposer.py      Compound NL → ordered atomic steps
+├── recovery_handler.py     Failure recovery via LLM replanning
+├── world_setup.py          Convenience world/robot initialisation helpers
+├── pipeline/
+│   ├── action_pipeline.py      Slot filling → grounding → dispatch
+│   ├── action_dispatcher.py    Build typed PyCRAM actions (PickUp, Place, …)
+│   ├── entity_grounder.py      Resolve object names to world Body objects
+│   └── clarification.py        Clarification request / arm-capacity errors
+├── planning/
+│   └── motion_precondition_planner.py  Navigate + posture preconditions
+└── workflows/
+    ├── llm_configuration.py    LLM provider factory (OpenAI / Ollama)
+    ├── nodes/                  LangGraph nodes (slot_filler, resolver, recovery_resolver)
+    ├── prompts/                LangChain prompt templates
+    ├── schemas/                Pydantic output schemas (PickUp, Place, Recovery)
+    └── states/                 LangGraph state definitions
 
-tests/              Unit tests (no LLM calls — all mocked)
-examples/           example usages
+test/llmr_test/             Unit tests (all LLM calls mocked)
 ```
 
 ## Installation
 
 ```bash
 workon cram-env
-pip install -e .
+pip install -e llmr/
 ```
 
-Requires a `OPENAI_API_KEY` and running MongoDB instance (only for cache) `MONGODB_URI` set in `src/llmr/workflows/.env`.
+Requires `OPENAI_API_KEY` set in `llmr/.env`:
+
+```
+OPENAI_API_KEY=your-openai-api-key-here
+```
 
 ## Quick Start
 
 ```python
-from llmr.workflows.graphs.ad_graph import run_with_cache
-from llmr.adapters.simulation_bridge import SimulationBridge
+from llmr import ExecutionLoop, ActionPipeline, TaskDecomposer
+from llmr import load_pr2_apartment_world
 
-result = run_with_cache("pick up the cup from the table", use_cache=False)
-cram_plans = result["cram_plan_response"]
+world, robot = load_pr2_apartment_world()
 
-bridge = SimulationBridge(world, robot)
-bridge.execute_batch(cram_plans, arm=Arms.RIGHT)
+loop = ExecutionLoop(
+    pipeline=ActionPipeline(world=world),
+    task_decomposer=TaskDecomposer(),
+    world=world,
+)
+
+results = loop.run(["pick up the milk from the table and place it on the island"])
 ```
 
 ## Running Tests
 
 ```bash
 workon cram-env
-pytest tests/
+pytest test/llmr_test/
 ```
