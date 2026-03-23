@@ -11,9 +11,10 @@ from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+
 from pycram.datastructures.enums import Arms
 from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.datastructures.pose import PoseStamped
 from pycram.designators.location_designator import CostmapLocation, SemanticCostmapLocation
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.navigation import NavigateAction
@@ -209,12 +210,7 @@ class PickUpPreconditionProvider(PreconditionProvider):
         its bounding box geometry (which can shift the nav pose out of reach
         for objects that are off-center relative to the robot).
         """
-        try:
-            from pycram.datastructures.pose import PoseStamped as PyCramPoseStamped
-
-            target = PyCramPoseStamped.from_spatial_type(obj_body.global_pose)
-        except Exception:
-            target = obj_body
+        target = obj_body.global_pose
         loc = CostmapLocation(
             target=target,
             reachable_for=robot,
@@ -308,15 +304,15 @@ class PlacePreconditionProvider(PreconditionProvider):
         self,
         target: Any,
         for_object: Optional[Body],
-    ) -> PoseStamped:
-        """Convert a placement target to a PoseStamped.
+    ) -> Pose:
+        """Convert a placement target to a Pose.
 
-        If *target* is already a ``PoseStamped`` it is returned as-is.
+        If *target* is already a ``Pose`` it is returned as-is.
         If it is a ``Body`` (as returned by the ActionDispatcher), the pose is
         computed by ``SemanticCostmapLocation`` so the object rests on the surface.
         SemanticCostmapLocation does not access robot_view, so this is safe outside a plan.
         """
-        if isinstance(target, PoseStamped):
+        if isinstance(target, Pose):
             return target
 
         # target is a Body – compute placement pose on its surface.
@@ -331,11 +327,11 @@ class PlacePreconditionProvider(PreconditionProvider):
             logger.warning(
                 "SemanticCostmapLocation failed (%s). Falling back to body global pose.", exc
             )
-            return PoseStamped.from_spatial_type(target.global_pose)
+            return target.global_pose
 
     def _make_nav_designator(
         self,
-        place_pose: PoseStamped,
+        place_pose: Pose,
         arm: Arms,
         robot: Optional[AbstractRobot],
     ) -> Optional[PartialDesignator]:
