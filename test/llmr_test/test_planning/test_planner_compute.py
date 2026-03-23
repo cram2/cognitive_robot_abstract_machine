@@ -160,10 +160,10 @@ class TestPlaceCompute:
 
 class TestResolvePlacePose:
     def test_posestamped_passthrough(self, mock_world):
-        from pycram.datastructures.pose import PoseStamped
+        from semantic_digital_twin.spatial_types.spatial_types import Pose
 
         provider = PlacePreconditionProvider(world=mock_world)
-        pose = MagicMock(spec=PoseStamped)
+        pose = MagicMock(spec=Pose)
 
         result = provider._resolve_place_pose(pose, MagicMock())
         assert result is pose
@@ -186,20 +186,16 @@ class TestResolvePlacePose:
         assert result is mock_pose
 
     def test_body_target_fallback_on_costmap_failure(self, mock_world):
-        from pycram.datastructures.pose import PoseStamped
-
         provider = PlacePreconditionProvider(world=mock_world)
         body = MagicMock()
         fallback_pose = MagicMock()
+        body.global_pose = fallback_pose
 
         with patch(
             "llmr.planning.motion_precondition_planner.SemanticCostmapLocation",
             side_effect=RuntimeError("no surface"),
         ):
-            with patch.object(
-                PoseStamped, "from_spatial_type", return_value=fallback_pose
-            ):
-                result = provider._resolve_place_pose(body, MagicMock())
+            result = provider._resolve_place_pose(body, MagicMock())
 
         assert result is fallback_pose
 
