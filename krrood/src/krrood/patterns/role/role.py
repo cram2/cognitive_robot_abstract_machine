@@ -2,9 +2,9 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
 from functools import lru_cache, cached_property
-from typing import List, TypeVar
+from typing import List, TypeVar, ClassVar
 
-from typing_extensions import Type, get_origin, Any, Dict
+from typing_extensions import Type, get_origin, Any, Dict, Iterable
 
 from krrood.class_diagrams.utils import T, get_type_hints_of_object
 from krrood.entity_query_language.core.mapped_variable import Attribute
@@ -204,3 +204,11 @@ class Role(SubClassSafeGeneric[T], ABC):
 
     def __eq__(self, other):
         return hash(self) == hash(other)
+
+
+@dataclass(eq=False)
+class RoleTaker(ABC):
+    roles: ClassVar[Dict[Type[Role], List[Role]]] = {}
+
+    def as_role(self, role_type: Type[T]) -> List[Role[T]]:
+        return self.roles.get(role_type, [])

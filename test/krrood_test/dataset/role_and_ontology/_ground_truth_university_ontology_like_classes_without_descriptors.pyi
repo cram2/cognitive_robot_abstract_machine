@@ -38,22 +38,23 @@ class PersonMixin(HasName, Symbol):
     representative_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class Person(PersonMixin):
+class Person(HasName, Symbol, PersonMixin):
     works_for: RecognizedGroup = field(default=None, kw_only=True)
     member_of: List[RecognizedGroup] = field(default_factory=list, kw_only=True)
 
 @dataclass(eq=False)
-class SubclassOfARoleTakerMixin(Person):
+class SubclassOfARoleTakerMixin(PersonMixin):
     introduced_attribute: str = field(init=False)
+    head_of: RecognizedGroup = field(init=False)
 
 @dataclass(eq=False)
-class SubclassOfARoleTaker(SubclassOfARoleTakerMixin):
+class SubclassOfARoleTaker(Person, SubclassOfARoleTakerMixin):
     introduced_attribute: str = field(default="", kw_only=True)
 
 TPerson = TypeVar("TPerson", bound=Person)
 
 @dataclass(eq=False)
-class DirectDiamondShapedInheritanceWhereOneIsRole(Role[TPerson], PersonMixin):
+class DirectDiamondShapedInheritanceWhereOneIsRole(PersonMixin, Role[TPerson]):
     person: TPerson = field(kw_only=True)
 
     @classmethod
@@ -61,9 +62,9 @@ class DirectDiamondShapedInheritanceWhereOneIsRole(Role[TPerson], PersonMixin):
 
 @dataclass(eq=False)
 class InDirectDiamondShapedInheritanceWhereOneIsRole(
-    Role[TPerson],
-    PersonMixin,
     RecognizedGroup,
+    PersonMixin,
+    Role[TPerson],
 ):
     person: TPerson = field(kw_only=True)
 
@@ -71,12 +72,9 @@ class InDirectDiamondShapedInheritanceWhereOneIsRole(
     def role_taker_attribute(cls) -> TPerson: ...
 
 @dataclass(eq=False)
-class CEOAsFirstRoleMixin(Role[TPerson], PersonMixin):
+class CEOAsFirstRoleMixin(PersonMixin, Role[TPerson], Symbol):
     person: TPerson = field(init=False)
     head_of: RecognizedGroup = field(init=False)
-
-    @classmethod
-    def role_taker_attribute(cls) -> TPerson: ...
 
 @dataclass(eq=False)
 class CEOAsFirstRole(CEOAsFirstRoleMixin[TPerson]):
@@ -84,20 +82,18 @@ class CEOAsFirstRole(CEOAsFirstRoleMixin[TPerson]):
     # Original Owner of the head_of field
     head_of: RecognizedGroup = field(default=None, kw_only=True)
 
+    @classmethod
+    def role_taker_attribute(cls) -> TPerson: ...
+
 TSubclassOfARoleTaker = TypeVar("TSubclassOfARoleTaker", bound=SubclassOfARoleTaker)
 
 @dataclass(eq=False)
-class CEOAsFirstRoleAsRoleForSubclassOfARoleTaker(
-    CEOAsFirstRole[TSubclassOfARoleTaker], SubclassOfARoleTakerMixin
-): ...
-
-@dataclass(eq=False)
 class SubclassOfRoleThatUpdatesRoleTakerType(
-    CEOAsFirstRoleAsRoleForSubclassOfARoleTaker
+    SubclassOfARoleTakerMixin, CEOAsFirstRole[TSubclassOfARoleTaker]
 ): ...
 
 @dataclass(eq=False)
-class ProfessorAsFirstRole(PersonMixin, Role[TPerson], Symbol):
+class ProfessorAsFirstRole(PersonMixin, Role[TPerson]):
     person: TPerson = field(kw_only=True)
     # Original Owner of the teacher_of field
     teacher_of: List[Course] = field(default_factory=list, kw_only=True)
@@ -120,14 +116,14 @@ class RepresentativeAsSecondRoleMixin(
     # Original Owner of the representative_of field
     representative_of: RecognizedGroup = field(init=False)
 
-    @classmethod
-    def role_taker_attribute(cls) -> TCEOAsFirstRole: ...
-
 @dataclass(eq=False)
 class RepresentativeAsSecondRole(RepresentativeAsSecondRoleMixin[TCEOAsFirstRole]):
     ceo: TCEOAsFirstRole = field(kw_only=True)
     # Original Owner of the representative_of field
     representative_of: RecognizedGroup = field(default=None, kw_only=True)
+
+    @classmethod
+    def role_taker_attribute(cls) -> TCEOAsFirstRole: ...
 
 TRepresentativeAsSecondRole = TypeVar(
     "TRepresentativeAsSecondRole", bound=RepresentativeAsSecondRole
@@ -135,7 +131,7 @@ TRepresentativeAsSecondRole = TypeVar(
 
 @dataclass(eq=False)
 class DelegateAsThirdRole(
-    RepresentativeAsSecondRoleMixin, Role[TRepresentativeAsSecondRole], Symbol
+    RepresentativeAsSecondRoleMixin, Role[TRepresentativeAsSecondRole]
 ):
     representative: TRepresentativeAsSecondRole = field(kw_only=True)
     # Original Owner of the delegate_of field

@@ -92,7 +92,7 @@ class StubComparator:
             gen_cls = gen_classes[name]
             assert [base.__name__ for base in gen_cls.__bases__] == [
                 base.__name__ for base in exp_cls.__bases__
-            ]
+            ], f"Base classes of {gen_cls.__name__} mismatch"
 
     def compare_field_details(self):
         """
