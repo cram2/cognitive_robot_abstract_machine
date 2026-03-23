@@ -39,6 +39,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.robots.abstract_robot import Neck, Arm
 from semantic_digital_twin.robots.robot_mixins import (
     HasNeck,
     HasArms,
@@ -110,7 +111,7 @@ class BodyButton(QPushButton):
     """
 
     body: Body
-    interface: RobotSemanticAnnotationBuilderInterface
+    application: Application
 
     def __post_init__(self):
         super().__init__(self.body.name.name)
@@ -121,7 +122,8 @@ class BodyButton(QPushButton):
         """
         Callback for button click.
         """
-        self.interface.highlight_body(self.body)
+        self.application.interface.highlight_body(self.body)
+        self.application.last_highlighted_body = self.body
 
 
 class ProgressBarWithText(QProgressBar):
@@ -209,6 +211,103 @@ class ComponentSelectionDialog(QDialog):
 
 
 @dataclass
+class NeckWidget(QGroupBox):
+    """
+    Widget for managing neck properties.
+    """
+
+    application: Application
+
+    def __post_init__(self):
+        super().__init__("Neck")
+        self.init_ui()
+
+    def init_ui(self):
+        """
+        Initializes the UI.
+        """
+        layout = QVBoxLayout()
+        remove_button = QPushButton("Remove Neck")
+        remove_button.clicked.connect(self.application.remove_neck)
+        layout.addWidget(remove_button)
+
+        pitch_body_name = (
+            self.application.neck.pitch_body.name.name
+            if self.application.neck.pitch_body
+            else "None"
+        )
+        pitch_button = QPushButton(f"pitch body: {pitch_body_name}")
+        pitch_button.clicked.connect(self.application.assign_body_to_neck_pitch)
+        layout.addWidget(pitch_button)
+
+        yaw_body_name = (
+            self.application.neck.yaw_body.name.name
+            if self.application.neck.yaw_body
+            else "None"
+        )
+        yaw_button = QPushButton(f"yaw body: {yaw_body_name}")
+        yaw_button.clicked.connect(self.application.assign_body_to_neck_yaw)
+        layout.addWidget(yaw_button)
+
+        root_body_name = (
+            self.application.neck.root.name.name
+            if self.application.neck.root
+            else "None"
+        )
+        root_button = QPushButton(f"Root Body: {root_body_name}")
+        root_button.clicked.connect(self.application.assign_body_to_neck_root)
+        layout.addWidget(root_button)
+
+        tip_body_name = (
+            self.application.neck.tip.name.name if self.application.neck.tip else "None"
+        )
+        tip_button = QPushButton(f"Tip Body: {tip_body_name}")
+        tip_button.clicked.connect(self.application.assign_body_to_neck_tip)
+        layout.addWidget(tip_button)
+
+        self.setLayout(layout)
+
+
+@dataclass
+class ArmWidget(QGroupBox):
+    """
+    Widget for managing arm properties.
+    """
+
+    application: Application
+    arm: Arm
+
+    def __post_init__(self):
+        super().__init__("Arm")
+        self.init_ui()
+
+    def init_ui(self):
+        """
+        Initializes the UI.
+        """
+        layout = QVBoxLayout()
+        remove_button = QPushButton("Remove Arm")
+        remove_button.clicked.connect(lambda: self.application.remove_arm(self.arm))
+        layout.addWidget(remove_button)
+
+        root_body_name = self.arm.root.name.name if self.arm.root else "None"
+        root_button = QPushButton(f"Root Body: {root_body_name}")
+        root_button.clicked.connect(
+            lambda: self.application.assign_body_to_arm_root(self.arm)
+        )
+        layout.addWidget(root_button)
+
+        tip_body_name = self.arm.tip.name.name if self.arm.tip else "None"
+        tip_button = QPushButton(f"Tip Body: {tip_body_name}")
+        tip_button.clicked.connect(
+            lambda: self.application.assign_body_to_arm_tip(self.arm)
+        )
+        layout.addWidget(tip_button)
+
+        self.setLayout(layout)
+
+
+@dataclass
 class Application(QMainWindow):
     """
     The main application for the robot semantic annotation builder tool.
@@ -233,6 +332,18 @@ class Application(QMainWindow):
     )
     """
     Dictionary storing the state of chosen robot components.
+    """
+    last_highlighted_body: Optional[Body] = None
+    """
+    The last highlighted body.
+    """
+    neck: Optional[Neck] = None
+    """
+    The neck of the robot.
+    """
+    arms: List[Arm] = field(default_factory=list)
+    """
+    The arms of the robot.
     """
 
     def __post_init__(self):
@@ -318,6 +429,100 @@ class Application(QMainWindow):
         for component, chosen in self.chosen_components.items():
             if chosen:
                 self.components_list_layout.addWidget(QLabel(f"- {component}"))
+                if component == "HasNeck":
+                    add_neck_button = QPushButton("Add Neck")
+                    add_neck_button.setEnabled(self.neck is None)
+                    add_neck_button.clicked.connect(self._add_neck_callback)
+                    self.components_list_layout.addWidget(add_neck_button)
+
+                if component in ["HasArms", "SpecifiesLeftRightArm"]:
+                    add_arm_button = QPushButton("Add Arm")
+                    add_arm_button.clicked.connect(self._add_arm_callback)
+                    self.components_list_layout.addWidget(add_arm_button)
+
+        if self.neck:
+            self.components_list_layout.addWidget(NeckWidget(self))
+
+        for arm in self.arms:
+            self.components_list_layout.addWidget(ArmWidget(self, arm))
+
+    def _add_neck_callback(self):
+        """
+        Callback for adding a neck.
+        """
+        self.neck = Neck(name=PrefixedName("neck"))
+        self._update_chosen_components_list()
+
+    def _add_arm_callback(self):
+        """
+        Callback for adding an arm.
+        """
+        arm_name = f"arm_{len(self.arms)}"
+        arm = Arm(name=PrefixedName(arm_name))
+        self.arms.append(arm)
+        self._update_chosen_components_list()
+
+    def remove_neck(self):
+        """
+        Removes the neck.
+        """
+        self.neck = None
+        self._update_chosen_components_list()
+
+    def remove_arm(self, arm: Arm):
+        """
+        Removes the given arm.
+        """
+        self.arms.remove(arm)
+        self._update_chosen_components_list()
+
+    def assign_body_to_neck_pitch(self):
+        """
+        Assigns the last highlighted body to the neck's pitch body.
+        """
+        if self.neck and self.last_highlighted_body:
+            self.neck.pitch_body = self.last_highlighted_body
+            self._update_chosen_components_list()
+
+    def assign_body_to_neck_yaw(self):
+        """
+        Assigns the last highlighted body to the neck's yaw body.
+        """
+        if self.neck and self.last_highlighted_body:
+            self.neck.yaw_body = self.last_highlighted_body
+            self._update_chosen_components_list()
+
+    def assign_body_to_neck_root(self):
+        """
+        Assigns the last highlighted body to the neck's root body.
+        """
+        if self.neck and self.last_highlighted_body:
+            self.neck.root = self.last_highlighted_body
+            self._update_chosen_components_list()
+
+    def assign_body_to_neck_tip(self):
+        """
+        Assigns the last highlighted body to the neck's tip body.
+        """
+        if self.neck and self.last_highlighted_body:
+            self.neck.tip = self.last_highlighted_body
+            self._update_chosen_components_list()
+
+    def assign_body_to_arm_root(self, arm: Arm):
+        """
+        Assigns the last highlighted body to the arm's root body.
+        """
+        if self.last_highlighted_body:
+            arm.root = self.last_highlighted_body
+            self._update_chosen_components_list()
+
+    def assign_body_to_arm_tip(self, arm: Arm):
+        """
+        Assigns the last highlighted body to the arm's tip body.
+        """
+        if self.last_highlighted_body:
+            arm.tip = self.last_highlighted_body
+            self._update_chosen_components_list()
 
     def _create_urdf_box_layout(self) -> QHBoxLayout:
         """
@@ -368,7 +573,7 @@ class Application(QMainWindow):
 
         columns = 5
         for index, body in enumerate(self.interface.bodies):
-            button = BodyButton(body=body, interface=self.interface)
+            button = BodyButton(body=body, application=self)
             row = index // columns
             column = index % columns
             self.body_buttons_layout.addWidget(button, row, column)
