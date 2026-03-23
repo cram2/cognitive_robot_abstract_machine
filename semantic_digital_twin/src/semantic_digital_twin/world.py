@@ -13,7 +13,9 @@ from uuid import UUID
 import numpy as np
 import rustworkx as rx
 import rustworkx.visualization
+from PIL.Image import Image
 from rustworkx import NoEdgeBetweenNodes
+from rustworkx.visualization import graphviz_draw
 from typing_extensions import (
     Dict,
     Tuple,
@@ -1863,6 +1865,30 @@ class World(HasSimulatorProperties):
                 new_connection = connection.copy_for_world(new_world)
                 new_world.add_connection(new_connection)
         return new_world
+
+    def visualize_world_structure(self) -> Image:
+        """
+        Visualizes the kinematic structure of the world using Graphviz in a topological way.
+        This is not meant to be a beautiful visualization, but a functional way at all to quickly inspect the structure.
+
+        Each node in the graph represents a KinematicStructureEntity, and each edge represents a Connection between entities.
+        The nodes are labeled with the names of the entities, and the edges are labeled with the types of connections.
+
+        Plot by calling `world.plot_world_structure().show()`.
+
+        :return: An Image object containing the visualization of the world's kinematic structure.
+        """
+        return graphviz_draw(
+            self.kinematic_structure,
+            node_attr_fn=lambda kinematic_structure_entity: {
+                "label": kinematic_structure_entity.name.name,
+                "style": "filled",
+                "fillcolor": "lightgray",
+            },
+            edge_attr_fn=lambda connection: {
+                "label": str(connection.__class__.__name__)
+            },
+        )
 
     # %% Associations
 
