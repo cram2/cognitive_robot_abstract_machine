@@ -864,6 +864,7 @@ class Application(QMainWindow):
 
 def handle_sigint(sig, frame):
     """Handler for the SIGINT signal."""
+    rospy.shutdown()
     QApplication.quit()
 
 
@@ -874,4 +875,6 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = Application()
     window.show()
-    sys.exit(app.exec_())
+    exit_code = app.exec_()
+    rospy.shutdown()
+    sys.exit(exit_code)

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import builtins
 import copy
+import inspect
 import math
 import operator
 import sys
@@ -28,7 +29,8 @@ from abc import ABC, abstractmethod
 from collections import Counter
 from dataclasses import field, dataclass
 from enum import IntEnum
-from functools import partial
+from functools import partial, wraps
+from inspect import BoundArguments
 
 import casadi as ca
 import numpy as np
@@ -45,6 +47,7 @@ from typing_extensions import (
     Dict,
     TypeVar,
     Type,
+    Any,
 )
 
 from krrood.symbolic_math.exceptions import (
@@ -52,10 +55,10 @@ from krrood.symbolic_math.exceptions import (
     DuplicateVariablesError,
     WrongNumberOfArgsError,
     NotSquareMatrixError,
-    SymbolicMathError,
     NotScalerError,
     UnsupportedOperationError,
     WrongDimensionsError,
+    CannotConvertToStringError,
 )
 
 EPS: float = sys.float_info.epsilon * 4.0
@@ -519,6 +522,16 @@ class SymbolicMathType(ABC):
     def shape(self) -> Tuple[int, int]:
         return self.casadi_sx.shape
 
+    def flatten(self) -> Vector:
+        """
+        Returns a row-major flattened Vector, matching `numpy.ndarray.flatten(order='C')`.
+        """
+        rows, cols = self.shape
+        if rows == 0 or cols == 0:
+            return Vector([])
+        flat = ca.reshape(self.casadi_sx.T, rows * cols, 1)
+        return Vector.from_casadi_sx(flat)
+
     def __len__(self) -> int:
         return self.shape[0]
 
@@ -981,6 +994,12 @@ class FloatVariable(Scalar):
     .. warning:: Does not ensure that two FloatVariable instances are identical.
     """
 
+    resolve: Callable[[], float] | None = field(default=None, init=False)
+    """
+    This is called by SymbolicType.evaluate().
+    Subclasses should set it to return the current float value for this variable.
+    """
+
     def __init__(self, name: str):
         self.name = name
         casadi_sx = ca.SX.sym(self.name)
@@ -1007,14 +1026,6 @@ class FloatVariable(Scalar):
 
     def __hash__(self):
         return hash(self.casadi_sx)
-
-    def resolve(self) -> float:
-        """
-        This method is called by SymbolicType.evaluate().
-        Subclasses should override this method to return the current float value for this variable.
-        :return: This variables' current value.
-        """
-        return np.nan
 
 
 @dataclass(eq=False, repr=False)
@@ -1453,16 +1464,6 @@ class Matrix(SymbolicMathType):
         """
         assert self.shape[0] == self.shape[1]
         return Matrix(ca.inv(self.casadi_sx))
-
-    def flatten(self) -> Vector:
-        """
-        Returns a row-major flattened Vector, matching numpy.ndarray.flatten(order='C').
-        """
-        rows, cols = self.shape
-        if rows == 0 or cols == 0:
-            return Vector([])
-        flat = ca.reshape(self.casadi_sx.T, rows * cols, 1)
-        return Vector.from_casadi_sx(flat)
 
     def kron(self, other: Matrix) -> Self:
         """
@@ -2066,7 +2067,7 @@ def trinary_logic_to_str(expression: Scalar) -> str:
             right = trinary_logic_to_str(cas_expr.dep(1))
             return f"({left} or {right})"
         case _:
-            raise SymbolicMathError(message=f"cannot convert {expression} to a string")
+            raise CannotConvertToStringError(expression=expression)
 
 
 # %% ifs
@@ -2242,11 +2243,14 @@ def if_eq_cases(
         return else_result
     """
     a_sx = to_sx(a)
-    result_sx = to_sx(else_result)
-    for b, b_result in b_result_cases:
+    result_sx_list = []
+    ind = to_sx(-1)
+    for i, (b, b_result) in enumerate(b_result_cases):
         b_sx = to_sx(b)
-        b_result_sx = to_sx(b_result)
-        result_sx = ca.if_else(ca.eq(a_sx, b_sx), b_result_sx, result_sx)
+        ind = ca.if_else(ca.eq(a_sx, b_sx), i, ind)
+        result_sx_list.append(to_sx(b_result))
+
+    result_sx = ca.conditional(ind, result_sx_list, to_sx(else_result))
     return _create_return_type(else_result).from_casadi_sx(result_sx)
 
 
@@ -2263,11 +2267,14 @@ def if_cases(
     else:
         return else_result
     """
-    result_sx = to_sx(else_result)
+    result_sx_list = []
+    ind = to_sx(len(cases))
     for i in reversed(range(len(cases))):
         case = to_sx(cases[i][0])
-        case_result = to_sx(cases[i][1])
-        result_sx = ca.if_else(case, case_result, result_sx)
+        ind = ca.if_else(case, i, ind)
+        result_sx_list.insert(0, to_sx(cases[i][1]))
+
+    result_sx = ca.conditional(ind, result_sx_list, to_sx(else_result))
     return _create_return_type(else_result).from_casadi_sx(result_sx)
 
 
@@ -2287,15 +2294,15 @@ def if_less_eq_cases(
         return else_result
     """
     a_sx = to_sx(a)
-    result_sx = to_sx(else_result)
+    result_sx_list = []
+    ind = to_sx(len(b_result_cases))
     for i in reversed(range(len(b_result_cases))):
         b_sx = to_sx(b_result_cases[i][0])
-        b_result_sx = to_sx(b_result_cases[i][1])
-        result_sx = ca.if_else(ca.le(a_sx, b_sx), b_result_sx, result_sx)
+        ind = ca.if_else(ca.le(a_sx, b_sx), i, ind)
+        result_sx_list.insert(0, to_sx(b_result_cases[i][1]))
+
+    result_sx = ca.conditional(ind, result_sx_list, to_sx(else_result))
     return _create_return_type(else_result).from_casadi_sx(result_sx)
-
-
-_substitution_cache: Dict[str, Tuple[SymbolicMathType, List[FloatVariable]]] = {}
 
 
 def substitution_cache(method):
@@ -2305,30 +2312,68 @@ def substitution_cache(method):
     On subsequent calls, the cached expression is used and the args are substituted into the variables,
     avoiding rebuilding of the computation graph.
     """
+    cache = method.__substitution_cache__ = {}
 
+    def _variables_from_kwargs(
+        variable_kwargs: dict[str, SymbolicMathType],
+    ) -> list[FloatVariable | Scalar]:
+        """
+        Extracts the variables from SymbolicMathType kwargs.
+        """
+        return [
+            item
+            for arg in variable_kwargs.values()
+            if isinstance(arg, SymbolicMathType)
+            for item in arg.flatten()
+        ]
+
+    def _create_placeholder_kwargs(
+        bound_arguments: BoundArguments,
+    ) -> dict[str, Any]:
+        """
+        This function creates placeholder kwargs for the given bound arguments by replacing all SymbolicMathType variables
+        with placeholder float variables.
+        :param bound_arguments: The bound arguments to create placeholder kwargs for.
+        :return: The placeholder kwargs.
+        """
+        variable_kwargs = {}
+        for name, arg in bound_arguments.arguments.items():
+            match arg:
+                case Scalar():
+                    variable_kwargs[name] = FloatVariable(name=name)
+                case SymbolicMathType():
+                    variable_kwargs[name] = Matrix.create_filled_with_variables(
+                        arg.shape, name=name
+                    )
+                case _:
+                    variable_kwargs[name] = arg
+
+        return variable_kwargs
+
+    @wraps(method)
     def wrapper(*args, **kwargs):
-        if len(kwargs) > 0:
-            raise SymbolicMathError(
-                message="substitution_cache does not support kwargs"
-            )
-        global _substitution_cache
-        cache_key = method.__name__
-        if not cache_key in _substitution_cache:
-            variable_args = []
-            for i, arg in enumerate(args):
-                variable_args.append(
-                    Matrix.create_filled_with_variables(arg.shape, name=f"arg{i}")
-                )
-            variables = [
-                item.free_variables()[0]
-                for arg in variable_args
-                for item in arg.flatten()
-            ]
-            result = method(*variable_args)
-            _substitution_cache[cache_key] = (result, variables)
-        expr, variables = _substitution_cache[cache_key]
-        substitutions = [item for arg in args for item in arg.flatten()]
-        return expr.substitute(variables, substitutions)
+        signature = inspect.signature(method)
+        bound_arguments = signature.bind(*args, **kwargs)
+        bound_arguments.apply_defaults()
+        cache_key = (
+            tuple(
+                arg
+                for arg in bound_arguments.arguments.values()
+                if not isinstance(arg, SymbolicMathType)
+            ),
+        )
+        if not cache_key in cache:
+            variable_kwargs = _create_placeholder_kwargs(bound_arguments)
+            result = method(**variable_kwargs)
+
+            variables = _variables_from_kwargs(variable_kwargs)
+            cache[cache_key] = (result, variables)
+
+        expression, variables = cache[cache_key]
+        substitutions = _variables_from_kwargs(bound_arguments.arguments)
+        if isinstance(expression, tuple):
+            return (expr.substitute(variables, substitutions) for expr in expression)
+        return expression.substitute(variables, substitutions)
 
     return wrapper
 

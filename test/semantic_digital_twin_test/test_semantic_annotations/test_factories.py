@@ -441,7 +441,8 @@ class TestFactories(unittest.TestCase):
         # handle is at y=0.4, door width is 1.0. Hinge should be at opposite side: y=-0.5
         world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
         expected_T_hinge = (
-            door.root.global_pose @ HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.5)
+            door.root.global_transform
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.5)
         )
         self.assertTrue(np.allclose(world_T_hinge.to_np(), expected_T_hinge.to_np()))
 
@@ -457,7 +458,8 @@ class TestFactories(unittest.TestCase):
 
         world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
         expected_T_hinge = (
-            door.root.global_pose @ HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+            door.root.global_transform
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
         )
         self.assertTrue(np.allclose(world_T_hinge.to_np(), expected_T_hinge.to_np()))
 
@@ -478,7 +480,8 @@ class TestFactories(unittest.TestCase):
         # handle z=0. Hinge should be at z=1.0 (opposite of default sign 1 if z=0)
         world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Y())
         expected_T_hinge = (
-            door.root.global_pose @ HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0)
+            door.root.global_transform
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0)
         )
         self.assertTrue(np.allclose(world_T_hinge.to_np(), expected_T_hinge.to_np()))
 
@@ -500,7 +503,8 @@ class TestFactories(unittest.TestCase):
         )
         world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Y())
         expected_T_hinge = (
-            door.root.global_pose @ HomogeneousTransformationMatrix.from_xyz_rpy(z=-1.0)
+            door.root.global_transform
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(z=-1.0)
         )
         self.assertTrue(np.allclose(world_T_hinge.to_np(), expected_T_hinge.to_np()))
 
@@ -560,11 +564,11 @@ class TestFactories(unittest.TestCase):
 
         _, max_point = table.min_max_points
         # supporting surface should be at the height of the table's global z + the max z of the table's bounding box (since the table's origin is at its center)
-        expected_z = table.root.global_pose.z + max_point.z
+        expected_z = table.root.global_transform.z + max_point.z
 
         self.assertIsNotNone(surface)
         self.assertEqual(surface, table.supporting_surface)
-        self.assertEqual(expected_z, surface.global_pose.z)
+        self.assertEqual(expected_z, surface.global_transform.z)
 
     def test_sample_points_from_surface(self):
         world = World()
@@ -651,7 +655,7 @@ class TestFactories(unittest.TestCase):
             conditional, _ = sampler.conditional({object_variable: object})
             expectation = conditional.expectation([x_variable, y_variable])
             surface_T_object = world.transform(
-                object.global_pose, table.supporting_surface
+                object.global_transform, table.supporting_surface
             )
             assert expectation[x_variable] == surface_T_object.x
             assert expectation[y_variable] == surface_T_object.y
@@ -686,10 +690,10 @@ class TestFactories(unittest.TestCase):
         surface_event: Event = table._2d_surface_sample_space_excluding_objects(0)
 
         surface_P_milk = world.transform(
-            milk.root.global_pose, table.supporting_surface
+            milk.root.global_transform, table.supporting_surface
         ).to_position()
         surface_P_cereal = world.transform(
-            cereal.root.global_pose, table.supporting_surface
+            cereal.root.global_transform, table.supporting_surface
         ).to_position()
 
         assert not surface_event.contains(surface_P_milk[:2])
@@ -825,10 +829,10 @@ class TestFactories(unittest.TestCase):
         with world.modify_world():
             world.add_semantic_annotation(slider)
 
-        parent_T_self = root.global_pose.inverse() @ slider.root.global_pose
+        parent_T_self = root.global_transform.inverse() @ slider.root.global_transform
         self.assertAlmostEqual(parent_T_self[0, 3], 2.0)
 
-        self_T_child = slider.root.global_pose.inverse() @ root.global_pose
+        self_T_child = slider.root.global_transform.inverse() @ root.global_transform
         self.assertAlmostEqual(self_T_child[0, 3], -2.0)
 
         self.assertEqual(slider.get_new_grandparent(mid), root)

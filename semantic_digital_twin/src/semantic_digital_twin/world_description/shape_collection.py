@@ -384,7 +384,5 @@ class BoundingBoxCollection(ShapeCollection):
             max(all_x),
             max(all_y),
             max(all_z),
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
-                reference_frame=self.reference_frame
-            ),
+            HomogeneousTransformationMatrix(reference_frame=self.reference_frame),
         )

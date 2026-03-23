@@ -8,6 +8,7 @@ from typing_extensions import Union, Optional, Type, Any, Iterable
 
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
 from pycram.robot_plans.motions.gripper import MoveGripperMotion, MoveTCPMotion
@@ -19,13 +20,11 @@ from pycram.datastructures.enums import (
 )
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.datastructures.pose import PoseStamped
 from pycram.failures import ObjectNotGraspedError
 from pycram.failures import ObjectNotInGraspingArea
 from pycram.language import SequentialPlan
 from pycram.view_manager import ViewManager
 from pycram.robot_plans.actions.base import ActionDescription
-from pycram.utils import translate_pose_along_local_axis
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +35,7 @@ class ReachAction(ActionDescription):
     Let the robot reach a specific pose.
     """
 
-    target_pose: PoseStamped
+    target_pose: Pose
     """
     Pose that should be reached.
     """
@@ -105,7 +104,7 @@ class ReachAction(ActionDescription):
     @classmethod
     def description(
         cls,
-        target_pose: Union[Iterable[PoseStamped], PoseStamped],
+        target_pose: Union[Iterable[Pose], Pose],
         arm: Union[Iterable[Arms], Arms] = None,
         grasp_description: Union[Iterable[GraspDescription], GraspDescription] = None,
         object_designator: Union[Iterable[Body], Body] = None,
@@ -155,9 +154,7 @@ class PickUpAction(ActionDescription):
             self.context,
             MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm),
             ReachActionDescription(
-                target_pose=PoseStamped.from_spatial_type(
-                    self.object_designator.global_pose
-                ),
+                target_pose=self.object_designator.global_pose,
                 object_designator=self.object_designator,
                 arm=self.arm,
                 grasp_description=self.grasp_description,

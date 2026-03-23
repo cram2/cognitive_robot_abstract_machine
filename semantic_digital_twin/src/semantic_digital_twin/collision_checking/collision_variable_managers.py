@@ -9,9 +9,16 @@ from krrood.symbolic_math.float_variable_data import (
     FloatVariableData,
 )
 from krrood.symbolic_math.symbolic_math import FloatVariable, SymbolicMathType
-from semantic_digital_twin.collision_checking.collision_detector import CollisionCheckingResult, ClosestPoints
-from semantic_digital_twin.collision_checking.collision_groups import CollisionGroupConsumer, CollisionGroup
+from semantic_digital_twin.collision_checking.collision_detector import (
+    CollisionCheckingResult,
+    ClosestPoints,
+)
+from semantic_digital_twin.collision_checking.collision_groups import (
+    CollisionGroupConsumer,
+    CollisionGroup,
+)
 from semantic_digital_twin.spatial_types import Vector3, Point3
+from semantic_digital_twin.spatial_types.math import inverse_frame
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -87,10 +94,7 @@ class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
         cache_key = (method_name, *identifier)
         if cache_key not in self._symbol_cache:
             symbol = creator_func()
-            if isinstance(symbol, SymbolicMathType):
-                self.float_variable_data.add_variables_of_expression(symbol)
-            else:
-                self.float_variable_data.add_variable(symbol)
+            self.float_variable_data.register_expression(symbol)
             self._symbol_cache[cache_key] = symbol
         return self._symbol_cache[cache_key]
 
@@ -178,7 +182,9 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
                 )
             ):
                 collision = collisions[i]
-                group_a_T_root = group_a.root.global_pose.inverse().to_np()
+                group_a_T_root = group_a.root._world.compute_forward_kinematics_np(
+                    group_a.root, group_a.root._world.root
+                )
                 group_a_P_pa = group_a_T_root @ collision.root_P_point_on_body_a
                 self.insert_data_block(
                     group=group_a,
@@ -376,10 +382,14 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
 
         for (group_a, group_b), collisions in closest_contacts.items():
             closest_contact = sorted(collisions, key=lambda c: c.distance)[0]
-            group_a_T_root = group_a.root.global_pose.inverse().to_np()
+            group_a_T_root = group_a.root._world.compute_forward_kinematics_np(
+                group_a.root, group_a.root._world.root
+            )
             group_a_P_pa = group_a_T_root @ closest_contact.root_P_point_on_body_a
 
-            group_b_T_root = group_b.root.global_pose.inverse().to_np()
+            group_b_T_root = group_b.root._world.compute_forward_kinematics_np(
+                group_b.root, group_b.root._world.root
+            )
             group_b_P_pb = group_b_T_root @ closest_contact.root_P_point_on_body_b
 
             group_b_V_contact_normal = (

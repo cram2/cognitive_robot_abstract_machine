@@ -15,8 +15,7 @@ from pycram.validation.error_checkers import (
     PrismaticJointPositionErrorChecker,
     MultiJointPositionErrorChecker,
 )
-
-from pycram.datastructures.pose import PoseStamped
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
 def test_calculate_quaternion_error():
@@ -30,23 +29,23 @@ def test_calculate_quaternion_error():
 
 
 def test_pose_error_checker():
-    pose_1 = PoseStamped.from_list([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0])
-    pose_2 = PoseStamped.from_list([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0])
+    pose_1 = Pose.from_xyz_quaternion(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+    pose_2 = Pose.from_xyz_quaternion(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
     error_checker = PoseErrorChecker()
     error = error_checker.calculate_error(pose_1, pose_2)
     assert error == [0.0, 0.0]
     assert error_checker.is_error_acceptable(pose_1, pose_2)
     quat = quaternion_from_euler(0, np.pi / 2, 0)
-    pose_2 = PoseStamped.from_list([0, 1, np.sqrt(3)], quat)
+    pose_2 = Pose.from_xyz_quaternion(0, 1, np.sqrt(3), *quat)
     error = error_checker.calculate_error(pose_1, pose_2)
     assert error[0] == pytest.approx(2, abs=0.01)
     assert error[1] == np.pi / 2
     assert not (error_checker.is_error_acceptable(pose_1, pose_2))
     quat = quaternion_from_euler(0, 0, np.pi / 360)
-    pose_2 = PoseStamped.from_list([0, 0.0001, 0.0001], quat)
+    pose_2 = Pose.from_xyz_quaternion(0, 0.0001, 0.0001, *quat)
     assert error_checker.is_error_acceptable(pose_1, pose_2)
     quat = quaternion_from_euler(0, 0, np.pi / 179)
-    pose_2 = PoseStamped.from_list([0, 0.0001, 0.0001], quat)
+    pose_2 = Pose.from_xyz_quaternion(0, 0.0001, 0.0001, *quat)
     assert not (error_checker.is_error_acceptable(pose_1, pose_2))
 
 
@@ -104,12 +103,12 @@ def test_prismatic_joint_position_error_checker():
 
 def test_list_of_poses_error_checker():
     poses_1 = [
-        PoseStamped.from_list([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
-        PoseStamped.from_list([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        Pose.from_xyz_quaternion(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
+        Pose.from_xyz_quaternion(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
     ]
     poses_2 = [
-        PoseStamped.from_list([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
-        PoseStamped.from_list([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+        Pose.from_xyz_quaternion(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
+        Pose.from_xyz_quaternion(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
     ]
     error_checker = PoseErrorChecker(is_iterable=True)
     error = error_checker.calculate_error(poses_1, poses_2)
@@ -117,8 +116,8 @@ def test_list_of_poses_error_checker():
     assert error_checker.is_error_acceptable(poses_1, poses_2)
     quat = quaternion_from_euler(0, np.pi / 2, 0)
     poses_2 = [
-        PoseStamped.from_list([0, 1, np.sqrt(3)], quat),
-        PoseStamped.from_list([0, 1, np.sqrt(3)], quat),
+        Pose.from_xyz_quaternion(0, 1, np.sqrt(3), *quat),
+        Pose.from_xyz_quaternion(0, 1, np.sqrt(3), *quat),
     ]
     error = error_checker.calculate_error(poses_1, poses_2)
     assert error[0][0] == pytest.approx(2, abs=0.01)

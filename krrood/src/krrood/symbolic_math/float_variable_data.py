@@ -5,13 +5,23 @@ from dataclasses import dataclass, field
 import numpy as np
 from typing_extensions import List
 
+from krrood.symbolic_math.exceptions import (
+    SymbolicMathExpressionNotRegisteredError,
+    NoFreeVariablesError,
+    SymbolicMathExpressionAlreadyRegisteredError,
+    FloatVariableAlreadyHasResolveError,
+)
 from krrood.symbolic_math.symbolic_math import FloatVariable, SymbolicMathType
+
+
+hidden_index_name = "__FLOAT_VARIABLE_INDEX__"
 
 
 @dataclass
 class FloatVariableData:
     """
     Stores float variables and their values in a single flat numpy array.
+    The purpose of this class is to store data in a single numpy array for efficient evaluation of compiled casadi functions.
     """
 
     variables: List[FloatVariable] = field(default_factory=list)
@@ -23,42 +33,59 @@ class FloatVariableData:
     Flat array of values for all `variables`.
     """
 
-    def add_variable(self, variable: FloatVariable) -> int:
+    def register_expression(self, expression: SymbolicMathType):
         """
-        Add a new variable to the data.
-        :param variable: The new variable.
-        :return: The index in data for the variable
+        Add an expression to the data.
+        Adds a `hidden_index_name` attribute to the expression to keep track of its index in the data array.
+        .. warning:: You can only use expressions with free variables that have no resolve function defined.
+            This is a safeguard to prevent accidentally registering, e.g., degree of freedom variables.
+        .. warning:: this class is not thread-safe.
+        :param expression: The expression to be tracked.
         """
-        self.variables.append(variable)
-        self.data = np.append(self.data, 0.0)
-        index = len(self.variables) - 1
-        variable.resolve = lambda: self.data[index]
-        return index
+        free_variables = expression.free_variables()
+        if len(free_variables) == 0:
+            raise NoFreeVariablesError()
 
-    def add_variables_of_expression(self, expression: SymbolicMathType) -> int:
-        """
-        Add variables from an expression to the data.
-        :param expression: The expression to add variables from.
-        :return: The index in data for the first added variable
-        """
+        if hasattr(expression, hidden_index_name):
+            raise SymbolicMathExpressionAlreadyRegisteredError(expression)
+
+        for variable in free_variables:
+            if variable.resolve is not None:
+                raise FloatVariableAlreadyHasResolveError(variable=variable)
+
         index = len(self.variables)
-        for variable in expression.free_variables():
-            self.add_variable(variable)
-        return index
+        # save the data index at the expression
+        setattr(expression, hidden_index_name, index)
 
-    def set_value(self, variable_index: int, value: float):
-        """
-        Set the value of a variable.
-        """
-        self.data[variable_index] = value
+        self.variables.extend(free_variables)
+        self.data = np.concatenate((self.data, np.zeros(len(free_variables))))
 
-    def set_values(self, variable_index: int, values: List[float] | np.ndarray):
+        # define resolvers for the variables to make `.evaluate()` work
+        for i, variable in enumerate(free_variables):
+
+            def resolve_variable(data_index=index + i):
+                # this is a workaround to hardcode the "i"
+                return self.data[data_index]
+
+            variable.resolve = resolve_variable
+
+    def set_value(
+        self, expression: SymbolicMathType, value: float | list[float] | np.ndarray
+    ):
         """
-        Set the values of multiple variables which are contiguous in the data array.
-        :param variable_index: The index of the first variable to set.
-        :param values: The values to set for the variables.
+        Set the managed values of free variables in an expression.
+        Only works if the expression was registered before.
+        :param expression: The expression to set the values for.
+        :param value: The new value(s) for the expression's free variables.
         """
-        self.data[variable_index : variable_index + len(values)] = values
+        if not hasattr(expression, hidden_index_name):
+            raise SymbolicMathExpressionNotRegisteredError(expression)
+
+        variable_index = getattr(expression, hidden_index_name)
+        if isinstance(value, (int, float)):
+            self.data[variable_index] = value
+        else:
+            self.data[variable_index : variable_index + len(value)] = value
 
     @property
     def mapping(self) -> dict[FloatVariable, float]:

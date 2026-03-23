@@ -64,7 +64,7 @@ def test_set_state(world_setup):
     assert c1.position == 2.0
 
     transform[0, 3] += c1.position
-    assert np.allclose(l2.global_pose.to_np(), transform)
+    assert np.allclose(l2.global_transform.to_np(), transform)
 
 
 def test_construction(world_setup):
@@ -626,13 +626,13 @@ def test_copy_world(world_setup):
     )
     assert (
         float(
-            world_copy.get_kinematic_structure_entity_by_name("bf").global_pose.to_np()[
-                0, 3
-            ]
+            world_copy.get_kinematic_structure_entity_by_name(
+                "bf"
+            ).global_transform.to_np()[0, 3]
         )
         == 0.0
     )
-    assert float(bf.global_pose.to_np()[0, 3]) == 1.5
+    assert float(bf.global_transform.to_np()[0, 3]) == 1.5
 
 
 def test_copy_world_state(world_setup):
@@ -693,7 +693,9 @@ def test_copy_pr2_world_state_reset_connection_origin(pr2_world_state_reset):
         pr2_body = pr2_world_state_reset.get_kinematic_structure_entity_by_id(body.id)
         pr2_copy_body = pr2_copy.get_kinematic_structure_entity_by_id(body.id)
         np.testing.assert_array_almost_equal(
-            pr2_body.global_pose.to_np(), pr2_copy_body.global_pose.to_np(), decimal=4
+            pr2_body.global_transform.to_np(),
+            pr2_copy_body.global_transform.to_np(),
+            decimal=4,
         )
 
 
@@ -723,10 +725,10 @@ def test_copy_pr2(pr2_world_state_reset):
     pr2_copy = deepcopy(pr2_world_state_reset)
     assert pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "head_tilt_link"
-    ).global_pose.to_np()[2, 3] == pytest.approx(1.472, abs=1e-3)
+    ).global_transform.to_np()[2, 3] == pytest.approx(1.472, abs=1e-3)
     assert pr2_copy.get_kinematic_structure_entity_by_name(
         "head_tilt_link"
-    ).global_pose.to_np()[2, 3] == pytest.approx(1.472, abs=1e-3)
+    ).global_transform.to_np()[2, 3] == pytest.approx(1.472, abs=1e-3)
 
 
 def test_copy_connections(pr2_world_state_reset):
@@ -801,7 +803,9 @@ def test_set_omni_after_copy(pr2_world_state_reset):
     pr2_copy.notify_state_change()
 
     np.testing.assert_array_almost_equal(
-        pr2_copy.get_body_by_name("base_footprint").global_pose.to_position().to_np(),
+        pr2_copy.get_body_by_name("base_footprint")
+        .global_transform.to_position()
+        .to_np(),
         np.array([10.0, 10.0, 0.0, 1.0]),
     )
 
@@ -1108,7 +1112,7 @@ def test_merge_into_empty_world(world_setup):
 def test_reattach_child_to_new_parent(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     # Initial state: l2 is child of l1 via PrismaticConnection
-    old_child_global_pose = l2.global_pose
+    old_child_global_pose = l2.global_transform
     assert l2.parent_connection.parent == l1
     assert isinstance(l2.parent_connection, PrismaticConnection)
 
@@ -1120,7 +1124,7 @@ def test_reattach_child_to_new_parent(world_setup):
     assert isinstance(l2.parent_connection, FixedConnection)
     assert l2 in world.compute_child_kinematic_structure_entities(bf)
     assert l2 not in world.compute_child_kinematic_structure_entities(l1)
-    new_child_global_pose = l2.global_pose
+    new_child_global_pose = l2.global_transform
     assert np.allclose(old_child_global_pose, new_child_global_pose)
 
 

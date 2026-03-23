@@ -14,7 +14,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
     Hinge,
 )
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
@@ -34,7 +37,7 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
             scale=drawer_scale,
             world=world,
         )
-        world_T_drawer = drawer_body.global_pose
+        world_T_drawer = drawer_body.global_transform
         drawer_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=drawer_scale.x / 2
         )
@@ -73,7 +76,7 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
     door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=scale.x / 2, y=sampled_2d_point[0], z=sampled_2d_point[1]
     )
-    world_T_door = door_body.global_pose
+    world_T_door = door_body.global_transform
     world_T_handle = world_T_door @ door_T_handle
 
     with world.modify_world():

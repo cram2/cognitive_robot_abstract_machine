@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from io import BytesIO
+from typing import Self
 from uuid import UUID
 
 import numpy as np
@@ -208,24 +209,48 @@ class HomogeneousTransformationMatrixMapping(
 @dataclass
 class PoseMapping(AlternativeMapping[Pose]):
     position: Point3
-    rotation: Quaternion
+    orientation: Quaternion
     reference_frame: Optional[KinematicStructureEntity] = field(
-        init=False, default=None
+        default=None, kw_only=True
     )
 
     @classmethod
     def from_domain_object(cls, obj: Pose):
         position = obj.to_position()
-        rotation = obj.to_quaternion()
-        result = cls(position=position, rotation=rotation)
+        orientation = obj.to_quaternion()
+        result = cls(position=position, orientation=orientation)
         result.reference_frame = obj.reference_frame
         return result
 
     def to_domain_object(self) -> Pose:
         return Pose(
             position=self.position,
-            orientation=self.rotation,
+            orientation=self.orientation,
             reference_frame=None,
+        )
+
+    @classmethod
+    def from_point_mapping_quaternion_mapping(
+        cls,
+        point_mapping: Point3Mapping,
+        quaternion_mapping: QuaternionMapping,
+        reference_frame: KinematicStructureEntity,
+    ) -> Pose:
+        """
+        Creates a Pose instance from a Point3Mapping and a QuaternionMapping.
+
+        This method constructs a Pose object by utilizing the provided Point3Mapping for the position and the
+        QuaternionMapping for the orientation. The resulting Pose is associated with the specified reference frame.
+
+        :param point_mapping: A Point3Mapping object that provides the position data for the Pose.
+        :param quaternion_mapping: A QuaternionMapping object that provides the orientation data for the Pose.
+        :param reference_frame: The reference frame to which the Pose will be associated.
+        :return: A Pose instance created from the given Point3Mapping and QuaternionMapping.
+        """
+        return Pose(
+            position=point_mapping.to_domain_object(),
+            orientation=quaternion_mapping.to_domain_object(),
+            reference_frame=reference_frame,
         )
 
 

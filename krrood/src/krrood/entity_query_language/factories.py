@@ -8,7 +8,10 @@ import operator
 
 from typing_extensions import Union, Iterable
 
-from krrood.entity_query_language.core.base_expressions import SymbolicExpression, TruthValueOperator
+from krrood.entity_query_language.core.base_expressions import (
+    SymbolicExpression,
+    TruthValueOperator,
+)
 from krrood.entity_query_language.core.mapped_variable import (
     FlatVariable,
     CanBehaveLikeAVariable,
@@ -118,13 +121,15 @@ def match_variable(
 
 
 def underspecified(
-    expression: Union[Type[T], Callable[..., T]],
+    expression: Union[Type[T], Callable[..., T]], target_type: Type[T] | None = None
 ) -> Union[Type[T], Match[T]]:
     """
     Same as :py:func:`krrood.entity_query_language.factories.match` but instead of searching for solutions in
     the domain objects, it is used as a query for generative processes to infer solutions that satisfy the constraints
     in the query.
     """
+    if target_type is not None:
+        return Match(factory=expression, type_=target_type)
     return Match(factory=expression)
 
 
@@ -134,7 +139,7 @@ def underspecified(
 def variable(
     type_: Type[T],
     domain: Optional[DomainType],
-) -> Union[T, Selectable[T]]:
+) -> Union[T, Selectable[T], Variable[T]]:
     """
     Declare a symbolic variable that can be used inside queries.
 

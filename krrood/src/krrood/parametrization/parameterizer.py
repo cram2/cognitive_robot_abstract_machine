@@ -72,8 +72,7 @@ class UnderspecifiedParameters:
                 )
                 result[random_events_variable.name] = random_events_variable
                 continue
-
-            if not issubclass(
+            if attribute_match.assigned_variable._type_ is None or not issubclass(
                 attribute_match.assigned_variable._type_,
                 random_events.variable.compatible_types,
             ):

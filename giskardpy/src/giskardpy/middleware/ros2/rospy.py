@@ -62,10 +62,14 @@ def shutdown() -> None:
     """
     global node, executor, spinner_thread
 
-    executor.shutdown()
-    spinner_thread.join(2.0)
-    node.destroy_node()
-    rclpy.shutdown()
+    if executor is not None:
+        executor.shutdown()
+    if spinner_thread is not None:
+        spinner_thread.join(2.0)
+    if node is not None:
+        node.destroy_node()
+    if rclpy.ok():
+        rclpy.shutdown()
 
     # Reset globals
     executor = None

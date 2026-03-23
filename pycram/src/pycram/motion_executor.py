@@ -2,8 +2,6 @@ import logging
 from dataclasses import dataclass, field
 from typing import List, Any, ClassVar
 
-from typing_extensions import Callable
-
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import Sequence

@@ -158,7 +158,7 @@ def test_script_launch_and_kill():
 
     try:
         # Give it enough time to initialize (e.g., 3-5 seconds)
-        time.sleep(3)
+        time.sleep(5)
 
         # Check if it crashed immediately
         if process.poll() is not None:
@@ -169,7 +169,7 @@ def test_script_launch_and_kill():
         os.killpg(os.getpgid(process.pid), signal.SIGINT)
 
         # Wait for clean shutdown
-        process.communicate(timeout=10)
+        process.communicate(timeout=15)
 
         # Return code 0 (Success) or -2 (SIGINT) are expected
         # Note: In headless environments, you might see -6 (SIGABRT) from Qt

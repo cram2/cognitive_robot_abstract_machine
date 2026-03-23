@@ -51,7 +51,8 @@ class FCLCollisionDetector(CollisionDetector):
             self._collision_objects[body] = fcl.CollisionObject(
                 mesh_to_BVH(body.collision.combined_mesh),
                 fcl.Transform(
-                    body.global_pose.to_np()[:3, :3], body.global_pose.to_np()[:3, 3]
+                    body.global_transform.to_np()[:3, :3],
+                    body.global_transform.to_np()[:3, 3],
                 ),
             )
         bodies_to_be_removed = set(self._collision_objects.keys()) - set(
@@ -69,7 +70,8 @@ class FCLCollisionDetector(CollisionDetector):
         for body, coll_obj in self._collision_objects.items():
             coll_obj.setTransform(
                 fcl.Transform(
-                    body.global_pose.to_np()[:3, :3], body.global_pose.to_np()[:3, 3]
+                    body.global_transform.to_np()[:3, :3],
+                    body.global_transform.to_np()[:3, 3],
                 )
             )
 

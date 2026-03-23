@@ -30,7 +30,9 @@ from typing_extensions import Type, Set
 
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.collision_checking.collision_manager import CollisionManager
-from semantic_digital_twin.collision_checking.pybullet_collision_detector import BulletCollisionDetector
+from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
+    BulletCollisionDetector,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.exceptions import (
@@ -43,10 +45,15 @@ from semantic_digital_twin.exceptions import (
     MismatchingPublishChangesAttribute,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
-from semantic_digital_twin.spatial_computations.forward_kinematics import ForwardKinematicsManager
+from semantic_digital_twin.spatial_computations.forward_kinematics import (
+    ForwardKinematicsManager,
+)
 from semantic_digital_twin.spatial_computations.ik_solver import InverseKinematicsSolver
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Quaternion
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Quaternion,
+)
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.utils import IDGenerator
 from semantic_digital_twin.world_description.connections import (
@@ -56,8 +63,14 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
 )
 from semantic_digital_twin.world_description.connections import HasUpdateState
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
-from semantic_digital_twin.world_description.visitors import CollisionBodyCollector, ConnectionCollector
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
+from semantic_digital_twin.world_description.visitors import (
+    CollisionBodyCollector,
+    ConnectionCollector,
+)
 from semantic_digital_twin.world_description.world_entity import (
     Connection,
     SemanticAnnotation,
@@ -72,7 +85,7 @@ from semantic_digital_twin.world_description.world_entity import (
     Actuator,
 )
 from semantic_digital_twin.world_description.world_modification import (
-    WorldModelModification,
+    WorldModification,
     WorldModelModificationBlock,
     SetDofHasHardwareInterface,
     AddDegreeOfFreedomModification,
@@ -205,9 +218,7 @@ class AtomicWorldModificationNotAtomic(Exception):
     """
 
 
-def atomic_world_modification(
-    func=None, modification: Type[WorldModelModification] = None
-):
+def atomic_world_modification(func=None, modification: Type[WorldModification] = None):
     """
     Decorator for ensuring atomicity in world modification operations.
 
@@ -598,7 +609,7 @@ class World(HasSimulatorProperties):
 
         :param kinematic_structure_entity: The kinematic_structure_entity to add.
         """
-        logger.info(
+        logger.debug(
             f"Trying to add kinematic_structure_entity with name {kinematic_structure_entity.name}"
         )
         self._raise_error_if_belongs_to_other_world(kinematic_structure_entity)
