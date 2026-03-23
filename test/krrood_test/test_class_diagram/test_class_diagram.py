@@ -1,4 +1,4 @@
-from dataclasses import is_dataclass, fields, Field
+from dataclasses import is_dataclass, fields
 from typing import Optional, List
 
 from krrood.class_diagrams.class_diagram import (

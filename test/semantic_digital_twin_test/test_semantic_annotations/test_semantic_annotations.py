@@ -13,6 +13,7 @@ from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Drawer, Wardrobe, Door
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,

@@ -22,6 +22,7 @@ from typing_extensions import (
     Dict,
 )
 
+from krrood.patterns.role.role import Role
 from krrood.entity_query_language.utils import T, merge_args_and_kwargs
 from krrood.entity_query_language.core.variable import Variable, InstantiatedVariable
 from krrood.entity_query_language.core.base_expressions import Selectable
@@ -104,13 +105,16 @@ class HasType(Predicate):
     """
     The variable whose type is being checked.
     """
-    types_: Type
+    type_: Type
     """
     The type or tuple of types against which the `variable` is validated.
     """
 
     def __call__(self) -> bool:
-        return isinstance(self.variable, self.types_)
+        return isinstance(self.variable, self.type_) or (
+            isinstance(self.variable, Role)
+            and issubclass(self.variable.get_role_generic_type(), self.type_)
+        )
 
 
 @dataclass(eq=False)
@@ -125,7 +129,7 @@ class HasTypes(HasType):
     information with equality comparison explicitly disabled.
     """
 
-    types_: Tuple[Type, ...]
+    type_: Tuple[Type, ...]
     """
     A tuple containing Type objects that are associated with this instance.
     """

@@ -34,6 +34,7 @@ from krrood.entity_query_language.exceptions import (
     NestedAggregationError,
     InvalidChildType,
 )
+from krrood.entity_query_language.operators.set_operations import Union
 from krrood.entity_query_language.utils import T
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
 

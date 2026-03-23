@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import weakref
 from collections import defaultdict
 from dataclasses import dataclass, field, InitVar
@@ -19,7 +20,7 @@ from typing_extensions import (
 )
 
 from krrood import logger
-from krrood.class_diagrams import ClassDiagram
+from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
@@ -95,7 +96,7 @@ class WrappedInstance:
     Index in the instance graph of the symbol graph that manages this object.
     """
 
-    _symbol_graph_: Optional[SymbolGraph] = field(
+    symbol_graph: Optional[SymbolGraph] = field(
         init=False, hash=False, default=None, repr=False
     )
     """
@@ -192,9 +193,19 @@ class SymbolGraph(metaclass=SingletonMeta):
 
     def __post_init__(self):
         if self._class_diagram is None:
-            # fetch all symbols and construct the graph
+            all_symbols = [
+                cls
+                for cls in recursive_subclasses(Symbol)
+                if hasattr(cls, "__module__")
+                and (cls.__module__ in sys.modules)
+                and not (
+                    getattr(sys.modules[cls.__module__], "__file__", "").endswith(
+                        ".pyi"
+                    )
+                )
+            ]
             self._class_diagram = ClassDiagram(
-                list(recursive_subclasses(Symbol)),
+                all_symbols,
                 introspector=DescriptorAwareIntrospector(),
             )
 
@@ -209,7 +220,7 @@ class SymbolGraph(metaclass=SingletonMeta):
         :param wrapped_instance: The instance to add.
         """
         wrapped_instance.index = self._instance_graph.add_node(wrapped_instance)
-        wrapped_instance._symbol_graph_ = self
+        wrapped_instance.symbol_graph = self
         self._instance_index[id(wrapped_instance.instance)] = wrapped_instance
         self._class_to_wrapped_instances[wrapped_instance.instance_type].append(
             wrapped_instance
@@ -267,7 +278,8 @@ class SymbolGraph(metaclass=SingletonMeta):
 
     @classmethod
     def clear(cls) -> None:
-        SingletonMeta.clear_instance(cls)
+        cls._instances[cls]._class_diagram.clear()
+        cls.clear_instance()
 
     # Adapters to align with ORM alternative mapping expectations
     def add_instance(self, wrapped_instance: WrappedInstance) -> None:

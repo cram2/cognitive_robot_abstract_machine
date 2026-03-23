@@ -6,6 +6,8 @@ rustworkx>=0.14.0
 sqlalchemy
 black
 sortedcontainers
+ruff
+libcst
 
 # rdr requirements
 anytree>=2.8.0

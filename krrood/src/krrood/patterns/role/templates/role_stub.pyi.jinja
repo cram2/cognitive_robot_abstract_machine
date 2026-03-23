@@ -1,0 +1,47 @@
+from __future__ import annotations
+from dataclasses import dataclass, field, Field
+{% for import_statement in imports %}
+{{ import_statement }}
+{% endfor %}
+
+{% for item in items %}
+{% if item.__class__.__name__ == 'TypeVarInfo' %}
+{{ item.source }}
+
+
+{% elif item.__class__.__name__ in ['StubClassInfo', 'MixinInfo', 'SpecializedRoleForInfo'] %}
+@dataclass({{ item.dataclass_args }})
+class {{ item.name }}{% if item.bases %}({{ item.bases|join(', ') }}){% endif %}:
+    {% for wrapped_field in item.fields %}
+    {{ wrapped_field.name }}: {{ wrapped_field.type_name }}{{ wrapped_field.field_representation }}
+    {% endfor %}
+    {% if not item.fields %}
+    ...
+    {% endif %}
+
+
+{% elif item.__class__.__name__ == 'RoleForInfo' %}
+@dataclass({{ item.dataclass_args }})
+class {{ item.name }}{% if item.bases %}({{ item.bases|join(', ') }}){% endif %}:
+    {{ item.taker_field_name }}: {{ item.taker_field.type_name }}{{ item.taker_field.field_representation }}
+    {% for wrapped_field in item.inherited_fields %}
+    {{ wrapped_field.name }}: {{ wrapped_field.type_name }}{{ wrapped_field.field_representation }}
+    {% endfor %}
+
+    @classmethod
+    def role_taker_attribute(cls) -> Field: ...
+
+
+{% elif item.__class__.__name__ == 'RoleInfo' %}
+@dataclass({{ item.dataclass_args }})
+class {{ item.name }}{% if item.bases %}({{ item.bases|join(', ') }}){% endif %}:
+    {% if item.introduced_field %}
+    # Original Owner of the {{ item.introduced_field.name }} field
+    {{ item.introduced_field.name }}: {{ item.introduced_field.type_name }}{{ item.introduced_field.field_representation }}
+    {% else %}
+    ...
+    {% endif %}
+
+
+{% endif %}
+{% endfor %}

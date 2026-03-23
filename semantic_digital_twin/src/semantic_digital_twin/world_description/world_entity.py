@@ -39,7 +39,10 @@ from krrood.symbolic_math.symbolic_math import Matrix
 from krrood.utils import get_full_class_name
 from semantic_digital_twin.world_description.geometry import TriangleMesh
 from semantic_digital_twin.world_description.inertial_properties import Inertial
-from semantic_digital_twin.world_description.shape_collection import ShapeCollection, BoundingBoxCollection
+from semantic_digital_twin.world_description.shape_collection import (
+    ShapeCollection,
+    BoundingBoxCollection,
+)
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -119,7 +122,7 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
         The WorldEntity class is not meant to be instantiated directly.
     """
 
-    id: UUID = field(default_factory=uuid4)
+    id: UUID = field(default_factory=uuid4, kw_only=True)
     """
     A unique identifier for this world entity.
     """

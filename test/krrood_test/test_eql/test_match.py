@@ -9,13 +9,11 @@ from krrood.entity_query_language.factories import (
     the,
     match,
     match_variable,
-    an,
     a,
 )
 from krrood.entity_query_language.exceptions import NoKwargsInMatchVar
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.core.base_expressions import UnificationDict
-from krrood.parametrization.random_events_translator import is_literal_comparator
 from ..dataset.example_classes import Positions, Position
 from ..dataset.semantic_world_like_classes import (
     FixedConnection,
@@ -112,7 +110,6 @@ def test_select_where(handles_and_containers_world):
             container := fixed_connection.parent, handle := fixed_connection.child
         ).where(container.size > 1)
     )
-    # QueryGraph(container_and_handle.build()).visualize()
     # Method 2
     fixed_connection_2 = variable(FixedConnection, domain=world.connections)
     container_and_handle_2 = the(

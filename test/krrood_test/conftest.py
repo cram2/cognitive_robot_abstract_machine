@@ -124,7 +124,10 @@ except Exception as e:
         RuntimeWarning,
     )
 
-from .dataset.ormatic_interface import *
+try:
+    from .dataset.ormatic_interface import *
+except ImportError:
+    pass
 
 
 @pytest.fixture
