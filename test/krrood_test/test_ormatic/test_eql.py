@@ -300,6 +300,9 @@ def test_translate_limit(session):
     query._quantification_constraint_ = type('QC', (object,), {'n': 5})()
 
     translator = eql_to_sql(query, session)
+    expected = select(BodyDAO).limit(5)
+
+    assert str(translator.sql_query) == str(expected)
 
     sql_string = str(translator.sql_query.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
     assert "LIMIT 5" in sql_string.upper()
@@ -317,6 +320,11 @@ def test_order_by(session, database):
     query._order_by_ = BodyDAO.size
 
     translator = eql_to_sql(query, session)
+
+    expected = select(BodyDAO).order_by(BodyDAO.size)
+
+    assert str(translator.sql_query) == str(expected)
+
     results = translator.evaluate()
 
     # SmallBody (10) should come before BigBody (100)
@@ -336,6 +344,9 @@ def test_translate_distinct(session, database):
     query._distinct_ = True
 
     translator = eql_to_sql(query, session)
+    expected = select(BodyDAO).distinct()
+
+    assert str(translator.sql_query) == str(expected)
     results = translator.evaluate()
 
     # Should return only 1 result instead of 2
