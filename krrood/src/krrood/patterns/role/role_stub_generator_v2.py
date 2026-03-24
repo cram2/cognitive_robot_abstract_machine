@@ -589,6 +589,16 @@ class StubTransformer(ContextAwareTransformer):
         """
         Creates a libcst SimpleStatementLine node for a field.
         """
+        self.require_import(
+            wrapped_field.type_endpoint.__module__,
+            [wrapped_field.type_endpoint.__name__],
+        )
+        if wrapped_field.is_container:
+            self.require_import(
+                wrapped_field.container_type.__module__,
+                [wrapped_field.container_type.__name__],
+            )
+
         f_copy = copy(wrapped_field.field)
         if not init:
             f_copy.init = False
@@ -790,6 +800,8 @@ class StubTransformer(ContextAwareTransformer):
         """
         Add an import statement to the module context.
         """
+        if module in ["builtins", self.module_.__name__]:
+            return
         for name in names:
             AddImportsVisitor.add_needed_import(
                 self.context,
