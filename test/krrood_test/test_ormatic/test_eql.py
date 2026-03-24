@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import MultipleResultsFound
+from sqlalchemy.dialects import postgresql
 
 from krrood.entity_query_language.exceptions import MultipleSolutionFound
 from ..dataset.example_classes import Position, Pose
@@ -288,5 +289,51 @@ def test_contains(session, database):
 
     assert body1 == result[0]
 
+def test_translate_limit(session):
+    b = variable(type_=Body, domain=[])
+    query = an(entity(b))
+
+    query._quantification_constraint_ = type('QC', (object,), {'n': 5})()
+
+    translator = eql_to_sql(query, session)
+
+    sql_string = str(translator.sql_query.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
+    assert "LIMIT 5" in sql_string.upper()
+
+
 def test_order_by(session, database):
-    pass
+    # Setup: Bodies with different sizes
+    session.add(BodyDAO(name="BigBody", size=100))
+    session.add(BodyDAO(name="SmallBody", size=10))
+    session.commit()
+
+    body_var = variable(type_=Body, domain=[])
+    query = an(entity(body_var))
+
+    query._order_by_ = BodyDAO.size
+
+    translator = eql_to_sql(query, session)
+    results = translator.evaluate()
+
+    # SmallBody (10) should come before BigBody (100)
+    assert len(results) == 2
+    assert results[0].name == "SmallBody"
+    assert results[1].name == "BigBody"
+
+def test_translate_distinct(session, database):
+    # Add two identical entries
+    session.add(BodyDAO(name="DuplicateBody", size=10))
+    session.add(BodyDAO(name="DuplicateBody", size=10))
+    session.commit()
+
+    body_var = variable(type_=Body, domain=[])
+    query = an(entity(body_var))
+
+    query._distinct_ = True
+
+    translator = eql_to_sql(query, session)
+    results = translator.evaluate()
+
+    # Should return only 1 result instead of 2
+    assert len(results) == 1
+    assert results[0].name == "DuplicateBody"
