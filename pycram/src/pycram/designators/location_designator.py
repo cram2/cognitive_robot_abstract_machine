@@ -1382,17 +1382,17 @@ class ProbabilisticCostmapLocation(LocationDesignatorDescription):
         p_point_root = ProductUnit(probabilistic_circuit=navigation_circuit)
         circuit_root.add_subcircuit(p_point_root, 1.0)
         target_x_p = DiracDeltaDistribution(
-            self.target_x, float(target_position.x), 1.0
+            variable=self.target_x, location=float(target_position.x), density_cap=1.0
         )
         target_y_p = DiracDeltaDistribution(
-            self.target_y, float(target_position.y), 1.0
+            variable=self.target_y, location=float(target_position.y), density_cap=1.0
         )
 
         nav_x_p = GaussianDistribution(
-            SpatialVariables.x.value, float(target_position.x), scale
+            variable=SpatialVariables.x.value, location=float(target_position.x), scale=scale
         )
         nav_y_p = GaussianDistribution(
-            SpatialVariables.y.value, float(target_position.y), scale
+            variable=SpatialVariables.y.value, location=float(target_position.y), scale=scale
         )
 
         p_point_root.add_subcircuit(leaf(target_x_p, navigation_circuit))

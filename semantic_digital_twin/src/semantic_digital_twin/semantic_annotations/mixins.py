@@ -902,14 +902,14 @@ class HasSupportingSurface(HasStorageSpace, ABC):
             )
 
             x_p = GaussianDistribution(
-                SpatialVariables.x.value,
-                float(surface_P_obj.x),
-                variance,
+                variable=SpatialVariables.x.value,
+                location=float(surface_P_obj.x),
+                scale=variance,
             )
             y_p = GaussianDistribution(
-                SpatialVariables.y.value,
-                float(surface_P_obj.y),
-                variance,
+                variable=SpatialVariables.y.value,
+                location=float(surface_P_obj.y),
+                scale=variance,
             )
 
             p_object_root.add_subcircuit(leaf(object_of_interest_p, surface_circuit))
