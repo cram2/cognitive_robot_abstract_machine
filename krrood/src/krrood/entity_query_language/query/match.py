@@ -12,10 +12,10 @@ from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
 from functools import cached_property
+from inspect import ismethod, isfunction, isclass
 from typing import assert_never, Any
 
 import rustworkx as rx
-from inspect import ismethod, isclass
 from typing_extensions import (
     Optional,
     Type,
@@ -24,12 +24,10 @@ from typing_extensions import (
     Generic,
     TYPE_CHECKING,
     Self,
-    Dict,
-    Generator,
     Iterator,
+    get_type_hints,
 )
 
-from krrood.adapters.json_serializer import list_like_classes
 from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     SymbolicExpression,
@@ -47,14 +45,16 @@ from krrood.entity_query_language.exceptions import (
     CalledMatchMultipleTimes,
 )
 from krrood.entity_query_language.predicate import HasType
-from krrood.entity_query_language.query.quantifiers import An
 from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.rustworkx_utils import RWXNode
+from krrood.symbol_graph.helpers import get_field_type_endpoint
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType
     from krrood.entity_query_language.query.query import Entity, Query
+
+from typing import get_type_hints
 
 
 @dataclass
@@ -66,11 +66,11 @@ class AbstractMatchExpression(Generic[T], ABC):
     which are used to structural pattern matching in the form of nested match expressions with keyword arguments.
     """
 
-    type_: Optional[Type[T]] = field(default=None, init=False)
+    type_: Optional[Type[T]] = field(default=None, kw_only=True)
     """
     The type of the variable.
     """
-    variable: Optional[Selectable[T]] = field(default=None, kw_only=True)
+    variable: Optional[Variable[T]] = field(default=None, kw_only=True)
     """
     The created variable from the type and kwargs.
     """
@@ -129,7 +129,7 @@ class AbstractMatchExpression(Generic[T], ABC):
     @abstractmethod
     def name(self) -> str: ...
 
-    @cached_property
+    @property
     def type(self) -> Optional[Type[T]]:
         """
         If type is predefined return it, else if the variable is available return its type, else return None.
@@ -217,12 +217,21 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
     """
 
     def __post_init__(self):
-        if ismethod(self.factory):
-            self.type_ = self.factory.__class__
-        elif isclass(self.factory):
-            self.type_ = self.factory
-        else:
-            assert_never(self.factory)
+        if self.type_ is None:
+            if isclass(self.factory):
+                self.type_ = self.factory
+            elif ismethod(self.factory):
+                self.type_ = self.factory.__class__
+            elif isfunction(self.factory):
+
+                type_ = get_type_hints(self.factory)["return"]
+                assert isclass(
+                    type_
+                ), f"factory must return a class, got {type_} which is of type {type(type_)}"
+                self.type_ = type_
+
+            else:
+                assert_never(self.factory)
 
     def __call__(self, **kwargs) -> Union[T, Self, CanBehaveLikeAVariable[T]]:
         """
@@ -577,6 +586,18 @@ class AttributeMatch(AbstractMatchExpression[T]):
         specific wrappings.
         """
         return self.variable._access_path_[-1]._name_
+
+    @property
+    def type(self) -> Optional[Type[T]]:
+        result = super().type
+        if result is not None:
+            return result
+
+        if isinstance(self.parent, AttributeMatch):
+            return get_field_type_endpoint(
+                self.parent.assigned_value.type, self.variable._attribute_name_
+            )
+        return None
 
 
 def construct_graph_and_get_root(

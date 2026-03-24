@@ -1,0 +1,91 @@
+flowchart TD
+    subgraph RoboKudo ["RoboKudo"]
+        Pipeline[Perception Pipeline Trees]
+        Annotators[Annotators]
+    end
+
+    subgraph PyCRAM ["PyCRAM"]
+        Plans[Plans]
+        Designators[Designators]
+        MotionExecutor[Motion Executor]
+    end
+
+    subgraph SDT ["Semantic Digital Twin"]
+        WorldModel[World Model]
+        Annotations[Semantic Annotations]
+        Geometry[Geometry / Collision]
+        WorldState[World State]
+        Robots[Robots]
+    end
+
+    subgraph GiskardPy ["GiskardPy"]
+        Statechart[Motion Statechart]
+        QPController[QP Controller]
+        RosExecutor[ROS Executor]
+    end
+
+    subgraph KRROOD ["KRROOD"]
+        EQL[Entity Query Language]
+        ORM[ORMatic]
+        PM[Probabilistic Model]
+        Parameterizer[Parameterizer]
+    end
+
+    subgraph Execution ["Execution"]
+        subgraph Simulators ["Simulators"]
+            MultiSim[Physics Simulator]
+            Mujoco[MuJoCo Connector]
+        end
+
+        subgraph RealWorld ["Real World"]
+            ROS[ROS]
+            Multiverse[Multiverse]
+            RealWorldNode[Real World]
+        end
+    end
+
+
+    %% PyCRAM Relationships
+    Plans -.->|uses| Designators
+    Plans -.->|is parameterized by| Parameterizer
+    Designators -.->|uses| MotionExecutor
+    Designators -.->|define questions| EQL
+    Designators -.->|commands| Pipeline
+
+    %% Motion Executor Relationships
+    MotionExecutor -.->|constructs| Statechart
+    MotionExecutor -.->|runs| RosExecutor
+
+    %% RoboKudo Relationships
+    Pipeline -.->|builds hypothesis using| Annotators
+    Pipeline -.->|Fetch Images| ROS
+    Pipeline -.->|Update| WorldModel
+    Pipeline -.->|updates| WorldState
+
+    %% KRROOD Relationships
+    Parameterizer -.->|learns from| ORM
+    EQL -.->|reasons with| ORM
+    EQL -.->|reasons with| PM
+    EQL -.->|reasons with| WorldModel
+    EQL -.->|reasons with| QPController
+
+    %% Semantic Digital Twin Relationships
+    WorldModel -.->|persists via| ORM
+    WorldModel -.->|contains| Annotations
+    WorldModel -.->|manages| Geometry
+    WorldModel -.->|manages| WorldState
+    WorldModel -.->|synchronizes with| MultiSim
+    Annotations -.->|defines| Robots
+
+    %% GiskardPy Relationships
+    QPController -.->|is constructed using| Statechart
+    QPController -.->|is constructed using| WorldModel
+    QPController -.->|updates| WorldState
+
+    %% Real World Relationships
+    RosExecutor -.->|Read/Write| ROS
+    ROS -.->|Read/Write| RealWorldNode
+    ROS -.->|Read/Write| Multiverse
+
+    %% Simulators Relationships
+    MultiSim -.->|uses| Mujoco

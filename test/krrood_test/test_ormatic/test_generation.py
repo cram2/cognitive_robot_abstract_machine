@@ -28,6 +28,6 @@ def test_generation_process():
     assert hasattr(ormatic_interface, "Base")
 
     # Verify that expected DAO classes exist
-    assert hasattr(ormatic_interface, "TransformationMappedDAO")
-    assert hasattr(ormatic_interface, "PositionDAO")
+    assert hasattr(ormatic_interface, "KRROODTransformationMappedDAO")
+    assert hasattr(ormatic_interface, "KRROODPositionDAO")
     assert hasattr(ormatic_interface, "AtomDAO")

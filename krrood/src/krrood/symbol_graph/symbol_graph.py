@@ -265,8 +265,9 @@ class SymbolGraph(metaclass=SingletonMeta):
             self.add_node(wrapped_instance)
         return wrapped_instance
 
-    def clear(self) -> None:
-        SingletonMeta.clear_instance(type(self))
+    @classmethod
+    def clear(cls) -> None:
+        SingletonMeta.clear_instance(cls)
 
     # Adapters to align with ORM alternative mapping expectations
     def add_instance(self, wrapped_instance: WrappedInstance) -> None:

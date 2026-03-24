@@ -6,6 +6,7 @@ import tempfile
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
+from enum import Enum
 from functools import cached_property
 
 import numpy as np
@@ -78,6 +79,81 @@ class Color:
 
     def to_rgba(self) -> Tuple[float, float, float, float]:
         return (self.R, self.G, self.B, self.A)
+
+    def to_rgb(self) -> Tuple[float, float, float]:
+        return (self.R, self.G, self.B)
+
+    @classmethod
+    def from_list(cls, color: List[float]):
+        """
+        Set the rgba_color from a list of RGBA values.
+
+        :param color: The list of RGBA values
+        """
+        if len(color) == 3:
+            return cls.from_rgb(color)
+        elif len(color) == 4:
+            return cls.from_rgba(color)
+        else:
+            raise ValueError("Color list must have 3 or 4 elements")
+
+    @classmethod
+    def from_rgb(cls, rgb: List[float]):
+        """
+        Set the rgba_color from a list of RGB values.
+
+        :param rgb: The list of RGB values
+        """
+        return cls(*rgb, 1)
+
+    @classmethod
+    def from_rgba(cls, rgba: List[float]):
+        """
+        Set the rgba_color from a list of RGBA values.
+
+        :param rgba: The list of RGBA values
+        """
+        return cls(*rgba)
+
+    @classmethod
+    def PINK(cls) -> Self:
+        return cls(1, 0, 1, 1)
+
+    @classmethod
+    def BLACK(cls) -> Self:
+        return cls(0, 0, 0, 1)
+
+    @classmethod
+    def WHITE(cls) -> Self:
+        return cls(1, 1, 1, 1)
+
+    @classmethod
+    def RED(cls) -> Self:
+        return cls(1, 0, 0, 1)
+
+    @classmethod
+    def GREEN(cls) -> Self:
+        return cls(0, 1, 0, 1)
+
+    @classmethod
+    def BLUE(cls) -> Self:
+        return cls(0, 0, 1, 1)
+
+    @classmethod
+    def YELLOW(cls) -> Self:
+        return cls(1, 1, 0, 1)
+
+    @classmethod
+    def CYAN(cls) -> Self:
+        return cls(0, 1, 1, 1)
+
+    @classmethod
+    def MAGENTA(cls) -> Self:
+        return cls(1, 0, 1, 1)
+
+    @classmethod
+    def GREY(cls) -> Self:
+        return cls(0.5, 0.5, 0.5, 1)
 
 
 @dataclass
@@ -965,31 +1041,30 @@ class BoundingBox:
         """
         Transform the bounding box to a different reference frame.
         """
-        origin_T_self = self.origin
-        origin_frame = origin_T_self.reference_frame
+        origin_T_self_np = self.origin.to_np()
+        origin_frame = self.origin.reference_frame
         world = origin_frame._world
 
-        reference_T_origin = world.compute_forward_kinematics(
+        reference_T_origin_np = world.compute_forward_kinematics_np(
             reference_T_new_origin.reference_frame, origin_frame
         )
 
-        reference_T_self: HomogeneousTransformationMatrix = (
-            reference_T_origin @ origin_T_self
-        )
+        reference_T_self_np: np.ndarray = reference_T_origin_np @ origin_T_self_np
 
         # Get all 8 corners of the BB in link-local space
         list_self_T_corner = [
-            HomogeneousTransformationMatrix.from_point_rotation_matrix(self_T_corner)
+            HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                self_T_corner
+            ).to_np()
             for self_T_corner in self.get_points()
         ]  # shape (8, 3)
 
         list_reference_T_corner = [
-            reference_T_self @ self_T_corner for self_T_corner in list_self_T_corner
+            reference_T_self_np @ self_T_corner for self_T_corner in list_self_T_corner
         ]
 
         list_reference_P_corner = [
-            reference_T_corner.to_position().to_np()[:3]
-            for reference_T_corner in list_reference_T_corner
+            reference_T_corner[:3, 3:] for reference_T_corner in list_reference_T_corner
         ]
 
         # Compute world-space bounding box from transformed corners

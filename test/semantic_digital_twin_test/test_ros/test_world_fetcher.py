@@ -150,8 +150,8 @@ def test_world_fetching(rclpy_node):
         == world.get_world_model_manager().model_modification_blocks
     )
     np.testing.assert_array_almost_equal(
-        world2.get_body_by_name("body_2").global_pose.to_np(),
-        world.get_body_by_name("body_2").global_pose.to_np(),
+        world2.get_body_by_name("body_2").global_transform.to_np(),
+        world.get_body_by_name("body_2").global_transform.to_np(),
     )
 
 

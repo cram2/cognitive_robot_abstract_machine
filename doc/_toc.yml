@@ -1,2 +1,6 @@
 format: jb-book
 root: index
+chapters:
+  - file: contributing
+    options:
+      hidden: true

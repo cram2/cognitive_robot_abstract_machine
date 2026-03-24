@@ -35,7 +35,7 @@ from semantic_digital_twin.utils import rclpy_installed, tracy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
-    DiffDrive,
+    DifferentialDrive,
     FixedConnection,
     Connection6DoF,
     RevoluteConnection,
@@ -93,7 +93,7 @@ The structure of fixtures in this conftest:
 def cleanup_after_test():
     # We need to pass the class diagram, since otherwise some names are not found anymore after clearing the symbol graph
     # for the first time, since World is not a symbol
-    SymbolGraph().clear()
+    SymbolGraph.clear()
     class_diagram = ClassDiagram(
         recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),
@@ -102,7 +102,7 @@ def cleanup_after_test():
     # runs BEFORE each test
     yield
     # runs AFTER each test (even if the test fails or errors)
-    SymbolGraph().clear()
+    SymbolGraph.clear()
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -317,7 +317,7 @@ def cylinder_bot_diff_world():
         )
         world.add_connection(env_connection)
 
-        connection = DiffDrive.create_with_dofs(
+        connection = DifferentialDrive.create_with_dofs(
             world=world, parent=body, child=robot_world.root
         )
         world.merge_world(robot_world, connection)
@@ -329,7 +329,7 @@ def cylinder_bot_diff_world():
 def world_with_urdf_factory(
     urdf_path: str,
     robot_semantic_annotation: Type[AbstractRobot] | None,
-    drive_connection_type: Type[OmniDrive | DiffDrive],
+    drive_connection_type: Type[OmniDrive | DifferentialDrive],
     robot_starting_pose: HomogeneousTransformationMatrix | None = None,
     urdf_path_resolver: PathResolver | None = None,
 ):
@@ -420,13 +420,13 @@ def stretch_world():
         "robots",
     )
     stretch = os.path.join(urdf_dir, "stretch_description.urdf")
-    return world_with_urdf_factory(stretch, Stretch, DiffDrive)
+    return world_with_urdf_factory(stretch, Stretch, DifferentialDrive)
 
 
 @pytest.fixture(scope="session")
 def tiago_world():
     tiago = "package://iai_tiago_description/urdf/tiago_from_our_robot.urdf"
-    return world_with_urdf_factory(tiago, Tiago, DiffDrive)
+    return world_with_urdf_factory(tiago, Tiago, DifferentialDrive)
 
 
 @pytest.fixture(scope="session")

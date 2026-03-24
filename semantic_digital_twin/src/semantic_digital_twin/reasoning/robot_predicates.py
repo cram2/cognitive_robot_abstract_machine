@@ -4,9 +4,20 @@ import itertools
 from typing import Optional, List
 
 import trimesh.sample
-from krrood.entity_query_language.factories import entity, variable, and_, not_, contains, an, the
+from krrood.entity_query_language.factories import (
+    entity,
+    variable,
+    and_,
+    not_,
+    contains,
+    an,
+    the,
+)
 
-from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints, CollisionCheck
+from semantic_digital_twin.collision_checking.collision_detector import (
+    ClosestPoints,
+    CollisionCheck,
+)
 from semantic_digital_twin.collision_checking.collision_manager import CollisionManager
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionMatrix
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -14,8 +25,12 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AllowSelfCollisions,
 )
-from semantic_digital_twin.collision_checking.pybullet_collision_detector import BulletCollisionDetector
-from semantic_digital_twin.collision_checking.trimesh_collision_detector import FCLCollisionDetector
+from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
+    BulletCollisionDetector,
+)
+from semantic_digital_twin.collision_checking.trimesh_collision_detector import (
+    FCLCollisionDetector,
+)
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot, ParallelGripper
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -134,9 +149,9 @@ def is_body_in_gripper(
     body_mesh = body.collision.combined_mesh.copy()
 
     # Transform copies of the meshes into the world frame
-    body_mesh.apply_transform(body.global_pose.to_np())
-    thumb_mesh.apply_transform(gripper.thumb.tip.global_pose.to_np())
-    finger_mesh.apply_transform(gripper.finger.tip.global_pose.to_np())
+    body_mesh.apply_transform(body.global_transform.to_np())
+    thumb_mesh.apply_transform(gripper.thumb.tip.global_transform.to_np())
+    finger_mesh.apply_transform(gripper.finger.tip.global_transform.to_np())
 
     # get random points from thumb mesh
     finger_points = trimesh.sample.sample_surface(finger_mesh, sample_size)[0]

@@ -93,7 +93,7 @@ class PipelineTestCase(unittest.TestCase):
         ]
 
         original_global_poses = [
-            body.global_pose.to_np() for body in world.bodies_with_collision
+            body.global_transform.to_np() for body in world.bodies_with_collision
         ]
         for pose in original_global_poses:
             np.testing.assert_almost_equal(pose, np.eye(4))
@@ -103,7 +103,8 @@ class PipelineTestCase(unittest.TestCase):
         centered_world = pipeline.apply(world)
 
         centered_global_poses = [
-            body.global_pose.to_np() for body in centered_world.bodies_with_collision
+            body.global_transform.to_np()
+            for body in centered_world.bodies_with_collision
         ]
         for original, centered in zip(original_global_poses, centered_global_poses):
             assert not np.allclose(original, centered)

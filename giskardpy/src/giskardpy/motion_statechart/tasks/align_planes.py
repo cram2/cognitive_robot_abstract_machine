@@ -67,7 +67,7 @@ class AlignPlanes(Task):
             frame_V_current=root_V_tip_normal,
             frame_V_goal=root_V_root_normal,
             reference_velocity=self.reference_velocity,
-            weight=self.weight,
+            quadratic_weight=self.weight,
         )
         artifacts.observation = (
             root_V_tip_normal.angle_between(root_V_root_normal) <= self.threshold

@@ -49,10 +49,13 @@ from krrood.entity_query_language.query.quantifiers import (
 from krrood.entity_query_language.utils import (
     cartesian_product_while_passing_the_bindings_around,
 )
+from ...dataset.example_classes import (
+    KRROODPose,
+    KRROODPosition,
+    KRROODVectorsWithProperty,
+)
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 
-from ...dataset.example_classes import VectorsWithProperty
-from ...dataset.example_classes import VectorsWithProperty
 from ...dataset.semantic_world_like_classes import (
     Handle,
     Body,
@@ -1017,7 +1020,7 @@ def test_property_selection():
     """
     Test that properties can be selected from entities in a query.
     """
-    v = variable(VectorsWithProperty, None)
+    v = variable(KRROODVectorsWithProperty, None)
     q = an(entity(v).where(v.vectors[0].x == 1))
 
 

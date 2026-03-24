@@ -19,6 +19,7 @@ from krrood.entity_query_language.factories import (
     a,
     flat_variable,
 )
+from ..dataset.example_classes import KRROODVectorsWithProperty
 from krrood.entity_query_language.predicate import length
 from krrood.entity_query_language.query.operations import GroupedBy
 from ..dataset.department_and_employee import Department, Employee
@@ -478,6 +479,12 @@ def test_multiple_aggregations_per_group_on_same_variable(departments_and_employ
         results, 2, 25000, max_salary, department, avg_salary, employees, departments
     )
 
+def test_property_selection():
+    """
+    Test that properties can be selected from entities in a query.
+    """
+    v = variable(KRROODVectorsWithProperty, None)
+    q = an(entity(v).where(v.vectors[0].x == 1))
 
 def test_having_node_hierarchy(departments_and_employees):
 
