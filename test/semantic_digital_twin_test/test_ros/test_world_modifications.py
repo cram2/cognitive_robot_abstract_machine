@@ -134,8 +134,11 @@ class ConnectionModificationTestCase(unittest.TestCase):
         modifications = world.get_world_model_manager().model_modification_blocks[-1]
         self.assertEqual(len(modifications.modifications), 3)
 
+        tracker = WorldEntityWithIDKwargsTracker.from_world(w2)
+        kwargs = tracker.create_kwargs()
+
         modifications_copy = WorldModelModificationBlock.from_json(
-            modifications.to_json()
+            modifications.to_json(), **kwargs
         )
         with w2.modify_world():
             modifications_copy.apply(w2)
@@ -149,8 +152,8 @@ class ConnectionModificationTestCase(unittest.TestCase):
         v1 = Handle(root=b1)
         v2 = Door(root=b1, handle=v1)
 
-        add_v1 = AddSemanticAnnotationModification(v1)
-        add_v2 = AddSemanticAnnotationModification(v2)
+        add_v1 = AddSemanticAnnotationModification.from_domain_object(v1)
+        add_v2 = AddSemanticAnnotationModification.from_domain_object(v2)
 
         self.assertNotIn(v1, w.semantic_annotations)
         self.assertNotIn(v2, w.semantic_annotations)
@@ -161,9 +164,10 @@ class ConnectionModificationTestCase(unittest.TestCase):
 
         self.assertIn(v1, w.semantic_annotations)
         self.assertIn(v2, w.semantic_annotations)
+        self.assertEqual({v1.id, v2.id}, set(a.id for a in w.semantic_annotations))
 
-        rm_v1 = RemoveSemanticAnnotationModification(v1)
-        rm_v2 = RemoveSemanticAnnotationModification(v2)
+        rm_v1 = RemoveSemanticAnnotationModification.from_domain_object(v1)
+        rm_v2 = RemoveSemanticAnnotationModification.from_domain_object(v2)
         with w.modify_world():
             rm_v1.apply(w)
             rm_v2.apply(w)

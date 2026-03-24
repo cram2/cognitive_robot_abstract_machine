@@ -57,7 +57,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 headless = os.environ.get("CI", "false").lower() == "true"
 # headless = True
-only_run_test_in_CI = os.environ.get("CI", "false").lower() == "false"
+only_run_test_in_CI = False  # os.environ.get("CI", "false").lower() == "false"
 
 
 @unittest.skipIf(

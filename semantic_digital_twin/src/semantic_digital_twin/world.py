@@ -85,7 +85,7 @@ from semantic_digital_twin.world_description.world_entity import (
     Actuator,
 )
 from semantic_digital_twin.world_description.world_modification import (
-    WorldModelModification,
+    WorldModification,
     WorldModelModificationBlock,
     SetDofHasHardwareInterface,
     AddDegreeOfFreedomModification,
@@ -218,9 +218,7 @@ class AtomicWorldModificationNotAtomic(Exception):
     """
 
 
-def atomic_world_modification(
-    func=None, modification: Type[WorldModelModification] = None
-):
+def atomic_world_modification(func=None, modification: Type[WorldModification] = None):
     """
     Decorator for ensuring atomicity in world modification operations.
 

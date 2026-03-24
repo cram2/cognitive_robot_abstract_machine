@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import (
         KinematicStructureEntity,
     )
+    from semantic_digital_twin.orm.model import Point3Mapping, QuaternionMapping
 
 
 @dataclass(eq=False, repr=False)

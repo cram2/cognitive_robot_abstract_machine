@@ -7,7 +7,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -29,7 +29,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
@@ -51,7 +51,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -73,7 +73,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -95,7 +95,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
@@ -117,7 +117,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -139,7 +139,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -161,7 +161,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -183,7 +183,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -205,7 +205,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -227,7 +227,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -249,7 +249,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -271,7 +271,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -293,7 +293,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -315,7 +315,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
@@ -337,7 +337,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -359,7 +359,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -381,7 +381,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
@@ -404,7 +404,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -426,7 +426,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
@@ -448,7 +448,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -470,7 +470,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -492,7 +492,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -514,7 +514,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -536,7 +536,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
     """Get possible value(s) for Animal.species  of type Species."""
@@ -558,7 +558,7 @@ from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import GeneralRDR, MultiClassRDR, SingleClassRDR
 from krrood.ripple_down_rules.utils import make_set
 from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import get_fit_grdr, get_fit_mcrdr, get_fit_scrdr, get_habitat
-from pandas.core.frame import DataFrame
+from pandas import DataFrame
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""

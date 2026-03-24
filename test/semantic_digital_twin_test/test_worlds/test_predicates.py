@@ -304,7 +304,7 @@ def test_is_body_in_gripper(pr2_world_copy):
         if LeftOf(
             gripper[0].root.center_of_mass,
             gripper[1].root.center_of_mass,
-            pr2.root.global_pose,
+            pr2.root.global_transform,
         )()
         else gripper[1]
     )

@@ -25,7 +25,7 @@ from giskardpy.motion_statechart.exceptions import (
     NodeAlreadyBelongsToDifferentNodeError,
 )
 from giskardpy.motion_statechart.goals.cartesian_goals import (
-    DiffDriveBaseGoal,
+    DifferentialDriveBaseGoal,
     CartesianPoseStraight,
 )
 from giskardpy.motion_statechart.goals.collision_avoidance import (
@@ -123,6 +123,7 @@ from semantic_digital_twin.spatial_types import (
     RotationMatrix,
 )
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -1587,7 +1588,9 @@ class TestCartesianTasks:
                     CartesianPosition(
                         root_link=hsr_world_setup.root,
                         tip_link=hand.tool_frame,
-                        goal_point=hsr_world_setup.bodies[-1].global_pose.to_position(),
+                        goal_point=hsr_world_setup.bodies[
+                            -1
+                        ].global_transform.to_position(),
                     ),
                 ]
             )
@@ -2066,8 +2069,8 @@ class TestDiffDriveBaseGoal:
     @pytest.mark.parametrize(
         "goal_pose",
         [
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=0.489, y=-0.598, z=0.000),
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            Pose.from_xyz_rpy(x=0.489, y=-0.598, z=0.000),
+            Pose.from_xyz_quaternion(
                 pos_x=-0.026,
                 pos_y=0.569,
                 pos_z=0.0,
@@ -2076,28 +2079,26 @@ class TestDiffDriveBaseGoal:
                 quat_z=0.916530200374776,
                 quat_w=0.3999654882623912,
             ),
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, yaw=np.pi / 4),
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=2, y=0, yaw=-np.pi / 4),
-            HomogeneousTransformationMatrix.from_xyz_rpy(yaw=-np.pi / 4),
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=-1, y=-1, yaw=np.pi / 4),
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=-2, y=-1, yaw=-np.pi / 4),
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=0.01, y=0.5, yaw=np.pi / 8),
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=-0.01, y=-0.5, yaw=np.pi / 5
-            ),
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=1.1, y=2.0, yaw=-np.pi),
-            HomogeneousTransformationMatrix.from_xyz_rpy(y=1),
+            Pose.from_xyz_rpy(x=1, y=1, yaw=np.pi / 4),
+            Pose.from_xyz_rpy(x=2, y=0, yaw=-np.pi / 4),
+            Pose.from_xyz_rpy(yaw=-np.pi / 4),
+            Pose.from_xyz_rpy(x=-1, y=-1, yaw=np.pi / 4),
+            Pose.from_xyz_rpy(x=-2, y=-1, yaw=-np.pi / 4),
+            Pose.from_xyz_rpy(x=0.01, y=0.5, yaw=np.pi / 8),
+            Pose.from_xyz_rpy(x=-0.01, y=-0.5, yaw=np.pi / 5),
+            Pose.from_xyz_rpy(x=1.1, y=2.0, yaw=-np.pi),
+            Pose.from_xyz_rpy(y=1),
         ],
     )
     def test_drive(
         self,
         cylinder_bot_diff_world,
-        goal_pose: HomogeneousTransformationMatrix,
+        goal_pose: Pose,
     ):
         bot = cylinder_bot_diff_world.get_body_by_name("bot")
         msc = MotionStatechart()
         goal_pose.reference_frame = cylinder_bot_diff_world.root
-        msc.add_node(goal := DiffDriveBaseGoal(goal_pose=goal_pose))
+        msc.add_node(goal := DifferentialDriveBaseGoal(goal_pose=goal_pose))
         msc.add_node(EndMotion.when_true(goal))
 
         kin_sim = Executor(MotionStatechartContext(world=cylinder_bot_diff_world))

@@ -136,14 +136,6 @@ class WrongNumberOfArgsError(ExpressionEvaluationError):
 
 
 @dataclass
-class NoArgsAllowedError(SymbolicMathError):
-
-    def __post_init__(self):
-        self.message = "substitution_cache does not support kwargs"
-        super().__post_init__()
-
-
-@dataclass
 class DuplicateVariablesError(SymbolicMathError):
     """
     Raised when duplicate variables are found in an operation that requires unique variables.

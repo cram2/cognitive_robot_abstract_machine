@@ -2,7 +2,7 @@ from copy import deepcopy
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.goals.cartesian_goals import DiffDriveBaseGoal
+from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.goals.open_close import Close
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
@@ -14,6 +14,7 @@ from pycram.robot_plans.motions.base import AlternativeMotion
 from pycram.view_manager import ViewManager
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
 class StretchMoveTCP(MoveTCPMotion, AlternativeMotion[Stretch]):
@@ -30,7 +31,7 @@ class StretchMoveTCP(MoveTCPMotion, AlternativeMotion[Stretch]):
     @property
     def _motion_chart(self) -> Sequence:
         tip = ViewManager().get_end_effector_view(self.arm, self.robot_view).tool_frame
-        goal_copy = deepcopy(self.target.to_spatial_type())
+        goal_copy = deepcopy(self.target)
         goal_copy = self.world.transform(goal_copy, self.world.root)
         goal_point = goal_copy.to_position()
         goal_point.z = 0
@@ -48,7 +49,7 @@ class StretchMoveTCP(MoveTCPMotion, AlternativeMotion[Stretch]):
                 CartesianPose(
                     root_link=self.world.root,
                     tip_link=tip,
-                    goal_pose=self.target.to_spatial_type(),
+                    goal_pose=self.target,
                 ),
             ]
         )
@@ -67,8 +68,8 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
     @property
     def _motion_chart(self):
 
-        return DiffDriveBaseGoal(
-            goal_pose=self.target.to_spatial_type(),
+        return DifferentialDriveBaseGoal(
+            goal_pose=self.target,
         )
 
 
@@ -90,9 +91,7 @@ class StretchClose(ClosingMotion, AlternativeMotion[Stretch]):
             name="Keep holding handle",
             root_link=self.object_part,
             tip_link=tip,
-            goal_pose=HomogeneousTransformationMatrix(
-                reference_frame=tip, child_frame=tip
-            ),
+            goal_pose=Pose(reference_frame=tip),
         )
         align = AlignPlanes(
             root_link=self.world.root,

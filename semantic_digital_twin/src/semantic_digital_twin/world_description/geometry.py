@@ -6,6 +6,7 @@ import tempfile
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
+from enum import Enum
 from functools import cached_property
 
 import numpy as np
@@ -78,6 +79,81 @@ class Color:
 
     def to_rgba(self) -> Tuple[float, float, float, float]:
         return (self.R, self.G, self.B, self.A)
+
+    def to_rgb(self) -> Tuple[float, float, float]:
+        return (self.R, self.G, self.B)
+
+    @classmethod
+    def from_list(cls, color: List[float]):
+        """
+        Set the rgba_color from a list of RGBA values.
+
+        :param color: The list of RGBA values
+        """
+        if len(color) == 3:
+            return cls.from_rgb(color)
+        elif len(color) == 4:
+            return cls.from_rgba(color)
+        else:
+            raise ValueError("Color list must have 3 or 4 elements")
+
+    @classmethod
+    def from_rgb(cls, rgb: List[float]):
+        """
+        Set the rgba_color from a list of RGB values.
+
+        :param rgb: The list of RGB values
+        """
+        return cls(*rgb, 1)
+
+    @classmethod
+    def from_rgba(cls, rgba: List[float]):
+        """
+        Set the rgba_color from a list of RGBA values.
+
+        :param rgba: The list of RGBA values
+        """
+        return cls(*rgba)
+
+    @classmethod
+    def PINK(cls) -> Self:
+        return cls(1, 0, 1, 1)
+
+    @classmethod
+    def BLACK(cls) -> Self:
+        return cls(0, 0, 0, 1)
+
+    @classmethod
+    def WHITE(cls) -> Self:
+        return cls(1, 1, 1, 1)
+
+    @classmethod
+    def RED(cls) -> Self:
+        return cls(1, 0, 0, 1)
+
+    @classmethod
+    def GREEN(cls) -> Self:
+        return cls(0, 1, 0, 1)
+
+    @classmethod
+    def BLUE(cls) -> Self:
+        return cls(0, 0, 1, 1)
+
+    @classmethod
+    def YELLOW(cls) -> Self:
+        return cls(1, 1, 0, 1)
+
+    @classmethod
+    def CYAN(cls) -> Self:
+        return cls(0, 1, 1, 1)
+
+    @classmethod
+    def MAGENTA(cls) -> Self:
+        return cls(1, 0, 1, 1)
+
+    @classmethod
+    def GREY(cls) -> Self:
+        return cls(0.5, 0.5, 0.5, 1)
 
 
 @dataclass

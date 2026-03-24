@@ -287,8 +287,8 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         return future_root_T_self
 
     @property
-    def global_pose(self) -> HomogeneousTransformationMatrix:
-        return self.root.global_pose
+    def global_transform(self) -> HomogeneousTransformationMatrix:
+        return self.root.global_transform
 
 
 @dataclass(eq=False)
@@ -891,7 +891,7 @@ class HasSupportingSurface(HasStorageSpace, ABC):
 
         for object_of_interest in objects_of_interest:
             surface_P_obj = self._world.transform(
-                object_of_interest.root.global_pose, self.supporting_surface
+                object_of_interest.root.global_transform, self.supporting_surface
             )
 
             p_object_root = ProductUnit(probabilistic_circuit=surface_circuit)

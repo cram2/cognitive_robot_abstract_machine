@@ -4,7 +4,12 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
+from geometry_msgs.msg import (
+    PoseStamped as ROSPoseStamped,
+    Pose as ROSPose,
+    Point as ROSPoint,
+    Quaternion as ROSQuaternion,
+)
 
 try:
     from nav2_msgs.action import NavigateToPose
@@ -19,7 +24,7 @@ from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
 from giskardpy.motion_statechart.ros_context import RosContextExtension
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
@@ -113,7 +118,7 @@ class NavigateActionServerTask(
     Node for calling a Navigation2 ROS2 action server to navigate to a given pose.1
     """
 
-    target_pose: HomogeneousTransformationMatrix
+    target_pose: Pose
     """
     Target pose to which the robot should navigate.
     """
@@ -134,11 +139,11 @@ class NavigateActionServerTask(
         )
         position = root_p_goal.to_position().to_np()
         orientation = root_p_goal.to_quaternion().to_np()
-        pose_stamped = PoseStamped(
+        pose_stamped = ROSPoseStamped(
             header=Header(frame_id="map"),
-            pose=Pose(
-                position=Point(x=position[0], y=position[1], z=position[2]),
-                orientation=Quaternion(
+            pose=ROSPose(
+                position=ROSPoint(x=position[0], y=position[1], z=position[2]),
+                orientation=ROSQuaternion(
                     x=orientation[0],
                     y=orientation[1],
                     z=orientation[2],

@@ -1,4 +1,4 @@
-from giskardpy.motion_statechart.goals.cartesian_goals import DiffDriveBaseGoal
+from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
 from pycram.datastructures.enums import ExecutionType
 from pycram.robot_plans import MoveMotion
 from pycram.robot_plans.motions.base import AlternativeMotion
@@ -18,6 +18,6 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Tiago]):
     @property
     def _motion_chart(self):
 
-        return DiffDriveBaseGoal(
-            goal_pose=self.target.to_spatial_type(),
+        return DifferentialDriveBaseGoal(
+            goal_pose=self.target,
         )

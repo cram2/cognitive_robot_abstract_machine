@@ -8,7 +8,6 @@ from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientat
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
-from pycram.datastructures.pose import PoseStamped
 from pycram.datastructures.trajectory import PoseTrajectory
 from pycram.language import SequentialPlan
 from pycram.motion_executor import simulated_robot
@@ -33,7 +32,8 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -131,7 +131,9 @@ def test_reach_action_multi(immutable_tracy_block_world):
         context,
         ParkArmsActionDescription(Arms.BOTH),
         ReachActionDescription(
-            target_pose=PoseStamped.from_list([0.8, 0.5, 0.93], frame=world.root),
+            target_pose=Pose(
+                Point3.from_iterable([0.8, 0.5, 0.93]), reference_frame=world.root
+            ),
             object_designator=box_body,
             arm=Arms.LEFT,
             grasp_description=grasp_description,
@@ -141,7 +143,7 @@ def test_reach_action_multi(immutable_tracy_block_world):
     with simulated_robot:
         plan.perform()
 
-    manipulator_pose = left_arm.manipulator.tool_frame.global_pose
+    manipulator_pose = left_arm.manipulator.tool_frame.global_transform
     manipulator_position = manipulator_pose.to_position().to_np()
     manipulator_orientation = manipulator_pose.to_quaternion().to_np()
 
@@ -198,7 +200,9 @@ def test_grasping(immutable_tracy_block_world):
     )
     with simulated_robot:
         plan.perform()
-    dist = np.linalg.norm(world.get_body_by_name("box1").global_pose.to_np()[3, :3])
+    dist = np.linalg.norm(
+        world.get_body_by_name("box1").global_transform.to_np()[3, :3]
+    )
     assert dist < 0.01
 
 
@@ -252,7 +256,7 @@ def test_place_multi(mutable_tracy_block_world):
         ),
         PlaceActionDescription(
             world.get_body_by_name("box1"),
-            PoseStamped.from_list([0.9, 0, 0.93], frame=world.root),
+            Pose(Point3.from_iterable([0.9, 0, 0.93]), reference_frame=world.root),
             Arms.LEFT,
         ),
     )
@@ -266,25 +270,26 @@ def test_place_multi(mutable_tracy_block_world):
             world.get_body_by_name("box1"),
         )
     box_body = world.get_body_by_name("box1")
-    milk_position = box_body.global_pose.to_position().to_np()
+    milk_position = box_body.global_transform.to_position().to_np()
 
     assert milk_position[:3] == pytest.approx([0.9, 0, 0.93], abs=0.01)
 
     assert len(plan.nodes) == len(plan.all_nodes)
     assert len(plan.edges) == len(plan.all_nodes) - 1
 
+
 def test_move_tcp_follows_sine_waypoints(immutable_tracy_block_world):
     world, view, context = immutable_tracy_block_world
     right_arm = ViewManager.get_arm_view(Arms.RIGHT, view)
-    anchor = PoseStamped.from_list([0.85, -0.25, 0.95], frame=world.root)
-    anchor_T = anchor.to_spatial_type()
+    anchor = Pose(Point3.from_iterable([0.85, -0.25, 0.95]), reference_frame=world.root)
+    anchor_T = anchor.to_homogeneous_matrix()
     offset_T = HomogeneousTransformationMatrix.from_xyz_axis_angle(
         z=-0.03,
         axis=(0, 1, 0),
         angle=np.pi / 2,
         reference_frame=world.root,
     )
-    target_pose = PoseStamped.from_spatial_type(anchor_T @ offset_T)
+    target_pose = (anchor_T @ offset_T).to_pose()
     waypoints = PoseTrajectory(_make_sine_scan_poses(target_pose, lane_axis="z"))
 
     plan = SequentialPlan(
@@ -294,12 +299,8 @@ def test_move_tcp_follows_sine_waypoints(immutable_tracy_block_world):
     with simulated_robot:
         plan.perform()
 
-    tip_pose = right_arm.manipulator.tool_frame.global_pose
-    tip_position = tip_pose.to_position().to_np()
-    tip_orientation = tip_pose.to_quaternion().to_np()
+    tip_pose = right_arm.manipulator.tool_frame.global_transform
     expected = waypoints.poses[-1]
 
-    assert tip_position[:3] == pytest.approx(expected.position.to_list(), abs=0.03)
-    compare_orientations(
-        tip_orientation, expected.orientation.to_numpy(), decimal=1
-    )
+    assert np.allclose(tip_pose.to_position(), expected.to_position(), atol=0.01)
+    assert np.allclose(tip_pose.to_quaternion(), expected.to_quaternion(), atol=0.01)

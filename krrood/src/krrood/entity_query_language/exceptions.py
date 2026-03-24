@@ -25,7 +25,11 @@ if TYPE_CHECKING:
         Selectable,
     )
     from krrood.entity_query_language.core.variable import Variable
-    from krrood.entity_query_language.query.match import Match, AbstractMatchExpression
+    from krrood.entity_query_language.query.match import (
+        Match,
+        AbstractMatchExpression,
+        AttributeMatch,
+    )
 
 
 @dataclass
@@ -636,3 +640,21 @@ class CalledMatchMultipleTimes(DataclassException):
             f"Match acts like a constructor and hence should not be called multiple times. "
             f"Invoking the `__call__` method multiple times has unexpected side effects."
         )
+        super().__post_init__()
+
+
+@dataclass
+class UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
+    DataclassException
+):
+    attribute_match: AttributeMatch
+
+    def __post_init__(self):
+        self.message = (
+            "If you want to use EQL to generate answers,"
+            f"assignments in underspecified queries must be concrete objects or a symbolic expression."
+            f"If the assignment is Ellipsis it must, the type of the field must be an Enum, otherwise EQL cant"
+            f"generate it. If your looking for more flexible generations, try ProbabilisticBackend."
+            f"Got {self.attribute_match.name_from_variable_access_path} = {self.attribute_match.assigned_variable._type_}."
+        )
+        super().__post_init__()

@@ -10,10 +10,6 @@ from typing import Tuple, List, Dict, TYPE_CHECKING, DefaultDict, Type
 import numpy as np
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.qp.constraint import (
-    DerivativeInequalityConstraint,
-    DerivativeEqualityConstraint,
-)
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.exceptions import (
     InfeasibleException,

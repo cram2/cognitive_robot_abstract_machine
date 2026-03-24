@@ -83,7 +83,7 @@ class SpecifiesLeftRightArm(HasArms, ABC):
         assert (
             len(self.arms) == 2
         ), f"Must have exactly two arms to specify left and right arm, but found {len(self.arms)}."
-        pov = self.root.global_pose
+        pov = self.root.global_transform
         first_arm = self.arms[0]
         second_arm = self.arms[1]
         # the arms may share a root, but the first body after the root should be different
@@ -91,14 +91,14 @@ class SpecifiesLeftRightArm(HasArms, ABC):
         world_P_first_body = (
             first_arm_body_after_root.center_of_mass
             if first_arm_body_after_root.has_collision()
-            else first_arm_body_after_root.global_pose.to_position()
+            else first_arm_body_after_root.global_transform.to_position()
         )
 
         second_arm_body_after_root = list(second_arm.bodies)[1]
         world_P_second_body = (
             second_arm_body_after_root.center_of_mass
             if second_arm_body_after_root.has_collision()
-            else second_arm_body_after_root.global_pose.to_position()
+            else second_arm_body_after_root.global_transform.to_position()
         )
 
         return (

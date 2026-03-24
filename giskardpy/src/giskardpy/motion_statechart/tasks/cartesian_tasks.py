@@ -18,6 +18,7 @@ from semantic_digital_twin.spatial_types import (
     RotationMatrix,
     HomogeneousTransformationMatrix,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.degree_of_freedom import PositionVariable
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -524,7 +525,7 @@ class CartesianPose(CartesianTask):
     This goal will use the kinematic chain between root and tip link to move tip_link into the 6D goal_pose.
     """
 
-    goal_pose: HomogeneousTransformationMatrix = field(kw_only=True)
+    goal_pose: Pose = field(kw_only=True)
     """The goal pose."""
 
     reference_linear_velocity: float = field(

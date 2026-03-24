@@ -14,10 +14,9 @@ from semantic_digital_twin.world import WorldModelManager
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
-    WorldModelModification,
+    WorldModification,
 )
 
-import pycram.datastructures.pose
 import pycram.language
 from pycram.datastructures import grasp
 from pycram.language import SequentialNode, RepeatNode, LanguageNode
@@ -65,7 +64,7 @@ alternative_mappings = [
 classes = set(classes)
 
 # create of classes that should be mapped
-classes |= set(classes_of_module(pycram.datastructures.pose))
+classes |= set(classes_of_module(pycram.datastructures.dataclasses))
 classes |= {ExecutionData}
 # classes |= set(classes_of_module(action_designator)) | {ActionDescription}
 classes |= set(classes_of_module(facing))
@@ -82,7 +81,7 @@ classes |= {ActionDescription}
 classes |= {DesignatorDescription}
 classes |= {BaseMotion}
 classes |= set(classes_of_module(grasp))
-classes |= {WorldModelModificationBlock, WorldModelModification}
+classes |= {WorldModelModificationBlock, WorldModification}
 
 # Semantic World Classes
 classes |= {Body}

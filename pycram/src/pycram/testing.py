@@ -14,11 +14,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
+    Pose,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
 from pycram.datastructures.dataclasses import Context
-from pycram.datastructures.pose import PoseStamped
 from pycram.plan import Plan
 
 logger = logging.getLogger(__name__)
@@ -123,7 +123,7 @@ class SemanticWorldTestCase(unittest.TestCase):
 
 
 def _make_sine_scan_poses(
-    anchor: PoseStamped,
+    anchor: Pose,
     lanes: int = 6,
     lane_spacing: float = 0.03,
     y_span: float = 0.18,
@@ -131,21 +131,21 @@ def _make_sine_scan_poses(
     wiggles: float = 1.0,
     points_per_lane: int = 16,
     lane_axis: str = "z",
-) -> list[PoseStamped]:
-    x0 = anchor.pose.position.x
-    y0 = anchor.pose.position.y
-    z0 = anchor.pose.position.z
-    q = anchor.pose.orientation
+) -> list[Pose]:
+    x0 = anchor.x
+    y0 = anchor.y
+    z0 = anchor.z
+    q = anchor.to_quaternion()
 
     y_min = y0 - 0.5 * y_span
     y_max = y0 + 0.5 * y_span
-    poses: list[PoseStamped] = []
+    poses: list[Pose] = []
 
     if lane_axis not in ("x", "z"):
         raise ValueError(f"lane_axis must be 'x' or 'z', got: {lane_axis}")
 
     for i in range(lanes):
-        yc = np.linspace(y_min, y_max, points_per_lane)
+        yc = np.linspace(y_min, y_max, points_per_lane).flatten()
         if i % 2 == 1:
             yc = yc[::-1]
 
@@ -162,10 +162,15 @@ def _make_sine_scan_poses(
 
         for x, y, z in zip(xc, yc, zc):
             poses.append(
-                PoseStamped.from_list(
-                    position=[float(x), float(y), float(z)],
-                    orientation=[q.x, q.y, q.z, q.w],
-                    frame=anchor.frame_id,
+                Pose.from_xyz_quaternion(
+                    float(x),
+                    float(y),
+                    float(z),
+                    q.x,
+                    q.y,
+                    q.z,
+                    q.w,
+                    reference_frame=anchor.reference_frame,
                 )
             )
     return poses
