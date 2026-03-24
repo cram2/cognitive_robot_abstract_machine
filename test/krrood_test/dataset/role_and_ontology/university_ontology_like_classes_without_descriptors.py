@@ -145,6 +145,9 @@ class DelegateAsThirdRole(Role[TRepresentativeAsSecondRole], Symbol):
 class RoleForTakerInAnotherModule(Role[RoleTakerInAnotherModule]):
     taker: RoleTakerInAnotherModule = field(kw_only=True)
     introduced_attribute: str = field(default="", kw_only=True)
+    same_module_annotated_introduced_attribute: DelegateAsThirdRole = field(
+        default=None, kw_only=True
+    )
 
     @classmethod
     def role_taker_attribute(cls) -> RoleTakerInAnotherModule:
