@@ -135,7 +135,7 @@ class Role(SubClassSafeGeneric[T], ABC):
         except AttributeError:
             raise AttributeError(f"Role taker attribute '{attr_name}' not found.")
 
-    @cached_property
+    @property
     def root_persistent_entity(self):
         """
         :return: The root persistent entity in the role hierarchy.

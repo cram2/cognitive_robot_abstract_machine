@@ -117,14 +117,12 @@ class HasRootKinematicStructureEntity(
 
     @property
     def scale(self) -> Scale:
-        return Scale(
-            *(self.root.combined_mesh.bounds[1] - self.root.combined_mesh.bounds[0])
-        )
+        return Scale(*(self.combined_mesh.bounds[1] - self.combined_mesh.bounds[0]))
 
     @property
     def min_max_points(self) -> Tuple[Point3, Point3]:
-        min = Point3.from_iterable(self.root.combined_mesh.bounds[0])
-        max = Point3.from_iterable(self.root.combined_mesh.bounds[1])
+        min = Point3.from_iterable(self.combined_mesh.bounds[0])
+        max = Point3.from_iterable(self.combined_mesh.bounds[1])
         return min, max
 
     @classproperty
@@ -303,9 +301,11 @@ class HasRootKinematicStructureEntity(
             parent_entity = parent_entity.parent_kinematic_structure_entity
         return future_root_T_self
 
-    @property
-    def global_pose(self) -> HomogeneousTransformationMatrix:
-        return self.root.global_pose
+    def __hash__(self):
+        return Role.__hash__(self)
+
+    def __eq__(self, other):
+        return Role.__eq__(self, other)
 
 
 TBody = TypeVar("TBody", bound=Body)

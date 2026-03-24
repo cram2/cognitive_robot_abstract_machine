@@ -13,7 +13,12 @@ from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Drawer, Wardrobe, Door
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+    Drawer,
+    Wardrobe,
+    Door,
+)
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -182,7 +187,7 @@ def test_generated_semantic_annotations(kitchen_world):
         for v in found_semantic_annotations
         if isinstance(v, HasCaseAsRootBody)
     ]
-    assert len(drawer_container_names) == 19
+    assert len(drawer_container_names) == 18
 
 
 @pytest.mark.order("second_to_last")

@@ -134,6 +134,9 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
     def __hash__(self):
         return self._hash
 
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
     def add_to_world(self, world: World):
         super().add_to_world(world)
 
