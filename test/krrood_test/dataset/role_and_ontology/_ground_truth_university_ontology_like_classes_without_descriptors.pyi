@@ -4,6 +4,9 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Set, List, TypeVar
 
+from .role_takers_in_another_module import (
+    RoleTakerInAnotherModule,
+)
 from krrood.patterns.role.role import Role
 from krrood.symbol_graph.symbol_graph import Symbol
 
@@ -141,3 +144,13 @@ class DelegateAsThirdRole(
 
     @classmethod
     def role_taker_attribute(cls) -> TRepresentativeAsSecondRole: ...
+
+@dataclass(eq=False)
+class RoleForTakerInAnotherModule(
+    RoleTakerInAnotherModule, Role[RoleTakerInAnotherModule]
+):
+    taker: RoleTakerInAnotherModule = field(kw_only=True)
+    introduced_attribute: str = field(default="", kw_only=True)
+
+    @classmethod
+    def role_taker_attribute(cls) -> RoleTakerInAnotherModule: ...

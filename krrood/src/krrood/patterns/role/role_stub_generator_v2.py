@@ -17,6 +17,9 @@ from typing import (
 
 import libcst
 from black.handle_ipynb_magics import lru_cache
+from libcst.codemod import ContextAwareTransformer, CodemodContext, transform_module
+from libcst.codemod.visitors import AddImportsVisitor
+from typing_extensions import Dict
 
 from krrood.class_diagrams import ClassDiagram
 from krrood.class_diagrams.class_diagram import WrappedClass
@@ -35,17 +38,17 @@ from krrood.utils import (
 )
 
 
-class StubTransformer(libcst.CSTTransformer):
+class StubTransformer(ContextAwareTransformer):
     """
     Transforms a Python module AST into a stub file AST by pruning methods
     and applying the Role pattern transformations.
     """
 
-    def __init__(self, diagram: ClassDiagram, module: ModuleType):
-        super().__init__()
-        self.diagram = diagram
-        self.module = module
-        self.needed_role_for_classes: Set[Type] = set()
+    def __init__(self, context, class_diagram, module, taker_modules):
+        super().__init__(context)
+        self.class_diagram = class_diagram
+        self.module_ = module
+        self.taker_modules = taker_modules
 
     def leave_FunctionDef(
         self, original_node: libcst.FunctionDef, updated_node: libcst.FunctionDef
@@ -63,7 +66,7 @@ class StubTransformer(libcst.CSTTransformer):
         Checks if there is at least one primary role targeting this taker
         that does not update its taker type.
         """
-        roles = self.diagram.get_roles_of_class(taker_type)
+        roles = self.class_diagram.get_roles_of_class(taker_type)
         return any(
             RoleType.get_role_type(role_wrapped) == RoleType.PRIMARY
             for role_wrapped in roles
@@ -93,9 +96,11 @@ class StubTransformer(libcst.CSTTransformer):
         bound_value = self.get_keyword_value_from_call(node.value, "bound")
         bound_name = self.unparse_type_value(bound_value) if bound_value else None
 
-        if bound_name and bound_name in self.module.__dict__:
-            clazz = self.module.__dict__[bound_name]
-            if clazz in self.diagram.role_takers and self._has_primary_role(clazz):
+        if bound_name and bound_name in self.module_.__dict__:
+            clazz = self.module_.__dict__[bound_name]
+            if clazz in self.class_diagram.role_takers and self._has_primary_role(
+                clazz
+            ):
                 # role_for_class = self._synthesize_role_for(clazz)
                 # return libcst.FlattenSentinel([updated_node, role_for_class])
                 return updated_node
@@ -128,11 +133,11 @@ class StubTransformer(libcst.CSTTransformer):
         """
         Transforms class definitions: prunes methods, renames takers, and adjusts roles.
         """
-        if updated_node.name.value not in self.module.__dict__:
+        if updated_node.name.value not in self.module_.__dict__:
             return updated_node
-        clazz = self.module.__dict__[updated_node.name.value]
+        clazz = self.module_.__dict__[updated_node.name.value]
         try:
-            wrapped_class = self.diagram.get_wrapped_class(clazz)
+            wrapped_class = self.class_diagram.get_wrapped_class(clazz)
         except ClassIsUnMappedInClassDiagram:
             return updated_node
 
@@ -142,7 +147,7 @@ class StubTransformer(libcst.CSTTransformer):
             body=updated_node.body.with_changes(body=new_body_list)
         )
 
-        is_taker = wrapped_class.clazz in self.diagram.role_takers
+        is_taker = wrapped_class.clazz in self.class_diagram.role_takers
 
         if is_taker:
             # transform_role_taker returns [Mixin, original_class]
@@ -170,6 +175,10 @@ class StubTransformer(libcst.CSTTransformer):
         if len(result_nodes) > 1:
             return libcst.FlattenSentinel(result_nodes)
         return result_nodes[0]
+
+    def leave_Module(self, original_node, updated_node):
+        self.require_import("dataclasses", ["dataclass", "field"])
+        return updated_node
 
     def _has_type_var_for_taker(self, taker_type: Type) -> bool:
         """
@@ -204,7 +213,7 @@ class StubTransformer(libcst.CSTTransformer):
         ]
 
         # Add fields from taker as init=False
-        wrapped_taker = self.diagram.get_wrapped_class(taker_type)
+        wrapped_taker = self.class_diagram.get_wrapped_class(taker_type)
         body = [
             self._create_field_node(
                 field_, init=False, available_type_vars=available_type_vars
@@ -239,7 +248,7 @@ class StubTransformer(libcst.CSTTransformer):
         bases_that_are_takers = {
             b.__name__: b
             for b in wrapped_class.clazz.__bases__
-            if b in self.diagram.role_takers
+            if b in self.class_diagram.role_takers
         }
         make_role_attributes = not (
             any(self._is_role_base(base.value) for base in node.bases)
@@ -251,7 +260,7 @@ class StubTransformer(libcst.CSTTransformer):
         mixin_body = []
         all_taker_fields = []
         for base_name, taker_type in bases_that_are_takers.items():
-            wrapped_taker = self.diagram.get_wrapped_class(taker_type)
+            wrapped_taker = self.class_diagram.get_wrapped_class(taker_type)
             all_taker_fields.extend([f.name for f in wrapped_taker.fields])
         for field_ in wrapped_class.fields:
             if field_.name in all_taker_fields:
@@ -441,9 +450,8 @@ class StubTransformer(libcst.CSTTransformer):
 
         return node.with_changes(bases=new_bases)
 
-    @classmethod
     def _get_mixin_name(
-        cls,
+        self,
         taker_type: Type,
         wrapped_class: WrappedClass[Role],
         add_generic: bool = True,
@@ -455,7 +463,10 @@ class StubTransformer(libcst.CSTTransformer):
         :param wrapped_class: The wrapped class of the original role class.
         :param add_generic: Whether to include generic type parameters in the mixin name.
         """
-        mixin_name = f"{taker_type.__name__}Mixin"
+        if sys.modules[taker_type.__module__] != self.module_:
+            mixin_name = taker_type.__name__
+        else:
+            mixin_name = f"{taker_type.__name__}Mixin"
 
         if not issubclass(taker_type, Role) or not add_generic:
             return mixin_name
@@ -519,7 +530,7 @@ class StubTransformer(libcst.CSTTransformer):
         Recursively finds all roles for a taker.
         """
         roles = []
-        direct_roles = self.diagram.get_roles_of_class(taker_type)
+        direct_roles = self.class_diagram.get_roles_of_class(taker_type)
         for role_wrapped in direct_roles:
             roles.append(role_wrapped)
             # A role can also be a taker
@@ -536,8 +547,8 @@ class StubTransformer(libcst.CSTTransformer):
             tv_name = match.group(0)
             if tv_name not in available_type_vars:
                 # Find TypeVar in module
-                if tv_name in self.module.__dict__:
-                    tv = self.module.__dict__[tv_name]
+                if tv_name in self.module_.__dict__:
+                    tv = self.module_.__dict__[tv_name]
                     if isinstance(tv, TypeVar):
                         bound = getattr(tv, "__bound__", None)
                         if bound:
@@ -621,7 +632,7 @@ class StubTransformer(libcst.CSTTransformer):
 
         # Base classes: TakerMixin, Role[T]
         available_type_vars = {type_var_name}
-        wrapped_taker = self.diagram.get_wrapped_class(taker_type)
+        wrapped_taker = self.class_diagram.get_wrapped_class(taker_type)
         mixin_base_class_name = f"{taker_name}Mixin"
         role_base_class_name = f"{Role.__name__}[{type_var_name}]"
         bases = [mixin_base_class_name, role_base_class_name]
@@ -630,7 +641,7 @@ class StubTransformer(libcst.CSTTransformer):
         # 1. Add fields from Taker as init=False
         # Only exclude fields from roles targeting THIS taker
         roles_targeting_taker_fields = set()
-        roles = self.diagram.get_roles_of_class(taker_type)
+        roles = self.class_diagram.get_roles_of_class(taker_type)
         for role_wrapped in roles:
             for f in role_wrapped.own_fields:
                 roles_targeting_taker_fields.add(f.name)
@@ -752,14 +763,25 @@ class StubTransformer(libcst.CSTTransformer):
         """
         Finds a TypeVar bound to the given class.
         """
-        for name, value in self.module.__dict__.items():
+        for name, value in self.module_.__dict__.items():
             if isinstance(value, TypeVar):
                 if getattr(value, "__bound__", None) == clazz:
                     return name
         return None
 
+    def require_import(self, module: str, names: List[str]):
+        """
+        Add an import statement to the module context.
+        """
+        for name in names:
+            AddImportsVisitor.add_needed_import(
+                self.context,
+                module=module,
+                obj=name,
+            )
+
     def __hash__(self):
-        return hash((self.__class__, self.module))
+        return hash((self.__class__, self.module_))
 
 
 @dataclasses.dataclass
@@ -769,47 +791,80 @@ class RoleStubGeneratorV2:
     """
 
     module: ModuleType
+    taker_modules: List[ModuleType] = dataclasses.field(default_factory=list)
+    class_diagram: ClassDiagram = dataclasses.field(init=False)
     path: Optional[Path] = None
 
     def __post_init__(self):
         if self.path is None:
-            self.path = Path(self.module_file_path).with_suffix(".pyi")
+            self.path = self.get_generated_file_path(self.module)
         self._build_diagram()
 
     def _build_diagram(self):
         classes = classes_of_module(self.module)
-        for clazz in classes:
-            if issubclass(clazz, Role):
-                role_taker_type = clazz.get_role_taker_type()
-                if role_taker_type not in classes:
-                    classes.append(role_taker_type)
+        role_classes = [clazz for clazz in classes if issubclass(clazz, Role)]
+        for clazz in role_classes:
+            role_taker_type = clazz.get_role_taker_type()
+            if role_taker_type not in classes:
+                classes.append(role_taker_type)
+                role_taker_module = sys.modules[role_taker_type.__module__]
+                if role_taker_module not in self.taker_modules:
+                    self.taker_modules.append(role_taker_module)
         self.class_diagram = ClassDiagram(classes)
 
-    def generate_stub(self, write: bool = False) -> str:
+    def generate_stub(self, write: bool = False) -> Dict[ModuleType, str]:
         """
         Generates the stub file content.
         """
-        with open(self.module_file_path, "r") as f:
-            source = f.read()
+        all_modules = list(self.taker_modules)
+        if self.module not in all_modules:
+            all_modules.append(self.module)
+        all_stub_contents = {}
+        for module in all_modules:
+            with open(self.get_module_file_path(module), "r") as f:
+                source = f.read()
 
-        tree = libcst.parse_module(source)
+            context = CodemodContext()
 
-        transformer = StubTransformer(self.class_diagram, self.module)
-        transformed_tree = tree.visit(transformer)
+            transformer = StubTransformer(
+                context=context,
+                class_diagram=self.class_diagram,
+                module=module,
+                taker_modules=self.taker_modules,
+            )
+            tree = libcst.parse_module(source)
 
-        stub_content = transformed_tree.code
+            result = transformer.transform_module(tree)
+            # Run AddImportsVisitor as a second pass
+            result = AddImportsVisitor(context).transform_module(result)
 
-        if write:
-            with open(self.path, "w") as f:
-                f.write(stub_content)
-            run_ruff_on_file(str(self.path))
-            run_black_on_file(str(self.path))
+            stub_content = result.code
 
-        return stub_content
+            all_stub_contents[module] = stub_content
 
-    @property
-    def module_file_path(self) -> Path:
+            if write:
+                path = self.get_generated_file_path(module)
+                with open(path, "w") as f:
+                    f.write(stub_content)
+                run_ruff_on_file(str(path))
+                run_black_on_file(str(path))
+
+        return all_stub_contents
+
+    @staticmethod
+    @lru_cache
+    def get_module_file_path(module: ModuleType) -> Path:
         """
         :return: Path to the module file.
         """
-        return Path(sys.modules[self.module.__name__].__file__)
+        return Path(sys.modules[module.__name__].__file__)
+
+    @staticmethod
+    @lru_cache
+    def get_generated_file_path(module: ModuleType) -> Path:
+        """
+        :return: Path to the generated stub file.
+        """
+        return Path(RoleStubGeneratorV2.get_module_file_path(module)).with_suffix(
+            ".pyi"
+        )

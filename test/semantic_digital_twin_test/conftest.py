@@ -1,4 +1,5 @@
 import sys
+from subprocess import CalledProcessError
 
 from krrood.class_diagrams import ClassDiagram
 from krrood.class_diagrams.class_diagram import WrappedSpecializedGeneric
@@ -31,14 +32,23 @@ def pytest_configure(config):
     )
     SymbolGraph(_class_diagram=class_diagram)
 
-    modules_with_roles = set()
+    modules_with_roles = []
     for wrapped_class in class_diagram.wrapped_classes:
         if (
             not isinstance(wrapped_class, WrappedSpecializedGeneric)
             and Role in wrapped_class.clazz.__bases__
         ):
-            modules_with_roles.add(sys.modules[wrapped_class.clazz.__module__])
-    for module in modules_with_roles:
-        # generator = RoleStubGenerator(module)
-        generator = RoleStubGeneratorV2(module)
+            new_modules = [
+                sys.modules[wrapped_class.clazz.get_role_taker_type().__module__],
+                sys.modules[wrapped_class.clazz.__module__],
+            ]
+            for new_module in new_modules:
+                if new_module not in modules_with_roles:
+                    modules_with_roles.append(new_module)
+    # for module in modules_with_roles:
+    # generator = RoleStubGenerator(module)
+    generator = RoleStubGeneratorV2(modules_with_roles)
+    try:
         stub = generator.generate_stub(write=True)
+    except CalledProcessError as e:
+        pass

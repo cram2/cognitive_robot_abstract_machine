@@ -1,6 +1,7 @@
 import inspect
 import os
 from dataclasses import dataclass, fields, is_dataclass
+from pathlib import Path
 from typing import Dict, Any, Type
 
 import pytest
@@ -143,42 +144,43 @@ class StubComparator:
 
 
 @pytest.fixture
-def stub_comparator():
-    """
-    Fixture that provides a StubComparator initialized with generated and expected namespaces.
-    """
+def stub_comparators():
     generator = RoleStubGeneratorV2(
         university_ontology_like_classes_without_descriptors
     )
     generated_stub = generator.generate_stub()
 
-    expected_stub_path = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "dataset",
-        "role_and_ontology",
-        "_ground_truth_university_ontology_like_classes_without_descriptors.pyi",
-    )
-    with open(expected_stub_path, "r") as f:
-        expected_stub_content = f.read()
+    comparators = []
+    modules_to_cleanup = []
 
-    gen_namespace = execute_stub(
-        generated_stub,
-        "generated_stub",
-        package="test.krrood_test.dataset.role_and_ontology",
-    )
-    exp_namespace = execute_stub(
-        expected_stub_content,
-        "expected_stub",
-        package="test.krrood_test.dataset.role_and_ontology",
-    )
+    for i, module in enumerate(generated_stub):
+        path = Path(module.__file__)
+        expected_stub_path = path.with_name(f"_ground_truth_{path.name}").with_suffix(
+            ".pyi"
+        )
+        with open(expected_stub_path, "r") as f:
+            expected_stub_content = f.read()
 
-    yield StubComparator(gen_namespace, exp_namespace)
+        gen_namespace = execute_stub(
+            generated_stub[module],
+            f"generated_stub_{i}",
+            package="test.krrood_test.dataset.role_and_ontology",
+        )
+        exp_namespace = execute_stub(
+            expected_stub_content,
+            f"expected_stub_{i}",
+            package="test.krrood_test.dataset.role_and_ontology",
+        )
+
+        comparators.append(StubComparator(gen_namespace, exp_namespace))
+        modules_to_cleanup.extend([f"generated_stub_{i}", f"expected_stub_{i}"])
+
+    yield comparators  # single yield
 
     import sys
 
-    sys.modules.pop("generated_stub", None)
-    sys.modules.pop("expected_stub", None)
+    for mod in modules_to_cleanup:
+        sys.modules.pop(mod, None)
 
 
 @pytest.mark.order("first")
@@ -190,29 +192,34 @@ def test_stub_generation_smoke():
     assert generator.path.exists()
 
 
-def test_full_stub_comparison_class_existence(stub_comparator):
+def test_full_stub_comparison_class_existence(stub_comparators):
     """
     Tests that all classes defined in the expected stub exist in the generated stub.
     """
-    stub_comparator.compare_class_existence()
+    for stub_comparator in stub_comparators:
+        stub_comparator.compare_class_existence()
 
 
-def test_full_stub_comparison_class_hierarchy(stub_comparator):
+def test_full_stub_comparison_class_hierarchy(stub_comparators):
     """
     Tests that the class hierarchy (base classes) matches between stubs.
     """
-    stub_comparator.compare_class_hierarchy()
+    for stub_comparator in stub_comparators:
+        stub_comparator.compare_class_hierarchy()
 
 
-def test_full_stub_comparison_field_details(stub_comparator):
+def test_full_stub_comparison_field_details(stub_comparators):
     """
     Tests that all fields, their types, and arguments match between stubs.
     """
-    stub_comparator.compare_field_details()
+    for stub_comparator in stub_comparators:
+        stub_comparator.compare_field_details()
 
 
-def test_full_stub_comparison_dataclass_params(stub_comparator):
+def test_full_stub_comparison_dataclass_params(stub_comparators):
     """
     Tests that @dataclass decorator arguments match between stubs.
     """
-    stub_comparator.compare_dataclass_params()
+
+    for stub_comparator in stub_comparators:
+        stub_comparator.compare_dataclass_params()

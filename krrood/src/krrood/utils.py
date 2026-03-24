@@ -537,7 +537,7 @@ def run_black_on_file(filename: str):
     Format the file with black
     """
     command = [sys.executable, "-m", "black", filename]
-    subprocess.run(command, capture_output=True, text=True, check=True)
+    run_subprocess_on_file(command)
 
 
 def run_ruff_on_file(filename: str):
@@ -545,7 +545,18 @@ def run_ruff_on_file(filename: str):
     Format the file with ruff
     """
     command = ["ruff", "check", "--fix", filename]
-    subprocess.run(command, capture_output=True, text=True, check=True)
+    run_subprocess_on_file(command)
+
+
+def run_subprocess_on_file(command: List[str]):
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(
+            f"Ruff failed with code {e.returncode}\n"
+            f"STDOUT:\n{e.stdout}\n"
+            f"STDERR:\n{e.stderr}"
+        ) from e
 
 
 def get_generic_type_param(cls, generic_base: Type[T]) -> Optional[List[Type[T]]]:

@@ -4,6 +4,9 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Set, List, TypeVar
 
+from dataset.role_and_ontology.role_takers_in_another_module import (
+    RoleTakerInAnotherModule,
+)
 from krrood.entity_query_language.predicate import (
     Symbol,  # type: ignore
 )
@@ -147,3 +150,13 @@ class DelegateAsThirdRole(
 
     @classmethod
     def role_taker_attribute(cls) -> TRepresentativeAsSecondRole: ...
+
+@dataclass(eq=False)
+class RoleForTakerInAnotherModule(
+    RoleTakerInAnotherModule, Role[RoleTakerInAnotherModule]
+):
+    taker: RoleTakerInAnotherModule = field(kw_only=True)
+    introduced_attribute: str = field(default="", kw_only=True)
+
+    @classmethod
+    def role_taker_attribute(cls) -> RoleTakerInAnotherModule: ...
