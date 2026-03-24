@@ -375,6 +375,7 @@ class EQLTranslator:
 
     sql_query: Optional[Select] = None
     join_manager: JoinManager = field(default_factory=JoinManager)
+    _visited_ids: set = field(default_factory=set)
 
     @property
     def quantifier(self) -> ResultQuantifier:
@@ -400,10 +401,16 @@ class EQLTranslator:
             )
 
         self.sql_query = select(dao_class)
-        conditions = self.translate_query(self.root_condition)
 
+        self._visited_ids.clear()
+
+        conditions = self.translate_query(self.root_condition)
         if conditions is not None:
             self.sql_query = self.sql_query.where(conditions)
+
+        order_by_attr = getattr(self.eql_query, "_order_by_", None)
+        if order_by_attr is not None:
+            self.sql_query = self.sql_query.order_by(order_by_attr)
 
     def evaluate(self) -> List[Any]:
         """
@@ -432,6 +439,13 @@ class EQLTranslator:
         :param query: The EQL query expression
         :return: SQLAlchemy expression or None
         """
+        if query is None:
+            return None
+        obj_id = id(query)
+        if obj_id in self._visited_ids:
+            return None
+        self._visited_ids.add(obj_id)
+
         if isinstance(query, AND):
             return self.translate_and(query)
         if isinstance(query, OR):
@@ -442,6 +456,8 @@ class EQLTranslator:
             return self.translate_attribute(query)
         if isinstance(query, Where):
             return self.translate_query(query.condition)
+        if isinstance(query, (An, The, ResultQuantifier, Variable)):
+            return None
 
         raise UnsupportedQueryTypeError(f"Unknown query type: {type(query)}")
 
