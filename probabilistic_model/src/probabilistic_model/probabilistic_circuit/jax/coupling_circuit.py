@@ -1,4 +1,5 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
+from dataclasses import dataclass
 from functools import cached_property
 
 import jax
@@ -10,7 +11,8 @@ import jax.numpy as jnp
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import Layer
 
 
-class Conditioner:
+@dataclass
+class Conditioner(ABC):
     """
     Interface for a conditioner that generates parameters for a circuit.
     """

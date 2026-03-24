@@ -21,7 +21,7 @@ from probabilistic_model.probabilistic_model import ProbabilisticModel
 from random_events.variable import Symbolic, Continuous, Integer
 from random_events.interval import SimpleInterval, Interval
 from probabilistic_model.utils import neighbouring_points
-from probabilistic_model.error import UndefinedOperationError
+from probabilistic_model.exceptions import UndefinedOperationError
 from .utils import (
     get_primary_color,
     get_secondary_light_color,
@@ -257,8 +257,8 @@ class ProbabilisticModelPlotWidget(QWidget):
             for x, y in zip(samples, cdf):
                 cdf_series.append(x, y)
             chart.addSeries(cdf_series)
-        except (UndefinedOperationError, NotImplementedError):
-            pass
+        except:
+            raise UndefinedOperationError
 
         # Mode and Expectation
         try:

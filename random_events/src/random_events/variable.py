@@ -34,6 +34,7 @@ class Variable(CPPWrapper):
     domain: AbstractCompositeSet = field(kw_only=True, default=None)
     """
     The domain of the variable.
+    The domain is a composite set that can be used to create values of the variable.
     """
 
     def __lt__(self, other: Self) -> bool:

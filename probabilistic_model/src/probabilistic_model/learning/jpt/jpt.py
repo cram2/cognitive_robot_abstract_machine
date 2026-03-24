@@ -76,8 +76,6 @@ class JPT(SubclassJSONSerializer):
     The maximum depth of the tree.
     """
 
-    weights: List[float] = field(default_factory=list, init=False)
-
     dependencies: Optional[VariableMap] = field(default=None)
     """
     The dependencies between the variables.
@@ -94,8 +92,19 @@ class JPT(SubclassJSONSerializer):
     """
 
     indices: Optional[np.ndarray] = field(default=None)
+    """
+    The indices of the samples that were used to fit the model.
+    """
+
     impurity: Optional[Impurity] = field(default=None)
+    """
+    The impurity object that is used to calculate the best split.
+    """
+
     c45queue: deque = field(default_factory=deque)
+    """
+    The queue used to store the data to be processed by the C4.5 algorithm.
+    """
 
     keep_sample_indices: bool = field(default=False)
     """

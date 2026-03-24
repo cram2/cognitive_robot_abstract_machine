@@ -24,6 +24,7 @@ class AbstractSimpleSet(CPPWrapper, SubclassJSONSerializer, ABC):
     cpp_object: rl.AbstractSimpleSet
 
     @classmethod
+    @abstractmethod
     def from_data(cls, *args, **kwargs) -> Self:
         """
         Create a simple set from data.
@@ -137,6 +138,7 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
     """
 
     @classmethod
+    @abstractmethod
     def from_simple_sets(cls, *simple_sets: Tuple[AbstractSimpleSet, ...]) -> Self:
         """
         Create a composite set from simple sets.

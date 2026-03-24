@@ -187,9 +187,8 @@ class TruncatedGaussianDistribution(
 
         .. math::
 
-        Z = {\mathbf{\Phi}\left ( \frac{self.interval.upper-\mu}{\sigma} \right )-\mathbf{\Phi}
-        \left( \frac{self.interval.lower-\mu}{\sigma} \right )}
-
+            Z = \mathbf{\Phi}\left( \frac{\text{self.interval.upper} - \mu}{\sigma} \right)
+            - \mathbf{\Phi}\left( \frac{\text{self.interval.lower} - \mu}{\sigma} \right)
         """
         return (
             GaussianDistribution.cdf(self, np.array([[self.upper]]))
@@ -286,16 +285,16 @@ class TruncatedGaussianDistribution(
         )  # normalize the center
         truncated_moment = 0
 
-        for k in range(order + 1):
+        for value in range(order + 1):
 
             multiplying_constant = (
-                math.comb(order, k)
-                * 2 ** (k / 2)
-                * math.gamma((k + 1) / 2)
+                math.comb(order, value)
+                * 2 ** (value / 2)
+                * math.gamma((value + 1) / 2)
                 / math.sqrt(math.pi)
             )
 
-            if k % 2 == 0:
+            if value % 2 == 0:
                 bound_selection_lower = np.sign(lower_bound)
                 bound_selection_upper = np.sign(upper_bound)
             else:
@@ -304,17 +303,17 @@ class TruncatedGaussianDistribution(
 
             gamma_term_lower = (
                 -0.5
-                * gamma.cdf(lower_bound**2 / 2, (k + 1) / 2)
+                * gamma.cdf(lower_bound**2 / 2, (value + 1) / 2)
                 * bound_selection_lower
             )
             gamma_term_upper = (
-                0.5 * gamma.cdf(upper_bound**2 / 2, (k + 1) / 2) * bound_selection_upper
+                0.5 * gamma.cdf(upper_bound**2 / 2, (value + 1) / 2) * bound_selection_upper
             )
 
             truncated_moment += (
                 multiplying_constant
                 * (gamma_term_lower + gamma_term_upper)
-                * (-normalized_center) ** (order - k)
+                * (-normalized_center) ** (order - value)
             )
 
         truncated_moment *= (self.scale**order) / self.normalizing_constant
@@ -365,7 +364,7 @@ class TruncatedGaussianDistribution(
         """
         return (number - self.location) / self.scale
 
-    def robert_rejection_sample(self, amount: int) -> np.ndarray:
+    def robert_rejection_sample(self, amount: int) -> npt.NDArray:
         """
         Use robert rejection sampling to sample from the truncated Gaussian distribution.
 

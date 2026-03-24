@@ -34,9 +34,13 @@ import jax.random
 class Region:
     """
     A region in a region graph.
+    A region is a set of variables.
     """
 
     variables: SortedSet
+    """
+    The variables in the region.
+    """
 
     def __hash__(self) -> int:
         return id(self)
@@ -254,9 +258,10 @@ class RegionGraph(nx.DiGraph):
 
                 elif isinstance(node, Partition):
                     node_lengths = [child.layer.number_of_nodes for child in children]
-                    assert (
-                        len(set(node_lengths)) == 1
-                    ), "Node lengths must be all equal. Got {}".format(node_lengths)
+                    if not len(set(node_lengths)) == 1:
+                        raise ValueError(
+                            f"Node lengths must be all equal. Got {node_lengths}"
+                        )
 
                     edges = (
                         jnp.arange(node_lengths[0])

@@ -103,7 +103,7 @@ class ContinuousDistribution(UnivariateDistribution):
     Abstract base class for continuous distributions.
     """
 
-    variable: Continuous
+    variable: Continuous = field(kw_only=True)
 
     @property
     @abstractmethod
@@ -140,6 +140,12 @@ class ContinuousDistribution(UnivariateDistribution):
     def log_conditional(
         self, point: Dict[Variable, Any]
     ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
+        """
+        Return the conditional distribution and log-probability for a singleton point.
+
+        :param point: Mapping from Variables to their observed value(s); the value for ``self.variable`` will be used.
+        :return: A tuple (conditional_distribution or None, log-likelihood). If the point has zero probability, returns (None, -np.inf).
+        """
         value = point[self.variable]
         log_pdf_value = self.log_likelihood(np.array([[value]]))[0]
 
@@ -505,6 +511,11 @@ class SymbolicDistribution(DiscreteDistribution):
         return self
 
     def fit_from_indices(self, data: npt.NDArray) -> Self:
+        """
+        Fit the distribution to the data, where the data contains the indices of the domain elements.
+        :param data: The data.
+        :return: The fitted distribution
+        """
         unique, counts = np.unique(data, return_counts=True)
         probabilities = MissingDict(float)
         for value, count in zip(unique, counts):
@@ -521,7 +532,7 @@ class IntegerDistribution(ContinuousDistribution, DiscreteDistribution):
     distributions.
     """
 
-    variable: Integer
+    variable: Integer = field(kw_only=True)
 
     def log_truncated(self, event: Event) -> Tuple[Optional[Self], float]:
         return DiscreteDistribution.log_truncated(self, event)
@@ -606,7 +617,7 @@ class DiracDeltaDistribution(ContinuousDistribution):
     https://en.wikipedia.org/wiki/Dirac_delta_function
     """
 
-    variable: Continuous
+    variable: Continuous = field(kw_only=True)
 
     location: float
     """

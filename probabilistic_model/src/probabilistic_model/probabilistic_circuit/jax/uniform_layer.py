@@ -4,6 +4,8 @@ import jax
 import tqdm
 from jax import numpy as jnp
 from jaxtyping import Array
+
+from probabilistic_model.exceptions import ShapeMismatchError
 from random_events.interval import SimpleInterval, Bound
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
@@ -34,9 +36,11 @@ class UniformLayer(ContinuousLayerWithFiniteSupport):
         return (UniformDistribution,)
 
     def validate(self):
-        assert (
-            self.lower.shape == self.upper.shape
-        ), "The shapes of the lower and upper bounds must match."
+        if not self.lower.shape == self.upper.shape:
+            raise ShapeMismatchError(
+                self.upper.shape,
+                self.lower.shape
+            )
 
     @property
     def number_of_nodes(self) -> int:
@@ -88,7 +92,7 @@ class UniformLayer(ContinuousLayerWithFiniteSupport):
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(data["variable"], jnp.array(data["interval"]))
 
-    def to_nx(
+    def to_rustworkx(
         self,
         variables: SortedSet[Variable],
         result: NXProbabilisticCircuit,

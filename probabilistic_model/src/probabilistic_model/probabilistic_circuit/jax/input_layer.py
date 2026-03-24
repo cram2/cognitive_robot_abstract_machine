@@ -7,6 +7,8 @@ import equinox as eqx
 import jax
 import tqdm
 from jax import numpy as jnp
+
+from probabilistic_model.exceptions import ShapeMismatchError
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Tuple, Type, Self, Optional
@@ -115,9 +117,11 @@ class DiracDeltaLayer(ContinuousLayer):
         self.density_cap = density_cap
 
     def validate(self):
-        assert len(self.location) == len(
-            self.density_cap
-        ), "The number of locations and density caps must match."
+        if not self.location.shape == self.density_cap.shape:
+            raise ShapeMismatchError(
+                self.density_cap.shape,
+                self.location.shape
+            )
 
     @property
     def number_of_nodes(self):
@@ -140,6 +144,9 @@ class DiracDeltaLayer(ContinuousLayer):
         child_layers: List[NXConverterLayer],
         progress_bar: bool = True,
     ) -> NXConverterLayer:
+        """
+        Create a DiracDeltaLayer from a list of UnivariateContinuousLeaf nodes that all represent Dirac delta distributions over the same variable.
+        """
         hash_remap = {hash(node): index for index, node in enumerate(nodes)}
         locations = jnp.array(
             [node.distribution.location for node in nodes], dtype=jnp.float32
@@ -168,7 +175,7 @@ class DiracDeltaLayer(ContinuousLayer):
             jnp.array(data["density_cap"]),
         )
 
-    def to_nx(
+    def to_rustworkx(
         self,
         variables: SortedSet[Variable],
         result: NXProbabilisticCircuit,

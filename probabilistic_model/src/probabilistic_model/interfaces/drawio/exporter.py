@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import networkx
 import numpy as np
 from N2G import drawio_diagram
@@ -7,6 +9,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 )
 
 
+@dataclass
 class DrawIoExporter:
     """
     Export a probabilistic circuit to a drawio diagram.
@@ -16,9 +19,6 @@ class DrawIoExporter:
     """
     The probabilistic circuit to export.
     """
-
-    def __init__(self, model: ProbabilisticCircuit):
-        self.model = model
 
     def export(self) -> drawio_diagram:
         unique_id = 1000

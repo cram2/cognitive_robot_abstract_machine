@@ -17,7 +17,7 @@ from probabilistic_model.distributions import SymbolicDistribution
 import tqdm
 import numpy as np
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
-    ProbabilisticCircuit as NXProbabilisticCircuit,
+    ProbabilisticCircuit as RustworkxProbabilisticCircuit,
     UnivariateDiscreteLeaf,
 )
 
@@ -25,6 +25,9 @@ from probabilistic_model.utils import MissingDict
 
 
 class DiscreteLayer(InputLayer):
+    """
+    A layer that represents discrete distributions over a single variable.
+    """
 
     log_probabilities: Array
     """
@@ -99,10 +102,10 @@ class DiscreteLayer(InputLayer):
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(data["variable"], jnp.array(data["log_probabilities"]))
 
-    def to_nx(
+    def to_rustworkx(
         self,
         variables: SortedSet[Variable],
-        result: NXProbabilisticCircuit,
+        result: RustworkxProbabilisticCircuit,
         progress_bar: Optional[tqdm.tqdm] = None,
     ) -> List[Unit]:
 

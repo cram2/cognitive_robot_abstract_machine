@@ -85,13 +85,13 @@ class DiscreteLayerTestCase(unittest.TestCase):
             jnp.allclose(discrete_layer.log_probabilities, self.model.log_probabilities)
         )
 
-    def test_to_nx(self):
-        nx_circuit = self.model.to_nx(SortedSet([self.x]), NXProbabilisticCircuit())[
+    def test_to_rx(self):
+        rx_circuit = self.model.to_rustworkx(SortedSet([self.x]), NXProbabilisticCircuit())[
             0
         ].probabilistic_circuit
-        self.assertEqual(len(nx_circuit.nodes()), 2)
-        self.assertEqual(len(nx_circuit.edges()), 0)
-        for node in nx_circuit.nodes():
+        self.assertEqual(len(rx_circuit.nodes()), 2)
+        self.assertEqual(len(rx_circuit.edges()), 0)
+        for node in rx_circuit.nodes():
             self.assertIsInstance(node, UnivariateDiscreteLeaf)
             self.assertEqual(node.variable, self.x)
             distribution: SymbolicDistribution = node.distribution

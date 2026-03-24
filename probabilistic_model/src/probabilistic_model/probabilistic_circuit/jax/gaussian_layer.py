@@ -4,8 +4,8 @@ import equinox as eqx
 import jax
 import tqdm
 from jax import numpy as jnp
-from jaxtyping import Array
 
+from probabilistic_model.exceptions import ShapeMismatchError
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Type, Tuple, Self
@@ -22,15 +22,26 @@ from probabilistic_model.distributions import GaussianDistribution
 
 class GaussianLayer(ContinuousLayer):
     """
-    A layer that represents uniform distributions over a single variable.
+    A layer that represents Gaussian distributions over a single variable.
     """
 
-    location: Array
-    log_scale: Array
-    min_scale: Array = eqx.field(static=True, default=0.01)
+    location: jax.Array
+    """
+    The location of the Gaussian distributions.
+    """
+
+    log_scale: jax.Array
+    """
+    The logarithm of the scale of the Gaussian distributions.
+    """
+
+    min_scale: jax.Array = eqx.field(static=True, default=0.01)
+    """
+    The minimum scale of the Gaussian distributions.
+    """
 
     def __init__(
-        self, variable: int, location: Array, log_scale: Array, min_scale: Array
+        self, variable: int, location: jax.Array, log_scale: jax.Array, min_scale: jax.Array
     ):
         super().__init__(variable)
         self.location = location
@@ -54,26 +65,31 @@ class GaussianLayer(ContinuousLayer):
         return (GaussianDistribution,)
 
     def validate(self):
-        assert (
-            self.location.shape == self.log_scale.shape
-        ), "The shapes of location and scale must match."
-        assert (
-            self.min_scale.shape == self.log_scale.shape
-        ), "The shapes of the min_scale and scale bounds must match."
-        assert jnp.all(self.min_scale >= 0), "The minimum scale must be positive."
+        if not self.location.shape == self.log_scale.shape:
+            raise ShapeMismatchError(
+                self.log_scale.shape,
+                self.location.shape
+            )
+        if not self.min_scale.shape == self.log_scale.shape:
+            raise ShapeMismatchError(
+                self.log_scale.shape,
+                self.min_scale.shape
+            )
+        if not jnp.all(self.min_scale >= 0):
+            raise ValueError("The minimum scale must be positive.")
 
     @property
     def number_of_nodes(self) -> int:
         return self.location.shape[0]
 
     @property
-    def scale(self) -> Array:
+    def scale(self) -> jax.Array:
         return jnp.exp(self.log_scale) + self.min_scale
 
-    def log_likelihood_of_nodes_single(self, x: Array) -> Array:
+    def log_likelihood_of_nodes_single(self, x: jax.Array) -> jax.Array:
         return jax.scipy.stats.norm.logpdf(x, loc=self.location, scale=self.scale)
 
-    def log_likelihood_of_nodes(self, x: Array) -> Array:
+    def log_likelihood_of_nodes(self, x: jax.Array) -> jax.Array:
         return jax.vmap(self.log_likelihood_of_nodes_single)(x)
 
     @classmethod
@@ -83,6 +99,9 @@ class GaussianLayer(ContinuousLayer):
         child_layers: List[NXConverterLayer],
         progress_bar: bool = True,
     ) -> NXConverterLayer:
+        """
+        Create a GaussianLayer from a list of UnivariateContinuousLeaf nodes that have the same variable and scope.
+        """
         hash_remap = {hash(node): index for index, node in enumerate(nodes)}
 
         variable = nodes[0].variable
@@ -127,7 +146,7 @@ class GaussianLayer(ContinuousLayer):
             jnp.array(data["min_scale"]),
         )
 
-    def to_nx(
+    def to_rustworkx(
         self,
         variables: SortedSet[Variable],
         result: NXProbabilisticCircuit,

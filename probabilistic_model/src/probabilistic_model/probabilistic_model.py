@@ -36,7 +36,7 @@ from probabilistic_model.constants import (
 from random_events.interval import closed, SimpleInterval, Interval
 from abc import abstractmethod, ABC
 
-from probabilistic_model.error import IntractableError, UndefinedOperationError
+from probabilistic_model.exceptions import IntractableError, UndefinedOperationError
 from probabilistic_model.utils import neighbouring_points
 from random_events.product_algebra import VariableMap, Event, SimpleEvent
 from random_events.variable import Integer, Continuous, Variable, Symbolic

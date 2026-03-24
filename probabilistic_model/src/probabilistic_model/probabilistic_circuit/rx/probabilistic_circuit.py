@@ -11,7 +11,6 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import IntEnum
 
-import networkx as nx
 import numpy as np
 import rustworkx as rx
 import rustworkx.visualization
@@ -1470,7 +1469,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         :param node: The root of the subgraph.
         :return: The subgraph.
         """
-        nodes_to_keep = list(nx.descendants(self.graph, node)) + [node]
+        nodes_to_keep = list(rx.descendants(self.graph, node)) + [node]
         result = self.__class__()
         result.graph = self.graph.subgraph(nodes_to_keep)
         return result
