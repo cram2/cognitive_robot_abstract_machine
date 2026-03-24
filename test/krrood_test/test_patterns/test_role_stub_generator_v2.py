@@ -242,16 +242,20 @@ class StubComparator:
             gen_order = [
                 f["name"]
                 for f in (_field_info(a) for a in _get_field_stmts(gen_cls))
-                if f["default"]
-                and ("init=False" not in f["default"])
-                and ("kw_only=True" not in f["default"])
+                if "field" not in str(f["default"])
+                or (
+                    ("init=False" not in f["default"])
+                    and ("kw_only=True" not in f["default"])
+                )
             ]
             exp_order = [
                 f["name"]
                 for f in (_field_info(a) for a in _get_field_stmts(exp_cls))
-                if f["default"]
-                and ("init=False" not in f["default"])
-                and ("kw_only=True" not in f["default"])
+                if "field" not in str(f["default"])
+                or (
+                    ("init=False" not in f["default"])
+                    and ("kw_only=True" not in f["default"])
+                )
             ]
             assert (
                 gen_order == exp_order
