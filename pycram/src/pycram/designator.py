@@ -114,7 +114,9 @@ class DesignatorDescription:
 
     @property
     def context(self) -> Context:
-        return Context(self.world, self.robot_view, self.plan)
+        return Context(
+            self.world, self.robot_view, self.plan, self.plan.context.ros_node
+        )
 
     def __init__(self):
         """

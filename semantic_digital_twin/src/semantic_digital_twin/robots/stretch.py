@@ -202,7 +202,13 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
     def _setup_joint_states(self):
         arm_park = JointState.from_mapping(
             name=PrefixedName("arm_park", prefix=self.name.name),
-            mapping={self._world.get_connection_by_name("joint_lift"): 0.5},
+            mapping={
+                self._world.get_connection_by_name("joint_lift"): 1.0,
+                self._world.get_connection_by_name("joint_arm_l0"): 0,
+                self._world.get_connection_by_name("joint_arm_l1"): 0,
+                self._world.get_connection_by_name("joint_arm_l2"): 0,
+                self._world.get_connection_by_name("joint_arm_l3"): 0,
+            },
             state_type=StaticJointState.PARK,
         )
 
