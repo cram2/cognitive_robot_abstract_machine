@@ -84,16 +84,15 @@ def conditions_35528769484583703815352905256802298589(case) -> bool:
 def conclusion_35528769484583703815352905256802298589(case) -> List[Wardrobe]:
     def get_wardrobes(case: World) -> List[Wardrobe]:
         """Get possible value(s) for World.semantic_annotations of types list/set of Wardrobe"""
-        drawer = variable(Drawer, case.semantic_annotations)
         prismatic_connection = variable(PrismaticConnection, case.connections)
         return (
             entity(
                 inference(Wardrobe)(
                     root=prismatic_connection.parent,
-                    drawers=drawer,
+                    drawers=prismatic_connection.child,
                 )
             )
-            .where(prismatic_connection.child == drawer)
+            .where(HasRole(prismatic_connection.child, Drawer))
             .grouped_by(prismatic_connection.parent)
             .tolist()
         )
@@ -112,14 +111,19 @@ def conditions_59112619694893607910753808758642808601(case) -> bool:
 def conclusion_59112619694893607910753808758642808601(case) -> List[Door]:
     def get_doors(case: World) -> List[Door]:
         """Get possible value(s) for World.semantic_annotations  of type Door."""
-        handle = variable(Handle, case.semantic_annotations)
         revolute_connection = variable(RevoluteConnection, case.connections)
         fixed_connection = match_variable(FixedConnection, case.connections)(
-            parent=revolute_connection.child, child=handle
+            parent=revolute_connection.child
         )
-        return inference(Door)(
-            root=fixed_connection.parent, handle=fixed_connection.child
-        ).tolist()
+        return (
+            entity(
+                inference(Door)(
+                    root=fixed_connection.parent, handle=fixed_connection.child
+                )
+            )
+            .where(HasRole(fixed_connection.child, Handle))
+            .tolist()
+        )
 
     return get_doors(case)
 
@@ -135,13 +139,16 @@ def conditions_10840634078579061471470540436169882059(case) -> bool:
 def conclusion_10840634078579061471470540436169882059(case) -> List[Fridge]:
     def get_fridges(case: World) -> List[Fridge]:
         """Get possible value(s) for World.semantic_annotations of type Fridge."""
-        door = variable(Door, case.semantic_annotations)
         revolute_connection = variable(RevoluteConnection, case.connections)
         return (
-            entity(inference(Fridge)(root=revolute_connection.parent, doors=door))
+            entity(
+                inference(Fridge)(
+                    root=revolute_connection.parent, doors=revolute_connection.child
+                )
+            )
             .where(
-                revolute_connection.child == door,
-                contains(door.name.name.lower(), "fridge"),
+                HasRole(revolute_connection.child, Door),
+                contains(revolute_connection.child.name.name.lower(), "fridge"),
             )
             .grouped_by(revolute_connection.parent)
             .tolist()
