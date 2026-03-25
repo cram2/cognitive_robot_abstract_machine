@@ -8,6 +8,7 @@ from krrood.class_diagrams.class_diagram import (
     AssociationThroughRoleTaker,
 )
 from krrood.class_diagrams.utils import classes_of_module
+from krrood.patterns.role.role import EntityAndType
 from ..dataset.role_and_ontology import university_ontology_like_classes
 from ..dataset.role_and_ontology.university_ontology_like_classes_without_descriptors import (
     Person,
@@ -15,7 +16,7 @@ from ..dataset.role_and_ontology.university_ontology_like_classes_without_descri
     Company,
     ProfessorAsFirstRole,
     Course,
-    RepresentativeAsSecondRole,
+    RepresentativeAsSecondRole, DelegateAsThirdRole,
 )
 
 
@@ -75,6 +76,28 @@ def test_roles_are_equal_and_has_same_hash_as_each_other():
     assert ceo == person
     assert ceo == representative
     assert ceo == professor
+    assert len({person, ceo, representative, professor}) == 1
+
+
+
+def test_mappings_between_roles_and_role_takers():
+    person = Person(name="Bass")
+    ceo = CEOAsFirstRole(person=person)
+    representative = RepresentativeAsSecondRole(ceo=ceo)
+    professor = ProfessorAsFirstRole(person=person)
+    delegate = DelegateAsThirdRole(representative=representative)
+    roles = [ceo, representative, professor, delegate]
+
+    for role_ in roles:
+        assert all(role in role_.role_taker_roles for role in roles)
+
+    delegate_role_takers = [representative, ceo, person]
+    assert len(delegate_role_takers) == len(delegate.all_role_takers)
+    assert all(EntityAndType(role_taker) in delegate.all_role_takers for role_taker in delegate_role_takers)
+
+    professor_role_takers = [person]
+    assert len(professor_role_takers) == len(professor.all_role_takers)
+    assert all(EntityAndType(role_taker) in professor.all_role_takers for role_taker in professor_role_takers)
 
 
 def test_role_taker_associations():

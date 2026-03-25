@@ -1,15 +1,33 @@
+from __future__ import annotations
+
 import sys
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass, field, fields
 from functools import lru_cache, cached_property
 from typing import List, TypeVar, ClassVar
 
-from typing_extensions import Type, get_origin, Any, Dict, Iterable
+from typing_extensions import Type, get_origin, Any, Dict, Set
 
-from krrood.class_diagrams.utils import T, get_type_hints_of_object
+from krrood.class_diagrams.utils import T
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_param
+
+
+@dataclass
+class EntityAndType(SubClassSafeGeneric[T]):
+    entity: T
+    type: Type[T] = field(init=False)
+
+    def __post_init__(self):
+        self.type = type(self.entity)
+
+    def __hash__(self):
+        return hash((self.entity, self.type))
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
 
 
 @dataclass
@@ -50,6 +68,22 @@ class Role(SubClassSafeGeneric[T], ABC):
 
     _role_taker_field_set: bool = field(default=False, init=False)
     _to_set_in_role_taker: Dict[str, Any] = field(default_factory=dict, init=False)
+    _role_taker_roles: ClassVar[Dict[Any, List[Role]]] = defaultdict(list)
+    _role_role_takers: ClassVar[Dict[EntityAndType, Set[EntityAndType]]] = defaultdict(set)
+
+    @property
+    def role_taker_roles(self) -> List[Role]:
+        """
+        :return: All roles of the role taker instance.
+        """
+        return self._role_taker_roles[self.role_taker]
+
+    @property
+    def all_role_takers(self) -> Set[Any]:
+        """
+        :return: All role takers of the role instance.
+        """
+        return self._role_role_takers[EntityAndType(self)]
 
     @classmethod
     @lru_cache(maxsize=None)
@@ -64,7 +98,7 @@ class Role(SubClassSafeGeneric[T], ABC):
 
     @classmethod
     @lru_cache
-    def get_role_generic_type(cls) -> Type[T]:
+    def get_role_generic_type(cls) -> Type[T] | TypeVar:
         """
         :return: The type of the role taker.
         """
@@ -94,17 +128,19 @@ class Role(SubClassSafeGeneric[T], ABC):
     @classmethod
     @lru_cache
     def updates_role_taker_type(cls) -> bool:
+        """
+        :return: True if this role inherits from another role and updates its role-taker type, False otherwise.
+        """
         if Role in cls.__bases__:
             return False
-        my_rt = cls.get_role_taker_type()
-        my_rt_name = getattr(my_rt, "__name__", str(my_rt))
+        role_taker_type = cls.get_role_taker_type()
         for parent in cls.__bases__:
-            if issubclass(parent, Role) and parent is not Role:
-                p_origin = get_origin(parent) or parent
-                p_rt = p_origin.get_role_taker_type()
-                p_rt_name = getattr(p_rt, "__name__", str(p_rt))
-                if p_rt_name != my_rt_name:
-                    return True
+            if not issubclass(parent, Role):
+                continue
+            parent_origin_type = get_origin(parent) or parent
+            parent_role_taker_type = parent_origin_type.get_role_taker_type()
+            if parent_role_taker_type is not role_taker_type:
+                return True
         return False
 
     @classmethod
@@ -151,7 +187,7 @@ class Role(SubClassSafeGeneric[T], ABC):
 
     def __getattr__(self, item):
         """
-        Get an attribute from the role taker when not found on the class.
+        Get an attribute from the role taker when not found on the role itself, otherwise raise AttributeError.
 
         :param item: The attribute name to retrieve.
         :return: The attribute value if found in the role taker, otherwise raises AttributeError.
@@ -173,26 +209,10 @@ class Role(SubClassSafeGeneric[T], ABC):
         Set an attribute on the role taker instance if the role taker has this attribute,
          otherwise set on this instance directly.
         """
-        role_taker_attr = self.role_taker_attribute_name()
+        self._bootstrap_inner_attributes()
 
-        # Bootstrap both internal fields before any other logic runs
-        for bootstrap_attr, default in [
-            ("_to_set_in_role_taker", {}),
-            ("_role_taker_field_set", False),
-        ]:
-            try:
-                object.__getattribute__(self, bootstrap_attr)
-            except AttributeError:
-                object.__setattr__(self, bootstrap_attr, default)
-
-        if key == role_taker_attr:
-            object.__setattr__(self, "_role_taker_field_set", True)
-            # Also set the actual attribute defined in the dataclass
-            super().__setattr__(key, value)
-
-            for attribute_name, attribute_value in self._to_set_in_role_taker.items():
-                setattr(value, attribute_name, attribute_value)
-            self._to_set_in_role_taker.clear()
+        if key == self.role_taker_attribute_name():
+            self._set_role_taker(value)
         elif self._role_taker_field_set:
             setattr(self.role_taker, key, value)
             # Ensure the attribute is also set on this instance if it's a field
@@ -202,8 +222,48 @@ class Role(SubClassSafeGeneric[T], ABC):
                 super().__setattr__(key, value)
         else:
             super().__setattr__(key, value)
-            if key not in ["_to_set_in_role_taker"]:
+            if key not in Role.__dict__:
                 self._to_set_in_role_taker[key] = value
+
+    def _set_role_taker(self, value: T):
+        """
+        Handle setting attributes when the role taker is set.
+        Ensure that attributes intended for delegation are correctly set on the role taker.
+        """
+        object.__setattr__(self, "_role_taker_field_set", True)
+        # Also set the actual attribute defined in the dataclass
+        super().__setattr__(self.role_taker_attribute_name(), value)
+
+        # Set the attributes that were set before the role taker was set
+        for attribute_name, attribute_value in self._to_set_in_role_taker.items():
+            setattr(value, attribute_name, attribute_value)
+        self._to_set_in_role_taker.clear()
+        self._update_mapping_between_roles_and_role_takers(value)
+
+    def _update_mapping_between_roles_and_role_takers(self, role_taker: T):
+        """
+        Update the mapping between roles and role takers.
+        Ensures that the role taker and its role are correctly linked in the mapping.
+
+        :param role_taker: The role taker instance to update the mapping for.
+        """
+        Role._role_taker_roles[role_taker].append(self)
+        Role._role_role_takers[EntityAndType(self)].add(EntityAndType(role_taker))
+        if isinstance(role_taker, Role):
+            Role._role_role_takers[EntityAndType(self)].update(Role._role_role_takers[EntityAndType(role_taker)])
+
+    def _bootstrap_inner_attributes(self):
+        """
+        Initialize internal attributes with default values if they don't exist.
+        """
+        for bootstrap_attr, default in [
+            ("_to_set_in_role_taker", {}),
+            ("_role_taker_field_set", False),
+        ]:
+            try:
+                object.__getattribute__(self, bootstrap_attr)
+            except AttributeError:
+                object.__setattr__(self, bootstrap_attr, default)
 
     def __hash__(self):
         """

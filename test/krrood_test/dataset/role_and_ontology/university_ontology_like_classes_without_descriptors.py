@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, Field, fields
 
 from typing_extensions import Set, List, TypeVar
 
-from dataset.role_and_ontology.role_takers_in_another_module import (
+from .role_takers_in_another_module import (
     RoleTakerInAnotherModule,
 )
 from krrood.entity_query_language.factories import variable_from
