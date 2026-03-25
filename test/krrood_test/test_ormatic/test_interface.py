@@ -1,16 +1,17 @@
 import pytest
 from sqlalchemy import select, inspect
 
-from krrood.class_diagrams.class_diagram import Association
-from krrood.entity_query_language import factories
-from krrood.ormatic.alternative_mappings import FunctionMapping, UncallableFunction
-from krrood.ormatic.dao import (
+from krrood.ormatic.data_access_objects.alternative_mappings import (
+    FunctionMapping,
+    UncallableFunction,
+)
+from krrood.ormatic.data_access_objects.helper import (
     to_dao,
-    is_data_column,
     ToDataAccessObjectState,
     get_dao_class,
-    FromDataAccessObjectState,
 )
+from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
+from krrood.ormatic.utils import is_data_column
 from krrood.ormatic.exceptions import NoDAOFoundError
 from ..dataset.alternative_mappings_construction_order import (
     Entrypoint,
@@ -24,7 +25,7 @@ from ..dataset.ormatic_interface import *
 def test_position(session, database):
     p1 = Position(1, 2, 3)
 
-    p1dao: PositionDAO = PositionDAO.to_dao(p1)
+    p1dao: PositionDAO = to_dao(p1)
     assert p1.x == p1dao.x
     assert p1.y == p1dao.y
     assert p1.z == p1dao.z
@@ -46,7 +47,7 @@ def test_position(session, database):
 def test_position4d(session, database):
     p4d = Position4D(1.0, 2.0, 3.0, 4.0)
 
-    p4d_dao = Position4DDAO.to_dao(p4d)
+    p4d_dao = to_dao(p4d)
     assert p4d.x == p4d_dao.x
     assert p4d.y == p4d_dao.y
     assert p4d.z == p4d_dao.z
@@ -71,7 +72,7 @@ def test_position4d(session, database):
 def test_orientation(session, database):
     o1 = Orientation(1.0, 2.0, 3.0, None)
 
-    o1dao = OrientationDAO.to_dao(o1)
+    o1dao = to_dao(o1)
     assert o1.x == o1dao.x
     assert o1.y == o1dao.y
     assert o1.z == o1dao.z
@@ -97,7 +98,7 @@ def test_pose(session, database):
     o1 = Orientation(1.0, 2.0, 3.0, None)
     pose = Pose(p1, o1)
 
-    posedao = PoseDAO.to_dao(pose)
+    posedao = to_dao(pose)
     assert isinstance(posedao.position, PositionDAO)
     assert isinstance(posedao.orientation, OrientationDAO)
 
@@ -114,7 +115,7 @@ def test_pose(session, database):
 
 def test_atom(session, database):
     atom = Atom(Element.C, 1, 2.0)
-    atomdao = AtomDAO.to_dao(atom)
+    atomdao = to_dao(atom)
     assert atomdao.element == Element.C
 
     session.add(atomdao)
@@ -197,7 +198,7 @@ def test_node(session, database):
     n2 = Node(parent=n1)
     n3 = Node(parent=n1)
 
-    n2dao = NodeDAO.to_dao(n2)
+    n2dao = to_dao(n2)
 
     session.add(n2dao)
     session.commit()
@@ -208,7 +209,7 @@ def test_node(session, database):
 
 def test_position_type_wrapper(session, database):
     wrapper = PositionTypeWrapper(Position)
-    dao = PositionTypeWrapperDAO.to_dao(wrapper)
+    dao = to_dao(wrapper)
     assert dao.position_type == wrapper.position_type
     session.add(dao)
     session.commit()
@@ -221,7 +222,7 @@ def test_positions(session, database):
     p1 = Position(1, 2, 3)
     p2 = Position(2, 3, 4)
     positions = Positions([p1, p2], ["a", "b", "c"])
-    dao = PositionsDAO.to_dao(positions)
+    dao = to_dao(positions)
     assert len(dao.positions) == 2
 
     session.add(dao)
@@ -256,7 +257,7 @@ def test_positions_with_duplicated_entry_in_list(session, database):
 def test_double_position_aggregator(session, database):
     p1, p2, p3 = Position(1, 2, 3), Position(2, 3, 4), Position(3, 4, 5)
     dpa = DoublePositionAggregator([p1, p2], [p1, p3])
-    dpa_dao = DoublePositionAggregatorDAO.to_dao(dpa)
+    dpa_dao = to_dao(dpa)
     session.add(dpa_dao)
     session.commit()
 
@@ -272,7 +273,7 @@ def test_kinematic_chain_and_torso(session, database):
     k1 = KinematicChain("a")
     k2 = KinematicChain("b")
     torso = Torso("t", [k1, k2])
-    torso_dao = TorsoDAO.to_dao(torso)
+    torso_dao = to_dao(torso)
 
     session.add(torso_dao)
     session.commit()
@@ -283,7 +284,7 @@ def test_kinematic_chain_and_torso(session, database):
 
 def test_custom_types(session, database):
     ogs = OriginalSimulatedObject(Bowl(), 1)
-    ogs_dao = OriginalSimulatedObjectDAO.to_dao(ogs)
+    ogs_dao = to_dao(ogs)
     assert ogs.concept == ogs_dao.concept
 
     session.add(ogs_dao)
@@ -297,7 +298,7 @@ def test_custom_types(session, database):
 def test_inheriting_from_explicit_mapping(session, database):
     entity: DerivedEntity = DerivedEntity(name="TestEntity")
 
-    entity_dao = DerivedEntityDAO.to_dao(entity)
+    entity_dao = to_dao(entity)
     assert isinstance(entity_dao, DerivedEntityDAO)
     session.add(entity_dao)
     session.commit()
@@ -382,6 +383,7 @@ def test_backreference_with_mapping(session, database):
     session.commit()
     reconstructed = dao.from_dao()
 
+    assert isinstance(reconstructed, Reference)
     # Check individual properties instead of comparing entire objects
     assert reconstructed.value == ref.value
     assert reconstructed.backreference is not None

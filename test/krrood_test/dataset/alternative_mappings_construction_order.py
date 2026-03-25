@@ -5,7 +5,10 @@ from typing import Self, List, Type
 
 from typing_extensions import Optional
 
-from krrood.ormatic.dao import AlternativeMapping, T
+from krrood.ormatic.data_access_objects.alternative_mappings import (
+    AlternativeMapping,
+    T,
+)
 
 
 @dataclass

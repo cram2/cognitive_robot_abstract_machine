@@ -20,8 +20,8 @@ import datetime
 import enum
 import krrood.adapters.json_serializer
 import krrood.entity_query_language.orm.model
-import krrood.ormatic.alternative_mappings
 import krrood.ormatic.custom_types
+import krrood.ormatic.data_access_objects.alternative_mappings
 import krrood.ormatic.type_dict
 import krrood.symbol_graph.symbol_graph
 import sqlalchemy.sql.sqltypes
@@ -33,7 +33,10 @@ import typing_extensions
 import uuid
 
 
-from krrood.ormatic.dao import DataAccessObject, AssociationDataAccessObject
+from krrood.ormatic.data_access_objects.dao import (
+    DataAccessObject,
+    AssociationDataAccessObject,
+)
 from krrood.ormatic.custom_types import TypeType
 
 
@@ -2591,7 +2594,10 @@ class WrappedInstanceMappingDAO(
 
 
 class FunctionMappingDAO(
-    Base, DataAccessObject[krrood.ormatic.alternative_mappings.FunctionMapping]
+    Base,
+    DataAccessObject[
+        krrood.ormatic.data_access_objects.alternative_mappings.FunctionMapping
+    ],
 ):
 
     __tablename__ = "FunctionMappingDAO"

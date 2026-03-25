@@ -22,9 +22,13 @@ from krrood.adapters.exceptions import (
     JSON_TYPE_NAME,
 )
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
-from krrood.ormatic.dao import HasGeneric
+from krrood.ormatic.data_access_objects.base import HasGeneric
 from krrood.singleton import SingletonMeta
-from krrood.utils import get_full_class_name, recursive_subclasses, inheritance_path_length
+from krrood.utils import (
+    get_full_class_name,
+    recursive_subclasses,
+    inheritance_path_length,
+)
 
 list_like_classes = (
     list,

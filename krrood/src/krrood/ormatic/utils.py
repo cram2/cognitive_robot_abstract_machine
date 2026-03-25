@@ -9,6 +9,8 @@ import pkgutil
 import types
 from contextlib import suppress
 from enum import Enum
+from functools import lru_cache
+from typing import Type, Dict, Any
 
 import sqlalchemy
 from sqlalchemy import (
@@ -17,6 +19,7 @@ from sqlalchemy import (
     MetaData,
     create_engine as create_sqlalchemy_engine,
     URL,
+    Column,
 )
 from typing_extensions import (
     TypeVar,
@@ -25,6 +28,7 @@ from typing_extensions import (
     Iterable,
     Union,
     Any,
+    get_type_hints,
 )
 
 from krrood.adapters.json_serializer import to_json, from_json
@@ -196,3 +200,28 @@ def create_engine(url: Union[str, URL], **kwargs: Any) -> Engine:
         json_deserializer=lambda x: from_json(json.loads(x)),
         **kwargs,
     )
+
+
+def is_data_column(column: Column) -> bool:
+    """
+    Check if a column contains data.
+
+    :param column: The SQLAlchemy column to check.
+    :return: True if it is a data column.
+    """
+    return (
+        not column.primary_key
+        and len(column.foreign_keys) == 0
+        and column.name != "polymorphic_type"
+    )
+
+
+@lru_cache(maxsize=None)
+def _get_type_hints_cached(clazz: Type) -> Dict[str, Any]:
+    """
+    Get type hints for a class.
+    """
+    try:
+        return get_type_hints(clazz)
+    except Exception:
+        return {}

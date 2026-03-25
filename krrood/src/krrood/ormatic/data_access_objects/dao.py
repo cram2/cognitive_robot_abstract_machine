@@ -1,486 +1,48 @@
 from __future__ import annotations
 
-import abc
-import inspect
-import itertools
 import logging
 import threading
-import time
-from dataclasses import dataclass, field, is_dataclass, fields, MISSING
-from functools import lru_cache
-from inspect import isclass
 from typing import _GenericAlias
 
-import rustworkx
 import sqlalchemy.inspection
 import sqlalchemy.orm
 from sqlalchemy import Column
 from sqlalchemy.orm import MANYTOONE, MANYTOMANY, ONETOMANY, RelationshipProperty
 from typing_extensions import (
     Type,
-    get_args,
     get_origin,
-    get_type_hints,
-    Dict,
     Any,
     TypeVar,
-    Generic,
-    Self,
     Optional,
     List,
     Iterable,
     Tuple,
-    Set,
 )
 
+from krrood.ormatic.data_access_objects import helper
+from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
+from krrood.ormatic.data_access_objects.base import (
+    DataAccessObjectWorkItem,
+    HasGeneric,
+)
+from krrood.ormatic.data_access_objects.from_dao import (
+    FromDataAccessObjectWorkItem,
+    FromDataAccessObjectState,
+)
+from krrood.ormatic.data_access_objects.helper import get_dao_class
+from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
+from krrood.ormatic.utils import is_data_column, _get_type_hints_cached
 
-@lru_cache(maxsize=None)
-def _get_type_hints_cached(clazz: Type) -> Dict[str, Any]:
-    """
-    Get type hints for a class.
-    """
-    try:
-        return get_type_hints(clazz)
-    except Exception:
-        return {}
-
-
-from collections import deque
 from krrood.ormatic.exceptions import (
     NoGenericError,
-    NoDAOFoundError,
     NoDAOFoundDuringParsingError,
-    UnsupportedRelationshipError,
 )
-from krrood.utils import recursive_subclasses
 
 logger = logging.getLogger(__name__)
 _repr_thread_local = threading.local()
 
 T = TypeVar("T")
 _DAO = TypeVar("_DAO", bound="DataAccessObject")
-WorkItemT = TypeVar("WorkItemT", bound="DataAccessObjectWorkItem")
-
-InstanceDict = Dict[int, Any]  # Dictionary that maps object ids to objects
-InProgressDict = Dict[int, bool]
-
-
-def is_data_column(column: Column) -> bool:
-    """
-    Check if a column contains data.
-
-    :param column: The SQLAlchemy column to check.
-    :return: True if it is a data column.
-    """
-    return (
-        not column.primary_key
-        and len(column.foreign_keys) == 0
-        and column.name != "polymorphic_type"
-    )
-
-
-@dataclass
-class DataAccessObjectWorkItem(abc.ABC):
-    """
-    Abstract base class for conversion work items.
-    """
-
-    dao_instance: DataAccessObject
-
-
-@dataclass
-class DataAccessObjectState(Generic[WorkItemT], abc.ABC):
-    """
-    Abstract base class for conversion states.
-    """
-
-    memo: InstanceDict = field(default_factory=dict)
-    """
-    Cache for converted objects to prevent duplicates and handle circular references.
-    """
-
-    work_items: deque[WorkItemT] = field(default_factory=deque)
-    """
-    Deque of work items to be processed.
-    """
-
-    @abc.abstractmethod
-    def push_work_item(self, *args: Any, **kwargs: Any) -> None:
-        """
-        Add a new work item to the processing queue.
-
-        :param args: Positional arguments for the work item.
-        :param kwargs: Keyword arguments for the work item.
-        """
-        pass
-
-    def has(self, source: Any) -> bool:
-        """
-        Check if the given source object has already been converted.
-
-        :param source: The object to check.
-        :return: True if already converted.
-        """
-        return id(source) in self.memo
-
-    def get(self, source: Any) -> Optional[Any]:
-        """
-        Get the converted object for the given source object.
-
-        :param source: The source object.
-        :return: The converted object if it exists.
-        """
-        return self.memo.get(id(source))
-
-    def register(self, source: Any, target: Any) -> None:
-        """
-        Register a conversion result in the memoization store.
-
-        :param source: The source object.
-        :param target: The conversion result.
-        """
-        self.memo[id(source)] = target
-
-    def pop(self, source: Any) -> Optional[Any]:
-        """
-        Remove and return the conversion result for the given source object.
-
-        :param source: The source object.
-        :return: The conversion result if it existed.
-        """
-        return self.memo.pop(id(source), None)
-
-
-@dataclass
-class ToDataAccessObjectWorkItem(DataAccessObjectWorkItem):
-    """
-    Work item for converting an object to a Data Access Object.
-    """
-
-    source_object: Any
-    alternative_base: Optional[Type[DataAccessObject]] = None
-
-
-@dataclass
-class ToDataAccessObjectState(DataAccessObjectState[ToDataAccessObjectWorkItem]):
-    """
-    State for converting objects to Data Access Objects.
-    """
-
-    keep_alive: InstanceDict = field(default_factory=dict)
-    """
-    Dictionary that prevents objects from being garbage collected.
-    """
-
-    def push_work_item(
-        self,
-        source_object: Any,
-        dao_instance: DataAccessObject,
-        alternative_base: Optional[Type[DataAccessObject]] = None,
-    ):
-        """
-        Add a new work item to the processing queue.
-
-        :param source_object: The object being converted.
-        :param dao_instance: The DAO instance being populated.
-        :param alternative_base: Base class for alternative mapping, if any.
-        """
-        self.work_items.append(
-            ToDataAccessObjectWorkItem(
-                dao_instance=dao_instance,
-                source_object=source_object,
-                alternative_base=alternative_base,
-            )
-        )
-
-    def apply_alternative_mapping_if_needed(
-        self, dao_clazz: Type[DataAccessObject], source_object: Any
-    ) -> Any:
-        """
-        Apply an alternative mapping if the DAO class requires it.
-
-        :param dao_clazz: The DAO class to check.
-        :param source_object: The object being converted.
-        :return: The source object or the result of alternative mapping.
-        """
-        original_class = dao_clazz.original_class()
-        # Handle GenericAlias which cannot be used with issubclass in some python versions
-        # or might not be what we want to check for AlternativeMapping anyway.
-        origin = get_origin(original_class) or original_class
-        if inspect.isclass(origin) and issubclass(origin, AlternativeMapping):
-            return original_class.to_dao(source_object, state=self)
-        return source_object
-
-    def register(self, source_object: Any, dao_instance: DataAccessObject) -> None:
-        """
-        Register a partially built DAO in the memoization stores.
-
-        :param source_object: The object being converted.
-        :param dao_instance: The partially built DAO.
-        """
-        super().register(source_object, dao_instance)
-        self.keep_alive[id(source_object)] = source_object
-
-
-@dataclass
-class FromDataAccessObjectWorkItem(DataAccessObjectWorkItem):
-    """
-    Work item for converting a Data Access Object back to a domain object.
-    """
-
-    domain_object: Any
-
-
-@dataclass
-class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkItem]):
-    """
-    State for converting Data Access Objects back to domain objects.
-    """
-
-    discovery_mode: bool = False
-    """
-    Whether the state is currently in discovery mode.
-    """
-
-    initialized_ids: Set[int] = field(default_factory=set)
-    """
-    Set of DAO ids that have been fully initialized.
-    """
-
-    is_processing: bool = False
-    """
-    Whether the state is currently in the processing loop.
-    """
-
-    resolution_mode: bool = False
-    """
-    Whether the state is currently in the resolution phase.
-    """
-
-    synthetic_parent_daos: Dict[
-        Tuple[int, Type[DataAccessObject]], DataAccessObject
-    ] = field(default_factory=dict)
-    """
-    Cache for synthetic parent DAOs to maintain identity across discovery and filling phases.
-    Synthentic DAOs are used when the parent of a DAO uses and AlternativeMapping.
-    In this case the, the parent has to be converted using its specialized routine. After that, the child can copy
-    its inherited fields from the parent.
-    """
-
-    _class_dependencies: rustworkx.PyDiGraph = field(
-        default_factory=lambda: rustworkx.PyDiGraph(multigraph=False)
-    )
-    """
-    A rustowkrx graph that tracks the dependencies between classes defined 
-    in `AlternativeMapping.required_pre_build_classes`
-    The nodes are the data access object types and the edges represent the dependencies.
-    An edge (source, target) means that the class `source` needs to be build before `target`.
-    """
-
-    def is_initialized(self, dao_instance: DataAccessObject) -> bool:
-        """
-        Check if the given DAO instance has been fully initialized.
-
-        :param dao_instance: The DAO instance to check.
-        :return: True if fully initialized.
-        """
-        return id(dao_instance) in self.initialized_ids
-
-    def mark_initialized(self, dao_instance: DataAccessObject):
-        """
-        Mark the given DAO instance as fully initialized.
-
-        :param dao_instance: The DAO instance to mark.
-        """
-        self.initialized_ids.add(id(dao_instance))
-
-    def push_work_item(self, dao_instance: DataAccessObject, domain_object: Any):
-        """
-        Add a new work item to the processing queue.
-
-        :param dao_instance: The DAO instance being converted.
-        :param domain_object: The domain object being populated.
-        """
-        self.work_items.append(
-            FromDataAccessObjectWorkItem(
-                dao_instance=dao_instance, domain_object=domain_object
-            )
-        )
-
-    def allocate_and_memoize(
-        self, dao_instance: DataAccessObject, original_clazz: Type
-    ) -> Any:
-        """
-        Allocate a new instance and store it in the memoization dictionary.
-        Initializes default values for dataclass fields.
-
-        :param dao_instance: The DAO instance to register.
-        :param original_clazz: The domain class to instantiate.
-        :return: The uninitialized domain object instance.
-        """
-
-        result = original_clazz.__new__(original_clazz)
-        if is_dataclass(original_clazz):
-            for f in fields(original_clazz):
-                if f.default is not MISSING:
-                    object.__setattr__(result, f.name, f.default)
-                elif f.default_factory is not MISSING:
-                    object.__setattr__(result, f.name, f.default_factory())
-        self.register(dao_instance, result)
-        return result
-
-    def _build_class_dependencies(self, dao_types: List[Type[DataAccessObject]]):
-        """
-        Build the class dependencies for the given types that can be used to infer the built order.
-
-        :param dao_types: The data access object types to build the dependency graph for.
-        """
-        types_to_index: Dict[Type, int] = {
-            type_: self._class_dependencies.add_node(type_) for type_ in dao_types
-        }  # add all dao types to the dependency graph
-
-        for parent, child in itertools.combinations(dao_types, 2):
-            if parent is child:
-                continue
-            if issubclass(child, parent):
-                self._class_dependencies.add_edge(
-                    types_to_index[parent], types_to_index[child], None
-                )
-
-        # add all dependencies between the classes defined from the alternative mappings
-        for dao_type in dao_types:
-            alternative_mapping = dao_type.original_class()
-
-            # if it's an alternative mapping, build its dependencies
-            if inspect.isclass(alternative_mapping) and issubclass(
-                alternative_mapping, AlternativeMapping
-            ):
-                self._build_dependencies_of_alternative_mapping(
-                    alternative_mapping, dao_types, types_to_index
-                )
-
-    def _build_dependencies_of_alternative_mapping(
-        self,
-        alternative_mapping: Type[AlternativeMapping],
-        dao_types: List[Type[DataAccessObject]],
-        types_to_index: Dict[Type, int],
-    ):
-        """
-        Builds the dependencies of a given alternative mapping and updates the internal
-        class dependency graph.
-
-        :param alternative_mapping: The alternative mapping for which dependencies
-            are being resolved.
-        :param dao_types: A list of DAO types representing the discovered Data Access
-            Objects.
-        :param types_to_index: A dictionary mapping DAO types to their respective
-            indices in the dependency graph.
-
-        """
-
-        dao_of_alternative_mapping = get_dao_class(alternative_mapping)
-        # get all concrete types that are affected by the dependencies
-        for required_domain_type in alternative_mapping.required_pre_build_classes():
-            # for every concrete dao type discovered in the discovery phase
-            for concrete_dao_type in dao_types:
-
-                # get the concrete domain type of the dao current dao type
-                concrete_domain_type = concrete_dao_type.original_class()
-
-                if not isclass(concrete_domain_type):  # skip non classes for now
-                    continue
-
-                if issubclass(concrete_domain_type, AlternativeMapping):
-                    concrete_domain_type = concrete_domain_type.original_class()
-
-                # skip types that are not required
-                if not issubclass(concrete_domain_type, required_domain_type):
-                    continue
-
-                # add the dependency
-                self._class_dependencies.add_edge(
-                    types_to_index[concrete_dao_type],
-                    types_to_index[dao_of_alternative_mapping],
-                    None,
-                )
-
-    def _order_work_items_by_dependency_graph(
-        self, work_items: List[FromDataAccessObjectWorkItem]
-    ) -> List[FromDataAccessObjectWorkItem]:
-        """
-        Order the work items such that dependencies are met first.
-
-        :param work_items: The work items to order.
-        :return: The newly sorted work items.
-        """
-
-        number_of_work_items = len(work_items)
-        result = []
-
-        for type_index in rustworkx.topological_sort(self._class_dependencies):
-            dao_type = self._class_dependencies[type_index]
-
-            matching_types = [
-                work_item
-                for work_item in work_items
-                if type(work_item.dao_instance) is dao_type
-            ]
-            result.extend(matching_types)
-
-            for work_item in matching_types:
-                work_items.remove(work_item)
-        assert len(result) == number_of_work_items
-        return result
-
-
-class HasGeneric(Generic[T]):
-    """
-    Base class for classes that carry a generic type argument.
-    """
-
-    @classmethod
-    @lru_cache(maxsize=None)
-    def original_class(cls) -> T:
-        """
-        Get the concrete generic argument.
-
-        :return: The generic type argument.
-        :raises NoGenericError: If no generic argument is found.
-        """
-        tp = cls._dao_like_argument()
-        if tp is None:
-            raise NoGenericError(cls)
-        return tp
-
-    @classmethod
-    @lru_cache(maxsize=None)
-    def constructable_original_class(cls) -> T:
-        """
-        Return the constructable original class. Use this for object allocation in from_dao cycles, as Generic Aliases
-        cannot be constructed directly.
-        """
-        original_class = cls.original_class()
-        if type(original_class) is _GenericAlias:
-            return get_origin(original_class)
-        else:
-            return original_class
-
-    @classmethod
-    def _dao_like_argument(cls) -> Optional[Type]:
-        """
-        Extract the generic argument from the class hierarchy.
-
-        :return: The generic type or None.
-        """
-        # filter for instances of generic aliases in the superclasses
-        for base in filter(
-            lambda x: isinstance(x, _GenericAlias),
-            cls.__orig_bases__,
-        ):
-            return get_args(base)[0]
-
-        # No acceptable base found
-        return None
 
 
 class AssociationDataAccessObject:
@@ -559,7 +121,7 @@ class DataAccessObject(HasGeneric[T]):
     def to_dao(
         cls,
         source_object: T,
-        state: Optional[ToDataAccessObjectState] = None,
+        state: Optional[ToDataAccessObjectState],
         register: bool = True,
     ) -> _DAO:
         """
@@ -570,7 +132,6 @@ class DataAccessObject(HasGeneric[T]):
         :param register: Whether to register the result in the memo.
         :return: The converted DAO instance.
         """
-        state = state or ToDataAccessObjectState()
 
         # Phase 1: Resolution - Check memo and apply alternative mappings
         existing = state.get(source_object)
@@ -685,7 +246,7 @@ class DataAccessObject(HasGeneric[T]):
         temp_dao = state.pop(source_object)
 
         # create dao of alternatively mapped superclass
-        parent_dao = alternative_base.original_class().to_dao(source_object, state)
+        parent_dao = helper.to_dao(source_object, state)
 
         # Restore the object in the memo dictionary
         if temp_dao is not None:
@@ -928,7 +489,9 @@ class DataAccessObject(HasGeneric[T]):
         self._discover_dependencies(state, discovery_order)
 
         # reorder discovery order to respect the states dependency graph
-        discovery_order = state._order_work_items_by_dependency_graph(discovery_order)
+        discovery_order = state._order_work_items_by_dependency_graph(
+            list((discovery_order))
+        )
 
         self._fill_domain_objects(state, discovery_order)
         self._finalize_containers(state, discovery_order)
@@ -1374,151 +937,3 @@ class DataAccessObject(HasGeneric[T]):
             return f"{self.__class__.__name__}({', '.join(representations)})"
         finally:
             _repr_thread_local.seen.remove(id(self))
-
-
-class AlternativeMapping(HasGeneric[T], abc.ABC):
-    """
-    Base class for alternative mapping implementations.
-    """
-
-    @classmethod
-    def to_dao(
-        cls, source_object: T, state: Optional[ToDataAccessObjectState] = None
-    ) -> _DAO:
-        """
-        Resolve a source object to a DAO.
-
-        :param source_object: The object to convert.
-        :param state: The conversion state.
-        :return: The converted DAO instance.
-        """
-        state = state or ToDataAccessObjectState()
-        if state.has(source_object):
-            return state.get(source_object)
-        elif isinstance(source_object, cls):
-            return source_object
-        else:
-            result = cls.from_domain_object(source_object)
-            return result
-
-    @classmethod
-    @abc.abstractmethod
-    def from_domain_object(cls, obj: T) -> Self:
-        """
-        Create this from a domain object.
-        Do not create any DAOs here but the target DAO of `T`.
-        The rest of the `to_dao` algorithm will process the fields of the created instance.
-
-        :param obj: The source object.
-        :return: A new instance of this mapping class.
-        """
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def to_domain_object(self) -> T:
-        """
-        Create a domain object from this instance.
-
-        :return: The constructed domain object.
-        """
-        raise NotImplementedError
-
-    @classmethod
-    def required_pre_build_classes(cls) -> List[Type]:
-        """
-        A list of other classes that have to be built before this one in the `from_dao` algorithm.
-        The types inside the list are the domain types, not the data access objects nor the alternative mappings.
-        """
-        return []
-
-
-@lru_cache(maxsize=None)
-def _get_clazz_by_original_clazz(
-    base_clazz: Type, original_clazz: Type
-) -> Optional[Type]:
-    """
-    Find a subclass that maps to a specific domain class.
-
-    :param base_clazz: The base class to search from.
-    :param original_clazz: The domain class to match.
-    :return: The matching subclass or None.
-    """
-    for subclass in recursive_subclasses(base_clazz):
-        try:
-            if subclass.original_class() == original_clazz:
-                return subclass
-        except (AttributeError, TypeError, NoGenericError):
-            continue
-    return None
-
-
-@lru_cache(maxsize=None)
-def get_dao_class(
-    original_clazz: Type, expected_type: Optional[Type] = None
-) -> Optional[Type[DataAccessObject]]:
-    """
-    Retrieve the DAO class for a domain class.
-
-    :param original_clazz: The domain class.
-    :param expected_type: The expected domain type (from relationship).
-    :return: The corresponding DAO class or None.
-    """
-
-    if issubclass(original_clazz, DataAccessObject):
-        return original_clazz
-
-    alternative_mapping = get_alternative_mapping(original_clazz)
-    if alternative_mapping is not None:
-        original_clazz = alternative_mapping
-
-    # If the actual class is the same as the origin of the expected type,
-    # the expected type is more specific (likely a parametrized generic)
-    # and we should prefer it.
-    if expected_type is not None and original_clazz == get_origin(expected_type):
-        dao = _get_clazz_by_original_clazz(DataAccessObject, expected_type)
-        if dao is not None:
-            return dao
-
-    # Try the actual class first.
-    # This is important for polymorphic inheritance to get the most specific DAO.
-    dao = _get_clazz_by_original_clazz(DataAccessObject, original_clazz)
-    if dao is not None:
-        return dao
-
-    # Fallback to the expected type if provided.
-    if expected_type is not None:
-        dao = _get_clazz_by_original_clazz(DataAccessObject, expected_type)
-        if dao is not None:
-            return dao
-
-    return None
-
-
-@lru_cache(maxsize=None)
-def get_alternative_mapping(
-    original_clazz: Type,
-) -> Optional[Type[AlternativeMapping]]:
-    """
-    Retrieve the alternative mapping for a domain class.
-
-    :param original_clazz: The domain class.
-    :return: The corresponding alternative mapping or None.
-    """
-    return _get_clazz_by_original_clazz(AlternativeMapping, original_clazz)
-
-
-def to_dao(
-    source_object: Any, state: Optional[ToDataAccessObjectState] = None
-) -> DataAccessObject:
-    """
-    Convert an object to its corresponding DAO.
-
-    :param source_object: The object to convert.
-    :param state: The conversion state.
-    :return: The converted DAO instance.
-    """
-    dao_clazz = get_dao_class(type(source_object))
-    if dao_clazz is None:
-        raise NoDAOFoundError(source_object)
-    state = state or ToDataAccessObjectState()
-    return dao_clazz.to_dao(source_object, state)

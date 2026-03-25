@@ -1,8 +1,6 @@
 import os
-import unittest
 
 import numpy as np
-import sqlalchemy
 from krrood.ormatic.utils import create_engine
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -14,7 +12,6 @@ from semantic_digital_twin.adapters.ros.world_fetcher import (
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (

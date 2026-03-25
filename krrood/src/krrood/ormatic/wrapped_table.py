@@ -8,7 +8,7 @@ from inspect import isclass
 
 from typing_extensions import List, Dict, TYPE_CHECKING, Optional, Set, Type, get_origin
 
-from krrood.ormatic.dao import AlternativeMapping
+from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.utils import InheritanceStrategy
 from krrood.class_diagrams.class_diagram import (
     WrappedClass,

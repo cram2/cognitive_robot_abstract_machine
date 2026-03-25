@@ -1,6 +1,6 @@
 import sys
 
-from krrood.ormatic.dao import to_dao
+from krrood.ormatic.data_access_objects.helper import to_dao
 from ..dataset.example_classes import Person
 from ..dataset.ormatic_interface import PersonDAO
 

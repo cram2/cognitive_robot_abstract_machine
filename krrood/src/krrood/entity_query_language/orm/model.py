@@ -8,7 +8,10 @@ from krrood.symbol_graph.symbol_graph import (
     PredicateClassRelation,
     Symbol,
 )
-from krrood.ormatic.dao import AlternativeMapping, T
+from krrood.ormatic.data_access_objects.alternative_mappings import (
+    AlternativeMapping,
+    T,
+)
 
 
 @dataclass

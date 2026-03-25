@@ -1,5 +1,5 @@
 from ..dataset.example_classes import ContainerGeneration, ItemWithBackreference
-from krrood.ormatic.dao import to_dao
+from krrood.ormatic.data_access_objects.helper import to_dao
 from .test_interface import Position, Position4D, Pose, Orientation
 from ..dataset.ormatic_interface import PositionDAO, PoseDAO, Position4DDAO
 
