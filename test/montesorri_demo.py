@@ -85,14 +85,11 @@ class TestMultiverseEpisodeSegmenter(TestCase):
 
         self.episode_executor.compile(sc)
 
-        print(f"Number of holes: {len(self.context.holes)}")
         assert len(self.context.holes) > 0
 
         time.sleep(5)
-        while self.episode_executor.player.is_alive():
-            time.sleep(0.1)
-            # here we need to subscribe to the world, and add the states to a queue
-            self.episode_executor.tick()
+
+        self.episode_executor.tick_until_end(10000000)
 
         translation_events = [
             i for i in self.logger.get_events() if isinstance(i, TranslationEvent)

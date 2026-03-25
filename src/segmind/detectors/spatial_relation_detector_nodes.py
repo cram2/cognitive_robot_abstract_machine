@@ -330,11 +330,14 @@ class InsertionDetector(AbstractDetector):
         contact_events_with_holes = [i for i in contact_events if i.with_object in self.context.holes]
         containment_event = [i for i in self.context.logger.get_events() if isinstance(i, ContainmentEvent)]
 
-        for i in contact_events_with_holes:
-            for j in containment_event:
+        for j in containment_event:
+            for i in contact_events_with_holes:
                 if i.tracked_object == j.tracked_object:
                     if abs(i.timestamp - j.timestamp) < self.shift_threshold:
-                        key = (id(i), id(j))
+                        key = (
+                            i.tracked_object.id,
+                            i.with_object.id,
+                        )
                         if key in self.context.insertion_pairs:
                             continue
                         self.context.insertion_pairs.add(key)

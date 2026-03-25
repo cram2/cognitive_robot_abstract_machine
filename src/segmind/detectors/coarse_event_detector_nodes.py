@@ -66,19 +66,25 @@ class PlacingDetector(AbstractInteractionDetector):
         ]
 
         events = []
-        for i in stop_translation_event:
-            for j in support_event:
+
+        for i in support_event:
+            for j in stop_translation_event:
+
                 if i.tracked_object == j.tracked_object:
                     if abs(i.timestamp - j.timestamp) < self.shift_threshold:
-                        # needs to be reworked, it doesnt work
-                        key = (id(i), id(j))
-                        # ✅ exclusivity check
+
+                        key = (
+                            i.tracked_object.id,
+                            i.with_object.id,
+                            #int(i.timestamp * 1000),
+                        )
+
                         if key in self.context.placing_pairs:
                             continue
                         self.context.placing_pairs.add(key)
                         e = PlacingEvent(
-                            tracked_object=i.tracked_object,
-                            with_object=j.with_object,
+                            tracked_object=j.tracked_object,
+                            with_object=i.with_object,
                             timestamp=i.timestamp,
                         )
                         events.append(e)
@@ -122,17 +128,20 @@ class PickUpDetector(AbstractInteractionDetector):
             i for i in self.context.logger.get_events() if isinstance(i, LossOfSupportEvent)
         ]
         events = []
-        for i in translation_event:
-            for j in loss_of_support_event:
+        for i in loss_of_support_event:
+            for j in translation_event:
                 if i.tracked_object == j.tracked_object:
                     if abs(i.timestamp - j.timestamp) < self.shift_threshold:
-                        key = (id(i), id(j))
+                        key = (
+                            i.tracked_object.id,
+                            i.with_object.id,
+                        )
                         if key in self.context.placing_pairs:
                             continue
                         self.context.placing_pairs.add(key)
                         e = PickUpEvent(
-                            tracked_object=i.tracked_object,
-                            with_object=j.with_object,
+                            tracked_object=j.tracked_object,
+                            with_object=i.with_object,
                             timestamp=i.timestamp,
                         )
                         events.append(e)

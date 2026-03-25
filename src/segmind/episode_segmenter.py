@@ -584,17 +584,7 @@ class EpisodeSegmenterExecutor:
     _control_cycle_index: int = field(init=False)
     _time_variable: FloatVariable = field(init=False)
 
-    # @property
-    # def control_cycles(self):
-    #     return self.context.float_variable_data.data[self._control_cycle_index]
-    #
-    # @control_cycles.setter
-    # def control_cycles(self, value):
-    #     self.context.float_variable_data.set_value(self._control_cycle_index, value)
-    #
-    # @property
-    # def time(self) -> float:
-    #     return self.control_cycles * self.context.qp_controller_config.control_dt
+
 
     def compile(self, statechart: DetectorStateChart):
         self.statechart = statechart
@@ -630,9 +620,10 @@ class EpisodeSegmenterExecutor:
         """
         try:
             for i in range(timeout):
-                self.tick()
-                self.pacer.sleep()
-                if self.statechart.is_end_motion():
+                if self.player.is_alive():
+                    self.tick()
+                    self.pacer.sleep()
+                else:
                     return
             raise TimeoutError("Timeout reached while waiting for end of motion.")
         finally:
