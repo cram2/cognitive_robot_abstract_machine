@@ -32,7 +32,7 @@ class Entrypoint:
     build_first_association: BuildFirstAssociation
 
 
-@dataclass
+@dataclass(eq=False)
 class BuildFirstMapping(AlternativeMapping[BuildFirst]):
 
     value: str
@@ -46,7 +46,7 @@ class BuildFirstMapping(AlternativeMapping[BuildFirst]):
         return BuildFirst(self.value, self.backreference_to_entrypoint)
 
 
-@dataclass
+@dataclass(eq=False)
 class EntryPointMapping(AlternativeMapping[Entrypoint]):
     build_first: BuildFirst
     build_first_association: BuildFirstAssociation

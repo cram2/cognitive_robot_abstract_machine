@@ -35,7 +35,7 @@ from semantic_digital_twin.world_description.world_entity import (
 from semantic_digital_twin.world_description.world_state import WorldState
 
 
-@dataclass
+@dataclass(eq=False)
 class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
     kinematic_structure_entities: List[KinematicStructureEntity]
     connections: List[Connection]
@@ -81,8 +81,10 @@ class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
     def required_pre_build_classes(cls) -> List[Type]:
         return [WorldState, SpatialType, WorldEntity]
 
+    __hash__ = AlternativeMapping.__hash__
 
-@dataclass
+
+@dataclass(eq=False)
 class WorldStateMapping(AlternativeMapping[WorldState]):
     data: List[float]
     ids: List[UUID]
@@ -102,7 +104,7 @@ class WorldStateMapping(AlternativeMapping[WorldState]):
         )
 
 
-@dataclass
+@dataclass(eq=False)
 class Vector3Mapping(AlternativeMapping[Vector3]):
     x: float
     y: float
@@ -122,7 +124,7 @@ class Vector3Mapping(AlternativeMapping[Vector3]):
         )
 
 
-@dataclass
+@dataclass(eq=False)
 class Point3Mapping(AlternativeMapping[Point3]):
     x: float
     y: float
@@ -142,7 +144,7 @@ class Point3Mapping(AlternativeMapping[Point3]):
         )
 
 
-@dataclass
+@dataclass(eq=False)
 class QuaternionMapping(AlternativeMapping[Quaternion]):
     x: float
     y: float
@@ -167,7 +169,7 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
         )
 
 
-@dataclass
+@dataclass(eq=False)
 class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
     rotation: Quaternion
     reference_frame: Optional[KinematicStructureEntity]
@@ -186,7 +188,7 @@ class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
         return [QuaternionMapping]
 
 
-@dataclass
+@dataclass(eq=False)
 class HomogeneousTransformationMatrixMapping(
     AlternativeMapping[HomogeneousTransformationMatrix]
 ):
@@ -222,7 +224,7 @@ class HomogeneousTransformationMatrixMapping(
         return [Quaternion, Point3]
 
 
-@dataclass
+@dataclass(eq=False)
 class PoseMapping(AlternativeMapping[Pose]):
     position: Point3
     rotation: Quaternion

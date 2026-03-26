@@ -14,7 +14,7 @@ from krrood.ormatic.data_access_objects.alternative_mappings import (
 )
 
 
-@dataclass
+@dataclass(eq=False)
 class SymbolGraphMapping(AlternativeMapping[SymbolGraph]):
     """
     Mapping specific for SymbolGraph.
@@ -41,7 +41,7 @@ class SymbolGraphMapping(AlternativeMapping[SymbolGraph]):
         return result
 
 
-@dataclass
+@dataclass(eq=False)
 class WrappedInstanceMapping(AlternativeMapping[WrappedInstance]):
     instance: Optional[Symbol]
 

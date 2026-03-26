@@ -17,6 +17,8 @@ from ..dataset.alternative_mappings_construction_order import (
     Entrypoint,
     BuildFirst,
     BuildFirstAssociation,
+    BuildFirstMapping,
+    EntryPointMapping,
 )
 from ..dataset.example_classes import *
 from ..dataset.ormatic_interface import *
@@ -834,9 +836,8 @@ def test_class_dependencies(session, database):
     reconstructed = queried_dao.from_dao(state=state)
 
     assert set(state._class_dependencies.nodes()) == {
-        BuildFirstAssociationDAO,
-        BuildFirstMappingDAO,
-        EntryPointMappingDAO,
+        BuildFirstMapping,
+        EntryPointMapping,
     }
 
     edges = {
@@ -844,6 +845,5 @@ def test_class_dependencies(session, database):
         for source, target in state._class_dependencies.edge_list()
     }
     assert edges == {
-        (BuildFirstAssociationDAO, EntryPointMappingDAO),
-        (BuildFirstMappingDAO, EntryPointMappingDAO),
+        (BuildFirstMapping, EntryPointMapping),
     }

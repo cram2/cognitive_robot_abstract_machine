@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import inspect
+from collections import defaultdict
 from dataclasses import dataclass, field, is_dataclass, fields, MISSING
 from inspect import isclass
-from typing import Any, Set, Dict, Tuple, Type, List, TYPE_CHECKING
+from typing import Any, Set, Dict, Tuple, Type, List, TYPE_CHECKING, Optional, Union
 
 import rustworkx
 
+from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.ormatic.data_access_objects.base import (
     DataAccessObjectWorkItem,
     DataAccessObjectState,
@@ -52,11 +54,6 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
     Whether the state is currently in the processing loop.
     """
 
-    resolution_mode: bool = False
-    """
-    Whether the state is currently in the resolution phase.
-    """
-
     synthetic_parent_daos: Dict[
         Tuple[int, Type[DataAccessObject]], DataAccessObject
     ] = field(default_factory=dict)
@@ -75,6 +72,18 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
     in `AlternativeMapping.required_pre_build_classes`
     The nodes are the data access object types and the edges represent the dependencies.
     An edge (source, target) means that the class `source` needs to be build before `target`.
+    """
+
+    _alternative_mappings_being_referenced: Dict[
+        AlternativeMapping, List[Tuple[Any, MappedVariable]]
+    ] = field(default_factory=lambda: defaultdict(list))
+
+    """
+    A dictionary that maps remembers all occurrences of an alternative mapping in any column or relationship of a 
+    domain object. This is filled during the `_fill_domain_objects` phase in the `_populate_relationship` 
+    method.
+    The keys are the ids of the instances of the alternative mappings and the values are descriptions of how they are 
+    referenced. The descriptions are MappedVariable instances from EQL.
     """
 
     def is_initialized(self, dao_instance: DataAccessObject) -> bool:
@@ -129,32 +138,32 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         self.register(dao_instance, result)
         return result
 
-    def _build_class_dependencies(self, dao_types: List[Type[DataAccessObject]]):
+    def _build_class_dependencies(
+        self, alternative_mapping_types: List[Type[AlternativeMapping]]
+    ):
         """
         Build the class dependencies for the given types that can be used to infer the built order.
+        This method should only take Alternative Mapping types as input as these are the only types that can have
+        order sensitive dependencies.
 
-        :param dao_types: The data access object types to build the dependency graph for.
+        :param alternative_mapping_types: The types to build the dependency graph for.
         """
         types_to_index: Dict[Type, int] = {
-            type_: self._class_dependencies.add_node(type_) for type_ in dao_types
+            type_: self._class_dependencies.add_node(type_)
+            for type_ in alternative_mapping_types
         }  # add all dao types to the dependency graph
 
         # add all dependencies between the classes defined from the alternative mappings
-        for dao_type in dao_types:
-            alternative_mapping = dao_type.original_class()
+        for alternative_mapping_type in alternative_mapping_types:
 
-            # if it's an alternative mapping, build its dependencies
-            if inspect.isclass(alternative_mapping) and issubclass(
-                alternative_mapping, AlternativeMapping
-            ):
-                self._build_dependencies_of_alternative_mapping(
-                    alternative_mapping, dao_types, types_to_index
-                )
+            self._build_dependencies_of_alternative_mapping(
+                alternative_mapping_type, alternative_mapping_types, types_to_index
+            )
 
     def _build_dependencies_of_alternative_mapping(
         self,
         alternative_mapping: Type[AlternativeMapping],
-        dao_types: List[Type[DataAccessObject]],
+        concrete_alternative_mappings: List[Type[AlternativeMapping]],
         types_to_index: Dict[Type, int],
     ):
         """
@@ -163,27 +172,24 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
 
         :param alternative_mapping: The alternative mapping for which dependencies
             are being resolved.
-        :param dao_types: A list of DAO types representing the discovered Data Access
-            Objects.
-        :param types_to_index: A dictionary mapping DAO types to their respective
+        :param concrete_alternative_mappings: A list of Alternative Mapping types discovered during the discovery phase.
+        :param types_to_index: A dictionary mapping Alternative Mapping types to their respective
             indices in the dependency graph.
-
         """
 
-        dao_of_alternative_mapping = get_dao_class(alternative_mapping)
         # get all concrete types that are affected by the dependencies
         for required_domain_type in alternative_mapping.required_pre_build_classes():
+
             # for every concrete dao type discovered in the discovery phase
-            for concrete_dao_type in dao_types:
+            for concrete_alternative_mapping in concrete_alternative_mappings:
 
                 # get the concrete domain type of the dao current dao type
-                concrete_domain_type = concrete_dao_type.original_class()
+                concrete_domain_type = concrete_alternative_mapping.original_class()
 
-                if not isclass(concrete_domain_type):  # skip non classes for now
+                if not isclass(
+                    concrete_domain_type
+                ):  # skip non classes (like generics)
                     continue
-
-                if issubclass(concrete_domain_type, AlternativeMapping):
-                    concrete_domain_type = concrete_domain_type.original_class()
 
                 # skip types that are not required
                 if not issubclass(concrete_domain_type, required_domain_type):
@@ -191,42 +197,32 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
 
                 # add the dependency
                 self._class_dependencies.add_edge(
-                    types_to_index[concrete_dao_type],
-                    types_to_index[dao_of_alternative_mapping],
+                    types_to_index[concrete_alternative_mapping],
+                    types_to_index[alternative_mapping],
                     None,
                 )
 
-    def _order_work_items_by_dependency_graph(
-        self, work_items: List[FromDataAccessObjectWorkItem]
-    ) -> List[FromDataAccessObjectWorkItem]:
+    def convert_alternative_mappings_to_domain_objects(self):
         """
-        Order the work items such that dependencies are met first.
-        Alternative mappings are moved to the end of the list w. r. t. their dependency order.
-
-        :param work_items: The work items to order.
-        :return: The newly sorted work items.
+        Convert all alternative mappings registered in `_alternative_mappings_being_referenced` to domain objects.
+        Update all the references of other domain objects to the newly created domain objects.
+        This uses the order from `_order_work_items_by_dependency_graph` to ensure that the alternative mappings are
+        respecting their dependencies.
         """
-
-        number_of_work_items = len(work_items)
-        result = []
-        alternative_mappings = []
-
-        for work_item in work_items:
-            if isinstance(work_item.domain_object, AlternativeMapping):
-                alternative_mappings.append(work_item)
-            else:
-                result.append(work_item)
 
         for type_index in rustworkx.topological_sort(self._class_dependencies):
-            dao_type = self._class_dependencies[type_index]
+            alternative_mapping_type = self._class_dependencies[type_index]
+            for (
+                alternative_mapping_instance,
+                references,
+            ) in self._alternative_mappings_being_referenced.items():
 
-            matching_types = [
-                work_item
-                for work_item in alternative_mappings
-                if type(work_item.dao_instance) is dao_type
-            ]
-            result.extend(matching_types)
+                if type(alternative_mapping_instance) is not alternative_mapping_type:
+                    continue
 
-        assert len(result) == number_of_work_items
+                domain_object = alternative_mapping_instance.to_domain_object()
+                for referencing_instance, reference in references:
 
-        return result
+                    reference._set_external_root_instance_value_(
+                        referencing_instance, domain_object
+                    )

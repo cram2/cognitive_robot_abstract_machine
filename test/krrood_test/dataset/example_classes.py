@@ -213,7 +213,7 @@ class EntityAssociation(Symbol):
 # Define an explicit mapping DAO that maps to the base entity class
 
 
-@dataclass
+@dataclass(eq=False)
 class EntityMapping(AlternativeMapping[Entity]):
     overwritten_name: str
 
@@ -258,7 +258,7 @@ class Backreference(Symbol):
     reference: Reference = None
 
 
-@dataclass
+@dataclass(eq=False)
 class BackreferenceMapping(AlternativeMapping[Backreference]):
     values: List[int]
     reference: Reference
@@ -297,7 +297,7 @@ class Vector(Symbol):
     x: float
 
 
-@dataclass
+@dataclass(eq=False)
 class VectorMapped(AlternativeMapping[Vector]):
     x: float
 
@@ -314,7 +314,7 @@ class Rotation(Symbol):
     angle: float
 
 
-@dataclass
+@dataclass(eq=False)
 class RotationMapped(AlternativeMapping[Rotation]):
 
     angle: float
@@ -333,7 +333,7 @@ class Transformation(Symbol):
     rotation: Rotation
 
 
-@dataclass
+@dataclass(eq=False)
 class TransformationMapped(AlternativeMapping[Transformation]):
     vector: Vector
     rotation: Rotation
@@ -371,7 +371,7 @@ class VectorsWithProperty(Symbol):
         return self._vectors
 
 
-@dataclass
+@dataclass(eq=False)
 class VectorsWithPropertyMapped(AlternativeMapping[VectorsWithProperty]):
     vectors: List[Vector]
 
@@ -394,7 +394,7 @@ class ChildBase(ParentBase):
     pass
 
 
-@dataclass
+@dataclass(eq=False)
 class ParentBaseMapping(AlternativeMapping[ParentBase]):
     name: str
 
@@ -408,7 +408,7 @@ class ParentBaseMapping(AlternativeMapping[ParentBase]):
         return ParentBase(self.name, 0)
 
 
-@dataclass
+@dataclass(eq=False)
 class ChildBaseMapping(ParentBaseMapping, AlternativeMapping[ChildBase]):
 
     @classmethod
@@ -466,7 +466,7 @@ class InheritanceLevel2WithoutSymbolButAlternativelyMapped(
     level_two_attribute: float = 0
 
 
-@dataclass
+@dataclass(eq=False)
 class InheritanceBaseWithoutSymbolButAlternativelyMappedMapping(
     AlternativeMapping[InheritanceBaseWithoutSymbolButAlternativelyMapped]
 ):
@@ -480,7 +480,7 @@ class InheritanceBaseWithoutSymbolButAlternativelyMappedMapping(
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(eq=False)
 class InheritanceLevel1WithoutSymbolButAlternativelyMappedMapping(
     InheritanceBaseWithoutSymbolButAlternativelyMappedMapping,
     AlternativeMapping[InheritanceLevel1WithoutSymbolButAlternativelyMapped],
@@ -492,7 +492,7 @@ class InheritanceLevel1WithoutSymbolButAlternativelyMappedMapping(
         return cls(obj.base_attribute, obj.level_one_attribute)
 
 
-@dataclass
+@dataclass(eq=False)
 class InheritanceLevel2WithoutSymbolButAlternativelyMappedMapping(
     InheritanceLevel1WithoutSymbolButAlternativelyMappedMapping,
     AlternativeMapping[InheritanceLevel2WithoutSymbolButAlternativelyMapped],
@@ -521,7 +521,7 @@ class ChildLevel2NormallyMapped(ChildLevel1NormallyMapped):
     level_two_attribute: float = 0
 
 
-@dataclass
+@dataclass(eq=False)
 class ParentAlternativelyMappedMapping(AlternativeMapping[ParentAlternativelyMapped]):
     derived_attribute: str
     entities: List[Entity]

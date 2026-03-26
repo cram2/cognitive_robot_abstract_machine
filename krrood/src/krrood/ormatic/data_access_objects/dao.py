@@ -22,6 +22,7 @@ from typing_extensions import (
     Dict,
 )
 
+from krrood.entity_query_language.core.mapped_variable import Attribute, Index
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.base import (
     HasGeneric,
@@ -472,7 +473,12 @@ class DataAccessObject(HasGeneric[T]):
             return state.get(self)
 
         if not state.is_processing:
-            return self._perform_from_dao_conversion(state)
+            result = self._perform_from_dao_conversion(state)
+
+            # if the instance that started this whole process is alternatively mapped, finally convert it
+            if isinstance(result, AlternativeMapping):
+                return result.to_domain_object()
+            return result
 
         return self._register_for_conversion(state)
 
@@ -490,59 +496,14 @@ class DataAccessObject(HasGeneric[T]):
         state.push_work_item(self, state.get(self))
 
         self._discover_dependencies(state, discovery_order)
-
-        # # reorder discovery order to respect the states dependency graph
-        # discovery_order = state._order_work_items_by_dependency_graph(
-        #     list(discovery_order)
-        # )
-
         self._fill_domain_objects(state, discovery_order)
-        self._convert_alternative_mappings_to_domain_objects(state, discovery_order)
+        state.convert_alternative_mappings_to_domain_objects()
         self._finalize_containers(state, discovery_order)
         self._call_post_inits(state, discovery_order)
 
         state.is_processing = False
 
         return state.get(self)
-
-    def _convert_alternative_mappings_to_domain_objects(
-        self,
-        state: FromDataAccessObjectState,
-        discovery_order: List[FromDataAccessObjectWorkItem],
-    ):
-        """
-        Convert all alternative mapping instances to their corresponding domain objects.
-        """
-
-        alternative_mapping_work_items = [
-            work_item
-            for work_item in discovery_order
-            if isinstance(work_item.domain_object, AlternativeMapping)
-        ]
-
-        alternative_mapping_work_items = state._order_work_items_by_dependency_graph(
-            alternative_mapping_work_items
-        )
-
-        for alternative_mapping_work_item in alternative_mapping_work_items:
-            old_id = id(alternative_mapping_work_item.domain_object)
-            final_domain_object = (
-                alternative_mapping_work_item.domain_object.to_domain_object()
-            )
-            discovery_order.remove(alternative_mapping_work_item)
-
-            for work_item in discovery_order:
-                for field in fields(work_item.domain_object):
-                    field_value = getattr(work_item.domain_object, field.name)
-                    if isinstance(field_value, list):
-                        for index, item in enumerate(field_value):
-                            if id(item) == old_id:
-                                field_value[index] = final_domain_object
-                    else:
-                        if id(field_value) == old_id:
-                            setattr(
-                                work_item.domain_object, field.name, final_domain_object
-                            )
 
     def _discover_dependencies(
         self,
@@ -563,7 +524,8 @@ class DataAccessObject(HasGeneric[T]):
             # Use pop() to treat the deque as a stack (LIFO) for DFS
             work_item = state.work_items.pop()
             discovery_order.append(work_item)
-            collected_types.add(type(work_item.dao_instance))
+            if isinstance(work_item.domain_object, AlternativeMapping):
+                collected_types.add(type(work_item.domain_object))
             work_item.dao_instance._fill_from_dao(work_item.domain_object, state)
 
         # build dependency graphg used to order the discovery queue
@@ -575,25 +537,10 @@ class DataAccessObject(HasGeneric[T]):
         self,
         state: FromDataAccessObjectState,
         discovery_order: List[FromDataAccessObjectWorkItem],
-    ) -> None:
+    ):
         """
         Phase 2: Filling (Bottom-Up) to initialize domain objects.
 
-        :param state: The conversion state.
-        :param discovery_order: The order in which DAOs were discovered.
-        """
-        state.resolution_mode = False
-        self._populate_relationships_and_scalars(state, discovery_order)
-
-        state.resolution_mode = True
-        # self._finalize_resolution(state, discovery_order)
-
-    def _populate_relationships_and_scalars(
-        self,
-        state: FromDataAccessObjectState,
-        discovery_order: List[FromDataAccessObjectWorkItem],
-    ):
-        """
         Populate all relationships and scalars for all discovered instances.
         This ensures that all objects point to each other (even if not yet fully resolved).
 
@@ -606,21 +553,36 @@ class DataAccessObject(HasGeneric[T]):
                     work_item.domain_object, state
                 )
 
-    def _finalize_resolution(
+    def _handle_subclass_of_alternative_mapping_in_from_dao(
         self,
-        state: FromDataAccessObjectState,
-        discovery_order: List[FromDataAccessObjectWorkItem],
+        data_access_object: DataAccessObject,
+        domain_object: Any,
+        alternatively_mapped_base: Type[AlternativeMapping],
     ):
         """
-        Finalize resolution of instances and resolve AlternativeMappings.
+        Handle the case where the parent class is an alternative mapping in the `from_dqo` algorithm.
 
-        :param state: The conversion state.
-        :param discovery_order: The order in which to process the instances.
+        :param data_access_object: The data access object that has an alternative mapping as its parent class.
+        :param domain_object: The domain object that is being constructed.
+        :param alternatively_mapped_base: The base class that is the alternative mapping.
+        :return:
         """
-        for work_item in discovery_order:
-            if not state.is_initialized(work_item.dao_instance):
-                work_item.dao_instance._resolve_from_dao(work_item.domain_object, state)
-                state.mark_initialized(work_item.dao_instance)
+        logger.warning(
+            "Subclasses of AlternativeMapping are only partially supported. "
+            "If the parent classes alternative mapping has dependencies these are ignored and may yield "
+            "inconsistent build orders."
+        )
+        # create the domain object of the alternatively mapped base
+        base_domain_object = alternatively_mapped_base.to_domain_object(
+            data_access_object
+        )
+        for domain_object_field in fields(domain_object):
+            if hasattr(base_domain_object, domain_object_field.name):
+                setattr(
+                    domain_object,
+                    domain_object_field.name,
+                    getattr(base_domain_object, domain_object_field.name),
+                )
 
     def _finalize_containers(
         self,
@@ -716,6 +678,14 @@ class DataAccessObject(HasGeneric[T]):
         """
         mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(type(self))
 
+        # check if self is a subclass of an alternative mapping
+        alternatively_mapped_base = self._find_alternative_mapping_base()
+        if alternatively_mapped_base is not None:
+            self._handle_subclass_of_alternative_mapping_in_from_dao(
+                self, domain_object, alternatively_mapped_base.original_class()
+            )
+            return
+
         # Populate scalar columns
         for column in mapper.columns:
             if is_data_column(column):
@@ -724,31 +694,6 @@ class DataAccessObject(HasGeneric[T]):
 
         # Populate all relationships
         self._populate_relationships_from_dao(domain_object, state)
-
-    def _resolve_from_dao(
-        self, domain_object: T, state: FromDataAccessObjectState
-    ) -> T:
-        """
-        Finalize resolution of AlternativeMappings and handle inheritance.
-        Also re-populates relationships to ensure they point to resolved domain objects
-        instead of AlternativeMapping instances.
-
-        :param domain_object: The domain object.
-        :param state: The conversion state.
-        :return: The fully populated (and potentially resolved) domain object.
-        """
-        # Re-populate relationships to pick up resolved AlternativeMappings.
-        # Regular objects will be overwritten with the same instance,
-        # but mappings will be replaced by their domain object results.
-        self._populate_relationships_from_dao(domain_object, state)
-
-        # Populate from alternative parent if any
-        self._build_base_keyword_arguments_for_alternative_parent(domain_object, state)
-
-        if isinstance(domain_object, AlternativeMapping):
-            return self._handle_alternative_mapping_result(domain_object, state)
-
-        return domain_object
 
     def _fill_from_dao(self, domain_object: T, state: FromDataAccessObjectState) -> T:
         """
@@ -857,6 +802,10 @@ class DataAccessObject(HasGeneric[T]):
             object.__setattr__(domain_object, key, None)
             return
         instance = self._get_or_allocate_domain_object(value, state)
+        if isinstance(instance, AlternativeMapping):
+            state._alternative_mappings_being_referenced[instance].append(
+                (domain_object, Attribute(_attribute_name_=key, _child_=None))
+            )
         object.__setattr__(domain_object, key, instance)
 
     def _populate_collection_relationship(
@@ -870,21 +819,31 @@ class DataAccessObject(HasGeneric[T]):
         :param value: The collection of DAO instances.
         :param state: The conversion state.
         """
+
+        # handle empty collections / None
         if not value:
             object.__setattr__(domain_object, key, value)
             return
 
-        relationship = sqlalchemy.inspection.inspect(type(self)).relationships[key]
-        target_dao_clazz = relationship.mapper.class_
-
-        if issubclass(target_dao_clazz, AssociationDataAccessObject):
-            dao_collection = [item.target for item in value if item.target is not None]
-        else:
-            dao_collection = value
+        dao_collection = [item.target for item in value if item.target is not None]
 
         instances = [
             self._get_or_allocate_domain_object(v, state) for v in dao_collection
         ]
+
+        # memorize alternative mapping references
+        for index, instance in enumerate(instances):
+            if isinstance(instance, AlternativeMapping):
+                state._alternative_mappings_being_referenced[instance].append(
+                    (
+                        domain_object,
+                        Index(
+                            _key_=index,
+                            _child_=Attribute(_attribute_name_=key, _child_=None),
+                        ),
+                    )
+                )
+
         object.__setattr__(domain_object, key, list(instances))
 
     def _get_or_allocate_domain_object(

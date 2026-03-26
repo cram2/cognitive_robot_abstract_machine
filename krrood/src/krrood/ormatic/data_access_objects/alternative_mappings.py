@@ -17,9 +17,14 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
+@dataclass
 class AlternativeMapping(HasGeneric[T], abc.ABC):
     """
     Base class for alternative mapping implementations.
+
+    .. important::
+        The hash function has to be the object's identity.
+        Make sure to decorate subclasses with @dataclass(eq=False).
     """
 
     @classmethod
@@ -69,6 +74,9 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
         """
         return []
 
+    def __hash__(self):
+        return id(self)
+
 
 @dataclass
 class UncallableFunction(NotImplementedError):
@@ -89,7 +97,7 @@ def raise_uncallable_function(function_mapping: FunctionMapping):
     raise UncallableFunction(function_mapping)
 
 
-@dataclass
+@dataclass(eq=False)
 class FunctionMapping(AlternativeMapping[FunctionType]):
     """
     Alternative mapping for functions.

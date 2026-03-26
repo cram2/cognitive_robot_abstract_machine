@@ -26,7 +26,7 @@ from semantic_digital_twin.world import World
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass
+@dataclass(eq=False)
 class PyCRAMQuaternionMapping(AlternativeMapping[PyCramQuaternion]):
     x: float = 0
     y: float = 0
@@ -47,7 +47,7 @@ class PlanEdge:
     child: PlanNode
 
 
-@dataclass
+@dataclass(eq=False)
 class PlanMapping(AlternativeMapping[Plan]):
     root: PlanNode
     nodes: List[PlanNode]
