@@ -15,6 +15,7 @@ from krrood.symbol_graph.symbol_graph import Symbol
 @dataclass(eq=False)
 class HasName:
     name: str
+    default_name: str = field(default="", kw_only=True)
 
 @dataclass(eq=False)
 class RecognizedGroup(HasName, Symbol):
@@ -42,6 +43,7 @@ class PersonInRoleAndOntologyRoleAttributes:
 @dataclass(eq=False)
 class PersonInRoleAndOntologyMixin(PersonInRoleAndOntologyRoleAttributes, HasName, Symbol):
     name: str = field(init=False)
+    default_name: str = field(init=False)
     works_for: RecognizedGroup = field(init=False)
     member_of: List[RecognizedGroup] = field(init=False)
 

@@ -21,6 +21,7 @@ from krrood.patterns.role.role import Role
 @dataclass(eq=False)
 class HasName:
     name: str
+    default_name: str = field(default="", kw_only=True)
 
     def __hash__(self):
         return hash(self.name)

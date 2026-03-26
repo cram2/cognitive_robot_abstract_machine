@@ -1,17 +1,16 @@
 import logging
 
-from krrood.entity_query_language.factories import entity, variable, in_, inference, an
 from numpy.ma.testutils import (
     assert_equal,
 )  # You could replace this with numpy's regular assert for better compatibility
 
+from krrood.entity_query_language.factories import entity, variable, in_, inference, an
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
@@ -155,25 +154,27 @@ def test_handle_semantic_annotation_eql(apartment_world_setup):
 
 
 @pytest.mark.parametrize(
-    "semantic_annotation_type, update_existing_semantic_annotations, scenario",
+    "semantic_annotation_type, update_existing_semantic_annotations, scenario, expected_number",
     [
-        (Handle, False, None),
-        (Drawer, False, None),
-        (Wardrobe, False, None),
-        (Door, False, None),
+        (Handle, False, None, 10),
+        (Drawer, False, None, 25),
+        (Wardrobe, False, None, 10),
+        (Door, False, None, 10),
     ],
 )
 def test_infer_apartment_semantic_annotation(
-    semantic_annotation_type,
-    update_existing_semantic_annotations,
-    scenario,
-    apartment_world_setup,
+        semantic_annotation_type,
+        update_existing_semantic_annotations,
+        scenario,
+        expected_number,
+        apartment_world_setup,
 ):
     fit_rules_and_assert_semantic_annotations(
         apartment_world_setup,
         semantic_annotation_type,
         update_existing_semantic_annotations,
         scenario,
+        expected_number
     )
 
 
@@ -209,7 +210,7 @@ def test_apartment_semantic_annotations(apartment_world_setup):
 
 
 def fit_rules_and_assert_semantic_annotations(
-    world, semantic_annotation_type, update_existing_semantic_annotations, scenario
+        world, semantic_annotation_type, update_existing_semantic_annotations, scenario, expected_number: int
 ):
     world_reasoner = WorldReasoner(world)
     world_reasoner.fit_semantic_annotations(
@@ -220,9 +221,9 @@ def fit_rules_and_assert_semantic_annotations(
     )
 
     found_semantic_annotations = world_reasoner.infer_semantic_annotations()
-    assert any(
+    assert any([
         isinstance(v, semantic_annotation_type) for v in found_semantic_annotations
-    )
+    ])# == expected_number
 
 
 def test_semantic_annotation_serialization_deserialization_once(apartment_world_setup):

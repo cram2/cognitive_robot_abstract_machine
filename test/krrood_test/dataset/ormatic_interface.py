@@ -24,10 +24,12 @@ import krrood.entity_query_language.predicate
 import krrood.ormatic.alternative_mappings
 import krrood.ormatic.custom_types
 import krrood.ormatic.type_dict
+import krrood.patterns.role.predicates
 import krrood.patterns.role.role
 import krrood.symbol_graph.symbol_graph
 import sqlalchemy.sql.sqltypes
 import test.krrood_test.dataset.example_classes
+import test.krrood_test.dataset.role_and_ontology.classes_for_testing_role_recursion_error
 import test.krrood_test.dataset.role_and_ontology.role_takers_in_another_module
 import test.krrood_test.dataset.role_and_ontology.university_ontology_like_classes_without_descriptors
 import test.krrood_test.dataset.semantic_world_like_classes
@@ -516,6 +518,24 @@ class CabinetDAO_drawers_association(Base, AssociationDataAccessObject):
     )
 
 
+class BaseForRoleRecursionDAO(
+    Base,
+    DataAccessObject[
+        test.krrood_test.dataset.role_and_ontology.classes_for_testing_role_recursion_error.BaseForRoleRecursion
+    ],
+):
+
+    __tablename__ = "BaseForRoleRecursionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    base_attr: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+
 class CallableWrapperDAO(
     Base, DataAccessObject[test.krrood_test.dataset.example_classes.CallableWrapper]
 ):
@@ -554,34 +574,6 @@ class GenericClassDAO(
     __mapper_args__ = {
         "polymorphic_on": "polymorphic_type",
         "polymorphic_identity": "GenericClassDAO",
-    }
-
-
-class GenericClass_floatDAO(
-    GenericClassDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass[float]],
-):
-
-    __tablename__ = "GenericClass_floatDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(GenericClassDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    optional_value: Mapped[typing.Optional[builtins.float]] = mapped_column(
-        use_existing_column=True
-    )
-
-    container: Mapped[typing.List[builtins.float]] = mapped_column(
-        JSON, nullable=False, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "GenericClass_floatDAO",
-        "inherit_condition": database_id == GenericClassDAO.database_id,
     }
 
 
@@ -634,6 +626,34 @@ class GenericClass_PositionDAO(
     }
 
 
+class GenericClass_floatDAO(
+    GenericClassDAO,
+    DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass[float]],
+):
+
+    __tablename__ = "GenericClass_floatDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GenericClassDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    optional_value: Mapped[typing.Optional[builtins.float]] = mapped_column(
+        use_existing_column=True
+    )
+
+    container: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GenericClass_floatDAO",
+        "inherit_condition": database_id == GenericClassDAO.database_id,
+    }
+
+
 class GenericClassAssociationDAO(
     Base,
     DataAccessObject[test.krrood_test.dataset.example_classes.GenericClassAssociation],
@@ -681,6 +701,9 @@ class HasNameDAO(
     )
 
     name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    default_name: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
 
     polymorphic_type: Mapped[str] = mapped_column(
         String(255), nullable=False, use_existing_column=True
@@ -938,6 +961,22 @@ class PersonDAO(
         cascade="all, delete-orphan",
         foreign_keys="[PersonDAO_knows_association.source_persondao_id]",
     )
+
+
+class PersonForRoleRecursionDAO(
+    Base,
+    DataAccessObject[
+        test.krrood_test.dataset.role_and_ontology.classes_for_testing_role_recursion_error.PersonForRoleRecursion
+    ],
+):
+
+    __tablename__ = "PersonForRoleRecursionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
 
 
 class PolymorphicEnumAssociationDAO(
@@ -1220,6 +1259,9 @@ class CourseDAO(
     )
 
     name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    default_name: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
 
     __mapper_args__ = {
         "polymorphic_identity": "CourseDAO",
@@ -1721,6 +1763,9 @@ class PersonInRoleAndOntologyDAO(
     )
 
     name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    default_name: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
 
     works_for_id: Mapped[int] = mapped_column(
         ForeignKey("RecognizedGroupDAO.database_id", use_alter=True),
@@ -1960,7 +2005,7 @@ class PredicateDAO(
 
 
 class HasRoleDAO(
-    PredicateDAO, DataAccessObject[krrood.entity_query_language.predicate.HasRole]
+    PredicateDAO, DataAccessObject[krrood.patterns.role.predicates.HasRole]
 ):
 
     __tablename__ = "HasRoleDAO"
@@ -2012,6 +2057,9 @@ class RecognizedGroupDAO(
     )
 
     name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    default_name: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
 
     members: Mapped[builtins.set[RecognizedGroupDAO_members_association]] = (
         relationship(
@@ -2284,6 +2332,9 @@ class InDirectDiamondShapedInheritanceWhereOneIsRoleDAO(
     )
 
     name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    default_name: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
 
     members: Mapped[
         builtins.set[
@@ -2308,6 +2359,42 @@ class InDirectDiamondShapedInheritanceWhereOneIsRoleDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "InDirectDiamondShapedInheritanceWhereOneIsRoleDAO",
+        "inherit_condition": database_id == RoleDAO.database_id,
+    }
+
+
+class IntermediateForRoleRecursionDAO(
+    RoleDAO,
+    DataAccessObject[
+        test.krrood_test.dataset.role_and_ontology.classes_for_testing_role_recursion_error.IntermediateForRoleRecursion
+    ],
+):
+
+    __tablename__ = "IntermediateForRoleRecursionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoleDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    inter_attr: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    base_id: Mapped[int] = mapped_column(
+        ForeignKey("BaseForRoleRecursionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    base: Mapped[BaseForRoleRecursionDAO] = relationship(
+        "BaseForRoleRecursionDAO",
+        uselist=False,
+        foreign_keys=[base_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "IntermediateForRoleRecursionDAO",
         "inherit_condition": database_id == RoleDAO.database_id,
     }
 
@@ -2429,6 +2516,42 @@ class RoleForTakerInAnotherModuleDAO(
     }
 
 
+class StudentForRoleRecursionDAO(
+    RoleDAO,
+    DataAccessObject[
+        test.krrood_test.dataset.role_and_ontology.classes_for_testing_role_recursion_error.StudentForRoleRecursion
+    ],
+):
+
+    __tablename__ = "StudentForRoleRecursionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoleDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    student_id: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    person_id: Mapped[int] = mapped_column(
+        ForeignKey("PersonForRoleRecursionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    person: Mapped[PersonForRoleRecursionDAO] = relationship(
+        "PersonForRoleRecursionDAO",
+        uselist=False,
+        foreign_keys=[person_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "StudentForRoleRecursionDAO",
+        "inherit_condition": database_id == RoleDAO.database_id,
+    }
+
+
 class RotationMappedDAO(
     SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.RotationMapped]
 ):
@@ -2521,6 +2644,42 @@ class SymbolGraphMappingDAO(
     )
 
 
+class TeacherForRoleRecursionDAO(
+    RoleDAO,
+    DataAccessObject[
+        test.krrood_test.dataset.role_and_ontology.classes_for_testing_role_recursion_error.TeacherForRoleRecursion
+    ],
+):
+
+    __tablename__ = "TeacherForRoleRecursionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoleDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    employee_id: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    person_id: Mapped[int] = mapped_column(
+        ForeignKey("PersonForRoleRecursionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    person: Mapped[PersonForRoleRecursionDAO] = relationship(
+        "PersonForRoleRecursionDAO",
+        uselist=False,
+        foreign_keys=[person_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "TeacherForRoleRecursionDAO",
+        "inherit_condition": database_id == RoleDAO.database_id,
+    }
+
+
 class TestPositionSetDAO(
     Base, DataAccessObject[test.krrood_test.dataset.example_classes.TestPositionSet]
 ):
@@ -2539,6 +2698,29 @@ class TestPositionSetDAO(
             foreign_keys="[TestPositionSetDAO_positions_association.source_testpositionsetdao_id]",
         )
     )
+
+
+class TopForRoleRecursionDAO(
+    RoleDAO,
+    DataAccessObject[
+        test.krrood_test.dataset.role_and_ontology.classes_for_testing_role_recursion_error.TopForRoleRecursion
+    ],
+):
+
+    __tablename__ = "TopForRoleRecursionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoleDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    top_attr: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "TopForRoleRecursionDAO",
+        "inherit_condition": database_id == RoleDAO.database_id,
+    }
 
 
 class TorsoDAO(

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import sys
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, fields
+from copy import copy
+from dataclasses import dataclass, field, fields, Field, is_dataclass
 from functools import lru_cache, cached_property
 
 from typing_extensions import Type, get_origin, Any, Dict, List, TypeVar, Iterator
@@ -52,6 +53,21 @@ class Role(SubClassSafeGeneric[T], Symbol, ABC):
     """
     _role_taker_field_set: bool = field(default=False, init=False)
     _to_set_in_role_taker: Dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # redefine fields of role taker to be init=False, these are fields that are inherited
+        # from bases that the role taker also inherits from
+        for base in cls.__bases__:
+            if not issubclass(cls.get_role_taker_type(), base):
+                continue
+            if not is_dataclass(base):
+                continue
+            for field_ in fields(base):
+                if issubclass(base, Role) and field_.name in ["_role_taker_field_set", "_to_set_in_role_taker", "_conflicting_fields_with_role_taker"]:
+                    continue
+                cls._update_field_kwargs(field_.name, {"init": False}, type_=field_.type)
+                setattr(cls, field_.name, delegate_property(field_.name, cls.role_taker_attribute_name()))
 
     @classmethod
     def has_role(cls, role_taker: T, role_type: Type[Role]) -> bool:
@@ -128,9 +144,13 @@ class Role(SubClassSafeGeneric[T], Symbol, ABC):
         """
         :return: The type of the role taker.
         """
-        type_ = next(
-            f.type for f in fields(cls) if f.name == cls.role_taker_attribute_name()
-        )
+        try:
+            type_ = next(
+                f.type for f in fields(cls) if f.name == cls.role_taker_attribute_name()
+            )
+        except StopIteration:
+            # get it by extracting the generic parameter
+            type_ = get_generic_type_param(cls, Role)[0]
         if isinstance(type_, str):
             type_ = sys.modules[cls.__module__].__dict__[type_]
         if isinstance(type_, TypeVar):
@@ -263,7 +283,7 @@ class Role(SubClassSafeGeneric[T], Symbol, ABC):
         :param role_taker: The role taker instance to update the mapping for.
         """
         wrapped_self = SymbolGraph().get_wrapped_instance(self)
-        wrapped_role_taker = SymbolGraph().get_wrapped_instance(role_taker)
+        wrapped_role_taker = SymbolGraph().ensure_wrapped_instance(role_taker)
         SymbolGraph().add_relation(
             HasRoleTaker(wrapped_self, wrapped_role_taker,
                          self.role_taker_wrapped_field))
@@ -305,3 +325,22 @@ class Role(SubClassSafeGeneric[T], Symbol, ABC):
 
 class HasRoleTaker(PredicateClassRelation[Role]):
     ...
+
+
+def delegate_property(name, role_taker):
+    """
+    Creates a property that delegates to another attribute's attribute.
+    """
+    def getter(self):
+        target = getattr(self, role_taker)
+        return getattr(target, name)
+
+    def setter(self, value):
+        try:
+            target = getattr(self, role_taker)
+        except AttributeError as e:
+            # the role taker is not set yet
+            return
+        setattr(target, name, value)
+
+    return property(getter, setter)

@@ -7,7 +7,7 @@ from krrood.entity_query_language.factories import (
     variable,
     match_variable,
 )
-from krrood.entity_query_language.predicate import HasRole
+from krrood.patterns.role.predicates import HasRole
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wardrobe,
     Door,

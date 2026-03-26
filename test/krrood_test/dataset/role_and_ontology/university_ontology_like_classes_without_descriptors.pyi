@@ -18,6 +18,7 @@ from test.krrood_test.dataset.role_and_ontology.role_takers_in_another_module im
 @dataclass(eq=False)
 class HasName:
     name: str
+    default_name: str = field(default="", kw_only=True)
 
     def __hash__(self): ...
     def __eq__(self, other): ...
@@ -50,6 +51,7 @@ class PersonInRoleAndOntologyMixin(
     PersonInRoleAndOntologyRoleAttributes, HasName, Symbol
 ):
     name: str = field(init=False)
+    default_name: str = field(init=False)
     works_for: RecognizedGroup = field(init=False)
     member_of: List[RecognizedGroup] = field(init=False)
 
@@ -57,10 +59,6 @@ class PersonInRoleAndOntologyMixin(
 class PersonInRoleAndOntology(PersonInRoleAndOntologyRoleAttributes, HasName, Symbol):
     works_for: RecognizedGroup = None
     member_of: List[RecognizedGroup] = field(default_factory=list)
-
-@dataclass(eq=False)
-class SubclassOfARoleTakerMixin(PersonInRoleAndOntologyMixin):
-    introduced_attribute: str = field(init=False)
 
 @dataclass(eq=False)
 class SubclassOfARoleTaker(PersonInRoleAndOntology):
@@ -84,9 +82,7 @@ class CEOAsFirstRole(PersonInRoleAndOntologyMixin, Role[TPerson], Symbol):
 TSubclassOfARoleTaker = TypeVar("TSubclassOfARoleTaker", bound=SubclassOfARoleTaker)
 
 @dataclass(eq=False)
-class SubclassOfRoleThatUpdatesRoleTakerType(
-    SubclassOfARoleTakerMixin, CEOAsFirstRole[TSubclassOfARoleTaker]
-): ...
+class SubclassOfRoleThatUpdatesRoleTakerType(CEOAsFirstRole[TSubclassOfARoleTaker]): ...
 
 @dataclass(eq=False)
 class DirectDiamondShapedInheritanceWhereOneIsRole(

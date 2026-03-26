@@ -20,14 +20,13 @@ from typing_extensions import (
     ClassVar,
     Sized,
     Dict,
-    Generic,
 )
 
 from krrood.patterns.role.role import Role
 from krrood.entity_query_language.utils import T, merge_args_and_kwargs
 from krrood.entity_query_language.core.variable import Variable, InstantiatedVariable
 from krrood.entity_query_language.core.base_expressions import Selectable
-from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
+from krrood.symbol_graph.symbol_graph import Symbol
 
 
 def symbolic_function(
@@ -134,15 +133,6 @@ class HasTypes(HasType):
     """
     A tuple containing Type objects that are associated with this instance.
     """
-
-
-@dataclass(eq=False)
-class HasRole(Predicate, Generic[T]):
-    entity: T
-    role: Type[Role[T]]
-
-    def __call__(self) -> bool:
-        return Role.has_role(self.entity, self.role)
 
 
 @symbolic_function

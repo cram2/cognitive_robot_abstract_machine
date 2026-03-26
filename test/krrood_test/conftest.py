@@ -1,10 +1,9 @@
 import logging
 import os
-import traceback
 from dataclasses import is_dataclass
 
 import pytest
-from sqlalchemy.orm import Session, configure_mappers, sessionmaker
+from sqlalchemy.orm import configure_mappers, sessionmaker
 
 import krrood.entity_query_language.orm.model
 import krrood.symbol_graph.symbol_graph
@@ -13,13 +12,13 @@ from krrood.entity_query_language.predicate import (
     HasTypes,
     HasType,
 )
-from krrood.patterns.role.role import Role
-from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ormatic.alternative_mappings import *  # type: ignore
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_module, create_engine
 from krrood.ormatic.utils import drop_database
+from krrood.patterns.role.role import Role
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 from krrood.utils import recursive_subclasses
 from .dataset import example_classes, semantic_world_like_classes
 from .dataset.example_classes import (
@@ -29,7 +28,8 @@ from .dataset.example_classes import (
     ConceptType,
     JSONSerializableClass,
 )
-from .dataset.role_and_ontology import university_ontology_like_classes_without_descriptors, role_takers_in_another_module
+from .dataset.role_and_ontology import university_ontology_like_classes_without_descriptors, \
+    role_takers_in_another_module, classes_for_testing_role_recursion_error
 from .dataset.semantic_world_like_classes import *
 from .test_eql.conf.world.doors_and_drawers import DoorsAndDrawersWorld
 from .test_eql.conf.world.handles_and_containers import (
@@ -61,6 +61,7 @@ def generate_sqlalchemy_interface():
     all_classes |= set(classes_of_module(semantic_world_like_classes))
     all_classes |= set(classes_of_module(university_ontology_like_classes_without_descriptors))
     all_classes |= set(classes_of_module(role_takers_in_another_module))
+    all_classes |= set(classes_of_module(classes_for_testing_role_recursion_error))
     all_classes |= {Symbol, Role}
 
     # remove classes that don't need persistence
@@ -118,7 +119,6 @@ def pytest_configure(config):
 # conftest module is fully imported, which means the import on the next line
 # would fail if the generated file is stale or missing.
 generate_sqlalchemy_interface()
-
 
 try:
     from .dataset.ormatic_interface import *

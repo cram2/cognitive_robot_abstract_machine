@@ -20,7 +20,8 @@ from ..dataset.role_and_ontology.university_ontology_like_classes_without_descri
     Company,
     ProfessorAsFirstRole,
     Course,
-    RepresentativeAsSecondRole, DelegateAsThirdRole,
+    RepresentativeAsSecondRole, DelegateAsThirdRole, InDirectDiamondShapedInheritanceWhereOneIsRole,
+    DirectDiamondShapedInheritanceWhereOneIsRole,
 )
 
 
@@ -128,6 +129,13 @@ def test_get_roles_of_type():
     assert Role.get_taker_roles_of_type(person, DelegateAsThirdRole) == []
     assert isinstance(Role.get_taker_roles_of_type(person, ProfessorAsFirstRole)[0], ProfessorAsFirstRole)
     assert Role.get_taker_roles_of_type(person, PersonInRoleAndOntology) == []
+
+
+def test_role_that_inherits_from_class_that_role_taker_inherits_from_that_has_default_attributes():
+    person = PersonInRoleAndOntology(name="Bass", default_name="BassDefualt")
+    ceo = DirectDiamondShapedInheritanceWhereOneIsRole(person=person)
+    assert ceo.name == person.name
+    assert ceo.default_name == person.default_name
 
 
 def test_role_taker_associations():
