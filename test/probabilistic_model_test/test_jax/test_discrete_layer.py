@@ -74,7 +74,7 @@ class DiscreteLayerTestCase(unittest.TestCase):
 
         nx_pc = s.probabilistic_circuit
 
-        jax_pc = ProbabilisticCircuit.from_nx(nx_pc)
+        jax_pc = ProbabilisticCircuit.from_rustworkx(nx_pc)
         discrete_layer = jax_pc.root.child_layers[0]
 
         self.assertIsInstance(discrete_layer, DiscreteLayer)

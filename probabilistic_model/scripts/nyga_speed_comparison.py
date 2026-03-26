@@ -57,7 +57,7 @@ if not load_from_disc:
         variable, min_samples_per_quantile=min_samples_per_quantile
     )
     nx_model.fit(data)
-    jax_model = ProbabilisticCircuit.from_nx(nx_model, True)
+    jax_model = ProbabilisticCircuit.from_rustworkx(nx_model, True)
     if save_to_disc:
         with open(nx_model_path, "w") as f:
             f.write(json.dumps(nx_model.to_json()))

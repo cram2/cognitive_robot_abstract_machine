@@ -62,9 +62,9 @@ variables = infer_variables_from_dataframe(
 
 # create models
 if not load_from_disc:
-    rx_model = JPT(variables, min_samples_leaf=min_samples_leaf)
+    rx_model = JPT(variables, min_samples_per_leaf=min_samples_leaf)
     rx_model = rx_model.fit(df)
-    jax_model = ProbabilisticCircuit.from_nx(rx_model, True)
+    jax_model = ProbabilisticCircuit.from_rustworkx(rx_model, True)
     if save_to_disc:
         with open(nx_model_path, "w") as f:
             f.write(json.dumps(rx_model.to_json()))

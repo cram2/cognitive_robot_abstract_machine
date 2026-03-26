@@ -9,14 +9,11 @@ from jpt.learning.impurity import Impurity
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from random_events.product_algebra import VariableMap
-from random_events.variable import Variable
+from random_events.variable import Variable, Continuous, Integer, Symbolic
 from typing_extensions import Self
 
 from probabilistic_model.learning.jpt.variables import (
-    Continuous,
-    Integer,
-    Symbolic,
-    ScaledContinuous,
+    AnnotatedVariable
 )
 from probabilistic_model.learning.nyga_distribution import NygaDistribution
 from probabilistic_model.distributions.distributions import (
@@ -39,18 +36,18 @@ class JPT(SubclassJSONSerializer):
     Class that implements the JPT learning algorithm for probabilistic circuits.
     """
 
-    variables: Tuple[Variable, ...]
+    annotated_variables: Iterable[AnnotatedVariable]
     """
     The variables from initialization. Since variables will be overwritten as soon as the model is learned,
     we need to store the variables from initialization here.
     """
 
-    targets: Optional[Tuple[Variable, ...]] = field(default=None)
+    targets: Optional[Iterable[Variable]] = field(default=None)
     """
     The variables to optimize for.
     """
 
-    features: Optional[Tuple[Variable, ...]] = field(default=None)
+    features: Optional[Iterable[Variable]] = field(default=None)
     """
     The variables that are used to craft criteria.
     """
@@ -117,7 +114,7 @@ class JPT(SubclassJSONSerializer):
     """
 
     def __post_init__(self):
-        self.variables = tuple(sorted(self.variables))
+        self.annotated_variables = tuple(sorted(self.annotated_variables))
         self.set_targets_and_features(self.targets, self.features)
 
         if self.dependencies is None:
@@ -126,6 +123,10 @@ class JPT(SubclassJSONSerializer):
             )
 
         self.probabilistic_circuit = ProbabilisticCircuit()
+
+    @property
+    def variables(self) -> Tuple[Variable, ...]:
+        return tuple(annotated_variable.variable for annotated_variable in self.annotated_variables)
 
     def set_targets_and_features(
         self,
@@ -226,8 +227,6 @@ class JPT(SubclassJSONSerializer):
 
         for variable_index, variable in enumerate(self.variables):
             column = data[variable.name]
-            if isinstance(variable, ScaledContinuous):
-                column = variable.encode(column)
             if isinstance(variable, Symbolic):
                 all_elements = {
                     element: index
@@ -315,24 +314,24 @@ class JPT(SubclassJSONSerializer):
         result = ProductUnit(probabilistic_circuit=self.probabilistic_circuit)
         result.total_samples = len(data)
 
-        for index, variable in enumerate(self.variables):
-            if isinstance(variable, Continuous):
+        for index, annotated_variable in enumerate(self.annotated_variables):
+            if isinstance(annotated_variable.variable, Continuous):
                 distribution = NygaDistribution(
-                    variable,
-                    min_likelihood_improvement=variable.min_likelihood_improvement,
-                    min_samples_per_quantile=variable.min_samples_per_quantile,
+                    annotated_variable.variable,
+                    min_likelihood_improvement=annotated_variable.min_likelihood_improvement,
+                    min_samples_per_quantile=annotated_variable.min_samples_per_quantile,
                 )
                 distribution = distribution.fit(data[:, index])
 
                 if isinstance(distribution.root, DiracDeltaDistribution):
-                    distribution.root.density_cap = 1 / variable.minimal_distance
+                    distribution.root.density_cap = 1 / annotated_variable.minimal_distance
                 nyga_root = distribution.root
                 new_nodes = self.probabilistic_circuit.mount(nyga_root)
                 result.add_subcircuit(new_nodes[nyga_root.index])
 
-            elif isinstance(variable, Symbolic):
+            elif isinstance(annotated_variable.variable, Symbolic):
                 distribution = SymbolicDistribution(
-                    variable=variable, probabilities=MissingDict(float)
+                    variable=annotated_variable.variable, probabilities=MissingDict(float)
                 )
                 distribution.fit_from_indices(data[:, index].astype(int))
                 distribution = UnivariateDiscreteLeaf(
@@ -340,9 +339,9 @@ class JPT(SubclassJSONSerializer):
                 )
                 result.add_subcircuit(distribution)
 
-            elif isinstance(variable, Integer):
+            elif isinstance(annotated_variable.variable, Integer):
                 distribution = IntegerDistribution(
-                    variable=variable, probabilities=MissingDict(float)
+                    variable=annotated_variable.variable, probabilities=MissingDict(float)
                 )
                 distribution.fit(data[:, index])
                 distribution = UnivariateDiscreteLeaf(
@@ -351,7 +350,7 @@ class JPT(SubclassJSONSerializer):
                 result.add_subcircuit(distribution)
 
             else:
-                raise ValueError(f"Variable {variable} is not supported.")
+                raise ValueError(f"Variable {annotated_variable} is not supported.")
 
         return result
 
@@ -406,7 +405,16 @@ class JPT(SubclassJSONSerializer):
             [len(variable.domain.simple_sets) for variable in self.symbolic_variables]
         )
         max_variances = np.array(
-            [variable.std**2 for variable in self.numeric_variables]
+            [annotated_variable.std**2 for annotated_variable in self.annotated_variables]
+        )
+
+        min_impurity_improvement = np.array(
+            [
+                annotated_variable.min_impurity_improvement
+                for annotated_variable in self.annotated_variables
+                if annotated_variable.variable in self.features
+            ],
+            dtype=float,
         )
 
         dependency_indices = dict()
@@ -428,6 +436,7 @@ class JPT(SubclassJSONSerializer):
             symbolic_features,
             symbols,
             max_variances,
+            min_impurity_improvement,
             dependency_indices,
         )
 
@@ -443,7 +452,7 @@ class JPT(SubclassJSONSerializer):
 
     def empty_copy(self):
         result = self.__class__(
-            variables=self.variables,
+            annotated_variables=self.annotated_variables,
             targets=self.targets,
             features=self.features,
             min_samples_per_leaf=self.min_samples_leaf,
@@ -455,8 +464,8 @@ class JPT(SubclassJSONSerializer):
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
-        result["variables_from_init"] = [
-            to_json(variable) for variable in self.variables
+        result["annotated_variables_from_init"] = [
+            to_json(variable) for variable in self.annotated_variables
         ]
         result["targets"] = [variable.name for variable in self.targets]
         result["features"] = [variable.name for variable in self.features]
@@ -471,14 +480,14 @@ class JPT(SubclassJSONSerializer):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        variable_from_init = [
-            from_json(variable) for variable in data["variables_from_init"]
+        annotated_variable_from_init: List[AnnotatedVariable] = [
+            from_json(annotated_variable) for annotated_variable in data["annotated_variables_from_init"]
         ]
-        name_to_variable_map = {
-            variable.name: variable for variable in variable_from_init
+        name_to_variable_map: Dict[str, Variable] = {
+            annotated_variable.variable.name: annotated_variable.variable for annotated_variable in annotated_variable_from_init
         }
-        targets = [name_to_variable_map[name] for name in data["targets"]]
-        features = [name_to_variable_map[name] for name in data["features"]]
+        targets: List[Variable] = [name_to_variable_map[name] for name in data["targets"]]
+        features: List[Variable] = [name_to_variable_map[name] for name in data["features"]]
         _min_samples_leaf = data["min_samples_per_leaf"]
         min_impurity_improvement = data["min_impurity_improvement"]
         max_leaves = data["max_leaves"]
@@ -492,7 +501,7 @@ class JPT(SubclassJSONSerializer):
             }
         )
         result = cls(
-            variables=variable_from_init,
+            annotated_variables=annotated_variable_from_init,
             targets=targets,
             features=features,
             min_samples_per_leaf=_min_samples_leaf,

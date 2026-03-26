@@ -226,8 +226,9 @@ class TruncatedGaussianDistribution(
 
     def rejection_sample(self, amount: int) -> npt.NDArray:
         """
+        Rejection sample from the distribution.
         .. note::
-            This uses rejection sampling and hence is inefficient.
+            Be aware that this may be inefficient.
             The acceptance probability is self.normalizing_constant.
 
         """

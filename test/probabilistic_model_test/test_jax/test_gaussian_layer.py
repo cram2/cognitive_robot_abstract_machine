@@ -48,7 +48,7 @@ class GaussianLayerTestCase(unittest.TestCase):
         s.add_subcircuit(g2, 0.5)
         s.add_subcircuit(g1, 0.5)
 
-        jax_pc = ProbabilisticCircuit.from_nx(nx_pc)
+        jax_pc = ProbabilisticCircuit.from_rustworkx(nx_pc)
         gaussian_layer = jax_pc.root.child_layers[0]
         self.assertIsInstance(gaussian_layer, GaussianLayer)
         gaussian_layer.validate()

@@ -3,27 +3,26 @@ import json
 import math
 import random
 import tempfile
-from dataclasses import dataclass
 from datetime import datetime
-from enum import IntEnum, Enum
+from enum import Enum
 
 import numpy as np
 import pandas as pd
 import sklearn.datasets
-from jpt import infer_from_dataframe as old_infer_from_dataframe
 from jpt.learning.impurity import Impurity
+from jpt.variables import infer_from_dataframe as old_infer_from_dataframe
 from jpt.trees import JPT as OldJPT
+from jpt.learning.preprocessing import preprocess_data as old_preprocess_data
 from krrood.adapters.json_serializer import to_json, from_json
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
-from random_events.variable import Continuous
+from random_events.variable import Continuous, Symbolic, Integer
+from random_events.set import Set
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.learning.jpt.jpt import JPT
 from probabilistic_model.learning.jpt.variables import (
-    ScaledContinuous,
     infer_variables_from_dataframe,
-    Integer,
-    Symbolic,
+    AnnotatedVariable,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
@@ -49,26 +48,24 @@ class SymbolEnum(Enum):
 
 
 class VariableTestCase(unittest.TestCase):
-    variable: ScaledContinuous = ScaledContinuous(name="x", mean=2, std=3)
-
-    def test_encode(self):
-        self.assertEqual(self.variable.encode(2), 0)
-        self.assertEqual(self.variable.encode(5), 1)
-        self.assertEqual(self.variable.encode(0), -2 / 3)
-
-    def test_decode(self):
-        self.assertEqual(self.variable.decode(0), 2)
-        self.assertEqual(self.variable.decode(1), 5)
-        self.assertEqual(self.variable.decode(-2 / 3), 0)
+    integer = Integer(name="x")
+    continuous = Continuous(name="x")
+    symbolic = Symbolic(name="x", domain=Set.from_iterable(SymbolEnum))
 
     def test_serialization_integer(self):
-        variable = Integer("x", 2, 1)
+        variable = AnnotatedVariable(self.integer, 2, 1)
         serialized = to_json(variable)
         deserialized = from_json(serialized)
         self.assertEqual(variable, deserialized)
 
     def test_serialization_continuous(self):
-        variable = ScaledContinuous("x", 2, 3, 1.0, 0.1, 10)
+        variable = AnnotatedVariable(self.continuous, 2, 3, 1.0, 0.1, 10)
+        serialized = to_json(variable)
+        deserialized = from_json(serialized)
+        self.assertEqual(variable, deserialized)
+
+    def test_serialization_symbolic(self):
+        variable = AnnotatedVariable(self.symbolic)
         serialized = to_json(variable)
         deserialized = from_json(serialized)
         self.assertEqual(variable, deserialized)
@@ -95,19 +92,12 @@ class InferFromDataFrameTestCase(unittest.TestCase):
 
     def test_infer_from_dataframe_with_scaling(self):
         real, integer, symbol = infer_variables_from_dataframe(
-            self.data, scale_continuous_types=True
+            self.data
         )
-        self.assertEqual(real.name, "real")
-        self.assertIsInstance(real, ScaledContinuous)
-        self.assertEqual(integer.name, "integer")
-        self.assertEqual(symbol.name, "symbol")
-        self.assertLess(real.minimal_distance, 1.0)
-
-    def test_infer_from_dataframe_without_scaling(self):
-        real, integer, symbol = infer_variables_from_dataframe(
-            self.data, scale_continuous_types=False
-        )
-        self.assertNotIsInstance(real, ScaledContinuous)
+        self.assertEqual(real.variable.name, "real")
+        self.assertEqual(integer.variable.name, "integer")
+        self.assertEqual(symbol.variable.name, "symbol")
+        self.assertLessEqual(real.minimal_distance, 1.0)
 
     def test_unknown_type(self):
         df = pd.DataFrame()
@@ -118,9 +108,6 @@ class InferFromDataFrameTestCase(unittest.TestCase):
 
 class JPTTestCase(unittest.TestCase):
     data: pd.DataFrame
-    real: ScaledContinuous
-    integer: Integer
-    symbol: Symbolic
     model: JPT
 
     def setUp(self):
@@ -133,9 +120,9 @@ class JPTTestCase(unittest.TestCase):
         data["symbol"] = random.choices(list(SymbolEnum), k=100)
         self.data = data
         self.real, self.integer, self.symbol = infer_variables_from_dataframe(
-            self.data, scale_continuous_types=False
+            self.data
         )
-        self.model = JPT(variables=[self.real, self.integer, self.symbol])
+        self.model = JPT(annotated_variables=[self.real, self.integer, self.symbol])
 
     def test_construct_impurity(self):
         impurity = self.model.construct_impurity()
@@ -177,8 +164,7 @@ class JPTTestCase(unittest.TestCase):
         )
 
         # check that all likelihoods are greater than 0
-        preprocessed_data = self.model.preprocess_data(self.data)
-        likelihood = pc.likelihood(preprocessed_data)
+        likelihood = pc.likelihood(self.data.to_numpy())
 
         self.assertTrue(all(likelihood > 0))
 
@@ -191,7 +177,7 @@ class JPTTestCase(unittest.TestCase):
             min_samples_leaf=self.model.min_samples_leaf,
             min_impurity_improvement=self.model.min_impurity_improvement,
         )
-        original_preprocessing = original_jpt._preprocess_data(self.data)
+        original_preprocessing = old_preprocess_data(original_jpt, self.data).to_numpy()
         own_preprocessing = self.model.preprocess_data(self.data)
 
         # Symbolic columns are not preprocessed in order in JPTs. The difference is intended
@@ -273,10 +259,10 @@ class BreastCancerTestCase(unittest.TestCase):
         df["malignant"] = target
         cls.data = df
         variables = infer_variables_from_dataframe(
-            cls.data, scale_continuous_types=False, min_samples_per_quantile=600
+            cls.data, min_samples_per_quantile=600
         )
 
-        cls.model = JPT(variables=variables, min_samples_per_leaf=0.4)
+        cls.model = JPT(annotated_variables=variables, min_samples_per_leaf=0.4)
         cls.pc = cls.model.fit(cls.data)
 
     def test_serialization(self):
@@ -347,9 +333,9 @@ class MNISTTestCase(unittest.TestCase):
         df["digit"] = df["digit"].astype(str)
 
         variables = infer_variables_from_dataframe(
-            df, scale_continuous_types=False, min_likelihood_improvement=0.01
+            df, min_likelihood_improvement=0.01
         )
-        cls.model = JPT(variables=variables, min_samples_per_leaf=0.1)
+        cls.model = JPT(annotated_variables=variables, min_samples_per_leaf=0.1)
         cls.model.fit(df)
 
     def test_serialization(self):
@@ -374,8 +360,8 @@ import plotly.graph_objects as go
 
 
 class GaussianJPTTestCase(unittest.TestCase):
-    x: Continuous
-    y: Continuous
+    x: AnnotatedVariable
+    y: AnnotatedVariable
 
     data: pd.DataFrame
     multivariate_normal: ProbabilisticCircuit
@@ -394,7 +380,8 @@ class GaussianJPTTestCase(unittest.TestCase):
         )
 
         cls.x, cls.y = infer_variables_from_dataframe(
-            cls.data, scale_continuous_types=False, min_samples_per_quantile=20
+            cls.data,
+            min_samples_per_quantile=20
         )
 
     def test_plot_2d_jpt(self):

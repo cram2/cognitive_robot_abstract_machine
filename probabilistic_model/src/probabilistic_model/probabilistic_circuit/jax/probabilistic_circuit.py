@@ -55,7 +55,7 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
         return self.root.log_likelihood_of_nodes(x)[:, 0]
 
     @classmethod
-    def from_nx(
+    def from_rustworkx(
         cls, pc: NXProbabilisticCircuit, progress_bar: bool = False
     ) -> ProbabilisticCircuit:
         """
@@ -86,12 +86,12 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
 
         return cls(pc.variables, root)
 
-    def to_nx(self, progress_bar: bool = True) -> NXProbabilisticCircuit:
+    def to_rustworkx(self, progress_bar: bool = True) -> NXProbabilisticCircuit:
         """
-        Convert the probabilistic circuit to a networkx graph.
+        Convert the probabilistic circuit to a rustworkx graph.
 
         :param progress_bar: Whether to show a progress bar.
-        :return: The networkx graph.
+        :return: The rustworkx graph.
         """
         if progress_bar:
             number_of_edges = self.root.number_of_components
@@ -229,7 +229,7 @@ class ClassificationCircuit(ProbabilisticCircuit):
 
         return ProbabilisticCircuit(new_variables, root)
 
-    def to_nx(self, progress_bar: bool = True) -> NXProbabilisticCircuit:
+    def to_rustworkx(self, progress_bar: bool = True) -> NXProbabilisticCircuit:
         raise NotImplementedError(
             "ClassificationCircuit does not support to_nx. "
             "Call 'to_probabilistic_circuit' first."

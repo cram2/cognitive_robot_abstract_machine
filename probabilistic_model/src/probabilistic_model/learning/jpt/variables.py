@@ -1,155 +1,114 @@
-from dataclasses import dataclass, field
-import numpy as np
+from dataclasses import dataclass, field, MISSING, fields
+from typing import Union, Optional
 import pandas as pd
+
+from krrood.utils import get_default_value
+from random_events.variable import Continuous, Integer, Symbolic
+from pandas.core.dtypes.common import is_integer_dtype, is_float_dtype, is_bool_dtype
 from random_events.set import Set
-from random_events.variable import (
-    Variable,
-    Continuous as REContinuous,
-    Integer as REInteger,
-    Symbolic,
-)
-from typing_extensions import Self, List, Any, Dict
+from typing_extensions import List, Any
+
+
+
+
+@dataclass
+class AnnotatedVariable:
+    """
+    AnnotatedVariable is a wrapper around the variables that are used in the JPTs.
+    They consist of an association object and some additional parameters.
+    """
+
+    variable: Union[Continuous, Integer, Symbolic]
+    """
+    An association object.
+    """
+
+    mean: Optional[float] = field(default=0)
+    """
+    Mean of the random variable.
+    """
+
+    std: Optional[float] = field(default=1)
+    """
+    Standard Deviation of the random variable.
+    """
+
+    minimal_distance: Optional[float] = field(default=1.0)
+    """
+    The minimal distance between two values of the variable.
+    """
+
+    min_likelihood_improvement: Optional[float] = field(default=0.1)
+    """
+    The minimum likelihood improvement passed to the Nyga Distributions.
+    """
+
+    min_samples_per_quantile: Optional[int] = field(default=10)
+    """
+    The minimum number of samples per quantile passed to the Nyga Distributions.
+    """
+
+    min_impurity_improvement: Optional[float] = field(default=0)
+    """
+    The minimum impurity improvement for JPT learning.
+    """
+
+    def __lt__(self, other):
+        return self.variable < other.variable
 
 
 def infer_variables_from_dataframe(
-    data: pd.DataFrame,
-    scale_continuous_types: bool = False,
-    min_likelihood_improvement: float = 0.1,
-    min_samples_per_quantile: int = 10,
-) -> List[Variable]:
+        data: pd.DataFrame,
+        minimal_distance: float = 1.0,
+        min_likelihood_improvement: float = 0.1,
+        min_samples_per_quantile: int = 10,
+        min_impurity_improvement: float = 0,
+) -> List[AnnotatedVariable]:
     """
     Infer the variables from a dataframe.
     The variables are inferred by the column names and types of the dataframe.
 
     :param data: The dataframe to infer the variables from.
-    :param scale_continuous_types: Whether to scale numeric types.
+    :param minimal_distance: The minimal distance between two values of the variable.
     :param min_likelihood_improvement: The minimum likelihood improvement passed to the Continuous Variables.
     :param min_samples_per_quantile: The minimum number of samples per quantile passed to the Continuous Variables.
+    :param min_impurity_improvement: The minimum impurity improvement for JPT learning.
     :return: The inferred variables.
     """
     result = []
 
     for column, datatype in zip(data.columns, data.dtypes):
-
-        unique_values = data[column].unique()
-
-        # handle continuous variables
-        if np.issubdtype(datatype, np.number) and datatype != int:
-
-            if len(unique_values) == 1:
-                minimal_distance_between_values = 1.0
-            else:
-                minimal_distance_between_values = np.diff(np.sort(unique_values)).min()
+        domain = None
+        mean = get_default_value(AnnotatedVariable, "mean")
+        std = get_default_value(AnnotatedVariable, "std")
+        if is_integer_dtype(datatype):
+            variable_class = Integer
             mean = data[column].mean()
             std = data[column].std()
-
-            # select the correct class type
-            if scale_continuous_types:
-                variable_class = ScaledContinuous
-
-            else:
-                variable_class = Continuous
-
-            variable = variable_class(
-                column,
-                mean,
-                std,
-                minimal_distance_between_values,
-                min_likelihood_improvement,
-                min_samples_per_quantile,
-            )
-
-        # handle discrete variables
-        elif datatype in [object, int]:
-            if datatype == int:
-                mean = data[column].mean()
-                std = data[column].std()
-                variable = Integer(column, mean, std)
-            elif datatype == object:
-                unique_values = data[column].unique()
-                # unique_values.sort()
-                # enum = IntEnum(column, {value: index for index, value in enumerate(unique_values)})
-                variable = Symbolic(
-                    name=column, domain=Set.from_iterable(unique_values)
-                )
-            else:
-                raise ValueError(
-                    f"Datatype {datatype} of column {column} is not supported."
-                )
-
+        elif is_float_dtype(datatype):
+            variable_class = Continuous
+            mean = data[column].mean()
+            std = data[column].std()
+        elif is_bool_dtype(datatype):
+            variable_class = Symbolic
+            domain = Set.from_iterable([True, False])
+        elif data[column].dtype == object:
+            unique_values = data[column].unique()
+            variable_class = Symbolic
+            domain = Set.from_iterable(unique_values)
         else:
-            raise ValueError(
-                f"Datatype {datatype} of column {column} is not supported."
-            )
+            raise ValueError(f"Unsupported datatype: {datatype}")
 
-        result.append(variable)
+        domain = domain or get_default_value(variable_class, "domain")
+        variable = variable_class(name=column, domain=domain)
+        annotated_variable = AnnotatedVariable(variable=variable,
+                                               mean=mean,
+                                               std=std,
+                                               minimal_distance=minimal_distance,
+                                               min_likelihood_improvement=min_likelihood_improvement,
+                                               min_samples_per_quantile=min_samples_per_quantile,
+                                               min_impurity_improvement=min_impurity_improvement, )
 
+        result.append(annotated_variable)
     return result
 
-
-@dataclass
-class Integer(REInteger):
-    mean: float
-    """
-    Mean of the random variable.
-    """
-
-    std: float
-    """
-    Standard Deviation of the random variable.
-    """
-
-    def __eq__(self, other):
-        return super().__eq__(other)
-
-    def __hash__(self):
-        return hash(self.name)
-
-
-@dataclass(eq=False)
-class Continuous(REContinuous):
-    """
-    Base class for continuous variables in JPTs. This class does not standardize the data,
-    but needs to know mean and std anyway.
-    """
-
-    mean: float
-    """
-    Mean of the random variable.
-    """
-
-    std: float
-    """
-    Standard Deviation of the random variable.
-    """
-
-    minimal_distance: float = field(default=1.0)
-    """
-    The minimal distance between two values of the variable.
-    """
-
-    min_likelihood_improvement: float = field(default=0.1)
-    """
-    The minimum likelihood improvement passed to the Nyga Distributions.
-    """
-
-    min_samples_per_quantile: int = field(default=10)
-    """
-    The minimum number of samples per quantile passed to the Nyga Distributions.
-    """
-
-
-@dataclass
-class ScaledContinuous(Continuous):
-    """
-    A continuous variable that is standardized.
-    """
-
-    def encode(self, value: Any):
-        return (value - self.mean) / self.std
-
-    def decode(self, value: float) -> float:
-        return value * self.std + self.mean
-
-    def __str__(self):
-        return f"{self.__class__.__name__}({self.name}, {self.mean}, {self.std}, {self.minimal_distance})"

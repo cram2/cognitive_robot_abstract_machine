@@ -83,7 +83,7 @@ if not load_from_disc:
     result.normalize()
 
     nx_model = result.probabilistic_circuit
-    jax_model = ProbabilisticCircuit.from_nx(nx_model, True)
+    jax_model = ProbabilisticCircuit.from_rustworkx(nx_model, True)
 
     if save_to_disc:
         with open(nx_model_path, "w") as f:
@@ -136,7 +136,7 @@ fig = px.line(x=range(len(losses)), y=losses, title="Average negative log likeli
 fig.show()
 
 jax_model.root = root
-nx_model = jax_model.to_nx(True)
+nx_model = jax_model.to_rustworkx(True)
 fig = go.Figure(nx_model.plot(), nx_model.plotly_layout())
 fig.update_layout(title="Fitted model guess")
 fig.show()

@@ -130,13 +130,13 @@ class CouplingCircuit4DTestCase(unittest.TestCase):
             samples, columns=[f"x_{i}" for i in range(cls.number_of_variables)]
         )
         variables = infer_variables_from_dataframe(df, min_samples_per_quantile=30)
-        jpt = JPT(variables=tuple(variables), min_samples_per_leaf=0.1)
+        jpt = JPT(annotated_variables=variables, min_samples_per_leaf=0.1)
         cls.non_marginalized_jpt = jpt.fit(df)
 
         cls.jpt = cls.non_marginalized_jpt.marginal(
-            variables[cls.number_of_variables // 2 :]
+            jpt.variables[cls.number_of_variables // 2 :]
         )
-        circuit = ProbabilisticCircuit.from_nx(cls.jpt, False)
+        circuit = ProbabilisticCircuit.from_rustworkx(cls.jpt, False)
         conditioner = LinearConditioner(
             cls.number_of_variables // 2, circuit.root.number_of_trainable_parameters
         )
