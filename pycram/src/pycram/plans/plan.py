@@ -169,6 +169,8 @@ class Plan:
             return
         self.add_plan_entity(node)
         node.index = self.plan_graph.add_node(node)
+        if len(self.plan_graph.nodes()) == 1:
+            node.layer_index = 0
 
     def add_edge(
         self, source: PlanNode, target: PlanNode, target_index: Optional[int] = None
