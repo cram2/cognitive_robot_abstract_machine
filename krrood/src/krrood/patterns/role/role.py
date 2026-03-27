@@ -7,7 +7,8 @@ from functools import lru_cache, cached_property
 
 from typing_extensions import Type, get_origin, Any, Dict, List, TypeVar, Iterator
 
-from krrood.class_diagrams.utils import T
+from krrood.class_diagrams.utils import T, role_aware_nearest_common_ancestor, role_aware_all_nearest_common_ancestors, \
+    all_nearest_common_ancestors
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -57,26 +58,25 @@ class Role(SubClassSafeGeneric[T], Symbol, ABC):
         super().__init_subclass__(**kwargs)
         # redefine fields of role taker to be init=False, these are fields that are inherited
         # from bases that the role taker also inherits from
-        for base in cls.__bases__:
-            if not is_dataclass(base):
+        for common_base in all_nearest_common_ancestors((cls.get_role_taker_type(), cls)):
+            if common_base in [ABC, object, Role]:
                 continue
-            if base is Role:
+            if not is_dataclass(common_base):
                 continue
-            conflicting_fields = [base_field for base_field in fields(base) for cls_field in fields(cls) if
-                                  base_field == cls_field]
-            for field_ in conflicting_fields:
+            for field_ in fields(common_base):
                 if not field_.init:
                     continue
                 if field_.name == cls.role_taker_attribute_name():
                     continue
-                if issubclass(base, Role) and field_.name in Role.__annotations__:
+                if issubclass(common_base, Role) and field_.name in Role.__annotations__:
                     continue
-                if hasattr(base, field_.name) and isinstance(getattr(base, field_.name), property):
+                if hasattr(common_base, field_.name) and isinstance(getattr(common_base, field_.name), property):
+                    # That means this field was already seen before and was assigned a property.
                     continue
                 type_ = field_.type
                 if isinstance(field_.type, str):
                     try:
-                        type_ = eval(field_.type, sys.modules[base.__module__].__dict__)
+                        type_ = eval(field_.type, sys.modules[common_base.__module__].__dict__)
                     except NameError:
                         pass
                 cls._update_field_kwargs(field_.name, {"init": False}, type_=type_)

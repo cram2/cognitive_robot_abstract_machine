@@ -10,7 +10,7 @@ from typing import Callable, Any, Dict, get_args, get_origin, Union
 from uuid import UUID
 
 import typing_extensions
-from typing_extensions import List, Type, Any, Dict, TypeVar, Tuple, Iterable
+from typing_extensions import List, Type, Any, Dict, TypeVar, Tuple, Iterable, Iterator
 from typing_extensions import TypeVar
 
 from krrood.class_diagrams.exceptions import CouldNotResolveType
@@ -198,24 +198,47 @@ def issubclass_or_role(child: Type, parent: Type | Tuple[Type, ...]) -> bool:
 
 
 @lru_cache
-def role_aware_nearest_common_ancestor(classes):
+def nearest_common_ancestor(classes):
+    return next(all_nearest_common_ancestors(classes), None)
+
+
+def all_nearest_common_ancestors(classes) -> Iterator[Type]:
     if not classes:
-        return None
+        return
+    method_resolution_orders = {cls: copy(cls.mro()) for cls in classes}
+    yield from _all_nearest_common_ancestors_from_classes_method_resolution_order(method_resolution_orders)
+
+
+
+@lru_cache
+def role_aware_nearest_common_ancestor(classes):
+    return next(role_aware_all_nearest_common_ancestors(classes), None)
+
+
+def role_aware_all_nearest_common_ancestors(classes) -> Iterator[Type]:
+    if not classes:
+        return
 
     from krrood.patterns.role.role import Role
 
     # Get MROs as lists
-    mros = {cls: copy(cls.mro()) for cls in classes}
-    for cls, mro in mros.items():
-        if Role not in mro:
+    method_resolution_orders = {cls: copy(cls.mro()) for cls in classes}
+    for cls, method_resolution_order in method_resolution_orders.items():
+        if Role not in method_resolution_order:
             continue
-        rol_idx = mro.index(Role)
-        mro[rol_idx] = cls.get_role_taker_type()
+        rol_idx = method_resolution_order.index(Role)
+        method_resolution_order[rol_idx] = cls.get_role_taker_type()
 
+    yield from _all_nearest_common_ancestors_from_classes_method_resolution_order(method_resolution_orders)
+
+
+def _all_nearest_common_ancestors_from_classes_method_resolution_order(method_resolution_orders: Dict[Type, List[Type]]) -> Iterator[Type]:
     # Iterate in MRO order of the first class
-    mros_values = list(mros.values())
-    for candidate in mros_values[0]:
-        if all(candidate in mro for mro in mros_values[1:]):
-            return candidate
-
-    return None
+    method_resolution_orders_values = list(method_resolution_orders.values())
+    seen_candidates = set()
+    for candidate in method_resolution_orders_values[0]:
+        if any(issubclass(seen_candidate, candidate) for seen_candidate in seen_candidates):
+            continue
+        if all(candidate in mro for mro in method_resolution_orders_values[1:]):
+            seen_candidates.add(candidate)
+            yield candidate
