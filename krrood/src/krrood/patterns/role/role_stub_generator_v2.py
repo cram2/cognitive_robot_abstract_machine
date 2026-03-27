@@ -17,7 +17,7 @@ from typing import (
 
 import libcst
 from black.handle_ipynb_magics import lru_cache
-from libcst.codemod import ContextAwareTransformer, CodemodContext, transform_module
+from libcst.codemod import ContextAwareTransformer, CodemodContext
 from libcst.codemod.visitors import AddImportsVisitor
 from typing_extensions import Dict
 import rustworkx as rx
@@ -26,12 +26,9 @@ from krrood.class_diagrams import ClassDiagram
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 from krrood.class_diagrams.utils import classes_of_module
-from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.class_diagrams.wrapped_field import WrappedField, FieldRepresentation
 from krrood.patterns.role.meta_data import RoleType
 from krrood.patterns.role.role import Role
-from krrood.patterns.role.role_stub_generator import (
-    FieldRepresentation,
-)
 from krrood.utils import (
     run_black_on_file,
     run_ruff_on_file,

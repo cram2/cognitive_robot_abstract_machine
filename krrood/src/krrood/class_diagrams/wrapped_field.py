@@ -5,13 +5,13 @@ import inspect
 import logging
 import sys
 from collections.abc import Sequence
-from dataclasses import dataclass, Field, MISSING
+from dataclasses import dataclass, Field, MISSING, field
 from datetime import datetime
 from functools import cached_property, lru_cache
 from inspect import isclass
 from types import NoneType
 from copy import copy
-from typing import Generic
+from typing import Generic, Any
 
 from typing_extensions import (
     get_type_hints,
@@ -275,7 +275,10 @@ class WrappedField:
             return False
         if not isclass(origin) or not issubclass(origin, Generic):
             return False
-        return len(get_args(self.type_endpoint)) > 0 and len(self.type_endpoint.__parameters__) == 0
+        return (
+            len(get_args(self.type_endpoint)) > 0
+            and len(self.type_endpoint.__parameters__) == 0
+        )
 
     @cached_property
     def is_underspecified_generic(self) -> bool:
@@ -359,3 +362,109 @@ def search_class_in_sys_modules(target_class_name: str) -> List[Type]:
                 if obj not in found_classes:
                     found_classes.append(obj)
     return found_classes
+
+
+@dataclass(frozen=True)
+class Assignment:
+    """
+    Represents a name-value pair used for assignments.
+    """
+
+    name: str
+    """
+    The name of the variable or argument.
+    """
+
+    value: Any
+    """
+    The value to be assigned.
+    """
+
+    def __str__(self) -> str:
+        value = repr(self.value) if not isclass(self.value) else self.value.__name__
+        return f"{self.name}={value}"
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+
+@dataclass(frozen=True)
+class FieldRepresentation:
+    """
+    Represents a dataclass field in a stub file.
+    """
+
+    current_field: Field = field(default_factory=field)
+    """
+    The field being represented.
+    """
+
+    @classmethod
+    def from_wrapped_field(
+        cls, wrapped_field: WrappedField, role_related_class: bool = True
+    ) -> FieldRepresentation:
+        """
+        Creates a FieldRepresentation from a WrappedField.
+
+        :param wrapped_field: The wrapped field to represent.
+        :param role_related_class: Whether the field belongs to a role-related class.
+        """
+        current_field = copy(wrapped_field.field)
+        if role_related_class:
+            current_field.kw_only = wrapped_field.field.kw_only or (
+                not wrapped_field.is_required and wrapped_field.field.init
+            )
+        return cls(current_field)
+
+    def __str__(self) -> str:
+        return self.representation
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    @cached_property
+    def representation(self) -> str:
+        """
+        Provide the string representation of the field to be written in the stub file.
+
+        :return: The string representation of the field.
+        """
+        non_default_field_assignments = []
+        from dataclasses import MISSING
+
+        default_field = field()
+        field_arguments = inspect.signature(field).parameters
+        for parameter in field_arguments.values():
+            current_value = getattr(self.current_field, parameter.name)
+            default_value = getattr(default_field, parameter.name)
+
+            # Avoid adding kw_only=False as it is the default behavior and MISSING in field signature
+            if (
+                parameter.name == "kw_only"
+                and current_value is False
+                and default_value is MISSING
+            ):
+                continue
+
+            if current_value != default_value:
+                non_default_field_assignments.append(
+                    Assignment(parameter.name, current_value)
+                )
+
+        if not non_default_field_assignments:
+            return ""
+
+        # Handle simple assignment (e.g., " = value")
+        if (
+            len(non_default_field_assignments) == 1
+            and non_default_field_assignments[0].name == "default"
+        ):
+            return f" = {non_default_field_assignments[0].value!r}"
+
+        # Format as field(...) and clean up type names (e.g., <class 'list'> -> list)
+        args_str = (
+            ", ".join(map(str, non_default_field_assignments))
+            .replace("<class '", "")
+            .replace("'>", "")
+        )
+        return f" = field({args_str})"
