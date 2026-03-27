@@ -60,6 +60,9 @@ class Pipeline(Sequence):
         self.cas: cas.CAS = None
         """The Common Analysis Structure for this pipeline."""
 
+        self._cas_counter: int = 0
+        """Monotonic CAS counter that is local to this pipeline instance."""
+
         self.cas_start_timer: timeit.default_timer = None
         """Timer for measuring pipeline execution time."""
 
@@ -72,7 +75,9 @@ class Pipeline(Sequence):
 
     def create_new_cas(self) -> None:
         """Create a new Common Analysis Structure (CAS) for this pipeline. Also resets the execution timer."""
+        self._cas_counter += 1
         self.cas = cas.CAS()
+        self.cas.cas_id = self._cas_counter
         self.cas_start_timer = timeit.default_timer()
 
     def setup(self, **kwargs: Any) -> bool:

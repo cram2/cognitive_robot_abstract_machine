@@ -86,6 +86,11 @@ class CASViews:
     type: Int
     """
 
+    CAS_ID: str = "cas_id"
+    """Monotonic ID of the CAS instance within a single pipeline run.
+    type: Int
+    """
+
     OBJECT_IMAGE: str = "object_image"
     """Object image data. This view is used in imagistic reasoning pipelines where a 
     rendered scene can be fully segmented per object."""
@@ -218,6 +223,14 @@ class CAS:
     @query.setter
     def query(self, value: Any) -> None:
         self.views[CASViews.QUERY] = value
+
+    @property
+    def cas_id(self) -> Optional[int]:
+        return self.views.get(CASViews.CAS_ID)
+
+    @cas_id.setter
+    def cas_id(self, value: int) -> None:
+        self.views[CASViews.CAS_ID] = value
 
     def get(self, view_name: str) -> Any:
         """Get a view by name.
