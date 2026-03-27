@@ -40,7 +40,7 @@ def init_world_with_entity_tracker() -> WorldEntityWithIDKwargsTracker:
     with _rk_world_lock:
         world = World()
         this.world_entity_tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-        set_world(world)
+        unsafe_set_world(world)
     return this.world_entity_tracker
 
 
@@ -88,7 +88,8 @@ def unsafe_set_world(world: World) -> None:
     """Unsafely set the world state without acquiring the lock.
 
     .. warning::
-        Always acquire the lock manually before calling this method. Take a look at `this.set_world()` for example.
+        Always acquire the lock manually before calling this method. Take a look at `this.set_world()` or
+        `this.init_world_with_entity_tracker()` for example.
 
     :param world: The new world state to set.
     """
