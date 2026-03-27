@@ -139,7 +139,6 @@ class Role(SubClassSafeGeneric[T], Symbol, ABC):
         return res[0] if res else T
 
     @classmethod
-    @lru_cache
     def get_role_taker_type(cls) -> Type[T]:
         """
         :return: The type of the role taker.

@@ -61,6 +61,10 @@ class PersonInRoleAndOntology(PersonInRoleAndOntologyRoleAttributes, HasName, Sy
     member_of: List[RecognizedGroup] = field(default_factory=list)
 
 @dataclass(eq=False)
+class SubclassOfARoleTakerMixin(PersonInRoleAndOntologyMixin):
+    introduced_attribute: str = field(init=False)
+
+@dataclass(eq=False)
 class SubclassOfARoleTaker(PersonInRoleAndOntology):
     introduced_attribute: str = field(default="", kw_only=True)
 
@@ -82,7 +86,9 @@ class CEOAsFirstRole(PersonInRoleAndOntologyMixin, Role[TPerson], Symbol):
 TSubclassOfARoleTaker = TypeVar("TSubclassOfARoleTaker", bound=SubclassOfARoleTaker)
 
 @dataclass(eq=False)
-class SubclassOfRoleThatUpdatesRoleTakerType(CEOAsFirstRole[TSubclassOfARoleTaker]): ...
+class SubclassOfRoleThatUpdatesRoleTakerType(
+    SubclassOfARoleTakerMixin, CEOAsFirstRole[TSubclassOfARoleTaker]
+): ...
 
 @dataclass(eq=False)
 class DirectDiamondShapedInheritanceWhereOneIsRole(
