@@ -3,20 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
-import numpy as np
-from typing_extensions import Union, Optional, Type, Any, Iterable
+from typing_extensions import Optional, Any
 
-from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.robots.abstract_robot import Camera
-from pycram.robot_plans.actions.base import ActionDescription
-from pycram.robot_plans.motions.robot_body import LookingMotion
-from pycram.robot_plans.motions.navigation import MoveMotion
 from pycram.config.action_conf import ActionConfig
-from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.failures import NavigationGoalNotReachedError
-from pycram.language import SequentialPlan
-from pycram.validation.error_checkers import PoseErrorChecker
-from semantic_digital_twin.world import World
+from pycram.plans.factories import execute_single
+from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.motions.navigation import MoveMotion
+from pycram.robot_plans.motions.robot_body import LookingMotion
+from semantic_digital_twin.robots.abstract_robot import Camera
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
 @dataclass
@@ -36,32 +31,9 @@ class NavigateAction(ActionDescription):
     """
 
     def execute(self) -> None:
-        return SequentialPlan(
-            self.context, MoveMotion(self.target_location, self.keep_joint_states)
+        self.add_subplan(
+            execute_single(MoveMotion(self.target_location, self.keep_joint_states))
         ).perform()
-
-    def validate(
-        self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
-    ):
-        pose_validator = PoseErrorChecker(World.conf.get_pose_tolerance())
-        if not pose_validator.is_error_acceptable(
-            World.robot.pose, self.target_location
-        ):
-            raise NavigationGoalNotReachedError(World.robot.pose, self.target_location)
-
-    @classmethod
-    def description(
-        cls,
-        target_location: Union[Iterable[Pose], Pose],
-        keep_joint_states: Union[
-            Iterable[bool], bool
-        ] = ActionConfig.navigate_keep_joint_states,
-    ) -> PartialDesignator[NavigateAction]:
-        return PartialDesignator[NavigateAction](
-            NavigateAction,
-            target_location=target_location,
-            keep_joint_states=keep_joint_states,
-        )
 
 
 @dataclass
@@ -81,9 +53,9 @@ class LookAtAction(ActionDescription):
     """
 
     def execute(self) -> None:
-        camera = self.camera or self.robot_view.get_default_camera()
-        SequentialPlan(
-            self.context, LookingMotion(target=self.target, camera=camera)
+        camera = self.camera or self.robot.get_default_camera()
+        self.add_subplan(
+            execute_single(LookingMotion(target=self.target, camera=camera))
         ).perform()
 
     def validate(
@@ -94,17 +66,3 @@ class LookAtAction(ActionDescription):
         creating a ray from the camera and checking if it intersects with the object.
         """
         return
-
-    @classmethod
-    def description(
-        cls,
-        target: Union[Iterable[Pose], Pose],
-        camera: Optional[Union[Iterable[Camera], Camera]] = None,
-    ) -> PartialDesignator[LookAtAction]:
-        return PartialDesignator[LookAtAction](
-            LookAtAction, target=target, camera=camera
-        )
-
-
-NavigateActionDescription = NavigateAction.description
-LookAtActionDescription = LookAtAction.description

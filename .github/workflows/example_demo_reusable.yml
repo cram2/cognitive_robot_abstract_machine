@@ -1,0 +1,69 @@
+name: Examples and Demos Reusable
+defaults:
+  run:
+    shell: bash -ieo pipefail {0}
+
+on:
+  workflow_call:
+    inputs:
+      script:
+        description: "Script to execute to test the demo or example"
+        required: true
+        type: string
+      repo_lowercase:
+        description: "Lowercase repository name with tag"
+        required: true
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ inputs.repo_lowercase }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: cognitive_robot_abstract_machine
+          submodules: recursive
+
+      - name: Initialize submodules explicitly
+        run: |
+          cd cognitive_robot_abstract_machine
+          git config --global --add safe.directory "*"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
+      - name: Install dependencies
+        run: |
+          cd cognitive_robot_abstract_machine
+          source /opt/ros/cram-env/bin/activate
+          sudo apt-get update
+          sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
+          poetry install
+
+      - name: Restore cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /github/home/.cache/semantic_digital_twin
+          key: ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-cache-${{ inputs.repo_lowercase }}-${{ github.ref_name }}
+            ${{ runner.os }}-cache-${{ inputs.repo_lowercase }}
+            ${{ runner.os }}-cache-
+
+      - name: Build ORM
+        if: ${{inputs.repo_lowercase == 'pycram' || inputs.repo_lowercase == 'semantic_digital_twin'}}
+        run: |
+          cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/cram-env/bin/activate
+          python generate_orm.py
+      - name: Run Script
+        run: |
+
+      - name: Run Script
+        run: |
+          cd cognitive_robot_abstract_machine
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/cram-env/bin/activate
+          ./${{inputs.script}}

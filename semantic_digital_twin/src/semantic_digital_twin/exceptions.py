@@ -1,7 +1,8 @@
-from __future__ import annotations
+from __future__ import annotations, absolute_import
 
+import traceback
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Callable
 from uuid import UUID
 
 from typing_extensions import (
@@ -503,3 +504,30 @@ class BodyHasNoGeometryError(InvalidCollisionCheckError):
             self.message += (
                 f"Body {self.collision_check.body_b.name} has collision geometry."
             )
+
+
+@dataclass
+class AtomicWorldModificationNotAtomic(DataclassException):
+    """
+    Exception raised when atomic world modifications are overlapping.
+    If this exception is raised, it means that somewhere in the code a function decorated with @atomic_world_modification
+    triggered another function decorated with it. This must not happen ever!
+    """
+
+    modification: Callable
+    """
+    The callable that tried to atomically modify the world.
+    """
+
+    world: World
+    """
+    The world where this happened.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"World {self.world} is already being modified atomically by "
+            f"{self.world._current_active_atomic_world_modification.__name__}.\n"
+            f"{self.modification.__name__} tried to perform an atomic world modification anyways."
+        )
+        super().__post_init__()

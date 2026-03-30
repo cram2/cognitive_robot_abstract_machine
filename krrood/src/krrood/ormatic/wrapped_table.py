@@ -8,7 +8,7 @@ from inspect import isclass
 
 from typing_extensions import List, Dict, TYPE_CHECKING, Optional, Set, Type, get_origin
 
-from krrood.ormatic.dao import AlternativeMapping
+from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.utils import InheritanceStrategy
 from krrood.class_diagrams.class_diagram import (
     WrappedClass,
@@ -287,7 +287,7 @@ class WrappedTable:
                     self.wrapped_clazz.index
                 )
             )
-            for parent_wrapped in inheritance_parents:
+            for parent_wrapped in inheritance_parents[::-1]:
                 # Check if this parent has a wrapped table and if the relation is Inheritance
                 # We need to check the actual relation object
                 edge_data = (
@@ -525,6 +525,8 @@ class WrappedTable:
             such as its data type, whether it represents a built-in or user-defined type, or if it has
             specific ORM container properties.
         """
+
+        # check underspecified generic fields
         if (
             wrapped_field.is_underspecified_generic
             and isclass(wrapped_field.type_endpoint)
@@ -747,6 +749,7 @@ class WrappedTable:
         :param wrapped_field: The field to extract the information from.
         """
         self.ormatic.imported_modules.add("typing_extensions")
+        self.ormatic.imported_modules.add(wrapped_field.type_endpoint.__module__)
         column_name = wrapped_field.field.name
         container = Set if issubclass(wrapped_field.container_type, set) else List
         column_type = f"Mapped[{module_and_class_name(container)}[{module_and_class_name(wrapped_field.type_endpoint)}]]"

@@ -132,7 +132,7 @@ def pose_sequence_reachability_validator(
                 CartesianPose(
                     root_link=root,
                     tip_link=tip_link,
-                    goal_pose=pose.to_homogeneous_matrix(),
+                    goal_pose=pose,
                 )
                 for pose in target_sequence
             ]

@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 import abc
-import os
 from abc import ABC
 from dataclasses import dataclass, field
 
 import numpy as np
 from sqlalchemy import select
 
-from sqlalchemy.orm import sessionmaker
+from krrood.ormatic.data_access_objects.helper import get_dao_class
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
@@ -172,10 +170,11 @@ class WorldFromDatabaseConfig(WorldConfig):
         pass
 
     def setup_world(self):
+        ormatic_world_class = get_dao_class(World)
         session = semantic_digital_twin_sessionmaker()()
         world_dao = session.scalar(
-            select(WorldMappingDAO).where(
-                WorldMappingDAO.database_id == self.primary_key
+            select(ormatic_world_class).where(
+                ormatic_world_class.database_id == self.primary_key
             )
         )
         self.world = world_dao.from_dao()

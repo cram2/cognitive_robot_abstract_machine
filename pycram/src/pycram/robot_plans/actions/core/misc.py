@@ -3,6 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
+from typing_extensions import Optional, Type, Any
+
+from pycram.datastructures.enums import DetectionTechnique, DetectionState
+from pycram.perception import PerceptionQuery
+from pycram.robot_plans.actions.base import ActionDescription
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
@@ -10,12 +15,6 @@ from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     SemanticEnvironmentAnnotation,
 )
-from typing_extensions import Union, Optional, Type, Any, Iterable
-
-from pycram.perception import PerceptionQuery
-from pycram.datastructures.enums import DetectionTechnique, DetectionState
-from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.robot_plans.actions.base import ActionDescription
 
 
 @dataclass
@@ -43,9 +42,6 @@ class DetectAction(ActionDescription):
     The region in which the object should be detected
     """
 
-    def __post_init__(self):
-        super().__post_init__()
-
     def execute(self) -> None:
         if not self.object_sem_annotation and self.region:
             raise AttributeError(
@@ -53,13 +49,11 @@ class DetectAction(ActionDescription):
             )
         region_bb = (
             self.region.area.as_bounding_box_collection_in_frame(
-                self.robot_view.root
+                self.robot.root
             ).bounding_box
             if self.region
             else BoundingBox(
-                origin=HomogeneousTransformationMatrix(
-                    reference_frame=self.robot_view.root
-                ),
+                origin=HomogeneousTransformationMatrix(reference_frame=self.robot.root),
                 min_x=-1,
                 min_y=-1,
                 min_z=0,
@@ -71,7 +65,7 @@ class DetectAction(ActionDescription):
         if not self.object_sem_annotation:
             self.object_sem_annotation = SemanticEnvironmentAnnotation
         query = PerceptionQuery(
-            self.object_sem_annotation, region_bb, self.robot_view, self.world
+            self.object_sem_annotation, region_bb, self.robot, self.world
         )
 
         return query.from_world()
@@ -82,24 +76,3 @@ class DetectAction(ActionDescription):
         return
         # if not result:
         #     raise PerceptionObjectNotFound(self.object_designator, self.technique, self.region)
-
-    @classmethod
-    def description(
-        cls,
-        technique: Union[Iterable[DetectionTechnique], DetectionTechnique],
-        state: Union[Iterable[DetectionState], DetectionState] = None,
-        object_sem_annotation: Union[
-            Iterable[Type[SemanticAnnotation]], Type[SemanticAnnotation]
-        ] = None,
-        region: Union[Iterable[Region], Region] = None,
-    ) -> PartialDesignator[DetectAction]:
-        return PartialDesignator[DetectAction](
-            DetectAction,
-            technique=technique,
-            state=state,
-            object_sem_annotation=object_sem_annotation,
-            region=region,
-        )
-
-
-DetectActionDescription = DetectAction.description

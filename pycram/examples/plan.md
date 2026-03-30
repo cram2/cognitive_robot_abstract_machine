@@ -25,7 +25,7 @@ need a language expression.
 # Setup a World 
 
 ```python
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 from pycram.testing import setup_world
 from pycram.datastructures.dataclasses import Context
 from semantic_digital_twin.robots.pr2 import PR2
@@ -42,14 +42,15 @@ context = Context(world, pr2)
 
 ```python
 from pycram.robot_plans import *
-from pycram.datastructures.pose import PoseStamped
 from pycram.datastructures.enums import Arms
-from pycram.language import SequentialPlan
+from pycram.plans.factories import *
+from pycram.robot_plans.actions.core.robot_body import ParkArmsAction
+from pycram.robot_plans.actions.core.navigation import NavigateAction
 
-navigate = NavigateActionDescription(PoseStamped.from_list([1, 1, 0]))
-park = ParkArmsActionDescription([Arms.BOTH])
+navigate = NavigateAction(Pose.from_xyz_quaternion(1, 1, 0, reference_frame=world.root))
+park = ParkArmsAction(Arms.BOTH)
 
-plan = SequentialPlan(context, navigate, park)
+plan = sequential([navigate, park], context=context).plan
 ```
 
 This will create a simple plan which has a SequentialNode as its root and two DesignatorNodes as its children. You can 
@@ -76,7 +77,7 @@ Now let's take a look at the arguments of the plan we just created.
 ```python
 print(plan.root.status)
 print(plan.root.start_time)
-print(plan.root.execute)
+print(plan.root.reason)
 ```
 
 ## Plan Execution

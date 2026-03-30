@@ -12,9 +12,8 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from typing_extensions import Union, Optional, Iterable
 
-from pycram.robot_plans.motions.gripper import MoveTCPMotion
+from pycram.robot_plans.motions.gripper import MoveToolCenterPointMotion
 from pycram import utils
-from pycram.datastructures.partial_designator import PartialDesignator
 from pycram.datastructures.enums import (
     Arms,
     AxisIdentifier,
@@ -64,21 +63,9 @@ class MixingAction(ActionDescription):
             spiral = lt.transform_pose(p, "map")
             spiral.pose.position.z += height_offset
             World.current_world.add_vis_axis(spiral)
-            MoveTCPMotion(spiral, self.arm).perform()
+            MoveToolCenterPointMotion(spiral, self.arm).perform()
 
         World.current_world.remove_vis_axis()
-
-    @classmethod
-    def description(
-        cls,
-        object_: Union[Iterable[Body], Body],
-        tool: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
-        arm: Optional[Union[Iterable[Arms], Arms]] = None,
-        technique: Optional[Union[Iterable[str], str]] = None,
-    ):
-        return PartialDesignator(
-            cls, object_=object_, tool=tool, arm=arm, technique=technique
-        )
 
 
 @dataclass
@@ -127,7 +114,7 @@ class PouringAction(ActionDescription):
         pose = lt.transform_pose(pose, "map")
 
         World.current_world.add_vis_axis(pose)
-        MoveTCPMotion(
+        MoveToolCenterPointMotion(
             pose,
             self.arm,
             allow_gripper_collision=False,
@@ -140,14 +127,14 @@ class PouringAction(ActionDescription):
         )
         World.current_world.add_vis_axis(pour_pose)
 
-        MoveTCPMotion(
+        MoveToolCenterPointMotion(
             pour_pose,
             self.arm,
             allow_gripper_collision=False,
             movement_type=MovementType.CARTESIAN,
         ).perform()
         sleep(3)
-        MoveTCPMotion(
+        MoveToolCenterPointMotion(
             pose,
             self.arm,
             allow_gripper_collision=False,
@@ -155,19 +142,6 @@ class PouringAction(ActionDescription):
         ).perform()
 
         World.current_world.remove_vis_axis()
-
-    @classmethod
-    def description(
-        cls,
-        object_: Union[Iterable[Body], Body],
-        tool: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
-        arm: Optional[Union[Iterable[Arms], Arms]] = None,
-        technique: Optional[Union[Iterable[str], str]] = None,
-        angle: Optional[Union[Iterable[float], float]] = 90,
-    ):
-        return PartialDesignator(
-            cls, object_=object_, tool=tool, arm=arm, technique=technique, angle=angle
-        )
 
 
 @dataclass
@@ -238,24 +212,6 @@ class CuttingAction(ActionDescription):
             lift_pose = new_pose.copy()
             lift_pose.pose.position.z += height
 
-    @classmethod
-    def description(
-        cls,
-        object_: Union[Iterable[Body], Body],
-        tool: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
-        arm: Optional[Union[Iterable[Arms], Arms]] = None,
-        technique: Optional[Union[Iterable[str], str]] = None,
-        slice_thickness: Optional[float] = 0.03,
-    ):
-        return PartialDesignator(
-            cls,
-            object_=object_,
-            tool=tool,
-            arm=arm,
-            technique=technique,
-            slice_thickness=slice_thickness,
-        )
-
     def calculate_slices(self, obj_length):
         if self.technique == "Halving":
             return 1, 0
@@ -295,8 +251,3 @@ class CuttingAction(ActionDescription):
         fy, ay = pose_a.is_facing_2d_axis(pose_b, axis=AxisIdentifier.Y)
 
         return (-90 if abs(ax) > abs(ay) else 90), ay
-
-
-CuttingActionDescription = CuttingAction.description
-PouringActionDescription = PouringAction.description
-MixingActionDescription = MixingAction.description

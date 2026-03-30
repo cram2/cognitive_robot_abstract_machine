@@ -149,9 +149,7 @@ class EntityQueryLanguageBackend(SelectiveBackend):
         if isinstance(
             attribute_match.assigned_value, type(Ellipsis)
         ) and not issubclass(attribute_match.assigned_variable._type_, enum.Enum):
-            raise UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
-                attribute_match
-            )
+            raise UnderspecifiedStatementInfeasibleForEQLGeneration(attribute_match)
 
     def _convert_attribute_match_to_variable(self, attribute_match: AttributeMatch):
         """

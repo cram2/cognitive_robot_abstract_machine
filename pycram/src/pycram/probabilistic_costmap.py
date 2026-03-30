@@ -4,10 +4,7 @@ from functools import cached_property
 import numpy as np
 import logging
 
-from semantic_digital_twin.adapters.ros import SemDTToRos2Converter
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Camera
-from semantic_digital_twin.spatial_types import Quaternion
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
@@ -17,10 +14,10 @@ from pycram.tf_transformations import quaternion_from_euler
 from random_events.interval import closed_open
 from typing_extensions import Optional, Type
 
-from pycram.costmaps import Costmap, OccupancyCostmap, VisibilityCostmap
+from pycram.locations.costmaps import Costmap, OccupancyCostmap, VisibilityCostmap
 import matplotlib.colorbar
+from pycram.datastructures.pose import PoseStamped
 from pycram.ros import create_publisher, Duration
-from pycram.units import meter
 
 from pint import Quantity
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
@@ -64,28 +61,28 @@ class ProbabilisticCostmap:
 
     costmap: Costmap
     """
-    The legacy costmap.
+    The legacy locations.
     """
 
-    origin: Pose
+    origin: PoseStamped
     """
-    The origin of the costmap.
+    The origin of the locations.
     """
 
     size: Quantity
     """
-    The side length of the costmap. The costmap is a square.
+    The side length of the locations. The locations is a square.
     """
 
     distribution: Optional[ProbabilisticCircuit] = None
     """
-    The distribution associated with the costmap.
+    The distribution associated with the locations.
     """
 
     def __init__(
         self,
-        origin: Pose,
-        size: Quantity = 2 * meter,
+        origin: PoseStamped,
+        size: Quantity = 2,
         max_cells=10000,
         costmap_type: Type[Costmap] = OccupancyCostmap,
         world: Optional[World] = None,
@@ -98,7 +95,7 @@ class ProbabilisticCostmap:
 
         # calculate the number of cells per axis
         number_of_cells = int(np.sqrt(max_cells))
-        resolution = self.size.to(meter) / number_of_cells
+        resolution = size / number_of_cells
 
         if costmap_type == OccupancyCostmap:
             robot_bounding_box = BoundingBoxCollection(
@@ -121,7 +118,7 @@ class ProbabilisticCostmap:
                 robot_view=robot,
             )
         elif costmap_type == VisibilityCostmap:
-            camera: Camera = robot.get_default_camera()
+            camera = robot.sensors[0]
             self.costmap = VisibilityCostmap(
                 min_height=camera.minimal_height,
                 max_height=camera.maximal_height,
@@ -131,7 +128,7 @@ class ProbabilisticCostmap:
                 world=self.world,
             )
         else:
-            raise NotImplementedError(f"Unknown costmap type {costmap_type}")
+            raise NotImplementedError(f"Unknown locations type {costmap_type}")
         self.create_distribution()
 
     @cached_property
@@ -140,14 +137,11 @@ class ProbabilisticCostmap:
 
     def create_event_from_map(self) -> Event:
         """
-        :return: The event that is encoded by the costmaps map.
+        :return: The event that is encoded by the locations map.
         """
         area = Event()
         for rectangle in self.costmap.partitioning_rectangles():
-            rectangle.translate(
-                float(self.origin.x),
-                float(self.origin.y),
-            )
+            rectangle.translate(self.origin.position.x, self.origin.position.y)
             area.simple_sets.add(
                 SimpleEvent(
                     {
@@ -160,36 +154,33 @@ class ProbabilisticCostmap:
 
     def create_distribution(self):
         """
-        Create a probabilistic circuit from the costmap.
+        Create a probabilistic circuit from the locations.
         """
         self.distribution = uniform_measure_of_event(self.create_event_from_map())
 
-    def sample_to_pose(self, sample: np.ndarray) -> Pose:
+    def sample_to_pose(self, sample: np.ndarray) -> PoseStamped:
         """
-        Convert a sample from the costmap to a pose.
+        Convert a sample from the locations to a pose.
 
         :param sample: The sample to convert
         :return: The pose corresponding to the sample
         """
         x = sample[0]
         y = sample[1]
-        position = [x, y, float(self.origin.z)]
+        position = [x, y, self.origin.position.z]
         angle = (
             np.arctan2(
-                position[1] - self.origin.y,
-                position[0] - self.origin.x,
+                position[1] - self.origin.position.y,
+                position[0] - self.origin.position.x,
             )
             + np.pi
         )
-        return Pose(
-            Point3(*position),
-            Quaternion.from_rpy(0, 0, angle),
-            self.origin.reference_frame,
-        )
+        orientation = list(quaternion_from_euler(0, 0, angle, axes="sxyz"))
+        return PoseStamped.from_list(position, orientation, self.origin.frame_id)
 
     def visualize(self):
         """
-        Visualize the costmap for rviz.
+        Visualize the locations for rviz.
         """
         samples = self.distribution.sample(1000)
         likelihoods = self.distribution.likelihood(samples)
@@ -200,16 +191,16 @@ class ProbabilisticCostmap:
         marker.type = Marker.POINTS
         marker.id = 0
         marker.action = Marker.ADD
-        marker.header.frame_id = str(self.origin.reference_frame.name)
-        marker.pose = SemDTToRos2Converter.convert(self.origin)
+        marker.header.frame_id = self.origin.frame_id
+        marker.pose = PoseStamped().pose
         marker.lifetime = Duration(60)
         marker.scale.x = 0.05
         marker.scale.y = 0.05
 
         for index, (sample, likelihood) in enumerate(zip(samples, likelihoods)):
-            position = self.sample_to_pose(sample).to_position()
+            position = self.sample_to_pose(sample).pose.position
             position.z = 0.1
-            marker.points.append(SemDTToRos2Converter.convert(position))
+            marker.points.append(position)
             marker.colors.append(
                 ColorRGBA(
                     **dict(

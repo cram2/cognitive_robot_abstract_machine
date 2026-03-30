@@ -28,6 +28,6 @@ class MoveMotion(BaseMotion):
     def _motion_chart(self):
         return CartesianPose(
             root_link=self.world.root,
-            tip_link=self.robot_view.root,
-            goal_pose=self.target.to_homogeneous_matrix(),
+            tip_link=self.robot.root,
+            goal_pose=self.target,
         )

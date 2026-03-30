@@ -13,7 +13,7 @@ Below is an example that used classes and objects from the test dataset provided
 
    from dataset.example_classes import *
    from dataset.sqlalchemy_interface import *
-   from krrood.ormatic.dao import (
+   from krrood.ormatic.data_access_objects.helper import (
        to_dao
    )
 

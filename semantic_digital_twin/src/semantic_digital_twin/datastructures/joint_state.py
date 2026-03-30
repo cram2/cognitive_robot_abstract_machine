@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Type, Self
 
-from typing_extensions import Dict, List, TYPE_CHECKING
+from typing_extensions import Dict, List, TYPE_CHECKING, Optional
 
 from krrood.adapters.json_serializer import (
     DataclassJSONSerializer,
@@ -39,7 +39,7 @@ class JointState(SubclassJSONSerializer):
     All target values in this state, order has to correspond to the order of connections
     """
 
-    state_type: JointStateType = field(default=None)
+    state_type: Optional[JointStateType] = field(default=None)
     """
     A type to better describe this state
     """

@@ -12,15 +12,12 @@ from pycram.datastructures.enums import (
     Arms,
 )
 from pycram.datastructures.grasp import GraspDescription
-from pycram.language import SequentialPlan
 from pycram.motion_executor import simulated_robot, real_robot
-from pycram.plan import MotionNode
-from pycram.robot_plans import (
-    PickUpActionDescription,
-    NavigateActionDescription,
-    MoveTorsoActionDescription,
-    PickUpAction,
-)
+from pycram.plans.factories import sequential, execute_single
+from pycram.plans.plan_node import MotionNode, ActionNode
+from pycram.robot_plans.actions.core.navigation import NavigateAction
+from pycram.robot_plans.actions.core.pick_up import PickUpAction
+from pycram.robot_plans.actions.core.robot_body import MoveTorsoAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.spatial_types import Point3, Quaternion
@@ -44,35 +41,40 @@ def test_pick_up_motion(immutable_model_world):
         VerticalAlignment.NoAlignment,
         test_robot.left_arm.manipulator,
     )
-    description = PickUpActionDescription(
-        test_world.get_body_by_name("milk.stl"), [Arms.LEFT], [grasp_description]
+    pick_up = PickUpAction(
+        test_world.get_body_by_name("milk.stl"), Arms.LEFT, grasp_description
     )
 
-    plan = plan = SequentialPlan(
-        Context.from_world(test_world),
-        NavigateActionDescription(
-            Pose(
-                Point3.from_iterable([1.7, 1.5, 0]),
-                Quaternion.from_iterable([0, 0, 0, 1]),
-                test_world.root,
+    root = sequential(
+        children=[
+            ActionNode(
+                designator=NavigateAction(
+                    Pose(
+                        Point3.from_iterable([1.7, 1.5, 0]),
+                        Quaternion.from_iterable([0, 0, 0, 1]),
+                        test_world.root,
+                    ),
+                    True,
+                )
             ),
-            True,
-        ),
-        MoveTorsoActionDescription([TorsoState.HIGH]),
-        description,
+            MoveTorsoAction(TorsoState.HIGH),
+            pick_up,
+        ],
+        context=Context.from_world(test_world),
     )
+    assert pick_up.plan is not None
     with simulated_robot:
-        plan.perform()
+        root.perform()
 
-    pick_up_node = plan.get_nodes_by_designator_type(PickUpAction)[0]
+    pick_up_node = root.plan.get_nodes_by_designator_type(PickUpAction)[0]
 
     motion_nodes = list(
-        filter(lambda x: isinstance(x, MotionNode), pick_up_node.recursive_children)
+        filter(lambda x: isinstance(x, MotionNode), pick_up_node.descendants)
     )
 
     assert len(motion_nodes) == 5
 
-    motion_charts = [type(m.designator_ref.motion_chart) for m in motion_nodes]
+    motion_charts = [type(m.designator.motion_chart) for m in motion_nodes]
     assert all(mc is not None for mc in motion_charts)
     assert CartesianPose in motion_charts
     assert JointPositionList in motion_charts
@@ -83,7 +85,10 @@ def test_move_motion_chart(immutable_model_world):
     motion = MoveMotion(
         Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
     )
-    SequentialPlan(context, motion)
+    plan = execute_single(
+        motion,
+        context=context,
+    )
 
     msc = motion.motion_chart
 
@@ -98,7 +103,7 @@ def test_alternative_mapping(hsr_apartment_world):
         Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
     )
 
-    plan = SequentialPlan(context, move_motion)
+    plan = execute_single(move_motion, context=context)
 
     with real_robot:
         assert move_motion.get_alternative_motion()
