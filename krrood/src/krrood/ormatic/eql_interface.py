@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from krrood.entity_query_language.query.query import (
     Query,
 )
-from krrood.entity_query_language.query.operations import Where
+from krrood.entity_query_language.query.operations import Where, OrderedBy
 from krrood.entity_query_language.query.quantifiers import ResultQuantifier, An, The
 from krrood.entity_query_language.operators.core_logical_operators import AND, OR
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
@@ -375,7 +375,6 @@ class EQLTranslator:
 
     sql_query: Optional[Select] = None
     join_manager: JoinManager = field(default_factory=JoinManager)
-    _visited_ids: set = field(default_factory=set)
 
     @property
     def quantifier(self) -> ResultQuantifier:
@@ -392,6 +391,26 @@ class EQLTranslator:
         """Get the root condition from the query."""
         return self.eql_query._conditions_root_
 
+    @property
+    def _sql_limit(self) -> Optional[int]:
+        quantifier = self.eql_query._quantifier_expression_
+        if quantifier is None:
+            return None
+        return quantifier._limit_
+
+    @property
+    def _sql_order_by(self) -> Optional[Any]:
+        builder = self.eql_query._ordered_by_builder_
+        if builder is None:
+            return None
+        if isinstance(builder.variable, Attribute):
+            return self.translate_attribute(builder.variable)
+        return builder.variable
+
+    @property
+    def _sql_distinct(self) -> bool:
+        return bool(self.eql_query._distinct_on)
+
     def translate(self) -> None:
         """Translate the EQL query to SQL."""
         dao_class = get_dao_class(self.select_like.selected_variable._type_)
@@ -402,15 +421,20 @@ class EQLTranslator:
 
         self.sql_query = select(dao_class)
 
-        self._visited_ids.clear()
+        where_expr = self.eql_query._where_expression_
+        if where_expr is not None:
+            conditions = self.translate_query(where_expr)
+            if conditions is not None:
+                self.sql_query = self.sql_query.where(conditions)
 
-        conditions = self.translate_query(self.root_condition)
-        if conditions is not None:
-            self.sql_query = self.sql_query.where(conditions)
+        if self._sql_limit is not None:
+            self.sql_query = self.sql_query.limit(self._sql_limit)
 
-        order_by_attr = getattr(self.eql_query, "_order_by_", None)
-        if order_by_attr is not None:
-            self.sql_query = self.sql_query.order_by(order_by_attr)
+        if self._sql_order_by is not None:
+            self.sql_query = self.sql_query.order_by(self._sql_order_by)
+
+        if self._sql_distinct:
+            self.sql_query = self.sql_query.distinct()
 
     def evaluate(self) -> List[Any]:
         """
@@ -441,10 +465,6 @@ class EQLTranslator:
         """
         if query is None:
             return None
-        obj_id = id(query)
-        if obj_id in self._visited_ids:
-            return None
-        self._visited_ids.add(obj_id)
 
         if isinstance(query, AND):
             return self.translate_and(query)
@@ -456,6 +476,8 @@ class EQLTranslator:
             return self.translate_attribute(query)
         if isinstance(query, Where):
             return self.translate_query(query.condition)
+        if isinstance(query, OrderedBy):
+            return None
         if isinstance(query, (An, The, ResultQuantifier, Variable)):
             return None
 

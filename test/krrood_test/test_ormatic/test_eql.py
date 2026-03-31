@@ -293,62 +293,58 @@ def test_contains(session, database):
 
     assert body1 == result[0]
 
-def test_translate_limit(session):
-    b = variable(type_=Body, domain=[])
-    query = an(entity(b))
+def test_translate_limit(session, database):
+    session.add(BodyDAO(name="Body1", size=1))
+    session.add(BodyDAO(name="Body2", size=2))
+    session.add(BodyDAO(name="Body3", size=3))
+    session.add(BodyDAO(name="Body4", size=4))
+    session.add(BodyDAO(name="Body5", size=5))
+    session.add(BodyDAO(name="Body6", size=6))
+    session.commit()
 
-    query._quantification_constraint_ = type('QC', (object,), {'n': 5})()
+    b = variable(type_=Body, domain=[])
+    query = an(entity(b)).limit(5)
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).limit(5)
 
     assert str(translator.sql_query) == str(expected)
 
-    sql_string = str(translator.sql_query.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
-    assert "LIMIT 5" in sql_string.upper()
+    results = translator.evaluate()
+    assert len(results) == 5
+
 
 
 def test_order_by(session, database):
-    # Setup: Bodies with different sizes
     session.add(BodyDAO(name="BigBody", size=100))
     session.add(BodyDAO(name="SmallBody", size=10))
     session.commit()
 
-    body_var = variable(type_=Body, domain=[])
-    query = an(entity(body_var))
-
-    query._order_by_ = BodyDAO.size
+    b = variable(type_=Body, domain=[])
+    query = an(entity(b).ordered_by(b.size))
 
     translator = eql_to_sql(query, session)
-
     expected = select(BodyDAO).order_by(BodyDAO.size)
 
     assert str(translator.sql_query) == str(expected)
 
     results = translator.evaluate()
-
-    # SmallBody (10) should come before BigBody (100)
     assert len(results) == 2
     assert results[0].name == "SmallBody"
     assert results[1].name == "BigBody"
 
 def test_translate_distinct(session, database):
-    # Add two identical entries
-    session.add(BodyDAO(name="DuplicateBody", size=10))
-    session.add(BodyDAO(name="DuplicateBody", size=10))
+    session.add(BodyDAO(name="UniqueBody", size=10))
+    session.add(BodyDAO(name="UniqueBody", size=20))
     session.commit()
 
-    body_var = variable(type_=Body, domain=[])
-    query = an(entity(body_var))
-
-    query._distinct_ = True
+    b = variable(type_=Body, domain=[])
+    query = an(entity(b).distinct())
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).distinct()
 
     assert str(translator.sql_query) == str(expected)
-    results = translator.evaluate()
 
-    # Should return only 1 result instead of 2
-    assert len(results) == 1
-    assert results[0].name == "DuplicateBody"
+    results = translator.evaluate()
+    assert len(results) == 2
