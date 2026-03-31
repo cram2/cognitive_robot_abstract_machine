@@ -35,7 +35,7 @@ from semantic_digital_twin.world_description.geometry import (
     Box,
     Sphere,
     Cylinder,
-    FileMesh,
+    Mesh,
     Scale,
     Color,
 )
@@ -356,7 +356,7 @@ class URDFParser:
                 if geom.geometry.filename is None:
                     raise ValueError("Mesh geometry must have a filename.")
                 res.append(
-                    FileMesh(
+                    Mesh(
                         origin=origin_transform,
                         filename=self.path_resolver.resolve(geom.geometry.filename),
                         scale=Scale(*(geom.geometry.scale or (1, 1, 1))),

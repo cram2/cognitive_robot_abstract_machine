@@ -1,24 +1,9 @@
 import unittest
-
-import equinox
-import jax
-import numpy as np
 from jax.experimental.sparse import BCOO
-from numpy import dtype
-from random_events.interval import closed, singleton
-from random_events.product_algebra import SimpleEvent
 from random_events.variable import Continuous
 import jax.numpy as jnp
-from sortedcontainers import SortedSet
-
-from probabilistic_model.probabilistic_circuit.jax import (
-    embed_sparse_array_in_nan_array,
-)
 from probabilistic_model.probabilistic_circuit.jax.input_layer import DiracDeltaLayer
 from probabilistic_model.probabilistic_circuit.jax.inner_layer import ProductLayer
-from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
-    ProbabilisticCircuit,
-)
 
 import warnings
 

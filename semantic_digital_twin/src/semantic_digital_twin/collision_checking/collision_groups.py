@@ -6,8 +6,14 @@ from dataclasses import dataclass, field
 from rustworkx import rustworkx
 from typing_extensions import TYPE_CHECKING
 
-from semantic_digital_twin.collision_checking.collision_manager import CollisionManager, CollisionConsumer
-from semantic_digital_twin.world_description.world_entity import Body, KinematicStructureEntity
+from semantic_digital_twin.collision_checking.collision_manager import (
+    CollisionManager,
+    CollisionConsumer,
+)
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    KinematicStructureEntity,
+)
 
 if TYPE_CHECKING:
     from ..world import World
@@ -98,7 +104,9 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
         ):
             for child in children:
                 parent_C_child = world.get_connection(parent, child)
-                if parent_C_child.is_controlled:
+                if parent_C_child.is_controlled or (
+                    isinstance(child, Body) and child.has_collision()
+                ):
                     self.collision_groups.append(CollisionGroup(child))
                 else:
                     collision_group = self.get_collision_group(parent)

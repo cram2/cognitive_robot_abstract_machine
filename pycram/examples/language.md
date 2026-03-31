@@ -255,7 +255,7 @@ We will see how exceptions are handled at a simple example.
 from pycram.robot_plans import *
 from pycram.process_module import simulated_robot
 from pycram.language import CodePlan, ParallelPlan
-from pycram.failures import PlanFailure
+from pycram.plans.failures import PlanFailure
 
 
 def code_test():

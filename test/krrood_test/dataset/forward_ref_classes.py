@@ -19,11 +19,11 @@ from krrood.symbol_graph.symbol_graph import Symbol
 
 if TYPE_CHECKING:
     # These imports are only available to type checkers, not at runtime
-    # This mimics the pattern in semantic_digital_twin/semantic_annotations/mixins.py
+    # This mimics the pattern in semantic_digital_twin/semantic_annotations/designator.py
     from .example_classes import ForwardRefTypeA, ForwardRefTypeB
 
 # Import a type that will be used in method signatures but NOT in TYPE_CHECKING
-# This mimics how World is imported in mixins.py
+# This mimics how World is imported in designator.py
 from .example_classes import Position
 
 

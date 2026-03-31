@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import timedelta
 
 from semantic_digital_twin.datastructures.definitions import GripperState
@@ -8,24 +8,28 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Union, Optional, Type, Any, Iterable
+from typing_extensions import Optional, Any
 
-from pycram.robot_plans.actions.core.pick_up import ReachActionDescription, PickUpAction
-from pycram.config.action_conf import ActionConfig
-from pycram.robot_plans.motions.gripper import MoveTCPMotion, MoveGripperMotion, ReachMotion
 from pycram.datastructures.enums import (
     Arms,
     ApproachDirection,
     VerticalAlignment,
 )
 from pycram.datastructures.grasp import GraspDescription
-from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.failures import ObjectNotPlacedAtTargetLocation, ObjectStillInContact
-from pycram.language import SequentialPlan
-from pycram.view_manager import ViewManager
+
+
+from pycram.plans.factories import sequential, execute_single
 from pycram.robot_plans.actions.base import ActionDescription
-from pycram.utils import translate_pose_along_local_axis
+from pycram.robot_plans.actions.core.pick_up import PickUpAction, ReachAction
+from pycram.robot_plans.motions.gripper import (
+    MoveToolCenterPointMotion,
+    MoveGripperMotion,
+)
 from pycram.validation.error_checkers import PoseErrorChecker
-from pycram.visualization import plot_rustworkx_interactive
+from pycram.view_manager import ViewManager
+from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -46,39 +50,35 @@ class PlaceAction(ActionDescription):
     """
     Arm that is currently holding the object
     """
-    _pre_perform_callbacks = []
-    """
-    List to save the callbacks which should be called before performing the action.
-    """
-
-    def __post_init__(self):
-        super().__post_init__()
 
     def execute(self) -> None:
-        arm = ViewManager.get_arm_view(self.arm, self.robot_view)
+        arm = ViewManager.get_arm_view(self.arm, self.robot)
         manipulator = arm.manipulator
 
-        previous_pick = self.plan.get_previous_node_by_designator_type(
-            self.plan_node, PickUpAction
+        previous_pick = self.plan_node.get_previous_node_by_designator_type(
+            PickUpAction
         )
         previous_grasp = (
-            previous_pick.designator_ref.grasp_description
+            previous_pick.designator.grasp_description
             if previous_pick
             else GraspDescription(
                 ApproachDirection.FRONT, VerticalAlignment.NoAlignment, manipulator
             )
         )
 
-        SequentialPlan(
-            self.context,
-            ReachActionDescription(
-                self.target_location,
-                self.arm,
-                previous_grasp,
-                self.object_designator,
-                reverse_reach_order=True,
-            ),
-            MoveGripperMotion(GripperState.OPEN, self.arm),
+        self.add_subplan(
+            sequential(
+                [
+                    ReachAction(
+                        self.target_location,
+                        self.arm,
+                        previous_grasp,
+                        self.object_designator,
+                        reverse_reach_order=True,
+                    ),
+                    MoveGripperMotion(GripperState.OPEN, self.arm),
+                ]
+            )
         ).perform()
 
         # Detaches the object from the robot
@@ -98,7 +98,9 @@ class PlaceAction(ActionDescription):
             self.target_location, self.object_designator, reverse=True
         )
 
-        SequentialPlan(self.context, MoveTCPMotion(retract_pose, self.arm)).perform()
+        self.add_subplan(
+            execute_single(MoveToolCenterPointMotion(retract_pose, self.arm))
+        ).perform()
 
     def validate(
         self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
@@ -136,20 +138,3 @@ class PlaceAction(ActionDescription):
             raise ObjectNotPlacedAtTargetLocation(
                 self.object_designator, self.target_location, World.robot, self.arm
             )
-
-    @classmethod
-    def description(
-        cls,
-        object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[Pose], Pose],
-        arm: Union[Iterable[Arms], Arms],
-    ) -> PartialDesignator[PlaceAction]:
-        return PartialDesignator[PlaceAction](
-            PlaceAction,
-            object_designator=object_designator,
-            target_location=target_location,
-            arm=arm,
-        )
-
-
-PlaceActionDescription = PlaceAction.description

@@ -22,6 +22,7 @@ from krrood.ripple_down_rules.datastructures.case import create_cases_from_dataf
 from ucimlrepo import fetch_ucirepo
 from enum import Enum
 
+
 class Species(str, Enum):
     """Enum for the species of the animals in the UCI Zoo dataset."""
     mammal = "mammal"
@@ -31,10 +32,11 @@ class Species(str, Enum):
     amphibian = "amphibian"
     insect = "insect"
     molusc = "molusc"
-    
+
     @classmethod
     def from_str(cls, value: str) -> Species:
         return getattr(cls, value)
+
 
 # fetch dataset
 zoo = fetch_ucirepo(id=111)

@@ -9,19 +9,23 @@ from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
 from pycram.datastructures.trajectory import PoseTrajectory
-from pycram.language import SequentialPlan
+
 from pycram.motion_executor import simulated_robot
+from pycram.plans.factories import execute_single, sequential
+from pycram.robot_plans.actions.core.pick_up import (
+    ReachAction,
+    GraspingAction,
+    PickUpAction,
+)
+from pycram.robot_plans.actions.core.placing import PlaceAction
+from pycram.robot_plans.actions.core.robot_body import (
+    ParkArmsAction,
+    SetGripperAction,
+    FollowToolCenterPointPathAction,
+)
 from pycram.testing import _make_sine_scan_poses
 from pycram.view_manager import ViewManager
-from pycram.robot_plans import (
-    ParkArmsActionDescription,
-    ReachActionDescription,
-    GraspingActionDescription,
-    PickUpActionDescription,
-    PlaceActionDescription,
-    SetGripperActionDescription,
-    FollowTCPPathActionDescription,
-)
+
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -77,10 +81,10 @@ def tracy_block_world(tracy_world):
 
 @pytest.fixture
 def immutable_tracy_block_world(tracy_block_world):
-    state = deepcopy(tracy_block_world.state.data)
+    state = deepcopy(tracy_block_world.state._data)
     view = tracy_block_world.get_semantic_annotations_by_type(Tracy)[0]
     yield tracy_block_world, view, Context(tracy_block_world, view)
-    tracy_block_world.state.data[:] = state
+    tracy_block_world.state._data[:] = state
     tracy_block_world.notify_state_change()
 
 
@@ -94,9 +98,8 @@ def mutable_tracy_block_world(tracy_block_world):
 def test_park_arms_tracy(immutable_tracy_block_world):
     world, view, context = immutable_tracy_block_world
 
-    description = ParkArmsActionDescription([Arms.BOTH])
-    plan = SequentialPlan(context, description)
-    assert description.resolve().arm == Arms.BOTH
+    description = ParkArmsAction(Arms.BOTH)
+    plan = execute_single(description, context=context).plan
     with simulated_robot:
         plan.perform()
 
@@ -127,18 +130,20 @@ def test_reach_action_multi(immutable_tracy_block_world):
     )
     box_body = world.get_body_by_name("box1")
 
-    plan = SequentialPlan(
-        context,
-        ParkArmsActionDescription(Arms.BOTH),
-        ReachActionDescription(
-            target_pose=Pose(
-                Point3.from_iterable([0.8, 0.5, 0.93]), reference_frame=world.root
+    plan = sequential(
+        [
+            ParkArmsAction(Arms.BOTH),
+            ReachAction(
+                target_pose=Pose(
+                    Point3.from_iterable([0.8, 0.5, 0.93]), reference_frame=world.root
+                ),
+                object_designator=box_body,
+                arm=Arms.LEFT,
+                grasp_description=grasp_description,
             ),
-            object_designator=box_body,
-            arm=Arms.LEFT,
-            grasp_description=grasp_description,
-        ),
-    )
+        ],
+        context=context,
+    ).plan
 
     with simulated_robot:
         plan.perform()
@@ -156,9 +161,9 @@ def test_reach_action_multi(immutable_tracy_block_world):
 def test_move_gripper_multi(immutable_tracy_block_world):
     world, view, context = immutable_tracy_block_world
 
-    plan = SequentialPlan(
-        context, SetGripperActionDescription(Arms.LEFT, GripperState.OPEN)
-    )
+    plan = execute_single(
+        SetGripperAction(Arms.LEFT, GripperState.OPEN), context=context
+    ).plan
 
     with simulated_robot:
         plan.perform()
@@ -170,9 +175,9 @@ def test_move_gripper_multi(immutable_tracy_block_world):
     for connection, target in open_state.items():
         assert connection.position == pytest.approx(target, abs=0.01)
 
-    plan = SequentialPlan(
-        context, SetGripperActionDescription(Arms.LEFT, GripperState.CLOSE)
-    )
+    plan = execute_single(
+        SetGripperAction(Arms.LEFT, GripperState.CLOSE), context=context
+    ).plan
 
     with simulated_robot:
         plan.perform()
@@ -190,14 +195,13 @@ def test_grasping(immutable_tracy_block_world):
         VerticalAlignment.TOP,
         left_arm.manipulator,
     )
-    description = GraspingActionDescription(
-        world.get_body_by_name("box1"), [Arms.LEFT], grasp_description
+    description = GraspingAction(
+        world.get_body_by_name("box1"), Arms.LEFT, grasp_description
     )
-    plan = SequentialPlan(
-        context,
-        ParkArmsActionDescription(Arms.BOTH),
-        description,
-    )
+    plan = sequential(
+        [ParkArmsAction(Arms.BOTH), description],
+        context=context,
+    ).plan
     with simulated_robot:
         plan.perform()
     dist = np.linalg.norm(
@@ -215,13 +219,13 @@ def test_pick_up_multi(mutable_tracy_block_world):
         VerticalAlignment.TOP,
         left_arm.manipulator,
     )
-    plan = SequentialPlan(
-        context,
-        ParkArmsActionDescription(Arms.BOTH),
-        PickUpActionDescription(
-            world.get_body_by_name("box1"), Arms.LEFT, grasp_description
-        ),
-    )
+    plan = sequential(
+        [
+            ParkArmsAction(Arms.BOTH),
+            PickUpAction(world.get_body_by_name("box1"), Arms.LEFT, grasp_description),
+        ],
+        context=context,
+    ).plan
 
     with simulated_robot:
         plan.perform()
@@ -234,8 +238,7 @@ def test_pick_up_multi(mutable_tracy_block_world):
         is not None
     )
 
-    assert len(plan.nodes) == len(plan.all_nodes)
-    assert len(plan.edges) == len(plan.all_nodes) - 1
+    plan.validate()
 
 
 def test_place_multi(mutable_tracy_block_world):
@@ -248,18 +251,18 @@ def test_place_multi(mutable_tracy_block_world):
         left_arm.manipulator,
     )
 
-    plan = SequentialPlan(
-        context,
-        ParkArmsActionDescription(Arms.BOTH),
-        PickUpActionDescription(
-            world.get_body_by_name("box1"), Arms.LEFT, grasp_description
-        ),
-        PlaceActionDescription(
-            world.get_body_by_name("box1"),
-            Pose(Point3.from_iterable([0.9, 0, 0.93]), reference_frame=world.root),
-            Arms.LEFT,
-        ),
-    )
+    plan = sequential(
+        [
+            ParkArmsAction(Arms.BOTH),
+            PickUpAction(world.get_body_by_name("box1"), Arms.LEFT, grasp_description),
+            PlaceAction(
+                world.get_body_by_name("box1"),
+                Pose(Point3.from_iterable([0.9, 0, 0.93]), reference_frame=world.root),
+                Arms.LEFT,
+            ),
+        ],
+        context=context,
+    ).plan
 
     with simulated_robot:
         plan.perform()
@@ -273,9 +276,7 @@ def test_place_multi(mutable_tracy_block_world):
     milk_position = box_body.global_transform.to_position().to_np()
 
     assert milk_position[:3] == pytest.approx([0.9, 0, 0.93], abs=0.01)
-
-    assert len(plan.nodes) == len(plan.all_nodes)
-    assert len(plan.edges) == len(plan.all_nodes) - 1
+    plan.validate()
 
 
 def test_move_tcp_follows_sine_waypoints(immutable_tracy_block_world):
@@ -292,9 +293,9 @@ def test_move_tcp_follows_sine_waypoints(immutable_tracy_block_world):
     target_pose = (anchor_T @ offset_T).to_pose()
     waypoints = PoseTrajectory(_make_sine_scan_poses(target_pose, lane_axis="z"))
 
-    plan = SequentialPlan(
-        context,
-        FollowTCPPathActionDescription(target_locations=waypoints, arm=Arms.RIGHT),
+    plan = execute_single(
+        FollowToolCenterPointPathAction(target_locations=waypoints, arm=Arms.RIGHT),
+        context=context,
     )
     with simulated_robot:
         plan.perform()

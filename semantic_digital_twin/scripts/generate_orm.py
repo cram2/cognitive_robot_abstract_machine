@@ -9,39 +9,37 @@ from __future__ import annotations
 
 import logging
 import os
-import uuid
 from dataclasses import is_dataclass
 
-import sqlalchemy
-
 import semantic_digital_twin.adapters.procthor.procthor_resolver
+import semantic_digital_twin.collision_checking.collision_detector
+import semantic_digital_twin.collision_checking.collision_groups
+import semantic_digital_twin.collision_checking.collision_manager
+import semantic_digital_twin.collision_checking.collision_rules
+import semantic_digital_twin.collision_checking.collision_variable_managers
 import semantic_digital_twin.orm.model
+import semantic_digital_twin.orm.ormatic_interface
 import semantic_digital_twin.reasoning.predicates
 import semantic_digital_twin.robots.abstract_robot
+import semantic_digital_twin.robots.hsrb
+import semantic_digital_twin.robots.pr2
 import semantic_digital_twin.semantic_annotations.semantic_annotations
 import semantic_digital_twin.world  # ensure the module attribute exists on the package
 import semantic_digital_twin.world_description.degree_of_freedom
 import semantic_digital_twin.world_description.geometry
 import semantic_digital_twin.world_description.shape_collection
 import semantic_digital_twin.world_description.world_entity
-import semantic_digital_twin.collision_checking.collision_groups
-import semantic_digital_twin.collision_checking.collision_rules
-import semantic_digital_twin.collision_checking.collision_detector
-import semantic_digital_twin.collision_checking.collision_manager
-import semantic_digital_twin.collision_checking.collision_variable_managers
-from krrood.adapters.json_serializer import JSONAttributeDiff
+from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
-from krrood.ormatic.utils import classes_of_module
+from krrood.ormatic.utils import classes_of_module, classes_of_package
 from krrood.utils import recursive_subclasses
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.mixin import SimulatorAdditionalProperty
+from semantic_digital_twin.adapters.procthor.procthor_parser import ProcTHORParser
+
+from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.orm.model import *  # type: ignore
 from semantic_digital_twin.reasoning.predicates import ContainsType
-from semantic_digital_twin.semantic_annotations.mixins import (
-    HasRootBody,
-)
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
     SemanticDirection,
 )
@@ -52,90 +50,23 @@ from semantic_digital_twin.world import (
     ResetStateContextManager,
     WorldModelUpdateContextManager,
 )
-from semantic_digital_twin.world import WorldModelManager
-from semantic_digital_twin.world_description.connections import (
-    FixedConnection,
-    HasUpdateState,
-)
-from semantic_digital_twin.world_description.world_modification import (
-    AttributeUpdateModification,
-)
-import semantic_digital_twin.robots.hsrb
-import semantic_digital_twin.robots.pr2
 
-all_classes = set(
-    classes_of_module(semantic_digital_twin.world_description.world_entity)
-)
-all_classes |= set(classes_of_module(semantic_digital_twin.world_description.geometry))
-all_classes |= set(
-    classes_of_module(semantic_digital_twin.world_description.shape_collection)
-)
-all_classes |= set(classes_of_module(semantic_digital_twin.world))
-all_classes |= set(
-    classes_of_module(semantic_digital_twin.datastructures.prefixed_name)
-)
-all_classes |= set(classes_of_module(semantic_digital_twin.datastructures.joint_state))
-
-all_classes |= set(
-    classes_of_module(semantic_digital_twin.world_description.connections)
-)
-all_classes |= set(
-    classes_of_module(semantic_digital_twin.semantic_annotations.semantic_annotations)
-)
-all_classes |= set(
-    classes_of_module(semantic_digital_twin.world_description.degree_of_freedom)
-)
-all_classes |= set(classes_of_module(semantic_digital_twin.robots.abstract_robot))
-all_classes |= set(classes_of_module(semantic_digital_twin.datastructures.definitions))
-all_classes |= set(classes_of_module(semantic_digital_twin.robots.hsrb))
-all_classes |= set(classes_of_module(semantic_digital_twin.robots.pr2))
-all_classes |= set(
-    classes_of_module(semantic_digital_twin.collision_checking.collision_rules)
-)
-all_classes |= set(
-    classes_of_module(semantic_digital_twin.collision_checking.collision_matrix)
-)
-all_classes |= set(
-    classes_of_module(semantic_digital_twin.collision_checking.collision_groups)
-)
-all_classes |= set(
-    classes_of_module(
-        semantic_digital_twin.collision_checking.collision_variable_managers
-    )
-)
-# classes |= set(recursive_subclasses(ViewFactory))
-all_classes |= {SimulatorAdditionalProperty}
-all_classes |= set(classes_of_module(semantic_digital_twin.reasoning.predicates))
-all_classes |= set(classes_of_module(semantic_digital_twin.semantic_annotations.mixins))
-all_classes |= set(
-    classes_of_module(semantic_digital_twin.adapters.procthor.procthor_resolver)
-)
-all_classes |= set(
-    classes_of_module(semantic_digital_twin.world_description.world_modification)
-)
-all_classes |= set(classes_of_module(semantic_digital_twin.callbacks.callback))
-
+all_classes = set(classes_of_package(semantic_digital_twin))
+all_classes -= set(classes_of_module(semantic_digital_twin.orm.ormatic_interface))
+all_classes -= set(classes_of_package(semantic_digital_twin.adapters))
 # remove classes that should not be mapped
 all_classes -= {
     ResetStateContextManager,
     WorldModelUpdateContextManager,
-    HasUpdateState,
     ForwardKinematicsManager,
-    WorldModelManager,
     semantic_digital_twin.adapters.procthor.procthor_resolver.ProcthorResolver,
     ContainsType,
     SemanticDirection,
-    JSONAttributeDiff,
-    AttributeUpdateModification,
+    SubclassJSONSerializer,
 }
 # keep only dataclasses that are NOT AlternativeMapping subclasses
 all_classes = {
     c for c in all_classes if is_dataclass(c) and not issubclass(c, AlternativeMapping)
-}
-all_classes |= {
-    am.original_class()
-    for am in recursive_subclasses(AlternativeMapping)
-    if not am.__module__.startswith("test.")
 }
 
 alternative_mappings = [

@@ -264,14 +264,14 @@ Finally, if we apply the algorithm to the dataset, we get the following result.
 We can see that it looks very similar to the gaussian mixture we sampled from.
 
 ```{code-cell} ipython3
-from probabilistic_model.learning.nyga_distribution import NygaDistribution
+from probabilistic_model.learning.nyga_induction import NygaInduction
 from random_events.variable import Continuous
 
 import plotly
 plotly.offline.init_notebook_mode()
 import plotly.graph_objects as go
 
-distribution = NygaDistribution(Continuous("x"), min_samples_per_quantile=100, min_likelihood_improvement=0.01)
+distribution = NygaInduction(Continuous("x"), min_samples_per_quantile=100, min_likelihood_improvement=0.01)
 distribution = distribution.fit(dataset)
 fig = go.Figure(distribution.plot(), distribution.plotly_layout())
 fig.show()
@@ -280,12 +280,12 @@ fig.show()
 Comparing this to the Gaussian distribution we sampled from, we can see that the result is very similar.
 
 ```{code-cell} ipython3
-from probabilistic_model.distributions import GaussianDistribution
+from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
 
 mixture = ProbabilisticCircuit()
-gaussian_1 = leaf(GaussianDistribution(Continuous("x"), 0, 1), mixture)
-gaussian_2 = leaf(GaussianDistribution(Continuous("x"), 5, 0.5), mixture)
+gaussian_1 = leaf(GaussianDistribution(variable=Continuous("x"), location=0, scale=1), mixture)
+gaussian_2 = leaf(GaussianDistribution(variable=Continuous("x"), location=5, scale=0.5), mixture)
 s1 = SumUnit(probabilistic_circuit = mixture)
 s1.add_subcircuit(gaussian_1, np.log(0.5))
 s1.add_subcircuit(gaussian_2, np.log(0.5))

@@ -4,18 +4,17 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import timedelta
 
+from typing_extensions import Optional, Type, Any
+
+from pycram.datastructures.enums import DetectionTechnique
+from pycram.plans.failures import PerceptionObjectNotFound
+from pycram.locations.locations import CostmapLocation
+from pycram.plans.factories import sequential, execute_single, try_in_order
+from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.core.misc import DetectAction
+from pycram.robot_plans.actions.core.navigation import NavigateAction, LookAtAction
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
-from typing_extensions import Union, Optional, Type, Any, Iterable
-
-from pycram.robot_plans.actions.core.misc import DetectActionDescription
-from pycram.robot_plans.actions.core.navigation import LookAtActionDescription, NavigateActionDescription
-from pycram.datastructures.enums import DetectionTechnique
-from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.designators.location_designator import CostmapLocation
-from pycram.failures import PerceptionObjectNotFound
-from pycram.language import TryInOrderPlan, SequentialPlan
-from pycram.robot_plans.actions.base import ActionDescription
 
 
 @dataclass
@@ -35,76 +34,57 @@ class SearchAction(ActionDescription):
     """
 
     def execute(self) -> None:
-        SequentialPlan(
-            self.context,
-            NavigateActionDescription(
-                CostmapLocation(
-                    target=self.target_location, visible_for=self.robot_view
+
+        # go to a location where the target location is visible
+        self.add_subplan(
+            execute_single(
+                NavigateAction(
+                    next(
+                        iter(CostmapLocation(target=self.target_location, visible=True))
+                    )
                 )
-            ),
+            )
         ).perform()
 
-        target_base = Pose.from_spatial_type(
-            self.world.transform(
-                self.target_location.to_spatial_type(), self.world.root
+        # define searching cone
+        target_base = self.world.transform(self.target_location, self.world.root)
+
+        target_base_left = deepcopy(target_base)
+        target_base_left.y -= 0.5
+
+        target_base_right = deepcopy(target_base)
+        target_base_right.y += 0.5
+
+        self.add_subplan(
+            searching := try_in_order(
+                [
+                    sequential(
+                        [
+                            LookAtAction(target),
+                            DetectAction(
+                                DetectionTechnique.TYPES,
+                                object_sem_annotation=self.object_sem_annotation,
+                            ),
+                        ]
+                    )
+                    for target in [target_base, target_base_left, target_base_right]
+                ]
             )
         )
 
-        target_base_left = deepcopy(target_base)
-        target_base_left.pose.position.y -= 0.5
+        # get the found objects
+        old_annotation_ids = {
+            annotation.id for annotation in self.world.semantic_annotations
+        }
+        searching.perform()
+        new_annotation_ids = {
+            annotation.id for annotation in self.world.semantic_annotations
+        } - old_annotation_ids
 
-        target_base_right = deepcopy(target_base)
-        target_base_right.pose.position.y += 0.5
-
-        plan = TryInOrderPlan(
-            self.context,
-            SequentialPlan(
-                self.context,
-                LookAtActionDescription(target_base_left),
-                DetectActionDescription(
-                    DetectionTechnique.TYPES,
-                    object_sem_annotation=self.object_sem_annotation,
-                ),
-            ),
-            SequentialPlan(
-                self.context,
-                LookAtActionDescription(target_base_right),
-                DetectActionDescription(
-                    DetectionTechnique.TYPES,
-                    object_sem_annotation=self.object_sem_annotation,
-                ),
-            ),
-            SequentialPlan(
-                self.context,
-                LookAtActionDescription(target_base),
-                DetectActionDescription(
-                    DetectionTechnique.TYPES,
-                    object_sem_annotation=self.object_sem_annotation,
-                ),
-            ),
-        )
-
-        obj = plan.perform()
-        if obj is not None:
-            return obj
-        raise PerceptionObjectNotFound(
-            self.object_sem_annotation, DetectionTechnique.TYPES, self.target_location
-        )
+        if not new_annotation_ids:
+            raise PerceptionObjectNotFound(self)
 
     def validate(
         self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
     ):
         pass
-
-    @classmethod
-    def description(
-        cls,
-        target_location: Union[Iterable[Pose], Pose],
-        object_type: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
-    ) -> PartialDesignator[SearchAction]:
-        return PartialDesignator(
-            SearchAction, target_location=target_location, object_type=object_type
-        )
-
-
-SearchActionDescription = SearchAction.description

@@ -1,0 +1,40 @@
+name: Examples and Demos  (matrix over libs)
+defaults:
+  run:
+    shell: bash -ieo pipefail {0}
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+  workflow_run:
+    workflows: [ "update_docker" ]
+    types: [ completed ]
+    branches: [ main ]
+
+jobs:
+  to-lowercase:
+    runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
+    steps:
+      - id: lowercase
+        run: |
+          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
+
+  test_each_lib:
+    needs: [to-lowercase]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - script: pycram/scripts/test_notebook_examples.sh
+          - script: semantic_digital_twin/scripts/test_notebook_examples.sh
+          - script: semantic_digital_twin/scripts/test_exercises.sh
+          - script: semantic_digital_twin/scripts/test_quizzes.sh
+          - script: pycram/demos/pycram_bullet_world_demo/test_demo.py
+    uses: ./.github/workflows/example_demo_reusable.yml
+    with:
+      script: ${{ matrix.script }}
+      repo_lowercase: ${{ needs.to-lowercase.outputs.repo_lowercase }}

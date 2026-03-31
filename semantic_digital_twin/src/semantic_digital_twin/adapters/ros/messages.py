@@ -193,5 +193,5 @@ class WorldModelSnapshot(SubclassJSONSerializer):
         if not assign_pairs:
             return
         for i, s in assign_pairs:
-            world.state.data[0, i] = s
+            world.state._data[0, i] = s
         world.notify_state_change()

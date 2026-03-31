@@ -38,9 +38,9 @@ The script for generating the test ORM interface for KRROOD looks like this:
         HasType,
     )
     from krrood.entity_query_language.symbol_graph import SymbolGraph
-    from krrood.ormatic.dao import AlternativeMapping
+    from krrood.ormatic.data_access_objects.alternative_mapping import AlternativeMapping
     from krrood.ormatic.ormatic import ORMatic
-    from krrood.ormatic.utils import classes_of_module
+    from krrood.ormatic.utils import classes_of_package
     from krrood.utils import recursive_subclasses
 
     # build the symbol graph
@@ -52,7 +52,7 @@ The script for generating the test ORM interface for KRROOD looks like this:
         alternative_mapping.original_class()
         for alternative_mapping in recursive_subclasses(AlternativeMapping)
     }
-    all_classes |= set(classes_of_module(krrood.entity_query_language.symbol_graph))
+    all_classes |= set(classes_of_package(krrood))
     all_classes |= {Symbol}
 
     # remove classes that don't need persistence

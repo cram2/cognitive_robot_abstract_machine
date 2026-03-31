@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
 import sys
-import os
 
 from PySide6.QtWidgets import QApplication
 
@@ -23,8 +22,8 @@ class TestPosteriorGUI(unittest.TestCase):
         self.controller = ModelController()
 
         # Setup a simple model
-        self.v1 = Continuous("v1", closed(0, 1))
-        self.v2 = Symbolic("v2", Set.from_iterable(["a", "b"]))
+        self.v1 = Continuous(name="v1")
+        self.v2 = Symbolic(name="v2", domain=Set.from_iterable(["a", "b"]))
 
         self.model = MagicMock()
         self.model.variables = [self.v1, self.v2]
@@ -62,7 +61,7 @@ class TestPosteriorGUI(unittest.TestCase):
         item.setSelected(True)
 
         # Mock build_event
-        evidence_event = Event(SimpleEvent())
+        evidence_event = Event.from_simple_sets(SimpleEvent.from_data())
         widget.on_calculate()
 
         # Since evidence is empty, it should return the model itself or call truncated (but here we check evidence_event)
@@ -77,7 +76,7 @@ class TestPosteriorGUI(unittest.TestCase):
         self.assertEqual(widget.query_vars[0], self.v1.name)
 
     def test_controller_calculate_posterior(self):
-        evidence = Event(SimpleEvent({self.v1: closed(0, 0.5)}))
+        evidence = Event.from_simple_sets(SimpleEvent.from_data({self.v1: closed(0, 0.5)}))
         self.controller.calculate_posterior(evidence)
         self.model.truncated.assert_called()
 

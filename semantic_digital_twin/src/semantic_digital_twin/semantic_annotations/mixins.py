@@ -7,7 +7,7 @@ from typing import Tuple
 import numpy as np
 import trimesh
 from polytope import bounding_box
-from probabilistic_model.distributions.helper import make_dirac
+from probabilistic_model.distributions.gaussian import GaussianDistribution
 from random_events.product_algebra import Event
 from random_events.set import Set
 from random_events.variable import Symbolic
@@ -22,7 +22,6 @@ from typing_extensions import (
 )
 
 from krrood.ormatic.utils import classproperty
-from probabilistic_model.distributions import GaussianDistribution
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     uniform_measure_of_event,
@@ -43,6 +42,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -422,14 +422,12 @@ class HasGraspPose(HasRootBody, ABC):
     A mixin class for semantic annotations that have a grasp pose.
     """
 
-    grasp_pose: Optional[HomogeneousTransformationMatrix] = field(
-        kw_only=True, default=None
-    )
+    grasp_pose: Optional[Pose] = field(kw_only=True, default=None)
     """
-    The static grasp pose of the semantic annotation. 
+    The static grasp pose of the semantic annotation.
     """
 
-    def grasp_poses(self) -> Generator[HomogeneousTransformationMatrix, None, None]:
+    def grasp_poses(self) -> Generator[Pose, None, None]:
         """
         Yield grasp poses for this semantic annotation.
         """
@@ -908,7 +906,7 @@ class HasSupportingSurface(HasStorageSpace, ABC):
         surface_circuit_root = SumUnit(probabilistic_circuit=surface_circuit)
 
         objects_of_interest_variable = Symbolic(
-            "objects_of_interest", Set.from_iterable(objects_of_interest)
+            name="objects_of_interest", domain=Set.from_iterable(objects_of_interest)
         )
 
         for object_of_interest in objects_of_interest:
@@ -924,14 +922,14 @@ class HasSupportingSurface(HasStorageSpace, ABC):
             )
 
             x_p = GaussianDistribution(
-                SpatialVariables.x.value,
-                float(surface_P_obj.x),
-                variance,
+                variable=SpatialVariables.x.value,
+                location=float(surface_P_obj.x),
+                scale=variance,
             )
             y_p = GaussianDistribution(
-                SpatialVariables.y.value,
-                float(surface_P_obj.y),
-                variance,
+                variable=SpatialVariables.y.value,
+                location=float(surface_P_obj.y),
+                scale=variance,
             )
 
             p_object_root.add_subcircuit(leaf(object_of_interest_p, surface_circuit))

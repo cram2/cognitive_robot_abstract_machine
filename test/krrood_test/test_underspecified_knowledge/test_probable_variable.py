@@ -43,7 +43,7 @@ def test_underspecification_with_where():
     )
     r = t.translate()
 
-    result_by_hand = SimpleEvent(
+    result_by_hand = SimpleEvent.from_data(
         {
             Continuous("KRROODPose.orientation.x"): ~singleton(1.0),
             Continuous("KRROODPose.position.y"): open(0.0, 10),
@@ -107,23 +107,23 @@ def test_dnf_checking():
     ]
     [p_x, p_y, p_z, o_z] = variables
 
-    e1 = SimpleEvent(
+    e1 = SimpleEvent.from_data(
         {
             p_x: singleton(0.0),
         }
     )
     e1.fill_missing_variables(variables)
-    e2 = SimpleEvent(
+    e2 = SimpleEvent.from_data(
         {
             p_z: closed(-1.0, 1.0),
             p_y: closed_open(-np.inf, 10.0),
         }
     )
     e2.fill_missing_variables(variables)
-    e3 = SimpleEvent({o_z: open(0.0, np.inf)})
+    e3 = SimpleEvent.from_data({o_z: open(0.0, np.inf)})
     e3.fill_missing_variables(variables)
 
-    result_by_hand = Event(e1, e2, e3)
+    result_by_hand = Event.from_simple_sets(e1, e2, e3)
 
     assert (result_by_hand - translated).is_empty()
     assert (translated - result_by_hand).is_empty()
@@ -160,7 +160,9 @@ def test_probable_variable_with_concrete_kwarg():
 def test_new_underspecified_with_factory():
 
     prob_q = underspecified(KRROODPose)(
-        position=underspecified(KRROODPosition.from_abc)(a=..., b=..., c=...),
+        position=underspecified(KRROODPosition.from_abc, target_type=KRROODPosition)(
+            a=..., b=..., c=...
+        ),
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     ).resolve()
     prob_q.where(prob_q.variable.position.x > 0.5)

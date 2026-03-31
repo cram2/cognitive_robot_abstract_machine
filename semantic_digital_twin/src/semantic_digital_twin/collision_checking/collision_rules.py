@@ -156,7 +156,7 @@ class AvoidAllCollisions(AvoidCollisionRule):
             self.added_collision_checks.add(collision_check)
 
 
-@dataclass
+@dataclass(eq=False)
 class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
     """
     Adds collision checks between all bodies managed by the rule and all bodies that do not belong to the robot.
@@ -208,6 +208,11 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
                 for body_id in body_subset_ids
             }
         return cls(robot=robot, body_subset=body_subset)
+
+    def __eq__(self, other):
+        if not isinstance(other, AvoidExternalCollisions):
+            return False
+        return self.robot == other.robot and self.body_subset == other.body_subset
 
 
 @dataclass
@@ -614,6 +619,17 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
     SRDF_DISABLE_ALL_COLLISIONS: ClassVar[str] = "disable_all_collisions"
     SRDF_DISABLE_SELF_COLLISION: ClassVar[str] = "disable_self_collision"
     SRDF_MOVEIT_DISABLE_COLLISIONS: ClassVar[str] = "disable_collisions"
+
+    allowed_collision_pairs: set[CollisionCheck] = field(default_factory=set)
+    """
+    Set of collision checks that are allowed to occur.
+    This is redeclared from super to set init=True
+    """
+    allowed_collision_bodies: set[Body] = field(default_factory=set)
+    """
+    Set of bodies that are allowed to collide.
+    This is redeclared from super to set init=True
+    """
 
     def update(self, world: World):
         """

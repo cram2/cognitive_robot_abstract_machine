@@ -165,8 +165,8 @@ The intersection of two simple intervals is a simple interval.
 :tags: []
 from random_events.interval import SimpleInterval, Interval, Bound
 
-i1 = SimpleInterval(1, 3, Bound.CLOSED, Bound.CLOSED)
-i2 = SimpleInterval(2, 4, Bound.OPEN, Bound.CLOSED)
+i1 = SimpleInterval.from_data(1, 3, Bound.CLOSED, Bound.CLOSED)
+i2 = SimpleInterval.from_data(2, 4, Bound.OPEN, Bound.CLOSED)
 i2.intersection_with(i1)
 ````
 
@@ -174,7 +174,7 @@ The complement of a simple interval is an interval.
 
 ```{code-cell} ipython3
 :tags: []
-Interval(*i2.complement())
+Interval.from_simple_sets(*i2.complement())
 ````
 
 Since every other set operation can be done using only the intersection, union and difference of two sets, we now 
@@ -349,7 +349,7 @@ from random_events.interval import *
 x = Continuous("x")
 y = Continuous("y")
 
-unit_square = SimpleEvent({x: closed(0, 1), y: closed(0, 1)}).as_composite_set()
+unit_square = SimpleEvent.from_data({x: closed(0, 1), y: closed(0, 1)}).as_composite_set()
 fig = go.Figure(unit_square.plot(), unit_square.plotly_layout())
 fig.update_layout(title="Unit Square")
 fig.show()
@@ -365,7 +365,7 @@ However, this does not influence the line of thinking.
 :tags: []
 
 
-not_x_and_R = SimpleEvent({x: (~closed(0, 1)) & closed(-1, 2), y: closed(-1, 2)}).as_composite_set()
+not_x_and_R = SimpleEvent.from_data({x: (~closed(0, 1)) & closed(-1, 2), y: closed(-1, 2)}).as_composite_set()
 fig = go.Figure(not_x_and_R.plot(), not_x_and_R.plotly_layout())
 fig.update_layout(title="Left and right part of the complement of the unit square.")
 fig.show()
@@ -378,7 +378,7 @@ complement of y and keep x the way it was.
 :tags: []
 
 
-not_y_and_x = SimpleEvent({x: closed(0, 1), y: (~closed(0, 1)) & closed(-1, 2)}).as_composite_set()
+not_y_and_x = SimpleEvent.from_data({x: closed(0, 1), y: (~closed(0, 1)) & closed(-1, 2)}).as_composite_set()
 fig.add_traces(not_y_and_x.plot())
 fig.update_layout(title="All parts of the complement of the unit square.")
 fig.show()
@@ -416,12 +416,12 @@ If you look at the floor plan of your kitchen, you could perhaps describe it as 
 ```{code-cell} ipython3
 :tags: []
 
-kitchen = SimpleEvent({x: closed(0, 6.6), y: closed(0, 7)}).as_composite_set()
-refrigerator = SimpleEvent({x: closed(5, 6), y: closed(6.3, 7)}).as_composite_set()
-top_kitchen_island = SimpleEvent({x: closed(0, 5), y: closed(6.5, 7)}).as_composite_set()
-left_cabinets = SimpleEvent({x: closed(0, 0.5), y: closed(0, 6.5)}).as_composite_set()
+kitchen = SimpleEvent.from_data({x: closed(0, 6.6), y: closed(0, 7)}).as_composite_set()
+refrigerator = SimpleEvent.from_data({x: closed(5, 6), y: closed(6.3, 7)}).as_composite_set()
+top_kitchen_island = SimpleEvent.from_data({x: closed(0, 5), y: closed(6.5, 7)}).as_composite_set()
+left_cabinets = SimpleEvent.from_data({x: closed(0, 0.5), y: closed(0, 6.5)}).as_composite_set()
 
-center_island = SimpleEvent({x: closed(2, 4), y: closed(3, 5)}).as_composite_set()
+center_island = SimpleEvent.from_data({x: closed(2, 4), y: closed(3, 5)}).as_composite_set()
 
 occupied_spaces = refrigerator | top_kitchen_island | left_cabinets | center_island
 fig = go.Figure(occupied_spaces.plot(), occupied_spaces.plotly_layout())

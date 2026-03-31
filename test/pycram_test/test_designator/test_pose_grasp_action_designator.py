@@ -10,6 +10,7 @@ from pycram.datastructures.grasp import GraspDescription
 from pycram.failures import PlanFailure
 from pycram.language import SequentialPlan
 from pycram.motion_executor import simulated_robot
+from pycram.plans.failures import PlanFailure
 from pycram.robot_plans.actions.core.pose_grasp import (
     PoseGraspActionDescription,
     PoseGraspAndLiftActionDescription,
@@ -22,7 +23,10 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspPose
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Pose,
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -36,7 +40,7 @@ class GraspableBox(HasGraspPose):
     def __post_init__(self):
         super().__post_init__()
         if self.grasp_pose is None:
-            self.grasp_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+            self.grasp_pose = Pose.from_xyz_rpy(
                 roll=numpy.pi / 2,
                 pitch=numpy.pi,
                 reference_frame=self.root,
@@ -54,6 +58,11 @@ def pose_grasp_world(tracy_world):
         collision=ShapeCollection([Box(scale=Scale(0.07, 0.07, 0.1))]),
         visual=ShapeCollection([Box(scale=Scale(0.07, 0.07, 0.1))]),
     )
+    hindrance_box = Body(
+        name=PrefixedName("hindrance_box"),
+        collision=ShapeCollection([Box(scale=Scale(0.07, 0.07, 0.1))]),
+        visual=ShapeCollection([Box(scale=Scale(0.07, 0.07, 0.1))]),
+    )
     with copy_world.modify_world():
         connection = Connection6DoF.create_with_dofs(
             copy_world,
@@ -65,22 +74,27 @@ def pose_grasp_world(tracy_world):
             ),
         )
         copy_world.add_connection(connection)
+        connection2 = Connection6DoF.create_with_dofs(
+            copy_world,
+            copy_world.root,
+            hindrance_box,
+            PrefixedName("hindrance_box_connection"),
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                0.8, 0.6, 0.93, reference_frame=tracy_world.root
+            ),
+        )
+        copy_world.add_connection(connection2)
 
     return copy_world, copy_view, Context(copy_world, copy_view)
 
 
-def _compute_grasp_pose(
-    world, view, body_name: str, arm: Arms
-) -> HomogeneousTransformationMatrix:
+def _compute_grasp_pose(world, view, body_name: str, arm: Arms) -> Pose:
     """Derive a valid grasp pose for a body using GraspDescription."""
     arm_view = ViewManager.get_arm_view(arm, view)
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT, VerticalAlignment.TOP, arm_view.manipulator
     )
-    return grasp_desc.grasp_pose(world.get_body_by_name(body_name)).to_spatial_type()
-
-
-# --- Precondition tests ---
+    return grasp_desc.grasp_pose(world.get_body_by_name(body_name))
 
 
 def test_pose_grasp_precondition_fails_without_grasp_pose(pose_grasp_world):
@@ -103,9 +117,6 @@ def test_pose_grasp_and_lift_precondition_fails_without_grasp_pose(pose_grasp_wo
 
     with pytest.raises(PlanFailure):
         action.validate_precondition()
-
-
-# --- Execution tests ---
 
 
 def test_pose_grasp_action(pose_grasp_world, rclpy_node):

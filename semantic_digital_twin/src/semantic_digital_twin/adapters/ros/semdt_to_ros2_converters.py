@@ -9,7 +9,10 @@ from std_msgs.msg import ColorRGBA
 from trimesh.visual import TextureVisuals
 from visualization_msgs.msg import Marker
 
-from semantic_digital_twin.adapters.ros.msg_converter import SemDTToRos2Converter, InputType
+from semantic_digital_twin.adapters.ros.msg_converter import (
+    SemDTToRos2Converter,
+    InputType,
+)
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -22,8 +25,7 @@ from semantic_digital_twin.world_description.geometry import (
     Cylinder,
     Sphere,
     Color,
-    FileMesh,
-    TriangleMesh,
+    Mesh,
 )
 
 
@@ -208,32 +210,13 @@ class SphereToRos2Converter(ShapeToRos2Converter[Sphere]):
 
 
 @dataclass
-class FileMeshToRos2Converter(ShapeToRos2Converter[FileMesh]):
+class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
 
     @classmethod
-    def convert(cls, data: FileMesh) -> Marker:
+    def convert(cls, data: Mesh) -> Marker:
         marker = super().convert(data)
         marker.type = visualization_msgs.Marker.MESH_RESOURCE
         marker.mesh_resource = "file://" + data.filename
-        marker.scale.x = data.scale.x
-        marker.scale.y = data.scale.y
-        marker.scale.z = data.scale.z
-        if data.mesh.visual.kind == TextureVisuals().kind:
-            marker.mesh_use_embedded_materials = True
-            marker.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0)
-        else:
-            marker.mesh_use_embedded_materials = False
-        return marker
-
-
-@dataclass
-class TriangleMeshToRos2Converter(ShapeToRos2Converter[TriangleMesh]):
-
-    @classmethod
-    def convert(cls, data: TriangleMesh) -> Marker:
-        marker = super().convert(data)
-        marker.type = visualization_msgs.Marker.MESH_RESOURCE
-        marker.mesh_resource = "file://" + data.file.name
         marker.scale.x = data.scale.x
         marker.scale.y = data.scale.y
         marker.scale.z = data.scale.z

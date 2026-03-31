@@ -3,6 +3,7 @@ matplotlib
 numpy
 sphinx-autoapi
 sphinxcontrib-plantuml
+sphinxcontrib-mermaid
 pylint
 jupytext
 nbconvert

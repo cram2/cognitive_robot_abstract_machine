@@ -65,7 +65,8 @@ def test_clear(rclpy_node, pr2_world_copy):
     )
 
     world_copy = deepcopy(pr2_world_copy)
-    pr2_world_copy.clear()
+    with pr2_world_copy.modify_world():
+        pr2_world_copy.clear()
     with pr2_world_copy.modify_world():
         pr2_world_copy.merge_world(world_copy)
 

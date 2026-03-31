@@ -212,7 +212,7 @@ class ObservationState(State):
             arg_idx=1, numpy_array=self.motion_statechart.life_cycle_state.data
         )
         self._compiled_updater.bind_args_to_memory_view(
-            arg_idx=2, numpy_array=context.world.state.data
+            arg_idx=2, numpy_array=context.world.state._data
         )
         self._compiled_updater.bind_args_to_memory_view(
             arg_idx=3, numpy_array=context.float_variable_data.data

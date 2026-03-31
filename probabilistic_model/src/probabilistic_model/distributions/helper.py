@@ -1,6 +1,11 @@
 from random_events.variable import Continuous, Symbolic, Integer
 
-from probabilistic_model.distributions.distributions import DiracDeltaDistribution, SymbolicDistribution, IntegerDistribution, UnivariateDistribution
+from probabilistic_model.distributions.distributions import (
+    DiracDeltaDistribution,
+    SymbolicDistribution,
+    IntegerDistribution,
+    UnivariateDistribution,
+)
 from probabilistic_model.utils import MissingDict
 
 
@@ -18,10 +23,16 @@ def make_dirac(variable, value) -> UnivariateDistribution:
     :raises NotImplementedError: When the variable type is unsupported.
     """
     if isinstance(variable, Continuous):
-        return DiracDeltaDistribution(variable, value, 1.)
+        return DiracDeltaDistribution(
+            variable=variable, location=value, density_cap=1.0
+        )
     elif isinstance(variable, Symbolic):
-        return SymbolicDistribution(variable, MissingDict(float, {hash(value): 1.}))
+        return SymbolicDistribution(
+            variable=variable, probabilities=MissingDict(float, {hash(value): 1.0})
+        )
     elif isinstance(variable, Integer):
-        return IntegerDistribution(variable, MissingDict(float, {value: 1.}))
+        return IntegerDistribution(
+            variable=variable, probabilities=MissingDict(float, {value: 1.0})
+        )
     else:
         raise NotImplementedError

@@ -78,7 +78,7 @@ mlartifacts
 .drawio
 
 # Documentation build artifacts
-**/doc/_build/
+**/_build/
 **/.jupyter_cache/
 **/test_tmp/
 semantic_digital_twin/resources/output

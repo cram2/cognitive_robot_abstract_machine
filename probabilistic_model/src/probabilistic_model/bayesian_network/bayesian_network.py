@@ -8,9 +8,14 @@ from matplotlib import pyplot as plt
 from random_events.variable import Symbolic, Variable
 from typing_extensions import Optional, Any, Self, List, Tuple, Set, Iterable, Dict
 
-from probabilistic_model.distributions import SymbolicDistribution
+from probabilistic_model.distributions.distributions import SymbolicDistribution
 from probabilistic_model.distributions.helper import make_dirac
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit, ProductUnit, SumUnit, leaf
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProbabilisticCircuit,
+    ProductUnit,
+    SumUnit,
+    leaf,
+)
 
 
 @dataclass
@@ -22,7 +27,9 @@ class Node:
     For inference, convert the bayesian network to a probabilistic circuit.
     """
 
-    bayesian_network: Optional[BayesianNetwork] = field(kw_only=True, repr=False, default=None)
+    bayesian_network: Optional[BayesianNetwork] = field(
+        kw_only=True, repr=False, default=None
+    )
     """
     The bayesian network this node is part of. 
     """
@@ -32,7 +39,9 @@ class Node:
     The index of the node in the graph of its circuit.
     """
 
-    product_units: Dict[Any, ProductUnit] = field(init=False, default_factory=dict, repr=False)
+    product_units: Dict[Any, ProductUnit] = field(
+        init=False, default_factory=dict, repr=False
+    )
     """
     A dictionary from states of the variable to product units. Only needed during conversion to probabilistic circuits.
     """
@@ -107,14 +116,20 @@ class BayesianNetwork:
 
         :return: True if the graph is valid, False otherwise.
         """
-        return rx.is_connected(self.graph) and (len(self.edges()) == (len(self.nodes()) - 1)) and self.root
+        return (
+            rx.is_connected(self.graph)
+            and (len(self.edges()) == (len(self.nodes()) - 1))
+            and self.root
+        )
 
     def add_node(self, node: Node):
 
         if node.bayesian_network is self and node.index is not None:
             return
         elif node.bayesian_network is not None and node.bayesian_network is not self:
-            raise NotImplementedError("Cannot add a node that already belongs to another bayesian network.")
+            raise NotImplementedError(
+                "Cannot add a node that already belongs to another bayesian network."
+            )
 
         node.index = self.graph.add_node(node)
 
@@ -142,8 +157,14 @@ class BayesianNetwork:
         return self.graph.predecessors(unit.index)
 
     def in_edges(self, node: Node) -> List[Tuple[Node, Node, Optional[float]]]:
-        return [(self.graph.get_node_data(parent_index), node, edge_data,)
-                for parent_index, _, edge_data in self.graph.in_edges(node.index)]
+        return [
+            (
+                self.graph.get_node_data(parent_index),
+                node,
+                edge_data,
+            )
+            for parent_index, _, edge_data in self.graph.in_edges(node.index)
+        ]
 
     def nodes(self) -> List[Node]:
         """
@@ -154,7 +175,10 @@ class BayesianNetwork:
         return self.graph.nodes()
 
     def edges(self) -> List[Tuple[Node, Node]]:
-        return [(self.graph[parent], self.graph[child]) for parent, child in self.graph.edge_list()]
+        return [
+            (self.graph[parent], self.graph[child])
+            for parent, child in self.graph.edge_list()
+        ]
 
     def in_degree(self, node: Node):
         return self.graph.in_degree(node.index)
@@ -176,7 +200,9 @@ class BayesianNetwork:
                 raise ValueError("The root is not an instance of Root.")
             return possible_roots[0]
         elif len(possible_roots) > 1:
-            raise ValueError(f"More than one root found. Possible roots are {possible_roots}")
+            raise ValueError(
+                f"More than one root found. Possible roots are {possible_roots}"
+            )
         else:
             raise ValueError(f"No root found.")
 
@@ -205,8 +231,12 @@ class BayesianNetwork:
 
     def plot(self):
         import rustworkx.visualization
-        rustworkx.visualization.mpl_draw(self.graph, with_labels=True,
-                                         labels=lambda node: ", ".join(v.name for v in node.variables))
+
+        rustworkx.visualization.mpl_draw(
+            self.graph,
+            with_labels=True,
+            labels=lambda node: ", ".join(v.name for v in node.variables),
+        )
         plt.show()
 
 
@@ -233,8 +263,17 @@ class Root(Node):
         self.root = SumUnit(probabilistic_circuit=result)
         for value, probability in self.distribution.probabilities.items():
             prod = ProductUnit(probabilistic_circuit=result)
-            distribution = leaf(make_dirac(self.variable, value, ), result)
-            self.root.add_subcircuit(prod, np.log(probability), )
+            distribution = leaf(
+                make_dirac(
+                    self.variable,
+                    value,
+                ),
+                result,
+            )
+            self.root.add_subcircuit(
+                prod,
+                np.log(probability),
+            )
             prod.add_subcircuit(distribution)
             self.product_units[value] = prod
 
@@ -246,7 +285,9 @@ class ConditionalProbabilityTable(Node):
     The parent in this case must be exactly one node.
     """
 
-    conditional_probability_distributions: Dict[Any, SymbolicDistribution] = field(default_factory=dict)
+    conditional_probability_distributions: Dict[Any, SymbolicDistribution] = field(
+        default_factory=dict
+    )
     __hash__ = Node.__hash__
 
     @property
@@ -271,22 +312,39 @@ class ConditionalProbabilityTable(Node):
         parent_domain_hash_map = self.parent.variable.domain.hash_map
         own_domain_hash_map = self.variable.domain.hash_map
 
-        for parent_hash, distribution in self.conditional_probability_distributions.items():
+        for (
+            parent_hash,
+            distribution,
+        ) in self.conditional_probability_distributions.items():
             for own_hash, probability in distribution.probabilities.items():
-                table.append([str(parent_domain_hash_map[parent_hash]), str(own_domain_hash_map[own_hash]),
-                              str(probability)])
+                table.append(
+                    [
+                        str(parent_domain_hash_map[parent_hash]),
+                        str(own_domain_hash_map[own_hash]),
+                        str(probability),
+                    ]
+                )
         return table
 
     def as_probabilistic_circuit(self, result: ProbabilisticCircuit):
         for value in self.variable.domain:
             prod = ProductUnit(probabilistic_circuit=result)
-            distribution = leaf(make_dirac(self.variable, value, ), result)
+            distribution = leaf(
+                make_dirac(
+                    self.variable,
+                    value,
+                ),
+                result,
+            )
             prod.add_subcircuit(distribution)
             self.product_units[value.element] = prod
 
         parent = self.parent
 
-        for key, conditional_distribution in self.conditional_probability_distributions.items():
+        for (
+            key,
+            conditional_distribution,
+        ) in self.conditional_probability_distributions.items():
             sum_unit = SumUnit(probabilistic_circuit=result)
             parent.product_units[key].add_subcircuit(sum_unit)
 
@@ -300,7 +358,9 @@ class ConditionalProbabilisticCircuit(Node):
     Conditional probability distribution represented as Circuit for Bayesian Network nodes given their parents.
     """
 
-    conditional_probability_distributions: Dict[int, ProbabilisticCircuit] = field(default_factory=dict)
+    conditional_probability_distributions: Dict[int, ProbabilisticCircuit] = field(
+        default_factory=dict
+    )
     __hash__ = Node.__hash__
 
     @property
@@ -309,7 +369,9 @@ class ConditionalProbabilisticCircuit(Node):
 
     @property
     def variables(self) -> Tuple[Variable, ...]:
-        return tuple(list(self.conditional_probability_distributions.values())[0].variables)
+        return tuple(
+            list(self.conditional_probability_distributions.values())[0].variables
+        )
 
     def __repr__(self):
         return f"P({', '.join([v.name for v in self.variables])} | {self.parent.variable.name})"
@@ -317,7 +379,10 @@ class ConditionalProbabilisticCircuit(Node):
     def as_probabilistic_circuit(self, result: ProbabilisticCircuit):
         parent = self.parent
 
-        for key, conditional_distribution in self.conditional_probability_distributions.items():
+        for (
+            key,
+            conditional_distribution,
+        ) in self.conditional_probability_distributions.items():
             old_root = conditional_distribution.root
             node_remap = result.mount(old_root)
             root_in_result = node_remap[old_root.index]

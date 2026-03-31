@@ -13,7 +13,10 @@ from typing_extensions import Dict, Any, Sequence, Self
 from typing_extensions import List, Optional, Type
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
-from krrood.ormatic.dao import AlternativeMapping, T
+from krrood.ormatic.data_access_objects.alternative_mappings import (
+    AlternativeMapping,
+    T,
+)
 from krrood.symbol_graph.symbol_graph import Symbol
 
 
@@ -39,7 +42,7 @@ class KRROODPosition(Symbol):
     z: float
 
     @classmethod
-    def from_abc(cls, a: float, b: float, c: float) -> Self:
+    def from_abc(cls, a: float, b: float, c: float) -> Position:
         return KRROODPosition(a, b, c)
 
 
@@ -205,8 +208,8 @@ class EntityAssociation(Symbol):
 # Define an explicit mapping DAO that maps to the base entity class
 
 
-@dataclass
-class CustomEntity(AlternativeMapping[Entity]):
+@dataclass(eq=False)
+class EntityMapping(AlternativeMapping[Entity]):
     overwritten_name: str
 
     @classmethod
@@ -250,7 +253,7 @@ class Backreference(Symbol):
     reference: Reference = None
 
 
-@dataclass
+@dataclass(eq=False)
 class BackreferenceMapping(AlternativeMapping[Backreference]):
     values: List[int]
     reference: Reference
@@ -289,7 +292,7 @@ class KRROODVector(Symbol):
     x: float
 
 
-@dataclass
+@dataclass(eq=False)
 class KRROODVectorMapped(AlternativeMapping[KRROODVector]):
     x: float
 
@@ -306,7 +309,7 @@ class Rotation(Symbol):
     angle: float
 
 
-@dataclass
+@dataclass(eq=False)
 class RotationMapped(AlternativeMapping[Rotation]):
 
     angle: float
@@ -325,7 +328,7 @@ class KRROODTransformation(Symbol):
     rotation: Rotation
 
 
-@dataclass
+@dataclass(eq=False)
 class KRROODTransformationMapped(AlternativeMapping[KRROODTransformation]):
     vector: KRROODVector
     rotation: Rotation
@@ -363,7 +366,7 @@ class KRROODVectorsWithProperty(Symbol):
         return self._vectors
 
 
-@dataclass
+@dataclass(eq=False)
 class KRROODVectorsWithPropertyMapped(AlternativeMapping[KRROODVectorsWithProperty]):
     vectors: List[KRROODVector]
 
@@ -386,7 +389,7 @@ class ChildBase(ParentBase):
     pass
 
 
-@dataclass
+@dataclass(eq=False)
 class ParentBaseMapping(AlternativeMapping[ParentBase]):
     name: str
 
@@ -400,7 +403,7 @@ class ParentBaseMapping(AlternativeMapping[ParentBase]):
         return ParentBase(self.name, 0)
 
 
-@dataclass
+@dataclass(eq=False)
 class ChildBaseMapping(ParentBaseMapping, AlternativeMapping[ChildBase]):
 
     @classmethod
@@ -458,7 +461,7 @@ class InheritanceLevel2WithoutSymbolButAlternativelyMapped(
     level_two_attribute: float = 0
 
 
-@dataclass
+@dataclass(eq=False)
 class InheritanceBaseWithoutSymbolButAlternativelyMappedMapping(
     AlternativeMapping[InheritanceBaseWithoutSymbolButAlternativelyMapped]
 ):
@@ -472,7 +475,7 @@ class InheritanceBaseWithoutSymbolButAlternativelyMappedMapping(
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(eq=False)
 class InheritanceLevel1WithoutSymbolButAlternativelyMappedMapping(
     InheritanceBaseWithoutSymbolButAlternativelyMappedMapping,
     AlternativeMapping[InheritanceLevel1WithoutSymbolButAlternativelyMapped],
@@ -484,7 +487,7 @@ class InheritanceLevel1WithoutSymbolButAlternativelyMappedMapping(
         return cls(obj.base_attribute, obj.level_one_attribute)
 
 
-@dataclass
+@dataclass(eq=False)
 class InheritanceLevel2WithoutSymbolButAlternativelyMappedMapping(
     InheritanceLevel1WithoutSymbolButAlternativelyMappedMapping,
     AlternativeMapping[InheritanceLevel2WithoutSymbolButAlternativelyMapped],
@@ -513,7 +516,7 @@ class ChildLevel2NormallyMapped(ChildLevel1NormallyMapped):
     level_two_attribute: float = 0
 
 
-@dataclass
+@dataclass(eq=False)
 class ParentAlternativelyMappedMapping(AlternativeMapping[ParentAlternativelyMapped]):
     derived_attribute: str
     entities: List[Entity]

@@ -175,7 +175,7 @@ class GraphOfConvexSets:
         Plot the free space of the environment in blue.
         :return: A list of traces that can be put into a plotly figure.
         """
-        free_space = Event(*[node.simple_event for node in self.graph.nodes()])
+        free_space = Event.from_simple_sets(*[node.simple_event for node in self.graph.nodes()])
         return free_space.plot(color="blue")
 
     def plot_occupied_space(self) -> List[go.Mesh3d]:
@@ -183,7 +183,7 @@ class GraphOfConvexSets:
         Plot the occupied space of the environment in red.
         :return: A list of traces that can be put into a plotly figure.
         """
-        free_space = Event(*[node.simple_event for node in self.graph.nodes()])
+        free_space = Event.from_simple_sets(*[node.simple_event for node in self.graph.nodes()])
         occupied_space = ~free_space & self.search_space.event
         return occupied_space.plot(color="red")
 
@@ -542,9 +542,9 @@ class GraphOfConvexSets:
 
         free_space = ~obstacles & search_event
 
-        SimpleEvent({SpatialVariables.z.value: reals()})
+        SimpleEvent.from_data({SpatialVariables.z.value: reals()})
         # create floor level
-        z_event = SimpleEvent({SpatialVariables.z.value: reals()}).as_composite_set()
+        z_event = SimpleEvent.from_data({SpatialVariables.z.value: reals()}).as_composite_set()
         z_event.fill_missing_variables(SpatialVariables.xy)
         free_space.fill_missing_variables(SortedSet([SpatialVariables.z.value]))
         free_space &= z_event

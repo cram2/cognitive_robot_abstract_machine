@@ -29,12 +29,12 @@ class ContinuousDistributionTestCase(unittest.TestCase):
 
     def setUp(self):
         self.leaf = leaf(
-            UniformDistribution(self.variable, closed(0, 1).simple_sets[0]),
+            UniformDistribution(variable=self.variable, interval=closed(0, 1).simple_sets[0]),
             probabilistic_circuit=ProbabilisticCircuit(),
         )
 
     def test_conditional_from_simple_event(self):
-        event = SimpleEvent({self.variable: closed(0.5, 2)}).as_composite_set()
+        event = SimpleEvent.from_data({self.variable: closed(0.5, 2)}).as_composite_set()
         conditional, probability = self.leaf.probabilistic_circuit.truncated(event)
         self.assertEqual(len(list(conditional.nodes())), 1)
         self.assertEqual(probability, 0.5)
@@ -43,7 +43,7 @@ class ContinuousDistributionTestCase(unittest.TestCase):
         )
 
     def test_conditional_from_singleton_event(self):
-        event = SimpleEvent({self.variable: singleton(0.3)}).as_composite_set()
+        event = SimpleEvent.from_data({self.variable: singleton(0.3)}).as_composite_set()
         conditional, probability = self.leaf.probabilistic_circuit.truncated(event)
         self.assertIsNone(conditional)
 
@@ -57,7 +57,7 @@ class ContinuousDistributionTestCase(unittest.TestCase):
 
     def test_conditional_from_complex_event(self):
         interval = closed(0.0, 0.2) | closed(0.5, 1.0) | singleton(0.3)
-        event = SimpleEvent({self.variable: interval})
+        event = SimpleEvent.from_data({self.variable: interval})
         conditional, probability = self.leaf.probabilistic_circuit.truncated(
             event.as_composite_set()
         )
@@ -67,13 +67,13 @@ class ContinuousDistributionTestCase(unittest.TestCase):
         self.assertIsInstance(conditional.root, SumUnit)
 
     def test_conditional_with_none(self):
-        event = SimpleEvent({self.variable: singleton(2)}).as_composite_set()
+        event = SimpleEvent.from_data({self.variable: singleton(2)}).as_composite_set()
         conditional, probability = self.leaf.probabilistic_circuit.truncated(event)
         self.assertEqual(conditional, None)
 
 
 class DiscreteDistributionTestCase(unittest.TestCase):
-    symbol = Symbolic("animal", Set.from_iterable(Animal))
+    symbol = Symbolic(name="animal", domain=Set.from_iterable(Animal))
     integer = Integer("x")
 
     symbolic_distribution: ProbabilisticCircuit
@@ -85,12 +85,12 @@ class DiscreteDistributionTestCase(unittest.TestCase):
             {hash(Animal.CAT): 0.1, hash(Animal.DOG): 0.2, hash(Animal.FISH): 0.7},
         )
         self.symbolic_distribution = leaf(
-            SymbolicDistribution(self.symbol, symbolic_probabilities),
+            SymbolicDistribution(variable=self.symbol, probabilities=symbolic_probabilities),
             ProbabilisticCircuit(),
         ).probabilistic_circuit
         integer_probabilities = MissingDict(float, {0: 0.1, 1: 0.2, 2: 0.7})
         self.integer_distribution = leaf(
-            IntegerDistribution(self.integer, integer_probabilities),
+            IntegerDistribution(variable=self.integer, probabilities=integer_probabilities),
             ProbabilisticCircuit(),
         ).probabilistic_circuit
 

@@ -1,7 +1,8 @@
-from __future__ import annotations
+from __future__ import annotations, absolute_import
 
+import traceback
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Callable
 from uuid import UUID
 
 from typing_extensions import (
@@ -36,6 +37,9 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.degree_of_freedom import (
         DegreeOfFreedomLimits,
     )
+    from semantic_digital_twin.world_description.world_modification import (
+        WorldModification,
+    )
 
 
 @dataclass
@@ -64,6 +68,32 @@ class UnknownWorldModification(DataclassException):
             " Make sure that world modifications are atomic and that every atomic modification is "
             "represented by exactly one subclass of WorldModelModification."
             "This module might be incomplete, you can help by expanding it."
+        )
+
+
+@dataclass
+class MismatchingIDsInWorldModification(DataclassException):
+    """
+    Raised when the UUIDs of a world modification during application are not consistent with the UUIDs assigned during initialization.
+    """
+
+    modification_type: Type[WorldModification]
+
+    original_uuids: list[UUID]
+    """
+    The original UUIDs of the Modification.
+    """
+
+    actual_uuids: list[UUID]
+    """
+    The actual UUIDs of the Modification.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"The world modification of type {self.modification_type.__name__} was initialized the following UUIDs: {self.original_uuids}"
+            f"But during the application of those modifications, the UUIDs were {self.actual_uuids}."
+            f"Somehow the original UUIDs were overridden, which should not happen."
         )
 
 
@@ -436,6 +466,17 @@ class AmbiguousNameError(ValueError):
 class UnresolvedNameError(ValueError):
     """Raised when no semantic annotation class matches a given name."""
 
+@dataclass
+class RootNodeNotFoundError(DataclassException):
+    """
+    Raised when the root node cannot be found or is ambiguous in a scene graph.
+    """
+
+    candidates: List[str]
+    """The candidate node names that were considered as potential roots."""
+
+    def __post_init__(self):
+        self.message = f"Could not determine unique root node. Candidates: {self.candidates}"
 
 @dataclass
 class CollisionCheckingError(DataclassException):
@@ -474,3 +515,30 @@ class BodyHasNoGeometryError(InvalidCollisionCheckError):
             self.message += (
                 f"Body {self.collision_check.body_b.name} has collision geometry."
             )
+
+
+@dataclass
+class AtomicWorldModificationNotAtomic(DataclassException):
+    """
+    Exception raised when atomic world modifications are overlapping.
+    If this exception is raised, it means that somewhere in the code a function decorated with @atomic_world_modification
+    triggered another function decorated with it. This must not happen ever!
+    """
+
+    modification: Callable
+    """
+    The callable that tried to atomically modify the world.
+    """
+
+    world: World
+    """
+    The world where this happened.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"World {self.world} is already being modified atomically by "
+            f"{self.world._current_active_atomic_world_modification.__name__}.\n"
+            f"{self.modification.__name__} tried to perform an atomic world modification anyways."
+        )
+        super().__post_init__()

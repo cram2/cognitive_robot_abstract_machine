@@ -16,11 +16,14 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 )
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionBetweenGroups,
+    AvoidExternalCollisions,
 )
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -41,7 +44,9 @@ class RetractDirection(Enum):
 
 
 def make_rule_for_allowing_collision_between_two_groups(
-    bodies1: List[Body], bodies2: List[Body]
+    bodies1: List[Body],
+    bodies2: List[Body],
+    robot: AbstractRobot,
 ) -> UpdateTemporaryCollisionRules:
     """Create a temporary collision rule that allows collisions between two groups of bodies."""
     return UpdateTemporaryCollisionRules(
@@ -53,7 +58,8 @@ def make_rule_for_allowing_collision_between_two_groups(
                 body_group_b=[
                     b for b in bodies2 if b is not None and b.has_collision()
                 ],
-            )
+            ),
+            AvoidExternalCollisions(robot=robot),
         ]
     )
 
@@ -98,10 +104,13 @@ class CollisionAwareArmMotion(BaseMotion):
                 return tasks[0]
             return Parallel(tasks, minimum_success=minimum_success)
         allow_rule = make_rule_for_allowing_collision_between_two_groups(
-            self._hand_bodies, self.allowed_collision_bodies
+            self._hand_bodies, self.allowed_collision_bodies, robot=self._hand._robot
         )
         motion = Parallel(
-            [*tasks, ExternalCollisionAvoidance(), SelfCollisionAvoidance()],
+            [
+                *tasks,
+                ExternalCollisionAvoidance(robot=self._hand._robot),
+            ],
             minimum_success=minimum_success,
         )
         return Parallel([allow_rule, motion])
@@ -115,7 +124,7 @@ class PoseGraspMotion(CollisionAwareArmMotion):
     grasp pose), then moves to the actual grasp pose.
     """
 
-    grasp_pose: HomogeneousTransformationMatrix
+    grasp_pose: Pose
     pre_grasp_distance: float = 0.1
     """Distance to offset the pre-grasp pose along the negative z-axis of the grasp pose (in meters)."""
     pre_grasp_threshold: float = 0.25

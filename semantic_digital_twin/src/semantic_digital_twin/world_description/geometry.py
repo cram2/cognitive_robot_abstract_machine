@@ -1,25 +1,25 @@
 from __future__ import annotations
 
 import itertools
+import logging
 import os
 import tempfile
+import weakref
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
-from enum import Enum
 from functools import cached_property
 
 import numpy as np
 import trimesh
 import trimesh.exchange.stl
 from PIL import Image
-from random_events.interval import SimpleInterval, Bound, closed
-from random_events.product_algebra import SimpleEvent
 from trimesh.visual.texture import TextureVisuals, SimpleMaterial
 from typing_extensions import Optional, List, Dict, Any, Self, Tuple, TYPE_CHECKING
 
-from krrood.adapters.exceptions import JSON_TYPE_NAME
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
+from random_events.interval import SimpleInterval, Bound, closed
+from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_types import (
@@ -38,6 +38,8 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 id_generator = IDGenerator()
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -193,7 +195,7 @@ class Scale:
         extend_result_in_direction: Optional[Vector3] = None,
         amount: float = 0.0,
     ) -> SimpleEvent:
-        simple_event = SimpleEvent(
+        simple_event = SimpleEvent.from_data(
             {
                 SpatialVariables.x.value: closed(-self.x / 2, self.x / 2),
                 SpatialVariables.y.value: closed(-self.y / 2, self.y / 2),
@@ -316,9 +318,6 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         """
         new_origin = HomogeneousTransformationMatrix(
             self.origin.to_np(),
-            reference_frame=world.get_kinematic_structure_entity_by_name(
-                self.origin.reference_frame.name
-            ),
         )
         shape_props = fields(self)
         new_props = {
@@ -330,7 +329,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
 
 
 @dataclass(eq=False)
-class Mesh(Shape, ABC):
+class Mesh(Shape):
     """
     Abstract mesh class.
     Subclasses must provide a `mesh` property returning a trimesh.Trimesh.
@@ -341,11 +340,10 @@ class Mesh(Shape, ABC):
     Scale of the mesh.
     """
 
-    @property
-    @abstractmethod
-    def mesh(self) -> trimesh.Trimesh:
-        """Return the loaded mesh object."""
-        raise NotImplementedError
+    filename: str = ""
+    """
+    Filename of the mesh.
+    """
 
     @property
     def local_frame_bounding_box(self) -> BoundingBox:
@@ -356,15 +354,25 @@ class Mesh(Shape, ABC):
         return BoundingBox.from_mesh(self.mesh, self.origin)
 
     def to_json(self) -> Dict[str, Any]:
+        # Serialize the raw (unscaled, unprocessed) mesh geometry and the scale separately
+        base_mesh = trimesh.load_mesh(self.filename, process=False)
         return {
             **super().to_json(),
-            "mesh": self.mesh.to_dict(),
+            "mesh": base_mesh.to_dict(),
             "scale": to_json(self.scale),
         }
 
     @classmethod
-    @abstractmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self: ...
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Mesh:
+        # Recreate the trimesh without processing to preserve exact topology
+        mesh = trimesh.Trimesh(
+            vertices=data["mesh"]["vertices"],
+            faces=data["mesh"]["faces"],
+            process=False,
+        )
+        origin = from_json(data["origin"], **kwargs)
+        scale = from_json(data["scale"], **kwargs)
+        return cls.from_trimesh(mesh=mesh, origin=origin, scale=scale)
 
     @classmethod
     def add_uv(cls, mesh: trimesh.Trimesh, uv: np.ndarray) -> trimesh.Trimesh:
@@ -402,18 +410,6 @@ class Mesh(Shape, ABC):
         copy_mesh.apply_scale(scale.to_np())
         return copy_mesh
 
-
-@dataclass(eq=False)
-class FileMesh(Mesh):
-    """
-    A mesh shape defined by a file.
-    """
-
-    filename: str = ""
-    """
-    Filename of the mesh.
-    """
-
     @cached_property
     def mesh(self) -> trimesh.Trimesh:
         """
@@ -424,37 +420,16 @@ class FileMesh(Mesh):
         mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
         return mesh
 
-    def to_triangle_mesh(self) -> TriangleMesh:
-        return TriangleMesh(
-            mesh=self.mesh, origin=self.origin, color=self.color, scale=self.scale
-        )
-
-    def to_json(self) -> Dict[str, Any]:
-        json = {
-            **super().to_json(),
-            "mesh": self.mesh.to_dict(),
-            "scale": to_json(self.scale),
-        }
-        json[JSON_TYPE_NAME] = json[JSON_TYPE_NAME].replace("FileMesh", "TriangleMesh")
-        return json
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        raise NotImplementedError(
-            f"{cls} does not support loading from JSON due to filenames across different systems."
-            f" Use TriangleMesh instead."
-        )
-
     @classmethod
     def from_file(
         cls, file_path: str, texture_file_path: Optional[str] = None, **kwargs
-    ) -> FileMesh:
+    ) -> Mesh:
         """
-        Create a FileMesh from a file path.
+        Create a Mesh from a file path.
 
         :param file_path: Path to the mesh file.
         :param texture_file_path: Optional path to the texture file.
-        :return: FileMesh object.
+        :return: Mesh object.
         """
         file_mesh = cls(filename=file_path, **kwargs)
         if texture_file_path is not None:
@@ -463,50 +438,92 @@ class FileMesh(Mesh):
             )
         return file_mesh
 
+    @classmethod
+    def from_trimesh(
+        cls,
+        mesh: trimesh.Trimesh,
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        scale: Optional[Scale] = None,
+        uv: Optional[np.ndarray] = None,
+        texture_file_path: Optional[str] = None,
+        dirname: str = "/tmp",
+        file_type: str = "stl",
+    ) -> "Mesh":
+        if origin is None:
+            origin = HomogeneousTransformationMatrix()
+        if scale is None:
+            scale = Scale()
+        if uv is not None:
+            mesh = cls.add_uv(mesh=mesh, uv=uv)
+        if texture_file_path is not None:
+            mesh = cls.add_texture(mesh=mesh, texture_file_path=texture_file_path)
 
-@dataclass(eq=False)
-class TriangleMesh(Mesh):
-    """
-    A mesh shape defined by vertices and faces.
-    """
-
-    mesh: Optional[trimesh.Trimesh] = None
-    """
-    The loaded mesh object.
-    """
-
-    def __post_init__(self):
-        self.mesh.apply_scale(self.scale.to_np())
-
-    @property
-    def filename(self) -> str:
-        return self.file.name
-
-    @cached_property
-    def file(
-        self, dirname: str = "/tmp", file_type: str = "obj"
-    ) -> tempfile._TemporaryFileWrapper:
-        f = tempfile.NamedTemporaryFile(
+        # Capture path immediately and close handle before trimesh opens the file
+        with tempfile.NamedTemporaryFile(
             dir=dirname, suffix=f".{file_type}", delete=False
+        ) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            if file_type == "obj":
+                mesh.export(tmp_path, file_type="obj")
+
+                old_mtl_file = "material.mtl"
+                new_mtl_file = f"{os.path.basename(tmp_path)}.mtl"
+                old_mtl = os.path.join(dirname, old_mtl_file)
+                new_mtl = os.path.join(dirname, new_mtl_file)
+
+                if os.path.exists(old_mtl):
+                    os.rename(old_mtl, new_mtl)
+
+                with open(tmp_path) as f:
+                    text = f.read()
+                text = text.replace(old_mtl_file, new_mtl_file)
+                with open(tmp_path, "w") as f:
+                    f.write(text)
+
+            elif file_type == "stl":
+                mesh.export(tmp_path, file_type="stl")
+
+            else:
+                raise ValueError(f"Unsupported file type: {file_type}")
+
+        except Exception:
+            # Clean up temp files on failure so nothing is orphaned
+            for path in [
+                tmp_path,
+                os.path.join(dirname, f"{os.path.basename(tmp_path)}.mtl"),
+            ]:
+                if os.path.exists(path):
+                    os.remove(path)
+            raise
+
+        instance = cls(
+            origin=origin,
+            scale=scale,
+            filename=tmp_path,
         )
-        if file_type == "obj":
-            self.mesh.export(f.name, file_type="obj")
-            old_mtl_file = "material.mtl"
-            new_mtl_file = f"{os.path.basename(f.name)}.mtl"
-            old_mtl = os.path.join(dirname, old_mtl_file)
-            new_mtl = os.path.join(dirname, new_mtl_file)
-            if os.path.exists(old_mtl):
-                os.rename(old_mtl, new_mtl)
-            with open(f.name) as f:
-                text = f.read()
-            text = text.replace(old_mtl_file, new_mtl_file)
-            with open(f.name, "w") as f:
-                f.write(text)
-        elif file_type == "stl":
-            self.mesh.export(f.name, file_type="stl")
-        else:
-            raise ValueError(f"Unsupported file type: {file_type}")
-        return f
+
+        # Tie file lifetime to the Mesh instance
+        weakref.finalize(instance, cls._cleanup_temp_files, tmp_path, dirname)
+
+        return instance
+
+    @staticmethod
+    def _cleanup_temp_files(tmp_path: str, dirname: str) -> None:
+        """
+        Clean up temporary files created for the mesh.
+        """
+        for path in [
+            tmp_path,
+            os.path.join(dirname, f"{os.path.basename(tmp_path)}.mtl"),
+        ]:
+            logger.debug(f"Cleaning up temporary file: {path}")
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except OSError:
+                pass
 
     @classmethod
     def from_vertices_and_faces(
@@ -517,35 +534,25 @@ class TriangleMesh(Mesh):
         scale: np.ndarray,
         uv: Optional[np.ndarray] = None,
         texture_file_path: Optional[str] = None,
-    ) -> TriangleMesh:
+    ) -> Mesh:
         """
-        Create a triangle mesh from vertices, faces, origin, and scale.
+        Create a mesh from vertices, faces, origin, and scale.
 
         :param vertices: Vertices of the mesh.
         :param faces: Faces of the mesh.
         :param origin: Origin of the mesh.
         :param scale: Scale of the mesh.
         :param uv: Optional UV coordinates.
-        :return: TriangleMesh object.
+        :return: Mesh object.
         """
         mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
-        if uv is not None:
-            mesh = cls.add_uv(mesh=mesh, uv=uv)
-        if texture_file_path is not None:
-            mesh = cls.add_texture(mesh=mesh, texture_file_path=texture_file_path)
-
-        origin = HomogeneousTransformationMatrix(data=origin)
-        scale = Scale(x=scale[0], y=scale[1], z=scale[2])
-        return cls(mesh=mesh, origin=origin, scale=scale)
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> TriangleMesh:
-        mesh = trimesh.Trimesh(
-            vertices=data["mesh"]["vertices"], faces=data["mesh"]["faces"]
+        return cls.from_trimesh(
+            mesh=mesh,
+            origin=origin,
+            scale=scale,
+            uv=uv,
+            texture_file_path=texture_file_path,
         )
-        origin = from_json(data["origin"], **kwargs)
-        scale = from_json(data["scale"], **kwargs)
-        return cls(mesh=mesh, origin=origin, scale=scale)
 
     @classmethod
     def from_3d_points(
@@ -616,7 +623,7 @@ class TriangleMesh(Mesh):
         hull.update_faces(hull.nondegenerate_faces())
         hull.process()
 
-        return cls(
+        return cls.from_trimesh(
             mesh=hull,
             origin=HomogeneousTransformationMatrix(reference_frame=reference_frame),
         )
@@ -817,21 +824,27 @@ class BoundingBox:
         """
         :return: The x interval of the bounding box.
         """
-        return SimpleInterval(self.min_x, self.max_x, Bound.CLOSED, Bound.CLOSED)
+        return SimpleInterval.from_data(
+            self.min_x, self.max_x, Bound.CLOSED, Bound.CLOSED
+        )
 
     @property
     def y_interval(self) -> SimpleInterval:
         """
         :return: The y interval of the bounding box.
         """
-        return SimpleInterval(self.min_y, self.max_y, Bound.CLOSED, Bound.CLOSED)
+        return SimpleInterval.from_data(
+            self.min_y, self.max_y, Bound.CLOSED, Bound.CLOSED
+        )
 
     @property
     def z_interval(self) -> SimpleInterval:
         """
         :return: The z interval of the bounding box.
         """
-        return SimpleInterval(self.min_z, self.max_z, Bound.CLOSED, Bound.CLOSED)
+        return SimpleInterval.from_data(
+            self.min_z, self.max_z, Bound.CLOSED, Bound.CLOSED
+        )
 
     @property
     def scale(self) -> Scale:
@@ -857,7 +870,7 @@ class BoundingBox:
         """
         :return: The bounding box as a random event.
         """
-        return SimpleEvent(
+        return SimpleEvent.from_data(
             {
                 SpatialVariables.x.value: self.x_interval,
                 SpatialVariables.y.value: self.y_interval,

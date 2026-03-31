@@ -1,9 +1,12 @@
+from dataclasses import dataclass, field
+
 import numpy as np
 
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
 from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
+@dataclass
 class MonteCarloEstimator:
     """
     This is a wrapper class for using monte carlo estimations of a model that can be sampled from and where the
@@ -15,14 +18,10 @@ class MonteCarloEstimator:
     The wrapped model.
     """
 
-    sample_size: int
+    sample_size: int = field(default=100)
     """
     The number of samples to use for the estimation.
     """
-
-    def __init__(self, model: ProbabilisticModel, sample_size: int = 100):
-        self.model = model
-        self.sample_size = sample_size
 
     def l1_metric_but_with_uniform_measure(self, other: ProbabilisticModel):
         """

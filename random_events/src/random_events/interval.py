@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import enum
 import math
-from typing import Dict, Any
+from dataclasses import dataclass, field, InitVar
+from typing import Dict, Any, Tuple, Union, Optional
 
 import random_events_lib as rl
 from typing_extensions import Self, Iterable
@@ -26,85 +27,86 @@ class Bound(enum.IntEnum):
     """
 
 
+@dataclass(eq=False)
 class SimpleInterval(sigma_algebra.AbstractSimpleSet):
     """
     A simple interval.
     A simple interval is the convex hull of two points.
+
+    .. attention::
+        Use :py:func:`from_data` class method to create a simple interval from a dictionary, do not use the constructor directly.
     """
 
-    _cpp_object: rl.SimpleInterval
+    cpp_object: rl.SimpleInterval = field(
+        default_factory=lambda: rl.SimpleInterval(
+            0.0, 0.0, Bound.OPEN.value, Bound.OPEN.value
+        )
+    )
 
-    def __init__(
-        self,
+    @classmethod
+    def from_data(
+        cls,
         lower: float = 0,
         upper: float = 0,
         left: Bound = Bound.OPEN,
         right: Bound = Bound.OPEN,
-    ):
-        """
-        Creates a new simple interval.
-        :param lower: The lower bound of the interval.
-        :param upper: The upper bound of the interval.
-        :param left: The bound type of the lower bound.
-        :param right: The bound type of the upper bound.
-        """
-        self._cpp_object = rl.SimpleInterval(lower, upper, left.value, right.value)
+    ) -> Self:
+        instance = cls.__new__(cls)
+        instance.cpp_object = rl.SimpleInterval(lower, upper, left.value, right.value)
+        return instance
 
     @property
     def lower(self) -> float:
         """
         :return: The lower bound of the interval.
         """
-        return self._cpp_object.lower
+        return self.cpp_object.lower
 
     @lower.setter
     def lower(self, value: float):
-        self._cpp_object.lower = value
+        self.cpp_object.lower = value
 
     @property
     def upper(self) -> float:
         """
         :return: The upper bound of the interval.
         """
-        return self._cpp_object.upper
+        return self.cpp_object.upper
 
     @upper.setter
     def upper(self, value: float):
-        self._cpp_object.upper = value
+        self.cpp_object.upper = value
 
     @property
     def left(self) -> Bound:
         """
         :return: The bound type of the lower bound.
         """
-        return Bound(self._cpp_object.left.value)
+        return Bound(self.cpp_object.left.value)
 
     @left.setter
     def left(self, value: Bound):
-        self._cpp_object.left = value.value
+        self.cpp_object.left = value.value
 
     @property
     def right(self) -> Bound:
         """
         :return: The bound type of the upper bound.
         """
-        return Bound(self._cpp_object.right.value)
+        return Bound(self.cpp_object.right.value)
 
     @right.setter
     def right(self, value: Bound):
-        self._cpp_object.right = value.value
+        self.cpp_object.right = value.value
 
     @classmethod
     def _from_cpp(cls, cpp_object: rl.SimpleInterval) -> Self:
-        return cls(
-            cpp_object.lower,
-            cpp_object.upper,
-            Bound(cpp_object.left.value),
-            Bound(cpp_object.right.value),
+        return cls.from_data(
+            cpp_object.lower, cpp_object.upper, cpp_object.left, cpp_object.right
         )
 
     def as_composite_set(self) -> Interval:
-        return Interval(self)
+        return Interval.from_simple_sets(self)
 
     def is_singleton(self) -> bool:
         """
@@ -139,8 +141,8 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any]) -> Self:
-        return cls(
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls.from_data(
             data["lower"], data["upper"], Bound[data["left"]], Bound[data["right"]]
         )
 
@@ -165,9 +167,10 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
         yield from range(rounded_lower, rounded_upper + 1)
 
     def __deepcopy__(self):
-        return self.__class__(self.lower, self.upper, self.left, self.right)
+        return SimpleInterval.from_data(self.lower, self.upper, self.left, self.right)
 
 
+@dataclass(eq=False)
 class Interval(sigma_algebra.AbstractCompositeSet):
     """
     Represents an interval.
@@ -175,23 +178,35 @@ class Interval(sigma_algebra.AbstractCompositeSet):
     An interval is a union of simple intervals.
 
     A simplified interval is an interval where adjacent simple intervals are merged.
+
+    .. attention::
+        Use :py:func:`from_simple_sets` class method to create an interval from a list of simple intervals, do not use the constructor directly.
     """
 
-    _cpp_object: rl.Interval
-    simple_set_example = SimpleInterval()
+    cpp_object: rl.Interval = field(default_factory=lambda: rl.Interval())
+    simple_set_example: SimpleInterval = field(init=False)
 
-    def __init__(self, *simple_sets):
+    @classmethod
+    def from_simple_sets(
+        cls, *simple_sets: Union[Tuple[SimpleInterval, ...], SimpleInterval]
+    ) -> Self:
         """
-        Creates a new interval.
+        Create an interval from a list of simple intervals.
         :param simple_sets: The simple intervals that make up the interval.
+        :return: The interval.
         """
-        self._cpp_object = rl.Interval(
-            {simple_set._cpp_object for simple_set in simple_sets}
+        instance = cls.__new__(cls)
+        instance.simple_set_example = SimpleInterval.from_data()
+        if not isinstance(simple_sets, tuple):
+            simple_sets = (simple_sets,)
+        instance.cpp_object = rl.Interval(
+            {simple_set.cpp_object for simple_set in simple_sets}
         )
+        return instance
 
     @classmethod
     def _from_cpp(cls, cpp_object: rl.Interval) -> Self:
-        return cls(
+        return cls.from_simple_sets(
             *[
                 SimpleInterval._from_cpp(cpp_simple_interval)
                 for cpp_simple_interval in cpp_object.simple_sets

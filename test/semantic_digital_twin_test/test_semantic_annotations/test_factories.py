@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from krrood.adapters.json_serializer import to_json
-from krrood.ormatic.dao import to_dao
+from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     InvalidPlaneDimensions,

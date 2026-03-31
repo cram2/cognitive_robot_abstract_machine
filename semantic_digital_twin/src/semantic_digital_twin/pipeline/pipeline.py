@@ -6,11 +6,15 @@ from typing import List, Callable
 
 import numpy as np
 
-from semantic_digital_twin.semantic_annotations.mixins import HasRootKinematicStructureEntity
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasRootKinematicStructureEntity,
+)
 from semantic_digital_twin.spatial_types import Point3
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.geometry import TriangleMesh, FileMesh
+from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -78,7 +82,7 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
             vertices = []
 
             for coll in body.collision:
-                if isinstance(coll, (FileMesh, TriangleMesh)):
+                if isinstance(coll, Mesh):
                     mesh = coll.mesh
                     if mesh.vertices.shape[0] > 0:
                         vertices.append(mesh.vertices.copy())
@@ -96,7 +100,7 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
             center = (mins + maxs) / 2.0
 
             for coll in body.collision:
-                if isinstance(coll, (FileMesh, TriangleMesh)):
+                if isinstance(coll, Mesh):
                     m = coll.mesh
                     if m.vertices.shape[0] > 0:
                         m.vertices -= center

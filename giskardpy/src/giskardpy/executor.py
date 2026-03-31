@@ -149,7 +149,7 @@ class Executor:
         if self.qp_controller is None:
             return
         next_cmd = self.qp_controller.compute_command(
-            world_state=self.context.world.state.data,
+            world_state=self.context.world.state._data,
             life_cycle_state=self.motion_statechart.life_cycle_state.data,
             float_variables=self.context.float_variable_data.data,
         )

@@ -1,21 +1,29 @@
 import jax.numpy as jnp
 import numpy as np
-from jax.experimental.sparse import BCOO, BCSR, CSC, CSR
+from jax.experimental.sparse import BCOO, BCSR
 from random_events.interval import SimpleInterval, Bound
 import jax
-from scipy.sparse import csr_matrix, csr_array, csc_array
+from scipy.sparse import csr_array, csc_array
 from typing_extensions import Tuple
-
-from probabilistic_model.utils import timeit_print
 
 
 def copy_bcoo(x: BCOO) -> BCOO:
-    return x.__class__((x.data.copy(), x.indices.copy()), shape=x.shape, indices_sorted=x.indices_sorted,
-                unique_indices=x.unique_indices)
+    return x.__class__(
+        (x.data.copy(), x.indices.copy()),
+        shape=x.shape,
+        indices_sorted=x.indices_sorted,
+        unique_indices=x.unique_indices,
+    )
+
 
 def copy_bcsr(x: BCSR) -> BCSR:
-    return x.__class__((x.data.copy(), x.indices.copy(), x.indptr.copy()), shape=x.shape, indices_sorted=x.indices_sorted,
-                unique_indices=x.unique_indices)
+    return x.__class__(
+        (x.data.copy(), x.indices.copy(), x.indptr.copy()),
+        shape=x.shape,
+        indices_sorted=x.indices_sorted,
+        unique_indices=x.unique_indices,
+    )
+
 
 def simple_interval_to_open_array(interval: SimpleInterval) -> jnp.array:
     lower = jnp.array(interval.lower)
@@ -65,6 +73,7 @@ def create_bcoo_indices_from_row_lengths(row_lengths: np.array) -> np.array:
 
     return np.vstack((row_indices, col_indices)).T
 
+
 def create_bcoo_indices_from_row_lengths_np(row_lengths: np.array) -> np.array:
     """
     Create the indices of a BCOO array with the given row lengths.
@@ -104,7 +113,9 @@ def create_bcoo_indices_from_row_lengths_np(row_lengths: np.array) -> np.array:
     return np.vstack((row_indices, col_indices))
 
 
-def create_bcsr_indices_from_row_lengths(row_lengths: jax.Array) -> Tuple[jax.Array, jax.Array]:
+def create_bcsr_indices_from_row_lengths(
+    row_lengths: jax.Array,
+) -> Tuple[jax.Array, jax.Array]:
     """
     Create the column indices and indent pointer of bcsr array with the given row lengths.
 
@@ -139,11 +150,15 @@ def create_bcsr_indices_from_row_lengths(row_lengths: jax.Array) -> Tuple[jax.Ar
 
 def embed_sparse_array_in_nan_array(sparse_array: BCOO) -> jax.Array:
     result = jnp.full(sparse_array.shape, jnp.nan, dtype=jnp.float32)
-    result = result.at[sparse_array.indices[:, 0], sparse_array.indices[:, 1]].set(sparse_array.data)
+    result = result.at[sparse_array.indices[:, 0], sparse_array.indices[:, 1]].set(
+        sparse_array.data
+    )
     return result
 
 
-def sample_from_sparse_probabilities_csc(probabilities: csr_array, amount: np.array) -> csc_array:
+def sample_from_sparse_probabilities_csc(
+    probabilities: csr_array, amount: np.array
+) -> csc_array:
     """
     Sample from a sparse array of probabilities.
     Each row in the sparse array encodes a categorical probability distribution.
@@ -152,9 +167,17 @@ def sample_from_sparse_probabilities_csc(probabilities: csr_array, amount: np.ar
     :param amount: The amount of samples to draw from each row.
     :return: The samples that are drawn for each state in the probabilities indicies.
     """
-    all_samples = np.concatenate([np.random.multinomial(amount_.item(), pvals=probability_row.data) for amount_, probability_row in zip(amount, probabilities)], axis=0)
-    result = csr_array((all_samples, probabilities.indices, probabilities.indptr),
-                       shape=probabilities.shape).tocsc(copy=False)
+    all_samples = np.concatenate(
+        [
+            np.random.multinomial(amount_.item(), pvals=probability_row.data)
+            for amount_, probability_row in zip(amount, probabilities)
+        ],
+        axis=0,
+    )
+    result = csr_array(
+        (all_samples, probabilities.indices, probabilities.indptr),
+        shape=probabilities.shape,
+    ).tocsc(copy=False)
     return result
 
 
@@ -182,6 +205,7 @@ def remove_rows_and_cols_where_all(array: jax.Array, value: float) -> jax.Array:
     valid = array[valid_rows][:, valid_cols]
     return valid
 
+
 def shrink_index_array(index_array: jax.Array) -> jax.Array:
     """
     Shrink an index array to only contain successive indices.
@@ -204,7 +228,6 @@ def shrink_index_array(index_array: jax.Array) -> jax.Array:
         for new_index, unique_index in zip(range(len(unique_indices)), unique_indices):
             result = result.at[result[:, dim] == unique_index, dim].set(new_index)
 
-
     return result
 
 
@@ -224,7 +247,7 @@ def sparse_remove_rows_and_cols_where_all(array: BCOO, value: float) -> BCOO:
     """
     # get indices of values where all elements are equal to a given value
     values = array.data
-    valid_elements = (values != value)
+    valid_elements = values != value
 
     # filter indices by valid elements
     valid_indices = array.indices[valid_elements]
@@ -235,6 +258,10 @@ def sparse_remove_rows_and_cols_where_all(array: BCOO, value: float) -> BCOO:
     new_shape = jnp.max(valid_indices, axis=0) + 1
 
     # construct result tensor
-    result = BCOO((values[valid_elements], valid_indices), shape=new_shape, indices_sorted=array.indices_sorted,
-                  unique_indices=array.unique_indices)
+    result = BCOO(
+        (values[valid_elements], valid_indices),
+        shape=new_shape,
+        indices_sorted=array.indices_sorted,
+        unique_indices=array.unique_indices,
+    )
     return result

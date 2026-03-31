@@ -13,7 +13,7 @@ from semantic_digital_twin.robots.abstract_robot import Manipulator, AbstractRob
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vector3, Quaternion
 from semantic_digital_twin.world_description.world_entity import Body, KinematicStructureEntity
-from pycram.datastructures.dataclasses import Rotations
+from pycram.datastructures.rotations import Rotations
 from pycram.datastructures.enums import Grasp, AxisIdentifier, ApproachDirection, VerticalAlignment, Arms
 from pycram.tf_transformations import quaternion_multiply
 from pycram.utils import translate_pose_along_local_axis

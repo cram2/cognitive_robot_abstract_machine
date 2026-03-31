@@ -632,12 +632,14 @@ class VariableConstraintWidget(QFrame):
             for widget in self.interval_widgets:
                 values = widget.value()
                 low, high = min(values), max(values)
-                intervals.append(SimpleInterval(low, high, Bound.CLOSED, Bound.CLOSED))
+                intervals.append(
+                    SimpleInterval.from_data(low, high, Bound.CLOSED, Bound.CLOSED)
+                )
 
             if not intervals:
                 return variable, variable.domain
 
-            return variable, Interval(*intervals)
+            return variable, Interval.from_simple_sets(*intervals)
         elif isinstance(variable, Symbolic):
             list_widget: QListWidget = self.constraint_widget
             selected_items = list_widget.selectedItems()
@@ -652,8 +654,8 @@ class VariableConstraintWidget(QFrame):
             if not matched_elements:
                 return variable, Set()  # Empty set
 
-            return variable, Set(
-                *[SetElement(e, all_elements) for e in matched_elements]
+            return variable, Set.from_simple_sets(
+                *[SetElement.from_data(e, all_elements) for e in matched_elements]
             )
 
         return None

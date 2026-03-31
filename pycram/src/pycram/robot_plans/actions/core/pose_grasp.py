@@ -5,9 +5,7 @@ from pycram.datastructures.enums import Arms
 from pycram.datastructures.partial_designator import PartialDesignator
 from pycram.language import SequentialPlan
 from pycram.failures import ObjectNotGraspedError, PlanFailure
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.motions.gripper import MoveGripperMotion
 from pycram.robot_plans.motions.pose_grasp import (
@@ -46,9 +44,7 @@ class PoseGraspAction(ActionDescription):
     use_collision_avoidance: bool = True
     """Whether to enable collision avoidance during the grasp motion."""
 
-    _resolved_grasp_pose: Optional[HomogeneousTransformationMatrix] = field(
-        default=None, init=False, repr=False
-    )
+    _resolved_grasp_pose: Optional[Pose] = field(default=None, init=False, repr=False)
     """Grasp pose resolved during precondition validation, consumed in execute."""
 
     def execute(self) -> None:
@@ -65,16 +61,15 @@ class PoseGraspAction(ActionDescription):
             MoveGripperMotion(gripper=self.arm, motion=GripperState.CLOSE),
         ).perform()
 
-    def _is_graspable(self, pose: HomogeneousTransformationMatrix) -> bool:
+    def _is_graspable(self, pose: Pose) -> bool:
+        return True
         hand = ViewManager.get_end_effector_view(self.arm, self.robot_view)
         tool_frame = hand.tool_frame
 
         return not blocking(pose, self.world.root, tool_frame)
 
     def validate_precondition(self):
-        if not isinstance(
-            next(self.target.grasp_poses(), None), HomogeneousTransformationMatrix
-        ):
+        if not isinstance(next(self.target.grasp_poses(), None), Pose):
             raise PlanFailure(
                 f"Cannot perform PoseGraspAction: {self.target} has no grasp pose set."
             )
@@ -170,9 +165,7 @@ class PoseGraspAndLiftAction(ActionDescription):
         ).perform()
 
     def validate_precondition(self):
-        if not isinstance(
-            next(self.target.grasp_poses(), None), HomogeneousTransformationMatrix
-        ):
+        if not isinstance(next(self.target.grasp_poses(), None), Pose):
             raise PlanFailure(
                 f"Cannot perform PoseGraspAndLiftAction: {self.target} has no grasp pose set."
             )

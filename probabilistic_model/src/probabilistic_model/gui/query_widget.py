@@ -192,7 +192,7 @@ class QueryWidget(QWidget):
         self.result_label.setText(f"P(Q | E) = {prob:.5f}")
 
     def build_event(self, widgets_list: List[VariableConstraintWidget]) -> Event:
-        simple_event = SimpleEvent()
+        simple_event = SimpleEvent.from_data()
         for widget in widgets_list:
             constraint = widget.get_constraint()
             if constraint:
@@ -211,7 +211,7 @@ class QueryWidget(QWidget):
         if not simple_event:
             return Event()
 
-        return Event(simple_event)
+        return Event.from_simple_sets(simple_event)
 
     def refresh(self):
         """Called when a new model is loaded."""

@@ -1,13 +1,8 @@
 import unittest
-
-from matplotlib import pyplot as plt
+from krrood.adapters.json_serializer import to_json, from_json
 from random_events.interval import closed
-from random_events.variable import Continuous
-from typing_extensions import Union
-
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
-import plotly.graph_objects as go
 
 
 class NormalizationTestCase(unittest.TestCase):
@@ -15,8 +10,8 @@ class NormalizationTestCase(unittest.TestCase):
 
     def test_normalization(self):
         pc = ProbabilisticCircuit()
-        u1 = leaf(UniformDistribution(self.x, closed(0, 1).simple_sets[0]), pc)
-        u2 = leaf(UniformDistribution(self.x, closed(3, 4).simple_sets[0]), pc)
+        u1 = leaf(UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]), pc)
+        u2 = leaf(UniformDistribution(variable=self.x, interval=closed(3, 4).simple_sets[0]), pc)
         sum_unit = SumUnit(probabilistic_circuit=pc)
         sum_unit.add_subcircuit(u1, np.log(0.5))
         sum_unit.add_subcircuit(u2, np.log(0.3))
@@ -34,8 +29,8 @@ class SumUnitTestCase(unittest.TestCase):
 
     def setUp(self):
         pc = ProbabilisticCircuit()
-        u1 = leaf(UniformDistribution(self.x, closed(0, 1).simple_sets[0]), pc)
-        u2 = leaf(UniformDistribution(self.x, closed(3, 4).simple_sets[0]), pc)
+        u1 = leaf(UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]), pc)
+        u2 = leaf(UniformDistribution(variable=self.x, interval=closed(3, 4).simple_sets[0]), pc)
 
         model = SumUnit(probabilistic_circuit=pc)
         model.add_subcircuit(u1, np.log(0.6))
@@ -54,7 +49,7 @@ class SumUnitTestCase(unittest.TestCase):
 
     def test_domain(self):
         domain = self.model.support
-        domain_by_hand = SimpleEvent(
+        domain_by_hand = SimpleEvent.from_data(
             {self.x: closed(0, 1) | closed(3, 4)}
         ).as_composite_set()
         self.assertEqual(domain, domain_by_hand)
@@ -73,19 +68,19 @@ class SumUnitTestCase(unittest.TestCase):
         self.assertEqual(result, 0.6)
 
     def test_probability(self):
-        event = SimpleEvent({self.x: closed(0, 3.5)}).as_composite_set()
+        event = SimpleEvent.from_data({self.x: closed(0, 3.5)}).as_composite_set()
         result = self.model.probability(event)
         self.assertEqual(result, 0.8)
 
     def test_conditional(self):
-        event = SimpleEvent({self.x: closed(0, 0.5)}).as_composite_set()
+        event = SimpleEvent.from_data({self.x: closed(0, 0.5)}).as_composite_set()
         result, probability = self.model.truncated(event)
         self.assertAlmostEqual(probability, 0.3)
         self.assertEqual(len(list(result.nodes())), 1)
         self.assertIsInstance(result.root, LeafUnit)
 
     def test_conditional_impossible(self):
-        event = SimpleEvent({self.x: closed(5, 6)}).as_composite_set()
+        event = SimpleEvent.from_data({self.x: closed(5, 6)}).as_composite_set()
         result, probability = self.model.truncated(event)
         self.assertEqual(probability, 0.0)
         self.assertIsNone(result)
@@ -107,16 +102,16 @@ class SumUnitTestCase(unittest.TestCase):
     def test_mode(self):
         mode, likelihood = self.model.mode()
         self.assertEqual(likelihood, 0.6)
-        self.assertEqual(mode, SimpleEvent({self.x: closed(0, 1)}).as_composite_set())
+        self.assertEqual(mode, SimpleEvent.from_data({self.x: closed(0, 1)}).as_composite_set())
 
     def test_serialization(self):
-        event = SimpleEvent({self.x: closed(0, 0.5)}).as_composite_set()
-        serialized = self.model.to_json()
-        deserialized = ProbabilisticCircuit.from_json(serialized)
+        event = SimpleEvent.from_data({self.x: closed(0, 0.5)}).as_composite_set()
+        serialized = to_json(self.model)
+        deserialized = from_json(serialized)
         self.assertEqual(self.model.probability(event), deserialized.probability(event))
 
     def test_conditional_inference(self):
-        event = SimpleEvent({self.x: closed(0, 0.5)}).as_composite_set()
+        event = SimpleEvent.from_data({self.x: closed(0, 0.5)}).as_composite_set()
         result, probability = self.model.truncated(event)
         self.assertEqual(result.probability(event), 1)
 
@@ -125,7 +120,7 @@ class SumUnitTestCase(unittest.TestCase):
         s1 = SumUnit(probabilistic_circuit=ProbabilisticCircuit())
         s2 = SumUnit(probabilistic_circuit=pc)
         s3 = SumUnit(probabilistic_circuit=pc)
-        u1 = leaf(UniformDistribution(self.x, closed(0, 1).simple_sets[0]), pc)
+        u1 = leaf(UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]), pc)
         s2.probabilistic_circuit.add_nodes_from([s2, s3, u1])
         s2.probabilistic_circuit.add_edges_from([(s2, s3, 1.0), (s3, u1, 1.0)])
         s1.probabilistic_circuit.mount(s2)

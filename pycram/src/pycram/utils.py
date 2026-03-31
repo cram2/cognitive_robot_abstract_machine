@@ -159,53 +159,6 @@ class bcolors:
     UNDERLINE = "\033[4m"
 
 
-class GeneratorList:
-    """Implementation of generator list wrappers.
-
-    Generator lists store the elements of a generator, so these can be fetched multiple times.
-
-    Methods:
-    get -- get the element at a specific index.
-    has -- check if an element at a specific index exists.
-    """
-
-    def __init__(self, generator: Callable):
-        """Create a new generator list.
-
-        Arguments:
-        generator -- the generator to use.
-        """
-        if isgeneratorfunction(generator):
-            self._generator = generator()
-        else:
-            self._generator = generator
-
-        self._generated = []
-
-    def get(self, index: int = 0):
-        """Get the element at a specific index or raise StopIteration if it doesn't exist.
-
-        Arguments:
-        index -- the index to get the element of.
-        """
-        while len(self._generated) <= index:
-            self._generated.append(next(self._generator))
-
-        return self._generated[index]
-
-    def has(self, index: int) -> bool:
-        """Check if an element at a specific index exists and return True or False.
-
-        Arguments:
-        index -- the index to check for.
-        """
-        try:
-            self.get(index)
-            return True
-        except StopIteration:
-            return False
-
-
 def axis_angle_to_quaternion(axis: List, angle: float) -> Tuple:
     """
     Convert axis-angle to quaternion.
@@ -369,82 +322,6 @@ def xyzw_to_wxyz_arr(xyzw: np.ndarray) -> np.ndarray:
     wxyz[0] = xyzw[3]
     wxyz[1:] = xyzw[:3]
     return wxyz
-
-
-class ClassPropertyDescriptor:
-    """
-    A helper that can be used to define properties of a class like the built-in ones but does not require the class
-    to be instantiated.
-    """
-
-    def __init__(self, fget, fset=None):
-        self.fget = fget
-        self.fset = fset
-
-    def __get__(self, obj, klass=None):
-        if klass is None:
-            klass = type(obj)
-        return self.fget.__get__(obj, klass)()
-
-    def __set__(self, obj, value):
-        if not self.fset:
-            raise AttributeError("can't set attribute")
-        type_ = type(obj)
-        return self.fset.__get__(obj, type_)(value)
-
-    def setter(self, func):
-        if not isinstance(func, (classmethod, staticmethod)):
-            func = classmethod(func)
-        self.fset = func
-        return self
-
-
-def classproperty(func):
-    if not isinstance(func, (classmethod, staticmethod)):
-        func = classmethod(func)
-
-    return ClassPropertyDescriptor(func)
-
-
-def lazy_product(*iterables: Iterable, iter_names: List[str] = None) -> Iterable[Tuple]:
-    """
-    Lazily generate the cartesian product of the iterables.
-
-    :param iterables: Iterable of iterables to construct product for.
-    :param iter_names: Optional names for the iterables for better error messages.
-    :return: Iterable of tuples in the cartesian product.
-    """
-
-    consumable_iterables = [iter(iterable) for iterable in iterables]
-
-    current_value = []
-    for i, consumable_iterable in enumerate(consumable_iterables):
-        try:
-            current_value.append(next(consumable_iterable))
-        except StopIteration as e:
-            raise RuntimeError(
-                f"No values in the iterable: {consumable_iterable} for iterable '{iter_names[i] if iter_names else i}'"
-            )
-
-    while True:
-        yield tuple(current_value)
-
-        for index in range(len(consumable_iterables) - 1, -1, -1):
-            current_iterable = consumable_iterables[index]
-            try:
-                consumable_value = next(current_iterable)
-                current_value[index] = consumable_value
-                break
-            except StopIteration as e:
-                if index == 0:
-                    return
-                consumable_iterables[index] = iter(iterables[index])
-                try:
-                    current_value[index] = next(consumable_iterables[index])
-                except StopIteration as e:
-                    raise StopIteration(
-                        f"No more values in the iterable: {iterables[index]}"
-                    )
 
 
 def translate_pose_along_local_axis(

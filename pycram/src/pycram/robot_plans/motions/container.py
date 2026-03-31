@@ -28,7 +28,7 @@ class OpeningMotion(BaseMotion):
 
     @property
     def _motion_chart(self):
-        tip = ViewManager().get_end_effector_view(self.arm, self.robot_view).tool_frame
+        tip = ViewManager().get_end_effector_view(self.arm, self.robot).tool_frame
         return Open(tip_link=tip, environment_link=self.object_part)
 
 
@@ -52,7 +52,7 @@ class ClosingMotion(BaseMotion):
 
     @property
     def _motion_chart(self):
-        tip = ViewManager().get_end_effector_view(self.arm, self.robot_view).tool_frame
+        tip = ViewManager().get_end_effector_view(self.arm, self.robot).tool_frame
         return Close(
             tip_link=tip, environment_link=self.object_part, goal_joint_state=0.01
         )
