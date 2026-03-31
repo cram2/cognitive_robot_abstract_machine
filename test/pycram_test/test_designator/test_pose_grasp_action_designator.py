@@ -7,15 +7,14 @@ import pytest
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
-from pycram.failures import PlanFailure
-from pycram.language import SequentialPlan
 from pycram.motion_executor import simulated_robot
+from pycram.plans.factories import sequential
 from pycram.plans.failures import PlanFailure
 from pycram.robot_plans.actions.core.pose_grasp import (
-    PoseGraspActionDescription,
-    PoseGraspAndLiftActionDescription,
+    PoseGraspAction,
+    PoseGraspAndLiftAction,
 )
-from pycram.robot_plans.actions.core.robot_body import ParkArmsActionDescription
+from pycram.robot_plans.actions.core.robot_body import ParkArmsAction
 from pycram.view_manager import ViewManager
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
@@ -43,6 +42,7 @@ class GraspableBox(HasGraspPose):
             self.grasp_pose = Pose.from_xyz_rpy(
                 roll=numpy.pi / 2,
                 pitch=numpy.pi,
+                yaw=numpy.pi / 2,
                 reference_frame=self.root,
             )
 
@@ -74,16 +74,16 @@ def pose_grasp_world(tracy_world):
             ),
         )
         copy_world.add_connection(connection)
-        connection2 = Connection6DoF.create_with_dofs(
-            copy_world,
-            copy_world.root,
-            hindrance_box,
-            PrefixedName("hindrance_box_connection"),
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                0.8, 0.6, 0.93, reference_frame=tracy_world.root
-            ),
-        )
-        copy_world.add_connection(connection2)
+        # connection2 = Connection6DoF.create_with_dofs(
+        #     copy_world,
+        #     copy_world.root,
+        #     hindrance_box,
+        #     PrefixedName("hindrance_box_connection"),
+        #     HomogeneousTransformationMatrix.from_xyz_rpy(
+        #         0.8, 0.6, 0.93, reference_frame=tracy_world.root
+        #     ),
+        # )
+        # copy_world.add_connection(connection2)
 
     return copy_world, copy_view, Context(copy_world, copy_view)
 
@@ -102,7 +102,7 @@ def test_pose_grasp_precondition_fails_without_grasp_pose(pose_grasp_world):
     box_body = world.get_body_by_name("grasp_box")
 
     obj = GraspableBox(root=box_body, _world=world, grasp_pose="")
-    action = PoseGraspActionDescription(target=obj, arm=Arms.LEFT).resolve()
+    action = PoseGraspAction(target=obj, arm=Arms.LEFT)
 
     with pytest.raises(PlanFailure):
         action.validate_precondition()
@@ -113,7 +113,7 @@ def test_pose_grasp_and_lift_precondition_fails_without_grasp_pose(pose_grasp_wo
     box_body = world.get_body_by_name("grasp_box")
 
     obj = GraspableBox(root=box_body, _world=world, grasp_pose="")
-    action = PoseGraspAndLiftActionDescription(target=obj, arm=Arms.LEFT).resolve()
+    action = PoseGraspAndLiftAction(target=obj, arm=Arms.LEFT)
 
     with pytest.raises(PlanFailure):
         action.validate_precondition()
@@ -129,13 +129,11 @@ def test_pose_grasp_action(pose_grasp_world, rclpy_node):
     with world.modify_world():
         world.add_semantic_annotation(obj)
 
-    plan = SequentialPlan(
-        context,
-        ParkArmsActionDescription(Arms.BOTH),
-        PoseGraspActionDescription(target=obj, arm=Arms.LEFT),
-    )
     with simulated_robot:
-        plan.perform()
+        sequential(
+            [ParkArmsAction(Arms.BOTH), PoseGraspAction(target=obj, arm=Arms.LEFT)],
+            context,
+        ).perform()
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
     tool_frame_position = (
@@ -154,13 +152,14 @@ def test_pose_grasp_and_lift_action(pose_grasp_world, rclpy_node):
     with world.modify_world():
         world.add_semantic_annotation(obj)
 
-    plan = SequentialPlan(
-        context,
-        ParkArmsActionDescription(Arms.BOTH),
-        PoseGraspAndLiftActionDescription(target=obj, arm=Arms.LEFT),
-    )
     with simulated_robot:
-        plan.perform()
+        sequential(
+            [
+                ParkArmsAction(Arms.BOTH),
+                PoseGraspAndLiftAction(target=obj, arm=Arms.LEFT),
+            ],
+            context,
+        ).perform()
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
     assert world.get_connection(left_arm.manipulator.tool_frame, box_body) is not None

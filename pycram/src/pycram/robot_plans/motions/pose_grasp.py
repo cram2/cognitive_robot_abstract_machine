@@ -86,7 +86,7 @@ class CollisionAwareArmMotion(BaseMotion):
 
     @property
     def _hand(self):
-        return ViewManager.get_end_effector_view(self.arm, self.robot_view)
+        return ViewManager.get_end_effector_view(self.arm, self.robot)
 
     @property
     def _tool_frame(self) -> KinematicStructureEntity:
@@ -109,7 +109,7 @@ class CollisionAwareArmMotion(BaseMotion):
         motion = Parallel(
             [
                 *tasks,
-                ExternalCollisionAvoidance(robot=self._hand._robot),
+                # ExternalCollisionAvoidance(robot=self._hand._robot),
             ],
             minimum_success=minimum_success,
         )

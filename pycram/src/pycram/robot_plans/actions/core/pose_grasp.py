@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
-from typing import Union, Iterable, Optional, Any
+from typing import Optional, Any
 
 from pycram.datastructures.enums import Arms
-from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.language import SequentialPlan
-from pycram.failures import ObjectNotGraspedError, PlanFailure
+from pycram.plans.factories import sequential, execute_single
+from pycram.plans.failures import PlanFailure, BodyUnfetchable
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.motions.gripper import MoveGripperMotion
@@ -16,10 +15,8 @@ from pycram.robot_plans.motions.pose_grasp import (
 from pycram.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,
-    StaticJointState,
 )
 from semantic_digital_twin.reasoning.robot_predicates import (
-    robot_in_collision,
     blocking,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspPose
@@ -48,61 +45,54 @@ class PoseGraspAction(ActionDescription):
     """Grasp pose resolved during precondition validation, consumed in execute."""
 
     def execute(self) -> None:
-        SequentialPlan(
-            self.context,
-            MoveGripperMotion(gripper=self.arm, motion=GripperState.OPEN),
-            PoseGraspMotion(
-                arm=self.arm,
-                grasp_pose=self._resolved_grasp_pose,
-                allowed_collision_bodies=list(self.target.bodies),
-                pre_grasp_distance=self.pre_grasp_distance,
-                use_collision_avoidance=self.use_collision_avoidance,
-            ),
-            MoveGripperMotion(gripper=self.arm, motion=GripperState.CLOSE),
+        self.add_subplan(
+            sequential(
+                [
+                    MoveGripperMotion(gripper=self.arm, motion=GripperState.OPEN),
+                    PoseGraspMotion(
+                        arm=self.arm,
+                        grasp_pose=self._resolved_grasp_pose,
+                        allowed_collision_bodies=list(self.target.bodies),
+                        pre_grasp_distance=self.pre_grasp_distance,
+                        use_collision_avoidance=self.use_collision_avoidance,
+                    ),
+                    MoveGripperMotion(gripper=self.arm, motion=GripperState.CLOSE),
+                ]
+            )
         ).perform()
 
     def _is_graspable(self, pose: Pose) -> bool:
-        return True
-        hand = ViewManager.get_end_effector_view(self.arm, self.robot_view)
+        hand = ViewManager.get_end_effector_view(self.arm, self.robot)
         tool_frame = hand.tool_frame
 
-        return not blocking(pose, self.world.root, tool_frame)
+        blocking_bods = blocking(
+            pose.to_homogeneous_matrix(), self.world.root, tool_frame
+        )
+
+        target_bodies = set(self.target.bodies)
+        actual_blocking = [
+            cp
+            for cp in blocking_bods
+            if cp.body_a not in target_bodies and cp.body_b not in target_bodies
+        ]
+
+        return not actual_blocking
 
     def validate_precondition(self):
         if not isinstance(next(self.target.grasp_poses(), None), Pose):
-            raise PlanFailure(
-                f"Cannot perform PoseGraspAction: {self.target} has no grasp pose set."
-            )
+            raise PlanFailure()
         self._resolved_grasp_pose = next(
             (pose for pose in self.target.grasp_poses() if self._is_graspable(pose)),
             None,
         )
         if self._resolved_grasp_pose is None:
-            raise PlanFailure(
-                f"Cannot perform PoseGraspAction: all grasp poses for {self.target} are blocked."
-            )
+            raise PlanFailure()
 
     def validate_postcondition(self, result: Optional[Any] = None):
         # TODO change when validate_postcondition() actually is called after base motions are finished
         pass
-        # if not robot_holds_body(self.robot_view, self.target.root):
-        #     raise ObjectNotGraspedError(self.target.root, self.robot_view, self.arm)
-
-    @classmethod
-    def description(
-        cls,
-        arm: Union[Iterable[Arms], Arms],
-        target: HasGraspPose,
-        pre_grasp_distance: Union[Iterable[float], float] = 0.15,
-        use_collision_avoidance: Union[Iterable[bool], bool] = True,
-    ) -> PartialDesignator["PoseGraspAction"]:
-        return PartialDesignator[PoseGraspAction](
-            PoseGraspAction,
-            arm=arm,
-            target=target,
-            pre_grasp_distance=pre_grasp_distance,
-            use_collision_avoidance=use_collision_avoidance,
-        )
+        # if not robot_holds_body(self.robot, self.target.root):
+        #     raise BodyUnfetchable(self.target.root, self.arm)
 
 
 @dataclass
@@ -135,16 +125,17 @@ class PoseGraspAndLiftAction(ActionDescription):
     """Whether to enable collision avoidance during the grasp and retract motions."""
 
     def execute(self) -> None:
-        hand = ViewManager.get_end_effector_view(self.arm, self.robot_view)
+        hand = ViewManager.get_end_effector_view(self.arm, self.robot)
 
-        SequentialPlan(
-            self.context,
-            PoseGraspActionDescription(
-                target=self.target,
-                arm=self.arm,
-                pre_grasp_distance=self.pre_grasp_distance,
-                use_collision_avoidance=self.use_collision_avoidance,
-            ),
+        self.add_subplan(
+            execute_single(
+                PoseGraspAction(
+                    target=self.target,
+                    arm=self.arm,
+                    pre_grasp_distance=self.pre_grasp_distance,
+                    use_collision_avoidance=self.use_collision_avoidance,
+                )
+            )
         ).perform()
 
         with self.world.modify_world():
@@ -152,55 +143,26 @@ class PoseGraspAndLiftAction(ActionDescription):
                 self.target.root, hand.tool_frame
             )
 
-        SequentialPlan(
-            self.context,
-            RetractMotion(
-                arm=self.arm,
-                allowed_collision_bodies=list(self.target.bodies),
-                distance=self.retract_distance,
-                direction=self.retract_direction,
-                reference_velocity=self.max_retract_velocity,
-                use_collision_avoidance=self.use_collision_avoidance,
-            ),
+        self.add_subplan(
+            execute_single(
+                RetractMotion(
+                    arm=self.arm,
+                    allowed_collision_bodies=list(self.target.bodies),
+                    distance=self.retract_distance,
+                    direction=self.retract_direction,
+                    reference_velocity=self.max_retract_velocity,
+                    use_collision_avoidance=self.use_collision_avoidance,
+                )
+            )
         ).perform()
 
     def validate_precondition(self):
         if not isinstance(next(self.target.grasp_poses(), None), Pose):
-            raise PlanFailure(
-                f"Cannot perform PoseGraspAndLiftAction: {self.target} has no grasp pose set."
-            )
+            raise PlanFailure()
 
     def validate_postcondition(self, result: Optional[Any] = None):
         # TODO change when validate_postcondition() actually is called after base motions are finished
-        # if not robot_holds_body(self.robot_view, self.target.root):
-        hand = ViewManager.get_end_effector_view(self.arm, self.robot_view)
+        # if not robot_holds_body(self.robot, self.target.root):
+        hand = ViewManager.get_end_effector_view(self.arm, self.robot)
         if self.world.get_connection(hand.tool_frame, self.target.root) is None:
-            raise ObjectNotGraspedError(self.target.root, self.robot_view, self.arm)
-
-    @classmethod
-    def description(
-        cls,
-        arm: Union[Iterable[Arms], Arms],
-        target: HasGraspPose,
-        pre_grasp_distance: Union[Iterable[float], float] = 0.15,
-        retract_distance: Union[Iterable[float], float] = 0.1,
-        retract_direction: Union[
-            Iterable[RetractDirection], RetractDirection
-        ] = RetractDirection.WORLD_Z,
-        max_retract_velocity: Union[Iterable[float], float] = 0.2,
-        use_collision_avoidance: Union[Iterable[bool], bool] = True,
-    ) -> PartialDesignator["PoseGraspAndLiftAction"]:
-        return PartialDesignator[PoseGraspAndLiftAction](
-            PoseGraspAndLiftAction,
-            arm=arm,
-            target=target,
-            pre_grasp_distance=pre_grasp_distance,
-            retract_distance=retract_distance,
-            retract_direction=retract_direction,
-            max_retract_velocity=max_retract_velocity,
-            use_collision_avoidance=use_collision_avoidance,
-        )
-
-
-PoseGraspActionDescription = PoseGraspAction.description
-PoseGraspAndLiftActionDescription = PoseGraspAndLiftAction.description
+            raise BodyUnfetchable(self.target.root, self.arm)

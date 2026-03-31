@@ -104,9 +104,7 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
         ):
             for child in children:
                 parent_C_child = world.get_connection(parent, child)
-                if parent_C_child.is_controlled or (
-                    isinstance(child, Body) and child.has_collision()
-                ):
+                if parent_C_child.is_controlled:
                     self.collision_groups.append(CollisionGroup(child))
                 else:
                     collision_group = self.get_collision_group(parent)
