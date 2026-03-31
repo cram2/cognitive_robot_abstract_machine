@@ -28,6 +28,7 @@ from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
     RevoluteConnection,
 )
+from semantic_digital_twin.orm.ormatic_interface import *  # noqa
 
 
 def test_compute_chain_of_bodies_pr2(pr2_world_state_reset):

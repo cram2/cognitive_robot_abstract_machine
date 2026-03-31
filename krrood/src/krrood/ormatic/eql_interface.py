@@ -19,7 +19,7 @@ from krrood.entity_query_language.core.variable import Variable, Literal
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.operators.comparator import Comparator
 
-from krrood.ormatic.dao import get_dao_class
+from krrood.ormatic.data_access_objects.helper import get_dao_class
 
 
 class EQLTranslationError(Exception):

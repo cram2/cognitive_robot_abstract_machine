@@ -90,7 +90,7 @@ class WhereExpressionToRandomEventTranslator:
             elif isinstance(expression, AND):
                 simple_event = self._translate_conjunction(expression)
             elif isinstance(expression, Comparator):
-                simple_event = SimpleEvent(
+                simple_event = SimpleEvent.from_data(
                     {v: v.domain for v in self.variables.values()}
                 )
 
@@ -102,7 +102,7 @@ class WhereExpressionToRandomEventTranslator:
             else:
                 assert_never(expression)
             simple_events.append(simple_event)
-        return Event(*simple_events)
+        return Event.from_simple_sets(*simple_events)
 
     def _translate_conjunction(self, expression: AND) -> SimpleEvent:
         """
@@ -112,7 +112,7 @@ class WhereExpressionToRandomEventTranslator:
         :param expression: The conjunction expression to translate.
         :return: The random event corresponding to the conjunction.
         """
-        result = SimpleEvent()
+        result = SimpleEvent.from_data()
 
         # check that it is always a comparison between a variable and a literal
         for variable, comparators in self.comparators_grouped_by_variable(

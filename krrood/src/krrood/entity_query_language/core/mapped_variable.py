@@ -52,6 +52,11 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
     A storage of created MappedVariable instances to prevent recreating same mapping multiple times.
     """
 
+    __iter__ = None
+    """
+    Prevent iteration on this class.
+    """
+
     def _get_mapped_variable_(
         self, type_: Type[MappedVariable], *args, **kwargs
     ) -> MappedVariable:

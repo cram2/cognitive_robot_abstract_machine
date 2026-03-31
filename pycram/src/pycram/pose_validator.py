@@ -122,7 +122,7 @@ def pose_sequence_reachability_validator(
     :param world: The world in which the visibility should be validated.
     :param use_fullbody_ik: If true the base will be used in trying to reach the poses
     """
-    old_state = deepcopy(world.state.data)
+    old_state = deepcopy(world.state._data)
     root = robot_view.root if not use_fullbody_ik else world.root
 
     msc = MotionStatechart()
@@ -132,7 +132,7 @@ def pose_sequence_reachability_validator(
                 CartesianPose(
                     root_link=root,
                     tip_link=tip_link,
-                    goal_pose=pose.to_homogeneous_matrix(),
+                    goal_pose=pose,
                 )
                 for pose in target_sequence
             ]
@@ -158,7 +158,7 @@ def pose_sequence_reachability_validator(
         logger.debug(f"Timeout while executing pose sequence: {target_sequence}")
         return False
     finally:
-        world.state.data[:] = old_state
+        world.state._data[:] = old_state
         world.notify_state_change()
     return True
 

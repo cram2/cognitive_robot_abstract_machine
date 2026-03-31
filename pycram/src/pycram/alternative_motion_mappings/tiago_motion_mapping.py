@@ -5,7 +5,7 @@ from pycram.robot_plans.motions.base import AlternativeMotion
 from semantic_digital_twin.robots.tiago import Tiago
 
 
-class StretchMoveSim(MoveMotion, AlternativeMotion[Tiago]):
+class TiagoMoveSim(MoveMotion, AlternativeMotion[Tiago]):
     """
     Uses a diff drive goal for the tiago base.
     """

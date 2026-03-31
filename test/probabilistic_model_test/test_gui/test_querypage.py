@@ -23,19 +23,19 @@ class TestQueryGUI(unittest.TestCase):
 
     def setUp(self):
         self.controller = ModelController()
-        self.v1 = Continuous("v1", closed(0, 1))
-        self.v2 = Symbolic("v2", Set.from_iterable(["a", "b"]))
+        self.v1 = Continuous(name="v1", domain=closed(0, 1))
+        self.v2 = Symbolic(name="v2", domain=Set.from_iterable(["a", "b"]))
 
         self.model = MagicMock()
         self.model.variables = [self.v1, self.v2]
         self.model.probability.return_value = 0.5
 
         mock_marginal_v1 = MagicMock()
-        mock_marginal_v1.support.simple_sets = [SimpleEvent({self.v1: closed(0, 1)})]
+        mock_marginal_v1.support.simple_sets = [SimpleEvent.from_data({self.v1: closed(0, 1)})]
 
         mock_marginal_v2 = MagicMock()
         mock_marginal_v2.support.simple_sets = [
-            SimpleEvent({self.v2: Set.from_iterable(["a", "b"])})
+            SimpleEvent.from_data({self.v2: Set.from_iterable(["a", "b"])})
         ]
 
         self.model.marginal.side_effect = lambda vars: (
@@ -103,8 +103,8 @@ class TestQueryGUI(unittest.TestCase):
         self.assertEqual(len(widget.query_widgets), initial_count)
 
     def test_controller_calculate_probability(self):
-        query = Event(SimpleEvent({self.v1: closed(0, 0.5)}))
-        evidence = Event(SimpleEvent({self.v2: Set.from_iterable(["a"])}))
+        query = Event.from_simple_sets(SimpleEvent.from_data({self.v1: closed(0, 0.5)}))
+        evidence = Event.from_simple_sets(SimpleEvent.from_data({self.v2: Set.from_iterable(["a"])}))
 
         self.model.probability.return_value = 0.5
         # Mock intersection_with
@@ -119,7 +119,7 @@ class TestQueryGUI(unittest.TestCase):
 
         priors = VariableMap()
         dist = MagicMock()
-        dist.support.simple_sets = [SimpleEvent({self.v1: closed(0.1, 0.9)})]
+        dist.support.simple_sets = [SimpleEvent.from_data({self.v1: closed(0.1, 0.9)})]
         priors[self.v1] = dist
 
         widget = VariableConstraintWidget(self.model.variables, priors)

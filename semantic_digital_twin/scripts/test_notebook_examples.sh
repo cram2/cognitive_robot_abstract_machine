@@ -9,4 +9,4 @@ mkdir test_tmp
 jupytext --to notebook *.md
 mv *.ipynb test_tmp
 cd test_tmp
-treon --thread 1 -v
+treon -v

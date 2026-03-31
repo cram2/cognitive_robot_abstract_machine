@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional
 
+from typing_extensions import List
+
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -18,11 +20,11 @@ class MoveJointsMotion(BaseMotion):
     Moves any joint on the robot
     """
 
-    names: list
+    names: List[str]
     """
     List of joint names that should be moved 
     """
-    positions: list
+    positions: List[float]
     """
     Target positions of joints, should correspond to the list of names
     """
@@ -81,7 +83,7 @@ class LookingMotion(BaseMotion):
     def _motion_chart(self):
         self.camera.forward_facing_axis.reference_frame = self.camera.root
         return Pointing(
-            root_link=self.robot_view.torso.root,
+            root_link=self.robot.torso.root,
             tip_link=self.camera.root,
             goal_point=self.target.to_position(),
             pointing_axis=self.camera.forward_facing_axis,

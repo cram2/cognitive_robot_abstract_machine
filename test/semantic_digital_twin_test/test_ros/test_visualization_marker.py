@@ -19,7 +19,7 @@ from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     FixedConnection,
 )
-from semantic_digital_twin.world_description.geometry import FileMesh
+from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -171,8 +171,8 @@ def test_trimesh(rclpy_node):
             "milk.stl",
         )
     ).parse()
-    visual: FileMesh = world.root.visual.shapes[0]
-    world.root.visual.shapes[0] = visual.to_triangle_mesh()
+    visual: Mesh = world.root.visual.shapes[0]
+    world.root.visual.shapes[0] = visual
     with world.modify_world():
         body2 = Body(name=PrefixedName("body2"))
         body_C_body2 = FixedConnection(parent=world.root, child=body2)

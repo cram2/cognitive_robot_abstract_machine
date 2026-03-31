@@ -27,13 +27,13 @@ First, let us create a Normal distribution:
 from random_events.interval import closed
 from random_events.variable import Continuous
 from random_events.product_algebra import Event, SimpleEvent
-from probabilistic_model.distributions import GaussianDistribution, TruncatedGaussianDistribution
+from probabilistic_model.distributions.gaussian import GaussianDistribution, TruncatedGaussianDistribution
 import plotly
 plotly.offline.init_notebook_mode()
 import plotly.graph_objects as go
 
 variable = Continuous("x")
-distribution = GaussianDistribution(variable, location=0, scale=1)
+distribution = GaussianDistribution(variable=variable, location=0, scale=1)
 fig = go.Figure(distribution.plot())
 fig.update_layout(title="Normal Distribution", xaxis_title=distribution.variable.name)
 fig.show()
@@ -43,7 +43,7 @@ Whenever one conditions a Gaussian Distribution to an event, the result of that 
 Let us see what happens:
 
 ```{code-cell} ipython3
-evidence = SimpleEvent({variable: closed(0.5, 2)}).as_composite_set()
+evidence = SimpleEvent.from_data({variable: closed(0.5, 2)}).as_composite_set()
 conditional_distribution, evidence_probability = distribution.truncated(evidence)
 fig = go.Figure(conditional_distribution.plot())
 fig.update_layout(title="Normal Distribution", xaxis_title=distribution.variable.name)

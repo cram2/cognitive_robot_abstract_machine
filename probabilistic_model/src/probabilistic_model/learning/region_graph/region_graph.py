@@ -1,4 +1,5 @@
 from collections import deque
+from dataclasses import dataclass, field
 
 import networkx as nx
 import numpy as np
@@ -7,24 +8,33 @@ from random_events.variable import Continuous, Symbolic
 from sortedcontainers import SortedSet
 from typing_extensions import List, Self, Type, Iterable, Union
 
-from probabilistic_model.distributions import GaussianDistribution
-from probabilistic_model.probabilistic_circuit.jax import SparseSumLayer, ProductLayer, DenseSumLayer
+from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
+    ProductLayer,
+    DenseSumLayer,
+)
 from probabilistic_model.probabilistic_circuit.jax.discrete_layer import DiscreteLayer
 from probabilistic_model.probabilistic_circuit.jax.gaussian_layer import GaussianLayer
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit, SumUnit, ProductUnit, UnivariateContinuousLeaf
-from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import ProbabilisticCircuit as JPC, ClassificationCircuit
+from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
+    ProbabilisticCircuit as JPC,
+    ClassificationCircuit,
+)
 import jax.numpy as jnp
 import jax.random
 
 
+@dataclass
 class Region:
     """
     A region in a region graph.
-    """
-    variables: SortedSet
+    A region is a set of variables.
+    Refer to this paper https://ml-research.github.io/papers/peharz2019uai_ratspns.pdf .
 
-    def __init__(self, variables: SortedSet):
-        self.variables = variables
+    """
+
+    variables: SortedSet
+    """
+    The variables in the region.
+    """
 
     def __hash__(self) -> int:
         return id(self)
@@ -32,17 +42,22 @@ class Region:
     def random_partition(self, k=2) -> List[Self]:
         indices = np.arange(len(self.variables))
         np.random.shuffle(indices)
-        partitions = [Region(SortedSet([self.variables[index] for index in split])) for split in np.array_split(indices, k)]
+        partitions = [
+            Region(SortedSet([self.variables[index] for index in split]))
+            for split in np.array_split(indices, k)
+        ]
         return partitions
 
     def __repr__(self) -> str:
         return "{" + ", ".join([v.name for v in self.variables]) + "}"
 
 
+@dataclass
 class Partition:
     """
     A partition in a region graph.
     """
+
     def __hash__(self) -> int:
         return id(self)
 
@@ -80,19 +95,20 @@ class RegionGraph(nx.DiGraph):
     A repetition is another partitioning on the set of variables.
     """
 
-    def __init__(self, variables: SortedSet,
-                 partitions: int = 2,
-                 depth:int = 2,
-                 repetitions:int = 2,
-                 classes: int = 1,
-                 ):
+    def __init__(
+        self,
+        variables: SortedSet,
+        partitions: int = 2,
+        depth: int = 2,
+        repetitions: int = 2,
+        classes: int = 1,
+    ):
         super().__init__()
         self.classes = classes
         self.variables = variables
         self.partitions = partitions
         self.depth = depth
         self.repetitions = repetitions
-
 
     def create_random_region_graph(self):
         """
@@ -133,7 +149,6 @@ class RegionGraph(nx.DiGraph):
         while remaining_regions:
             region, depth, partition = remaining_regions.popleft()
 
-
             if len(region.variables) == 1:
                 continue
 
@@ -156,12 +171,14 @@ class RegionGraph(nx.DiGraph):
         """
         possible_roots = [node for node in self.nodes() if self.in_degree(node) == 0]
         if len(possible_roots) > 1:
-            raise ValueError(f"More than one root found. Possible roots are {possible_roots}")
+            raise ValueError(
+                f"More than one root found. Possible roots are {possible_roots}"
+            )
         return possible_roots[0]
 
-
-    def as_probabilistic_circuit(self, input_units: int = 5, sum_units: int = 5,
-                                 key=jax.random.PRNGKey(69)) -> Union[JPC, ClassificationCircuit]:
+    def as_probabilistic_circuit(
+        self, input_units: int = 5, sum_units: int = 5, key=jax.random.PRNGKey(69)
+    ) -> Union[JPC, ClassificationCircuit]:
         """
         Convert the region graph to a jax probabilistic circuit.
         :param input_units: The number of input units to use in each input layer.
@@ -182,17 +199,32 @@ class RegionGraph(nx.DiGraph):
                         variable = node.variables[0]
                         variable_index = self.variables.index(variable)
                         if isinstance(variable, Continuous):
-                            location = jax.random.uniform(key, shape=(input_units,), minval=-1., maxval=1.)
-                            log_scale = jnp.log(jax.random.uniform(key, shape=(input_units,), minval=0.5, maxval=3.))
-                            node.layer = GaussianLayer(variable_index, location=location, log_scale=log_scale,
-                                                       min_scale=jnp.full_like(location, 0.1))
+                            location = jax.random.uniform(
+                                key, shape=(input_units,), minval=-1.0, maxval=1.0
+                            )
+                            log_scale = jnp.log(
+                                jax.random.uniform(
+                                    key, shape=(input_units,), minval=0.5, maxval=3.0
+                                )
+                            )
+                            node.layer = GaussianLayer(
+                                variable_index,
+                                location=location,
+                                log_scale=log_scale,
+                                min_scale=jnp.full_like(location, 0.1),
+                            )
                             node.layer.validate()
                         elif isinstance(variable, Symbolic):
-                            log_probabilities = jax.random.uniform(key,
-                                                                   shape=(input_units, len(variable.domain.simple_sets)),
-                                                                   minval=0.1, maxval=1.)
+                            log_probabilities = jax.random.uniform(
+                                key,
+                                shape=(input_units, len(variable.domain.simple_sets)),
+                                minval=0.1,
+                                maxval=1.0,
+                            )
                             log_probabilities = jnp.log(log_probabilities)
-                            node.layer = DiscreteLayer(variable_index, log_probabilities=log_probabilities)
+                            node.layer = DiscreteLayer(
+                                variable_index, log_probabilities=log_probabilities
+                            )
                         else:
                             raise ValueError(f"Variable {variable} is not supported.")
 
@@ -202,20 +234,39 @@ class RegionGraph(nx.DiGraph):
                         if len(parents) == 0:
                             sum_units = self.classes
 
-                        log_weights = [jnp.log(jax.random.uniform(key, shape=(sum_units, child.layer.number_of_nodes),
-                                                          minval=0.1, maxval=1.)) for child in children]
-                        node.layer = DenseSumLayer([child.layer for child in children], log_weights=log_weights)
+                        log_weights = [
+                            jnp.log(
+                                jax.random.uniform(
+                                    key,
+                                    shape=(sum_units, child.layer.number_of_nodes),
+                                    minval=0.1,
+                                    maxval=1.0,
+                                )
+                            )
+                            for child in children
+                        ]
+                        node.layer = DenseSumLayer(
+                            [child.layer for child in children], log_weights=log_weights
+                        )
                         node.layer.validate()
-
 
                 elif isinstance(node, Partition):
                     node_lengths = [child.layer.number_of_nodes for child in children]
-                    assert (len(set(node_lengths)) == 1), "Node lengths must be all equal. Got {}".format(node_lengths)
+                    if not len(set(node_lengths)) == 1:
+                        raise ValueError(
+                            f"Node lengths must be all equal. Got {node_lengths}"
+                        )
 
-                    edges = jnp.arange(node_lengths[0]).reshape(1, -1).repeat(len(children), axis=0)
+                    edges = (
+                        jnp.arange(node_lengths[0])
+                        .reshape(1, -1)
+                        .repeat(len(children), axis=0)
+                    )
                     sparse_edges = BCOO.fromdense(jnp.ones_like(edges))
                     sparse_edges.data = edges.flatten()
-                    node.layer = ProductLayer([child.layer for child in children], sparse_edges)
+                    node.layer = ProductLayer(
+                        [child.layer for child in children], sparse_edges
+                    )
                     node.layer.validate()
 
         if self.classes > 1:

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import datetime
+import importlib
 import inspect
 import json
+import logging
+import pkgutil
 import types
 from contextlib import suppress
 from enum import Enum
+from functools import lru_cache
+from typing import Type, Dict, Any
 
 import sqlalchemy
 from sqlalchemy import (
@@ -14,6 +19,7 @@ from sqlalchemy import (
     MetaData,
     create_engine as create_sqlalchemy_engine,
     URL,
+    Column,
 )
 from typing_extensions import (
     TypeVar,
@@ -22,6 +28,7 @@ from typing_extensions import (
     Iterable,
     Union,
     Any,
+    get_type_hints,
 )
 
 from krrood.adapters.json_serializer import to_json, from_json
@@ -51,6 +58,39 @@ def classes_of_module(module: types.ModuleType) -> List[Type]:
     for name, obj in inspect.getmembers(module):
         if inspect.isclass(obj) and obj.__module__ == module.__name__:
             result.append(obj)
+    return result
+
+
+def classes_of_package(package: types.ModuleType, recursive=True) -> List[Type]:
+    """
+    Get all classes that are defined in a given python package.
+    This does not include classes that are imported from other packages.
+
+    :param package: The package to inspect.
+    :param recursive: Whether to include classes from sub-packages.
+    :return: All classes of the given package.
+    """
+    result = classes_of_module(package)
+
+    for loader, modname, ispkg in pkgutil.walk_packages(
+        package.__path__, package.__name__ + "."
+    ):
+        if not recursive and modname.count(".") > package.__name__.count(".") + 1:
+            continue
+
+        try:
+            module = importlib.import_module(modname)
+        except Exception:
+            logging.warning(f"Module {modname} cannot be parsed")
+            continue
+        result.extend(classes_of_module(module))
+
+        if not recursive and ispkg:
+            # If not recursive, we don't want to descend into sub-packages
+            # walk_packages with path restricted usually handles this,
+            # but if we only want the immediate next level:
+            pass
+
     return result
 
 
@@ -160,3 +200,28 @@ def create_engine(url: Union[str, URL], **kwargs: Any) -> Engine:
         json_deserializer=lambda x: from_json(json.loads(x)),
         **kwargs,
     )
+
+
+def is_data_column(column: Column) -> bool:
+    """
+    Check if a column contains data.
+
+    :param column: The SQLAlchemy column to check.
+    :return: True if it is a data column.
+    """
+    return (
+        not column.primary_key
+        and len(column.foreign_keys) == 0
+        and column.name != "polymorphic_type"
+    )
+
+
+@lru_cache(maxsize=None)
+def _get_type_hints_cached(clazz: Type) -> Dict[str, Any]:
+    """
+    Get type hints for a class.
+    """
+    try:
+        return get_type_hints(clazz)
+    except Exception:
+        return {}

@@ -31,7 +31,7 @@ from krrood.entity_query_language.factories import (
     an,
     the,
 )
-from krrood.ormatic.dao import to_dao
+from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
 
 

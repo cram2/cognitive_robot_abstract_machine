@@ -26,7 +26,7 @@ from semantic_digital_twin.world_description.geometry import (
     Scale,
     Cylinder,
     Sphere,
-    FileMesh,
+    Mesh,
 )
 
 
@@ -233,15 +233,15 @@ class SphereMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Sphere]):
 
 
 @dataclass
-class MeshMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, FileMesh]):
+class MeshMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Mesh]):
 
     @classmethod
     def can_convert(cls, data: Any) -> bool:
         return super().can_convert(data) and data.type == Marker.MESH_RESOURCE
 
     @classmethod
-    def convert(cls, data: Marker, world: World) -> FileMesh:
-        result = FileMesh(
+    def convert(cls, data: Marker, world: World) -> Mesh:
+        result = Mesh(
             origin=PoseToSemDTConverter.convert(
                 data.pose, world
             ).to_homogeneous_matrix(),

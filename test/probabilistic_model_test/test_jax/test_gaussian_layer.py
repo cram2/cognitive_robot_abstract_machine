@@ -39,16 +39,16 @@ class GaussianLayerTestCase(unittest.TestCase):
         nx_pc = NXProbabilisticCircuit()
         x = Continuous("x")
         g1 = UnivariateContinuousLeaf(
-            GaussianDistribution(x, 0.0, 0.99), probabilistic_circuit=nx_pc
+            GaussianDistribution(variable=x, location=0.0, scale=0.99), probabilistic_circuit=nx_pc
         )
         g2 = UnivariateContinuousLeaf(
-            GaussianDistribution(x, 1.0, 1.0), probabilistic_circuit=nx_pc
+            GaussianDistribution(variable=x, location=1.0, scale=1.0), probabilistic_circuit=nx_pc
         )
         s = SumUnit(probabilistic_circuit=nx_pc)
         s.add_subcircuit(g2, 0.5)
         s.add_subcircuit(g1, 0.5)
 
-        jax_pc = ProbabilisticCircuit.from_nx(nx_pc)
+        jax_pc = ProbabilisticCircuit.from_rustworkx(nx_pc)
         gaussian_layer = jax_pc.root.child_layers[0]
         self.assertIsInstance(gaussian_layer, GaussianLayer)
         gaussian_layer.validate()

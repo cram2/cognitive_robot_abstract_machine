@@ -184,12 +184,7 @@ class ShapeCollection(SubclassJSONSerializer):
 
     def copy_for_world(self, world: World) -> ShapeCollection:
         new_shapes = [s.copy_for_world(world) for s in self.shapes]
-        new_reference_frame = (
-            world.get_kinematic_structure_entity_by_name(self.reference_frame.name)
-            if self.reference_frame
-            else None
-        )
-        return ShapeCollection(new_shapes, new_reference_frame)
+        return ShapeCollection(new_shapes)
 
     @property
     def scale(self):
@@ -238,7 +233,9 @@ class BoundingBoxCollection(ShapeCollection):
         """
         :return: The bounding boxes as a random event.
         """
-        return Event(*[box.simple_event for box in self.bounding_boxes])
+        return Event.from_simple_sets(
+            *[box.simple_event for box in self.bounding_boxes]
+        )
 
     def merge(self, other: BoundingBoxCollection) -> BoundingBoxCollection:
         """

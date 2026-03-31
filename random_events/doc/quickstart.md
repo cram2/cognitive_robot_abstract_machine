@@ -30,6 +30,7 @@ Next, import the necessary functionality:
 :tags: []
 
 
+from krrood.adapters.json_serializer import to_json, from_json
 from random_events.variable import Symbolic, Continuous, Integer
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.interval import SimpleInterval, Interval, closed, closed_open, open_closed, open
@@ -59,8 +60,8 @@ First, create two simple intervals:
 ```{code-cell} ipython3
 :tags: []
 
-si1 = SimpleInterval(0, 1)
-si2 = SimpleInterval(0.5, 1.5)
+si1 = SimpleInterval.from_data(0, 1)
+si2 = SimpleInterval.from_data(0.5, 1.5)
 si1, si2
 ```
 
@@ -130,8 +131,8 @@ Now you can interact with sets and set elements.
 ```{code-cell} ipython3
 :tags: []
 
-s1 = SetElement(Symbol.APPLE, Symbol).as_composite_set()
-s2 = SetElement(Symbol.DOG, Symbol).as_composite_set()
+s1 = SetElement.from_data(Symbol.APPLE, Symbol).as_composite_set()
+s2 = SetElement.from_data(Symbol.DOG, Symbol).as_composite_set()
 print(s1)
 print(~s1)
 print(s1 & s2)
@@ -148,7 +149,7 @@ Integer and Continuous variables need no specification of their domain.
 ```{code-cell} ipython3
 :tags: []
 
-a = Symbolic("a", Set.from_iterable(Symbol))
+a = Symbolic(name="a", domain=Set.from_iterable(Symbol))
 x = Continuous("x")
 y = Continuous("y")
 z = Integer("z")
@@ -164,8 +165,8 @@ Simple events are dictionary like objects that describe the values of the variab
 ```{code-cell} ipython3
 :tags: []
 
-e1 = SimpleEvent({a: Symbol.APPLE, x: closed(0, 1), y: closed(2, 3), z: closed(0, 10)}).as_composite_set()
-e2 = SimpleEvent({a: (Symbol.APPLE, Symbol.DOG), x: closed(0, 4), y: closed(0, 5), z: closed(0, 20)}).as_composite_set()
+e1 = SimpleEvent.from_data({a: Symbol.APPLE, x: closed(0, 1), y: closed(2, 3), z: closed(0, 10)}).as_composite_set()
+e2 = SimpleEvent.from_data({a: (Symbol.APPLE, Symbol.DOG), x: closed(0, 4), y: closed(0, 5), z: closed(0, 20)}).as_composite_set()
 print(e1)
 print(e1 & e2)
 print(e1 | e2)
@@ -177,7 +178,7 @@ Events can also be plotted.
 ```{code-cell} ipython3
 :tags: []
 
-e3 = SimpleEvent({x: closed(0, 1) | closed(2, 2.5), y: closed(2, 3) | closed(4, 5)}).as_composite_set()
+e3 = SimpleEvent.from_data({x: closed(0, 1) | closed(2, 2.5), y: closed(2, 3) | closed(4, 5)}).as_composite_set()
 fig = go.Figure(e3.plot(), e3.plotly_layout())
 fig.show()
 ```
@@ -188,7 +189,7 @@ JSON serialization is also supported for every object.
 :tags: []
 
 e4 = e2 - e1
-print(e4.to_json())
-e5 = Event.from_json(e4.to_json())
+print(to_json(e4))
+e5 = from_json(to_json(e4))
 e5 == e4
 ```

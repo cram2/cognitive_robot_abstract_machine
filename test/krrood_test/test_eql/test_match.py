@@ -9,7 +9,6 @@ from krrood.entity_query_language.factories import (
     the,
     match,
     match_variable,
-    an,
     a,
 )
 from krrood.entity_query_language.exceptions import NoKwargsInMatchVar

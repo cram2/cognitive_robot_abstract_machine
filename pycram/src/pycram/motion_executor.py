@@ -1,6 +1,11 @@
+from __future__ import annotations
 import logging
+import threading
+import time
 from dataclasses import dataclass, field
 from typing import List, Any, ClassVar
+
+from typing_extensions import TYPE_CHECKING
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import LifeCycleValues
@@ -13,7 +18,11 @@ from giskardpy.motion_statechart.motion_statechart import (
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.ros_executor import Ros2Executor
 from pycram.datastructures.enums import ExecutionType
+
 from semantic_digital_twin.world import World
+
+if TYPE_CHECKING:
+    from pycram.plans.plan_node import PlanNode
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +47,11 @@ class MotionExecutor:
     ros_node: Any = field(kw_only=True, default=None)
     """
     ROS node that should be used for communication. Only relevant for real execution.
+    """
+
+    plan_node: PlanNode = field(kw_only=True)
+    """
+    The plan node that created this executor.
     """
 
     execution_type: ClassVar[ExecutionType] = None
@@ -82,7 +96,18 @@ class MotionExecutor:
         )
         executor.compile(self.motion_state_chart)
         try:
-            executor.tick_until_end(timeout=2000)
+            # execute the motion state chart until it is done
+            counter = 0
+            while counter < 2000:
+                if self.plan_node.is_interrupted:
+                    return
+                elif self.plan_node.is_paused:
+                    time.sleep(0.01)
+                    continue
+
+                executor.tick()
+                counter += 1
+
         except TimeoutError as e:
             failed_nodes = [
                 (
@@ -97,11 +122,29 @@ class MotionExecutor:
             logger.error(f"Failed Nodes: {failed_nodes}")
             raise e
 
+    def _monitor_interrupt(self, giskard_wrapper, kill_event: threading.Event):
+        while True:
+            if self.plan_node.is_paused:
+                raise NotImplementedError("Pause not implemented for real execution")
+            elif self.plan_node.is_interrupted or kill_event.is_set():
+                giskard_wrapper.cancel_goal_async()
+            time.sleep(0.01)
+
     def _execute_for_real(self):
         from giskardpy_ros.python_interface.python_interface import GiskardWrapper
 
         giskard = GiskardWrapper(self.ros_node)
+
+        kill_event = threading.Event()
+        interrupt_thread = threading.Thread(
+            target=self._monitor_interrupt, args=(giskard, kill_event)
+        )
+        interrupt_thread.start()
+
         giskard.execute(self.motion_state_chart)
+
+        kill_event.set()
+        interrupt_thread.join()
 
 
 @dataclass

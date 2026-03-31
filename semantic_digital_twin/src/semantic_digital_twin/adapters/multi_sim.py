@@ -48,8 +48,6 @@ from semantic_digital_twin.world_description.geometry import (
     Cylinder,
     Sphere,
     Shape,
-    FileMesh,
-    TriangleMesh,
     Mesh,
     Color,
 )
@@ -450,15 +448,7 @@ class MeshConverter(ShapeConverter, ABC):
     Converts a Mesh object to a dictionary of mesh properties for Multiverse simulator.
     """
 
-    entity_type: ClassVar[Type[FileMesh]] = FileMesh
-
-
-class TriangleMeshConverter(ShapeConverter, ABC):
-    """
-    Converts a Mesh object to a dictionary of mesh properties for Multiverse simulator.
-    """
-
-    entity_type: ClassVar[Type[TriangleMesh]] = TriangleMesh
+    entity_type: ClassVar[Type[Mesh]] = Mesh
 
 
 class ConnectionConverter(EntityConverter, ABC):
@@ -1618,11 +1608,7 @@ class MujocoBuilder(MultiSimBuilder):
         :return: True if the mesh was parsed successfully, False otherwise.
         """
         mesh_entity = geom_props.pop("mesh")
-        if isinstance(mesh_entity, TriangleMesh):
-            mesh_name = os.path.basename(mesh_entity.file.name)
-            mesh_file_path = os.path.join(self.asset_folder_path, f"{mesh_name}.obj")
-            shutil.move(mesh_entity.file.name, mesh_file_path)
-        elif isinstance(mesh_entity, FileMesh):
+        if isinstance(mesh_entity, Mesh):
             mesh_file_path = mesh_entity.filename
         else:
             raise NotImplementedError(
@@ -2203,12 +2189,11 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
 
     def _notify(self, **kwargs):
         for modification in self._world._model_manager.model_modification_blocks[-1]:
-            if isinstance(
-                modification,
-                (AddKinematicStructureEntityModification, AddActuatorModification),
-            ):
-                entity = modification.to_domain_object(self._world)
-                entity = self._world.get_world_entity_with_id_by_id(entity.id)
+            if isinstance(modification, AddKinematicStructureEntityModification):
+                entity = modification.kinematic_structure_entity
+                self.entity_spawner.spawn(simulator=self.simulator, entity=entity)
+            elif isinstance(modification, AddActuatorModification):
+                entity = modification.actuator
                 self.entity_spawner.spawn(simulator=self.simulator, entity=entity)
 
     def stop(self):

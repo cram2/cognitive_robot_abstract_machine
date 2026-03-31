@@ -7,7 +7,7 @@ from random_events.set import Set
 from random_events.variable import Symbolic
 from sortedcontainers import SortedSet
 
-from probabilistic_model.distributions import SymbolicDistribution
+from probabilistic_model.distributions.distributions import SymbolicDistribution
 from probabilistic_model.probabilistic_circuit.jax.discrete_layer import DiscreteLayer
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
     ProbabilisticCircuit,
@@ -29,7 +29,7 @@ class Animal(IntEnum):
 
 class DiscreteLayerTestCase(unittest.TestCase):
     model: DiscreteLayer
-    x = Symbolic("x", Set.from_iterable(Animal))
+    x = Symbolic(name="x", domain=Set.from_iterable(Animal))
 
     @classmethod
     def setUpClass(cls):
@@ -62,19 +62,19 @@ class DiscreteLayerTestCase(unittest.TestCase):
         p1 = MissingDict(
             float, {hash(Animal.CAT): 0.0, hash(Animal.DOG): 1, hash(Animal.FISH): 2}
         )
-        d1 = leaf(SymbolicDistribution(self.x, p1), nx_pc)
+        d1 = leaf(SymbolicDistribution(variable=self.x, probabilities=p1), nx_pc)
 
         p2 = MissingDict(
             float, {hash(Animal.CAT): 3, hash(Animal.DOG): 4, hash(Animal.FISH): 0}
         )
-        d2 = leaf(SymbolicDistribution(self.x, p2), nx_pc)
+        d2 = leaf(SymbolicDistribution(variable=self.x, probabilities=p2), nx_pc)
         s = SumUnit(probabilistic_circuit=nx_pc)
         s.add_subcircuit(d2, np.log(0.5))
         s.add_subcircuit(d1, np.log(0.5))
 
         nx_pc = s.probabilistic_circuit
 
-        jax_pc = ProbabilisticCircuit.from_nx(nx_pc)
+        jax_pc = ProbabilisticCircuit.from_rustworkx(nx_pc)
         discrete_layer = jax_pc.root.child_layers[0]
 
         self.assertIsInstance(discrete_layer, DiscreteLayer)
@@ -85,13 +85,13 @@ class DiscreteLayerTestCase(unittest.TestCase):
             jnp.allclose(discrete_layer.log_probabilities, self.model.log_probabilities)
         )
 
-    def test_to_nx(self):
-        nx_circuit = self.model.to_nx(SortedSet([self.x]), NXProbabilisticCircuit())[
+    def test_to_rx(self):
+        rx_circuit = self.model.to_rustworkx(SortedSet([self.x]), NXProbabilisticCircuit())[
             0
         ].probabilistic_circuit
-        self.assertEqual(len(nx_circuit.nodes()), 2)
-        self.assertEqual(len(nx_circuit.edges()), 0)
-        for node in nx_circuit.nodes():
+        self.assertEqual(len(rx_circuit.nodes()), 2)
+        self.assertEqual(len(rx_circuit.edges()), 0)
+        for node in rx_circuit.nodes():
             self.assertIsInstance(node, UnivariateDiscreteLeaf)
             self.assertEqual(node.variable, self.x)
             distribution: SymbolicDistribution = node.distribution

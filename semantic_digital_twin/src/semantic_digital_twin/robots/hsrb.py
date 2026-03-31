@@ -107,7 +107,7 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
             root=self._world.get_body_by_name("arm_lift_link"),
             tip=self._world.get_body_by_name("hand_palm_link"),
             manipulator=gripper,
-            sensors={hand_camera},
+            sensors=[hand_camera],
             _world=self._world,
         )
         self.add_arm(arm)

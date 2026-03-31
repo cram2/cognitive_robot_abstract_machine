@@ -4,10 +4,13 @@ import unittest
 
 import jax
 import jax.numpy as jnp
+
+from probabilistic_model.probabilistic_circuit.jax.utils import (
+    simple_interval_to_open_array,
+)
 from random_events.interval import SimpleInterval, Bound
 from random_events.variable import Continuous
 
-from probabilistic_model.probabilistic_circuit.jax import simple_interval_to_open_array
 from probabilistic_model.probabilistic_circuit.jax.uniform_layer import UniformLayer
 
 
@@ -29,10 +32,10 @@ class UniformLayerTestCaste(unittest.TestCase):
 
     @unittest.skip("Jax next after is inconsistent")
     def test_from_interval(self):
-        ioo = SimpleInterval(0, 1)
-        ioc = SimpleInterval(0, 1, right=Bound.CLOSED)
-        ico = SimpleInterval(0, 1, left=Bound.CLOSED)
-        icc = SimpleInterval(0, 1, left=Bound.CLOSED, right=Bound.CLOSED)
+        ioo = SimpleInterval.from_data(0, 1)
+        ioc = SimpleInterval.from_data(0, 1, right=Bound.CLOSED)
+        ico = SimpleInterval.from_data(0, 1, left=Bound.CLOSED)
+        icc = SimpleInterval.from_data(0, 1, left=Bound.CLOSED, right=Bound.CLOSED)
 
         intervals = jnp.vstack(
             [simple_interval_to_open_array(i) for i in [ioo, ioc, ico, icc]]

@@ -26,16 +26,15 @@ class TestGUIComponents(unittest.TestCase):
         self.controller = ModelController()
 
         # Setup a simple model
-        self.v1 = Continuous("v1", closed(0, 1))
-        self.v2 = Symbolic("v2", Set.from_iterable(["a", "b"]))
+        self.v1 = Continuous(name="v1", domain=closed(0, 1))
+        self.v2 = Symbolic(name="v2", domain=Set.from_iterable(["a", "b"]))
 
         self.model = MagicMock()
         self.model.variables = [self.v1, self.v2]
 
         # Mock marginals
-        self.dist1 = UniformDistribution(self.v1, closed(0, 1))
-        self.dist2 = SymbolicDistribution(
-            self.v2,
+        self.dist1 = UniformDistribution(variable=self.v1, interval=closed(0, 1))
+        self.dist2 = SymbolicDistribution(variable= self.v2, probabilities=
             {self.v2.domain.simple_sets[0]: 0.5, self.v2.domain.simple_sets[1]: 0.5},
         )
 

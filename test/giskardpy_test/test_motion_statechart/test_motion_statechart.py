@@ -1332,7 +1332,7 @@ class TestCartesianPositionTrajectory:
         # Reconstruct executed Cartesian path by FK at each recorded state
         for state_view in world_state_trajectory.values():
             # Temporarily set the world's state to the recorded one
-            world.state.data[:] = state_view.data
+            world.state._data[:] = state_view.data
             world.notify_state_change()
             p = (
                 world.compute_forward_kinematics(root_link, tip_link)

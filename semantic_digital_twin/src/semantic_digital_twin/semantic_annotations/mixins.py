@@ -7,7 +7,7 @@ from typing import Tuple
 import numpy as np
 import trimesh
 from polytope import bounding_box
-from probabilistic_model.distributions.helper import make_dirac
+from probabilistic_model.distributions.gaussian import GaussianDistribution
 from random_events.product_algebra import Event
 from random_events.set import Set
 from random_events.variable import Symbolic
@@ -21,7 +21,6 @@ from typing_extensions import (
 )
 
 from krrood.ormatic.utils import classproperty
-from probabilistic_model.distributions import GaussianDistribution
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     uniform_measure_of_event,
@@ -886,7 +885,7 @@ class HasSupportingSurface(HasStorageSpace, ABC):
         surface_circuit_root = SumUnit(probabilistic_circuit=surface_circuit)
 
         objects_of_interest_variable = Symbolic(
-            "objects_of_interest", Set.from_iterable(objects_of_interest)
+            name="objects_of_interest", domain=Set.from_iterable(objects_of_interest)
         )
 
         for object_of_interest in objects_of_interest:
@@ -902,14 +901,14 @@ class HasSupportingSurface(HasStorageSpace, ABC):
             )
 
             x_p = GaussianDistribution(
-                SpatialVariables.x.value,
-                float(surface_P_obj.x),
-                variance,
+                variable=SpatialVariables.x.value,
+                location=float(surface_P_obj.x),
+                scale=variance,
             )
             y_p = GaussianDistribution(
-                SpatialVariables.y.value,
-                float(surface_P_obj.y),
-                variance,
+                variable=SpatialVariables.y.value,
+                location=float(surface_P_obj.y),
+                scale=variance,
             )
 
             p_object_root.add_subcircuit(leaf(object_of_interest_p, surface_circuit))

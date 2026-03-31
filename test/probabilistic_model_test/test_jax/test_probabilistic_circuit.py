@@ -13,10 +13,11 @@ from random_events.interval import closed
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Continuous
 
-from probabilistic_model.distributions import DiracDeltaDistribution
-from probabilistic_model.learning.jpt.jpt import JPT
+from probabilistic_model.distributions.distributions import DiracDeltaDistribution
+from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.probabilistic_circuit.jax import SparseSumLayer, UniformLayer
+from probabilistic_model.probabilistic_circuit.jax.uniform_layer import UniformLayer
+from probabilistic_model.probabilistic_circuit.jax.inner_layer import SparseSumLayer
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
@@ -63,10 +64,18 @@ class SmallCircuitIntegrationTestCase(unittest.TestCase):
         prod2.add_subcircuit(sum3)
         prod2.add_subcircuit(sum5)
 
-        d_x1 = leaf(DiracDeltaDistribution(cls.x, 0, 1), nx_model)
-        d_x2 = leaf(DiracDeltaDistribution(cls.x, 1, 2), nx_model)
-        d_y1 = leaf(DiracDeltaDistribution(cls.y, 2, 3), nx_model)
-        d_y2 = leaf(DiracDeltaDistribution(cls.y, 3, 4), nx_model)
+        d_x1 = leaf(
+            DiracDeltaDistribution(variable=cls.x, location=0, density_cap=1), nx_model
+        )
+        d_x2 = leaf(
+            DiracDeltaDistribution(variable=cls.x, location=1, density_cap=2), nx_model
+        )
+        d_y1 = leaf(
+            DiracDeltaDistribution(variable=cls.y, location=2, density_cap=3), nx_model
+        )
+        d_y2 = leaf(
+            DiracDeltaDistribution(variable=cls.y, location=3, density_cap=4), nx_model
+        )
 
         sum2.add_subcircuit(d_x1, np.log(0.8))
         sum2.add_subcircuit(d_x2, np.log(0.2))
@@ -79,7 +88,7 @@ class SmallCircuitIntegrationTestCase(unittest.TestCase):
         sum5.add_subcircuit(d_y2, np.log(0.9))
 
         cls.nx_model = nx_model
-        cls.jax_model = ProbabilisticCircuit.from_nx(cls.nx_model)
+        cls.jax_model = ProbabilisticCircuit.from_rustworkx(cls.nx_model)
 
     def test_creation(self):
         self.assertEqual(self.jax_model.variables, self.nx_model.variables)
@@ -125,19 +134,21 @@ class JPTIntegrationTestCase(unittest.TestCase):
             samples, columns=[f"x_{i}" for i in range(cls.number_of_variables)]
         )
         variables = infer_variables_from_dataframe(df, min_samples_per_quantile=100)
-        jpt = JPT(variables, min_samples_leaf=0.1)
+        jpt = JointProbabilityTree(
+            annotated_variables=variables, min_samples_per_leaf=0.1
+        )
 
         cls.jpt = jpt.fit(df)
 
     def test_from_jpt(self):
-        model = ProbabilisticCircuit.from_nx(self.jpt, False)
+        model = ProbabilisticCircuit.from_rustworkx(self.jpt, False)
         samples = jnp.array(self.jpt.sample(1000))
         jax_ll = model.log_likelihood(samples)
         self.assertTrue((jax_ll > -jnp.inf).all())
 
     def test_to_nx_pc(self):
-        model = ProbabilisticCircuit.from_nx(self.jpt, False)
-        model_nx = model.to_nx(True)
+        model = ProbabilisticCircuit.from_rustworkx(self.jpt, False)
+        model_nx = model.to_rustworkx(True)
         # import matplotlib.pyplot as plt
         # model_nx.root.plot_structure()
         # plt.show()
@@ -194,15 +205,15 @@ class NanGradientTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        event1 = SimpleEvent(
+        event1 = SimpleEvent.from_data(
             {cls.x: closed(0, 1) | closed(2, 3), cls.y: closed(0, 1) | closed(2, 3)}
         ).as_composite_set()
-        event2 = SimpleEvent(
+        event2 = SimpleEvent.from_data(
             {cls.x: closed(1, 2) | closed(3, 4), cls.y: closed(1, 2) | closed(3, 4)}
         ).as_composite_set()
         cls.event = event1 | event2
         cls.nx_model = uniform_measure_of_event(cls.event)
-        cls.jax_model = ProbabilisticCircuit.from_nx(cls.nx_model)
+        cls.jax_model = ProbabilisticCircuit.from_rustworkx(cls.nx_model)
 
     def test_nan_gradient(self):
         """

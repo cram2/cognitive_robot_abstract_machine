@@ -105,7 +105,7 @@ Next, we have to overload the c45 method of the JPT class to see the learning pr
 
 ```{code-cell} ipython3
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.learning.jpt.jpt import JPT
+from probabilistic_model.learning.jpt.jpt import JointProbabilityTree as JPT
 
 class TutorialJPT(JPT):
     
@@ -175,8 +175,8 @@ class TutorialJPT(JPT):
 Next, let's define, and fit the model. Plot the decision criteria and the resulting distribution.
 
 ```{code-cell} ipython3
-variables = infer_variables_from_dataframe(dataset, scale_continuous_types=False, min_likelihood_improvement=2.5)
-model = TutorialJPT(variables, min_impurity_improvement=0.05, min_samples_leaf=500)
+variables = infer_variables_from_dataframe(dataset, min_likelihood_improvement=2.5)
+model = TutorialJPT(variables, min_impurity_improvement=0.05, min_samples_per_leaf=500)
 model.fig = fig
 pc = model.fit(dataset)
 model.fig.show()

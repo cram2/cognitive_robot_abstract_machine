@@ -27,7 +27,7 @@ from semantic_digital_twin.world_description.geometry import (
     Scale,
     Sphere,
     Cylinder,
-    FileMesh,
+    Mesh,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -121,7 +121,7 @@ def world_setup_simple():
         name=PrefixedName("mesh", prefix="test"),
         collision=ShapeCollection(
             [
-                FileMesh(
+                Mesh(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
                     filename=os.path.join(
                         Path(files("semantic_digital_twin")).parent.parent,

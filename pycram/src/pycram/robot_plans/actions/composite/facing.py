@@ -4,21 +4,16 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 import numpy as np
-from typing_extensions import Union, Optional, Type, Any, Iterable
+from typing_extensions import Optional, Any
 
+from pycram.config.action_conf import ActionConfig
+from pycram.plans.factories import sequential
+from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.core.navigation import NavigateAction, LookAtAction
 from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
     Quaternion,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
-from pycram.robot_plans.actions.core.navigation import (
-    LookAtActionDescription,
-    NavigateActionDescription,
-)
-from pycram.config.action_conf import ActionConfig
-from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.language import SequentialPlan
-from pycram.robot_plans.actions.base import ActionDescription
 
 
 @dataclass
@@ -38,7 +33,7 @@ class FaceAtAction(ActionDescription):
 
     def execute(self) -> None:
         # get the robot position
-        robot_position = self.robot_view.root.global_transform
+        robot_position = self.robot.root.global_transform
 
         # calculate orientation for robot to face the object
         angle = (
@@ -56,12 +51,15 @@ class FaceAtAction(ActionDescription):
             reference_frame=self.world.root,
         )
 
-        # turn robot
-        SequentialPlan(
-            self.context,
-            NavigateActionDescription(new_robot_pose, self.keep_joint_states),
-            # look at target
-            LookAtActionDescription(self.pose),
+        self.add_subplan(
+            sequential(
+                [
+                    NavigateAction(
+                        new_robot_pose, self.keep_joint_states
+                    ),  # turn robot
+                    LookAtAction(self.pose),  # look at the target
+                ]
+            )
         ).perform()
 
     def validate(
@@ -69,18 +67,3 @@ class FaceAtAction(ActionDescription):
     ):
         # The validation will be done in the LookAtActionPerformable.perform() method so no need to validate here.
         pass
-
-    @classmethod
-    def description(
-        cls,
-        pose: Union[Iterable[Pose], Pose],
-        keep_joint_states: Union[
-            Iterable[bool], bool
-        ] = ActionConfig.face_at_keep_joint_states,
-    ) -> PartialDesignator[FaceAtAction]:
-        return PartialDesignator(
-            FaceAtAction, pose=pose, keep_joint_states=keep_joint_states
-        )
-
-
-FaceAtActionDescription = FaceAtAction.description

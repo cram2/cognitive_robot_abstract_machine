@@ -40,10 +40,10 @@ class GCSTestCase(unittest.TestCase):
 
         obstacle = BoundingBox(0, 0, 0, 1, 1, 1, cls.world.root)
 
-        z_lim = SimpleInterval(0.45, 0.55)
-        x_lim = SimpleInterval(-2, 3)
-        y_lim = SimpleInterval(-2, 3)
-        limiting_event = SimpleEvent(
+        z_lim = SimpleInterval.from_data(0.45, 0.55)
+        x_lim = SimpleInterval.from_data(-2, 3)
+        y_lim = SimpleInterval.from_data(-2, 3)
+        limiting_event = SimpleEvent.from_data(
             {
                 SpatialVariables.x.value: x_lim,
                 SpatialVariables.y.value: y_lim,

@@ -8,7 +8,7 @@ from random_events.variable import Continuous
 from sortedcontainers import SortedSet
 
 from probabilistic_model.bayesian_network.bayesian_network import *
-from probabilistic_model.distributions import UniformDistribution, SymbolicDistribution
+from probabilistic_model.distributions.uniform import UniformDistribution, SymbolicDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProductUnit,
 )
@@ -29,8 +29,8 @@ class XEnum(IntEnum):
 
 class MinimalBayesianNetworkTestCase(unittest.TestCase):
     model: BayesianNetwork
-    x: Symbolic = Symbolic("x", Set.from_iterable(XEnum))
-    y: Symbolic = Symbolic("y", Set.from_iterable(YEnum))
+    x: Symbolic = Symbolic(name="x", domain=Set.from_iterable(XEnum))
+    y: Symbolic = Symbolic(name="y", domain=Set.from_iterable(YEnum))
     p_x: Root
     p_yx: ConditionalProbabilityTable
 
@@ -42,8 +42,8 @@ class MinimalBayesianNetworkTestCase(unittest.TestCase):
         # create the root distribution for x
         self.p_x = Root(
             SymbolicDistribution(
-                self.x,
-                MissingDict(
+                variable=self.x,
+                probabilities=MissingDict(
                     float, zip([XEnum.ZERO, XEnum.ONE, XEnum.TWO], [0.5, 0.3, 0.2])
                 ),
             ),
@@ -53,16 +53,16 @@ class MinimalBayesianNetworkTestCase(unittest.TestCase):
         self.p_yx = ConditionalProbabilityTable(bayesian_network=self.model)
         # create the truncated probability table for y
         self.p_yx.conditional_probability_distributions[XEnum.ZERO] = (
-            SymbolicDistribution(self.y, MissingDict(float, zip([0, 1], [0.5, 0.5])))
+            SymbolicDistribution(variable=self.y, probabilities=MissingDict(float, zip([0, 1], [0.5, 0.5])))
         )
         self.p_yx.conditional_probability_distributions[XEnum.ONE] = (
             SymbolicDistribution(
-                self.y, MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.3, 0.7]))
+                variable=self.y, probabilities=MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.3, 0.7]))
             )
         )
         self.p_yx.conditional_probability_distributions[XEnum.TWO] = (
             SymbolicDistribution(
-                self.y, MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.1, 0.9]))
+                variable=self.y, probabilities=MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.1, 0.9]))
             )
         )
 
@@ -83,10 +83,10 @@ class MinimalBayesianNetworkTestCase(unittest.TestCase):
 
 class ComplexBayesianNetworkTestCase(unittest.TestCase):
     model: BayesianNetwork
-    x: Symbolic = Symbolic("x", Set.from_iterable(XEnum))
-    y: Symbolic = Symbolic("y", Set.from_iterable(YEnum))
-    z: Symbolic = Symbolic("z", Set.from_iterable(XEnum))
-    a: Symbolic = Symbolic("a", Set.from_iterable(YEnum))
+    x: Symbolic = Symbolic(name="x", domain=Set.from_iterable(XEnum))
+    y: Symbolic = Symbolic(name="y", domain=Set.from_iterable(YEnum))
+    z: Symbolic = Symbolic(name="z", domain=Set.from_iterable(XEnum))
+    a: Symbolic = Symbolic(name="a", domain=Set.from_iterable(YEnum))
 
     d_x: Root
 
@@ -97,8 +97,8 @@ class ComplexBayesianNetworkTestCase(unittest.TestCase):
 
         self.d_x = Root(
             SymbolicDistribution(
-                self.x,
-                MissingDict(
+                variable=self.x,
+                probabilities=MissingDict(
                     float, zip([XEnum.ZERO, XEnum.ONE, XEnum.TWO], [0.5, 0.3, 0.2])
                 ),
             ),
@@ -110,30 +110,38 @@ class ComplexBayesianNetworkTestCase(unittest.TestCase):
         self.d_az = ConditionalProbabilityTable(bayesian_network=self.model)
 
         self.d_yx.conditional_probability_distributions[0] = SymbolicDistribution(
-            self.y, MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.5, 0.5]))
+            variable=self.y,
+            probabilities=MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.5, 0.5]))
         )
         self.d_yx.conditional_probability_distributions[1] = SymbolicDistribution(
-            self.y, MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.6, 0.4]))
+            variable=self.y,
+            probabilities=MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.6, 0.4]))
         )
         self.d_yx.conditional_probability_distributions[2] = SymbolicDistribution(
-            self.y, MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.7, 0.3]))
+            variable=self.y,
+            probabilities=MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.7, 0.3]))
         )
 
         self.d_zx.conditional_probability_distributions[0] = SymbolicDistribution(
-            self.z, MissingDict(float, zip([XEnum.ZERO, XEnum.ONE], [0.1, 0.9]))
+            variable=self.z,
+            probabilities=MissingDict(float, zip([XEnum.ZERO, XEnum.ONE], [0.1, 0.9]))
         )
         self.d_zx.conditional_probability_distributions[1] = SymbolicDistribution(
-            self.z, MissingDict(float, zip([XEnum.ZERO, XEnum.ONE], [1, 0]))
+            variable=self.z,
+            probabilities=MissingDict(float, zip([XEnum.ZERO, XEnum.ONE], [1, 0]))
         )
         self.d_zx.conditional_probability_distributions[2] = SymbolicDistribution(
-            self.z, MissingDict(float, zip([XEnum.ZERO, XEnum.ONE], [0.8, 0.2]))
+            variable=self.z,
+            probabilities=MissingDict(float, zip([XEnum.ZERO, XEnum.ONE], [0.8, 0.2]))
         )
 
         self.d_az.conditional_probability_distributions[0] = SymbolicDistribution(
-            self.a, MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.3, 0.7]))
+            variable=self.a,
+            probabilities=MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.3, 0.7]))
         )
         self.d_az.conditional_probability_distributions[1] = SymbolicDistribution(
-            self.a, MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.6, 0.4]))
+            variable=self.a,
+            probabilities=MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.6, 0.4]))
         )
 
         self.model.add_edge(self.d_x, self.d_yx)
@@ -153,9 +161,9 @@ class ComplexBayesianNetworkTestCase(unittest.TestCase):
 
 
 class BayesianNetworkWithCircuitTestCase(unittest.TestCase):
-    x: Symbolic = Symbolic("x", Set.from_iterable(YEnum))
-    y: Continuous = Continuous("y")
-    z: Continuous = Continuous("z")
+    x: Symbolic = Symbolic(name="x", domain=Set.from_iterable(YEnum))
+    y: Continuous = Continuous(name="y")
+    z: Continuous = Continuous(name="z")
     p_x: Root
 
     bayesian_network: BayesianNetwork
@@ -164,7 +172,7 @@ class BayesianNetworkWithCircuitTestCase(unittest.TestCase):
         self.bayesian_network = BayesianNetwork()
         self.p_x = Root(
             SymbolicDistribution(
-                self.x, MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.7, 0.3]))
+                variable=self.x, probabilities=MissingDict(float, zip([YEnum.ZERO, YEnum.ONE], [0.7, 0.3]))
             ),
             bayesian_network=self.bayesian_network,
         )
@@ -176,19 +184,19 @@ class BayesianNetworkWithCircuitTestCase(unittest.TestCase):
         pc1 = ProbabilisticCircuit()
         d1 = ProductUnit(probabilistic_circuit=pc1)
         d1.add_subcircuit(
-            leaf(UniformDistribution(self.y, closed(0, 1).simple_sets[0]), pc1)
+            leaf(UniformDistribution(variable=self.y, interval=closed(0, 1).simple_sets[0]), pc1)
         )
         d1.add_subcircuit(
-            leaf(UniformDistribution(self.z, closed(0, 1).simple_sets[0]), pc1)
+            leaf(UniformDistribution(variable=self.z, interval=closed(0, 1).simple_sets[0]), pc1)
         )
 
         pc2 = ProbabilisticCircuit()
         d2 = ProductUnit(probabilistic_circuit=pc2)
         d2.add_subcircuit(
-            leaf(UniformDistribution(self.y, closed(0, 2).simple_sets[0]), pc2)
+            leaf(UniformDistribution(variable=self.y, interval=closed(0, 2).simple_sets[0]), pc2)
         )
         d2.add_subcircuit(
-            leaf(UniformDistribution(self.z, closed(0, 3).simple_sets[0]), pc2)
+            leaf(UniformDistribution(variable=self.z, interval=closed(0, 3).simple_sets[0]), pc2)
         )
 
         self.p_yzx.conditional_probability_distributions[YEnum.ZERO] = pc1
@@ -203,7 +211,7 @@ class BayesianNetworkWithCircuitTestCase(unittest.TestCase):
             circuit.probability(circuit.universal_simple_event().as_composite_set()),
             1.0,
         )
-        event = SimpleEvent({self.x: (XEnum.ZERO, XEnum(1)), self.y: closed(1.5, 2)})
+        event = SimpleEvent.from_data({self.x: (XEnum.ZERO, XEnum(1)), self.y: closed(1.5, 2)})
         self.assertAlmostEqual(
             0.3 * 0.25, circuit.probability(event.as_composite_set())
         )

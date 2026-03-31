@@ -9,7 +9,6 @@ from functools import wraps
 
 import numpy as np
 from random_events.interval import SimpleInterval, Interval
-from random_events.utils import recursive_subclasses
 from typing_extensions import Type
 import datetime
 
@@ -31,7 +30,12 @@ def interval_as_array(interval: Interval) -> np.ndarray:
     :param interval: The interval
     :return:  as numpy array
     """
-    return np.array([simple_interval_as_array(simple_interval) for simple_interval in interval.simple_sets])
+    return np.array(
+        [
+            simple_interval_as_array(simple_interval)
+            for simple_interval in interval.simple_sets
+        ]
+    )
 
 
 class MissingDict(defaultdict):
@@ -55,10 +59,11 @@ def timeit(func):
         end_time = time.perf_counter_ns()
 
         total_time = end_time - start_time
-        total_time = datetime.timedelta(microseconds=total_time/1000)
+        total_time = datetime.timedelta(microseconds=total_time / 1000)
         return result, total_time
 
     return timeit_wrapper
+
 
 def timeit_print(func):
 
@@ -70,7 +75,7 @@ def timeit_print(func):
         end_time = time.perf_counter_ns()
 
         total_time = end_time - start_time
-        total_time = datetime.timedelta(microseconds=total_time/1000)
+        total_time = datetime.timedelta(microseconds=total_time / 1000)
         print(f"{func.__qualname__} took : {total_time}")
         return result
 

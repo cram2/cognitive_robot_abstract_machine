@@ -209,6 +209,7 @@ from random_events.interval import *
 
 import plotly.graph_objects as go
 from probabilistic_model.distributions import *
+from probabilistic_model.distributions.gaussian import *
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
 import numpy as np
 
@@ -220,8 +221,8 @@ x = Continuous("X")
 
 model = ProbabilisticCircuit()
 s1 = SumUnit(probabilistic_circuit = model)
-s1.add_subcircuit(leaf(GaussianDistribution(x, 0, 0.5), model), np.log(0.1))
-s1.add_subcircuit(leaf(GaussianDistribution(x, 1, 2), model), np.log(0.9))
+s1.add_subcircuit(leaf(GaussianDistribution(variable=x, location=0, scale=0.5), model), np.log(0.1))
+s1.add_subcircuit(leaf(GaussianDistribution(variable=x, location=1, scale=2), model), np.log(0.9))
 
 wrong_mode, wrong_max_likelihood = model.root.subcircuits[1].distribution.mode()
 wrong_max_likelihood = model.likelihood(np.array([[wrong_mode.simple_sets[0][x].simple_sets[0].lower]]))[0]
@@ -242,8 +243,8 @@ The next figure shows that if we truncated the children of the sum node to a dis
 
 model = ProbabilisticCircuit()
 s1 = SumUnit(probabilistic_circuit = model)
-s1.add_subcircuit(leaf(TruncatedGaussianDistribution(x, open_closed(-np.inf, 0.5).simple_sets[0], 0, 0.5), model), np.log(0.1))
-s1.add_subcircuit(leaf(TruncatedGaussianDistribution(x, open(0.5, np.inf).simple_sets[0], 1, 2), model), np.log(0.9))
+s1.add_subcircuit(leaf(TruncatedGaussianDistribution(variable=x, interval=open_closed(-np.inf, 0.5).simple_sets[0], location=0, scale=0.5), model), np.log(0.1))
+s1.add_subcircuit(leaf(TruncatedGaussianDistribution(variable=x, interval=open(0.5, np.inf).simple_sets[0], location=1, scale=2), model), np.log(0.9))
 
 fig = go.Figure(model.plot(), model.plotly_layout())
 fig.show()

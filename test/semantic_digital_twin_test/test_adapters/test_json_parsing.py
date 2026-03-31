@@ -314,8 +314,8 @@ def test_json_serialization_with_mesh():
         .root
     )
 
-    json_data = body.to_json()
-    body2 = Body.from_json(json_data)
+    json_data = to_json(body)
+    body2 = from_json(json_data)
 
     for c1 in body.collision:
         for c2 in body2.collision:

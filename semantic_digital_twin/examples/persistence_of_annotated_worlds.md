@@ -36,7 +36,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from krrood.ormatic.utils import create_engine
-from krrood.ormatic.dao import to_dao
+from krrood.ormatic.data_access_objects.helper import to_dao
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.orm.ormatic_interface import *

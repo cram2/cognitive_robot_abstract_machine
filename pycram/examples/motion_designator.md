@@ -1,4 +1,4 @@
-from pycram.language import SequentialPlan---
+from pycram.plans.factories import execute_singlefrom pycram.plans.factories import execute_singlefrom pycram.plans.factories import execute_singlefrom pycram.plans.factories import execute_singlefrom pycram.language import SequentialPlan---
 jupyter:
   jupytext:
     text_representation:
@@ -41,15 +41,14 @@ designator, first create a description then resolve it to the actual designator 
 designator.
 
 ```python
-from pycram.datastructures.pose import PoseStamped
 from pycram.robot_plans.motions import MoveMotion
-from pycram.process_module import simulated_robot
-from pycram.language import SequentialPlan
+from pycram.motion_executor import simulated_robot
+from pycram.plans.factories import *
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+motion_description = MoveMotion(target=Pose.from_xyz_quaternion(pos_x=1., reference_frame=world.root))
 
 with simulated_robot:
-    motion_description = MoveMotion(target=PoseStamped.from_list([1, 0, 0], [0, 0, 0, 1]))
-
-    SequentialPlan(context, motion_description).perform()
+    execute_single(motion_description, context=context).perform()
 ```
 
 ## MoveTCP
@@ -58,14 +57,13 @@ MoveTCP is used to move the tool center point (TCP) of the given arm to the targ
 Like any designator we start by creating a description and then resolving and performing it.
 
 ```python
-from pycram.robot_plans.motions import MoveTCPMotion
-from pycram.process_module import simulated_robot
+from pycram.robot_plans.motions.gripper import MoveToolCenterPointMotion
+from pycram.motion_executor import simulated_robot
 from pycram.datastructures.enums import Arms
+motion_description = MoveToolCenterPointMotion(target=Pose.from_xyz_quaternion(0.5, 0.6, 0.6, 0, 0, 0, 1, reference_frame=world.root), arm=Arms.LEFT)
 
 with simulated_robot:
-    motion_description = MoveTCPMotion(target=PoseStamped.from_list([0.5, 0.6, 0.6], [0, 0, 0, 1], world.root), arm=Arms.LEFT)
-
-    SequentialPlan(context, motion_description).perform()
+    execute_single(motion_description, context=context).perform()
 ```
 
 ## Looking
@@ -75,12 +73,12 @@ motion designator takes the target as position and orientation, in reality only 
 
 ```python
 from pycram.robot_plans.motions import LookingMotion
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
+
+motion_description = LookingMotion(target=Pose.from_xyz_quaternion(1, 1, 1, 0, 0, 0, 1, reference_frame=world.root), camera=pr2_view.get_default_camera())
 
 with simulated_robot:
-    motion_description = LookingMotion(target=PoseStamped.from_list([1, 1, 1], [0, 0, 0, 1], world.root))
-
-    SequentialPlan(context, motion_description).perform()
+    execute_single(motion_description, context=context).perform()
 ```
 
 ## Move Gripper
@@ -90,13 +88,14 @@ and close the gripper respectively.
 
 ```python
 from pycram.robot_plans.motions import MoveGripperMotion
-from pycram.process_module import simulated_robot
-from pycram.datastructures.enums import Arms, GripperState
+from pycram.motion_executor import simulated_robot
+from pycram.datastructures.enums import Arms
+from semantic_digital_twin.datastructures.definitions import GripperState
+
+motion_description = MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT)
 
 with simulated_robot:
-    motion_description = MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT)
-
-    SequentialPlan(context, motion_description).perform()
+    execute_single(motion_description, context=context).perform()
 ```
 
 ## Detecting
@@ -128,20 +127,6 @@ Since we need an object that we can detect, we will spawn a milk for this.
 #     print(obj[0])
 ```
 
-## Move Arm Joints
-
-This motion designator moves one or both arms. Movement targets are a dictionary with joint name as key and target pose
-as value.
-
-```python
-from pycram.robot_plans.motions import MoveArmJointsMotion
-from pycram.process_module import simulated_robot
-
-with simulated_robot:
-    motion_description = MoveArmJointsMotion(right_arm_poses={"r_shoulder_pan_joint": -0.7})
-
-    SequentialPlan(context, motion_description).perform()
-```
 
 ## Move Joints
 
@@ -150,10 +135,10 @@ the names of all joints that should be moved and the second list are the positio
 
 ```python
 from pycram.robot_plans.motions import MoveJointsMotion
-from pycram.process_module import simulated_robot
+from pycram.motion_executor import simulated_robot
 
 with simulated_robot:
     motion_description = MoveJointsMotion(names=["torso_lift_joint", "r_shoulder_pan_joint"], positions=[0.2, -1.2])
 
-    SequentialPlan(context, motion_description).perform()
+    execute_single(motion_description, context=context).perform()
 ```

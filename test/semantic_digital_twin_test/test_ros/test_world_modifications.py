@@ -1,5 +1,6 @@
 import unittest
 
+from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -117,9 +118,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
         tracker = WorldEntityWithIDKwargsTracker()
         kwargs = tracker.create_kwargs()
         # copy modifications
-        modifications_copy = WorldModelModificationBlock.from_json(
-            modifications.to_json(), **kwargs
-        )
+        modifications_copy = from_json(to_json(modifications), **kwargs)
         with w2.modify_world():
             modifications_copy.apply(w2)
         self.assertEqual(len(w2.bodies), 3)
@@ -137,9 +136,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
         tracker = WorldEntityWithIDKwargsTracker.from_world(w2)
         kwargs = tracker.create_kwargs()
 
-        modifications_copy = WorldModelModificationBlock.from_json(
-            modifications.to_json(), **kwargs
-        )
+        modifications_copy = from_json(to_json(modifications), **kwargs)
         with w2.modify_world():
             modifications_copy.apply(w2)
         self.assertEqual(len(w2.bodies), 2)
@@ -166,8 +163,8 @@ class ConnectionModificationTestCase(unittest.TestCase):
         self.assertIn(v2, w.semantic_annotations)
         self.assertEqual({v1.id, v2.id}, set(a.id for a in w.semantic_annotations))
 
-        rm_v1 = RemoveSemanticAnnotationModification.from_domain_object(v1)
-        rm_v2 = RemoveSemanticAnnotationModification.from_domain_object(v2)
+        rm_v1 = RemoveSemanticAnnotationModification(v1.id)
+        rm_v2 = RemoveSemanticAnnotationModification(v2.id)
         with w.modify_world():
             rm_v1.apply(w)
             rm_v2.apply(w)
@@ -200,9 +197,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
         tracker = WorldEntityWithIDKwargsTracker()
         kwargs = tracker.create_kwargs()
 
-        modifications_copy = WorldModelModificationBlock.from_json(
-            modifications.to_json(), **kwargs
-        )
+        modifications_copy = from_json(to_json(modifications), **kwargs)
 
         w2 = World()
         with w2.modify_world():
@@ -228,9 +223,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
         tracker = WorldEntityWithIDKwargsTracker()
         kwargs = tracker.create_kwargs()
 
-        modifications_copy = WorldModelModificationBlock.from_json(
-            modifications.to_json(), **kwargs
-        )
+        modifications_copy = from_json(to_json(modifications), **kwargs)
         w2 = World()
         with w2.modify_world():
             modifications_copy.apply(w2)

@@ -14,7 +14,9 @@ class NoOptimalSolutionError(Exception):
     """
     Exception raised when the solver does not find an optimal solution.
     """
+
     pass
+
 
 class Polytope(polytope.Polytope):
     """
@@ -44,7 +46,9 @@ class Polytope(polytope.Polytope):
 
         # create the convexhull
         convex_hull = ConvexHull(points)
-        hull_points = np.vstack([points[convex_hull.vertices], points[convex_hull.vertices[0]]])
+        hull_points = np.vstack(
+            [points[convex_hull.vertices], points[convex_hull.vertices[0]]]
+        )
 
         # calculate the inequalities
         constraints = []
@@ -85,9 +89,13 @@ class Polytope(polytope.Polytope):
 
             # append the polytope without the inner box to the queue
             diff = polytope.mldivide(current_polytope, inner_box)
-            working_queue.extend([self.__class__.from_polytope(p) for p in diff.list_poly])
+            working_queue.extend(
+                [self.__class__.from_polytope(p) for p in diff.list_poly]
+            )
 
-        return Event(*[box.to_simple_event() for box in resulting_boxes]).make_disjoint()
+        return Event.from_simple_sets(
+            *[box.to_simple_event() for box in resulting_boxes]
+        ).make_disjoint()
 
     def as_box_polytope(self) -> Self:
         """
@@ -109,7 +117,7 @@ class Polytope(polytope.Polytope):
         :return: The left and right split of the polytope.
         """
         a_vector = np.zeros((1, self.A.shape[1]))
-        a_vector[0, axis] = 1.
+        a_vector[0, axis] = 1.0
         b_vector = value
 
         # construct left split
@@ -142,7 +150,10 @@ class Polytope(polytope.Polytope):
 
             # if the box is too small, skip
             volume = bounding_box_of_current_polytope.volume
-            if volume < minimum_volume or bounding_box_of_current_polytope <= current_polytope:
+            if (
+                volume < minimum_volume
+                or bounding_box_of_current_polytope <= current_polytope
+            ):
                 resulting_boxes.append(current_polytope)
                 continue
 
@@ -153,10 +164,14 @@ class Polytope(polytope.Polytope):
 
             # split the box in half along the longest side
             splitting_point = (lower[longest_side] + upper[longest_side]) / 2
-            left, right = current_polytope.split_on_axis_value(longest_side, splitting_point)
+            left, right = current_polytope.split_on_axis_value(
+                longest_side, splitting_point
+            )
             polytopes_to_split.extend([left, right])
 
-        return Event(*[box.to_simple_event() for box in resulting_boxes]).make_disjoint()
+        return Event.from_simple_sets(
+            *[box.to_simple_event() for box in resulting_boxes]
+        ).make_disjoint()
 
     def maximum_inner_box(self) -> Self:
         """
@@ -175,8 +190,10 @@ class Polytope(polytope.Polytope):
         solver = pywraplp.Solver.CreateSolver("GLOP")
 
         # create variables for the dimensions of the inner box approximation (x_0, x_1, ..., x_n)
-        dimension_variables = [solver.NumVar(minimum, maximum, f"x_{i}") for i, (minimum, maximum) in
-                               enumerate(zip(minima, maxima))]
+        dimension_variables = [
+            solver.NumVar(minimum, maximum, f"x_{i}")
+            for i, (minimum, maximum) in enumerate(zip(minima, maxima))
+        ]
 
         # create the scale variable (lambda in the paper)
         scale = solver.NumVar(0, 1, "scale")
@@ -192,17 +209,28 @@ class Polytope(polytope.Polytope):
 
         # create the constraints from proposition 2
         for a, a_positive, b in zip(self.A, a_positive, self.b):
-            solver.Add(sum(a * dimension_variables) + sum(a_positive * scale_of_box * scale) <= b)
+            solver.Add(
+                sum(a * dimension_variables) + sum(a_positive * scale_of_box * scale)
+                <= b
+            )
 
         # solve the problem
         status = solver.Solve()
 
         if status != pywraplp.Solver.OPTIMAL:
-            raise NoOptimalSolutionError(f"No optimal solution found for the bounding box {self}. ")
+            raise NoOptimalSolutionError(
+                f"No optimal solution found for the bounding box {self}. "
+            )
 
         # calculate the inner box
-        box = [[dimension.solution_value(), dimension.solution_value() + scale_of_dimension * scale.solution_value()]
-               for dimension, scale_of_dimension in zip(dimension_variables, scale_of_box)]
+        box = [
+            [
+                dimension.solution_value(),
+                dimension.solution_value()
+                + scale_of_dimension * scale.solution_value(),
+            ]
+            for dimension, scale_of_dimension in zip(dimension_variables, scale_of_box)
+        ]
         return self.__class__.from_box(box)
 
     def to_simple_event(self) -> SimpleEvent:
@@ -212,5 +240,9 @@ class Polytope(polytope.Polytope):
         minima, maxima = self.bounding_box
         minima = minima.flatten()
         maxima = maxima.flatten()
-        return SimpleEvent({Continuous(f"x_{i}"): closed_open(minimum, maximum) for i, (minimum, maximum) in
-                            enumerate(zip(minima, maxima))})
+        return SimpleEvent.from_data(
+            {
+                Continuous(f"x_{i}"): closed_open(minimum, maximum)
+                for i, (minimum, maximum) in enumerate(zip(minima, maxima))
+            }
+        )
