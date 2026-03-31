@@ -6,9 +6,9 @@ import argparse
 import logging
 import os
 import sys
+import time
 import traceback
 from threading import Thread
-
 # For time measurements or additional logic
 from timeit import default_timer as timer
 
@@ -33,7 +33,6 @@ from robokudo.utils.tree import setup_with_descendants_rk
 
 if TYPE_CHECKING:
     from py_trees_ros.trees import BehaviourTree
-    from rclpy.node import Node
 
 # Silence some TensorFlow GPU logs if needed
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -41,7 +40,6 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 def run_ae(
     ae_name: str,
-    node: Node,
     ae_root: BehaviourTree,
     tickrate: int = 20,
 ) -> None:
@@ -72,8 +70,18 @@ def run_ae(
             logger.error(f"Exception: {e}")
             logger.error("Traceback:\n" + traceback.format_exc())
 
-    # Create a timer to drive the behavior tree at `tickrate`
-    node.create_timer(1.0 / tickrate, tick_tree)
+    interval = 1.0 / tickrate
+    next_tick = time.monotonic()
+
+    while True:
+        current_time = time.monotonic()
+        elapsed = current_time - next_tick
+
+        if elapsed >= interval:
+            tick_tree()
+            next_tick = current_time
+        else:
+            time.sleep(interval - elapsed)
 
 
 def main() -> None:
@@ -202,20 +210,24 @@ def main() -> None:
     # If you have a custom version of `setup_with_descendants`, call it:
     setup_with_descendants_rk(ae_root)
 
-    # 9. Start ticking the Behavior Tree
-    run_ae(ae_name=args.ae, node=node1, ae_root=ae_root, tickrate=args.tickrate)
-
-    # 10. Wait for shutdown
     try:
-        thread_main.join()
-        thread_asrv.join()
+        # 9. Start ticking the Behavior Tree
+        run_ae(ae_name=args.ae, ae_root=ae_root, tickrate=args.tickrate)
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received; shutting down.")
     finally:
-        node1.destroy_node()
-        query_action_server.destroy_node()
+        # 10. Shutdown executors cleanly
         executor_main.shutdown()
         executor_asrv.shutdown()
+
+        # 11. Wait for shutdown
+        thread_main.join()
+        thread_asrv.join()
+
+        # 12. Clean up nodes
+        node1.destroy_node()
+        query_action_server.destroy_node()
+
         if rclpy.ok():
             rclpy.shutdown()
 
