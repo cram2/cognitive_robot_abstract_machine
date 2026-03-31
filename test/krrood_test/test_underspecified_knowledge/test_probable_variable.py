@@ -14,14 +14,19 @@ from krrood.parametrization.random_events_translator import (
 from random_events.interval import singleton, open, closed, closed_open
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.variable import Continuous
-from ..dataset.example_classes import Pose, Position, Orientation, Positions
+from ..dataset.example_classes import (
+    KRROODPose,
+    KRROODPosition,
+    KRROODOrientation,
+    KRROODPositions,
+)
 from ..dataset.ormatic_interface import *  # type: ignore
 
 
 def test_underspecification_with_where():
-    underspecified_pose = underspecified(Pose)(
-        position=underspecified(Position)(x=..., y=..., z=...),
-        orientation=underspecified(Orientation)(x=..., y=..., z=..., w=...),
+    underspecified_pose = underspecified(KRROODPose)(
+        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
+        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
     )
     underspecified_pose.expression
     q = underspecified_pose.where(
@@ -38,12 +43,12 @@ def test_underspecification_with_where():
     )
     r = t.translate()
 
-    result_by_hand = SimpleEvent(
+    result_by_hand = SimpleEvent.from_data(
         {
-            Continuous("Pose.orientation.x"): ~singleton(1.0),
-            Continuous("Pose.position.y"): open(0.0, 10),
-            Continuous("Pose.position.z"): closed(-1.0, 1.0),
-            Continuous("Pose.position.x"): singleton(0.0),
+            Continuous("KRROODPose.orientation.x"): ~singleton(1.0),
+            Continuous("KRROODPose.position.y"): open(0.0, 10),
+            Continuous("KRROODPose.position.z"): closed(-1.0, 1.0),
+            Continuous("KRROODPose.position.x"): singleton(0.0),
         }
     )
 
@@ -51,7 +56,7 @@ def test_underspecification_with_where():
 
 
 def test_dnf_checking():
-    pose_variable = variable(Pose, None)
+    pose_variable = variable(KRROODPose, None)
 
     q1 = entity(pose_variable).where(
         and_(
@@ -68,9 +73,9 @@ def test_dnf_checking():
 
     assert not is_disjunctive_normal_form(q1._conditions_root_)
 
-    underspecified_pose = underspecified(Pose)(
-        position=underspecified(Position)(x=..., y=..., z=...),
-        orientation=underspecified(Orientation)(x=..., y=..., z=..., w=...),
+    underspecified_pose = underspecified(KRROODPose)(
+        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
+        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
     )
     underspecified_pose.expression
     pose_variable = underspecified_pose.variable
@@ -95,38 +100,38 @@ def test_dnf_checking():
     translated = t.translate()
 
     variables = [
-        Continuous("Pose.position.x"),
-        Continuous("Pose.position.y"),
-        Continuous("Pose.position.z"),
-        Continuous("Pose.orientation.z"),
+        Continuous("KRROODPose.position.x"),
+        Continuous("KRROODPose.position.y"),
+        Continuous("KRROODPose.position.z"),
+        Continuous("KRROODPose.orientation.z"),
     ]
     [p_x, p_y, p_z, o_z] = variables
 
-    e1 = SimpleEvent(
+    e1 = SimpleEvent.from_data(
         {
             p_x: singleton(0.0),
         }
     )
     e1.fill_missing_variables(variables)
-    e2 = SimpleEvent(
+    e2 = SimpleEvent.from_data(
         {
             p_z: closed(-1.0, 1.0),
             p_y: closed_open(-np.inf, 10.0),
         }
     )
     e2.fill_missing_variables(variables)
-    e3 = SimpleEvent({o_z: open(0.0, np.inf)})
+    e3 = SimpleEvent.from_data({o_z: open(0.0, np.inf)})
     e3.fill_missing_variables(variables)
 
-    result_by_hand = Event(e1, e2, e3)
+    result_by_hand = Event.from_simple_sets(e1, e2, e3)
 
     assert (result_by_hand - translated).is_empty()
     assert (translated - result_by_hand).is_empty()
 
 
 def test_query_writing_with_match_and_copy():
-    var = underspecified(Pose)(
-        position=underspecified(Position)(x=0.1, y=..., z=...), orientation=None
+    var = underspecified(KRROODPose)(
+        position=underspecified(KRROODPosition)(x=0.1, y=..., z=...), orientation=None
     )
 
     obj = var.construct_instance()
@@ -137,14 +142,16 @@ def test_query_writing_with_match_and_copy():
 
 
 def test_probable_variable_with_concrete_kwarg():
-    prob_q = underspecified(Pose)(
-        position=underspecified(Position)(x=..., y=..., z=...),
-        orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
+    prob_q = underspecified(KRROODPose)(
+        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
+        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     ).resolve()
     prob_q.where(prob_q.variable.position.x > 0.5)
     instance = prob_q.construct_instance()
 
-    correct_instance = Pose(Position(..., ..., ...), Orientation(0.0, 0.0, 0.0, 1.0))
+    correct_instance = KRROODPose(
+        KRROODPosition(..., ..., ...), KRROODOrientation(0.0, 0.0, 0.0, 1.0)
+    )
 
     assert instance == correct_instance
     assert len(list(prob_q.matches_with_variables)) == 4
@@ -152,19 +159,26 @@ def test_probable_variable_with_concrete_kwarg():
 
 def test_new_underspecified_with_factory():
 
-    prob_q = underspecified(Pose)(
-        position=underspecified(Position.from_abc)(a=..., b=..., c=...),
-        orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
+    prob_q = underspecified(KRROODPose)(
+        position=underspecified(KRROODPosition.from_abc, target_type=KRROODPosition)(
+            a=..., b=..., c=...
+        ),
+        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     ).resolve()
     prob_q.where(prob_q.variable.position.x > 0.5)
     prob_q.expression.build()
     r = prob_q.construct_instance()
-    assert r == Pose(Position(..., ..., ...), Orientation(0.0, 0.0, 0.0, 1.0))
+    assert r == KRROODPose(
+        KRROODPosition(..., ..., ...), KRROODOrientation(0.0, 0.0, 0.0, 1.0)
+    )
 
 
 def test_underspecified_with_list():
-    q = underspecified(Positions)(
-        positions=[underspecified(Position)(x=1.0, y=..., z=...), Position(1, 2, 3)],
+    q = underspecified(KRROODPositions)(
+        positions=[
+            underspecified(KRROODPosition)(x=1.0, y=..., z=...),
+            KRROODPosition(1, 2, 3),
+        ],
         some_strings=["a", "b"],
     )
 
@@ -175,6 +189,8 @@ def test_underspecified_with_list():
     q._update_kwargs_from_literal_values()
 
     assert q.kwargs["positions"][0].kwargs == {"x": 1.0, "y": 0.0, "z": 0.0}
-    assert q.factory == Positions
+    assert q.factory == KRROODPositions
     r = q.construct_instance()
-    assert r == Positions([Position(1.0, 0.0, 0.0), Position(1, 2, 3)], ["a", "b"])
+    assert r == KRROODPositions(
+        [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(1, 2, 3)], ["a", "b"]
+    )

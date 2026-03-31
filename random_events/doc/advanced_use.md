@@ -53,10 +53,10 @@ colors = np.unique(image.reshape((image.shape[0] * image.shape[1], image.shape[2
 def indices_to_complex_event(indices: np.array) -> Event:
     result = []
     for index in indices:
-        event = SimpleEvent({y: closed_open(-index[0] - 1., -index[0]),
+        event = SimpleEvent.from_data({y: closed_open(-index[0] - 1., -index[0]),
                        x: closed_open(index[1], index[1] + 1.)})
         result.append(event)
-    return Event(*result).make_disjoint()
+    return Event.from_simple_sets(*result).make_disjoint()
 
 fig = go.Figure()
 

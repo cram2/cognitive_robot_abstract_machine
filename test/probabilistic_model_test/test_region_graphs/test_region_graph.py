@@ -2,15 +2,23 @@ import random
 import unittest
 from enum import IntEnum
 
+import numpy as np
+import jax.numpy as jnp
 import optax
+from sortedcontainers import SortedSet
+
+from probabilistic_model.distributions.gaussian import GaussianDistribution
+from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import ProbabilisticCircuit as JPC
+from probabilistic_model.learning.region_graph.region_graph import RegionGraph
+from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import ClassificationCircuit
 from random_events.product_algebra import SimpleEvent
 from random_events.set import Set
 from scipy.special import logsumexp
 
-from probabilistic_model.learning.region_graph.region_graph import *
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
-    UnivariateDiscreteLeaf,
+    UnivariateDiscreteLeaf, SumUnit, UnivariateContinuousLeaf,
 )
+from random_events.variable import Continuous, Symbolic
 
 np.random.seed(420)
 random.seed(420)
@@ -32,7 +40,7 @@ class RandomRegionGraphTestCase(unittest.TestCase):
 
     def test_as_jpc(self):
         model = self.region_graph.as_probabilistic_circuit(input_units=10, sum_units=5)
-        nx_model = model.to_nx()
+        nx_model = model.to_rustworkx()
         # fig = go.Figure(nx_model.plot_structure(), nx_model.plotly_layout_structure())
         # fig.show()
 
@@ -45,7 +53,7 @@ class RandomRegionGraphTestCase(unittest.TestCase):
 class RandomRegionGraphLearningTestCase(unittest.TestCase):
     variables = SortedSet(
         [Continuous(str(i)) for i in range(8)]
-        + [Symbolic("target", Set.from_iterable(Target))]
+        + [Symbolic(name="target", domain=Set.from_iterable(Target))]
     )
     region_graph = RegionGraph(variables, partitions=2, depth=2, repetitions=2)
     region_graph = region_graph.create_random_region_graph()
@@ -55,7 +63,7 @@ class RandomRegionGraphLearningTestCase(unittest.TestCase):
         data = jnp.array(data)
         model = self.region_graph.as_probabilistic_circuit(input_units=5, sum_units=5)
         model.fit(data, epochs=10, optimizer=optax.adamw(0.01))
-        nx_model = model.to_nx()
+        nx_model = model.to_rustworkx()
         for node in nx_model.nodes():
             if isinstance(node, SumUnit):
                 self.assertAlmostEqual(logsumexp(node.log_weights), 0.0)
@@ -68,7 +76,7 @@ class RandomRegionGraphLearningTestCase(unittest.TestCase):
 
 class ClassificationTestCase(unittest.TestCase):
     features = SortedSet([Continuous(f"x{i}") for i in range(4)])
-    target = Symbolic("target", Set.from_iterable(Target))
+    target = Symbolic(name="target", domain=Set.from_iterable(Target))
     region_graph = RegionGraph(
         features, partitions=2, depth=1, repetitions=6, classes=2
     )
@@ -86,13 +94,13 @@ class ClassificationTestCase(unittest.TestCase):
         pc = model.as_probabilistic_circuit(self.target)
         self.assertIsInstance(pc, JPC)
         self.assertEqual(pc.variables, self.features | SortedSet([self.target]))
-        nx_pc = pc.to_nx()
+        nx_pc = pc.to_rustworkx()
         self.assertTrue(nx_pc.is_decomposable())
 
         p_target = nx_pc.marginal(SortedSet([self.target]))
         probabilities = {
             str(element): p_target.probability_of_simple_event(
-                SimpleEvent({self.target: element})
+                SimpleEvent.from_data({self.target: element})
             )
             for element in self.target.domain
         }

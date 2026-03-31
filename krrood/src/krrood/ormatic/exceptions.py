@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing_extensions import Type, Any
+from typing_extensions import Type, Any, TYPE_CHECKING
 
 from sqlalchemy.orm import RelationshipProperty
 
+
 from krrood.utils import DataclassException
 
+if TYPE_CHECKING:
+    from krrood.ormatic.data_access_objects.alternative_mappings import FunctionMapping
 
 @dataclass
 class NoGenericError(DataclassException, TypeError):
@@ -84,3 +87,21 @@ class UnsupportedRelationshipError(DataclassException, ValueError):
 
     def __post_init__(self):
         self.message = f"Unsupported relationship direction for {self.relationship}."
+
+
+@dataclass
+class UncallableFunction(NotImplementedError):
+    """
+    Exception raised when anonymous functions are reconstructed and then called.
+    """
+
+    function_mapping: FunctionMapping
+    """
+    The mapping that was used to reconstruct the function.
+    """
+
+    def __post_init__(self):
+        super().__init__(
+            f"The reconstructed function was a lambda function and hence cannot be called again. "
+            f"The function tried to be reconstructed from {self.function_mapping}"
+        )

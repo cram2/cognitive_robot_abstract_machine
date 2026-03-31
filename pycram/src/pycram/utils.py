@@ -9,22 +9,13 @@ GeneratorList -- implementation of generator list wrappers.
 
 from __future__ import annotations
 
+import math
+import os
 from copy import deepcopy
 from inspect import isgeneratorfunction
-import os
-import math
 from typing import Union, Iterator
 
 import numpy as np
-from matplotlib import pyplot as plt
-import matplotlib.colors as mcolors
-from semantic_digital_twin.world_description.world_entity import Body
-
-from pycram.tf_transformations import (
-    quaternion_about_axis,
-    quaternion_multiply,
-    quaternion_matrix,
-)
 from typing_extensions import (
     Tuple,
     Callable,
@@ -36,15 +27,24 @@ from typing_extensions import (
     Iterable,
 )
 
-from pycram.datastructures.pose import PoseStamped
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Pose,
+    Quaternion,
+    HomogeneousTransformationMatrix,
+    Point3,
+)
+from semantic_digital_twin.world_description.world_entity import Body
+from pycram.tf_transformations import (
+    quaternion_about_axis,
+    quaternion_multiply,
+    quaternion_matrix,
+)
 
 if TYPE_CHECKING:
     from pycram.view_manager import CameraDescription
 
 
-def link_pose_for_joint_config(
-    obj: Body, joint_config: Dict[str, float]
-) -> PoseStamped:
+def link_pose_for_joint_config(obj: Body, joint_config: Dict[str, float]) -> Pose:
     """
     Get the pose a link would be in if the given joint configuration would be applied to the object.
     This is done by using the respective object in the prospection world and applying the joint configuration
@@ -60,8 +60,7 @@ def link_pose_for_joint_config(
             reasoning_world.get_degree_of_freedom_by_name(joint_name).id
         ].position = joint_pose
     reasoning_world.notify_state_change()
-    pose = reasoning_world.get_body_by_name(obj.name).global_pose
-    return PoseStamped.from_spatial_type(pose)
+    return reasoning_world.get_body_by_name(obj.name).global_pose
 
 
 def get_rays_from_min_max(
@@ -160,53 +159,6 @@ class bcolors:
     UNDERLINE = "\033[4m"
 
 
-class GeneratorList:
-    """Implementation of generator list wrappers.
-
-    Generator lists store the elements of a generator, so these can be fetched multiple times.
-
-    Methods:
-    get -- get the element at a specific index.
-    has -- check if an element at a specific index exists.
-    """
-
-    def __init__(self, generator: Callable):
-        """Create a new generator list.
-
-        Arguments:
-        generator -- the generator to use.
-        """
-        if isgeneratorfunction(generator):
-            self._generator = generator()
-        else:
-            self._generator = generator
-
-        self._generated = []
-
-    def get(self, index: int = 0):
-        """Get the element at a specific index or raise StopIteration if it doesn't exist.
-
-        Arguments:
-        index -- the index to get the element of.
-        """
-        while len(self._generated) <= index:
-            self._generated.append(next(self._generator))
-
-        return self._generated[index]
-
-    def has(self, index: int) -> bool:
-        """Check if an element at a specific index exists and return True or False.
-
-        Arguments:
-        index -- the index to check for.
-        """
-        try:
-            self.get(index)
-            return True
-        except StopIteration:
-            return False
-
-
 def axis_angle_to_quaternion(axis: List, angle: float) -> Tuple:
     """
     Convert axis-angle to quaternion.
@@ -228,10 +180,10 @@ def axis_angle_to_quaternion(axis: List, angle: float) -> Tuple:
 
 
 def adjust_camera_pose_based_on_target(
-    cam_pose: PoseStamped,
-    target_pose: PoseStamped,
+    cam_pose: Pose,
+    target_pose: Pose,
     camera_description: CameraDescription,
-) -> PoseStamped:
+) -> Pose:
     """
     Adjust the given cam_pose orientation such that it is facing the target_pose, which partly depends on the
      front_facing_axis of the that is defined in the camera_description.
@@ -249,8 +201,8 @@ def adjust_camera_pose_based_on_target(
 
 
 def get_quaternion_between_camera_and_target(
-    cam_pose: PoseStamped,
-    target_pose: PoseStamped,
+    cam_pose: Pose,
+    target_pose: Pose,
     camera_description: "CameraDescription",
 ) -> np.ndarray:
     """
@@ -290,7 +242,7 @@ def transform_vector_using_pose(vector: Sequence, pose) -> np.ndarray:
     )
 
 
-def apply_quaternion_to_pose(pose: PoseStamped, quaternion: np.ndarray) -> PoseStamped:
+def apply_quaternion_to_pose(pose: Pose, quaternion: np.ndarray) -> Pose:
     """
     Apply a quaternion to a pose.
 
@@ -300,7 +252,7 @@ def apply_quaternion_to_pose(pose: PoseStamped, quaternion: np.ndarray) -> PoseS
     """
     pose_quaternion = np.array(pose.orientation.to_list())
     new_quaternion = quaternion_multiply(quaternion, pose_quaternion)
-    return PoseStamped(pose.position.to_list(), new_quaternion.tolist())
+    return Pose(pose.position.to_list(), new_quaternion.tolist())
 
 
 def get_quaternion_between_two_vectors(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
@@ -372,99 +324,9 @@ def xyzw_to_wxyz_arr(xyzw: np.ndarray) -> np.ndarray:
     return wxyz
 
 
-class ClassPropertyDescriptor:
-    """
-    A helper that can be used to define properties of a class like the built-in ones but does not require the class
-    to be instantiated.
-    """
-
-    def __init__(self, fget, fset=None):
-        self.fget = fget
-        self.fset = fset
-
-    def __get__(self, obj, klass=None):
-        if klass is None:
-            klass = type(obj)
-        return self.fget.__get__(obj, klass)()
-
-    def __set__(self, obj, value):
-        if not self.fset:
-            raise AttributeError("can't set attribute")
-        type_ = type(obj)
-        return self.fset.__get__(obj, type_)(value)
-
-    def setter(self, func):
-        if not isinstance(func, (classmethod, staticmethod)):
-            func = classmethod(func)
-        self.fset = func
-        return self
-
-
-def classproperty(func):
-    if not isinstance(func, (classmethod, staticmethod)):
-        func = classmethod(func)
-
-    return ClassPropertyDescriptor(func)
-
-
-def is_iterable(obj: Any) -> bool:
-    """
-    Checks if the given object is iterable.
-
-    :param obj: The object that should be checked
-    :return: True if the object is iterable, False otherwise
-    """
-    try:
-        iter(obj)
-    except TypeError:
-        return False
-    return True
-
-
-def lazy_product(*iterables: Iterable, iter_names: List[str] = None) -> Iterable[Tuple]:
-    """
-    Lazily generate the cartesian product of the iterables.
-
-    :param iterables: Iterable of iterables to construct product for.
-    :param iter_names: Optional names for the iterables for better error messages.
-    :return: Iterable of tuples in the cartesian product.
-    """
-
-    consumable_iterables = [iter(iterable) for iterable in iterables]
-
-    current_value = []
-    for i, consumable_iterable in enumerate(consumable_iterables):
-        try:
-            current_value.append(next(consumable_iterable))
-        except StopIteration as e:
-            raise RuntimeError(
-                f"No values in the iterable: {consumable_iterable} for iterable '{iter_names[i] if iter_names else i}'"
-            )
-
-    while True:
-        yield tuple(current_value)
-
-        for index in range(len(consumable_iterables) - 1, -1, -1):
-            current_iterable = consumable_iterables[index]
-            try:
-                consumable_value = next(current_iterable)
-                current_value[index] = consumable_value
-                break
-            except StopIteration as e:
-                if index == 0:
-                    return
-                consumable_iterables[index] = iter(iterables[index])
-                try:
-                    current_value[index] = next(consumable_iterables[index])
-                except StopIteration as e:
-                    raise StopIteration(
-                        f"No more values in the iterable: {iterables[index]}"
-                    )
-
-
 def translate_pose_along_local_axis(
-    pose: PoseStamped, axis: Union[List, np.ndarray], distance: float
-) -> PoseStamped:
+    pose: Pose, axis: Union[List, np.ndarray], distance: float
+) -> Pose:
     """
     Translate a pose along a given 3d vector (axis) by a given distance. The axis is given in the local coordinate
     frame of the pose. The axis is normalized and then scaled by the distance.
@@ -477,12 +339,14 @@ def translate_pose_along_local_axis(
     """
     normalized_translation_vector = np.array(axis) / np.linalg.norm(axis)
 
-    rot_matrix = quaternion_matrix(pose.orientation.to_list())[:3, :3]
+    rot_matrix = pose.to_rotation_matrix().to_np()[:3, :3]
     translation_in_world = rot_matrix @ normalized_translation_vector
     scaled_translation_vector = (
-        np.array(pose.position.to_list()) + translation_in_world * distance
+        np.array(pose.to_position().to_list()[:3]) + translation_in_world * distance
     )
 
-    return PoseStamped.from_list(
-        list(scaled_translation_vector), pose.orientation.to_list(), pose.frame_id
+    return Pose(
+        Point3.from_iterable(scaled_translation_vector),
+        pose.to_quaternion(),
+        reference_frame=pose.reference_frame,
     )

@@ -1,5 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass
+from uuid import UUID
 
 import numpy as np
 import pytest
@@ -14,7 +15,7 @@ from semantic_digital_twin.exceptions import (
     WrongWorldModelVersion,
     NonMonotonicTimeError,
 )
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Milk
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 
@@ -34,6 +35,8 @@ from semantic_digital_twin.world_description.connections import (
     OmniDrive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     Body,
@@ -44,6 +47,7 @@ from semantic_digital_twin.world_description.world_state import WorldStateTrajec
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
     WorldStateTrajectoryPlotter,
 )
+from semantic_digital_twin.orm.ormatic_interface import *
 
 
 def test_set_state(world_setup):
@@ -64,7 +68,7 @@ def test_set_state(world_setup):
     assert c1.position == 2.0
 
     transform[0, 3] += c1.position
-    assert np.allclose(l2.global_pose.to_np(), transform)
+    assert np.allclose(l2.global_transform.to_np(), transform)
 
 
 def test_construction(world_setup):
@@ -224,10 +228,10 @@ def test_compute_fk(world_setup):
 
     connection: PrismaticConnection = world.get_connection(r1, r2)
 
-    state_memory_id = id(world.state.data)
+    state_memory_id = id(world.state._data)
     world.state[connection.dof.id].position = 1.0
     world.notify_state_change()
-    assert state_memory_id == id(world.state.data)
+    assert state_memory_id == id(world.state._data)
     fk = world.compute_forward_kinematics_np(l2, r2)
     assert np.allclose(
         fk,
@@ -274,7 +278,7 @@ def test_compute_fk_expression(world_setup):
 
 def test_apply_control_commands(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
-    state_memory_id = id(world.state.data)
+    state_memory_id = id(world.state._data)
     connection: PrismaticConnection = world.get_connection(r1, r2)
     cmd = np.array([100.0, 0, 0, 0, 0, 0, 0, 0])
     dt = 0.1
@@ -284,7 +288,7 @@ def test_apply_control_commands(world_setup):
     assert world.state[connection.dof.id].velocity == 100.0 * dt * dt
     assert world.state[connection.dof.id].position == 100.0 * dt * dt * dt
     # the state should reuse the same memory
-    assert state_memory_id == id(world.state.data)
+    assert state_memory_id == id(world.state._data)
 
 
 def test_compute_relative_pose(world_setup):
@@ -432,8 +436,8 @@ def test_merge_world(world_setup, pr2_world_copy):
     assert base_link in world.kinematic_structure_entities
     assert r_gripper_tool_frame in world.kinematic_structure_entities
     assert l_shoulder_pan_joint in world.connections
-    assert torso_lift_link._world == world
-    assert r_shoulder_pan_joint._world == world
+    assert torso_lift_link in world.bodies
+    assert r_shoulder_pan_joint in world.connections
 
 
 def test_merge_with_connection(world_setup, pr2_world_copy):
@@ -457,6 +461,7 @@ def test_merge_with_connection(world_setup, pr2_world_copy):
     origin = HomogeneousTransformationMatrix(pose)
 
     connection = pr2_world_copy.get_connection_by_name("l_gripper_l_finger_joint")
+    connection_dof_id = connection.dof.id
     pr2_world_copy.state[connection.dof.id].position = 0.55
     pr2_world_copy.notify_state_change()
     expected_fk = pr2_world_copy.compute_forward_kinematics(
@@ -473,9 +478,9 @@ def test_merge_with_connection(world_setup, pr2_world_copy):
     assert base_link in world.kinematic_structure_entities
     assert r_gripper_tool_frame in world.kinematic_structure_entities
     assert new_connection in world.connections
-    assert torso_lift_link._world == world
-    assert r_shoulder_pan_joint._world == world
-    assert world.state[connection.dof.id].position == 0.55
+    assert torso_lift_link in world.bodies
+    assert r_shoulder_pan_joint in world.connections
+    assert world.state[connection_dof_id].position == 0.55
     assert world.compute_forward_kinematics_np(world.root, base_link)[
         0, 3
     ] == pytest.approx(1.0, abs=1e-6)
@@ -507,8 +512,8 @@ def test_merge_with_pose(world_setup, pr2_world_copy):
 
     assert base_link in world.kinematic_structure_entities
     assert r_gripper_tool_frame in world.kinematic_structure_entities
-    assert torso_lift_link._world == world
-    assert r_shoulder_pan_joint._world == world
+    assert torso_lift_link in world.bodies
+    assert r_shoulder_pan_joint in world.connections
     assert world.compute_forward_kinematics_np(world.root, base_link)[
         0, 3
     ] == pytest.approx(1.0, abs=1e-6)
@@ -528,9 +533,6 @@ def test_merge_with_pose_rotation(world_setup, pr2_world_copy):
         torso_lift_link,
         pr2_world_copy.get_kinematic_structure_entity_by_name("r_shoulder_pan_link"),
     )
-    base_footprint = pr2_world_copy.get_kinematic_structure_entity_by_name(
-        "base_footprint"
-    )
 
     # Rotation is 90 degrees around z-axis, translation is 1 along x-axis
     pose = np.array(
@@ -544,10 +546,12 @@ def test_merge_with_pose_rotation(world_setup, pr2_world_copy):
 
     world.merge_world_at_pose(pr2_world_copy, HomogeneousTransformationMatrix(pose))
 
+    base_footprint = world.get_kinematic_structure_entity_by_name("base_footprint")
+
     assert base_link in world.kinematic_structure_entities
     assert r_gripper_tool_frame in world.kinematic_structure_entities
-    assert torso_lift_link._world == world
-    assert r_shoulder_pan_joint._world == world
+    assert torso_lift_link in world.bodies
+    assert r_shoulder_pan_joint in world.connections
     fk_base = world.compute_forward_kinematics_np(world.root, base_footprint)
     assert fk_base[0, 3] == pytest.approx(1.0, abs=1e-6)
     assert fk_base[1, 3] == pytest.approx(1.0, abs=1e-6)
@@ -626,13 +630,21 @@ def test_copy_world(world_setup):
     )
     assert (
         float(
-            world_copy.get_kinematic_structure_entity_by_name("bf").global_pose.to_np()[
-                0, 3
-            ]
+            world_copy.get_kinematic_structure_entity_by_name(
+                "bf"
+            ).global_transform.to_np()[0, 3]
         )
         == 0.0
     )
-    assert float(bf.global_pose.to_np()[0, 3]) == 1.5
+    assert float(bf.global_transform.to_np()[0, 3]) == 1.5
+    assert all(
+        hash(d) in world_copy._world_entity_hash_table.keys()
+        for d in world.degrees_of_freedom
+    )
+    assert all(
+        hash(k) in world_copy._world_entity_hash_table.keys()
+        for k in world.kinematic_structure_entities
+    )
 
 
 def test_copy_world_state(world_setup):
@@ -693,7 +705,9 @@ def test_copy_pr2_world_state_reset_connection_origin(pr2_world_state_reset):
         pr2_body = pr2_world_state_reset.get_kinematic_structure_entity_by_id(body.id)
         pr2_copy_body = pr2_copy.get_kinematic_structure_entity_by_id(body.id)
         np.testing.assert_array_almost_equal(
-            pr2_body.global_pose.to_np(), pr2_copy_body.global_pose.to_np(), decimal=4
+            pr2_body.global_transform.to_np(),
+            pr2_copy_body.global_transform.to_np(),
+            decimal=4,
         )
 
 
@@ -723,10 +737,10 @@ def test_copy_pr2(pr2_world_state_reset):
     pr2_copy = deepcopy(pr2_world_state_reset)
     assert pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "head_tilt_link"
-    ).global_pose.to_np()[2, 3] == pytest.approx(1.472, abs=1e-3)
+    ).global_transform.to_np()[2, 3] == pytest.approx(1.472, abs=1e-3)
     assert pr2_copy.get_kinematic_structure_entity_by_name(
         "head_tilt_link"
-    ).global_pose.to_np()[2, 3] == pytest.approx(1.472, abs=1e-3)
+    ).global_transform.to_np()[2, 3] == pytest.approx(1.472, abs=1e-3)
 
 
 def test_copy_connections(pr2_world_state_reset):
@@ -801,7 +815,9 @@ def test_set_omni_after_copy(pr2_world_state_reset):
     pr2_copy.notify_state_change()
 
     np.testing.assert_array_almost_equal(
-        pr2_copy.get_body_by_name("base_footprint").global_pose.to_position().to_np(),
+        pr2_copy.get_body_by_name("base_footprint")
+        .global_transform.to_position()
+        .to_np(),
         np.array([10.0, 10.0, 0.0, 1.0]),
     )
 
@@ -975,7 +991,6 @@ def test_dof_removal_simple():
             world=world, parent=body1, child=body2, axis=Vector3.Z()
         )
         world.add_connection(c2)
-        ...
 
 
 def test_dof_removal():
@@ -992,9 +1007,12 @@ def test_dof_removal():
     world.merge_world(world2)
 
     with world.modify_world():
-        world.remove_connection(body2.parent_connection)
+        new_body2 = world.get_kinematic_structure_entity_by_id(body2.id)
+        world.remove_connection(new_body2.parent_connection)
 
-        c_root_bf = OmniDrive.create_with_dofs(parent=body1, child=body2, world=world)
+        c_root_bf = OmniDrive.create_with_dofs(
+            parent=body1, child=new_body2, world=world
+        )
         world.add_connection(c_root_bf)
 
 
@@ -1068,7 +1086,7 @@ def test_world_state_trajectory(world_setup, tmp_path):
     # The first DOF should have changed due to jerk command
     assert not np.allclose(traj.data[0, :, 0], traj.data[-1, :, 0])  # First DOF changed
     assert np.allclose(
-        traj.data[0, :, 1:], initial_state.data[:, 1:]
+        traj.data[0, :, 1:], initial_state._data[:, 1:]
     )  # Other DOFs unchanged initially
 
     plotter = WorldStateTrajectoryPlotter()
@@ -1079,7 +1097,7 @@ def test_world_state_trajectory(world_setup, tmp_path):
     assert traj._world_version == world.get_world_model_manager().version
 
     # Verify that trajectory data matches current world state
-    np.testing.assert_allclose(traj.data[-1, :, :], world.state.data)
+    np.testing.assert_allclose(traj.data[-1, :, :], world.state._data)
 
     # verify that the state increased on each step
     previous = initial_state[dof_uuid]
@@ -1101,14 +1119,15 @@ def test_world_state_trajectory(world_setup, tmp_path):
 def test_merge_into_empty_world(world_setup):
     world, _, _, _, _, _ = world_setup
     world2 = deepcopy(world)
-    world2.clear()
+    with world2.modify_world():
+        world2.clear()
     world2.merge_world(world)
 
 
 def test_reattach_child_to_new_parent(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     # Initial state: l2 is child of l1 via PrismaticConnection
-    old_child_global_pose = l2.global_pose
+    old_child_global_pose = l2.global_transform
     assert l2.parent_connection.parent == l1
     assert isinstance(l2.parent_connection, PrismaticConnection)
 
@@ -1120,16 +1139,45 @@ def test_reattach_child_to_new_parent(world_setup):
     assert isinstance(l2.parent_connection, FixedConnection)
     assert l2 in world.compute_child_kinematic_structure_entities(bf)
     assert l2 not in world.compute_child_kinematic_structure_entities(l1)
-    new_child_global_pose = l2.global_pose
+    new_child_global_pose = l2.global_transform
     assert np.allclose(old_child_global_pose, new_child_global_pose)
 
 
 def test_reset_state_context(pr2_world_state_reset):
-    state_copy = pr2_world_state_reset.state.data.copy()
+    state_copy = pr2_world_state_reset.state._data.copy()
     with pr2_world_state_reset.reset_state_context():
         pr2_world_state_reset.get_body_by_name(
             "base_footprint"
         ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             10, 10, 0
         )
-    assert np.allclose(state_copy, pr2_world_state_reset.state.data)
+    assert np.allclose(state_copy, pr2_world_state_reset.state._data)
+
+
+def test_copy_for_world():
+
+    w1 = World()
+    w2 = World()
+    b1_uuid = UUID(int=1)
+    b1_w1 = Body(
+        name=PrefixedName("b1"),
+        collision=ShapeCollection([Box(scale=Scale())]),
+        id=b1_uuid,
+    )
+
+    milk = Milk(root=b1_w1)
+    with w1.modify_world():
+        w1.add_body(b1_w1)
+        w1.add_semantic_annotation(milk)
+
+    b1_w2 = b1_w1.copy_for_world(w2)
+
+    assert b1_w2.id == b1_w1.id
+    assert b1_w2.name == b1_w1.name
+    assert b1_w2.collision == b1_w1.collision
+
+    with w2.modify_world():
+        w2.add_body(b1_w2)
+    copied_milk = milk.copy_for_world(w2)
+
+    assert copied_milk.root == b1_w2

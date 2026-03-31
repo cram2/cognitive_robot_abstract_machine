@@ -86,8 +86,8 @@ y = Continuous("y")
 ```
 
 ```{code-cell} ipython3
-event_a = SimpleEvent({x: closed(0, 2), y: closed(0, 2)}).as_composite_set()
-event_b = SimpleEvent({x: closed(2.5, 3), y: closed(1, 2.5)}).as_composite_set()
+event_a = SimpleEvent.from_data({x: closed(0, 2), y: closed(0, 2)}).as_composite_set()
+event_b = SimpleEvent.from_data({x: closed(2.5, 3), y: closed(1, 2.5)}).as_composite_set()
 fig = go.Figure(event_a.plot(color="red") + event_b.plot(color="blue"), event_a.plotly_layout())
 fig.update_layout(title="Two disjoint events")
 fig.show()
@@ -234,7 +234,7 @@ def event_trace(event: SimpleEvent, name: str) -> go.Scatter:
     return trace
 
 
-x_event = SimpleEvent({x: closed(0, 1), y: closed(0, 1)})
+x_event = SimpleEvent.from_data({x: closed(0, 1), y: closed(0, 1)})
 
 # create figure and add event
 fig = go.Figure()
@@ -245,7 +245,7 @@ for index, (x_interval, y_interval) in enumerate(itertools.product([closed(-0.25
                                                                     closed(0.5, 1.25).simple_sets[0]],
                                                                    [closed(-0.25, 0.5).simple_sets[0],
                                                                     closed(0.5, 1.25).simple_sets[0]])):
-    sub_event = SimpleEvent({x: x_interval, y: y_interval})
+    sub_event = SimpleEvent.from_data({x: x_interval, y: y_interval})
     sub_event_trace = event_trace(sub_event, f"A_{index + 1}")
     fig.add_trace(sub_event_trace)
     intersection_trace = event_trace(sub_event.intersection_with(x_event), f"A_{index + 1} and X")
@@ -340,15 +340,15 @@ class Shape(IntEnum):
     TRIANGLE = 2
 
 
-color = Symbolic("color", Set.from_iterable(Color))
-shape = Symbolic("shape", Set.from_iterable(Shape))
+color = Symbolic(name="color", domain=Set.from_iterable(Color))
+shape = Symbolic(name="shape", domain=Set.from_iterable(Shape))
 
 probabilities = np.array([[2 / 15, 1 / 15, 1 / 5],
                           [1 / 5, 1 / 10, 3 / 10]])
 
 distribution = MultinomialDistribution((color, shape), probabilities)
-color_event = SimpleEvent({color: Color.BLUE}).as_composite_set()
-shape_event = SimpleEvent({shape: (Shape.CIRCLE, Shape.TRIANGLE)}).as_composite_set()
+color_event = SimpleEvent.from_data({color: Color.BLUE}).as_composite_set()
+shape_event = SimpleEvent.from_data({shape: (Shape.CIRCLE, Shape.TRIANGLE)}).as_composite_set()
 joint_event = color_event & shape_event
 print(f"P({joint_event}) = {distribution.probability(joint_event)}")
 print(
@@ -364,9 +364,9 @@ Let's verify if the variables are independent.
 
 ```{code-cell} ipython3
 for color_value, shape_value in itertools.product(color.domain.simple_sets, shape.domain.simple_sets):
-        joint_event = SimpleEvent({color: color_value, shape: shape_value}).as_composite_set()
-        color_event = SimpleEvent({color: color_value}).as_composite_set()
-        shape_event = SimpleEvent({shape: shape_value}).as_composite_set()
+        joint_event = SimpleEvent.from_data({color: color_value, shape: shape_value}).as_composite_set()
+        color_event = SimpleEvent.from_data({color: color_value}).as_composite_set()
+        shape_event = SimpleEvent.from_data({shape: shape_value}).as_composite_set()
         print(f"P({joint_event}) = {distribution.probability(joint_event)}")
         print(f"P({color_event}) * P(shape={shape_event}) = {distribution.probability(color_event) * distribution.probability(shape_event)}")
         print(np.allclose(distribution.probability(joint_event), 
@@ -404,25 +404,25 @@ class Size(IntEnum):
     SMALL = 0
     LARGE = 1
     
-size = Symbolic("size", Set.from_iterable(Size))
+size = Symbolic(name="size", domain=Set.from_iterable(Size))
 
 probabilities = np.array([[[2 / 30, 1 / 30, 1 / 10], [0, 0.3, 0.05]],
                           [[1 / 10, 1 / 20, 3 / 20], [ 0.15, 0, 0.,]]])
 distribution = MultinomialDistribution((color, size, shape), probabilities)
 
-small_event = SimpleEvent({size: Size.SMALL}).as_composite_set()
+small_event = SimpleEvent.from_data({size: Size.SMALL}).as_composite_set()
 p_small = distribution.probability(small_event)
 
 large_event = ~small_event
 p_large = distribution.probability(large_event)
 
-color_event = SimpleEvent({color: Color.BLUE}).as_composite_set()
+color_event = SimpleEvent.from_data({color: Color.BLUE}).as_composite_set()
 color_and_small = color_event & small_event
 color_and_large = color_event & large_event
 p_color_and_small = distribution.probability(color_and_small)
 p_color_and_large = distribution.probability(color_and_large)
 
-shape_event = SimpleEvent({shape: Shape.CIRCLE}).as_composite_set()
+shape_event = SimpleEvent.from_data({shape: Shape.CIRCLE}).as_composite_set()
 shape_and_small = shape_event & small_event
 shape_and_large = shape_event & large_event
 p_shape_and_small = distribution.probability(shape_and_small)
@@ -510,7 +510,7 @@ $x_1 < 1 \wedge x_2 < 2$.
 
 ```{code-cell} ipython3
 from probabilistic_model.distributions.gaussian import GaussianDistribution
-normal = GaussianDistribution(Continuous("x"), 0, 1)
+normal = GaussianDistribution(variable=Continuous("x"), location=0, scale=1)
 fig = go.Figure(normal.plot(), normal.plotly_layout())
 fig.for_each_trace(lambda trace: trace.update(visible='legendonly') if trace.name in ["Expectation", "Mode"] else ())
 ```

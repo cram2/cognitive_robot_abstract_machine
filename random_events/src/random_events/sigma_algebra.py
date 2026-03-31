@@ -1,17 +1,18 @@
 from __future__ import annotations
-
 from abc import abstractmethod, ABC
+from dataclasses import dataclass, field, InitVar
 from typing import Tuple, Dict, Any
-
 import random_events_lib as rl
 from typing_extensions import Self, Iterable
 
-from random_events.utils import SubclassJSONSerializer, CPPWrapper
+from krrood.adapters.json_serializer import SubclassJSONSerializer
+from random_events.utils import CPPWrapper
 
 EMPTY_SET_SYMBOL = "∅"
 
 
-class AbstractSimpleSet(SubclassJSONSerializer, CPPWrapper):
+@dataclass(init=False)
+class AbstractSimpleSet(CPPWrapper, SubclassJSONSerializer, ABC):
     """
     Abstract class for simple sets.
 
@@ -20,7 +21,15 @@ class AbstractSimpleSet(SubclassJSONSerializer, CPPWrapper):
     This class is a wrapper for the C++ class AbstractSimpleSet.
     """
 
-    _cpp_object: rl.AbstractSimpleSet
+    cpp_object: rl.AbstractSimpleSet
+
+    @classmethod
+    @abstractmethod
+    def from_data(cls, *args, **kwargs) -> Self:
+        """
+        Create a simple set from data.
+        """
+        raise NotImplementedError
 
     def intersection_with(self, other: Self) -> Self:
         """
@@ -29,19 +38,22 @@ class AbstractSimpleSet(SubclassJSONSerializer, CPPWrapper):
         :param other: The other SimpleSet
         :return: The intersection of this set with the other set
         """
-        return self._from_cpp(self._cpp_object.intersection_with(other._cpp_object))
+        return self._from_cpp(self.cpp_object.intersection_with(other.cpp_object))
 
     def complement(self) -> SimpleSetContainer:
         """
         :return: The complement of this set as disjoint set of simple sets.
         """
-        return tuple(self._from_cpp(cpp_simple_set) for cpp_simple_set in self._cpp_object.complement())
+        return tuple(
+            self._from_cpp(cpp_simple_set)
+            for cpp_simple_set in self.cpp_object.complement()
+        )
 
     def is_empty(self) -> bool:
         """
         :return: Rather this set is empty or not.
         """
-        return self._cpp_object.is_empty()
+        return self.cpp_object.is_empty()
 
     @abstractmethod
     def contains(self, item) -> bool:
@@ -53,7 +65,7 @@ class AbstractSimpleSet(SubclassJSONSerializer, CPPWrapper):
         raise NotImplementedError
 
     def __hash__(self):
-        return hash(self._cpp_object)
+        return hash(self.cpp_object)
 
     def non_empty_to_string(self) -> str:
         """
@@ -68,7 +80,7 @@ class AbstractSimpleSet(SubclassJSONSerializer, CPPWrapper):
         :param other: The other SimpleSet
         :return: The difference as a disjoint set of simple sets.
         """
-        return self._from_cpp(self._cpp_object.difference_with(other._cpp_object))
+        return self._from_cpp(self.cpp_object.difference_with(other.cpp_object))
 
     def to_string(self):
         """
@@ -85,10 +97,10 @@ class AbstractSimpleSet(SubclassJSONSerializer, CPPWrapper):
         return self.to_string()
 
     def __lt__(self, other: Self):
-        return self._cpp_object < other._cpp_object
+        return self.cpp_object < other.cpp_object
 
     def __eq__(self, other):
-        return self._cpp_object == other._cpp_object
+        return self.cpp_object == other.cpp_object
 
     @abstractmethod
     def as_composite_set(self) -> AbstractCompositeSet:
@@ -104,7 +116,8 @@ class AbstractSimpleSet(SubclassJSONSerializer, CPPWrapper):
         raise NotImplementedError
 
 
-class AbstractCompositeSet(SubclassJSONSerializer, CPPWrapper, ABC):
+@dataclass
+class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
     """
     Abstract class for composite sets.
 
@@ -116,7 +129,7 @@ class AbstractCompositeSet(SubclassJSONSerializer, CPPWrapper, ABC):
     This class wraps the C++ class AbstractCompositeSet.
     """
 
-    _cpp_object: rl.AbstractCompositeSet
+    cpp_object: rl.AbstractCompositeSet
 
     simple_set_example: AbstractSimpleSet
     """
@@ -124,19 +137,31 @@ class AbstractCompositeSet(SubclassJSONSerializer, CPPWrapper, ABC):
     Fields that are python only are read from this instance when reading from cpp.
     """
 
+    @classmethod
+    @abstractmethod
+    def from_simple_sets(cls, *simple_sets: Tuple[AbstractSimpleSet, ...]) -> Self:
+        """
+        Create a composite set from simple sets.
+        :param simple_sets: The simple sets that make up the union.
+        """
+        raise NotImplementedError
+
     @property
     def simple_sets(self) -> SimpleSetContainer:
         """
         :return: The simple sets contained in the union described by this set.
         """
-        return tuple(self.simple_set_example._from_cpp(cpp_object) for cpp_object in self._cpp_object.simple_sets)
+        return tuple(
+            self.simple_set_example._from_cpp(cpp_object)
+            for cpp_object in self.cpp_object.simple_sets
+        )
 
     def union_with(self, other: Self) -> Self:
         """
         :param other: The other set
         :return: The union of this set with the other set
         """
-        return self._from_cpp(self._cpp_object.union_with(other._cpp_object))
+        return self._from_cpp(self.cpp_object.union_with(other.cpp_object))
 
     def __or__(self, other: Self) -> Self:
         return self.union_with(other)
@@ -146,7 +171,7 @@ class AbstractCompositeSet(SubclassJSONSerializer, CPPWrapper, ABC):
         :param other: The other set
         :return: The intersection of this set with the other set
         """
-        return self._from_cpp(self._cpp_object.intersection_with(other._cpp_object))
+        return self._from_cpp(self.cpp_object.intersection_with(other.cpp_object))
 
     def __and__(self, other) -> Self:
         return self.intersection_with(other)
@@ -156,7 +181,7 @@ class AbstractCompositeSet(SubclassJSONSerializer, CPPWrapper, ABC):
         :param other: The other set
         :return: The difference of this set with the other set
         """
-        return self._from_cpp(self._cpp_object.difference_with(other._cpp_object))
+        return self._from_cpp(self.cpp_object.difference_with(other.cpp_object))
 
     def __sub__(self, other) -> Self:
         return self.difference_with(other)
@@ -165,7 +190,7 @@ class AbstractCompositeSet(SubclassJSONSerializer, CPPWrapper, ABC):
         """
         :return: The complement of this set
         """
-        return self._from_cpp(self._cpp_object.complement())
+        return self._from_cpp(self.cpp_object.complement())
 
     def __invert__(self) -> Self:
         return self.complement()
@@ -174,7 +199,7 @@ class AbstractCompositeSet(SubclassJSONSerializer, CPPWrapper, ABC):
         """
         :return: If this set is empty or not.
         """
-        return self._cpp_object.is_empty()
+        return self.cpp_object.is_empty()
 
     def contains(self, item) -> bool:
         """
@@ -207,7 +232,7 @@ class AbstractCompositeSet(SubclassJSONSerializer, CPPWrapper, ABC):
         """
         :return: If the union described by this is disjoint or not.
         """
-        return self._cpp_object.is_disjoint()
+        return self.cpp_object.is_disjoint()
 
     def make_disjoint(self) -> Self:
         """
@@ -215,7 +240,7 @@ class AbstractCompositeSet(SubclassJSONSerializer, CPPWrapper, ABC):
 
         :return: The disjoint set.
         """
-        return self._from_cpp(self._cpp_object.make_disjoint())
+        return self._from_cpp(self.cpp_object.make_disjoint())
 
     def add_simple_set(self, simple_set: AbstractSimpleSet):
         """
@@ -225,7 +250,7 @@ class AbstractCompositeSet(SubclassJSONSerializer, CPPWrapper, ABC):
         """
         if simple_set.is_empty():
             return
-        self._cpp_object.add_new_simple_set(simple_set._cpp_object)
+        self.cpp_object.add_new_simple_set(simple_set.cpp_object)
 
     def simplify(self) -> Self:
         """
@@ -233,10 +258,10 @@ class AbstractCompositeSet(SubclassJSONSerializer, CPPWrapper, ABC):
 
         :return: The simplified set
         """
-        return self._from_cpp(self._cpp_object.simplify())
+        return self._from_cpp(self.cpp_object.simplify())
 
     def __eq__(self, other: Self) -> bool:
-        return self._cpp_object == other._cpp_object
+        return self.cpp_object == other.cpp_object
 
     def __hash__(self) -> int:
         return hash(tuple(self.simple_sets))
@@ -258,17 +283,27 @@ class AbstractCompositeSet(SubclassJSONSerializer, CPPWrapper, ABC):
         :return: Rather this set is smaller than the other set
         """
 
-        return self._cpp_object < other._cpp_object
+        return self.cpp_object < other.cpp_object
 
     def to_json(self) -> Dict[str, Any]:
-        return {**super().to_json(), "simple_sets": [simple_set.to_json() for simple_set in self.simple_sets]}
+        return {
+            **super().to_json(),
+            "simple_sets": [simple_set.to_json() for simple_set in self.simple_sets],
+        }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any]) -> Self:
-        return cls(*[AbstractSimpleSet.from_json(simple_set) for simple_set in data["simple_sets"]])
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls.from_simple_sets(
+            *[
+                AbstractSimpleSet.from_json(simple_set)
+                for simple_set in data["simple_sets"]
+            ]
+        )
 
     def __deepcopy__(self):
-        return self.__class__(*[ss.__deepcopy__() for ss in self.simple_sets])
+        return self.__class__.from_simple_sets(
+            *[ss.__deepcopy__() for ss in self.simple_sets]
+        )
 
 
 # Type definitions

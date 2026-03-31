@@ -67,13 +67,12 @@ class UnderspecifiedParameters:
 
             if isinstance(attribute_match.assigned_value, SymbolicExpression):
                 random_events_variable = random_events.variable.Symbolic(
-                    name,
-                    Set.from_iterable(attribute_match.assigned_value.tolist()),
+                    name=name,
+                    domain=Set.from_iterable(attribute_match.assigned_value.tolist()),
                 )
                 result[random_events_variable.name] = random_events_variable
                 continue
-
-            if not issubclass(
+            if attribute_match.assigned_variable._type_ is None or not issubclass(
                 attribute_match.assigned_variable._type_,
                 random_events.variable.compatible_types,
             ):

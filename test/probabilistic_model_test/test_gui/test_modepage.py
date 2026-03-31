@@ -23,18 +23,18 @@ class TestModeGUI(unittest.TestCase):
         self.controller = ModelController()
 
         # Setup a simple model
-        self.v1 = Continuous("v1", closed(0, 1))
-        self.v2 = Symbolic("v2", Set.from_iterable(["a", "b"]))
+        self.v1 = Continuous(name="v1", domain=closed(0, 1))
+        self.v2 = Symbolic(name="v2", domain=Set.from_iterable(["a", "b"]))
 
         self.model = MagicMock()
         self.model.variables = [self.v1, self.v2]
 
         # Configure marginal to return real numbers for bounds
         mock_marginal_v1 = MagicMock()
-        mock_marginal_v1.support.simple_sets = [SimpleEvent({self.v1: closed(0, 1)})]
+        mock_marginal_v1.support.simple_sets = [SimpleEvent.from_data({self.v1: closed(0, 1)})]
         
         mock_marginal_v2 = MagicMock()
-        mock_marginal_v2.support.simple_sets = [SimpleEvent({self.v2: Set.from_iterable(["a", "b"])})]
+        mock_marginal_v2.support.simple_sets = [SimpleEvent.from_data({self.v2: Set.from_iterable(["a", "b"])})]
 
         def side_effect(vars):
             if vars == [self.v1]:
@@ -44,8 +44,8 @@ class TestModeGUI(unittest.TestCase):
         self.model.marginal.side_effect = side_effect
 
         # Mock mode result: (Event, Likelihood)
-        self.mode_event = Event(
-            SimpleEvent({self.v1: closed(0.5, 0.5), self.v2: Set.from_iterable(["a"])})
+        self.mode_event = Event.from_simple_sets(
+            SimpleEvent.from_data({self.v1: closed(0.5, 0.5), self.v2: Set.from_iterable(["a"])})
         )
         self.likelihood = 0.8
 
@@ -79,7 +79,7 @@ class TestModeGUI(unittest.TestCase):
 
         # Mock build_evidence_event to return non-empty event
         widget.build_evidence_event = MagicMock(
-            return_value=Event(SimpleEvent({self.v1: closed(2, 3)}))
+            return_value=Event.from_simple_sets(SimpleEvent.from_data({self.v1: closed(2, 3)}))
         )
 
         # Mock calculate_mode to return None

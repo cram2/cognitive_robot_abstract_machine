@@ -1,8 +1,6 @@
 import os
-import unittest
 
 import numpy as np
-import sqlalchemy
 from krrood.ormatic.utils import create_engine
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -14,7 +12,6 @@ from semantic_digital_twin.adapters.ros.world_fetcher import (
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -28,7 +25,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.orm.ormatic_interface import *
-from krrood.ormatic.dao import to_dao
+from krrood.ormatic.data_access_objects.helper import to_dao
 
 
 import pytest
@@ -150,6 +147,10 @@ def test_pr2_world(pr2_world_state_reset, session):
 
     queried_world = session.scalar(select(WorldMappingDAO))
     reconstructed: World = queried_world.from_dao()
+
+    q = select(RevoluteConnectionDAO)
+    r = session.scalars(q).all()
+    assert len(r) > 0
 
 
 def test_pr2_semantic_annotation_and_safe_to_db(

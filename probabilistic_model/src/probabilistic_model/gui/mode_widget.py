@@ -228,7 +228,7 @@ class ModeWidget(QWidget):
             w.update_available_variables(selected_vars)
 
     def build_evidence_event(self) -> Event:
-        simple_event = SimpleEvent()
+        simple_event = SimpleEvent.from_data()
         for widget in self.evidence_widgets:
             constraint = widget.get_constraint()
             if constraint:
@@ -242,7 +242,7 @@ class ModeWidget(QWidget):
         if not simple_event:
             return Event()
 
-        return Event(simple_event)
+        return Event.from_simple_sets(simple_event)
 
     def on_calculate(self):
         if not self.controller.model:

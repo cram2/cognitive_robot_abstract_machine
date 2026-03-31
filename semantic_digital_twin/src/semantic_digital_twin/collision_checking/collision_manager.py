@@ -25,10 +25,14 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidCollisionRule,
     AllowCollisionRule,
 )
-from semantic_digital_twin.collision_checking.pybullet_collision_detector import BulletCollisionDetector
+from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
+    BulletCollisionDetector,
+)
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.world_description.world_modification import synchronized_attribute_modification
+from semantic_digital_twin.world_description.world_modification import (
+    synchronized_attribute_modification,
+)
 
 if TYPE_CHECKING:
     from ..world import World
@@ -315,23 +319,3 @@ class CollisionManager(ModelChangeCallback):
                 data["max_avoided_bodies_rules"], **kwargs
             ),
         )
-
-    def merge_collision_manager(self, other: CollisionManager):
-        """
-        Merges the collision rules of another collision manager into this one.
-        """
-        for default_rule in other.default_rules:
-            if default_rule not in self.default_rules:
-                self.add_default_rule(default_rule)
-
-        for ignore_collision_rule in other.ignore_collision_rules:
-            if ignore_collision_rule not in self.ignore_collision_rules:
-                self.add_ignore_collision_rule(ignore_collision_rule)
-
-        for temporary_rule in other.temporary_rules:
-            if temporary_rule not in self.temporary_rules:
-                self.add_temporary_rule(temporary_rule)
-
-        for max_avoided_bodies_rule in other.max_avoided_bodies_rules:
-            if max_avoided_bodies_rule not in self.max_avoided_bodies_rules:
-                self.extend_max_avoided_bodies_rules([max_avoided_bodies_rule])

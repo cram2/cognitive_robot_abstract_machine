@@ -49,10 +49,13 @@ from krrood.entity_query_language.query.quantifiers import (
 from krrood.entity_query_language.utils import (
     cartesian_product_while_passing_the_bindings_around,
 )
+from ...dataset.example_classes import (
+    KRROODPose,
+    KRROODPosition,
+    KRROODVectorsWithProperty,
+)
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 
-from ...dataset.example_classes import VectorsWithProperty
-from ...dataset.example_classes import VectorsWithProperty
 from ...dataset.semantic_world_like_classes import (
     Handle,
     Body,
@@ -66,6 +69,14 @@ from ...dataset.semantic_world_like_classes import (
     Drawer,
     Cabinet,
 )
+
+
+def test_variable_from_type_setting(handles_and_containers_world):
+    world = handles_and_containers_world
+    B = variable_from(world.bodies)
+    assert (
+        B._type_ is None
+    ), "The type of the variable should be None when created only from a domain."
 
 
 def test_empty_conditions(handles_and_containers_world, doors_and_drawers_world):
@@ -1017,7 +1028,7 @@ def test_property_selection():
     """
     Test that properties can be selected from entities in a query.
     """
-    v = variable(VectorsWithProperty, None)
+    v = variable(KRROODVectorsWithProperty, None)
     q = an(entity(v).where(v.vectors[0].x == 1))
 
 
@@ -1262,3 +1273,10 @@ def test_accessing_dunder_methods():
     results = world_class_starting_with_c.tolist()
     assert len(results) == 3
     assert set(results) == {c for c in world_classes if c.__name__.startswith("C")}
+
+
+def test_debugger_issue():
+    # a normal query using a property
+    var = variable(int, [1, 2, 3])
+    with pytest.raises(TypeError):
+        list(var)

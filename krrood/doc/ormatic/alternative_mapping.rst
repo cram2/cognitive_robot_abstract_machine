@@ -17,13 +17,14 @@ database.
 Alternative Mapping (Explicit Control)
 --------------------------------------
 If a dataclass does not fit the standard rules or requires a more specialized schema, and a referencing of its fields
-define an explicit mapping by subclassing :class:`krrood.ormatic.dao.AlternativeMapping`. The generic variable
-has to be the class you create the alternative mapping for. This lets you:
+define an explicit mapping by subclassing :class:`krrood.ormatic.data_access_objects.alternative_mappings.AlternativeMapping`.
+The generic variable has to be the class you create the alternative mapping for. This lets you:
 
 - Override column names or shapes
 - Introduce association tables explicitly
 - Write reusable mappings that can be shared across multiple applications
 - Filter information that should not persist
+- Control build order of objects during :func:`krrood.ormatic.data_access_objects.dao.DataAccessObject.from_dao`
 
-You also have to implement the methods :func:`krrood.ormatic.dao.AlternativeMapping.create_instance` and
-:func:`krrood.ormatic.dao.AlternativeMapping.create_from_dao`.
+You also have to implement the methods :func:`krrood.ormatic.data_access_objects.alternative_mappings.AlternativeMapping.from_domain_object` and
+:func:`krrood.ormatic.data_access_objects.alternative_mappings.AlternativeMapping.to_domain_object`.

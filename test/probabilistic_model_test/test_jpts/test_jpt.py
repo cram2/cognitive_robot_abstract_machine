@@ -4,38 +4,33 @@ import math
 import random
 import tempfile
 from datetime import datetime
-from enum import IntEnum, Enum
+from enum import Enum
 
 import numpy as np
 import pandas as pd
 import sklearn.datasets
-from jpt import infer_from_dataframe as old_infer_from_dataframe
 from jpt.learning.impurity import Impurity
+from jpt.variables import infer_from_dataframe as old_infer_from_dataframe
 from jpt.trees import JPT as OldJPT
-from matplotlib import pyplot as plt
-from random_events.interval import closed, SimpleInterval
-from random_events.product_algebra import SimpleEvent, VariableSet
-from random_events.variable import Variable, Continuous, Integer as IntegerVariable
-
-from probabilistic_model.distributions import (
-    GaussianDistribution,
-    BernoulliDistribution,
-)
-from probabilistic_model.learning.jpt.jpt import JPT
+from jpt.learning.preprocessing import preprocess_data as old_preprocess_data
+from krrood.adapters.json_serializer import to_json, from_json
+from random_events.interval import closed
+from random_events.product_algebra import SimpleEvent
+from random_events.variable import Continuous, Symbolic, Integer
+from random_events.set import Set
+from probabilistic_model.distributions.gaussian import GaussianDistribution
+from probabilistic_model.distributions.distributions import BernoulliDistribution
+from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import (
-    ScaledContinuous,
     infer_variables_from_dataframe,
-    Integer,
-    Symbolic,
+    AnnotatedVariable,
 )
-from probabilistic_model.learning.nyga_distribution import NygaDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     ProbabilisticCircuit,
     ProductUnit,
     IntegerDistribution,
     SymbolicDistribution,
-    UnivariateContinuousLeaf,
     leaf,
 )
 from probabilistic_model.probabilistic_circuit.relational.rspns import (
@@ -57,28 +52,26 @@ class SymbolEnum(Enum):
 
 
 class VariableTestCase(unittest.TestCase):
-    variable: ScaledContinuous = ScaledContinuous("x", 2, 3)
-
-    def test_encode(self):
-        self.assertEqual(self.variable.encode(2), 0)
-        self.assertEqual(self.variable.encode(5), 1)
-        self.assertEqual(self.variable.encode(0), -2 / 3)
-
-    def test_decode(self):
-        self.assertEqual(self.variable.decode(0), 2)
-        self.assertEqual(self.variable.decode(1), 5)
-        self.assertEqual(self.variable.decode(-2 / 3), 0)
+    integer = Integer(name="x")
+    continuous = Continuous(name="x")
+    symbolic = Symbolic(name="x", domain=Set.from_iterable(SymbolEnum))
 
     def test_serialization_integer(self):
-        variable = Integer("x", 2, 1)
-        serialized = variable.to_json()
-        deserialized = Variable.from_json(serialized)
+        variable = AnnotatedVariable(self.integer, 2, 1)
+        serialized = to_json(variable)
+        deserialized = from_json(serialized)
         self.assertEqual(variable, deserialized)
 
     def test_serialization_continuous(self):
-        variable = ScaledContinuous("x", 2, 3, 1.0, 0.1, 10)
-        serialized = variable.to_json()
-        deserialized = Variable.from_json(serialized)
+        variable = AnnotatedVariable(self.continuous, 2, 3, 1.0, 0.1, 10)
+        serialized = to_json(variable)
+        deserialized = from_json(serialized)
+        self.assertEqual(variable, deserialized)
+
+    def test_serialization_symbolic(self):
+        variable = AnnotatedVariable(self.symbolic)
+        serialized = to_json(variable)
+        deserialized = from_json(serialized)
         self.assertEqual(variable, deserialized)
 
 
@@ -103,19 +96,12 @@ class InferFromDataFrameTestCase(unittest.TestCase):
 
     def test_infer_from_dataframe_with_scaling(self):
         real, integer, symbol = infer_variables_from_dataframe(
-            self.data, scale_continuous_types=True
+            self.data
         )
-        self.assertEqual(real.name, "real")
-        self.assertIsInstance(real, ScaledContinuous)
-        self.assertEqual(integer.name, "integer")
-        self.assertEqual(symbol.name, "symbol")
-        self.assertLess(real.minimal_distance, 1.0)
-
-    def test_infer_from_dataframe_without_scaling(self):
-        real, integer, symbol = infer_variables_from_dataframe(
-            self.data, scale_continuous_types=False
-        )
-        self.assertNotIsInstance(real, ScaledContinuous)
+        self.assertEqual(real.variable.name, "real")
+        self.assertEqual(integer.variable.name, "integer")
+        self.assertEqual(symbol.variable.name, "symbol")
+        self.assertLessEqual(real.minimal_distance, 1.0)
 
     def test_unknown_type(self):
         df = pd.DataFrame()
@@ -126,10 +112,7 @@ class InferFromDataFrameTestCase(unittest.TestCase):
 
 class JPTTestCase(unittest.TestCase):
     data: pd.DataFrame
-    real: ScaledContinuous
-    integer: Integer
-    symbol: Symbolic
-    model: JPT
+    model: JointProbabilityTree
 
     def setUp(self):
         np.random.seed(69)
@@ -141,9 +124,9 @@ class JPTTestCase(unittest.TestCase):
         data["symbol"] = random.choices(list(SymbolEnum), k=100)
         self.data = data
         self.real, self.integer, self.symbol = infer_variables_from_dataframe(
-            self.data, scale_continuous_types=False
+            self.data
         )
-        self.model = JPT([self.real, self.integer, self.symbol])
+        self.model = JointProbabilityTree(annotated_variables=[self.real, self.integer, self.symbol])
 
     def test_construct_impurity(self):
         impurity = self.model.construct_impurity()
@@ -174,7 +157,7 @@ class JPTTestCase(unittest.TestCase):
         self.assertEqual(len(self.model.root.subcircuits[0].subcircuits), 3)
 
     def test_fit(self):
-        self.model._min_samples_leaf = 10
+        self.model.min_samples_per_leaf = 10
         pc = self.model.fit(self.data)
         self.assertTrue(
             len(pc.root.subcircuits)
@@ -185,8 +168,7 @@ class JPTTestCase(unittest.TestCase):
         )
 
         # check that all likelihoods are greater than 0
-        preprocessed_data = self.model.preprocess_data(self.data)
-        likelihood = pc.likelihood(preprocessed_data)
+        likelihood = pc.likelihood(self.data.to_numpy())
 
         self.assertTrue(all(likelihood > 0))
 
@@ -199,7 +181,7 @@ class JPTTestCase(unittest.TestCase):
             min_samples_leaf=self.model.min_samples_leaf,
             min_impurity_improvement=self.model.min_impurity_improvement,
         )
-        original_preprocessing = original_jpt._preprocess_data(self.data)
+        original_preprocessing = old_preprocess_data(original_jpt, self.data).to_numpy()
         own_preprocessing = self.model.preprocess_data(self.data)
 
         # Symbolic columns are not preprocessed in order in JPTs. The difference is intended
@@ -208,7 +190,7 @@ class JPTTestCase(unittest.TestCase):
         )
 
     def test_fit_and_compare_to_jpt(self):
-        self.model._min_samples_leaf = 10
+        self.model.min_samples_per_leaf = 10
         self.model.keep_sample_indices = True
         self.model.fit(self.data)
         variables = old_infer_from_dataframe(
@@ -225,21 +207,21 @@ class JPTTestCase(unittest.TestCase):
     def test_jpt_continuous_variables_only(self):
         data = self.data[["real"]].astype(float)
         variables = infer_variables_from_dataframe(data)
-        model = JPT(variables)
+        model = JointProbabilityTree(variables)
         model.fit(data)
         self.assertEqual(len(model.root.subcircuits), 1)
 
     def test_jpt_integer_variables_only(self):
         data = self.data[["integer"]]
         variables = infer_variables_from_dataframe(data)
-        model = JPT(variables)
+        model = JointProbabilityTree(variables)
         model.fit(data)
         self.assertEqual(len(model.root.subcircuits), 1)
 
     def test_jpt_symbolic_variables_only(self):
         data = self.data[["symbol"]]
         variables = infer_variables_from_dataframe(data)
-        model = JPT(variables)
+        model = JointProbabilityTree(variables)
         pc = model.fit(data)
         pc.plot_structure()
         self.assertEqual(len(pc.root.subcircuits), 3)
@@ -257,16 +239,16 @@ class JPTTestCase(unittest.TestCase):
         )
 
     def test_serialization(self):
-        self.model._min_samples_leaf = 10
+        self.model.min_samples_per_leaf = 10
         self.model.fit(self.data)
-        serialized = self.model.to_json()
-        deserialized = JPT.from_json(serialized)
+        serialized = to_json(self.model)
+        deserialized = from_json(serialized)
         self.assertEqual(self.model, deserialized)
 
 
 class BreastCancerTestCase(unittest.TestCase):
     data: pd.DataFrame
-    model: JPT
+    model: JointProbabilityTree
     pc: ProbabilisticCircuit
 
     @classmethod
@@ -281,15 +263,15 @@ class BreastCancerTestCase(unittest.TestCase):
         df["malignant"] = target
         cls.data = df
         variables = infer_variables_from_dataframe(
-            cls.data, scale_continuous_types=False, min_samples_per_quantile=600
+            cls.data, min_samples_per_quantile=600
         )
 
-        cls.model = JPT(variables, min_samples_leaf=0.4)
+        cls.model = JointProbabilityTree(annotated_variables=variables, min_samples_per_leaf=0.4)
         cls.pc = cls.model.fit(cls.data)
 
     def test_serialization(self):
-        json_dict = self.model.to_json()
-        model = JPT.from_json(json_dict)
+        json_dict = to_json(self.model)
+        model = from_json(json_dict)
 
         self.assertEqual(model, self.model)
 
@@ -300,13 +282,13 @@ class BreastCancerTestCase(unittest.TestCase):
 
         with open(file.name, "r") as f:
             model_ = json.load(f)
-        model_ = JPT.from_json(model_)
+        model_ = from_json(model_)
 
         self.assertEqual(model, model_)
         file.close()
 
     def test_conditional_inference(self):
-        evidence = SimpleEvent(
+        evidence = SimpleEvent.from_data(
             {variable: variable.domain for variable in self.model.variables}
         ).as_composite_set()
         query = evidence
@@ -324,9 +306,9 @@ class BreastCancerTestCase(unittest.TestCase):
         self.assertIsInstance(marginal.root, SumUnit)
 
     def test_serialization_of_circuit(self):
-        json_dict = self.pc.to_json()
-        model = ProbabilisticCircuit.from_json(json_dict)
-        event = SimpleEvent(
+        json_dict = to_json(self.pc)
+        model = from_json(json_dict)
+        event = SimpleEvent.from_data(
             {variable: variable.domain for variable in self.model.variables}
         ).as_composite_set()
         self.assertAlmostEqual(model.probability(event), 1.0)
@@ -335,7 +317,7 @@ class BreastCancerTestCase(unittest.TestCase):
         model = self.pc
         marginal = model.marginal(self.model.variables[:2])
         x, y = self.model.variables[:2]
-        event = SimpleEvent({x: closed(0, 10)}).as_composite_set()
+        event = SimpleEvent.from_data({x: closed(0, 10)}).as_composite_set()
         conditional, probability = model.truncated(event)
 
     def test_mode(self):
@@ -344,7 +326,7 @@ class BreastCancerTestCase(unittest.TestCase):
 
 
 class MNISTTestCase(unittest.TestCase):
-    model: JPT
+    model: JointProbabilityTree
 
     @classmethod
     def setUpClass(cls):
@@ -355,15 +337,15 @@ class MNISTTestCase(unittest.TestCase):
         df["digit"] = df["digit"].astype(str)
 
         variables = infer_variables_from_dataframe(
-            df, scale_continuous_types=False, min_likelihood_improvement=0.01
+            df, min_likelihood_improvement=0.01
         )
-        cls.model = JPT(variables, min_samples_leaf=0.1)
+        cls.model = JointProbabilityTree(annotated_variables=variables, min_samples_per_leaf=0.1)
         cls.model.fit(df)
 
     def test_serialization(self):
-        json_dict = self.model.to_json()
+        json_dict = to_json(self.model)
         # print(json_dict)
-        model = JPT.from_json(json_dict)
+        model = from_json(json_dict)
         self.assertEqual(model, self.model)
 
         file = tempfile.NamedTemporaryFile()
@@ -373,7 +355,7 @@ class MNISTTestCase(unittest.TestCase):
 
         with open(file.name, "r") as f:
             model_ = json.load(f)
-        model_ = JPT.from_json(model_)
+        model_ = from_json(model_)
         self.assertEqual(model, model_)
         file.close()
 
@@ -382,8 +364,8 @@ import plotly.graph_objects as go
 
 
 class GaussianJPTTestCase(unittest.TestCase):
-    x: Continuous
-    y: Continuous
+    x: AnnotatedVariable
+    y: AnnotatedVariable
 
     data: pd.DataFrame
     multivariate_normal: ProbabilisticCircuit
@@ -393,8 +375,8 @@ class GaussianJPTTestCase(unittest.TestCase):
         np.random.seed(69)
         pc = ProbabilisticCircuit()
         prod = ProductUnit(probabilistic_circuit=pc)
-        prod.add_subcircuit(leaf(GaussianDistribution(Continuous("x"), 2, 4), pc))
-        prod.add_subcircuit(leaf(GaussianDistribution(Continuous("y"), 2, 4), pc))
+        prod.add_subcircuit(leaf(GaussianDistribution(variable=Continuous("x"), location=2, scale=4), pc))
+        prod.add_subcircuit(leaf(GaussianDistribution(variable=Continuous("y"), location=2, scale=4), pc))
         cls.multivariate_normal = pc
         samples = cls.multivariate_normal.sample(1000)
         cls.data = pd.DataFrame(
@@ -402,11 +384,12 @@ class GaussianJPTTestCase(unittest.TestCase):
         )
 
         cls.x, cls.y = infer_variables_from_dataframe(
-            cls.data, scale_continuous_types=False, min_samples_per_quantile=20
+            cls.data,
+            min_samples_per_quantile=20
         )
 
     def test_plot_2d_jpt(self):
-        model = JPT([self.x, self.y], min_samples_leaf=0.9)
+        model = JointProbabilityTree([self.x, self.y], min_samples_per_leaf=0.9)
         pc = model.fit(self.data)
         fig = go.Figure(pc.plot(500, surface=True), pc.plotly_layout())
         # fig.show()

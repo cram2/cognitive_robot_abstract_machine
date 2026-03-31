@@ -37,7 +37,7 @@ Supported Shapes are:
 - Box
 - Sphere
 - Cylinder
-- FileMesh/TriangleMesh
+- Mesh
 
 Finally, in our kinematic structure, each entity has a name. For this we can use a simple datastructure called `PrefixedName`. You always need to provide a name, but the prefix is optional. This is for human readability and allows for easy identification of entities. For uniqueness constraints, a UUID is used and stored in the `id` field.
 
@@ -45,7 +45,7 @@ Finally, in our kinematic structure, each entity has a name. For this we can use
 import os
 from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.geometry import Box, Scale, Sphere, Cylinder, FileMesh, Color
+from semantic_digital_twin.world_description.geometry import Box, Scale, Sphere, Cylinder, Mesh, Color
 
 box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=0, y=0, z=0, roll=0, pitch=0, yaw=0)
 box = Box(origin=box_origin, scale=Scale(1., 1., 0.5), color=Color(1., 0., 0., 1., ))
@@ -59,7 +59,7 @@ cylinder_origin = HomogeneousTransformationMatrix.from_point_rotation_matrix(poi
                                                                       Vector3.from_iterable([1., 0., 0.]), 0.8, ),)
 cylinder = Cylinder(origin=cylinder_origin, width=0.05, height=0.5)
 
-mesh = FileMesh(origin=HomogeneousTransformationMatrix(),
+mesh = Mesh(origin=HomogeneousTransformationMatrix(),
             filename=os.path.join(resource_filename("semantic_digital_twin", "../../"), "resources", "stl", "milk.stl"))
 
 collision = ShapeCollection([cylinder, sphere, box])

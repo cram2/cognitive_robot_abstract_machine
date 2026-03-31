@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
 from functools import cached_property
+from inspect import ismethod, isfunction, isclass
 from typing import assert_never, Any
 
 import rustworkx as rx
@@ -24,8 +25,6 @@ from typing_extensions import (
     Generic,
     TYPE_CHECKING,
     Self,
-    Dict,
-    Generator,
     Iterator,
     get_type_hints,
 )
@@ -47,9 +46,9 @@ from krrood.entity_query_language.core.variable import Literal, DomainType, Vari
 from krrood.entity_query_language.exceptions import (
     NoKwargsInMatchVar,
     CalledMatchMultipleTimes,
+    MatchTypeCannotBeDetermined,
 )
 from krrood.entity_query_language.predicate import HasType
-from krrood.entity_query_language.query.quantifiers import An
 from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.rustworkx_utils import RWXNode
@@ -58,6 +57,14 @@ from krrood.symbol_graph.helpers import get_field_type_endpoint
 if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType
     from krrood.entity_query_language.query.query import Entity, Query
+
+from typing import get_type_hints
+
+
+import builtins
+import importlib
+from typing import get_type_hints, get_origin, get_args
+from inspect import isclass
 
 
 import builtins
@@ -227,17 +234,23 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
     def __post_init__(self):
         if self.type_ is None:
-            if isclass(self.factory):
-                self.type_ = self.factory
-            elif isfunction(self.factory):
-                type_ = get_type_hints(self.factory)["return"]
-                assert isclass(
-                    type_
-                ), f"factory must return a class, got {type_} which is of type {type(type_)}"
-                self.type_ = type_
+            self._initialize_type_()
 
-            else:
-                assert_never(self.factory)
+    def _initialize_type_(self):
+        """
+        Initialize the type of the match based on the provided information in-place.
+        """
+        if isclass(self.factory):
+            self.type_ = self.factory
+        elif ismethod(self.factory):
+            self.type_ = self.factory.__class__
+        elif isfunction(self.factory):
+            type_ = get_type_hints(self.factory)["return"]
+            if not isclass(type_):
+                raise MatchTypeCannotBeDetermined(self)
+            self.type_ = type_
+        else:
+            assert_never(self.factory)
 
     def __call__(self, **kwargs) -> Union[T, Self, CanBehaveLikeAVariable[T]]:
         """
@@ -599,11 +612,11 @@ class AttributeMatch(AbstractMatchExpression[T]):
         if result is not None:
             return result
 
-        if isinstance(self.parent, AttributeMatch):
-            return get_field_type_endpoint(
-                self.parent.assigned_value.type, self.variable._attribute_name_
-            )
-        return None
+        if not isinstance(self.parent, AttributeMatch):
+            return None
+        return get_field_type_endpoint(
+            self.parent.assigned_value.type, self.variable._attribute_name_
+        )
 
 
 def construct_graph_and_get_root(
@@ -622,3 +635,11 @@ def construct_graph_and_get_root(
         child_node = construct_graph_and_get_root(child, graph=graph)
         child_node.parent = node
     return node
+
+
+def is_underspecified(instance: Any) -> bool:
+    """
+    :param instance: The instance to check.
+    :return: Rather, it's an underspecified statement or not.
+    """
+    return isinstance(instance, Match) and not isinstance(instance, MatchVariable)

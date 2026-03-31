@@ -24,6 +24,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -32,13 +33,12 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
 )
-from pycram.datastructures.pose import PoseStamped
 
 logger = logging.getLogger("pycram")
 
 
 def visibility_validator(
-    robot: AbstractRobot, object_or_pose: Union[Body, PoseStamped], world: World
+    robot: AbstractRobot, object_or_pose: Union[Body, Pose], world: World
 ) -> bool:
     """
     This method validates if the robot can see the target position from a given
@@ -52,7 +52,7 @@ def visibility_validator(
     :param world: The world in which the visibility should be validated.
     :return: True if the target is visible for the robot, None in any other case.
     """
-    if isinstance(object_or_pose, PoseStamped):
+    if isinstance(object_or_pose, Pose):
         gen_body = Body(
             name=PrefixedName("vist_test_obj", "pycram"),
             collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
@@ -63,20 +63,20 @@ def visibility_validator(
                     parent=world.root, child=gen_body, world=world
                 )
             )
-        gen_body.parent_connection.origin = object_or_pose.to_spatial_type()
+        gen_body.parent_connection.origin = object_or_pose.to_homogeneous_matrix()
     else:
         gen_body = object_or_pose
     r_t = world.ray_tracer
     camera = list(robot.neck.sensors)[0]
     ray = r_t.ray_test(
-        camera.bodies[0].global_pose.to_position().to_np()[:3],
-        gen_body.global_pose.to_position().to_np()[:3],
+        camera.bodies[0].global_transform.to_position().to_np()[:3],
+        gen_body.global_transform.to_position().to_np()[:3],
         multiple_hits=True,
     )
 
     hit_bodies = [b for b in ray[2] if not b in robot.bodies]
 
-    if isinstance(object_or_pose, PoseStamped):
+    if isinstance(object_or_pose, Pose):
         with world.modify_world():
             world.remove_connection(gen_body.parent_connection)
             world.remove_kinematic_structure_entity(gen_body)
@@ -85,7 +85,7 @@ def visibility_validator(
 
 
 def reachability_validator(
-    target_pose: PoseStamped,
+    target_pose: Pose,
     tip_link: KinematicStructureEntity,
     robot_view: AbstractRobot,
     world: World,
@@ -107,7 +107,7 @@ def reachability_validator(
 
 
 def pose_sequence_reachability_validator(
-    target_sequence: List[PoseStamped],
+    target_sequence: List[Pose],
     tip_link: KinematicStructureEntity,
     robot_view: AbstractRobot,
     world: World,
@@ -122,7 +122,7 @@ def pose_sequence_reachability_validator(
     :param world: The world in which the visibility should be validated.
     :param use_fullbody_ik: If true the base will be used in trying to reach the poses
     """
-    old_state = deepcopy(world.state.data)
+    old_state = deepcopy(world.state._data)
     root = robot_view.root if not use_fullbody_ik else world.root
 
     msc = MotionStatechart()
@@ -130,7 +130,9 @@ def pose_sequence_reachability_validator(
         cart_sequence := Sequence(
             [
                 CartesianPose(
-                    root_link=root, tip_link=tip_link, goal_pose=pose.to_spatial_type()
+                    root_link=root,
+                    tip_link=tip_link,
+                    goal_pose=pose,
                 )
                 for pose in target_sequence
             ]
@@ -156,7 +158,7 @@ def pose_sequence_reachability_validator(
         logger.debug(f"Timeout while executing pose sequence: {target_sequence}")
         return False
     finally:
-        world.state.data[:] = old_state
+        world.state._data[:] = old_state
         world.notify_state_change()
     return True
 

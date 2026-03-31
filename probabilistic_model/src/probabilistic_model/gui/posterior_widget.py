@@ -296,7 +296,7 @@ class PosteriorWidget(QWidget):
         if not simple_event:
             return Event()
 
-        return Event(simple_event)
+        return Event.from_simple_sets(simple_event)
 
     def update_plot(self):
         if not self.current_posterior_model or not self.query_vars:

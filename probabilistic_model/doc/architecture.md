@@ -6,7 +6,6 @@ query types.
 
 The class inheritance diagram for parametric distributions is shown below.
 
-
 ```{eval-rst}
     .. autoclasstree:: probabilistic_model.probabilistic_model probabilistic_model.distributions.distributions probabilistic_model.distributions.uniform probabilistic_model.distributions.gaussian probabilistic_model.distributions.multinomial
         :zoom:

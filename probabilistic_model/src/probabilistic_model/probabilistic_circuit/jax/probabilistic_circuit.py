@@ -1,38 +1,36 @@
 from __future__ import annotations
 
 import collections
+from dataclasses import dataclass
 from typing import Dict, Any
 
 import numpy as np
 import optax
 from jax.experimental.sparse import BCOO
-from random_events.product_algebra import SimpleEvent
-from random_events.utils import SubclassJSONSerializer
+from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from random_events.variable import Variable, Symbolic
 from sortedcontainers import SortedSet
 from typing_extensions import Tuple, Self, List, Optional
 
-from probabilistic_model.probabilistic_circuit.jax import (
+from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
     ProductLayer,
     SparseSumLayer,
     InputLayer,
     InnerLayer,
+    Layer,
+    RustworkxLayerConverter,
 )
 from probabilistic_model.probabilistic_circuit.jax.discrete_layer import DiscreteLayer
-from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
-    Layer,
-    NXConverterLayer,
-)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as NXProbabilisticCircuit,
 )
 import jax
 import tqdm
-import networkx as nx
 import jax.numpy as jnp
 import equinox as eqx
 
 
+@dataclass
 class ProbabilisticCircuit(SubclassJSONSerializer):
     """
     A probabilistic circuit as wrapper for a layered probabilistic model.
@@ -48,15 +46,11 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
     The root layer of the circuit.
     """
 
-    def __init__(self, variables: SortedSet, root: Layer):
-        self.variables = variables
-        self.root = root
-
     def log_likelihood(self, x: jax.Array) -> jax.Array:
         return self.root.log_likelihood_of_nodes(x)[:, 0]
 
     @classmethod
-    def from_nx(
+    def from_rustworkx(
         cls, pc: NXProbabilisticCircuit, progress_bar: bool = False
     ) -> ProbabilisticCircuit:
         """
@@ -73,7 +67,7 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
         reversed_layers_to_nodes_map = dict(reversed(layer_to_nodes_map.items()))
 
         # create layers from nodes
-        child_layers: List[NXConverterLayer] = []
+        child_layers: List[RustworkxLayerConverter] = []
         for layer_index, nodes in (
             tqdm.tqdm(reversed_layers_to_nodes_map.items(), desc="Creating Layers")
             if progress_bar
@@ -87,12 +81,12 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
 
         return cls(pc.variables, root)
 
-    def to_nx(self, progress_bar: bool = True) -> NXProbabilisticCircuit:
+    def to_rustworkx(self, progress_bar: bool = True) -> NXProbabilisticCircuit:
         """
-        Convert the probabilistic circuit to a networkx graph.
+        Convert the probabilistic circuit to a rustworkx graph.
 
         :param progress_bar: Whether to show a progress bar.
-        :return: The networkx graph.
+        :return: The rustworkx graph.
         """
         if progress_bar:
             number_of_edges = self.root.number_of_components
@@ -100,21 +94,21 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
         else:
             progress_bar = None
         result = NXProbabilisticCircuit()
-        self.root.to_nx(self.variables, result, progress_bar)
+        self.root.to_rustworkx(self.variables, result, progress_bar)
         return result
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
-        result["variables"] = [variable.to_json() for variable in self.variables]
+        result["variables"] = [to_json(variable) for variable in self.variables]
         result["root"] = self.root.to_json()
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any]) -> Self:
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         variables = SortedSet(
-            Variable.from_json(variable) for variable in data["variables"]
+            from_json(variable, **kwargs) for variable in data["variables"]
         )
-        root = Layer.from_json(data["root"])
+        root = Layer.from_json(data["root"], **kwargs)
         return cls(variables, root)
 
     def fit(
@@ -155,6 +149,7 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
             progress_bar.set_postfix_str(f"Neg. Avg. LL.: {loss_value}")
 
 
+@dataclass
 class ClassificationCircuit(ProbabilisticCircuit):
     """
     A probabilistic circuit for classification.
@@ -229,9 +224,9 @@ class ClassificationCircuit(ProbabilisticCircuit):
 
         return ProbabilisticCircuit(new_variables, root)
 
-    def to_nx(self, progress_bar: bool = True) -> NXProbabilisticCircuit:
+    def to_rustworkx(self, progress_bar: bool = True) -> NXProbabilisticCircuit:
         raise NotImplementedError(
-            "ClassificationCircuit does not support to_nx. "
+            "ClassificationCircuit does not support to_rustworkx. "
             "Call 'to_probabilistic_circuit' first."
         )
 

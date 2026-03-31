@@ -24,7 +24,7 @@ from semantic_digital_twin.world_description.geometry import (
     Scale,
     Cylinder,
     Sphere,
-    FileMesh,
+    Mesh,
 )
 
 
@@ -253,7 +253,7 @@ def test_convert_mesh_shape(cylinder_bot_world):
         "stl",
         "jeroen_cup.stl",
     )
-    mesh = FileMesh(
+    mesh = Mesh(
         filename=stl_file,
         color=Color(0.0, 0.0, 0.0, 0.0),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(

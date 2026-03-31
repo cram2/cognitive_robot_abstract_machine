@@ -2,25 +2,32 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Tuple, Dict, TYPE_CHECKING
+from typing import Tuple, Dict
 
 import gurobipy
 import numpy as np
 from gurobipy import GRB, GurobiError
 
-from giskardpy.qp.solvers.qp_solver import QPSolver
-from giskardpy.qp.solvers.qp_solver_ids import SupportedQPSolver
-from giskardpy.qp.adapters.explicit_adapter import GiskardToExplicitQPAdapter
-from giskardpy.qp.adapters.qp_adapter import QPData
 from giskardpy.qp.exceptions import QPSolverException, InfeasibleException
+from giskardpy.qp.qp_data import QPDataExplicit
+from giskardpy.qp.solvers.qp_solver import QPSolver
+from giskardpy.utils.math import fast_sparse_diagonal
 
 logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    import scipy.sparse as sp
 
 gurobipy.setParam(gurobipy.GRB.Param.LogToConsole, False)
 gurobipy.setParam(gurobipy.GRB.Param.FeasibilityTol, 2.5e-5)
+gurobipy.setParam(gurobipy.GRB.Param.Method, 2)
+gurobipy.setParam(gurobipy.GRB.Param.Presolve, 1)
+gurobipy.setParam(gurobipy.GRB.Param.Aggregate, 0)
+gurobipy.setParam(gurobipy.GRB.Param.PreDual, 0)
+gurobipy.setParam(gurobipy.GRB.Param.ScaleFlag, 2)
+gurobipy.setParam(gurobipy.GRB.Param.Threads, 1)
+gurobipy.setParam(gurobipy.GRB.Param.BarOrder, 0)
+gurobipy.setParam(gurobipy.GRB.Param.BarCorrectors, 2)
+gurobipy.setParam(gurobipy.GRB.Param.BarIterLimit, 100)
+gurobipy.setParam(gurobipy.GRB.Param.NumericFocus, 0)
 
 error_info = {
     gurobipy.GRB.LOADED: "Model is loaded, but no solution information is available.",
@@ -55,16 +62,8 @@ error_info = {
 }
 
 
-class QPSolverGurobi(QPSolver):
-    """
-    min_x 0.5 x^T P x + q^T x
-    s.t.  Ax = b
-          Gx <= h
-          lb <= x <= ub
-    """
+class QPSolverGurobi(QPSolver[QPDataExplicit]):
 
-    solver_id = SupportedQPSolver.gurobi
-    required_adapter_type = GiskardToExplicitQPAdapter
     STATUS_VALUE_DICT = {
         getattr(gurobipy.GRB.status, name): name
         for name in dir(gurobipy.GRB.status)
@@ -72,16 +71,14 @@ class QPSolverGurobi(QPSolver):
     }
     _times: Dict[Tuple[int, int, int], list] = defaultdict(list)
 
-    def init(self, qp_data: QPData):
-        import scipy.sparse as sp
-
+    def init(self, qp_data: QPDataExplicit):
         self.qpProblem = gurobipy.Model("qp")
         self.x = self.qpProblem.addMVar(
             qp_data.quadratic_weights.shape[0],
             lb=qp_data.box_lower_constraints,
             ub=qp_data.box_upper_constraints,
         )
-        H = sp.diags(qp_data.quadratic_weights, 0)
+        H = fast_sparse_diagonal(qp_data.quadratic_weights)
         self.qpProblem.setMObjective(
             Q=H,
             c=qp_data.linear_weights,
@@ -92,26 +89,28 @@ class QPSolverGurobi(QPSolver):
         )
         try:
             self.qpProblem.addMConstr(
-                qp_data.eq_matrix, self.x, gurobipy.GRB.EQUAL, qp_data.eq_bounds
+                qp_data.equality_matrix,
+                self.x,
+                gurobipy.GRB.EQUAL,
+                qp_data.equality_bounds,
             )
         except (GurobiError, ValueError) as e:
             pass  # no eq constraints
         try:
             self.qpProblem.addMConstr(
-                qp_data.neq_matrix,
+                qp_data.inequality_matrix,
                 self.x,
                 gurobipy.GRB.GREATER_EQUAL,
-                qp_data.neq_lower_bounds,
+                qp_data.inequality_lower_bounds,
             )
             self.qpProblem.addMConstr(
-                qp_data.neq_matrix,
+                qp_data.inequality_matrix,
                 self.x,
                 gurobipy.GRB.LESS_EQUAL,
-                qp_data.neq_upper_bounds,
+                qp_data.inequality_upper_bounds,
             )
         except (GurobiError, ValueError) as e:
             pass  # no neq constraints
-        self.started = False
 
     def print_debug(self):
         gurobipy.setParam(gurobipy.GRB.Param.LogToConsole, True)
@@ -140,7 +139,7 @@ class QPSolverGurobi(QPSolver):
             ubA_constraint_ids,
         )
 
-    def solver_call_explicit_interface(self, qp_data: QPData) -> np.ndarray:
+    def solver_call_explicit_interface(self, qp_data: QPDataExplicit) -> np.ndarray:
         self.init(qp_data)
         self.qpProblem.optimize()
         success = self.qpProblem.status

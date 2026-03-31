@@ -1,16 +1,10 @@
-import copy
 import unittest
-
-import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import random_events.interval
 from random_events.interval import closed, singleton
-from sklearn.gaussian_process.kernels import Product
 
-from probabilistic_model.distributions import (
-    GaussianDistribution,
-    DiracDeltaDistribution,
-)
+from probabilistic_model.distributions.gaussian import GaussianDistribution
+from probabilistic_model.distributions.distributions import DiracDeltaDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
 from probabilistic_model.utils import MissingDict
@@ -54,19 +48,19 @@ class SmallCircuitTestCast(unittest.TestCase):
         prod2.add_subcircuit(sum5)
 
         d_x1 = leaf(
-            UniformDistribution(self.x, SimpleInterval(0, 1)),
+            UniformDistribution(variable=self.x, interval=SimpleInterval.from_data(0, 1)),
             probabilistic_circuit=model,
         )
         d_x2 = leaf(
-            UniformDistribution(self.x, SimpleInterval(2, 3)),
+            UniformDistribution(variable=self.x, interval=SimpleInterval.from_data(2, 3)),
             probabilistic_circuit=model,
         )
         d_y1 = leaf(
-            UniformDistribution(self.y, SimpleInterval(0, 1)),
+            UniformDistribution(variable=self.y, interval=SimpleInterval.from_data(0, 1)),
             probabilistic_circuit=model,
         )
         d_y2 = leaf(
-            UniformDistribution(self.y, SimpleInterval(3, 4)),
+            UniformDistribution(variable=self.y, interval=SimpleInterval.from_data(3, 4)),
             probabilistic_circuit=model,
         )
 
@@ -88,7 +82,7 @@ class SmallCircuitTestCast(unittest.TestCase):
         self.assertGreater(len(unique), 95)
 
     def test_truncation(self):
-        event = SimpleEvent(
+        event = SimpleEvent.from_data(
             {self.x: closed(0, 0.25) | closed(0.5, 0.75)}
         ).as_composite_set()
         conditional, prob = self.model.truncated(event)
@@ -114,8 +108,8 @@ class SmallCircuitTestCast(unittest.TestCase):
 
     def test_translation(self):
         translation = {self.x: 5, self.y: 10}
-        self.model.translate(translation)
-        event = SimpleEvent(
+        self.model.apply_translation(translation)
+        event = SimpleEvent.from_data(
             {self.x: closed(5, 5.25) | closed(5.5, 5.75)}
         ).as_composite_set()
         probability = self.model.probability(event)
@@ -131,7 +125,7 @@ class SmallCircuitTestCast(unittest.TestCase):
 
 
 class SymbolicPlottingTestCase(unittest.TestCase):
-    x = Symbolic("x", Set.from_iterable(SymbolEnum))
+    x = Symbolic(name="x", domain=Set.from_iterable(SymbolEnum))
     model: ProbabilisticCircuit
 
     @classmethod
@@ -140,7 +134,7 @@ class SymbolicPlottingTestCase(unittest.TestCase):
         probabilities[int(SymbolEnum.A)] = 7 / 20
         probabilities[int(SymbolEnum.B)] = 13 / 20
         cls.model = ProbabilisticCircuit()
-        l1 = UnivariateDiscreteLeaf(SymbolicDistribution(cls.x, probabilities))
+        l1 = UnivariateDiscreteLeaf(SymbolicDistribution(variable=cls.x, probabilities=probabilities))
         cls.model.add_node(l1)
 
     def test_plot(self):
@@ -153,8 +147,8 @@ class ConditioningWithOrphansTestCase(unittest.TestCase):
     y = Continuous("y")
 
     prod = ProductUnit(probabilistic_circuit=ProbabilisticCircuit())
-    px = UnivariateContinuousLeaf(GaussianDistribution(x, 1, 1))
-    py = UnivariateContinuousLeaf(GaussianDistribution(y, 1, 1))
+    px = UnivariateContinuousLeaf(GaussianDistribution(variable=x, location=1, scale=1))
+    py = UnivariateContinuousLeaf(GaussianDistribution(variable=y, location=1, scale=1))
 
     prod.add_subcircuit(px)
     prod.add_subcircuit(py)
@@ -162,7 +156,7 @@ class ConditioningWithOrphansTestCase(unittest.TestCase):
     model = prod.probabilistic_circuit
 
     def test_conditioning(self):
-        event = SimpleEvent(
+        event = SimpleEvent.from_data(
             {
                 self.x: closed(1.191472053527832, 1.2024999856948853),
                 self.y: random_events.interval.open(1500.0009765625, np.inf)
@@ -184,20 +178,20 @@ class DiracMixtureConditioningTestCase(unittest.TestCase):
         cls.model = ProbabilisticCircuit()
         root = SumUnit(probabilistic_circuit=cls.model)
         root.add_subcircuit(
-            leaf(UniformDistribution(cls.x, SimpleInterval(0, 1.0)), cls.model),
+            leaf(UniformDistribution(variable=cls.x, interval=SimpleInterval.from_data(0, 1.0)), cls.model),
             np.log(0.5),
         )
         root.add_subcircuit(
-            leaf(DiracDeltaDistribution(cls.x, 0.5, 2.0), cls.model), np.log(0.5)
+            leaf(DiracDeltaDistribution(variable=cls.x, location=0.5, density_cap=2.0), cls.model), np.log(0.5)
         )
 
     def test_conditioning(self):
-        event = SimpleEvent({self.x: closed(0.0, 1.0)}).as_composite_set()
+        event = SimpleEvent.from_data({self.x: closed(0.0, 1.0)}).as_composite_set()
         conditional, probability = self.model.truncated(event)
         self.assertAlmostEqual(probability, 1.0)
 
     def test_conditioning_without_dirac(self):
-        event = SimpleEvent(
+        event = SimpleEvent.from_data(
             {self.x: closed(0.0, 0.25) | closed(0.75, 1.0)}
         ).as_composite_set()
 
@@ -214,7 +208,7 @@ class DiracMixtureConditioningTestCase(unittest.TestCase):
         )
 
     def test_conditioning_singleton(self):
-        event = SimpleEvent({self.x: singleton(0.5)}).as_composite_set()
+        event = SimpleEvent.from_data({self.x: singleton(0.5)}).as_composite_set()
 
         conditional, probability = self.model.truncated(event)
         self.assertEqual(len(list(conditional.nodes())), 1)
@@ -246,10 +240,10 @@ class ConditioningTestCase(unittest.TestCase):
         p1 = ProductUnit(probabilistic_circuit=model)
         p2 = ProductUnit(probabilistic_circuit=model)
 
-        u1 = leaf(UniformDistribution(cls.x, SimpleInterval(0, 1.0)), model)
-        u2 = leaf(UniformDistribution(cls.x, SimpleInterval(0.0, 2)), model)
-        u3 = leaf(UniformDistribution(cls.y, SimpleInterval(0, 1)), model)
-        u4 = leaf(UniformDistribution(cls.y, SimpleInterval(0.0, 2)), model)
+        u1 = leaf(UniformDistribution(variable=cls.x, interval=SimpleInterval.from_data(0, 1.0)), model)
+        u2 = leaf(UniformDistribution(variable=cls.x, interval=SimpleInterval.from_data(0.0, 2)), model)
+        u3 = leaf(UniformDistribution(variable=cls.y, interval=SimpleInterval.from_data(0, 1)), model)
+        u4 = leaf(UniformDistribution(variable=cls.y, interval=SimpleInterval.from_data(0.0, 2)), model)
 
         s1.add_subcircuit(p1, np.log(0.5))
         s1.add_subcircuit(p2, np.log(0.5))
@@ -267,11 +261,11 @@ class ConditioningTestCase(unittest.TestCase):
         marginal = self.model.marginal([self.y])
 
         model, _ = self.model.conditional(p)
-        # model, _ = self.model.truncated(SimpleEvent({self.x: closed(0.3, 0.5)}).as_composite_set())
+        # model, _ = self.model.truncated(SimpleEvent.from_data({self.x: closed(0.3, 0.5)}).as_composite_set())
 
         conditioned_marginal = model.marginal([self.y])
 
-        probability_event = SimpleEvent({self.y: closed(0.0, 1.0)}).as_composite_set()
+        probability_event = SimpleEvent.from_data({self.y: closed(0.0, 1.0)}).as_composite_set()
 
         p_marginal = marginal.probability(probability_event)
         p_conditioned_marginal = conditioned_marginal.probability(probability_event)
@@ -281,14 +275,14 @@ class ConditioningTestCase(unittest.TestCase):
 
         model = copy.deepcopy(self.model)
 
-        s = Symbolic("s", Set.from_iterable(SymbolEnum))
+        s = Symbolic(name="s", domain=Set.from_iterable(SymbolEnum))
         probabilities = MissingDict(float)
         probabilities[hash(SymbolEnum.A)] = 7 / 20
         probabilities[hash(SymbolEnum.B)] = 13 / 20
 
         old_root = model.root
         new_root = ProductUnit(probabilistic_circuit=model)
-        p_s = leaf(SymbolicDistribution(s, probabilities), model)
+        p_s = leaf(SymbolicDistribution(variable=s, probabilities=probabilities), model)
         new_root.add_subcircuit(
             old_root,
         )

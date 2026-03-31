@@ -2,7 +2,6 @@ import logging
 import os
 import time
 import unittest
-
 import mujoco
 import numpy
 

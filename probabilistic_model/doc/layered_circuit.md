@@ -30,7 +30,8 @@ Let's look at an example.
 import plotly
 plotly.offline.init_notebook_mode()
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
-from probabilistic_model.distributions import *
+from probabilistic_model.distributions.distributions import *
+from probabilistic_model.distributions.uniform import *
 from random_events.variable import Continuous
 import networkx as nx
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import ProbabilisticCircuit as JaxPC
@@ -53,10 +54,10 @@ prod1.add_subcircuit(sum4)
 prod2.add_subcircuit(sum3)
 prod2.add_subcircuit(sum5)
 
-d_x1 = leaf(UniformDistribution(x, SimpleInterval(0, 1)), probabilistic_circuit=model)
-d_x2 = leaf(UniformDistribution(x, SimpleInterval(2, 3)), probabilistic_circuit=model)
-d_y1 = leaf(UniformDistribution(y, SimpleInterval(0, 1)), probabilistic_circuit=model)
-d_y2 = leaf(UniformDistribution(y, SimpleInterval(3, 4)), probabilistic_circuit=model)
+d_x1 = leaf(UniformDistribution(variable=x, interval=SimpleInterval.from_data(0, 1)), probabilistic_circuit=model)
+d_x2 = leaf(UniformDistribution(variable=x, interval=SimpleInterval.from_data(2, 3)), probabilistic_circuit=model)
+d_y1 = leaf(UniformDistribution(variable=y, interval=SimpleInterval.from_data(0, 1)), probabilistic_circuit=model)
+d_y2 = leaf(UniformDistribution(variable=y, interval=SimpleInterval.from_data(3, 4)), probabilistic_circuit=model)
 
 sum2.add_subcircuit(d_x1, np.log(0.8))
 sum2.add_subcircuit(d_x2, np.log(0.2))
@@ -101,7 +102,7 @@ These nodes have to be of the same type, such that their operations (weighted su
 The example from above would look as following:
 
 ```{code-cell} ipython3
-jax_model = JaxPC.from_nx(model, progress_bar=False)
+jax_model = JaxPC.from_rustworkx(model, progress_bar=False)
 print(jax_model.root)
 ```
 

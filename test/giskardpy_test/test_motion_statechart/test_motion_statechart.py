@@ -2,7 +2,6 @@ import json
 import time
 from dataclasses import dataclass
 from math import radians
-from time import sleep
 from typing import Type
 
 import numpy as np
@@ -26,7 +25,7 @@ from giskardpy.motion_statechart.exceptions import (
     NodeAlreadyBelongsToDifferentNodeError,
 )
 from giskardpy.motion_statechart.goals.cartesian_goals import (
-    DiffDriveBaseGoal,
+    DifferentialDriveBaseGoal,
     CartesianPoseStraight,
 )
 from giskardpy.motion_statechart.goals.collision_avoidance import (
@@ -67,6 +66,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianVelocityLimit,
     CartesianPositionVelocityLimit,
     CartesianRotationVelocityLimit,
+    CartesianPositionTrajectory,
 )
 from giskardpy.motion_statechart.tasks.feature_functions import (
     AngleGoal,
@@ -89,7 +89,7 @@ from giskardpy.motion_statechart.test_nodes.test_nodes import (
 )
 from giskardpy.qp.constraint import EqualityConstraint
 from giskardpy.qp.constraint_collection import ConstraintCollection
-from giskardpy.qp.exceptions import HardConstraintsViolatedException
+from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.utils.math import angle_between_vector
 from krrood.symbolic_math.symbolic_math import (
     trinary_logic_and,
@@ -98,15 +98,8 @@ from krrood.symbolic_math.symbolic_math import (
     FloatVariable,
     shortest_angular_distance,
 )
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
-)
-from semantic_digital_twin.collision_checking.collision_matrix import (
-    MaxAvoidedCollisionsOverride,
 )
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidCollisionBetweenGroups,
@@ -117,6 +110,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import Manipulator, AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Door,
@@ -129,11 +123,13 @@ from semantic_digital_twin.spatial_types import (
     RotationMatrix,
 )
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     ActiveConnection1DOF,
     FixedConnection,
+    OmniDrive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -143,10 +139,42 @@ from semantic_digital_twin.world_description.geometry import (
     Cylinder,
     Box,
     Scale,
-    Sphere,
+    Color,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    KinematicStructureEntity,
+)
+from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
+from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
+    WorldStateTrajectoryPlotter,
+)
+
+
+@pytest.fixture()
+def better_pr2_pose():
+    return {
+        "r_shoulder_pan_joint": -1.7125,
+        "r_shoulder_lift_joint": -0.25672,
+        "r_upper_arm_roll_joint": -1.46335,
+        "r_elbow_flex_joint": -2.12,
+        "r_forearm_roll_joint": 1.76632,
+        "r_wrist_flex_joint": -0.10001,
+        "r_wrist_roll_joint": 0.05106,
+        "l_shoulder_pan_joint": 1.9652,
+        "l_shoulder_lift_joint": -0.26499,
+        "l_upper_arm_roll_joint": 1.3837,
+        "l_elbow_flex_joint": -2.12,
+        "l_forearm_roll_joint": 16.99,
+        "l_wrist_flex_joint": -0.10001,
+        "l_wrist_roll_joint": 0,
+        "torso_lift_joint": 0.2,
+        "l_gripper_l_finger_joint": 0.55,
+        "r_gripper_l_finger_joint": 0.55,
+        "head_pan_joint": 0,
+        "head_tilt_joint": 0,
+    }
 
 
 @pytest.fixture(scope="function")
@@ -1070,6 +1098,10 @@ class TestJointTasks:
         kin_sim = Executor(
             MotionStatechartContext(
                 world=world,
+                qp_controller_config=QPControllerConfig(
+                    target_frequency=20,
+                    prediction_horizon=7,
+                ),
             )
         )
         kin_sim.compile(motion_statechart=msc)
@@ -1167,6 +1199,34 @@ class TestJointTasks:
         assert np.isclose(head_pan_joint.position, 0.042, atol=1e-3)
         assert np.isclose(head_tilt_joint.position, -0.37, atol=1e-2)
 
+    def test_joint_sequence(self, pr2_world_state_reset):
+        msc = MotionStatechart()
+        msc.add_node(
+            sequence := Sequence(
+                [
+                    JointPositionList(
+                        goal_state=JointState.from_str_dict(
+                            {"torso_lift_joint": 0.1}, world=pr2_world_state_reset
+                        )
+                    ),
+                    JointPositionList(
+                        goal_state=JointState.from_str_dict(
+                            {"torso_lift_joint": 0.2}, world=pr2_world_state_reset
+                        )
+                    ),
+                ]
+            )
+        )
+        msc.add_node(EndMotion.when_true(sequence))
+
+        kin_sim = Executor(
+            MotionStatechartContext(
+                world=pr2_world_state_reset,
+            )
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
 
 def test_long_goal(pr2_world_state_reset: World):
     msc = MotionStatechart()
@@ -1222,6 +1282,217 @@ def test_long_goal(pr2_world_state_reset: World):
     print(diff / kin_sim.control_cycles)
 
 
+class TestCartesianPositionTrajectory:
+
+    def _points_to_np(self, positions: list[Point3] | np.ndarray) -> np.ndarray:
+        """
+        Convert a sequence of `Point3` or an `ndarray` of shape (N, 3) into an `ndarray` of shape (N, 3).
+        """
+        if isinstance(positions, np.ndarray):
+            if positions.ndim != 2 or positions.shape[1] != 3:
+                raise ValueError("positions ndarray must have shape (N, 3)")
+            return positions.astype(float)
+        pts = [
+            p.to_np()[:-1] if isinstance(p, Point3) else np.asarray(p, dtype=float)
+            for p in positions
+        ]
+        arr = np.vstack(pts).astype(float)
+        if arr.ndim != 2 or arr.shape[1] != 3:
+            raise ValueError("positions must convert to shape (N, 3)")
+        return arr
+
+    def compare_trajectories(
+        self,
+        positions: list[Point3] | np.ndarray,
+        world_state_trajectory: WorldStateTrajectory,
+        root_link: KinematicStructureEntity,
+        tip_link: KinematicStructureEntity,
+        tolerance: float = 0.01,
+    ):
+        """
+        Compare an executed Cartesian path against a reference list of positions.
+
+        The executed path is reconstructed from the `world_state_trajectory` by computing
+        forward kinematics for `tip_link` in the `root_link` frame at each recorded state.
+        For each executed point, the minimum Euclidean distance to the reference path is
+        computed. Aggregate statistics and pass/fail against `tolerance` are returned.
+
+        :param positions: Reference path as `Point3` iterable or an array of shape (N, 3). All points are with respect to root_link
+        :param world_state_trajectory: Recorded joint-space trajectory with access to the world.
+        :param root_link: Root kinematic frame for forward kinematics.
+        :param tip_link: Tip kinematic frame for forward kinematics.
+        :param tolerance: Maximum allowed distance to the reference path for all samples.
+        :return: Dictionary containing distances per sample and summary metrics.
+        """
+        ref_np = self._points_to_np(positions)
+
+        world = world_state_trajectory.world
+        executed_points = []
+
+        # Reconstruct executed Cartesian path by FK at each recorded state
+        for state_view in world_state_trajectory.values():
+            # Temporarily set the world's state to the recorded one
+            world.state._data[:] = state_view.data
+            world.notify_state_change()
+            p = (
+                world.compute_forward_kinematics(root_link, tip_link)
+                .to_position()
+                .evaluate()[:-1]
+                .astype(float)
+            )
+            executed_points.append(p.copy())
+
+        executed_np = np.vstack(executed_points)
+
+        # Distance of each executed point to the nearest reference point
+        def _min_dist_to_ref(p: np.ndarray) -> float:
+            return float(np.min(np.linalg.norm(executed_np - p, axis=1)))
+
+        distances = np.apply_along_axis(_min_dist_to_ref, 1, ref_np)
+
+        assert np.max(distances) <= tolerance
+
+    def test_cartesian_position_trajectory_spiral(self, cylinder_bot_world: World):
+        points = []
+        a = 0.05  # spiral growth factor (tunes how fast radius grows)
+
+        for i in range(10000):
+            t = (
+                i * np.pi / 5000.0
+            )  # angle parameter; adjust divisor for tighter/looser turns
+            r = a * t  # radius grows linearly with t
+            points.append(
+                Point3(
+                    r * np.cos(t),
+                    r * np.sin(t),
+                    0,
+                    reference_frame=cylinder_bot_world.root,
+                )
+            )
+        msc = MotionStatechart()
+        cart_traj = CartesianPositionTrajectory(
+            root_link=cylinder_bot_world.root,
+            tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            goal_points=points,
+        )
+        msc.add_node(cart_traj)
+        msc.add_node(EndMotion.when_true(cart_traj))
+
+        kin_sim = Executor(
+            context=MotionStatechartContext(
+                world=cylinder_bot_world,
+            ),
+            trajectory_plotter=WorldStateTrajectoryPlotter(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        self.compare_trajectories(
+            points,
+            kin_sim.trajectory_plotter.world_state_trajectory,
+            cart_traj.root_link,
+            cart_traj.tip_link,
+        )
+
+    def test_cartesian_position_trajectory_circle(self, cylinder_bot_world: World):
+        points = []
+        a = 0.1
+
+        for i in range(5000):
+            t = (
+                i * np.pi / 500.0
+            )  # angle parameter; adjust divisor for tighter/looser turns
+            points.append(
+                Point3(
+                    a * np.cos(t),
+                    a * np.sin(t),
+                    0,
+                    reference_frame=cylinder_bot_world.root,
+                )
+            )
+        msc = MotionStatechart()
+        cart_traj = CartesianPositionTrajectory(
+            root_link=cylinder_bot_world.root,
+            tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            goal_points=points,
+            maximum_skip_ahead=20,
+        )
+        msc.add_node(cart_traj)
+        msc.add_node(EndMotion.when_true(cart_traj))
+
+        kin_sim = Executor(
+            context=MotionStatechartContext(
+                world=cylinder_bot_world,
+            ),
+            trajectory_plotter=WorldStateTrajectoryPlotter(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        self.compare_trajectories(
+            points,
+            kin_sim.trajectory_plotter.world_state_trajectory,
+            cart_traj.root_link,
+            cart_traj.tip_link,
+        )
+
+    def test_cartesian_position_trajectory_spiral_pr2(
+        self, pr2_world_state_reset: World, better_pr2_pose
+    ):
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+
+        SetSeedConfiguration(
+            seed_configuration=JointState.from_str_dict(
+                better_pr2_pose, world=pr2_world_state_reset
+            )
+        ).on_start(MotionStatechartContext(world=pr2_world_state_reset))
+
+        points = []
+        root_points = []
+        a = 0.05  # spiral growth factor (tunes how fast radius grows)
+        for i in range(10000):
+            t = (
+                i * np.pi / 5000.0
+            )  # angle parameter; adjust divisor for tighter/looser turns
+            r = a * t  # radius grows linearly with t
+            point = Point3(
+                r * np.cos(t),
+                r * np.sin(t),
+                0,
+                reference_frame=tip,
+            )
+            points.append(point)
+            root_points.append(pr2_world_state_reset.transform(point, root))
+        msc = MotionStatechart()
+
+        msc.add_node(
+            cart_traj := CartesianPositionTrajectory(
+                root_link=root,
+                tip_link=tip,
+                goal_points=points,
+            )
+        )
+        msc.add_node(EndMotion.when_true(cart_traj))
+
+        kin_sim = Executor(
+            context=MotionStatechartContext(
+                world=pr2_world_state_reset,
+            ),
+            trajectory_plotter=WorldStateTrajectoryPlotter(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        self.compare_trajectories(
+            root_points,
+            kin_sim.trajectory_plotter.world_state_trajectory,
+            cart_traj.root_link,
+            cart_traj.tip_link,
+        )
+
+
 class TestCartesianTasks:
     """Test suite for all Cartesian motion tasks."""
 
@@ -1256,6 +1527,7 @@ class TestCartesianTasks:
         tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=-0.2, reference_frame=tip
         )
+        expected = pr2_world_state_reset.transform(tip_goal, root)
 
         msc = MotionStatechart()
         cart_goal = CartesianPose(
@@ -1277,7 +1549,9 @@ class TestCartesianTasks:
         kin_sim.tick_until_end()
 
         assert np.allclose(
-            kin_sim.context.world.compute_forward_kinematics(root, tip), tip_goal
+            kin_sim.context.world.compute_forward_kinematics(root, tip),
+            expected,
+            atol=cart_goal.threshold,
         )
 
     def test_front_facing_orientation(self, hsr_world_setup: World):
@@ -1314,7 +1588,9 @@ class TestCartesianTasks:
                     CartesianPosition(
                         root_link=hsr_world_setup.root,
                         tip_link=hand.tool_frame,
-                        goal_point=hsr_world_setup.bodies[-1].global_pose.to_position(),
+                        goal_point=hsr_world_setup.bodies[
+                            -1
+                        ].global_transform.to_position(),
                     ),
                 ]
             )
@@ -1325,41 +1601,10 @@ class TestCartesianTasks:
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
-    def test_cart_goal_1eef(self, pr2_world_state_reset: World):
-        """Single CartesianPose goal test."""
-        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
-        )
-        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
-        )
-        tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=-0.2, reference_frame=tip
-        )
-
-        msc = MotionStatechart()
-        cart_goal = CartesianPose(
-            root_link=root,
-            tip_link=tip,
-            goal_pose=tip_goal,
-        )
-        msc.add_node(cart_goal)
-        end = EndMotion()
-        msc.add_node(end)
-        end.start_condition = cart_goal.observation_variable
-
-        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
-        kin_sim.compile(motion_statechart=msc)
-        kin_sim.tick_until_end()
-
-    def test_cart_goal_sequence_at_build(
-        self, pr2_world_state_reset: World, rclpy_node
-    ):
+    def test_cart_goal_sequence_at_build(self, pr2_world_state_reset: World):
         """
         Test CartesianPose sequence with Bind_at_build policy.
         """
-        tf_publisher = TFPublisher(node=rclpy_node, _world=pr2_world_state_reset)
-        viz = VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "base_footprint"
         )
@@ -1824,8 +2069,8 @@ class TestDiffDriveBaseGoal:
     @pytest.mark.parametrize(
         "goal_pose",
         [
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=0.489, y=-0.598, z=0.000),
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            Pose.from_xyz_rpy(x=0.489, y=-0.598, z=0.000),
+            Pose.from_xyz_quaternion(
                 pos_x=-0.026,
                 pos_y=0.569,
                 pos_z=0.0,
@@ -1834,28 +2079,26 @@ class TestDiffDriveBaseGoal:
                 quat_z=0.916530200374776,
                 quat_w=0.3999654882623912,
             ),
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, yaw=np.pi / 4),
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=2, y=0, yaw=-np.pi / 4),
-            HomogeneousTransformationMatrix.from_xyz_rpy(yaw=-np.pi / 4),
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=-1, y=-1, yaw=np.pi / 4),
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=-2, y=-1, yaw=-np.pi / 4),
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=0.01, y=0.5, yaw=np.pi / 8),
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=-0.01, y=-0.5, yaw=np.pi / 5
-            ),
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=1.1, y=2.0, yaw=-np.pi),
-            HomogeneousTransformationMatrix.from_xyz_rpy(y=1),
+            Pose.from_xyz_rpy(x=1, y=1, yaw=np.pi / 4),
+            Pose.from_xyz_rpy(x=2, y=0, yaw=-np.pi / 4),
+            Pose.from_xyz_rpy(yaw=-np.pi / 4),
+            Pose.from_xyz_rpy(x=-1, y=-1, yaw=np.pi / 4),
+            Pose.from_xyz_rpy(x=-2, y=-1, yaw=-np.pi / 4),
+            Pose.from_xyz_rpy(x=0.01, y=0.5, yaw=np.pi / 8),
+            Pose.from_xyz_rpy(x=-0.01, y=-0.5, yaw=np.pi / 5),
+            Pose.from_xyz_rpy(x=1.1, y=2.0, yaw=-np.pi),
+            Pose.from_xyz_rpy(y=1),
         ],
     )
     def test_drive(
         self,
         cylinder_bot_diff_world,
-        goal_pose: HomogeneousTransformationMatrix,
+        goal_pose: Pose,
     ):
         bot = cylinder_bot_diff_world.get_body_by_name("bot")
         msc = MotionStatechart()
         goal_pose.reference_frame = cylinder_bot_diff_world.root
-        msc.add_node(goal := DiffDriveBaseGoal(goal_pose=goal_pose))
+        msc.add_node(goal := DifferentialDriveBaseGoal(goal_pose=goal_pose))
         msc.add_node(EndMotion.when_true(goal))
 
         kin_sim = Executor(MotionStatechartContext(world=cylinder_bot_diff_world))
@@ -1874,14 +2117,11 @@ class TestDiffDriveBaseGoal:
 class TestFeatureFunctions:
     """Test suite for feature function tasks (HeightGoal, DistanceGoal, etc.)."""
 
-    def test_height_goal_within_bounds(self, pr2_world_state_reset: World, rclpy_node):
+    def test_height_goal_within_bounds(self, pr2_world_state_reset: World):
         """
         Test that HeightGoal successfully constrains the vertical distance
         between tip and reference points within specified bounds.
         """
-        tf_publisher = TFPublisher(node=rclpy_node, _world=pr2_world_state_reset)
-        viz = VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
-
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -1926,15 +2166,10 @@ class TestFeatureFunctions:
             lower_limit <= height_diff <= upper_limit
         ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
 
-    def test_height_goal_negative_bounds(
-        self, pr2_world_state_reset: World, rclpy_node
-    ):
+    def test_height_goal_negative_bounds(self, pr2_world_state_reset: World):
         """
         Test HeightGoal with negative height bounds (tip below reference).
         """
-        tf_publisher = TFPublisher(node=rclpy_node, _world=pr2_world_state_reset)
-        viz = VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
-
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -1979,16 +2214,11 @@ class TestFeatureFunctions:
             lower_limit <= height_diff <= upper_limit
         ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
 
-    def test_distance_goal_within_bounds(
-        self, pr2_world_state_reset: World, rclpy_node
-    ):
+    def test_distance_goal_within_bounds(self, pr2_world_state_reset: World):
         """
         Test that DistanceGoal successfully constrains the horizontal distance
         (in x-y plane) between tip and reference points within specified bounds.
         """
-        tf_publisher = TFPublisher(node=rclpy_node, _world=pr2_world_state_reset)
-        viz = VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
-
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -2035,15 +2265,10 @@ class TestFeatureFunctions:
             lower_limit <= horizontal_distance <= upper_limit
         ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
 
-    def test_distance_goal_zero_distance(
-        self, pr2_world_state_reset: World, rclpy_node
-    ):
+    def test_distance_goal_zero_distance(self, pr2_world_state_reset: World):
         """
         Test DistanceGoal with bounds that include zero (tip and reference at same x-y position).
         """
-        tf_publisher = TFPublisher(node=rclpy_node, _world=pr2_world_state_reset)
-        viz = VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
-
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -2090,16 +2315,11 @@ class TestFeatureFunctions:
             lower_limit <= horizontal_distance <= upper_limit
         ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
 
-    def test_distance_goal_ignores_z_axis(
-        self, pr2_world_state_reset: World, rclpy_node
-    ):
+    def test_distance_goal_ignores_z_axis(self, pr2_world_state_reset: World):
         """
         Test that DistanceGoal only considers x-y plane distance and ignores z-axis.
         Even with large z difference, if x-y distance is within bounds, goal succeeds.
         """
-        tf_publisher = TFPublisher(node=rclpy_node, _world=pr2_world_state_reset)
-        viz = VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
-
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -2147,16 +2367,11 @@ class TestFeatureFunctions:
             lower_limit <= horizontal_distance <= upper_limit
         ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
 
-    def test_height_and_distance_combined(
-        self, pr2_world_state_reset: World, rclpy_node
-    ):
+    def test_height_and_distance_combined(self, pr2_world_state_reset: World):
         """
         Test combining HeightGoal and DistanceGoal in parallel to constrain
         both vertical and horizontal distances simultaneously.
         """
-        tf_publisher = TFPublisher(node=rclpy_node, _world=pr2_world_state_reset)
-        viz = VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
-
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -2223,16 +2438,13 @@ class TestFeatureFunctions:
         ), f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
 
     def test_distance_height_angle_perpendicular_combined(
-        self, pr2_world_state_reset: World, rclpy_node
+        self, pr2_world_state_reset: World
     ):
         """
         Test combining DistanceGoal, HeightGoal, and AlignPerpendicular
         to constrain horizontal distance, vertical distance, and perpendicular
         alignment simultaneously.
         """
-        tf_publisher = TFPublisher(node=rclpy_node, _world=pr2_world_state_reset)
-        viz = VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
-
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -2638,6 +2850,7 @@ class TestVelocityTasks:
                 root_link=root,
                 tip_link=tip,
                 goal_point=Point3(1, 0, 0, reference_frame=tip),
+                weight=DefaultWeights.WEIGHT_ABOVE_CA,
             )
         else:
             goal = CartesianOrientation(
@@ -2646,6 +2859,7 @@ class TestVelocityTasks:
                 goal_orientation=RotationMatrix.from_rpy(
                     yaw=np.pi / 2, reference_frame=tip
                 ),
+                weight=DefaultWeights.WEIGHT_ABOVE_CA,
             )
 
         low_weight_limit = limit_cls(
@@ -3208,7 +3422,10 @@ class TestCollisionAvoidance:
         kwargs = tracker.create_kwargs()
         msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
 
-        kin_sim = Executor(MotionStatechartContext(world=cylinder_bot_world))
+        kin_sim = Executor(
+            MotionStatechartContext(world=cylinder_bot_world),
+            pacer=SimulationPacer(real_time_factor=2),
+        )
         kin_sim.compile(motion_statechart=msc_copy)
 
         kin_sim.tick_until_end(500)
@@ -3217,10 +3434,214 @@ class TestCollisionAvoidance:
         assert collisions.contacts[0].distance > 0.049
         assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
 
-    def test_update_collision_matrix_later(self, cylinder_bot_world: World, rclpy_node):
-        VizMarkerPublisher(
-            _world=cylinder_bot_world, node=rclpy_node
-        ).with_tf_publisher()
+    def test_external_collision_avoidance_battle(self):
+        strong_robot_world = World()
+        with strong_robot_world.modify_world():
+            strong = Body(
+                name=PrefixedName("strong"),
+                collision=ShapeCollection(
+                    [Cylinder(width=0.1, height=0.1, color=Color(R=1, G=0, B=0, A=1))]
+                ),
+            )
+            strong_robot_world.add_body(strong)
+            strong_robot_sa = MinimalRobot.from_world(strong_robot_world)
+
+        weak_robot_world = World()
+        with weak_robot_world.modify_world():
+            weak = Body(
+                name=PrefixedName("weak"),
+                collision=ShapeCollection(
+                    [Cylinder(width=0.1, height=0.1, color=Color(R=0, G=0, B=1, A=1))]
+                ),
+            )
+            weak_robot_world.add_body(weak)
+            weak_robot_sa = MinimalRobot.from_world(weak_robot_world)
+
+        world = World()
+
+        with world.modify_world():
+            wall = Body(
+                name=PrefixedName("wall"),
+                collision=ShapeCollection([Box(scale=Scale(x=0.1, y=10, z=0.1))]),
+            )
+            map = Body(name=PrefixedName("map"))
+            world.add_connection(
+                FixedConnection(
+                    parent=map,
+                    child=wall,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=0.5
+                    ),
+                )
+            )
+            strong_odom = Body(name=PrefixedName("strong_odom"))
+            world.add_connection(
+                FixedConnection(
+                    parent=map,
+                    child=strong_odom,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        y=0.5
+                    ),
+                )
+            )
+            weak_odom = Body(name=PrefixedName("weak_odom"))
+            world.add_connection(
+                FixedConnection(
+                    parent=map,
+                    child=weak_odom,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        y=-0.5
+                    ),
+                )
+            )
+
+            # %% attach robots
+            world.merge_world(
+                strong_robot_world,
+                omni1 := OmniDrive.create_with_dofs(
+                    world=world,
+                    parent=strong_odom,
+                    child=strong_robot_world.root,
+                ),
+            )
+            world.merge_world(
+                weak_robot_world,
+                omni2 := OmniDrive.create_with_dofs(
+                    world=world,
+                    parent=weak_odom,
+                    child=weak_robot_world.root,
+                ),
+            )
+            omni1.has_hardware_interface = True
+            omni2.has_hardware_interface = True
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AvoidCollisionBetweenGroups(
+                            buffer_zone_distance=0.05,
+                            violated_distance=0.0,
+                            body_group_a=[weak],
+                            body_group_b=[wall],
+                        ),
+                        AvoidCollisionBetweenGroups(
+                            buffer_zone_distance=0.05,
+                            violated_distance=0.0,
+                            body_group_a=[strong],
+                            body_group_b=[wall],
+                        ),
+                    ]
+                ),
+                CartesianPose(
+                    root_link=map,
+                    tip_link=strong,
+                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=1, reference_frame=strong
+                    ),
+                    weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
+                ),
+                CartesianPose(
+                    root_link=map,
+                    tip_link=weak,
+                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=1, reference_frame=weak
+                    ),
+                    weight=DefaultWeights.WEIGHT_BELOW_CA,
+                ),
+                ExternalCollisionAvoidance(robot=weak_robot_sa),
+                ExternalCollisionAvoidance(robot=strong_robot_sa),
+                local_min := LocalMinimumReached(),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(local_min))
+        # msc.add_node(CancelMotion.when_true(distance_violated))
+
+        kin_sim = Executor(
+            MotionStatechartContext(world=world),
+            pacer=SimulationPacer(real_time_factor=1),
+        )
+        kin_sim.compile(motion_statechart=msc)
+
+        kin_sim.tick_until_end(500)
+
+        assert (
+            0.05
+            > world.collision_manager.collision_detector.check_collision_between_bodies(
+                body_a=strong, body_b=wall, distance=1
+            ).distance
+            > -0.01
+        )
+
+        assert (
+            world.collision_manager.collision_detector.check_collision_between_bodies(
+                body_a=weak, body_b=wall, distance=1
+            ).distance
+            > 0.049
+        )
+
+    def test_external_collision_avoidance_with_weight_above_ca(
+        self, cylinder_bot_world: World
+    ):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
+        env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AvoidCollisionBetweenGroups(
+                            buffer_zone_distance=0.05,
+                            violated_distance=0.0,
+                            body_group_a=[tip],
+                            body_group_b=[env1],
+                        )
+                    ]
+                ),
+                distance_violated := ExternalCollisionDistanceMonitor(
+                    body=robot.root, threshold=0.0
+                ),
+                CartesianPose(
+                    root_link=cylinder_bot_world.root,
+                    tip_link=tip,
+                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=1, reference_frame=cylinder_bot_world.root
+                    ),
+                    weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
+                ),
+                ExternalCollisionAvoidance(robot=robot),
+                local_min := LocalMinimumReached(),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(local_min))
+        msc.add_node(CancelMotion.when_true(distance_violated))
+
+        json_data = msc.to_json()
+        json_str = json.dumps(json_data)
+        new_json_data = json.loads(json_str)
+
+        tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
+        kwargs = tracker.create_kwargs()
+        msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
+
+        kin_sim = Executor(
+            MotionStatechartContext(world=cylinder_bot_world),
+            pacer=SimulationPacer(real_time_factor=1),
+        )
+        kin_sim.compile(motion_statechart=msc_copy)
+
+        kin_sim.tick_until_end(500)
+        collisions = kin_sim.context.world.collision_manager.compute_collisions()
+        assert len(collisions.contacts) == 1
+        assert collisions.contacts[0].distance < 0.049
+        assert collisions.contacts[0].distance > 0.0
+        assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
+
+    def test_update_collision_matrix_later(self, cylinder_bot_world: World):
         robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
@@ -3261,7 +3682,6 @@ class TestCollisionAvoidance:
 
         kin_sim = Executor(
             MotionStatechartContext(world=cylinder_bot_world),
-            pacer=SimulationPacer(real_time_factor=0.25),
         )
         kin_sim.compile(motion_statechart=msc)
 
@@ -3423,117 +3843,6 @@ class TestCollisionAvoidance:
             assert contact.distance > 0.249
         assert len(self_collision_bot_world.collision_manager.collision_consumers) == 0
 
-    def test_hard_constraints_violated(self, cylinder_bot_world: World):
-        root = cylinder_bot_world.root
-        with cylinder_bot_world.modify_world():
-            env2 = Body(
-                name=PrefixedName("environment21234"),
-                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
-            )
-            env_connection = FixedConnection(
-                parent=root,
-                child=env2,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    0.75
-                ),
-            )
-            cylinder_bot_world.add_connection(env_connection)
-
-            env3 = Body(
-                name=PrefixedName("environment31234"),
-                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
-            )
-            env_connection = FixedConnection(
-                parent=root,
-                child=env3,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    1.25
-                ),
-            )
-            cylinder_bot_world.add_connection(env_connection)
-            env4 = Body(
-                name=PrefixedName("environment41234"),
-                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
-            )
-            env_connection = FixedConnection(
-                parent=root,
-                child=env4,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=1, y=-0.25
-                ),
-            )
-            cylinder_bot_world.add_connection(env_connection)
-            env5 = Body(
-                name=PrefixedName("environment52134"),
-                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
-            )
-            env_connection = FixedConnection(
-                parent=root,
-                child=env5,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=1, y=0.25
-                ),
-            )
-            cylinder_bot_world.add_connection(env_connection)
-
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
-        robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
-
-        msc = MotionStatechart()
-        msc.add_node(
-            UpdateTemporaryCollisionRules(
-                temporary_rules=[
-                    AvoidExternalCollisions(
-                        buffer_zone_distance=0.05, violated_distance=0.0, robot=robot
-                    ),
-                ]
-            )
-        )
-        msc.add_node(
-            Sequence(
-                [
-                    SetOdometry(
-                        base_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
-                            x=1, reference_frame=cylinder_bot_world.root
-                        )
-                    ),
-                    Parallel(
-                        [
-                            CartesianPose(
-                                root_link=cylinder_bot_world.root,
-                                tip_link=tip,
-                                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
-                                    x=0, reference_frame=cylinder_bot_world.root
-                                ),
-                            ),
-                            ExternalCollisionAvoidance(robot=robot),
-                            # ConstTrueNode(),
-                        ]
-                    ),
-                ]
-            )
-        )
-        msc.add_node(local_min := LocalMinimumReached())
-        msc.add_node(EndMotion.when_true(local_min))
-
-        json_data = msc.to_json()
-        json_str = json.dumps(json_data)
-        new_json_data = json.loads(json_str)
-
-        tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
-        kwargs = tracker.create_kwargs()
-        msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
-
-        kin_sim = Executor(
-            MotionStatechartContext(
-                world=cylinder_bot_world,
-            )
-        )
-        kin_sim.compile(motion_statechart=msc_copy)
-
-        with pytest.raises(HardConstraintsViolatedException):
-            kin_sim.tick_until_end()
-
     def test_avoid_collision_go_around_corner(self, pr2_with_box):
         r_tip = pr2_with_box.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
@@ -3646,6 +3955,13 @@ class TestCollisionAvoidance:
                                 "r_upper_arm_roll_joint": -0.528415402668,
                                 "r_wrist_flex_joint": -1.18811419869,
                                 "r_wrist_roll_joint": 2.26884630124,
+                                "l_elbow_flex_joint": 0.0,
+                                "l_forearm_roll_joint": 0.0,
+                                "l_shoulder_lift_joint": 0.0,
+                                "l_shoulder_pan_joint": 0.0,
+                                "l_upper_arm_roll_joint": 0.0,
+                                "l_wrist_flex_joint": 0.0,
+                                "l_wrist_roll_joint": 0.0,
                             },
                             world=pr2_with_box,
                         )
@@ -3675,7 +3991,15 @@ class TestCollisionAvoidance:
         msc.add_node(EndMotion.when_true(local_min))
         msc.add_node(CancelMotion.when_true(contact))
 
-        kin_sim = Executor(MotionStatechartContext(world=pr2_with_box))
+        kin_sim = Executor(
+            MotionStatechartContext(
+                world=pr2_with_box,
+                qp_controller_config=QPControllerConfig(
+                    target_frequency=100,
+                    prediction_horizon=30,
+                ),
+            )
+        )
         kin_sim.compile(motion_statechart=msc)
 
         assert len(msc.nodes) == 75
@@ -3703,22 +4027,22 @@ def test_constraint_collection(pr2_world_state_reset: World):
         frame_P_current=Point3(0, 0, 0, reference_frame=tip),
         frame_P_goal=Point3(0, 0, 0, reference_frame=tip),
         reference_velocity=0.1,
-        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
     )
-    assert len(col.eq_constraints) >= 3
+    assert len(col.equality_constraints) >= 3
 
     for i in range(3):
         col.add_equality_constraint(
             reference_velocity=0.1 * i,
             equality_bound=0.0,
-            weight=DefaultWeights.WEIGHT_BELOW_CA,
+            quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
             task_expression=expr,
         )
 
     col.add_inequality_constraint(
         name="same_name",
         reference_velocity=0.2,
-        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
         lower_error=0.1,
         upper_error=0.2,
@@ -3729,7 +4053,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
             name="same_name",
             reference_velocity=0.2,
             equality_bound=0.0,
-            weight=DefaultWeights.WEIGHT_BELOW_CA,
+            quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
             task_expression=expr,
         )
 
@@ -3738,7 +4062,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
         name="same_name",
         reference_velocity=0.2,
         equality_bound=0.0,
-        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
     )
 
@@ -3753,7 +4077,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
         name="same_name",
         reference_velocity=0.2,
         equality_bound=0.0,
-        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
     )
     constraint = EqualityConstraint(

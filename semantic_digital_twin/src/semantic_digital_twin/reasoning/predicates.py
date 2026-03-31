@@ -13,7 +13,9 @@ from krrood.entity_query_language.predicate import (
 from random_events.interval import Interval
 from typing_extensions import List, TYPE_CHECKING, Iterable, Type
 
-from semantic_digital_twin.collision_checking.trimesh_collision_detector import FCLCollisionDetector
+from semantic_digital_twin.collision_checking.trimesh_collision_detector import (
+    FCLCollisionDetector,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_computations.ik_solver import (
@@ -22,11 +24,16 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
 )
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import Vector3, Point3
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
-from semantic_digital_twin.world_description.geometry import TriangleMesh
-from semantic_digital_twin.world_description.world_entity import Body, Region, KinematicStructureEntity
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    Region,
+    KinematicStructureEntity,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.robots.abstract_robot import (
@@ -82,7 +89,7 @@ def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
 
     # This ignores the camera orientation and sets it to identity
     cam_pose = np.eye(4, dtype=float)
-    cam_pose[:3, 3] = camera.root.global_pose.to_np()[:3, 3]
+    cam_pose[:3, 3] = camera.root.global_transform.to_np()[:3, 3]
 
     seg = rt.create_segmentation_mask(
         HomogeneousTransformationMatrix(cam_pose, reference_frame=camera._world.root),
@@ -119,7 +126,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
 
     # get camera pose
     camera_pose = np.eye(4, dtype=float)
-    camera_pose[:3, 3] = camera.root.global_pose.to_np()[:3, 3]
+    camera_pose[:3, 3] = camera.root.global_transform.to_np()[:3, 3]
     camera_pose = HomogeneousTransformationMatrix(
         camera_pose, reference_frame=camera._world.root
     )
@@ -130,7 +137,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     with world_without_occlusion.modify_world():
         world_without_occlusion.add_body(root)
         copied_body = Body.from_json(body.to_json())
-        root_T_body = body.global_pose
+        root_T_body = body.global_transform
         root_T_body.reference_frame = root
         root_to_copied_body = FixedConnection(
             parent=root,
@@ -208,7 +215,7 @@ def is_supported_by(
     if Below(
         supported_body.center_of_mass,
         supporting_body.center_of_mass,
-        supported_body.global_pose,
+        supported_body.global_transform,
     )():
         return False
     bounding_box_supported_body = (
@@ -253,8 +260,10 @@ def is_body_in_region(body: Body, region: Region) -> float:
     region_mesh_local = region.area.combined_mesh
 
     # Transform copies of the meshes into the world frame
-    body_mesh = body_mesh_local.copy().apply_transform(body.global_pose.to_np())
-    region_mesh = region_mesh_local.copy().apply_transform(region.global_pose.to_np())
+    body_mesh = body_mesh_local.copy().apply_transform(body.global_transform.to_np())
+    region_mesh = region_mesh_local.copy().apply_transform(
+        region.global_transform.to_np()
+    )
     intersection = trimesh.boolean.intersection([body_mesh, region_mesh])
 
     # no body volume -> zero fraction
@@ -444,10 +453,10 @@ class InsideOf(KinematicStructureEntitySpatialRelation):
 
         # Transform meshes from body frame to world frame
         mesh_a = mesh_a_local.copy()
-        mesh_a.apply_transform(self.body.global_pose.to_np())
+        mesh_a.apply_transform(self.body.global_transform.to_np())
 
         mesh_b = mesh_b_local.copy()
-        mesh_b.apply_transform(self.other.global_pose.to_np())
+        mesh_b.apply_transform(self.other.global_transform.to_np())
 
         # Use bounding box of mesh_b to check if mesh_a is inside mesh_b
         mesh_b_bbox = mesh_b.bounding_box

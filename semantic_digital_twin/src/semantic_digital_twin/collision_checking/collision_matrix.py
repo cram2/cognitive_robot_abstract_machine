@@ -7,14 +7,22 @@ from typing import Dict, Any
 
 from typing_extensions import Tuple, TYPE_CHECKING, Self
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    to_json,
+    from_json,
+    list_like_classes,
+)
+from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.exceptions import (
     NegativeCollisionCheckingDistanceError,
     InvalidBodiesInCollisionCheckError,
     BodyHasNoGeometryError,
 )
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import Body, WorldEntityWithID
 
 if TYPE_CHECKING:
     from semantic_digital_twin.collision_checking.collision_groups import CollisionGroup
@@ -39,6 +47,13 @@ class CollisionCheck(SubclassJSONSerializer):
     """
     Minimum distance to check for collisions.
     """
+
+    def copy_for_world(self, world: World) -> Self:
+        return CollisionCheck(
+            body_a=world.get_world_entity_with_id_by_id(self.body_a.id),
+            body_b=world.get_world_entity_with_id_by_id(self.body_b.id),
+            distance=self.distance,
+        )
 
     @classmethod
     def create_and_validate(
@@ -227,7 +242,7 @@ class DefaultMaxAvoidedCollisions(MaxAvoidedCollisionsRule):
 
 
 @dataclass
-class MaxAvoidedCollisionsOverride(MaxAvoidedCollisionsRule):
+class MaxAvoidedCollisionsOverride(MaxAvoidedCollisionsRule, SubclassJSONSerializer):
     """
     Implementation of MaxAvoidedCollisionsRule that overrides the maximum number of avoided collisions for specific bodies.
     """
@@ -245,3 +260,22 @@ class MaxAvoidedCollisionsOverride(MaxAvoidedCollisionsRule):
         if body not in self.bodies:
             return None
         return self.value
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "value": self.value,
+            "bodies": to_json({b.id for b in self.bodies} if self.bodies else None),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        body_subset_ids = from_json(data["bodies"], **kwargs)
+        body_subset = None
+        if body_subset_ids is not None:
+            body_subset = {
+                tracker.get_world_entity_with_id(id=body_id)
+                for body_id in body_subset_ids
+            }
+        return cls(value=data["value"], bodies=body_subset)

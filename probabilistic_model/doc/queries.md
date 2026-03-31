@@ -55,8 +55,8 @@ class Shape(IntEnum):
     TRIANGLE = 2
 
 
-color = Symbolic("color", Set.from_iterable(Color))
-shape = Symbolic("shape", Set.from_iterable(Shape))
+color = Symbolic(name="color", domain=Set.from_iterable(Color))
+shape = Symbolic(name="shape", domain=Set.from_iterable(Shape))
 
 probabilities = np.array([[2 / 15, 1 / 15, 1 / 5],
                           [1 / 5, 1 / 10, 3 / 10]])
@@ -143,12 +143,14 @@ variance the sample variance.
 
 
 ```{code-cell} ipython3
-from probabilistic_model.distributions import *
+from probabilistic_model.distributions.distributions import *
+from probabilistic_model.distributions.gaussian import *
+from probabilistic_model.distributions.uniform import *
 mean = dataframe["sepal length (cm)"].mean()
 variance = dataframe["sepal length (cm)"].std()
 
 sepal_length = Continuous("sepal length (cm)")
-distribution = GaussianDistribution(sepal_length, mean, variance)
+distribution = GaussianDistribution(variable=sepal_length, location=mean, scale=variance)
 fig = go.Figure(distribution.plot(), distribution.plotly_layout())
 fig.show()
 ```
@@ -167,7 +169,7 @@ Answering such questions requires the integration over the described area.
 In this scenario, we can get the probability by the following piece of code.
 
 ```{code-cell} ipython3
-event = SimpleEvent({sepal_length: closed(6, 7)}).as_composite_set()
+event = SimpleEvent.from_data({sepal_length: closed(6, 7)}).as_composite_set()
 distribution.probability(event)
 ```
 
@@ -204,7 +206,7 @@ truncated probability, it is, in most scenarios, more interesting to consider th
 We can construct such a thing by invoking the `truncated` method with the corresponding event.
 
 ```{code-cell} ipython3
-event = SimpleEvent({sepal_length: closed(6, 7)}).as_composite_set()
+event = SimpleEvent.from_data({sepal_length: closed(6, 7)}).as_composite_set()
 distribution, probability = distribution.truncated(event)
 fig = go.Figure(distribution.plot(), distribution.plotly_layout())
 fig.show()
@@ -277,7 +279,7 @@ The interface to calculate moments is the `moment` method of the distribution ob
 
 ```{code-cell} ipython3
 from random_events.product_algebra import VariableMap
-distribution = GaussianDistribution(sepal_length, mean, variance)
+distribution = GaussianDistribution(variable=sepal_length, location=mean, scale=variance)
 print("mean:", distribution.expectation(distribution.variables))
 print("variance:", distribution.moment(VariableMap({sepal_length: 2}), distribution.expectation(distribution.variables)))
 print("Raw variance:", distribution.moment(VariableMap({sepal_length: 2}), VariableMap({sepal_length: 0})))
@@ -311,7 +313,7 @@ A common perception of the mode is that it is the single point of highest densit
 ```{code-cell} ipython3
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
 distribution = ProbabilisticCircuit()
-leaf(GaussianDistribution(Continuous("x"), 0, 1), distribution)
+leaf(GaussianDistribution(variable=Continuous("x"), location=0, scale=1), distribution)
 fig = go.Figure(distribution.plot(), distribution.plotly_layout())
 fig.show()
 ```
@@ -320,14 +322,14 @@ However, the mode is more accurately described as the set of points with the hig
 
 ```{code-cell} ipython3
 condition = closed(-float("inf"), -1) | closed(1, float("inf"))
-distribution, _ = distribution.truncated(SimpleEvent({distribution.variables[0]: condition}).as_composite_set())
+distribution, _ = distribution.truncated(SimpleEvent.from_data({distribution.variables[0]: condition}).as_composite_set())
 go.Figure(distribution.plot(), distribution.plotly_layout()).show()
 ```
 
 We can see that conditioning a Gaussian on such an event already creates a mode that has two points. Furthermore, modes can be sets of infinite many points, such as shown below.
 
 ```{code-cell} ipython3
-uniform = leaf(UniformDistribution(Continuous("x"), open(-1, 1).simple_sets[0]), ProbabilisticCircuit()).probabilistic_circuit
+uniform = leaf(UniformDistribution(variable=Continuous("x"), interval=open(-1, 1).simple_sets[0]), ProbabilisticCircuit()).probabilistic_circuit
 go.Figure(uniform.plot(), uniform.plotly_layout()).show()
 ```
 
@@ -346,7 +348,7 @@ For most practical purposes, we can define sampling as the generation of random 
 Let's look at an example from the Gaussian distribution.
 
 ```{code-cell} ipython3
-distribution = GaussianDistribution(Continuous("x"), 0, 1)
+distribution = GaussianDistribution(variable=Continuous("x"), location=0, scale=1)
 samples = distribution.sample(2)
 print(samples)
 ```
@@ -413,8 +415,8 @@ x2 = Continuous("x2")
 
 model = ProbabilisticCircuit()
 prod = ProductUnit(probabilistic_circuit = model)
-p_x1 = leaf(GaussianDistribution(x1, 0, 1), model)
-p_x2 = leaf(GaussianDistribution(x2, 0, 1), model)
+p_x1 = leaf(GaussianDistribution(variable=x1, location=0, scale=1), model)
+p_x2 = leaf(GaussianDistribution(variable=x2, location=0, scale=1), model)
 prod.add_subcircuit(p_x1)
 prod.add_subcircuit(p_x2)
 
@@ -427,7 +429,7 @@ We can now calculate the probability that $x_1 \in (0.5, 1.)
 \land x_2 \in (0.75, 1.) $ not only by using integration but also by a monte carlo estimate.
 
 ```{code-cell} ipython3
-event = SimpleEvent({x1: closed(0.25, 1.), x2: closed(0., 1.)}).as_composite_set()
+event = SimpleEvent.from_data({x1: closed(0.25, 1.), x2: closed(0., 1.)}).as_composite_set()
 monte_carlo_probability = sum([event.contains(sample) for sample in samples]) / len(samples)
 
 fig.add_traces(event.plot())
@@ -462,12 +464,12 @@ Consider the kitchen scenario from the [product algebra notebook](https://random
 x = Continuous("x")
 y = Continuous("y")
 
-kitchen = SimpleEvent({x: closed(0, 6.6), y: closed(0, 7)}).as_composite_set()
-refrigerator = SimpleEvent({x: closed(5, 6), y: closed(6.3, 7)}).as_composite_set()
-top_kitchen_island = SimpleEvent({x: closed(0, 5), y: closed(6.5, 7)}).as_composite_set()
-left_cabinets = SimpleEvent({x: closed(0, 0.5), y: closed(0, 6.5)}).as_composite_set()
+kitchen = SimpleEvent.from_data({x: closed(0, 6.6), y: closed(0, 7)}).as_composite_set()
+refrigerator = SimpleEvent.from_data({x: closed(5, 6), y: closed(6.3, 7)}).as_composite_set()
+top_kitchen_island = SimpleEvent.from_data({x: closed(0, 5), y: closed(6.5, 7)}).as_composite_set()
+left_cabinets = SimpleEvent.from_data({x: closed(0, 0.5), y: closed(0, 6.5)}).as_composite_set()
 
-center_island = SimpleEvent({x: closed(2, 4), y: closed(3, 5)}).as_composite_set()
+center_island = SimpleEvent.from_data({x: closed(2, 4), y: closed(3, 5)}).as_composite_set()
 
 occupied_spaces = refrigerator | top_kitchen_island | left_cabinets | center_island
 free_space = kitchen - occupied_spaces
@@ -484,8 +486,8 @@ to describe locations and their probabilities to access the fridge.
 ```{code-cell} ipython3
 pc = ProbabilisticCircuit()
 
-p_x = leaf(GaussianDistribution(x, 5.5, 0.5), pc)
-p_y = leaf(GaussianDistribution(y, 6.65, 0.5), pc)
+p_x = leaf(GaussianDistribution(variable=x, location=5.5, scale=0.5), pc)
+p_y = leaf(GaussianDistribution(variable=y, location=6.65, scale=0.5), pc)
 p_xy = ProductUnit(probabilistic_circuit = pc)
 p_xy.add_subcircuit(p_x)
 p_xy.add_subcircuit(p_y)

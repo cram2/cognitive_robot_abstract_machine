@@ -7,15 +7,15 @@ from dataclasses import dataclass
 
 from typing_extensions import List
 
-from .example_classes import Position, Entity
+from .example_classes import KRROODPosition, Entity
 
 
 @dataclass
-class CustomPosition(Position):
+class CustomPosition(KRROODPosition):
     custom_value: str
 
 
 @dataclass
 class AggregatorOfExternalInstances:
-    a: List[Position]
+    a: List[KRROODPosition]
     entity: Entity

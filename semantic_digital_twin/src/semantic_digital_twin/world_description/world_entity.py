@@ -31,15 +31,20 @@ from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
     to_json,
     from_json,
+    list_like_classes,
 )
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.predicate import Symbol
 from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math.symbolic_math import Matrix
 from krrood.utils import get_full_class_name
-from semantic_digital_twin.world_description.geometry import TriangleMesh
+from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.inertial_properties import Inertial
-from semantic_digital_twin.world_description.shape_collection import ShapeCollection, BoundingBoxCollection
+from semantic_digital_twin.world_description.shape_collection import (
+    ShapeCollection,
+    BoundingBoxCollection,
+)
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -52,6 +57,7 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
+    Pose,
 )
 from semantic_digital_twin.utils import IDGenerator, camel_case_split
 
@@ -232,6 +238,33 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
         else:
             return obj
 
+    def copy_for_world(self, world: World) -> Self:
+        """
+        Copy the object, while updating all references to WorldEntityWithID objects to point to the new world.
+        This assumes that the referenced objects are already in the new world.
+        """
+
+        def _resolve_item(item: Any, world: World) -> Any:
+            if isinstance(item, WorldEntityWithID):
+                return world.get_world_entity_with_id_by_id(item.id)
+            elif isinstance(item, JointState):
+                return item.copy_for_world(world)
+            return deepcopy(item)
+
+        result = {}
+        introspector = DataclassOnlyIntrospector()
+        for field_ in introspector.discover(self.__class__):
+            value = getattr(self, field_.public_name)
+
+            if isinstance(value, list_like_classes):
+                current_result = value.__class__(
+                    [_resolve_item(item, world) for item in value]
+                )
+            else:
+                current_result = _resolve_item(value, world)
+            result[field_.public_name] = current_result
+        return self.__class__(**result)
+
 
 @dataclass(eq=False)
 class WorldEntityWithClassBasedID(WorldEntityWithID):
@@ -304,12 +337,20 @@ class KinematicStructureEntity(WorldEntityWithSimulatorProperties, ABC):
         return world.transform(com, world.root)
 
     @property
-    def global_pose(self) -> HomogeneousTransformationMatrix:
+    def global_transform(self) -> HomogeneousTransformationMatrix:
         """
-        Computes the pose of the KinematicStructureEntity in the world frame.
-        :return: TransformationMatrix representing the global pose.
+        Computes the transform of the KinematicStructureEntity in the world frame.
+        :return: TransformationMatrix representing the global transform.
         """
         return self._world.compute_forward_kinematics(self._world.root, self)
+
+    @property
+    def global_pose(self) -> Pose:
+        """
+        Computes the Pose of the KinematicStructureEntity in the world frame.
+        :return: Pose representing the global pose.
+        """
+        return self._world.compute_forward_kinematics(self._world.root, self).to_pose()
 
     @property
     def parent_connection(self) -> Connection:
@@ -369,13 +410,12 @@ class KinematicStructureEntity(WorldEntityWithSimulatorProperties, ABC):
 
         :param name: Prefixed name for the region.
         :param points_3d: List of 3D points.
-        :param reference_frame: Optional reference frame.
         :param minimum_thickness: Minimum thickness to add if points are near-planar.
         :param sv_ratio_tol: Tolerance for determining planarity based on singular value ratio.
 
         :return: Region object.
         """
-        area_mesh = TriangleMesh.from_3d_points(
+        area_mesh = Mesh.from_3d_points(
             points_3d,
             minimum_thickness=minimum_thickness,
             sv_ratio_tol=sv_ratio_tol,
@@ -945,21 +985,21 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
         :param world: Reference to the world where the reference frames are searched.
         :return: The other parent and child and new connection expressions with correct reference frames.
         """
-        other_parent = world.get_kinematic_structure_entity_by_name(self.parent.name)
-        other_child = world.get_kinematic_structure_entity_by_name(self.child.name)
+        other_parent = world.get_kinematic_structure_entity_by_id(self.parent.id)
+        other_child = world.get_kinematic_structure_entity_by_id(self.child.id)
 
         parent_T_connection = deepcopy(self.parent_T_connection_expression)
         parent_T_connection.reference_frame = (
-            world.get_kinematic_structure_entity_by_name(
-                parent_T_connection.reference_frame.name
+            world.get_kinematic_structure_entity_by_id(
+                parent_T_connection.reference_frame.id
             )
         )
 
         connection_T_child = deepcopy(self.connection_T_child_expression)
-        connection_T_child.child_frame = world.get_kinematic_structure_entity_by_name(
-            connection_T_child.child_frame.name
+        connection_T_child.child_frame = world.get_kinematic_structure_entity_by_id(
+            connection_T_child.child_frame.id
         )
-        return (other_parent, other_child, parent_T_connection, connection_T_child)
+        return other_parent, other_child, parent_T_connection, connection_T_child
 
     def copy_for_world(self, world: World) -> Self:
         """
@@ -982,6 +1022,18 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
             connection_T_child_expression=connection_T_child_expression,
             name=PrefixedName(self.name.name, prefix=self.name.prefix),
         )
+
+    def update_references_for_world(self, world: World):
+        """
+        Updates the parent and child references of this connection to the given world as well as the references from the expression.
+        """
+        child_id = self.child.id
+        child = world.get_kinematic_structure_entity_by_id(child_id)
+        parent_id = self.parent.id
+        parent = world.get_kinematic_structure_entity_by_id(parent_id)
+        self.parent = parent
+        self.child = child
+        self.parent_T_connection_expression.reference_frame = parent
 
 
 GenericConnection = TypeVar("GenericConnection", bound=Connection)

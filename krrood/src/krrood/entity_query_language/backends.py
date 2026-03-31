@@ -14,7 +14,7 @@ from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.exceptions import (
     NoSolutionFound,
     GenerativeBackendQueryIsNotUnderspecifiedVariable,
-    UnderspecifiedStatementInfeasibleForEQLGeneration,
+    UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration,
 )
 from krrood.entity_query_language.factories import (
     set_of,
@@ -110,6 +110,7 @@ class EntityQueryLanguageBackend(SelectiveBackend):
     def evaluate(self, expression: Query) -> Iterable:
         if isinstance(expression, Match) and not isinstance(expression, MatchVariable):
             yield from self._evaluate_underspecified(expression)
+            return
         yield from expression.evaluate()
 
     def _evaluate_underspecified(self, expression: Match[T]) -> Iterable[T]:

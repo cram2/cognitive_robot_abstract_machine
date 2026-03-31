@@ -20,14 +20,14 @@ class BindingsTestCase(unittest.TestCase):
             b = []
             for a in range(50):
                 b.append(
-                    SimpleInterval(
+                    SimpleInterval.from_data(
                         random.randint(0, 100),
                         random.randint(0, 100),
                         Bound.OPEN,
                         Bound.CLOSED,
                     )
                 )
-            z = Interval(*b)
+            z = Interval.from_simple_sets(*b)
             z.make_disjoint()
         print(f"\nwhen using the bindings within the old classes: {time.time() - t1}\n")
 

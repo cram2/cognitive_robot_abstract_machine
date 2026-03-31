@@ -22,18 +22,18 @@ class IntervalConstants:
     Predefined intervals for semantic directions.
     """
 
-    ZERO = (0, 0, Bound.CLOSED, Bound.CLOSED)
-    ZERO_TO_ONE_THIRD = (0, 1 / 3, Bound.CLOSED, Bound.CLOSED)
-    ONE_THIRD_TO_TWO_THIRD = (1 / 3, 2 / 3, Bound.OPEN, Bound.OPEN)
-    HALF = (0.5, 0.5, Bound.CLOSED, Bound.CLOSED)
-    TWO_THIRD_TO_ONE = (2 / 3, 1, Bound.CLOSED, Bound.CLOSED)
-    ONE = (1, 1, Bound.CLOSED, Bound.CLOSED)
+    ZERO = SimpleInterval.from_data(0, 0, Bound.CLOSED, Bound.CLOSED)
+    ZERO_TO_ONE_THIRD = SimpleInterval.from_data(0, 1 / 3, Bound.CLOSED, Bound.CLOSED)
+    ONE_THIRD_TO_TWO_THIRD = SimpleInterval.from_data(1 / 3, 2 / 3, Bound.OPEN, Bound.OPEN)
+    HALF = SimpleInterval.from_data(0.5, 0.5, Bound.CLOSED, Bound.CLOSED)
+    TWO_THIRD_TO_ONE = SimpleInterval.from_data(2 / 3, 1, Bound.CLOSED, Bound.CLOSED)
+    ONE = SimpleInterval.from_data(1, 1, Bound.CLOSED, Bound.CLOSED)
 
 
 class SemanticDirection(Enum): ...
 
 
-class HorizontalSemanticDirection(SimpleInterval, SemanticDirection):
+class HorizontalSemanticDirection(SemanticDirection):
     """
     Semantic directions for horizontal positioning.
     """
@@ -46,7 +46,7 @@ class HorizontalSemanticDirection(SimpleInterval, SemanticDirection):
     FULLY_RIGHT = IntervalConstants.ONE
 
 
-class VerticalSemanticDirection(SimpleInterval, SemanticDirection):
+class VerticalSemanticDirection(SemanticDirection):
     """
     Semantic directions for vertical positioning.
     """
@@ -94,7 +94,7 @@ class SemanticPositionDescription:
         span = base.upper - base.lower
         new_lower = base.lower + span * target.lower
         new_upper = base.lower + span * target.upper
-        return SimpleInterval(new_lower, new_upper, base.left, base.right)
+        return SimpleInterval.from_data(new_lower, new_upper, base.left, base.right)
 
     def _apply_zoom(self, simple_event: SimpleEvent) -> SimpleEvent:
         """
@@ -134,9 +134,9 @@ class SemanticPositionDescription:
             raise NotImplementedError
 
         for step in directions:
-            current_interval = self._zoom_interval(current_interval, step)
+            current_interval = self._zoom_interval(current_interval, step.value)
 
-        return SimpleEvent({axis: current_interval})
+        return SimpleEvent.from_data({axis: current_interval})
 
     def sample_point_from_event(self, event: Event) -> Tuple[float, float]:
         """

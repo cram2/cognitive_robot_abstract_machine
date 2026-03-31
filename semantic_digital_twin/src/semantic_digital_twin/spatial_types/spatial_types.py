@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import (
         KinematicStructureEntity,
     )
+    from semantic_digital_twin.orm.model import Point3Mapping, QuaternionMapping
 
 
 @dataclass(eq=False, repr=False)
@@ -224,7 +225,8 @@ class HomogeneousTransformationMatrix(
                     name=f"{cls.__name__}_{name}[{row},{column}]",
                 )
                 transformation_matrix[row, column] = variable
-                variable.resolve = lambda: resolver()[row, column]
+                if resolver is not None:
+                    variable.resolve = lambda: resolver()[row, column]
         return transformation_matrix
 
     def to_json(self) -> Dict[str, Any]:

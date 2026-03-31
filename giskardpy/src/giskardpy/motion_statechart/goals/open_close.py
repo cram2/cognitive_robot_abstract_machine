@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from krrood.symbolic_math.symbolic_math import trinary_logic_and
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -60,9 +60,7 @@ class Open(Goal):
                     name="hold handle",
                     root_link=self.environment_link,
                     tip_link=self.tip_link,
-                    goal_pose=HomogeneousTransformationMatrix(
-                        reference_frame=self.tip_link, child_frame=self.tip_link
-                    ),
+                    goal_pose=Pose(reference_frame=self.tip_link),
                     weight=self.weight,
                 ),
             ]
@@ -120,9 +118,7 @@ class Close(Open):
                     name="hold handle",
                     root_link=self.environment_link,
                     tip_link=self.tip_link,
-                    goal_pose=HomogeneousTransformationMatrix(
-                        reference_frame=self.tip_link, child_frame=self.tip_link
-                    ),
+                    goal_pose=Pose(reference_frame=self.tip_link),
                     weight=self.weight,
                 ),
             ]

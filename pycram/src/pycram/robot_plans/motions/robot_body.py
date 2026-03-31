@@ -1,11 +1,14 @@
 from dataclasses import dataclass
 from typing import Optional
 
+from typing_extensions import List
+
 from giskardpy.motion_statechart.tasks.pointing import Pointing
+from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.robots.abstract_robot import Camera
 
 from pycram.robot_plans.motions.base import BaseMotion
-from pycram.datastructures.pose import Vector3Stamped, PoseStamped
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 
 from pycram.view_manager import ViewManager
@@ -17,11 +20,11 @@ class MoveJointsMotion(BaseMotion):
     Moves any joint on the robot
     """
 
-    names: list
+    names: List[str]
     """
     List of joint names that should be moved 
     """
-    positions: list
+    positions: List[float]
     """
     Target positions of joints, should correspond to the list of names
     """
@@ -33,7 +36,7 @@ class MoveJointsMotion(BaseMotion):
     """
     Name of the tip link to align with, e.g the object (optional).
     """
-    tip_normal: Optional[Vector3Stamped] = None
+    tip_normal: Optional[Vector3] = None
     """
     Normalized vector representing the current orientation axis of the end-effector (optional).
     """
@@ -41,7 +44,7 @@ class MoveJointsMotion(BaseMotion):
     """
     Base link of the robot; typically set to the torso (optional).
     """
-    root_normal: Optional[Vector3Stamped] = None
+    root_normal: Optional[Vector3] = None
     """
     Normalized vector representing the desired orientation axis to align with (optional).
     """
@@ -63,7 +66,7 @@ class LookingMotion(BaseMotion):
     Lets the robot look at a point
     """
 
-    target: PoseStamped
+    target: Pose
     """
     Target pose to look at
     """
@@ -80,8 +83,8 @@ class LookingMotion(BaseMotion):
     def _motion_chart(self):
         self.camera.forward_facing_axis.reference_frame = self.camera.root
         return Pointing(
-            root_link=self.robot_view.torso.root,
+            root_link=self.robot.torso.root,
             tip_link=self.camera.root,
-            goal_point=self.target.to_spatial_type().to_position(),
+            goal_point=self.target.to_position(),
             pointing_axis=self.camera.forward_facing_axis,
         )

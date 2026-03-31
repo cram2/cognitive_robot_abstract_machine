@@ -24,10 +24,11 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
-    DiffDrive,
+    DifferentialDrive,
     PrismaticConnection,
     RevoluteConnection,
 )
+from semantic_digital_twin.orm.ormatic_interface import *  # noqa
 
 
 def test_compute_chain_of_bodies_pr2(pr2_world_state_reset):
@@ -304,7 +305,9 @@ def test_apply_control_commands_omni_drive_pr2(pr2_world_state_reset):
 
 
 def test_apply_control_commands_diff_drive(cylinder_bot_diff_world):
-    diff_drive: DiffDrive = cylinder_bot_diff_world.get_connection_by_name("map_T_bot")
+    diff_drive: DifferentialDrive = cylinder_bot_diff_world.get_connection_by_name(
+        "map_T_bot"
+    )
     cmd = np.zeros((len(cylinder_bot_diff_world.degrees_of_freedom)), dtype=float)
     cmd[cylinder_bot_diff_world.state._index[diff_drive.x_velocity.id]] = 100
     cmd[cylinder_bot_diff_world.state._index[diff_drive.yaw.id]] = 100
@@ -431,7 +434,7 @@ def test_specifies_left_right_arm_mixin(pr2_world_state_reset):
     assert LeftOf(
         left_arm_chain[1].center_of_mass,
         right_arm_chain[1].center_of_mass,
-        pr2.root.global_pose,
+        pr2.root.global_transform,
     )()
 
 

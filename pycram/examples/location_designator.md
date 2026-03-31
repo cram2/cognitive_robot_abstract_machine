@@ -1,4 +1,4 @@
----
+from pycram.motion_executor import simulated_robotfrom pycram.robot_plans import NavigateActionDescription---
 jupyter:
   jupytext:
     text_representation:
@@ -81,28 +81,29 @@ Since a robot is needed we will use the PR2 and use a milk as a target point for
 PR2 will be set to 0.2 since otherwise the arms of the robot will be too low to reach on the countertop.
 
 ```python
-from pycram.process_module import simulated_robot
-from pycram.language import SequentialPlan
-from pycram.robot_plans.actions import ParkArmsActionDescription, MoveTorsoActionDescription
-from pycram.datastructures.enums import Arms, TorsoState
+from pycram.motion_executor import simulated_robot
+from pycram.plans.factories import *
+from pycram.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
+from pycram.datastructures.enums import Arms
+from semantic_digital_twin.datastructures.definitions import TorsoState
 
 with simulated_robot:
-    SequentialPlan(context, 
-                   ParkArmsActionDescription(Arms.BOTH),
-                   MoveTorsoActionDescription(TorsoState.HIGH)).perform()
+    sequential([ ParkArmsAction(Arms.BOTH),
+                   MoveTorsoAction(TorsoState.HIGH)], context=context).perform()
 
 ```
 
 ```python
-from pycram.designators.location_designator import CostmapLocation
-from pycram.designators.object_designator import BelieveObject
-from pycram.language import SequentialPlan
+from pycram.locations.locations import CostmapLocation, Arms
+from pycram.robot_plans.actions.core.navigation import NavigateAction
+from pycram.motion_executor import simulated_robot
 
-location_description = CostmapLocation(target=world.get_body_by_name("milk.stl"), reachable_for=pr2_view)
+location_description = CostmapLocation(target=world.get_body_by_name("milk.stl").global_pose, reachable=True, reachable_arm=Arms.LEFT, context=context)
 
-SequentialPlan(context, location_description)
+plan = execute_single(NavigateAction(next(iter(location_description))), context=context)
 
-print(location_description.resolve())
+with simulated_robot:
+    plan.perform()
 ```
 
 As you can see we get a pose near the countertop where the robot can be placed without colliding with it. Furthermore,
@@ -118,56 +119,13 @@ For this example we need the milk as well as the PR2, so if you did not spawn th
 designator you can spawn them with the following cell.
 
 ```python
-from pycram.designators.location_designator import CostmapLocation
-from pycram.designators.object_designator import BelieveObject
-from pycram.language import SequentialPlan
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
+location_description = CostmapLocation(target=Pose(Point3.from_iterable([-1, 0, 1.2]), reference_frame=world.root), visible=True, context=context)
 
-location_description = CostmapLocation(target=world.get_body_by_name("milk.stl"), visible_for=pr2_view)
+plan = execute_single(NavigateAction(next(iter(location_description))), context=context)
 
-plan = SequentialPlan(context, location_description)
-
-print(location_description.resolve())
-```
-
-## Semantic
-
-Semantic location designator are used to create location descriptions for semantic entities, like a table. An example of
-this is: You have a robot that picked up an object and should place it on a table. Semantic location designator then
-allows to find poses that are on this table.
-
-Semantic location designator need an object from which the target entity is a part and the URDF link representing the
-entity. In this case we want a position on the kitchen island, so we have to provide the kitchen object designator since
-the island is a part of the kitchen and the link name of the island surface.
-
-For this example we need the kitchen as well as the milk. If you spawned them in one of the previous examples you don't
-need to execute the following cell.
-
-```python
-from pycram.designators.location_designator import SemanticCostmapLocation
-from pycram.designators.object_designator import BelieveObject
-
-location_description = SemanticCostmapLocation(world.get_body_by_name("island_countertop"),
-                                               for_object=world.get_body_by_name("milk.stl"))
-
-plan = SequentialPlan(context, location_description)
-
-print(location_description.resolve())
-```
-
-ProbabilisticSemanticLocation fulfills te same purpose as the SemanticCostmapLocation, but it uses probabilistic
-circuits and random events to build the costmap and sample from it. This allows more control over the sample space
-as well as overall better quality of samples. One difference to the SemanticCostmapLocation is that it takes a list
-of link names instead of a single link name, which allows us to sample from multiple links at once.
-
-```python
-from pycram.designators.location_designator import ProbabilisticSemanticLocation
-
-location_description = ProbabilisticSemanticLocation(world.get_body_by_name("island_countertop"),
-                                                    for_object=world.get_body_by_name("milk.stl"))
-
-plan = SequentialPlan(context, location_description)
-
-print(location_description.resolve())
+with simulated_robot:
+    plan.perform()
 ```
 
 ## Location Designator as Generator
@@ -179,13 +137,8 @@ We will see this at the example of a location designator for visibility. For thi
 already have a milk spawned in you world you can ignore the following cell.
 
 ```python
-from pycram.designators.location_designator import CostmapLocation
-from pycram.designators.object_designator import BelieveObject
-from pycram.language import SequentialPlan
 
-location_description = CostmapLocation(target=world.get_body_by_name("milk.stl"), visible_for=pr2_view)
-plan = SequentialPlan(context, location_description)
-
+location_description = CostmapLocation(target=Pose(Point3.from_iterable([-1, 0, 1.2]), reference_frame=world.root), visible=True, context=context)
 
 for i, pose in enumerate(location_description):
     print(pose)
@@ -193,39 +146,18 @@ for i, pose in enumerate(location_description):
         break
 ```
 
-Similar to the ProbabilisticSemanticLocation, the ProbabilisticCostmapLocation can be used as an alternative to the
-CostmapLocation. It uses probabilistic circuits and random events to build the costmap and sample from it, but has the
-same interface as the CostmapLocation. 
-
-```python
-from pycram.designators.location_designator import ProbabilisticCostmapLocation
-from pycram.designators.object_designator import BelieveObject
-from pycram.language import SequentialPlan
-
-location_description = ProbabilisticCostmapLocation(target=world.get_body_by_name("milk.stl"), visible_for=pr2_view)
-plan = SequentialPlan(context, location_description)
-
-for i, pose in enumerate(location_description):
-    print(pose)
-    if i > 3:
-        break
-```
 
 ## Accessing Locations
 
-Accessing describes a location from which the robot can open a drawer. The drawer is specified by a ObjetcPart
-designator which describes the handle of the drawer.
+Accessing describes a location from which the robot can open a drawer. The drawer is specified by the handle that is 
+used to open it.
 
 At the moment this location designator only works in the apartment environment, so please remove the kitchen if you
 spawned it in a previous example. Furthermore, we need a robot, so we also spawn the PR2 if it isn't spawned already.
 
 ```python
-from pycram.designators.object_designator import *
-from pycram.designators.location_designator import *
-from pycram.language import SequentialPlan
+from pycram.locations.locations import AccessingLocation
 
-access_location = AccessingLocation(world.get_body_by_name("handle_cab10_t"), pr2_view)
-plan = SequentialPlan(context, access_location)
-
-print(access_location.resolve())
+access_location = AccessingLocation(world.get_body_by_name("handle_cab10_t"), arm=Arms.LEFT, context=context)
+print(next(iter(access_location)))
 ```

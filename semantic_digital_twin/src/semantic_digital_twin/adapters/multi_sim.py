@@ -3,6 +3,8 @@ import inspect
 import os
 import shutil
 import time
+from typing import Self
+
 import trimesh
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -20,6 +22,8 @@ from multiverse_simulator import (
     MultiverseAttribute,
     MultiverseCallbackResult,
 )
+
+from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json
 from krrood.utils import recursive_subclasses
 from scipy.spatial.transform import Rotation
 from trimesh.visual import TextureVisuals
@@ -44,8 +48,6 @@ from semantic_digital_twin.world_description.geometry import (
     Cylinder,
     Sphere,
     Shape,
-    FileMesh,
-    TriangleMesh,
     Mesh,
     Color,
 )
@@ -446,15 +448,7 @@ class MeshConverter(ShapeConverter, ABC):
     Converts a Mesh object to a dictionary of mesh properties for Multiverse simulator.
     """
 
-    entity_type: ClassVar[Type[FileMesh]] = FileMesh
-
-
-class TriangleMeshConverter(ShapeConverter, ABC):
-    """
-    Converts a Mesh object to a dictionary of mesh properties for Multiverse simulator.
-    """
-
-    entity_type: ClassVar[Type[TriangleMesh]] = TriangleMesh
+    entity_type: ClassVar[Type[Mesh]] = Mesh
 
 
 class ConnectionConverter(EntityConverter, ABC):
@@ -663,7 +657,7 @@ class MujocoEntityNotFoundError(MujocoError):
 
 
 @dataclass
-class MujocoActuator(SimulatorAdditionalProperty):
+class MujocoActuator(SimulatorAdditionalProperty, SubclassJSONSerializer):
     """
     Represents a MuJoCo-specific actuator in the world model.
     For more information, see: https://mujoco.readthedocs.io/en/stable/XMLreference.html#actuator-general
@@ -750,6 +744,50 @@ class MujocoActuator(SimulatorAdditionalProperty):
     mujoco.mjtGain.mjGAIN_MUSCLE:   gain_term = mju_muscleGain(…)
     mujoco.mjtGain.mjGAIN_USER:     gain_term = mjcb_act_gain(…)
     """
+
+    def to_json(self) -> Dict[str, Any]:
+        """
+        Serializes the MujocoActuator to a JSON-compatible dictionary.
+
+        :return: A dictionary representation of the MujocoActuator.
+        """
+        return {
+            "activation_limited": self.activation_limited,
+            "activation_range": to_json(self.activation_range),
+            "control_limited": self.control_limited,
+            "control_range": to_json(self.control_range),
+            "force_limited": self.force_limited,
+            "force_range": to_json(self.force_range),
+            "bias_parameters": to_json(self.bias_parameters),
+            "bias_type": self.bias_type,
+            "dynamics_parameters": to_json(self.dynamics_parameters),
+            "dynamics_type": self.dynamics_type,
+            "gain_parameters": to_json(self.gain_parameters),
+            "gain_type": self.gain_type,
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        """
+        Deserializes a JSON-compatible dictionary to a MujocoActuator instance.
+
+        :param data: A dictionary representation of a MujocoActuator.
+        :return: A MujocoActuator instance created from the provided data.
+        """
+        return cls(
+            activation_limited=mujoco.mjtLimited(data["activation_limited"]),
+            activation_range=data["activation_range"],
+            control_limited=mujoco.mjtLimited(data["control_limited"]),
+            control_range=data["control_range"],
+            force_limited=mujoco.mjtLimited(data["force_limited"]),
+            force_range=data["force_range"],
+            bias_parameters=data["bias_parameters"],
+            bias_type=mujoco.mjtBias(data["bias_type"]),
+            dynamics_parameters=data["dynamics_parameters"],
+            dynamics_type=mujoco.mjtDyn(data["dynamics_type"]),
+            gain_parameters=data["gain_parameters"],
+            gain_type=mujoco.mjtGain(data["gain_type"]),
+        )
 
 
 @dataclass
@@ -1570,11 +1608,7 @@ class MujocoBuilder(MultiSimBuilder):
         :return: True if the mesh was parsed successfully, False otherwise.
         """
         mesh_entity = geom_props.pop("mesh")
-        if isinstance(mesh_entity, TriangleMesh):
-            mesh_name = os.path.basename(mesh_entity.file.name)
-            mesh_file_path = os.path.join(self.asset_folder_path, f"{mesh_name}.obj")
-            shutil.move(mesh_entity.file.name, mesh_file_path)
-        elif isinstance(mesh_entity, FileMesh):
+        if isinstance(mesh_entity, Mesh):
             mesh_file_path = mesh_entity.filename
         else:
             raise NotImplementedError(

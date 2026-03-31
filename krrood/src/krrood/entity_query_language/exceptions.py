@@ -644,7 +644,9 @@ class CalledMatchMultipleTimes(DataclassException):
 
 
 @dataclass
-class UnderspecifiedStatementInfeasibleForEQLGeneration(DataclassException):
+class UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
+    DataclassException
+):
     attribute_match: AttributeMatch
 
     def __post_init__(self):
@@ -656,3 +658,25 @@ class UnderspecifiedStatementInfeasibleForEQLGeneration(DataclassException):
             f"Got {self.attribute_match.name_from_variable_access_path} = {self.attribute_match.assigned_variable._type_}."
         )
         super().__post_init__()
+
+
+@dataclass
+class MatchTypeCannotBeDetermined(DataclassException):
+    """
+    Raised when a match fails at inferring its type.
+    """
+
+    match: Match
+    """
+    The match that failed to infer its type.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Match type cannot be determined for {self.match}. "
+            f"Tried to infer the type from {self.match.factory}."
+            f"The factory given to the match must ether be a classmethod the returns its class or a "
+            f"method where the return type is a class which has been concretely imported (not via "
+            f"TYPE_CHECKING). If that is not an option for you, set the `target_type` of the "
+            f"`underspecified` method."
+        )

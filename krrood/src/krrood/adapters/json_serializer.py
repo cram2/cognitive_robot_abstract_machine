@@ -22,9 +22,13 @@ from krrood.adapters.exceptions import (
     JSON_TYPE_NAME,
 )
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
-from krrood.ormatic.dao import HasGeneric
+from krrood.ormatic.data_access_objects.base import HasGeneric
 from krrood.singleton import SingletonMeta
-from krrood.utils import get_full_class_name, recursive_subclasses, inheritance_path_length
+from krrood.utils import (
+    get_full_class_name,
+    recursive_subclasses,
+    inheritance_path_length,
+)
 
 list_like_classes = (
     list,
@@ -508,3 +512,16 @@ class DataclassJSONSerializer(ExternalClassJSONSerializer[None]):
                 current_result = from_json(current_data, **kwargs)
             init_args[k] = current_result
         return clazz(**init_args)
+
+
+@dataclass
+class NumpyFloatJSONSerializer(ExternalClassJSONSerializer[np.float32]):
+    """External JSON serializer for numpy floats."""
+
+    @classmethod
+    def to_json(cls, obj: np.float32) -> Dict[str, Any]:
+        return {JSON_TYPE_NAME: get_full_class_name(type(obj)), "value": float(obj)}
+
+    @classmethod
+    def from_json(cls, data: Dict[str, Any], clazz: Type, **kwargs) -> Self:
+        return float(data["value"])

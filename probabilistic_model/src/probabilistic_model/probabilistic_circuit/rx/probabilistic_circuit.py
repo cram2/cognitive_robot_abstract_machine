@@ -1,4 +1,5 @@
 from __future__ import annotations
+import numpy.typing as npt
 
 import copy
 import itertools
@@ -28,7 +29,7 @@ from typing_extensions import (
     Union,
 )
 
-from probabilistic_model.distributions import (
+from probabilistic_model.distributions.distributions import (
     UnivariateDistribution,
     IntegerDistribution,
     SymbolicDistribution,
@@ -36,12 +37,7 @@ from probabilistic_model.distributions import (
     ContinuousDistribution,
 )
 from probabilistic_model.distributions.helper import make_dirac
-from probabilistic_model.error import IntractableError
-from probabilistic_model.interfaces.drawio.drawio import (
-    DrawIOInterface,
-    circled_product,
-    circled_sum,
-)
+from probabilistic_model.exceptions import IntractableError
 from probabilistic_model.probabilistic_model import (
     ProbabilisticModel,
     OrderType,
@@ -52,7 +48,7 @@ from probabilistic_model.utils import MissingDict
 from random_events.interval import SimpleInterval, Interval
 from random_events.product_algebra import VariableMap, SimpleEvent, Event
 from random_events.set import Set
-from random_events.utils import SubclassJSONSerializer
+from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from random_events.variable import Variable, Symbolic, Continuous, Integer
 
 
@@ -62,7 +58,7 @@ class PlotAlignment(IntEnum):
 
 
 @dataclass
-class Unit(SubclassJSONSerializer, DrawIOInterface, ABC):
+class Unit(SubclassJSONSerializer, ABC):
     """
     Class for all units of a probabilistic circuit.
 
@@ -233,16 +229,8 @@ class Unit(SubclassJSONSerializer, DrawIOInterface, ABC):
     def moment(self, *args, **kwargs):
         raise NotImplementedError
 
-    @property
-    def drawio_style(self) -> Dict[str, Any]:
-        return {
-            "style": self.drawio_label,
-            "width": 30,
-            "height": 30,
-        }
 
-
-@dataclass
+@dataclass(eq=False)
 class LeafUnit(Unit):
     """
     Class for Leaf units.
@@ -255,19 +243,6 @@ class LeafUnit(Unit):
 
     def __repr__(self):
         return f"leaf({repr(self.distribution)}"
-
-    @property
-    def drawio_label(self):
-        return "ellipse;whiteSpace=wrap;html=1;aspect=fixed;"
-
-    @property
-    def drawio_style(self) -> Dict[str, Any]:
-        return {
-            "style": self.drawio_label,
-            "width": 30,
-            "height": 30,
-            "label": self.distribution.abbreviated_symbol,
-        }
 
     @property
     def variables(self) -> Iterable[Variable]:
@@ -285,11 +260,11 @@ class LeafUnit(Unit):
     def leaves(self) -> List[LeafUnit]:
         return []
 
-    def log_likelihood(self, events: np.array):
+    def log_likelihood(self, events: npt.NDArray):
         self.result_of_current_query = self.distribution.log_likelihood(events)
 
-    def cdf(self, events: np.array):
-        self.result_of_current_query = self.distribution.cdf(events)
+    def cumulative_distribution(self, events: npt.NDArray):
+        self.result_of_current_query = self.distribution.cumulative_distribution_function(events)
 
     def probability_of_simple_event(self, event: SimpleEvent):
         self.result_of_current_query = self.distribution.probability_of_simple_event(
@@ -319,7 +294,7 @@ class LeafUnit(Unit):
                 result[variable_to_index_map[variable]] = moment[variable]
         self.result_of_current_query = result
 
-    def sample(self, samples: np.array, variable_to_index_map: Dict[Variable, int]):
+    def sample(self, samples: npt.NDArray, variable_to_index_map: Dict[Variable, int]):
         """
         Sample from the distribution and write the samples into the samples array.
         :param samples: The array to write the samples into.
@@ -347,12 +322,12 @@ class LeafUnit(Unit):
 
     def to_json(self):
         result = super().to_json()
-        result["distribution"] = self.distribution.to_json()
+        result["distribution"] = to_json(self.distribution)
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any]) -> Self:
-        distribution = SubclassJSONSerializer.from_json(data["distribution"])
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        distribution = from_json(data["distribution"])
         return cls(distribution)
 
     def log_conditional_in_place(self, point: Dict[Variable, Any]):
@@ -367,7 +342,8 @@ class LeafUnit(Unit):
         return self.__class__(distribution=self.distribution.__deepcopy__())
 
 
-class InnerUnit(Unit):
+@dataclass(eq=False)
+class InnerUnit(Unit, ABC):
     """
     Class for inner units
     """
@@ -391,7 +367,7 @@ class InnerUnit(Unit):
         return self
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any]) -> Self:
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls()
 
     def add_subcircuit(self, subcircuit: Unit, log_weight: float = None):
@@ -410,6 +386,7 @@ class InnerUnit(Unit):
         self.probabilistic_circuit.add_edge(self, subcircuit, log_weight)
 
 
+@dataclass(eq=False)
 class SumUnit(InnerUnit):
     _latent_variable: Optional[Symbolic] = None
     """
@@ -427,10 +404,6 @@ class SumUnit(InnerUnit):
     @property
     def representation(self) -> str:
         return "+"
-
-    @property
-    def drawio_label(self) -> str:
-        return circled_sum
 
     @property
     def log_weighted_subcircuits(self) -> List[Tuple[float, Unit]]:
@@ -461,7 +434,7 @@ class SumUnit(InnerUnit):
                 for index, subcircuit in enumerate(self.subcircuits)
             },
         )
-        result = Symbolic(name, Set.from_iterable(subcircuit_enum))
+        result = Symbolic(name=name, domain=Set.from_iterable(subcircuit_enum))
         self._latent_variable = result
         return result
 
@@ -500,13 +473,13 @@ class SumUnit(InnerUnit):
         self.result_of_current_query = support
 
     @property
-    def log_weights(self) -> np.array:
+    def log_weights(self) -> npt.NDArray:
         """
         :return: The log_weights of the subcircuits.
         """
         return np.array([weight for weight, _ in self.log_weighted_subcircuits])
 
-    def sample(self, *args, **kwargs) -> np.array:
+    def sample(self, *args, **kwargs):
         weights, subcircuits = self.log_weights, self.subcircuits
 
         subcircuit_indices = list(range(len(subcircuits)))
@@ -526,11 +499,6 @@ class SumUnit(InnerUnit):
                 count = counts[index]
                 subcircuit.result_of_current_query.append((start_index + total, count))
                 total += count
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any]) -> Self:
-        result = cls()
-        return result
 
     def mount_with_interaction_terms(
         self, other: Self, interaction_model: ProbabilisticModel
@@ -568,7 +536,9 @@ class SumUnit(InnerUnit):
             own_index = own_latent_variable.domain.simple_sets[0].element.__class__(
                 own_index
             )
-            condition = SimpleEvent({own_latent_variable: own_index}).as_composite_set()
+            condition = SimpleEvent.from_data(
+                {own_latent_variable: own_index}
+            ).as_composite_set()
             p_condition = interaction_model.probability(condition)
 
             # skip iterations that are impossible
@@ -599,7 +569,9 @@ class SumUnit(InnerUnit):
                     0
                 ].element.__class__(other_index)
                 query = (
-                    SimpleEvent({other_latent_variable: other_index}).as_composite_set()
+                    SimpleEvent.from_data(
+                        {other_latent_variable: other_index}
+                    ).as_composite_set()
                     & condition
                 )
                 p_query = interaction_model.probability(query)
@@ -677,7 +649,7 @@ class SumUnit(InnerUnit):
                     new_weight = sub_weight + weight
 
                     # add an edge to that subcircuit
-                    self.add_subcircuit(sub_subcircuit, new_weight, mount=False)
+                    self.add_subcircuit(sub_subcircuit, new_weight)
 
                 # remove the old node
                 self.probabilistic_circuit.remove_node(subcircuit)
@@ -727,7 +699,7 @@ class SumUnit(InnerUnit):
             arg_log_max |= event
         self.result_of_current_query = (arg_log_max, log_max)
 
-    def subcircuit_index_of_samples(self, samples: np.array) -> np.array:
+    def subcircuit_index_of_samples(self, samples: npt.NDArray) -> npt.NDArray:
         """
         :return: the index of the subcircuit where p(sample) > 0 and None if p(sample) = 0 for all subcircuits.
         """
@@ -738,6 +710,7 @@ class SumUnit(InnerUnit):
         return result
 
 
+@dataclass(eq=False)
 class ProductUnit(InnerUnit):
     """
     Decomposable Product Units for Probabilistic Circuits
@@ -745,10 +718,6 @@ class ProductUnit(InnerUnit):
 
     representation = "×"
     __hash__ = Unit.__hash__
-
-    @property
-    def drawio_label(self) -> str:
-        return circled_product
 
     def __repr__(self):
         return "⊗"
@@ -1019,7 +988,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         else:
             raise ValueError(f"No root found.")
 
-    def log_likelihood(self, events: np.array) -> np.array:
+    def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
         variable_to_index_map = self.variable_to_index_map
         for layer in reversed(self.layers):
             for unit in layer:  # open all the procesess
@@ -1039,13 +1008,13 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                     unit.log_forward()  # Synch trheads 1
         return self.root.result_of_current_query
 
-    def cdf(self, events: np.array) -> np.array:
+    def cumulative_distribution_function(self, events: npt.NDArray) -> npt.NDArray:
         variable_to_index_map = self.variable_to_index_map
         for layer in reversed(self.layers):
             for unit in layer:
                 unit: LeafUnit
                 if unit.is_leaf:
-                    unit.cdf(
+                    unit.cumulative_distribution(
                         events[
                             :,
                             [
@@ -1073,7 +1042,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
     def log_mode(self, check_determinism: bool = True) -> Tuple[Event, float]:
         if check_determinism:
             if not self.is_deterministic():
-                raise IntractableError("The circuit is not deterministic.")
+                raise IntractableError(self)
         [unit.log_mode() for layer in reversed(self.layers) for unit in layer]
         return self.root.result_of_current_query
 
@@ -1213,7 +1182,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         # clean the circuit up
         root = self.root
         [
-            self.graph.remove_node(node)
+            self.graph.remove_node(node.index)
             for layer in reversed(self.layers)
             for node in layer
             if node.result_of_current_query == -np.inf
@@ -1258,8 +1227,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         result = self.__deepcopy__()
         return result.marginal_in_place(variables)
 
-    def sample(self, amount: int) -> np.array:
-
+    def sample(self, amount: int) -> npt.NDArray:
         # initialize all results
         for node in self.graph.nodes():
             node.result_of_current_query = []
@@ -1379,7 +1347,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         # get super result
         result = super().to_json()
 
-        index_to_node_map = {node.index: node.to_json() for node in self.nodes()}
+        index_to_node_map = {node.index: to_json(node) for node in self.nodes()}
         edges = [
             (parent.index, child.index, data) for parent, child, data in self.edges()
         ]
@@ -1394,12 +1362,12 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         return cls()
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any]) -> Self:
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         result = cls.parameters_from_json(data)
         hash_remap: Dict[int, Unit] = dict()
 
         for index, node_data in data["index_to_node_map"].items():
-            node = Unit.from_json(node_data)
+            node = from_json(node_data)
             hash_remap[int(index)] = node
             result.add_node(node)
 
@@ -1461,7 +1429,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         :param node: The root of the subgraph.
         :return: The subgraph.
         """
-        nodes_to_keep = list(nx.descendants(self.graph, node)) + [node]
+        nodes_to_keep = list(rx.descendants(self.graph, node)) + [node]
         result = self.__class__()
         result.graph = self.graph.subgraph(nodes_to_keep)
         return result
@@ -1480,7 +1448,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                 node_colors[node] = "black"
         return node_colors
 
-    def bfs_layout(
+    def breadth_first_search_layout(
         self, scale: float = 1.0, align: PlotAlignment = PlotAlignment.VERTICAL
     ) -> Dict[int, np.array]:
         """
@@ -1490,33 +1458,33 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         """
         layers = self.layers
 
-        pos = None
+        position = None
         nodes = []
         width = len(layers)
-        for i, layer in enumerate(layers):
+        for index, layer in enumerate(layers):
             height = len(layer)
-            xs = np.repeat(i, height)
+            xs = np.repeat(index, height)
             ys = np.arange(0, height, dtype=float)
             offset = ((width - 1) / 2, (height - 1) / 2)
-            layer_pos = np.column_stack([xs, ys]) - offset
-            if pos is None:
-                pos = layer_pos
+            layer_position = np.column_stack([xs, ys]) - offset
+            if position is None:
+                position = layer_position
             else:
-                pos = np.concatenate([pos, layer_pos])
+                position = np.concatenate([position, layer_position])
             nodes.extend(layer)
 
         # Find max length over all dimensions
-        pos -= pos.mean(axis=0)
-        lim = np.abs(pos).max()  # max coordinate for all axes
+        position -= position.mean(axis=0)
+        lim = np.abs(position).max()  # max coordinate for all axes
         # rescale to (-scale, scale) in all directions, preserves aspect
         if lim > 0:
-            pos *= scale / lim
+            position *= scale / lim
 
         if align == PlotAlignment.HORIZONTAL:
-            pos = pos[:, ::-1]  # swap x and y coords
+            position = position[:, ::-1]  # swap x and y coords
 
-        pos = dict(zip([node.index for node in nodes], pos))
-        return pos
+        position = dict(zip([node.index for node in nodes], position))
+        return position
 
     def plot_structure(
         self,
@@ -1546,7 +1514,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         layers = self.layers
 
         # get the positions of the nodes
-        positions = self.bfs_layout(scale=scale, align=PlotAlignment.VERTICAL)
+        positions = self.breadth_first_search_layout(scale=scale, align=PlotAlignment.VERTICAL)
         position_for_variable_name = {
             node: (x + variable_name_offset, y) for node, (x, y) in positions.items()
         }
@@ -1622,15 +1590,15 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                     self.graph.remove_edge(predecessor, leaf)
                 self.graph.remove_node(leaf)
 
-    def translate(self, translation: Dict[Variable, float]):
+    def apply_translation(self, translation: Dict[Variable, float]):
         for leaf in self.leaves:
             if any(v.is_numeric for v in leaf.variables):
-                leaf.distribution.translate(translation)
+                leaf.distribution.apply_translation(translation)
 
-    def scale(self, scale: Dict[Variable, float]):
+    def apply_scaling(self, scale: Dict[Variable, float]):
         for leaf in self.leaves:
             if any(v.is_numeric for v in leaf.variables):
-                leaf.distribution.scale(scale)
+                leaf.distribution.apply_scaling(scale)
 
     def mount(self, other: Unit) -> Dict[int, Unit]:
         """
@@ -1936,7 +1904,8 @@ class UnivariateDiscreteLeaf(UnivariateLeaf):
             result.add_subcircuit(
                 leaf(
                     self.distribution.__class__(
-                        self.variable, MissingDict(float, {element: 1.0})
+                        variable=self.variable,
+                        probabilities=MissingDict(float, {element: 1.0}),
                     ),
                     self.probabilistic_circuit,
                 ),
@@ -1962,7 +1931,7 @@ class UnivariateDiscreteLeaf(UnivariateLeaf):
 
         for element in mixture.support.simple_sets[0][variable].simple_sets:
             probability = mixture.probability_of_simple_event(
-                SimpleEvent({variable: element})
+                SimpleEvent.from_data({variable: element})
             )
             if isinstance(element, SimpleInterval):
                 element = element.lower
@@ -1973,7 +1942,9 @@ class UnivariateDiscreteLeaf(UnivariateLeaf):
             if isinstance(variable, Integer)
             else SymbolicDistribution
         )
-        distribution = distribution_class(variable, probabilities)
+        distribution = distribution_class(
+            variable=variable, probabilities=probabilities
+        )
         return cls(distribution)
 
 

@@ -7,16 +7,14 @@ from jax.experimental.sparse import BCOO, BCSR
 from random_events.interval import SimpleInterval
 from scipy.sparse import coo_array
 
-from probabilistic_model.probabilistic_circuit.jax import (
-    create_bcsr_indices_from_row_lengths,
-    shrink_index_array,
-    sparse_remove_rows_and_cols_where_all,
-)
 from probabilistic_model.probabilistic_circuit.jax.utils import (
     copy_bcoo,
     simple_interval_to_open_array,
     create_bcoo_indices_from_row_lengths,
     sample_from_sparse_probabilities_csc,
+    create_bcsr_indices_from_row_lengths,
+    shrink_index_array,
+    sparse_remove_rows_and_cols_where_all,
 )
 
 
@@ -78,7 +76,7 @@ class BCOOTestCase(unittest.TestCase):
 class IntervalConversionTestCase(unittest.TestCase):
 
     def simple_interval_to_open_array(self):
-        simple_interval = SimpleInterval(0, 1)
+        simple_interval = SimpleInterval.from_data(0, 1)
         array = simple_interval_to_open_array(simple_interval)
         self.assertTrue(jnp.allclose(array, jnp.array([0, 1])))
 

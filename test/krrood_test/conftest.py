@@ -4,7 +4,7 @@ import traceback
 from dataclasses import is_dataclass
 
 import pytest
-from sqlalchemy.orm import Session, configure_mappers, sessionmaker
+from sqlalchemy.orm import configure_mappers, sessionmaker
 
 import krrood.entity_query_language.orm.model
 import krrood.symbol_graph.symbol_graph
@@ -13,22 +13,27 @@ from krrood.entity_query_language.predicate import (
     HasTypes,
     HasType,
 )
-from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
-from krrood.ormatic.alternative_mappings import *  # type: ignore
+from krrood.symbol_graph.symbol_graph import SymbolGraph
+from krrood.ormatic.data_access_objects.alternative_mappings import *  # type: ignore
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_module, create_engine
 from krrood.ormatic.utils import drop_database
 from krrood.utils import recursive_subclasses
-from .dataset import example_classes, semantic_world_like_classes
+from .dataset import (
+    example_classes,
+    semantic_world_like_classes,
+    alternative_mappings_construction_order,
+)
 from .dataset.example_classes import (
-    PhysicalObject,
+    KRROODPhysicalObject,
     NotMappedParent,
     ChildNotMapped,
     ConceptType,
     JSONSerializableClass,
 )
 from .dataset.semantic_world_like_classes import *
+
 from .test_eql.conf.world.doors_and_drawers import DoorsAndDrawersWorld
 from .test_eql.conf.world.handles_and_containers import (
     HandlesAndContainersWorld,
@@ -56,6 +61,7 @@ def generate_sqlalchemy_interface():
     all_classes |= set(classes_of_module(krrood.symbol_graph.symbol_graph))
     all_classes |= set(classes_of_module(example_classes))
     all_classes |= set(classes_of_module(semantic_world_like_classes))
+    all_classes |= set(classes_of_module(alternative_mappings_construction_order))
     all_classes |= {Symbol}
 
     # remove classes that don't need persistence
@@ -80,7 +86,7 @@ def generate_sqlalchemy_interface():
         class_dependency_graph=class_diagram,
         type_mappings=TypeDict(
             {
-                PhysicalObject: ConceptType,
+                KRROODPhysicalObject: ConceptType,
             }
         ),
         alternative_mappings=recursive_subclasses(AlternativeMapping),

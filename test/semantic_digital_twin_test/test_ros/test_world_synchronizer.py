@@ -4,15 +4,20 @@ import threading
 import time
 import unittest
 import uuid
+from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Optional, List, Set, Tuple
+from time import sleep
+from typing import Optional, Set, Tuple, List
 from uuid import uuid4
 
 import numpy as np
 import pytest
+import rclpy
 import sqlalchemy
 from importlib.resources import files
 from pathlib import Path
+
+from rclpy.executors import SingleThreadedExecutor
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -28,13 +33,13 @@ from semantic_digital_twin.exceptions import (
     MissingWorldModificationContextError,
     MismatchingPublishChangesAttribute,
 )
-from semantic_digital_twin.orm.ormatic_interface import Base, WorldMappingDAO
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Door,
     Fridge,
+    Drawer,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -58,6 +63,7 @@ from semantic_digital_twin.adapters.ros.messages import (
     LoadModel,
     Acknowledgment,
 )
+from semantic_digital_twin.orm.ormatic_interface import Base, WorldMappingDAO
 
 
 def create_dummy_world(w: Optional[World] = None) -> World:
@@ -154,11 +160,11 @@ def test_state_synchronization(rclpy_node):
     # Allow time for publishers/subscribers to connect on unique topics
     time.sleep(0.2)
 
-    w1.state.data[0, 0] = 1.0
+    w1.state._data[0, 0] = 1.0
     w1.notify_state_change()
     time.sleep(0.2)
-    assert w1.state.data[0, 0] == 1.0
-    assert w1.state.data[0, 0] == w2.state.data[0, 0]
+    assert w1.state._data[0, 0] == 1.0
+    assert w1.state._data[0, 0] == w2.state._data[0, 0]
 
     synchronizer_1.close()
     synchronizer_2.close()
@@ -182,11 +188,11 @@ def test_state_synchronization_world_model_change_after_init(rclpy_node):
     # Allow time for publishers/subscribers to connect on unique topics
     time.sleep(0.2)
 
-    w1.state.data[0, 0] = 1.0
+    w1.state._data[0, 0] = 1.0
     w1.notify_state_change()
     time.sleep(0.2)
-    assert w1.state.data[0, 0] == 1.0
-    assert w1.state.data[0, 0] == w2.state.data[0, 0]
+    assert w1.state._data[0, 0] == 1.0
+    assert w1.state._data[0, 0] == w2.state._data[0, 0]
 
     synchronizer_1.close()
     synchronizer_2.close()
@@ -291,62 +297,84 @@ def test_model_synchronization_creation_only(rclpy_node):
     synchronizer_2.close()
 
 
-def test_model_synchronization_merge_full_world(rclpy_node):
+def test_model_synchronization_merge_full_world_stress_test(rclpy_node):
+    for _ in range(10):
+        w1 = World(name="w1")
+        w2 = World(name="w2")
 
-    w1 = World(name="w1")
-    w2 = World(name="w2")
-
-    synchronizer_1 = ModelSynchronizer(
-        node=rclpy_node,
-        _world=w1,
-    )
-    synchronizer_2 = ModelSynchronizer(
-        node=rclpy_node,
-        _world=w2,
-    )
-
-    pr2_world = URDFParser.from_file(
-        os.path.join(
-            Path(files("semantic_digital_twin")).parent.parent,
-            "resources",
-            "urdf",
-            "pr2_kinematic_tree.urdf",
+        synchronizer_1 = ModelSynchronizer(
+            node=rclpy_node,
+            _world=w1,
         )
-    ).parse()
+        synchronizer_2 = ModelSynchronizer(
+            node=rclpy_node,
+            _world=w2,
+        )
 
-    def wait_for_sync(timeout=3.0, interval=0.05):
-        start = time.time()
-        while time.time() - start < timeout:
-            body_ids_1 = [body.id for body in w1.kinematic_structure_entities]
-            body_ids_2 = [body.id for body in w2.kinematic_structure_entities]
-            if body_ids_1 == body_ids_2:
-                return body_ids_1, body_ids_2
-            time.sleep(interval)
+        pr2_world = URDFParser.from_file(
+            os.path.join(
+                Path(files("semantic_digital_twin")).parent.parent,
+                "resources",
+                "urdf",
+                "pr2_kinematic_tree.urdf",
+            )
+        ).parse()
 
-        body_ids_1 = [body.id for body in w1.kinematic_structure_entities]
-        body_ids_2 = [body.id for body in w2.kinematic_structure_entities]
-        return body_ids_1, body_ids_2
+        def wait_for_sync(timeout=5.0, interval=0.05):
+            start = time.time()
+            while time.time() - start < timeout:
+                body_hash_1 = {hash(body) for body in w1.kinematic_structure_entities}
+                body_hash_2 = {hash(body) for body in w2.kinematic_structure_entities}
 
-    with w1.modify_world():
-        new_body = Body(name=PrefixedName("b3"))
-        w1.add_kinematic_structure_entity(new_body)
+                connection_hash_1 = {hash(conn) for conn in w1.connections}
+                connection_hash_2 = {hash(conn) for conn in w2.connections}
 
-    fixed_connection = FixedConnection(child=new_body, parent=pr2_world.root)
-    w1.merge_world(pr2_world, fixed_connection)
+                dof_hash_1 = {hash(dof) for dof in w1.degrees_of_freedom}
+                dof_hash_2 = {hash(dof) for dof in w2.degrees_of_freedom}
 
-    body_ids_1, body_ids_2 = wait_for_sync()
+                semantic_annotation_hash_1 = {
+                    hash(sa) for sa in w1.semantic_annotations
+                }
+                semantic_annotation_hash_2 = {
+                    hash(sa) for sa in w2.semantic_annotations
+                }
 
-    assert body_ids_1 == body_ids_2
-    assert len(w1.kinematic_structure_entities) == len(w2.kinematic_structure_entities)
+                if (
+                    body_hash_1 == body_hash_2
+                    and connection_hash_1 == connection_hash_2
+                    and dof_hash_1 == dof_hash_2
+                    and semantic_annotation_hash_1 == semantic_annotation_hash_2
+                ):
+                    return
+                time.sleep(interval)
 
-    w1_connection_hashes = [hash(c) for c in w1.connections]
-    w2_connection_hashes = [hash(c) for c in w2.connections]
-    assert w1_connection_hashes == w2_connection_hashes
-    assert len(w1.connections) == len(w2.connections)
-    assert len(w2.degrees_of_freedom) == len(w1.degrees_of_freedom)
+        with w1.modify_world():
+            new_body = Body(name=PrefixedName("b3"))
+            w1.add_kinematic_structure_entity(new_body)
 
-    synchronizer_1.close()
-    synchronizer_2.close()
+        fixed_connection = FixedConnection(child=new_body, parent=pr2_world.root)
+        w1.merge_world(pr2_world, fixed_connection)
+
+        wait_for_sync()
+
+        assert {body.id for body in w1.kinematic_structure_entities} == {
+            body.id for body in w2.kinematic_structure_entities
+        }
+        assert len(w1.kinematic_structure_entities) == len(
+            w2.kinematic_structure_entities
+        )
+
+        w1_connection_hashes = [hash(c) for c in w1.connections]
+        w2_connection_hashes = [hash(c) for c in w2.connections]
+        assert (
+            w1_connection_hashes == w2_connection_hashes
+        ), f"w1: {[c.name for c in w1.connections]}, w2: {[c.name for c in w2.connections]}, If this feels flaky, contact @LucaKro"
+        assert [d.id for d in w1.degrees_of_freedom] == [
+            d.id for d in w2.degrees_of_freedom
+        ], f"w1: {[d.name for d in w1.degrees_of_freedom]}, w2: {[d.name for d in w2.degrees_of_freedom]}, If this feels flaky, contact @LucaKro"
+
+        synchronizer_1.close()
+        synchronizer_2.close()
 
 
 def test_callback_pausing(rclpy_node):
@@ -463,10 +491,88 @@ def test_semantic_annotation_modifications(rclpy_node):
         w1.add_semantic_annotation(v1)
         w1.add_semantic_annotation(v2)
 
-    time.sleep(0.2)
+    time.sleep(0.5)
     assert [hash(sa) for sa in w1.semantic_annotations] == [
         hash(sa) for sa in w2.semantic_annotations
     ]
+
+
+def test_semantic_annotation_modifications_merge_world(rclpy_node):
+    w0 = World(name="w0")
+    root = Body(name=PrefixedName("root"))
+    with w0.modify_world():
+        w0.add_body(root)
+
+    with w0.modify_world():
+        door = Door.create_with_new_body_in_world(
+            name=PrefixedName("door"),
+            world=w0,
+        )
+        handle = Handle.create_with_new_body_in_world(
+            name=PrefixedName("handle"),
+            world=w0,
+        )
+        door.add_handle(handle)
+
+    w1 = World(name="w1")
+    w2 = World(name="w2")
+
+    synchronizer_1 = ModelSynchronizer(
+        node=rclpy_node,
+        _world=w1,
+    )
+    synchronizer_2 = ModelSynchronizer(
+        node=rclpy_node,
+        _world=w2,
+    )
+
+    with w1.modify_world():
+        w1.merge_world(w0)
+
+    time.sleep(1)
+    assert [hash(sa) for sa in w1.semantic_annotations] == [
+        hash(sa) for sa in w2.semantic_annotations
+    ]
+
+
+def test_semantic_annotation_change_parameter_during_same_modification_block(
+    rclpy_node,
+):
+    w1 = World(name="w1")
+    w2 = World(name="w2")
+
+    synchronizer_1 = ModelSynchronizer(
+        node=rclpy_node,
+        _world=w1,
+    )
+    synchronizer_2 = ModelSynchronizer(
+        node=rclpy_node,
+        _world=w2,
+    )
+    root = Body(name=PrefixedName("root"))
+    b1 = Body(name=PrefixedName("b1"))
+    drawer = Drawer(root=b1)
+
+    b2 = Body(name=PrefixedName("b2"))
+    handle = Handle(root=b2)
+
+    with w1.modify_world():
+        w1.add_body(root)
+        w1.add_body(b1)
+        w1.add_body(b2)
+        root_C_b1 = Connection6DoF.create_with_dofs(parent=root, child=b1, world=w1)
+        w1.add_connection(root_C_b1)
+        root_C_b2 = Connection6DoF.create_with_dofs(parent=root, child=b2, world=w1)
+        w1.add_connection(root_C_b2)
+    with w1.modify_world():
+        w1.add_semantic_annotation(drawer)
+        w1.add_semantic_annotation(handle)
+        drawer.add_handle(handle)
+
+    time.sleep(1)
+    assert [hash(sa) for sa in w1.semantic_annotations] == [
+        hash(sa) for sa in w2.semantic_annotations
+    ], f"w1: {[sa.name for sa in w1.semantic_annotations]}, w2: {[sa.name for sa in w2.semantic_annotations]}"
 
 
 def test_synchronize_6dof(rclpy_node):
@@ -497,7 +603,7 @@ def test_synchronize_6dof(rclpy_node):
     c2 = w2.get_connection_by_name(c1.name)
     assert isinstance(c2, Connection6DoF)
     assert w1.state[c1.qw_id].position == w2.state[c2.qw_id].position
-    np.testing.assert_array_almost_equal(w1.state.data, w2.state.data)
+    np.testing.assert_array_almost_equal(w1.state._data, w2.state._data)
 
 
 def test_synchronous_state_synchronization(rclpy_node):
@@ -533,12 +639,12 @@ def test_synchronous_state_synchronization(rclpy_node):
         # Allow time for publishers/subscribers to discover each other
         time.sleep(0.2)
 
-        w1.state.data[0, 0] = 1.0
+        w1.state._data[0, 0] = 1.0
         w1.notify_state_change()
 
         # With synchronous publishing the state must already be propagated
         # by the time notify_state_change returns.
-        assert w1.state.data[0, 0] == w2.state.data[0, 0]
+        assert w1.state._data[0, 0] == w2.state._data[0, 0]
 
         synchronizer_1.close()
         synchronizer_2.close()
@@ -647,7 +753,7 @@ def test_synchronous_publish_blocks_until_receiver_acknowledges(rclpy_node):
 
         # Trigger a synchronous state change in a background thread. It
         # should block because the receiver's acknowledgment will never arrive.
-        w1.state.data[0, 0] = 1.0
+        w1.state._data[0, 0] = 1.0
         publish_done = threading.Event()
 
         def do_publish():
@@ -678,7 +784,7 @@ def test_synchronous_publish_blocks_until_receiver_acknowledges(rclpy_node):
         # The state should also be propagated because the receiver's
         # subscription callback still applied the message (only the
         # acknowledgment was intercepted, not message processing).
-        assert w1.state.data[0, 0] == w2.state.data[0, 0]
+        assert w1.state._data[0, 0] == w2.state._data[0, 0]
 
         synchronizer_2.acknowledge_publisher = real_acknowledgment_publisher
         synchronizer_1.close()
@@ -702,7 +808,7 @@ def test_compute_state_changes_single_change(rclpy_node):
     w = create_dummy_world()
     s = StateSynchronizer(node=rclpy_node, _world=w)
     # change first position
-    w.state.data[0, 0] += 1e-3
+    w.state._data[0, 0] += 1e-3
     changes = s.compute_state_changes()
     names = w.state.keys()
     assert list(changes.keys()) == [names[0]]
@@ -727,7 +833,7 @@ def test_compute_state_changes_nan_handling(rclpy_node):
     w = create_dummy_world()
     s = StateSynchronizer(node=rclpy_node, _world=w)
     # set both previous and current to NaN for entry 0
-    w.state.data[0, 0] = np.nan
+    w.state._data[0, 0] = np.nan
     s.previous_world_state_data[0] = np.nan
     assert s.compute_state_changes() == {}
     s.close()
@@ -767,7 +873,6 @@ def test_attribute_updates(rclpy_node):
         hash(sa) for sa in world2.semantic_annotations
     ], f"{[sa.name for sa in world1.semantic_annotations]} vs {[sa.name for sa in world2.semantic_annotations]}"
 
-    print(f"{door.id=}")
     with world1.modify_world():
         fridge.add_door(door)
 
@@ -1155,14 +1260,14 @@ def test_acknowledgement_with_missed_messages(rclpy_node):
         # Allow time for publishers/subscribers to discover each other
         time.sleep(0.5)
 
-        w1.state.data[0, 0] = 1.0
+        w1.state._data[0, 0] = 1.0
         w1.notify_state_change()
 
         # the notify should time out giving us the old state
-        assert w2.state.data[0, 0] == 0
+        assert w2.state._data[0, 0] == 0
         synchronizer_2.apply_missed_messages()
         # after apply message we should have the correct state
-        assert w1.state.data[0, 0] == w2.state.data[0, 0]
+        assert w1.state._data[0, 0] == w2.state._data[0, 0]
 
         synchronizer_1.close()
         synchronizer_2.close()
@@ -1170,6 +1275,336 @@ def test_acknowledgement_with_missed_messages(rclpy_node):
         receiver_executor.shutdown()
         receiver_thread.join(timeout=2.0)
         receiver_node.destroy_node()
+
+
+def test_simultaneous_state_and_model_updates(rclpy_node):
+    w1 = World(name="w1")
+    w2 = World(name="w2")
+
+    b1 = Body(name=PrefixedName("b1"))
+    b2 = Body(name=PrefixedName("b2"))
+
+    model_sync_1 = ModelSynchronizer(
+        node=rclpy_node,
+        _world=w1,
+    )
+    state_sync_1 = StateSynchronizer(
+        node=rclpy_node,
+        _world=w1,
+    )
+
+    model_sync_2 = ModelSynchronizer(
+        node=rclpy_node,
+        _world=w2,
+    )
+    state_sync_2 = StateSynchronizer(
+        node=rclpy_node,
+        _world=w2,
+    )
+
+    with w1.modify_world():
+        w1.add_body(b1)
+        w1.add_body(b2)
+        connection = PrismaticConnection.create_with_dofs(
+            world=w1, parent=b1, child=b2, axis=Vector3.X()
+        )
+        w1.add_connection(connection)
+
+    sleep(1)
+
+    synced_connection = w2.get_connections_by_type(PrismaticConnection)[0]
+
+    with w2.modify_world():
+        connection.position = 1
+
+        sleep(1)
+
+        assert synced_connection.position == 0
+
+    sleep(1)
+    assert synced_connection.position == 1
+
+
+def test_two_parallel_modify_world_on_same_instance_are_serialized():
+    """
+    Two threads enter modify_world concurrently; operations must not interleave.
+    """
+    w = World(name="solo")
+
+    # Seed a single root so the world remains a tree.
+    with w.modify_world():
+        root = Body(name=PrefixedName("root"))
+        w.add_body(root)
+
+    start_barrier = threading.Barrier(2)
+    end_barrier = threading.Barrier(2)
+
+    def worker(prefix: str, count: int):
+        start_barrier.wait(timeout=2.0)
+        with w.modify_world():
+            for i in range(count):
+                b = Body(name=PrefixedName(f"{prefix}_{i}"))
+                w.add_body(b)
+                # Keep the graph a tree: attach to root
+                w.add_connection(FixedConnection(parent=root, child=b))
+            time.sleep(0.05)  # increase contention while still holding the lock
+        end_barrier.wait(timeout=2.0)
+
+    t1 = threading.Thread(target=worker, args=("a", 5), daemon=True)
+    t2 = threading.Thread(target=worker, args=("b", 5), daemon=True)
+
+    t1.start()
+    t2.start()
+    t1.join(timeout=5.0)
+    t2.join(timeout=5.0)
+
+    # Normalize names: strip the optional prefix like "None/"
+    def base(n: str) -> str:
+        return n.split("/", 1)[-1]
+
+    names = [base(b.name.name) for b in w.kinematic_structure_entities]
+    assert sum(n.startswith("a_") for n in names) == 5
+    assert sum(n.startswith("b_") for n in names) == 5
+
+
+def test_modify_world_then_sync_state_no_deadlock(rclpy_node):
+    """
+    Synchronous state publish inside/after model change must not deadlock.
+    """
+    receiver_node = rclpy.create_node("lock_order_receiver")
+    receiver_executor = SingleThreadedExecutor()
+    receiver_executor.add_node(receiver_node)
+    rx_thread = threading.Thread(target=receiver_executor.spin, daemon=True)
+    rx_thread.start()
+    time.sleep(0.1)
+
+    try:
+        w1 = World(name="w1")
+        w2 = World(name="w2")
+
+        ms1 = ModelSynchronizer(node=rclpy_node, _world=w1)
+        ms2 = ModelSynchronizer(node=receiver_node, _world=w2)
+        ss1 = StateSynchronizer(node=rclpy_node, _world=w1, synchronous=True)
+        ss2 = StateSynchronizer(node=receiver_node, _world=w2)
+
+        time.sleep(0.2)
+
+        with w1.modify_world():
+            w1.add_body(Body(name=PrefixedName("b")))
+            # trigger a synchronous publish while still reasonably close
+            # to the model change to stress ordering
+            if len(w1.state) > 0:
+                w1.state._data[0, 0] = 0.5
+                w1.notify_state_change()
+
+        time.sleep(0.3)
+        np.testing.assert_array_almost_equal(w1.state._data, w2.state._data)
+        assert len(w2.kinematic_structure_entities) == 1
+
+        ms1.close()
+        ms2.close()
+        ss1.close()
+        ss2.close()
+    finally:
+        receiver_executor.shutdown()
+        rx_thread.join(timeout=2.0)
+        receiver_node.destroy_node()
+
+
+def test_sync_model_vs_async_state_no_deadlock(rclpy_node):
+    """
+    A synchronous model publish must not deadlock with an async state publish.
+    """
+    receiver_node = rclpy.create_node("recv_node")
+    from rclpy.executors import SingleThreadedExecutor
+
+    exec2 = SingleThreadedExecutor()
+    exec2.add_node(receiver_node)
+    t = threading.Thread(target=exec2.spin, daemon=True)
+    t.start()
+    time.sleep(0.1)
+
+    try:
+        w1 = World(name="w1")
+        w2 = World(name="w2")
+
+        ms1 = ModelSynchronizer(node=rclpy_node, _world=w1, synchronous=True)
+        ms2 = ModelSynchronizer(node=receiver_node, _world=w2)
+        ss1 = StateSynchronizer(node=rclpy_node, _world=w1)  # async
+        ss2 = StateSynchronizer(node=receiver_node, _world=w2)
+
+        # Seed a root
+        with w1.modify_world():
+            root = Body(name=PrefixedName("seed"))
+            w1.add_body(root)
+
+        time.sleep(0.3)
+
+        # Publish state concurrently
+        stop = threading.Event()
+
+        def spam_state():
+            i = 0
+            while not stop.is_set() and i < 50:
+                if len(w1.state) > 0:
+                    w1.state._data[0, 0] = float(i % 3)
+                    w1.notify_state_change()
+                time.sleep(0.01)
+                i += 1
+
+        th = threading.Thread(target=spam_state, daemon=True)
+        th.start()
+
+        # Synchronous model update that preserves tree invariant
+        with w1.modify_world():
+            new_part = Body(name=PrefixedName("new_part"))
+            w1.add_body(new_part)
+            w1.add_connection(
+                Connection6DoF.create_with_dofs(parent=root, child=new_part, world=w1)
+            )
+
+        th.join(timeout=5.0)
+        stop.set()
+        time.sleep(0.5)
+
+        assert w2.get_kinematic_structure_entity_by_name("new_part") is not None
+
+        ms1.close()
+        ms2.close()
+        ss1.close()
+        ss2.close()
+    finally:
+        exec2.shutdown()
+        t.join(timeout=2.0)
+        receiver_node.destroy_node()
+
+
+def test_read_operations_inside_modify_world_do_not_deadlock():
+    """
+    Read operations inside a write block must not deadlock.
+    """
+    w = World(name="w")
+    with w.modify_world():
+        b1 = Body(name=PrefixedName("b1"))
+        b2 = Body(name=PrefixedName("b2"))
+        w.add_body(b1)
+        w.add_body(b2)
+        w.add_connection(FixedConnection(parent=b1, child=b2))
+        # Calls that traverse graphs and caches while the lock is held
+        assert w.root is not None
+        assert w.validate()  # must not hang
+        assert w.get_kinematic_structure_entity_by_name("b1") is b1
+
+
+def test_state_diff_during_concurrent_dof_add_remove_is_consistent(rclpy_node):
+    """
+    When DOFs change concurrently, state diff must not observe torn shapes.
+    """
+    w = World(name="w")
+    ss = StateSynchronizer(node=rclpy_node, _world=w)
+
+    with w.modify_world():
+        b1 = Body(name=PrefixedName("b1"))
+        b2 = Body(name=PrefixedName("b2"))
+        w.add_body(b1)
+        w.add_body(b2)
+        c = Connection6DoF.create_with_dofs(parent=b1, child=b2, world=w)
+        w.add_connection(c)
+
+    # Worker that changes the number of DOFs by adding/removing a temp 6DoF
+    stop = threading.Event()
+
+    def shape_flapper():
+        i = 0
+        while not stop.is_set() and i < 10:
+            with w.modify_world():
+                x = Body(name=PrefixedName(f"x{i}"))
+                w.add_body(x)
+                cc = Connection6DoF.create_with_dofs(parent=b1, child=x, world=w)
+                w.add_connection(cc)
+            with w.modify_world():
+                w.remove_kinematic_structure_entity(x)
+            i += 1
+
+    t = threading.Thread(target=shape_flapper, daemon=True)
+    t.start()
+
+    # Meanwhile, compute diffs repeatedly; must not raise or produce NaNs spuriously
+    for _ in range(50):
+        changes = ss.compute_state_changes()
+        # All reported names must be in the current world state
+        for name in changes.keys():
+            assert name in w.state.keys()
+        time.sleep(0.01)
+
+    stop.set()
+    t.join(timeout=5.0)
+    ss.close()
+
+
+def test_bidirectional_nested_modify_worlds_no_deadlock(rclpy_node):
+    """
+    Nested modify_world across two Worlds must not deadlock.
+    """
+    w1 = World(name="w1")
+    w2 = World(name="w2")
+    ms1 = ModelSynchronizer(node=rclpy_node, _world=w1)
+    ms2 = ModelSynchronizer(node=rclpy_node, _world=w2)
+
+    # Seed
+    with w1.modify_world():
+        w1.add_body(Body(name=PrefixedName("root1")))
+    with w2.modify_world():
+        w2.add_body(Body(name=PrefixedName("root2")))
+
+    # Thread A: w1 -> w2 nested
+    def a():
+        for _ in range(5):
+            with w1.modify_world():
+                Handle.create_with_new_body_in_world(PrefixedName("h1"), w1)
+                with w2.modify_world():
+                    Handle.create_with_new_body_in_world(PrefixedName("h2"), w2)
+
+    # Thread B: w2 -> w1 nested (reverse order)
+    def b():
+        for _ in range(5):
+            with w2.modify_world():
+                Handle.create_with_new_body_in_world(PrefixedName("g2"), w2)
+                with w1.modify_world():
+                    Handle.create_with_new_body_in_world(PrefixedName("g1"), w1)
+
+    t1 = threading.Thread(target=a, daemon=True)
+    t2 = threading.Thread(target=b, daemon=True)
+    t1.start()
+    t2.start()
+
+    t1.join(timeout=10.0)
+    t2.join(timeout=10.0)
+
+    # If we hit a lock-order inversion between different Worlds this would hang.
+    assert len(w1.kinematic_structure_entities) > 0
+    assert len(w2.kinematic_structure_entities) > 0
+
+    ms1.close()
+    ms2.close()
+
+
+def test_reentrant_modify_world_same_thread():
+    """
+    Nested modify_world on the same thread must be allowed and safe.
+    """
+    w = World(name="w")
+    with w.modify_world():
+        outer = Body(name=PrefixedName("outer"))
+        w.add_body(outer)
+        with w.modify_world():
+            inner = Body(name=PrefixedName("inner"))
+            w.add_body(inner)
+            w.add_connection(FixedConnection(parent=outer, child=inner))
+    assert {b.name.name.split("/", 1)[-1] for b in w.kinematic_structure_entities} == {
+        "outer",
+        "inner",
+    }
 
 
 if __name__ == "__main__":

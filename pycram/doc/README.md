@@ -7,22 +7,7 @@ the instructions below.
 ## Building the documentation
 
 
-The documentation uses jupyter-book as engine. Building the documentation requires Python 3.9 or higher to avoid 
-dependency conflicts. On Ubuntu 20.04 you can install Python 3.9 with the following commands.
-~~~
-apt-get install python3.9
-~~~
-
-It is recommended to create a virtual environment to avoid conflicts with the system python interpreter.
-~~~
-apt-get install python3.9-virtualenv
-virtualenv -p python3.9 --system-site-packages build-doc
-~~~
-
-Activate the virtual environment.
-~~~
-source build-doc/bin/activate
-~~~
+The documentation uses jupyter-book as engine.
 
 
 Install the requirements in your python interpreter.
