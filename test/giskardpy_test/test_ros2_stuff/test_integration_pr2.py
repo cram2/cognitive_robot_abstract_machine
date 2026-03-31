@@ -26,7 +26,7 @@ from giskardpy.data_types.exceptions import (
 )
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.middleware.ros2.behavior_tree_config import StandAloneBTConfig
-from giskardpy.middleware.ros2.configs.iai_robots.pr2 import (
+from giskardpy.middleware.ros2.scripts.iai_robots.pr2.pr2 import (
     PR2StandaloneInterface,
     WorldWithPR2Config,
 )

@@ -1,11 +1,11 @@
+from giskardpy.middleware.ros2 import rospy
+from giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs import (
+    HSRVelocityInterface,
+)
 from giskardpy.model.world_config import WorldFromDatabaseConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.middleware.ros2.behavior_tree_config import ClosedLoopBTConfig
 from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.configs import (
-    HSRVelocityInterface,
-)
-from giskardpy_ros.ros2 import rospy
 
 
 def main():

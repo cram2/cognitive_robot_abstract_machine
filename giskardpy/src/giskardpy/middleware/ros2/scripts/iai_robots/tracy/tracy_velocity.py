@@ -1,16 +1,14 @@
-from giskardpy.middleware.ros2.utils import load_xacro
-
 from giskardpy.middleware.ros2 import rospy
-from rclpy import Parameter
-from rclpy.exceptions import ParameterUninitializedException
-
-from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.middleware.ros2.behavior_tree_config import ClosedLoopBTConfig
 from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.configs import (
-    TracyVelocityInterface,
+from giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs import (
     WorldWithTracyConfig,
+    TracyVelocityInterface,
 )
+from giskardpy.middleware.ros2.utils.utils import load_xacro
+from giskardpy.qp.qp_controller_config import QPControllerConfig
+from rclpy import Parameter
+from rclpy.exceptions import ParameterUninitializedException
 
 
 def main():

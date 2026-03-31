@@ -1,13 +1,13 @@
 from giskardpy.middleware.ros2 import rospy
+from giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs import (
+    WorldWithTracyConfig,
+    TracyStandAloneRobotInterfaceConfig,
+)
 from rclpy import Parameter
 
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.middleware.ros2.behavior_tree_config import StandAloneBTConfig
 from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.configs import (
-    WorldWithTracyConfig,
-    TracyStandAloneRobotInterfaceConfig,
-)
 
 
 def main():
