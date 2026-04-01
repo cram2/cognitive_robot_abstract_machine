@@ -31,7 +31,10 @@ from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     ActiveConnection1DOF,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.geometry import BoundingBox, Scale
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
@@ -107,7 +110,9 @@ class RobotPart(HasRootBody, ABC):
         scale: Scale = None,
         **kwargs,
     ) -> Self:
-        raise NotImplementedError("The bodies needed for RobotParts should already exist in the world, by parsing a URDF")
+        raise NotImplementedError(
+            "The bodies needed for RobotParts should already exist in the world, by parsing a URDF"
+        )
 
 
 @dataclass
