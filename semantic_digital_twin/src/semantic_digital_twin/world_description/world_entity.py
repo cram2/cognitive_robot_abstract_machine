@@ -606,6 +606,11 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
          If a field is a semantic annotation, its kinematic structure entities are also added to the result, via the
          potentially overridden `kinematic_structure_entities` property.
 
+         ..warning::
+            if this method causes a infinite recursion, that probably means that there are cycles in your semantic annotations.
+            I don't think this is something we should, or need to allow, as we can always get the backreference via EQL queries.
+            Please contact @LucaKro if you encounter this problem and disagree with this decision.
+
          :returns: A list of kinematic structure entities that are part of this semantic annotation.
         """
 
