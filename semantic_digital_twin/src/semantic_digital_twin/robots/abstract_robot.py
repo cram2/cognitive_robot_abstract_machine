@@ -17,8 +17,8 @@ from typing_extensions import (
 
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import NoJointStateWithType
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
     Vector3,
@@ -36,10 +36,9 @@ from semantic_digital_twin.world_description.shape_collection import (
 )
 from semantic_digital_twin.world_description.world_entity import (
     Body,
-    RootedSemanticAnnotation,
-    Agent,
     Connection,
 )
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
     Region,
@@ -50,25 +49,21 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class SemanticRobotAnnotation(RootedSemanticAnnotation, ABC):
+class SemanticRobotAnnotation(HasRootBody, ABC):
     """
     Represents a collection of connected robot bodies, starting from a root body, and ending in a unspecified collection
     of tip bodies.
     """
 
-    _robot: AbstractRobot = field(default=None)
+    _robot: AbstractRobot = field(init=False, default=None, repr=False)
     """
     The robot this semantic annotation belongs to
     """
 
     joint_states: list[JointState] = field(default_factory=list)
     """
-    Fixed joint states that are defined for this manipulator, like open and close. 
+    Fixed joint states that are defined for this robot annotation. 
     """
-
-    def __post_init__(self):
-        if self._world is not None:
-            self._world.add_semantic_annotation(self)
 
     def add_joint_state(self, joint_state: JointState):
         """
@@ -120,11 +115,6 @@ class KinematicChain(SemanticRobotAnnotation, ABC):
     sensors: List[Sensor] = field(default_factory=list)
     """
     A collection of sensors in the kinematic chain, such as cameras or other sensors.
-    """
-
-    joint_states: list[JointState] = field(default_factory=list)
-    """
-    A list of pre-defined joint positions that this kinematic chain can perform, for example "park" for an arm.
     """
 
     @property

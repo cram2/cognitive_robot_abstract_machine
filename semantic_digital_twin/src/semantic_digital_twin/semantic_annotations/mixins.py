@@ -41,7 +41,6 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
@@ -72,6 +71,7 @@ if TYPE_CHECKING:
         Slider,
         Aperture,
     )
+    from semantic_digital_twin.world import World
 
 
 @dataclass(eq=False)
@@ -288,6 +288,14 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
     @property
     def global_transform(self) -> HomogeneousTransformationMatrix:
         return self.root.global_transform
+
+    @property
+    def connections(self) -> List[Connection]:
+        return self._world.get_connections_of_branch(self.root)
+
+    @property
+    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
+        return self._world.get_kinematic_structure_entities_of_branch(self.root)
 
 
 @dataclass(eq=False)

@@ -75,19 +75,6 @@ class TestSemanticAnnotation(SemanticAnnotation):
         )
 
 
-def test_semantic_annotation_hash(apartment_world_setup):
-    semantic_annotation1 = Handle(root=apartment_world_setup.bodies[0])
-    semantic_annotation2 = Handle(root=apartment_world_setup.bodies[0])
-    with apartment_world_setup.modify_world():
-        apartment_world_setup.add_semantic_annotation(semantic_annotation1)
-        apartment_world_setup.add_semantic_annotation(semantic_annotation2)
-
-    # hash of semantic annotations should be based on their properties, not ids
-    assert id(semantic_annotation1) != id(semantic_annotation2)
-    assert hash(semantic_annotation1) == hash(semantic_annotation2)
-    assert semantic_annotation1 == semantic_annotation2
-
-
 def test_aggregate_bodies(kitchen_world):
     world_semantic_annotation = TestSemanticAnnotation(_world=kitchen_world)
 
@@ -128,13 +115,24 @@ def test_aggregate_bodies(kitchen_world):
         20
     ]
 
-    assert_equal(
-        set(world_semantic_annotation.kinematic_structure_entities),
-        set(kitchen_world.kinematic_structure_entities)
-        - {
-            kitchen_world.kinematic_structure_entities[0],
-        },
-    )
+    assert set(world_semantic_annotation.kinematic_structure_entities) == set(
+        kitchen_world.kinematic_structure_entities
+    ) - {
+        kitchen_world.kinematic_structure_entities[0],
+    }
+
+
+def test_semantic_annotation_hash(apartment_world_setup):
+    semantic_annotation1 = Handle(root=apartment_world_setup.bodies[0])
+    semantic_annotation2 = Handle(root=apartment_world_setup.bodies[0])
+    with apartment_world_setup.modify_world():
+        apartment_world_setup.add_semantic_annotation(semantic_annotation1)
+        apartment_world_setup.add_semantic_annotation(semantic_annotation2)
+
+    # hash of semantic annotations should be based on their properties, not ids
+    assert id(semantic_annotation1) != id(semantic_annotation2)
+    assert hash(semantic_annotation1) == hash(semantic_annotation2)
+    assert semantic_annotation1 == semantic_annotation2
 
 
 def test_handle_semantic_annotation_eql(apartment_world_setup):

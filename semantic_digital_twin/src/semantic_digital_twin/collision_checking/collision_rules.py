@@ -29,11 +29,11 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
     CollisionMatrix,
     CollisionCheck,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 
 if TYPE_CHECKING:
-    from ..world import World
-    from ..world_description.world_entity import Body
+    from semantic_digital_twin.world import World
+    from semantic_digital_twin.world_description.world_entity import Body
+    from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 
 
 @dataclass

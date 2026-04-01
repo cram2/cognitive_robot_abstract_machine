@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Self, Tuple
+from typing import Iterable, Optional, Self, Tuple, Set
 
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
@@ -56,6 +56,7 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     Region,
     Connection,
+    KinematicStructureEntity,
 )
 
 
@@ -991,3 +992,44 @@ class LiquidCap(HasRootBody):
     """
     A liquid cap.
     """
+
+
+@dataclass(eq=False)
+class Agent(HasRootBody):
+    """
+    Represents an entity in the world that can act, move, or be controlled.
+
+    Agents are dynamic bodies with semantic meaning — they may have intent,
+    behavior, or be controlled by external or internal logic. Examples include
+    robots, humans, or other autonomous actors.
+
+    """
+
+
+@dataclass(eq=False)
+class Human(Agent):
+    """
+    Represents a human agent in the environment.
+
+    A Person is an Agent that is not robotically actuated and does not provide
+    kinematic chains, manipulators, or robot-specific components.
+
+    This class exists primarily for semantic distinction, so that algorithms
+    can treat human agents differently from robots if needed.
+    """
+
+
+@dataclass(eq=False)
+class SemanticEnvironmentAnnotation(HasRootBody):
+    """
+    Represents a semantic annotation of the environment.
+    """
+
+    @property
+    def kinematic_structure_entities(self) -> Set[KinematicStructureEntity]:
+        """
+        Returns a set of all KinematicStructureEntity in the environment semantic annotation.
+        """
+        return set(
+            self._world.get_kinematic_structure_entities_of_branch(self.root)
+        ) | {self.root}

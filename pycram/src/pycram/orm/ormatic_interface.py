@@ -16106,7 +16106,9 @@ class RootedSemanticAnnotationDAO(
 
 class AgentDAO(
     RootedSemanticAnnotationDAO,
-    DataAccessObject[semantic_digital_twin.world_description.world_entity.Agent],
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Agent
+    ],
 ):
 
     __tablename__ = "AgentDAO"
@@ -16771,7 +16773,9 @@ class UnitreeG1DAO(
 
 class HumanDAO(
     AgentDAO,
-    DataAccessObject[semantic_digital_twin.world_description.world_entity.Human],
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Human
+    ],
 ):
 
     __tablename__ = "HumanDAO"
@@ -16789,7 +16793,7 @@ class HumanDAO(
 class SemanticEnvironmentAnnotationDAO(
     RootedSemanticAnnotationDAO,
     DataAccessObject[
-        semantic_digital_twin.world_description.world_entity.SemanticEnvironmentAnnotation
+        semantic_digital_twin.semantic_annotations.semantic_annotations.SemanticEnvironmentAnnotation
     ],
 ):
 
