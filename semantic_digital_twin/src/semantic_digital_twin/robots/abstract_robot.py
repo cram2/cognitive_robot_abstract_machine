@@ -17,8 +17,10 @@ from typing_extensions import (
 
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import NoJointStateWithType
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
     Vector3,
@@ -29,8 +31,8 @@ from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     ActiveConnection1DOF,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
+from semantic_digital_twin.world_description.geometry import BoundingBox, Scale
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
@@ -49,7 +51,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class SemanticRobotAnnotation(HasRootBody, ABC):
+class RobotPart(HasRootBody, ABC):
     """
     Represents a collection of connected robot bodies, starting from a root body, and ending in a unspecified collection
     of tip bodies.
@@ -93,9 +95,23 @@ class SemanticRobotAnnotation(HasRootBody, ABC):
         """
         ...
 
+    def create_with_new_body_in_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        connection_limits: Optional[DegreeOfFreedomLimits] = None,
+        active_axis: Optional[Vector3] = None,
+        connection_multiplier: float = 1.0,
+        connection_offset: float = 0.0,
+        scale: Scale = None,
+        **kwargs,
+    ) -> Self:
+        raise NotImplementedError("The bodies needed for RobotParts should already exist in the world, by parsing a URDF")
+
 
 @dataclass
-class KinematicChain(SemanticRobotAnnotation, ABC):
+class KinematicChain(RobotPart, ABC):
     """
     Abstract base class for kinematic chain in a robot, starting from a root body, and ending in a specific tip body.
     A kinematic chain can contain both a manipulator and sensors at the same time. There are no assumptions about the
@@ -201,7 +217,7 @@ class Arm(KinematicChain):
 
 
 @dataclass
-class Manipulator(SemanticRobotAnnotation, ABC):
+class Manipulator(RobotPart, ABC):
     """
     Abstract base class of robot manipulators. Always has a tool frame.
     """
@@ -318,7 +334,7 @@ class HumanoidGripper(Manipulator):
 
 
 @dataclass
-class Sensor(SemanticRobotAnnotation, ABC):
+class Sensor(RobotPart, ABC):
     """
     Abstract base class for any kind of sensor in a robot.
     """

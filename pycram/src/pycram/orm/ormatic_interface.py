@@ -16814,7 +16814,7 @@ class SemanticEnvironmentAnnotationDAO(
 class SemanticRobotAnnotationDAO(
     RootedSemanticAnnotationDAO,
     DataAccessObject[
-        semantic_digital_twin.robots.abstract_robot.SemanticRobotAnnotation
+        semantic_digital_twin.robots.abstract_robot.RobotPart
     ],
 ):
 
