@@ -492,6 +492,15 @@ class HasHinge(HasRootBody, ABC):
         )
         self.hinge = hinge
 
+    @property
+    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
+        kinematic_structure_entities = (
+            self._world.get_kinematic_structure_entities_of_branch(self.root)
+        )
+        if self.hinge is not None:
+            kinematic_structure_entities.append(self.hinge.root)
+        return kinematic_structure_entities
+
 
 @dataclass(eq=False)
 class HasSlider(HasRootKinematicStructureEntity, ABC):
@@ -518,6 +527,15 @@ class HasSlider(HasRootKinematicStructureEntity, ABC):
             slider.root,
         )
         self.slider = slider
+
+    @property
+    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
+        kinematic_structure_entities = (
+            self._world.get_kinematic_structure_entities_of_branch(self.root)
+        )
+        if self.slider is not None:
+            kinematic_structure_entities.append(self.slider.root)
+        return kinematic_structure_entities
 
 
 @dataclass(eq=False)

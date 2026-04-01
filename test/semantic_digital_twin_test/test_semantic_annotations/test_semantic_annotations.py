@@ -38,88 +38,78 @@ class TestSemanticAnnotation(SemanticAnnotation):
     A Generic semantic annotation for multiple bodies.
     """
 
-    _private_entity: KinematicStructureEntity = field(default=None)
-    entity_list: List[KinematicStructureEntity] = field(
-        default_factory=list, hash=False
-    )
-    semantic_annotations: List[SemanticAnnotation] = field(
-        default_factory=list, hash=False
-    )
-    root_entity_1: KinematicStructureEntity = field(default=None)
-    root_entity_2: KinematicStructureEntity = field(default=None)
-    tip_entity_1: KinematicStructureEntity = field(default=None)
-    tip_entity_2: KinematicStructureEntity = field(default=None)
-
-    def add_entity(self, body: KinematicStructureEntity):
-        self.entity_list.append(body)
-
-    def add_semantic_annotation(self, semantic_annotation: SemanticAnnotation):
-        self.semantic_annotations.append(semantic_annotation)
-
-    @property
-    def chain(self) -> list[KinematicStructureEntity]:
-        """
-        Returns itself as a kinematic chain.
-        """
-        return self._world.compute_chain_of_kinematic_structure_entities(
-            self.root_entity_1, self.tip_entity_1
-        )
-
-    @property
-    def _private_chain(self) -> list[KinematicStructureEntity]:
-        """
-        Private chain computation.
-        """
-        return self._world.compute_chain_of_kinematic_structure_entities(
-            self.root_entity_2, self.tip_entity_2
-        )
+    _private_entity: Optional[KinematicStructureEntity] = None
+    public_entity: Optional[KinematicStructureEntity] = None
+    _private_entity_list: List[KinematicStructureEntity] = field(default_factory=list)
+    public_entity_list: List[KinematicStructureEntity] = field(default_factory=list)
+    _private_annotation: Optional[SemanticAnnotation] = None
+    public_annotation: Optional[SemanticAnnotation] = None
+    _private_annotation_list: List[SemanticAnnotation] = field(default_factory=list)
+    public_annotation_list: List[SemanticAnnotation] = field(default_factory=list)
 
 
 def test_aggregate_bodies(kitchen_world):
-    world_semantic_annotation = TestSemanticAnnotation(_world=kitchen_world)
+    """
+    Tests that SemanticAnnotation.kinematic_structure_entities aggregates:
+    -  public direct kinematic structure entity fields
+    - public list fields containing kinematic structure entities
+    - public nested semantic annotations' kinematic structure entities
+    but nothing from private fields
+    The exact order is not specified by the contract, so we check set membership.
+    """
 
-    # Test bodies added to a private dataclass field are not aggregated
-    world_semantic_annotation._private_entity = (
-        kitchen_world.kinematic_structure_entities[0]
+    # Arrange: pick some existing bodies from the world fixture
+    b0, b1, b2, b3 = kitchen_world.bodies[:4]
+
+    # Private values (should NOT appear)
+    private_entity = b0
+    private_entity_list = [b0]
+    private_annotation = TestSemanticAnnotation(public_entity=b0)
+    private_annotation_list = [TestSemanticAnnotation(public_entity=b0)]
+
+    # Public values (should appear)
+    public_entity = b1
+    public_entity_list = [b2]
+    public_annotation = TestSemanticAnnotation(public_entity=b3)
+    public_annotation_list = [TestSemanticAnnotation(public_entity=b1)]
+
+    ann = TestSemanticAnnotation(
+        _private_entity=private_entity,
+        public_entity=public_entity,
+        _private_entity_list=private_entity_list,
+        public_entity_list=public_entity_list,
+        _private_annotation=private_annotation,
+        public_annotation=public_annotation,
+        _private_annotation_list=private_annotation_list,
+        public_annotation_list=public_annotation_list,
     )
 
-    # Test aggregation of bodies added in custom properties
-    world_semantic_annotation.root_entity_1 = (
-        kitchen_world.kinematic_structure_entities[1]
+    # Act
+    aggregated_list = ann.kinematic_structure_entities
+
+    # Expected to include public direct entities and entities from public lists
+    expected_present = [public_entity, *public_entity_list]
+
+    # Nested public annotations contribute their own public_entity
+    if isinstance(public_annotation, SemanticAnnotation):
+        expected_present.extend(public_annotation.kinematic_structure_entities)
+    for x in public_annotation_list:
+        expected_present.extend(x.kinematic_structure_entities)
+
+    # Expected to exclude any private contributions
+    unexpected = [private_entity, *private_entity_list]
+    if isinstance(private_annotation, SemanticAnnotation):
+        unexpected.extend(private_annotation.kinematic_structure_entities)
+    for x in private_annotation_list:
+        unexpected.extend(x.kinematic_structure_entities)
+
+    sorting_key = lambda kse: kse.id
+    # Check all expected are present
+    assert sorted(aggregated_list, key=sorting_key) == sorted(
+        expected_present, key=sorting_key
     )
-    world_semantic_annotation.tip_entity_1 = kitchen_world.kinematic_structure_entities[
-        4
-    ]
-
-    # Test aggregation of normal dataclass field
-    body_subset = kitchen_world.kinematic_structure_entities[5:10]
-    [world_semantic_annotation.add_entity(body) for body in body_subset]
-
-    # Test aggregation of bodies in a new as well as a nested semantic annotation
-    semantic_annotation1 = TestSemanticAnnotation()
-    semantic_annotation1_subset = kitchen_world.kinematic_structure_entities[10:18]
-    [semantic_annotation1.add_entity(body) for body in semantic_annotation1_subset]
-
-    semantic_annotation2 = TestSemanticAnnotation()
-    semantic_annotation2_subset = kitchen_world.kinematic_structure_entities[20:]
-    [semantic_annotation2.add_entity(body) for body in semantic_annotation2_subset]
-
-    semantic_annotation1.add_semantic_annotation(semantic_annotation2)
-    world_semantic_annotation.add_semantic_annotation(semantic_annotation1)
-
-    # Test that bodies added in a custom private property are not aggregated
-    world_semantic_annotation.root_entity_2 = (
-        kitchen_world.kinematic_structure_entities[18]
-    )
-    world_semantic_annotation.tip_entity_2 = kitchen_world.kinematic_structure_entities[
-        20
-    ]
-
-    assert set(world_semantic_annotation.kinematic_structure_entities) == set(
-        kitchen_world.kinematic_structure_entities
-    ) - {
-        kitchen_world.kinematic_structure_entities[0],
-    }
+    # no unexpected item
+    assert set(aggregated_list) == set(expected_present) - set(unexpected)
 
 
 def test_semantic_annotation_hash(apartment_world_setup):
