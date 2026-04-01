@@ -13,15 +13,11 @@ def test_loader(rclpy_node):
     target_path = loader._download_scene()
     unzipped = loader._unzip_scene(target_path)
     scene = loader._parse_json(unzipped)
-    world = scene.create_world()
-    # pub = VizMarkerPublisher(
-    #     _world=world,
-    #     node=rclpy_node,
-    # )
-    # pub.with_tf_publisher()
-    print([type(a) for a in world.semantic_annotations])
-    from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 
-    rt = RayTracer(world)
-    rt.update_scene()
-    rt.scene.show("gl")
+    world = scene.create_world()
+    pub = VizMarkerPublisher(
+        _world=world,
+        node=rclpy_node,
+    )
+    pub.with_tf_publisher()
+    print([type(a) for a in world.semantic_annotations])

@@ -5,17 +5,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Dict, Any, Self
 
-import tqdm
 import trimesh
 import trimesh.visual
-from PIL import Image
 from typing_extensions import Optional, Tuple, assert_never
 
-from krrood.utils import get_full_class_name
-
-
 from krrood.adapters.exceptions import JSON_TYPE_NAME
-from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
+from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json
+from krrood.utils import get_full_class_name
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Floor,
@@ -26,7 +22,6 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
-    FixedConnection,
 )
 from semantic_digital_twin.world_description.geometry import Mesh, Scale, Box
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -34,7 +29,34 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class HasXYZ(SubclassJSONSerializer):
+class Sage10kBase(SubclassJSONSerializer):
+    """
+    Base class for all classes of the Sage 10k dataset.
+    These objects are serialized with JSON in a layout*.json and behave a bit different than the SubClassJSONSerializer
+    of KRROOD asserts. The data of Sage10k does not support polymorphism and hence does not give any column that
+    specifies their type. The JSON interface therefore just hard codes the type the referenced data should have.
+    Use with care.
+    """
+
+
+@dataclass
+class Sage10kWithID(Sage10kBase):
+    """
+    Base class for Sage10k classes that have an id.
+    """
+
+    id: str
+    """
+    Unique identifier used to reference this object in many-to-one like relationships.
+    """
+
+
+@dataclass
+class HasXYZ(Sage10kBase):
+    """
+    Parent for Sage10ks position and orientation to deduplicate the code.
+    """
+
     x: float
     y: float
     z: float
@@ -66,7 +88,7 @@ class Sage10kRotation(HasXYZ):
     They are given in degrees.
     """
 
-    def as_rpy_in_radians(self) -> Tuple[float, float, float]:
+    def as_roll_pitch_yaw_in_radians(self) -> Tuple[float, float, float]:
         conversion_factor = math.pi / 180
         return (
             self.x * conversion_factor,
@@ -76,37 +98,41 @@ class Sage10kRotation(HasXYZ):
 
 
 @dataclass
-class Sage10kPosition(HasXYZ): ...
+class Sage10kPosition(HasXYZ):
+    """
+    Position of an entity in a Sage10k scene.
+    It seems to always be global
+    """
 
 
 @dataclass
-class Sage10kSize(SubclassJSONSerializer):
+class Sage10kSize(Sage10kBase):
     """
-    The scale of an object in the Sage 10k world.
+    The scale of an object.
     """
 
     height: float
     """
-    Scale in z?
+    Scale in z
     """
 
     length: float
     """
-    Scale in x?
+    Scale in y
     """
 
     width: float
     """
-    Scale in y?
+    Scale in x
     """
 
     @property
     def x(self) -> float:
-        return self.length
+        return self.width
 
     @property
     def y(self) -> float:
-        return self.width
+        return self.length
 
     @property
     def z(self) -> float:
@@ -133,6 +159,10 @@ class Sage10kSize(SubclassJSONSerializer):
 
 @dataclass
 class Sage10kPhysicallyBasedRendering(SubclassJSONSerializer):
+    """
+    I don't really know what this is, but it appears consistently in the data.
+    """
+
     metallic: float
     roughness: float
 
@@ -157,14 +187,17 @@ class Sage10kPhysicallyBasedRendering(SubclassJSONSerializer):
 
 
 @dataclass
-class Sage10kWall(SubclassJSONSerializer):
-    id: str
+class Sage10kWall(Sage10kWithID):
+    """
+    Description of a wall for a room.
+    """
 
     start_point: Sage10kPosition
     """
     The start point of the wall.
     Only x and y matter.
     """
+
     end_point: Sage10kPosition
     """
     The end point of the wall.
@@ -220,18 +253,18 @@ class Sage10kWall(SubclassJSONSerializer):
         # the wall length is given by x
         if self.start_point.x != self.end_point.x:
             wall_length = self.end_point.x - self.start_point.x
-            yaw = 0
+            yaw = math.pi / 2
         # the wall length is given by y
         elif self.start_point.y != self.end_point.y:
             wall_length = self.end_point.y - self.start_point.y
-            yaw = math.pi / 2
+            yaw = 0
         else:
             assert_never(self)
 
         wall_scale = Scale(x=self.thickness, y=wall_length, z=self.height)
 
-        center_x = self.end_point.x + self.start_point.x / 2
-        center_y = self.end_point.y + self.start_point.y / 2
+        center_x = (self.end_point.x + self.start_point.x) / 2
+        center_y = (self.end_point.y + self.start_point.y) / 2
 
         parent_T_wall = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=center_x,
@@ -270,10 +303,21 @@ class Sage10kWall(SubclassJSONSerializer):
 
 
 @dataclass
-class Sage10kObject(SubclassJSONSerializer):
-    id: str
+class Sage10kObject(Sage10kWithID):
+    """
+    Like a Body, but from Sage10k.
+    """
+
     room_id: str
+    """
+    The room id where this object occurs in.
+    """
+
     type: str
+    """
+    The type of the object as one word.
+    """
+
     description: str
     source: str
 
@@ -302,7 +346,8 @@ class Sage10kObject(SubclassJSONSerializer):
 
     dimensions: Sage10kSize
     """
-    The scale of the object
+    The scale of the object.
+    This seems to be already incorporated in the meshes themselves, so dont use it.
     """
 
     pbr_parameters: Sage10kPhysicallyBasedRendering
@@ -321,21 +366,23 @@ class Sage10kObject(SubclassJSONSerializer):
             self.position.x,
             self.position.y,
             self.position.z,
-            *self.rotation.as_rpy_in_radians(),
+            *self.rotation.as_roll_pitch_yaw_in_radians(),
             reference_frame=parent,
             child_frame=body,
         )
 
         # Load the mesh and texture using the stable Mesh.from_file method
         # It automatically handles trimesh loading and applies the texture
-        mesh = Mesh.from_file(
-            file_path=str(ply_file),
-            texture_file_path=str(texture_file),
-            origin=HomogeneousTransformationMatrix(reference_frame=body),
-            scale=Scale(
-                self.dimensions.width, self.dimensions.height, self.dimensions.length
-            ),
+        mesh = Mesh.from_trimesh(
+            trimesh.load_mesh(str(ply_file)),
+            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
+            file_type="obj",
         )
+        # mesh = Mesh.from_file(
+        #     file_path=str(ply_file),
+        #     texture_file_path=str(texture_file),
+        #     origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
+        # )
 
         # Create a Body with the loaded mesh as both visual and collision geometry
         visual = ShapeCollection([mesh], reference_frame=body)
@@ -401,8 +448,7 @@ class Sage10kObject(SubclassJSONSerializer):
 
 
 @dataclass
-class Sage10kDoor(SubclassJSONSerializer):
-    id: str
+class Sage10kDoor(Sage10kWithID):
 
     wall_id: str
     """
@@ -484,16 +530,18 @@ class Sage10kDoor(SubclassJSONSerializer):
         directory_path: Path,
         parent: Body,
         sage_10k_wall: Sage10kWall,
+        wall_annotation: Wall,
     ) -> Door:
         """
         The parent is the wall body always.
         """
         name = PrefixedName(name=self.id, prefix=sage_10k_wall.id)
 
-        scale = Scale(x=sage_10k_wall.thickness, y=self.width, z=self.height)
+        scale = Scale(x=sage_10k_wall.thickness, y=self.width, z=self.height * 2)
 
         parent_T_body = HomogeneousTransformationMatrix.from_xyz_rpy(
             y=self.position_on_wall,
+            z=self.height / 2,
             reference_frame=parent,
         )
 
@@ -504,7 +552,7 @@ class Sage10kDoor(SubclassJSONSerializer):
                 world=world,
                 world_root_T_self=parent_T_body,
             )
-
+        assert annotation.entry_way is not None
         body = annotation.root
 
         geometry_with_texture = ShapeCollection(
@@ -512,11 +560,11 @@ class Sage10kDoor(SubclassJSONSerializer):
                 Mesh.from_trimesh(
                     origin=HomogeneousTransformationMatrix(reference_frame=body),
                     mesh=body.collision.combined_mesh,
-                    texture_file_path=str(
-                        directory_path
-                        / "materials"
-                        / f"{self.door_material}_texture.png"
-                    ),
+                    # texture_file_path=str(
+                    #     directory_path
+                    #     / "materials"
+                    #     / f"{self.door_material}_texture.png"
+                    # ),
                 )
             ],
             reference_frame=body,
@@ -524,12 +572,14 @@ class Sage10kDoor(SubclassJSONSerializer):
         body.collision = geometry_with_texture
         body.visual = geometry_with_texture
 
+        with world.modify_world():
+            wall_annotation.add_aperture(annotation.entry_way)
+
         return annotation
 
 
 @dataclass
-class Sage10kRoom(SubclassJSONSerializer):
-    id: str
+class Sage10kRoom(Sage10kWithID):
 
     room_type: str
     """
@@ -543,7 +593,7 @@ class Sage10kRoom(SubclassJSONSerializer):
 
     position: Sage10kPosition
     """
-    The position of the rooms center? in the scene.
+    The position of the rooms lower left corner? in the scene.
     """
 
     floor_material: str
@@ -573,9 +623,13 @@ class Sage10kRoom(SubclassJSONSerializer):
             scale=Scale(x=self.dimensions.x, y=self.dimensions.y, z=0.01)
         ).mesh
 
+        # convert position from lower left to center point
+        x_center = self.position.x + (self.dimensions.x / 2)
+        y_center = self.position.y + (self.dimensions.y / 2)
+
         parent_T_floor = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=self.position.x,
-            y=self.position.y,
+            x=x_center,
+            y=y_center,
             z=self.position.z,
             reference_frame=parent,
         )
@@ -619,7 +673,9 @@ class Sage10kRoom(SubclassJSONSerializer):
 
             # create doors
             for door in doors_of_this_wall:
-                door.create_in_world(world, directory_path, wall_annotation.root, wall)
+                door.create_in_world(
+                    world, directory_path, wall_annotation.root, wall, wall_annotation
+                )
 
         # create the objects
         for sage_object in self.objects:
@@ -661,11 +717,7 @@ class Sage10kRoom(SubclassJSONSerializer):
 
 
 @dataclass
-class Sage10kScene(SubclassJSONSerializer):
-    id: str
-    """
-    The id of the scene.
-    """
+class Sage10kScene(Sage10kWithID):
 
     building_style: str
     """
@@ -737,7 +789,7 @@ class Sage10kScene(SubclassJSONSerializer):
             world.add_body(root)
 
         for room in self.rooms:
-            room_body = room.create_in_world(
+            room.create_in_world(
                 world=world, directory_path=self.directory_path, parent=root
             )
         return world
