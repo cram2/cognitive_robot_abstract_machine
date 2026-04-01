@@ -607,7 +607,8 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
          potentially overridden `kinematic_structure_entities` property.
 
          ..warning::
-            if this method causes a infinite recursion, that probably means that there are cycles in your semantic annotations.
+            if this method causes an infinite recursion, that probably means that there are public backreferences forming
+             cycles in your semantic annotations.
             I don't think this is something we should, or need to allow, as we can always get the backreference via EQL queries.
             Please contact @LucaKro if you encounter this problem and disagree with this decision.
 
@@ -810,6 +811,10 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
     @property
     def passive_dofs(self) -> List[DegreeOfFreedom]:
         return []
+
+    @property
+    def controlled_dofs(self) -> List[DegreeOfFreedom]:
+        return [dof for dof in self.active_dofs if dof.has_hardware_interface]
 
     @property
     def is_controlled(self):

@@ -1,39 +1,15 @@
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import List, Type, Union
 
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
-from semantic_digital_twin.robots.abstract_robot import Neck, Arm
-
-
-@dataclass
-class HasNeck(ABC):
-    """
-    Mixin class for robots that have a neck.
-    """
-
-    neck: Neck = field(default=None)
-    """
-    The neck kinematic chain of the robot, if it exists.
-    """
-
-    def add_neck(self, neck: Neck):
-        """
-        Adds a neck kinematic chain to the robot.
-
-        :param neck: The neck kinematic chain to add.
-        """
-        if not neck.sensors:
-            raise ValueError(
-                f"Neck kinematic chain {neck.name} must have at least one sensor."
-            )
-        if self.neck is not None:
-            raise ValueError(f"Robot {self.name} already has a neck: {self.neck.name}.")
-        self.neck = neck
-        self.add_kinematic_chain(neck)
+from semantic_digital_twin.robots.abstract_robot import Arm
+from semantic_digital_twin.world_description.world_modification import (
+    synchronized_attribute_modification,
+)
 
 
 @dataclass
@@ -47,6 +23,7 @@ class HasArms(ABC):
     A collection of arms in the robot.
     """
 
+    @synchronized_attribute_modification
     def add_arm(self, arm: Arm):
         """
         Adds a kinematic chain to the PR2 robot's collection of kinematic chains.
@@ -54,10 +31,10 @@ class HasArms(ABC):
 
         :param arm: The kinematic chain to add to the PR2 robot.
         """
-        if arm.manipulator is None:
-            raise ValueError(f"Arm kinematic chain {arm.name} must have a manipulator.")
         self.arms.append(arm)
-        self.add_kinematic_chain(arm)
+
+    @abstractmethod
+    def _setup_arms(self): ...
 
 
 @dataclass
@@ -87,19 +64,8 @@ class SpecifiesLeftRightArm(HasArms, ABC):
         first_arm = self.arms[0]
         second_arm = self.arms[1]
         # the arms may share a root, but the first body after the root should be different
-        first_arm_body_after_root = list(first_arm.bodies)[1]
-        world_P_first_body = (
-            first_arm_body_after_root.center_of_mass
-            if first_arm_body_after_root.has_collision()
-            else first_arm_body_after_root.global_transform.to_position()
-        )
-
-        second_arm_body_after_root = list(second_arm.bodies)[1]
-        world_P_second_body = (
-            second_arm_body_after_root.center_of_mass
-            if second_arm_body_after_root.has_collision()
-            else second_arm_body_after_root.global_transform.to_position()
-        )
+        world_P_first_body = first_arm.bodies[1].global_transform.to_position()
+        world_P_second_body = second_arm.bodies[1].global_transform.to_position()
 
         return (
             first_arm

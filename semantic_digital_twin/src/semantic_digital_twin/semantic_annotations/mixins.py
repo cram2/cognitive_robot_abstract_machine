@@ -290,7 +290,7 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         return self.root.global_transform
 
     @property
-    def connections(self) -> List[Connection]:
+    def connections(self) -> list[Connection]:
         return self._world.get_connections_of_branch(self.root)
 
     @property
@@ -311,13 +311,6 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
     """
     The root body of the semantic annotation.
     """
-
-    @property
-    def bodies(self) -> Iterable[Body]:
-        """
-        The bodies that are part of the semantic annotation.
-        """
-        return [self.root]
 
     @classmethod
     def create_with_new_body_in_world(
@@ -376,13 +369,6 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
     """
     The root region of the semantic annotation.
     """
-
-    @property
-    def regions(self) -> Iterable[Region]:
-        """
-        The regions that are part of the semantic annotation.
-        """
-        return [self.root]
 
     @classmethod
     def create_with_new_region_in_world(
