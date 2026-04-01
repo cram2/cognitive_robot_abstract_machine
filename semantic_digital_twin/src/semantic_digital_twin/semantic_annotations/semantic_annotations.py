@@ -1024,12 +1024,3 @@ class SemanticEnvironmentAnnotation(HasRootBody):
     """
     Represents a semantic annotation of the environment.
     """
-
-    @property
-    def kinematic_structure_entities(self) -> Set[KinematicStructureEntity]:
-        """
-        Returns a set of all KinematicStructureEntity in the environment semantic annotation.
-        """
-        return set(
-            self._world.get_kinematic_structure_entities_of_branch(self.root)
-        ) | {self.root}

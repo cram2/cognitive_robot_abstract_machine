@@ -112,6 +112,59 @@ def test_aggregate_bodies(kitchen_world):
     assert set(aggregated_list) == set(expected_present) - set(unexpected)
 
 
+def test_has_root_kinematic_structure_entity_aggregate_bodies(kitchen_world):
+    annotation = SemanticEnvironmentAnnotation(root=kitchen_world.root)
+    with kitchen_world.modify_world():
+        kitchen_world.add_semantic_annotation(annotation)
+
+    assert (
+        annotation.kinematic_structure_entities
+        == kitchen_world.kinematic_structure_entities
+    )
+
+
+def test_has_hinge_has_slider_aggregate_bodies():
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+
+    door_body = Body(name=PrefixedName("door_body"))
+    drawer_body = Body(name=PrefixedName("drawer_body"))
+    handle1_body = Body(name=PrefixedName("handle1_body"))
+    handle2_body = Body(name=PrefixedName("handle2_body"))
+    hinge_body = Body(name=PrefixedName("hinge_body"))
+    slider_body = Body(name=PrefixedName("slider_body"))
+    handle1 = Handle(root=handle1_body)
+    handle2 = Handle(root=handle2_body)
+    hinge = Hinge(root=hinge_body)
+    slider = Slider(root=slider_body)
+    drawer = Drawer(root=drawer_body)
+    door = Door(root=door_body)
+    with world.modify_world():
+        world.add_connection(Connection(parent=root, child=door_body))
+        world.add_connection(Connection(parent=root, child=drawer_body))
+        world.add_connection(Connection(parent=root, child=handle2_body))
+        world.add_connection(Connection(parent=root, child=handle1_body))
+        world.add_connection(Connection(parent=root, child=hinge_body))
+        world.add_connection(Connection(parent=root, child=slider_body))
+        world.add_semantic_annotation(handle1)
+        world.add_semantic_annotation(handle2)
+        world.add_semantic_annotation(hinge)
+        world.add_semantic_annotation(slider)
+        world.add_semantic_annotation(drawer)
+        world.add_semantic_annotation(door)
+        door.add_handle(handle2)
+        door.add_hinge(hinge)
+        drawer.add_handle(handle1)
+        drawer.add_slider(slider)
+
+    expected_door_bodies = {door_body, handle2_body, hinge_body}
+    expected_drawer_bodies = {drawer_body, handle1_body, slider_body}
+    assert set(door.kinematic_structure_entities) == expected_door_bodies
+    assert set(drawer.kinematic_structure_entities) == expected_drawer_bodies
+
+
 def test_semantic_annotation_hash(apartment_world_setup):
     semantic_annotation1 = Handle(root=apartment_world_setup.bodies[0])
     semantic_annotation2 = Handle(root=apartment_world_setup.bodies[0])
