@@ -47,6 +47,9 @@ from semantic_digital_twin.world_description.world_entity import (
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from semantic_digital_twin.world_description.world_modification import (
+    synchronized_attribute_modification,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
@@ -73,6 +76,10 @@ class RobotPart(HasRootBody, ABC):
         """
         Adds a joint state to this semantic annotation.
         """
+        if not self.is_controlled:
+            raise NotImplementedError(
+                "Adding joint states is only supported for robot parts that are controlled by a controller."
+            )
         self.joint_states.append(joint_state)
         joint_state.assign_to_robot(self._robot)
 
@@ -86,6 +93,10 @@ class RobotPart(HasRootBody, ABC):
             if j.state_type == state_type:
                 return j
         raise NoJointStateWithType(state_type)
+
+    @property
+    def is_controlled(self) -> bool:
+        return any((c for c in self.connections if c.is_controlled))
 
     def create_with_new_body_in_world(
         cls,
@@ -154,10 +165,14 @@ class Arm(KinematicChain):
     Represents an arm of a robot, which is a kinematic chain with a manipulator.
     """
 
-    manipulator: Optional[Manipulator] = None
+    manipulator: Optional[Manipulator] = field(init=False, default=None, repr=False)
     """
     The manipulator of the kinematic chain, if it exists. This is usually a gripper or similar device.
     """
+
+    @synchronized_attribute_modification
+    def add_manipulator(self, manipulator: Manipulator):
+        self.manipulator = manipulator
 
     @property
     def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:

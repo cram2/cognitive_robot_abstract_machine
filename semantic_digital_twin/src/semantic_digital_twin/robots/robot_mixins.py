@@ -6,13 +6,13 @@ from functools import cached_property
 from typing import List, Type, Union
 
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
-from semantic_digital_twin.robots.abstract_robot import Arm
+from semantic_digital_twin.robots.abstract_robot import Arm, Torso
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
 
 
-@dataclass
+@dataclass(eq=False)
 class HasArms(ABC):
     """
     Mixin class for robots that have arms.
@@ -34,10 +34,9 @@ class HasArms(ABC):
         self.arms.append(arm)
 
     @abstractmethod
-    def _setup_arms(self): ...
+    def _create_arms(self) -> list[Arm]: ...
 
-
-@dataclass
+@dataclass(eq=False)
 class SpecifiesLeftRightArm(HasArms, ABC):
     """
     Mixin class for robots that have two arms and can specify which is the left and which is the right arm.
@@ -76,3 +75,22 @@ class SpecifiesLeftRightArm(HasArms, ABC):
             )()
             else second_arm
         )
+
+@dataclass(eq=False)
+class HasTorso(ABC):
+    """
+    Mixin class for robots that have a torso.
+    """
+
+    torso: Torso = field(init=False, default=None, repr=False)
+    """
+    The torso of the robot, represented as an arm.
+    """
+
+    @synchronized_attribute_modification
+    def add_torso(self, torso: Torso):
+        self.torso = torso
+
+    @abstractmethod
+    def _create_torso(self) -> Arm: ...
+
