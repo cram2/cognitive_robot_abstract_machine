@@ -1,9 +1,12 @@
 from __future__ import annotations
+
+import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
 from zipfile import ZipFile
-import json
+
 import requests
 
 from semantic_digital_twin.adapters.sage_10k_dataset.schema import Sage10kScene
@@ -13,6 +16,7 @@ from semantic_digital_twin.adapters.sage_10k_dataset.schema import Sage10kScene
 class Sage10kDatasetLoader:
     """
     Loader for scenes from the Sage10k dataset.
+    This loader currently does not load Windows of walls.
     """
 
     directory: Path = field(default_factory=lambda: Path.home() / "sage-10k-scenes")
@@ -20,48 +24,39 @@ class Sage10kDatasetLoader:
     The directory where the scene should be downloaded to.
     """
 
-    def _download_scene(self, scene_url: str) -> Path:
+    def _download_scene_if_not_exists(self, scene_url: str) -> Path:
         """
-        Download the scene from the Sage10k dataset and return it as a Path.
-        :return: The path to the scene downloaded.
+        Download the scene from the Sage10k dataset and unzip it.
+        Returns early if a directory with the requested scene already exists.
+
+        :return: The path to the unzipped scene.
         """
         self.directory.mkdir(parents=True, exist_ok=True)
 
         filename = Path(urlparse(scene_url).path).name
-        target_path = self.directory / filename
+        zipped_scene = self.directory / filename
+        extraction_directory = self.directory / zipped_scene.stem
 
-        # check if the target file already exists
-        if target_path.exists():
-            return target_path
+        # return early if the scene exists already
+        if extraction_directory.exists():
+            return extraction_directory
 
+        # download the scene
         with requests.get(scene_url, stream=True, timeout=60) as response:
             response.raise_for_status()
-            with target_path.open("wb") as f:
+            with zipped_scene.open("wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
 
-        return target_path
+        # unzip the scene
+        extraction_directory.mkdir(parents=True, exist_ok=True)
+        with ZipFile(zipped_scene, "r") as zip_ref:
+            zip_ref.extractall(extraction_directory)
 
-    def _unzip_scene(self, scene_path: Path) -> Path:
-        """
-        Extracts the contents of a zip file to a directory. If the directory already exists,
-        the function will return the existing directory path without performing any operations.
+        os.remove(str(zipped_scene))
 
-        :param scene_path: Path to the zip file that needs to be extracted.
-        :return: The path to the directory where the contents of the zip file have been extracted.
-        """
-        extract_dir = self.directory / scene_path.stem
-
-        if extract_dir.exists():
-            return extract_dir
-
-        extract_dir.mkdir(parents=True, exist_ok=True)
-
-        with ZipFile(scene_path, "r") as zip_ref:
-            zip_ref.extractall(extract_dir)
-
-        return extract_dir
+        return extraction_directory
 
     def _parse_json(self, extracted_dir: Path) -> Sage10kScene:
         """
@@ -93,9 +88,8 @@ class Sage10kDatasetLoader:
         :param scene_url: The URL of the scene to be loaded.
         :return: The Sage10kScene object.
         """
-        target_path = self._download_scene(scene_url)
-        unzipped = self._unzip_scene(target_path)
-        scene = self._parse_json(unzipped)
+        unzipped_scene = self._download_scene_if_not_exists(scene_url)
+        scene = self._parse_json(unzipped_scene)
         return scene
 
     @classmethod
