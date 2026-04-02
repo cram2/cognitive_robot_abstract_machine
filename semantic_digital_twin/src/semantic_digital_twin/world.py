@@ -527,6 +527,13 @@ class World(HasSimulatorProperties):
         ]
 
     @property
+    def connections_topologically_sorted(self) -> List[Connection]:
+        return [
+            kse.parent_connection
+            for kse in self.kinematic_structure_entities_topologically_sorted[1:]
+        ]
+
+    @property
     def kinematic_structure_entities(self) -> List[KinematicStructureEntity]:
         """
         :return: A list of all bodies in the world.

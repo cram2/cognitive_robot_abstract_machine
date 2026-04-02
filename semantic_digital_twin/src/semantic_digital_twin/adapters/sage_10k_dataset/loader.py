@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
@@ -80,6 +81,20 @@ class Sage10kDatasetLoader:
         result.directory = extracted_dir
 
         return result
+
+    def _delete_assets(self, extracted_dir: Path):
+        """
+        Delete the assets of a scene.
+        Use this when you only want to fetch all layout JSONS.
+
+        :param extracted_dir: The directory containing the extracted scene.
+        """
+        objects = extracted_dir / "objects"
+        preview = extracted_dir / "preview"
+        materials = extracted_dir / "materials"
+
+        for directory in [objects, preview, materials]:
+            shutil.rmtree(directory)
 
     def create_scene(self, scene_url: str) -> Sage10kScene:
         """

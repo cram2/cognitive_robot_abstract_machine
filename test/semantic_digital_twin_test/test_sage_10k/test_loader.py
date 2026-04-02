@@ -1,5 +1,8 @@
 import numpy as np
 
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from semantic_digital_twin.adapters.sage_10k_dataset.loader import Sage10kDatasetLoader
 from semantic_digital_twin.adapters.sage_10k_dataset.schema import Sage10kScene
 from semantic_digital_twin.world import World
@@ -8,9 +11,8 @@ from semantic_digital_twin.world import World
 def verify_scene(world: World, scene: Sage10kScene):
     """
     Verify that the object positions of the scene are the same as in the world.
-    :param world:
-    :param scene:
-    :return:
+    :param world: The world created from the scene.
+    :param scene: The scene.
     """
     for room in scene.rooms:
         for obj in room.objects:
@@ -23,14 +25,12 @@ def verify_scene(world: World, scene: Sage10kScene):
 
 def test_loader(rclpy_node):
     loader = Sage10kDatasetLoader()
-
     scene = loader.create_scene(scene_url=Sage10kDatasetLoader.available_scenes()[0])
-
     world = scene.create_world()
-    # pub = VizMarkerPublisher(
-    #     _world=world,
-    #     node=rclpy_node,
-    # )
-    # pub.with_tf_publisher()
+    pub = VizMarkerPublisher(
+        _world=world,
+        node=rclpy_node,
+    )
+    pub.with_tf_publisher()
 
     verify_scene(world, scene)

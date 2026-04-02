@@ -527,8 +527,8 @@ class Mesh(Shape):
             filename=tmp_path,
         )
 
-        # Tie file lifetime to the Mesh instance
-        weakref.finalize(instance, cls._cleanup_temp_dir, subdir)
+        # # Tie file lifetime to the Mesh instance TODO luca wants to find a way for this to work with rviz (atexit)
+        # weakref.finalize(instance, cls._cleanup_temp_dir, subdir)
 
         return instance
 
