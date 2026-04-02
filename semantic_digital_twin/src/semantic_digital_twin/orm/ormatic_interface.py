@@ -9718,6 +9718,20 @@ class WorldStateMappingDAO(
     )
 
 
+class WorldStateEntryViewDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.world_state.WorldStateEntryView
+    ],
+):
+
+    __tablename__ = "WorldStateEntryViewDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
 class WorldStateTrajectoryDAO(
     Base,
     DataAccessObject[

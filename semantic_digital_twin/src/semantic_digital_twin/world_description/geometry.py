@@ -3,12 +3,14 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+import shutil
 import tempfile
 import weakref
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from functools import cached_property
+from plyfile import PlyData
 
 import numpy as np
 import trimesh
@@ -356,10 +358,12 @@ class Mesh(Shape):
     def to_json(self) -> Dict[str, Any]:
         # Serialize the raw (unscaled, unprocessed) mesh geometry and the scale separately
         base_mesh = trimesh.load_mesh(self.filename, process=False)
+        file_type = self.filename.split(".")[-1]
         return {
             **super().to_json(),
             "mesh": base_mesh.to_dict(),
             "scale": to_json(self.scale),
+            "file_type": file_type,
         }
 
     @classmethod
@@ -372,7 +376,10 @@ class Mesh(Shape):
         )
         origin = from_json(data["origin"], **kwargs)
         scale = from_json(data["scale"], **kwargs)
-        return cls.from_trimesh(mesh=mesh, origin=origin, scale=scale)
+        file_type = data["file_type"]
+        return cls.from_trimesh(
+            mesh=mesh, origin=origin, scale=scale, file_type=file_type
+        )
 
     @classmethod
     def add_uv(cls, mesh: trimesh.Trimesh, uv: np.ndarray) -> trimesh.Trimesh:
@@ -439,6 +446,51 @@ class Mesh(Shape):
         return file_mesh
 
     @classmethod
+    def from_ply_file(
+        cls,
+        ply_file_path: str,
+        texture_file_path: Optional[str] = None,
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        scale: Optional[Scale] = None,
+    ) -> Mesh:
+        """
+        Create a Mesh from a PLY file path and an optional texture file path.
+        Ply files are not supported by RViz2, so we need to convert them to OBJ files with the textures intact.
+        """
+        texture_image = Image.open(texture_file_path)
+        ply_file = PlyData.read(ply_file_path)
+        # Raw data
+        vertices = np.stack(
+            [ply_file["vertex"]["x"], ply_file["vertex"]["y"], ply_file["vertex"]["z"]],
+            axis=-1,
+        )
+
+        texture_coordinates = np.stack(
+            [ply_file["texcoord"]["s"], ply_file["texcoord"]["t"]], axis=-1
+        )
+
+        faces = np.stack([np.array(f["vertex_indices"]) for f in ply_file["face"]])
+        texture_coordinate_indices = np.stack(
+            [np.array(f["texcoord_indices"]) for f in ply_file["face"]]
+        )
+
+        # Build per-vertex UV by unpacking face-corner UVs
+        # texture_coordinate_indices[f, c] -> index into texture_coordinates for face f, corner c
+        uv_per_corner = texture_coordinates[texture_coordinate_indices]
+
+        vertices_unindexed = vertices[faces.reshape(-1)]
+        uv_unindexed = uv_per_corner.reshape(-1, 2)
+        faces_new = np.arange(len(vertices_unindexed)).reshape(-1, 3)
+
+        mesh = trimesh.Trimesh(
+            vertices=vertices_unindexed,
+            faces=faces_new,
+            visual=trimesh.visual.TextureVisuals(uv=uv_unindexed, image=texture_image),
+        )
+
+        return Mesh.from_trimesh(mesh=mesh, origin=origin, scale=scale, file_type="obj")
+
+    @classmethod
     def from_trimesh(
         cls,
         mesh: trimesh.Trimesh,
@@ -447,8 +499,9 @@ class Mesh(Shape):
         uv: Optional[np.ndarray] = None,
         texture_file_path: Optional[str] = None,
         dirname: str = "/tmp",
-        file_type: str = "stl",
+        file_type: str = "obj",
     ) -> "Mesh":
+        file_type = file_type.lower()
         if origin is None:
             origin = HomogeneousTransformationMatrix()
         if scale is None:
@@ -458,44 +511,14 @@ class Mesh(Shape):
         if texture_file_path is not None:
             mesh = cls.add_texture(mesh=mesh, texture_file_path=texture_file_path)
 
-        # Capture path immediately and close handle before trimesh opens the file
-        with tempfile.NamedTemporaryFile(
-            dir=dirname, suffix=f".{file_type}", delete=False
-        ) as tmp:
-            tmp_path = tmp.name
+        # Each export gets its own subdir so material.mtl files never collide
+        subdir = tempfile.mkdtemp(dir=dirname)
+        tmp_path = os.path.join(subdir, f"mesh.{file_type}")
 
         try:
-            if file_type == "obj":
-                mesh.export(tmp_path, file_type="obj")
-
-                old_mtl_file = "material.mtl"
-                new_mtl_file = f"{os.path.basename(tmp_path)}.mtl"
-                old_mtl = os.path.join(dirname, old_mtl_file)
-                new_mtl = os.path.join(dirname, new_mtl_file)
-
-                if os.path.exists(old_mtl):
-                    os.rename(old_mtl, new_mtl)
-
-                with open(tmp_path) as f:
-                    text = f.read()
-                text = text.replace(old_mtl_file, new_mtl_file)
-                with open(tmp_path, "w") as f:
-                    f.write(text)
-
-            elif file_type == "stl":
-                mesh.export(tmp_path, file_type="stl")
-
-            else:
-                raise ValueError(f"Unsupported file type: {file_type}")
-
+            mesh.export(tmp_path, file_type=file_type)
         except Exception:
-            # Clean up temp files on failure so nothing is orphaned
-            for path in [
-                tmp_path,
-                os.path.join(dirname, f"{os.path.basename(tmp_path)}.mtl"),
-            ]:
-                if os.path.exists(path):
-                    os.remove(path)
+            shutil.rmtree(subdir, ignore_errors=True)
             raise
 
         instance = cls(
@@ -505,25 +528,20 @@ class Mesh(Shape):
         )
 
         # Tie file lifetime to the Mesh instance
-        weakref.finalize(instance, cls._cleanup_temp_files, tmp_path, dirname)
+        weakref.finalize(instance, cls._cleanup_temp_dir, subdir)
 
         return instance
 
     @staticmethod
-    def _cleanup_temp_files(tmp_path: str, dirname: str) -> None:
+    def _cleanup_temp_dir(subdir: str) -> None:
         """
-        Clean up temporary files created for the mesh.
+        Clean up the temporary subdirectory created for the mesh.
         """
-        for path in [
-            tmp_path,
-            os.path.join(dirname, f"{os.path.basename(tmp_path)}.mtl"),
-        ]:
-            logger.debug(f"Cleaning up temporary file: {path}")
-            try:
-                if os.path.exists(path):
-                    os.remove(path)
-            except OSError:
-                pass
+        logger.debug(f"Cleaning up temporary directory: {subdir}")
+        try:
+            shutil.rmtree(subdir, ignore_errors=True)
+        except OSError:
+            pass
 
     @classmethod
     def from_vertices_and_faces(
