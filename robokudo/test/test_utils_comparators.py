@@ -15,7 +15,6 @@ from robokudo.utils.comparators import (
     TranslationComparator,
     BboxComparator,
     SizeComparator,
-    ClassnameComparator,
     HistogramComparator,
     SemanticColorComparator,
     AdditionalDataComparator,
@@ -129,28 +128,6 @@ class TestUtilsComparators(object):
             return ann
 
         return _make
-
-    @pytest.mark.parametrize(
-        ["query_value", "obj_value", "expected_similarity"],
-        [
-            ("person", "person", 1.0),
-            ("person", "anything", 0.0),
-        ],
-    )
-    def test_classname_comparator(
-        self,
-        query_value: str,
-        obj_value: str,
-        expected_similarity: float,
-        classification_annotation_from_classname: Callable[[str], Classification],
-    ):
-        query_value = classification_annotation_from_classname(query_value)
-        obj_value = classification_annotation_from_classname(obj_value)
-        comparator = ClassnameComparator(weight=1.0)
-
-        similarity = comparator.compute_similarity(query_value, obj_value)
-        assert isinstance(similarity, float)
-        assert pytest.approx(similarity) == expected_similarity
 
     @pytest.mark.parametrize(
         ["query_value", "obj_value", "expected_similarity"],

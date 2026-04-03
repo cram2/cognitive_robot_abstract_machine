@@ -15,7 +15,7 @@ if TYPE_CHECKING:
         ColorHistogram,
         SemanticColor,
     )
-    from robokudo.types.cv import Rect
+    from robokudo.types.cv import Rect, ImageROI
 
 
 class FeatureComparator:
@@ -95,21 +95,6 @@ class SizeComparator(FeatureComparator):
         sorted_query_size = np.sort(obj_value)
         size_diff = np.abs(sorted_obj_size - sorted_query_size).sum()
         return 1.0 / (1.0 + size_diff)
-
-
-class ClassnameComparator(FeatureComparator):
-    """Extended FeatureComparator that computes similarity based on the string equality between query and object values."""
-
-    def compute_similarity(
-        self, query_value: Classification, obj_value: Classification
-    ) -> float:
-        """Computes similarity between classnames based on string equality.
-
-        :param query_value: The classname to use as a baseline for comparison.
-        :param obj_value: The classname to compare against `query_value`.
-        :returns: A similarity score between 0.0 (not identical) and 1.0 (identical).
-        """
-        return 1.0 if query_value.classname == obj_value.classname else 0.0
 
 
 class HistogramComparator(FeatureComparator):
@@ -226,3 +211,30 @@ class MaskComparator(FeatureComparator):
             return mask_iou
         else:
             return 0.0
+
+
+class ImageROIComparator(FeatureComparator):
+    """Extended `FeatureComparator` that computes the IoU of two images ROIs."""
+
+    def __init__(self, weight: float = 1.0):
+        """Create a new ImageROIComparator instance."""
+        super().__init__(weight)
+
+        self.roi_comparator = RoiComparator(weight=1.0)
+        """Comparator to compute the IoU of two images ROIs."""
+
+        self.mask_comparator = MaskComparator(weight=1.0)
+        """Comparator to compute the IoU of two image masks."""
+
+    def compute_similarity(self, query_value: ImageROI, obj_value: ImageROI) -> float:
+        """Computes the similarity of two ImageROI annotations by calculating the average IoU of both bounding boxes and masks.
+
+        :param query_value: The ImageROI to use as a baseline for comparison.
+        :param obj_value: The ImageROI to compare against `query_value`.
+        :returns: A similarity score between 0.0 (no overlap) and 1.0 (100% overlap).
+        """
+        roi_sim = self.roi_comparator.compute_similarity(query_value.roi, obj_value.roi)
+        mask_sim = self.mask_comparator.compute_similarity(
+            query_value.mask, obj_value.mask
+        )
+        return (roi_sim + mask_sim) / 2.0

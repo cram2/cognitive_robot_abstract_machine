@@ -1,8 +1,3 @@
-from trimesh import Trimesh
-
-from robokudo.types.cv import TSDFAnnotation
-from semantic_digital_twin.world_description.geometry import TriangleMesh, BoundingBox
-from robokudo.defs import PACKAGE_NAME
 import copy
 import dataclasses
 import importlib
@@ -10,23 +5,26 @@ import logging
 import uuid
 from collections.abc import Iterable
 from typing import Self
-import open3d as o3d
 
 import numpy as np
+import open3d as o3d
+from trimesh import Trimesh
 from typing_extensions import Callable, List, Protocol, Dict, Any, Optional, Set
 
 import robokudo.cas
 from random_events.utils import recursive_subclasses
+from robokudo.defs import PACKAGE_NAME
 from robokudo.types.annotation import BoundingBox3DAnnotation
+from robokudo.types.cv import TSDFAnnotation
 from robokudo.utils.annotator_helper import get_cam_to_world_transform_matrix
 from robokudo.utils.comparators import (
     TranslationComparator,
-    ClassnameComparator,
     HistogramComparator,
     SemanticColorComparator,
     RoiComparator,
     AdditionalDataComparator,
     BboxComparator,
+    ClassificationComparator,
 )
 from robokudo.utils.transform import (
     get_transform_matrix_from_q,
@@ -40,6 +38,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import Shape, Color, Scale, Box
+from semantic_digital_twin.world_description.geometry import TriangleMesh
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     SemanticAnnotation,
@@ -483,7 +482,7 @@ class SemanticDigitalTwinAdapter:
 
         self.comparators = {
             "translation_vector": TranslationComparator(weight=0.4, max_distance=0.5),
-            "class": ClassnameComparator(weight=0.4),
+            "class": ClassificationComparator(weight=0.4),
             "bbox": BboxComparator(weight=0.2),
             "color_histogram": HistogramComparator(weight=0.3),
             "semantic_color": SemanticColorComparator(weight=0.2),
