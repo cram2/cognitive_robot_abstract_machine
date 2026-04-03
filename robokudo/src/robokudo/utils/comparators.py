@@ -279,11 +279,36 @@ class ImageROIComparator(FeatureComparator):
         if query_mask.shape[:2] != (query_roi.height, query_roi.width):
             xyxy = query_roi.get_corner_points()
             query_mask = query_mask[xyxy[1] : xyxy[3], xyxy[0] : xyxy[2]]
-        if obj_mask.shape[:2] != (query_roi.height, query_roi.width):
+        if obj_mask.shape[:2] != (obj_roi.height, obj_roi.width):
             xyxy = obj_roi.get_corner_points()
             obj_mask = obj_mask[xyxy[1] : xyxy[3], xyxy[0] : xyxy[2]]
 
-        mask_sim = self.mask_comparator.compute_similarity(query_mask, obj_mask)
+        # Pad the masks to be the same shape, fill new areas with zeros
+        target_shape = (
+            max(query_mask.shape[0], obj_mask.shape[0]),
+            max(query_mask.shape[1], obj_mask.shape[1]),
+        )
+        padded_query = np.pad(
+            query_mask,
+            (
+                (0, target_shape[0] - query_mask.shape[0]),
+                (0, target_shape[1] - query_mask.shape[1]),
+            ),
+            mode="constant",
+            constant_values=0,
+        )
+
+        padded_obj = np.pad(
+            obj_mask,
+            (
+                (0, target_shape[0] - obj_mask.shape[0]),
+                (0, target_shape[1] - obj_mask.shape[1]),
+            ),
+            mode="constant",
+            constant_values=0,
+        )
+
+        mask_sim = self.mask_comparator.compute_similarity(padded_query, padded_obj)
         return (roi_sim + mask_sim) / 2.0
 
 
