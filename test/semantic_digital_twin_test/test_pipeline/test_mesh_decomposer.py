@@ -10,7 +10,7 @@ from semantic_digital_twin.pipeline.mesh_decomposer import (
 from semantic_digital_twin.pipeline.pipeline import Pipeline
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def jeroen_cup_world_fixture():
     stl_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
