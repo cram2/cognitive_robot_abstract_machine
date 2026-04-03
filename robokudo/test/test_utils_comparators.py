@@ -12,6 +12,7 @@ from robokudo.types.annotation import (
     PositionAnnotation,
 )
 from robokudo.types.cv import Rect, ImageROI, Point2D
+from robokudo.types.tf import Pose
 from robokudo.utils.comparators import (
     TranslationComparator,
     BboxComparator,
@@ -24,6 +25,7 @@ from robokudo.utils.comparators import (
     ClassificationComparator,
     ImageROIComparator,
     OrientationComparator,
+    PoseComparator,
 )
 
 if TYPE_CHECKING:
@@ -497,6 +499,52 @@ class TestUtilsComparators(object):
     )
     def test_orientation_comparator(self, query_value, obj_value, expected_similarity):
         comparator = OrientationComparator(weight=1.0)
+
+        similarity = comparator.compute_similarity(query_value, obj_value)
+
+        assert isinstance(similarity, float)
+        assert similarity == pytest.approx(expected_similarity)
+
+    @pytest.mark.parametrize(
+        ["query_value", "obj_value", "expected_similarity"],
+        [
+            (
+                Pose(
+                    translation=[0.0, 0.0, 0.0],
+                    rotation=[0.0, 0.0, 0.0, 1.0],
+                ),
+                Pose(
+                    translation=[0.0, 0.0, 0.0],
+                    rotation=[0.0, 0.0, 0.0, 1.0],
+                ),
+                1.0,
+            ),
+            (
+                Pose(
+                    translation=[1.0, 0.0, 0.0],
+                    rotation=[0.0, 0.0, 0.0, 1.0],
+                ),
+                Pose(
+                    translation=[0.0, 0.0, 0.0],
+                    rotation=[0.0, 0.0, 0.0, 1.0],
+                ),
+                0.5,
+            ),
+            (
+                Pose(
+                    translation=[0.0, 0.0, 0.0],
+                    rotation=[0.0, 0.0, 0.0, 1.0],
+                ),
+                Pose(
+                    translation=[0.0, 0.0, 0.0],
+                    rotation=[0.0, 0.0, 0.0, -1.0],
+                ),
+                0.5,
+            ),
+        ],
+    )
+    def test_pose_comparator(self, query_value, obj_value, expected_similarity):
+        comparator = PoseComparator(weight=1.0)
 
         similarity = comparator.compute_similarity(query_value, obj_value)
 

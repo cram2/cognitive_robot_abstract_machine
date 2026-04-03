@@ -7,6 +7,8 @@ from robokudo.types.annotation import (
     SemanticColor,
     PositionAnnotation,
     StampedPositionAnnotation,
+    StampedPoseAnnotation,
+    StampedTransformAnnotation,
 )
 from robokudo.types.core import Annotation
 from robokudo.types.core import Type as RkType
@@ -14,6 +16,9 @@ from robokudo.types.cv import ImageROI, Rect
 from robokudo.types.tf import (
     Position,
     StampedPosition,
+    Pose,
+    StampedPose,
+    StampedTransform,
 )
 from robokudo.utils.comparators import (
     FeatureComparator,
@@ -24,7 +29,9 @@ from robokudo.utils.comparators import (
     ImageROIComparator,
     RoiComparator,
     TranslationComparator,
+    PoseComparator,
 )
+from test.krrood_test.dataset.cyclic_imports import PoseAnnotation
 
 
 class FeatureComparatorFactory:
@@ -38,6 +45,9 @@ class FeatureComparatorFactory:
         ImageROI: ImageROIComparator,
         PositionAnnotation: TranslationComparator,
         StampedPositionAnnotation: TranslationComparator,
+        PoseAnnotation: PoseComparator,
+        StampedPoseAnnotation: PoseComparator,
+        StampedTransformAnnotation: PoseComparator,
     }
     """Mapping of annotation types to feature comparators."""
 
@@ -45,9 +55,9 @@ class FeatureComparatorFactory:
         Rect: RoiComparator,
         Position: TranslationComparator,
         StampedPosition: TranslationComparator,
-        # Pose: OrientationComparator,
-        # StampedPose: OrientationComparator,
-        # StampedTransform: OrientationComparator,
+        Pose: PoseComparator,
+        StampedPose: PoseComparator,
+        StampedTransform: PoseComparator,
     }
     """Mapping of robokudo types to feature comparators."""
 

@@ -3,9 +3,10 @@ from __future__ import annotations
 import cv2
 import numpy as np
 from scipy.spatial.distance import euclidean
-from typing_extensions import TYPE_CHECKING, List, Any, Tuple, Union, Iterable
+from typing_extensions import TYPE_CHECKING, List, Any, Union, Iterable
 
 from robokudo.types.annotation import PositionAnnotation
+from robokudo.types.tf import Pose
 from robokudo.utils.non_maxima_suppression import _iou
 
 if TYPE_CHECKING:
@@ -47,8 +48,8 @@ class TranslationComparator(FeatureComparator):
 
     def compute_similarity(
         self,
-        query_value: Union[Tuple[float, float, float], PositionAnnotation],
-        obj_value: Union[Tuple[float, float, float], PositionAnnotation],
+        query_value: Union[Iterable[float], PositionAnnotation],
+        obj_value: Union[Iterable[float], PositionAnnotation],
     ) -> float:
         """Computes similarity based on translation distance between query and object values.
 
@@ -250,8 +251,7 @@ class MaskComparator(FeatureComparator):
 class ImageROIComparator(FeatureComparator):
     """Extended `FeatureComparator` that computes the IoU of two images ROIs."""
 
-    def __init__(self, weight: float = 1.0):
-        """Create a new ImageROIComparator instance."""
+    def __init__(self, weight: float = 1.0) -> None:
         super().__init__(weight)
 
         self.roi_comparator = RoiComparator(weight=1.0)
@@ -285,3 +285,35 @@ class ImageROIComparator(FeatureComparator):
 
         mask_sim = self.mask_comparator.compute_similarity(query_mask, obj_mask)
         return (roi_sim + mask_sim) / 2.0
+
+
+class PoseComparator(FeatureComparator):
+    """Extended `FeatureComparator` that computes the similarity of two poses."""
+
+    def __init__(self, weight: float = 1.0, max_distance: float = 1.0) -> None:
+        super().__init__(weight)
+
+        self.translation_comparator = TranslationComparator(
+            weight=1.0, max_distance=max_distance
+        )
+        """Comparator to compute the similarity of two positions."""
+
+        self.orientation_comparator = OrientationComparator(weight=1.0)
+        """Comparator to compute the similarity of two orientations."""
+
+    def compute_similarity(self, query_value: Pose, obj_value: Pose) -> float:
+        """Computes the similarity of two poses by comparing translation and orientation values.
+
+        :param query_value: The Pose to use as a baseline for comparison.
+        :param obj_value: The Pose to compare against `query_value`.
+        :returns: A similarity score between 0.0 (no similarity at all) and 1.0 (completely identical).
+        """
+        position_sim = self.translation_comparator.compute_similarity(
+            query_value.translation, obj_value.translation
+        )
+
+        pose_sim = self.translation_comparator.compute_similarity(
+            query_value.rotation, obj_value.rotation
+        )
+
+        return (position_sim + pose_sim) / 2.0
