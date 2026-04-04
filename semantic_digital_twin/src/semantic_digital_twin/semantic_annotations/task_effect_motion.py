@@ -5,18 +5,13 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Optional, Callable, Any
 
 from giskardpy.executor import Executor
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from ..spatial_types import Point3
-from ..world import World
-from ..world_description.world_entity import (
-    SemanticAnnotation,
-    Body,
-    Region,
-    Connection,
-)
+from world import World
+from world_description.world_entity import SemanticAnnotation, Connection
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Effect(SemanticAnnotation):
     """
     Represents a desired or achieved effect in the environment.
@@ -126,11 +121,12 @@ class RunMSCModel(EffectExecutionModel):
                 "RunMSCModel requires a MotionStatechart instance to run."
             )
 
-        executor = Executor(world=world)
+        context = MotionStatechartContext(world=world)
+        executor = Executor(context=context)
         executor.compile(motion_statechart=self.msc)
 
         # Introspective rollout: mutate world during rollout but always reset before returning
-        initial_state_data = world.state.data.copy()
+        initial_state_data = world.state._data.copy()
         try:
             trajectory: List[float] = []
             for _ in range(self.timeout):
@@ -143,7 +139,7 @@ class RunMSCModel(EffectExecutionModel):
             achieved = effect.is_achieved()
 
         finally:
-            world.state.data = initial_state_data
+            world.state._data = initial_state_data
             world.notify_state_change()
 
         return trajectory, achieved

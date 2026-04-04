@@ -9,13 +9,8 @@ from typing import Optional
 from dataclasses import dataclass, field
 
 from giskardpy.executor import Executor
-from giskardpy.model.collision_matrix_manager import (
-    CollisionRequest,
-    CollisionAvoidanceTypes,
-)
-from giskardpy.model.collision_world_syncer import CollisionCheckerLib
-from giskardpy.motion_statechart.data_types import LifeCycleValues
-from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidance
+from giskardpy.motion_statechart.context import MotionStatechartContext
+
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion, CancelMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
@@ -28,17 +23,12 @@ from giskardpy.qp.exceptions import (
     HardConstraintsViolatedException,
     InfeasibleException,
 )
-from krrood.entity_query_language.entity import (
-    entity,
-    variable,
-    variable_from,
-    or_,
-    and_,
-)
-from krrood.entity_query_language.entity_result_processors import an
+
+
 from giskardpy.motion_statechart.tasks.pointing import Pointing
+from krrood.entity_query_language.factories import an, entity, variable, or_, and_
 from krrood.entity_query_language.predicate import Predicate, HasType, HasTypes
-from pycram.datastructures.pose import PyCramQuaternion
+
 from pycram.utils import link_pose_for_joint_config
 from ..robots.abstract_robot import AbstractRobot
 from ..semantic_annotations.semantic_annotations import Drawer, Door
@@ -89,7 +79,7 @@ class Causes(Predicate):
         return self._map_motion_to_effect()
 
     def _map_motion_to_effect(self):
-        initial_state_data = self.environment.state.data.copy()
+        initial_state_data = self.environment.state._data.copy()
         trajectory = self.motion.trajectory
         actuator = self.motion.actuator
 
@@ -100,7 +90,7 @@ class Causes(Predicate):
 
         is_achieved_post = self.effect.is_achieved()
 
-        self.environment.state.data = initial_state_data
+        self.environment.state._data = initial_state_data
         self.environment.notify_state_change()
 
         return (not is_achieved_pre) and is_achieved_post
@@ -125,11 +115,7 @@ class SatisfiesRequest(Predicate):
         # Placeholder logic
         task_type = (task.task_type or "").lower()
         if not "open" in task.name and not "close" in task.name:
-            target_name = (
-                effect.target_object.body.name.name
-                if isinstance(effect.target_object, Door)
-                else effect.target_object.container.body.name.name
-            )
+            target_name = effect.target_object.root.name.name
             if not target_name == task.name:
                 return False
 
@@ -159,7 +145,7 @@ class CanExecute(Predicate):
         if not self.motion.trajectory:
             return False
 
-        initial_state_data = self.robot._world.state.data.copy()
+        initial_state_data = self.robot._world.state._data.copy()
         # The child of the connection (actuator) is typically the movable part (e.g., drawer container)
 
         if self.motion.motion_model:
@@ -171,45 +157,42 @@ class CanExecute(Predicate):
                         or_(
                             and_(
                                 HasType(drawer, Drawer),
-                                drawer.container.body.parent_connection
-                                == self.motion.actuator,
+                                drawer.root.parent_connection == self.motion.actuator,
                             ),
                             and_(
                                 HasType(drawer, Door),
-                                drawer.body.parent_connection == self.motion.actuator,
+                                drawer.root.parent_connection == self.motion.actuator,
                             ),
                         )
                     )
                 ).evaluate()
-            )[0].handle.body
+            )[0].handle
 
         # 1. Transform trajectory to handle coordinates (PoseStamped sequence)
         handle_trajectory = []
         for position in self.motion.trajectory[:]:
             joint_config = {self.motion.actuator.name.name: position}
             # Calculate the global pose of the target body for the given joint position
-            pose = link_pose_for_joint_config(
-                target_body, joint_config, self.robot._world
-            )
+            pose = link_pose_for_joint_config(target_body, joint_config)
             if "sink_area_sink" in [b.name.name for b in self.robot._world.bodies]:
                 pose.rotate_by_quaternion([0, 0, 1, 0])
                 pose.rotate_by_quaternion([0.6816388, 0, 0, 0.7316889])
             handle_trajectory.append(pose)
 
-        # 1.1 take first half of the handle trajectory points and invert them to be used as an approach movement
+            # 1.1 take first half of the handle trajectory points and invert them to be used as an approach movement
         approach_trajectory = handle_trajectory[: len(handle_trajectory) // 4][::-1]
 
-        self.robot._world.state.data = initial_state_data
+        self.robot._world.state._data = initial_state_data
         self.robot._world.notify_state_change()
 
         # 2. Test execution for each gripper
         result = False
         root = self.robot._world.root
         for gripper in self.robot.manipulators:
-            initial_state_data = self.robot._world.state.data.copy()
+            initial_state_data = self.robot._world.state._data.copy()
             msc = MotionStatechart()
             pointing_axis = self.robot.base.main_axis
-            goal_point = handle_trajectory[0].to_spatial_type().to_position()
+            goal_point = handle_trajectory[0].to_position()
             goal_point.z = self.robot.base.bodies[0].global_pose.z
             # Facing the direction
             point = Pointing(
@@ -227,8 +210,9 @@ class CanExecute(Predicate):
                 goal = CartesianPose(
                     root_link=root,
                     tip_link=gripper.tool_frame,
-                    goal_pose=pose.to_spatial_type(),
+                    goal_pose=pose,
                     name=f"approach_waypoint_{i}",
+                    threshold=0.05,
                 )
                 approach_waypoints.append(goal)
 
@@ -237,8 +221,9 @@ class CanExecute(Predicate):
                 goal = CartesianPose(
                     root_link=root,
                     tip_link=gripper.tool_frame,
-                    goal_pose=pose.to_spatial_type(),
+                    goal_pose=pose,
                     name=f"waypoint_{i}",
+                    threshold=0.05,
                 )
                 waypoints.append(goal)
 
@@ -251,78 +236,74 @@ class CanExecute(Predicate):
                 nodes=waypoints, name="full_trajectory_sequence"
             )
             msc.add_node(full_trajectory_sequence)
-            keep_relation = CartesianPose(
-                name="hold handle",
-                root_link=target_body,
-                tip_link=gripper.tool_frame,
-                goal_pose=HomogeneousTransformationMatrix(
-                    reference_frame=gripper.tool_frame, child_frame=gripper.tool_frame
-                ),
-                # weight=self.weight,
-            )
-            msc.add_node(keep_relation)
+            # keep_relation = CartesianPose(
+            #     name="hold handle",
+            #     root_link=target_body,
+            #     tip_link=gripper.tool_frame,
+            #     goal_pose=HomogeneousTransformationMatrix(
+            #         reference_frame=gripper.tool_frame, child_frame=gripper.tool_frame
+            #     ),
+            #     # weight=self.weight,
+            # )
+            # msc.add_node(keep_relation)
 
             approach_trajectory_sequence.start_condition = point.observation_variable
 
             full_trajectory_sequence.start_condition = (
                 approach_trajectory_sequence.observation_variable
             )
-            keep_relation.start_condition = (
-                approach_trajectory_sequence.observation_variable
-            )
+            # keep_relation.start_condition = (
+            #     approach_trajectory_sequence.observation_variable
+            # )
 
             approach_trajectory_sequence.end_condition = (
                 approach_trajectory_sequence.observation_variable
             )
             point.end_condition = point.observation_variable
 
-            collision_node = CollisionAvoidance(
-                collision_entries=[
-                    CollisionRequest.avoid_all_collision(distance=0.01),
-                    CollisionRequest(
-                        type_=CollisionAvoidanceTypes.ALLOW_COLLISION,
-                        body_group1=gripper.bodies,
-                        body_group2=list(
-                            list(
-                                an(
-                                    entity(
-                                        drawer := variable_from(
-                                            domain=target_body._semantic_annotations
-                                        )
-                                    ).where(
-                                        HasTypes(drawer, (Drawer, Door)),
-                                        drawer.handle.body == target_body,
-                                    )
-                                ).evaluate()
-                            )[0].bodies
-                        ),
-                    ),
-                ],
-            )
-            msc.add_node(collision_node)
+            # collision_node = CollisionAvoidance(
+            #     collision_entries=[
+            #         CollisionRequest.avoid_all_collision(distance=0.01),
+            #         CollisionRequest(
+            #             type_=CollisionAvoidanceTypes.ALLOW_COLLISION,
+            #             body_group1=gripper.bodies,
+            #             body_group2=list(
+            #                 list(
+            #                     an(
+            #                         entity(
+            #                             drawer := variable_from(
+            #                                 domain=target_body._semantic_annotations
+            #                             )
+            #                         ).where(
+            #                             HasTypes(drawer, (Drawer, Door)),
+            #                             drawer.handle.body == target_body,
+            #                         )
+            #                     ).evaluate()
+            #                 )[0].bodies
+            #             ),
+            #         ),
+            #     ],
+            # )
+            # msc.add_node(collision_node)
 
             # The MSC ends when the sequence is done
             msc.add_node(EndMotion.when_true(full_trajectory_sequence))
             # Simulate execution in the world
             executor = Executor(
-                world=self.robot._world, collision_checker=CollisionCheckerLib.bpb
+                context=MotionStatechartContext(
+                    world=self.robot._world,
+                ),
             )
 
-            executor.compile(msc)
+            executor.compile(motion_statechart=msc)
 
             # Tick the executor until the motion ends or times out
-            try:
-                executor.tick_until_end(timeout=900)
-            except TimeoutError as e:
-                pass
-            except HardConstraintsViolatedException:
-                pass
-            except InfeasibleException:
-                pass
+
+            executor.tick_until_end(timeout=1500)
 
             # if sequence_goal.life_cycle_state == LifeCycleValues.DONE:
             result = msc.is_end_motion()
-            self.robot._world.state.data = initial_state_data
+            self.robot._world.state._data = initial_state_data
             self.robot._world.notify_state_change()
             if result:
                 break

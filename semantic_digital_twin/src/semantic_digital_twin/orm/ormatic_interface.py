@@ -39,6 +39,7 @@ import semantic_digital_twin.pipeline.gltf_loader
 import semantic_digital_twin.pipeline.mesh_decomposer
 import semantic_digital_twin.pipeline.pipeline
 import semantic_digital_twin.reasoning.predicates
+import semantic_digital_twin.reasoning.predicates_base
 import semantic_digital_twin.reasoning.reasoner
 import semantic_digital_twin.reasoning.world_reasoner
 import semantic_digital_twin.robots.abstract_robot
@@ -64,6 +65,7 @@ import semantic_digital_twin.robots.ur5e_controlled
 import semantic_digital_twin.semantic_annotations.mixins
 import semantic_digital_twin.semantic_annotations.position_descriptions
 import semantic_digital_twin.semantic_annotations.semantic_annotations
+import semantic_digital_twin.semantic_annotations.task_effect_motion
 import semantic_digital_twin.spatial_computations.ik_solver
 import semantic_digital_twin.spatial_types.derivatives
 import semantic_digital_twin.spatial_types.spatial_types
@@ -327,6 +329,40 @@ class JointStateDAO_connections_association(Base, AssociationDataAccessObject):
 
     target: Mapped[ActiveConnection1DOFDAO] = relationship(
         "ActiveConnection1DOFDAO", foreign_keys=[target_activeconnection1dofdao_id]
+    )
+
+
+class JointStateDAO_joint_names_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "_45083347919329008091636463915192410260878840213657200731565101"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_jointstatedao_id: Mapped[int] = mapped_column(
+        ForeignKey("JointStateDAO.database_id")
+    )
+    target_connectiondao_id: Mapped[int] = mapped_column(
+        ForeignKey("ConnectionDAO.database_id")
+    )
+
+    target: Mapped[ConnectionDAO] = relationship(
+        "ConnectionDAO", foreign_keys=[target_connectiondao_id]
+    )
+
+
+class JointStateDAO_kinematic_chains_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "_90531419516336285247311033348050004136728735039483081862594264"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_jointstatedao_id: Mapped[int] = mapped_column(
+        ForeignKey("JointStateDAO.database_id")
+    )
+    target_kinematicchaindao_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicChainDAO.database_id")
+    )
+
+    target: Mapped[KinematicChainDAO] = relationship(
+        "KinematicChainDAO", foreign_keys=[target_kinematicchaindao_id]
     )
 
 
@@ -1332,6 +1368,35 @@ class BoundingBoxDAO(
     )
 
 
+class CanExecuteDAO(
+    Base, DataAccessObject[semantic_digital_twin.reasoning.predicates_base.CanExecute]
+):
+
+    __tablename__ = "CanExecuteDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    motion_id: Mapped[int] = mapped_column(
+        ForeignKey("MotionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    robot_id: Mapped[int] = mapped_column(
+        ForeignKey("AbstractRobotDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    motion: Mapped[MotionDAO] = relationship(
+        "MotionDAO", uselist=False, foreign_keys=[motion_id], post_update=True
+    )
+    robot: Mapped[AbstractRobotDAO] = relationship(
+        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+    )
+
+
 class CaseReasonerDAO(
     Base, DataAccessObject[semantic_digital_twin.reasoning.reasoner.CaseReasoner]
 ):
@@ -1344,6 +1409,46 @@ class CaseReasonerDAO(
 
     model_directory: Mapped[builtins.str] = mapped_column(
         String(255), use_existing_column=True
+    )
+
+
+class CausesDAO(
+    Base, DataAccessObject[semantic_digital_twin.reasoning.predicates_base.Causes]
+):
+
+    __tablename__ = "CausesDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    effect_id: Mapped[int] = mapped_column(
+        ForeignKey("EffectDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    environment_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    motion_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("MotionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    effect: Mapped[EffectDAO] = relationship(
+        "EffectDAO", uselist=False, foreign_keys=[effect_id], post_update=True
+    )
+    environment: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[environment_id],
+        post_update=True,
+    )
+    motion: Mapped[MotionDAO] = relationship(
+        "MotionDAO", uselist=False, foreign_keys=[motion_id], post_update=True
     )
 
 
@@ -2660,6 +2765,51 @@ class JointStateDAO(
     )
 
 
+class JointStateDAO(
+    Base, DataAccessObject[semantic_digital_twin.robots.abstract_robot.JointState]
+):
+
+    __tablename__ = "JointStateDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    state_type: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
+
+    joint_positions: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    name_id: Mapped[int] = mapped_column(
+        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    name: Mapped[PrefixedNameDAO] = relationship(
+        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
+    )
+    joint_names: Mapped[builtins.list[JointStateDAO_joint_names_association]] = (
+        relationship(
+            "JointStateDAO_joint_names_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[JointStateDAO_joint_names_association.source_jointstatedao_id]",
+        )
+    )
+    kinematic_chains: Mapped[
+        builtins.list[JointStateDAO_kinematic_chains_association]
+    ] = relationship(
+        "JointStateDAO_kinematic_chains_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[JointStateDAO_kinematic_chains_association.source_jointstatedao_id]",
+    )
+
+
 class KinematicStructureEntitySpatialRelationDAO(
     Base,
     DataAccessObject[
@@ -2866,6 +3016,45 @@ class MismatchingIDsInWorldModificationDAO(
     )
     actual_uuids: Mapped[typing.List[uuid.UUID]] = mapped_column(
         JSON, nullable=False, use_existing_column=True
+    )
+
+
+class MotionDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.task_effect_motion.Motion
+    ],
+):
+
+    __tablename__ = "MotionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    trajectory: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    actuator_id: Mapped[int] = mapped_column(
+        ForeignKey("ConnectionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    motion_model_id: Mapped[int] = mapped_column(
+        ForeignKey("RunMSCModelDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    actuator: Mapped[ConnectionDAO] = relationship(
+        "ConnectionDAO", uselist=False, foreign_keys=[actuator_id], post_update=True
+    )
+    motion_model: Mapped[RunMSCModelDAO] = relationship(
+        "RunMSCModelDAO",
+        uselist=False,
+        foreign_keys=[motion_model_id],
+        post_update=True,
     )
 
 
@@ -3312,6 +3501,68 @@ class RootNodeNotFoundErrorDAO(
 
     candidates: Mapped[typing.List[builtins.str]] = mapped_column(
         JSON, nullable=False, use_existing_column=True
+    )
+
+
+class RunMSCModelDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.task_effect_motion.RunMSCModel
+    ],
+):
+
+    __tablename__ = "RunMSCModelDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    timeout: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    msc: Mapped[giskardpy.motion_statechart.motion_statechart.MotionStatechart] = (
+        mapped_column(
+            sqlalchemy.sql.sqltypes.JSON, nullable=False, use_existing_column=True
+        )
+    )
+
+    actuator_id: Mapped[int] = mapped_column(
+        ForeignKey("ConnectionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    actuator: Mapped[ConnectionDAO] = relationship(
+        "ConnectionDAO", uselist=False, foreign_keys=[actuator_id], post_update=True
+    )
+
+
+class SatisfiesRequestDAO(
+    Base,
+    DataAccessObject[semantic_digital_twin.reasoning.predicates_base.SatisfiesRequest],
+):
+
+    __tablename__ = "SatisfiesRequestDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    task_id: Mapped[int] = mapped_column(
+        ForeignKey("TaskRequestDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    effect_id: Mapped[int] = mapped_column(
+        ForeignKey("EffectDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    task: Mapped[TaskRequestDAO] = relationship(
+        "TaskRequestDAO", uselist=False, foreign_keys=[task_id], post_update=True
+    )
+    effect: Mapped[EffectDAO] = relationship(
+        "EffectDAO", uselist=False, foreign_keys=[effect_id], post_update=True
     )
 
 
@@ -4028,6 +4279,25 @@ class COACDMeshDecomposerDAO(
         "polymorphic_identity": "COACDMeshDecomposerDAO",
         "inherit_condition": database_id == MeshDecomposerDAO.database_id,
     }
+
+
+class TaskRequestDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.task_effect_motion.TaskRequest
+    ],
+):
+
+    __tablename__ = "TaskRequestDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    task_type: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
+    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
 
 
 class UnknownWorldModificationDAO(
@@ -5798,6 +6068,81 @@ class DoubleDoorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DoubleDoorDAO",
         "inherit_condition": database_id == SemanticAnnotationDAO.database_id,
+    }
+
+
+class EffectDAO(
+    SemanticAnnotationDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.task_effect_motion.Effect
+    ],
+):
+
+    __tablename__ = "EffectDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SemanticAnnotationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    goal_value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    tolerance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    target_object_id: Mapped[int] = mapped_column(
+        ForeignKey("SemanticAnnotationDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    target_object: Mapped[SemanticAnnotationDAO] = relationship(
+        "SemanticAnnotationDAO",
+        uselist=False,
+        foreign_keys=[target_object_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "EffectDAO",
+        "inherit_condition": database_id == SemanticAnnotationDAO.database_id,
+    }
+
+
+class ClosedEffectDAO(
+    EffectDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.task_effect_motion.ClosedEffect
+    ],
+):
+
+    __tablename__ = "ClosedEffectDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(EffectDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ClosedEffectDAO",
+        "inherit_condition": database_id == EffectDAO.database_id,
+    }
+
+
+class OpenedEffectDAO(
+    EffectDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.task_effect_motion.OpenedEffect
+    ],
+):
+
+    __tablename__ = "OpenedEffectDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(EffectDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "OpenedEffectDAO",
+        "inherit_condition": database_id == EffectDAO.database_id,
     }
 
 
@@ -9715,6 +10060,20 @@ class WorldStateMappingDAO(
     )
     ids: Mapped[typing.List[uuid.UUID]] = mapped_column(
         JSON, nullable=False, use_existing_column=True
+    )
+
+
+class WorldStateEntryViewDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.world_state.WorldStateEntryView
+    ],
+):
+
+    __tablename__ = "WorldStateEntryViewDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
     )
 
 
