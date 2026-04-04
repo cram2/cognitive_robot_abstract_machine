@@ -8,7 +8,7 @@ Body Motion Problem. Different problem domains might need to overwrite an implem
 from typing import Optional
 from dataclasses import dataclass, field
 
-from giskardpy.executor import Executor
+from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 
 from giskardpy.motion_statechart.goals.templates import Sequence
@@ -30,18 +30,18 @@ from krrood.entity_query_language.factories import an, entity, variable, or_, an
 from krrood.entity_query_language.predicate import Predicate, HasType, HasTypes
 
 from pycram.utils import link_pose_for_joint_config
-from ..robots.abstract_robot import AbstractRobot
-from ..semantic_annotations.semantic_annotations import Drawer, Door
-from ..semantic_annotations.task_effect_motion import (
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Door
+from semantic_digital_twin.semantic_annotations.task_effect_motion import (
     TaskRequest,
     Effect,
     Motion,
     OpenedEffect,
     ClosedEffect,
 )
-from ..spatial_types import Vector3, HomogeneousTransformationMatrix
-from ..world import World
-from ..world_description.world_entity import SemanticAnnotation
+from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
 
 @dataclass
@@ -90,7 +90,7 @@ class Causes(Predicate):
 
         is_achieved_post = self.effect.is_achieved()
 
-        self.environment.state._data = initial_state_data
+        self.environment.state._data[:] = initial_state_data
         self.environment.notify_state_change()
 
         return (not is_achieved_pre) and is_achieved_post
@@ -175,14 +175,19 @@ class CanExecute(Predicate):
             # Calculate the global pose of the target body for the given joint position
             pose = link_pose_for_joint_config(target_body, joint_config)
             if "sink_area_sink" in [b.name.name for b in self.robot._world.bodies]:
-                pose.rotate_by_quaternion([0, 0, 1, 0])
-                pose.rotate_by_quaternion([0.6816388, 0, 0, 0.7316889])
+                rotation1 = HomogeneousTransformationMatrix.from_xyz_quaternion(
+                    quat_x=0, quat_y=0, quat_z=1, quat_w=0
+                )
+                rotation2 = HomogeneousTransformationMatrix.from_xyz_quaternion(
+                    quat_x=0.6816388, quat_y=0, quat_z=0, quat_w=0.7316889
+                )
+                pose = (pose.to_homogeneous_matrix() @ rotation1 @ rotation2).to_pose()
             handle_trajectory.append(pose)
 
             # 1.1 take first half of the handle trajectory points and invert them to be used as an approach movement
         approach_trajectory = handle_trajectory[: len(handle_trajectory) // 4][::-1]
 
-        self.robot._world.state._data = initial_state_data
+        self.robot._world.state._data[:] = initial_state_data
         self.robot._world.notify_state_change()
 
         # 2. Test execution for each gripper
@@ -236,25 +241,25 @@ class CanExecute(Predicate):
                 nodes=waypoints, name="full_trajectory_sequence"
             )
             msc.add_node(full_trajectory_sequence)
-            # keep_relation = CartesianPose(
-            #     name="hold handle",
-            #     root_link=target_body,
-            #     tip_link=gripper.tool_frame,
-            #     goal_pose=HomogeneousTransformationMatrix(
-            #         reference_frame=gripper.tool_frame, child_frame=gripper.tool_frame
-            #     ),
-            #     # weight=self.weight,
-            # )
-            # msc.add_node(keep_relation)
+            keep_relation = CartesianPose(
+                name="hold handle",
+                root_link=target_body,
+                tip_link=gripper.tool_frame,
+                goal_pose=HomogeneousTransformationMatrix(
+                    reference_frame=gripper.tool_frame, child_frame=gripper.tool_frame
+                ),
+                # weight=self.weight,
+            )
+            msc.add_node(keep_relation)
 
             approach_trajectory_sequence.start_condition = point.observation_variable
 
             full_trajectory_sequence.start_condition = (
                 approach_trajectory_sequence.observation_variable
             )
-            # keep_relation.start_condition = (
-            #     approach_trajectory_sequence.observation_variable
-            # )
+            keep_relation.start_condition = (
+                approach_trajectory_sequence.observation_variable
+            )
 
             approach_trajectory_sequence.end_condition = (
                 approach_trajectory_sequence.observation_variable
@@ -293,17 +298,19 @@ class CanExecute(Predicate):
                 context=MotionStatechartContext(
                     world=self.robot._world,
                 ),
+                pacer=SimulationPacer(real_time_factor=1.0),
             )
 
             executor.compile(motion_statechart=msc)
 
             # Tick the executor until the motion ends or times out
+            try:
+                executor.tick_until_end(timeout=900)
+            except TimeoutError:
+                pass
 
-            executor.tick_until_end(timeout=1500)
-
-            # if sequence_goal.life_cycle_state == LifeCycleValues.DONE:
             result = msc.is_end_motion()
-            self.robot._world.state._data = initial_state_data
+            self.robot._world.state._data[:] = initial_state_data
             self.robot._world.notify_state_change()
             if result:
                 break

@@ -4,11 +4,14 @@ from abc import ABC
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Optional, Callable, Any
 
-from giskardpy.executor import Executor
+from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from world import World
-from world_description.world_entity import SemanticAnnotation, Connection
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import (
+    SemanticAnnotation,
+    Connection,
+)
 
 
 @dataclass(eq=False, kw_only=True)
@@ -122,7 +125,10 @@ class RunMSCModel(EffectExecutionModel):
             )
 
         context = MotionStatechartContext(world=world)
-        executor = Executor(context=context)
+        executor = Executor(
+            context=context,
+            pacer=SimulationPacer(real_time_factor=1.0),
+        )
         executor.compile(motion_statechart=self.msc)
 
         # Introspective rollout: mutate world during rollout but always reset before returning
@@ -139,7 +145,7 @@ class RunMSCModel(EffectExecutionModel):
             achieved = effect.is_achieved()
 
         finally:
-            world.state._data = initial_state_data
+            world.state._data[:] = initial_state_data
             world.notify_state_change()
 
         return trajectory, achieved

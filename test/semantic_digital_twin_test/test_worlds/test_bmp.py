@@ -8,7 +8,6 @@ from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from krrood.entity_query_language.factories import variable, an, set_of
-from semantic_annotations.task_effect_motion import Motion
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -335,7 +334,9 @@ class TestBodyMotionProblem:
 
         # change the world state
         for drawer in drawers:
-            drawer.root.parent_connection.position = 0.3
+            drawer.root.parent_connection.position = (
+                drawer.root.parent_connection.active_dofs[0].limits.upper.position
+            )
         apartment_world.notify_state_change()
 
         # query again
@@ -370,13 +371,14 @@ class TestBodyMotionProblem:
         viz.with_tf_publisher()
 
         effects, motions, open_task, close_task, drawers = self._extend_world(
-            world, only_doors=False
+            world, only_drawers=True
         )
 
-        task_sym = variable(
-            TaskRequest,
-            domain=[TaskRequest(task_type="open", name="oven_area_oven_door")],
-        )
+        # task_sym = variable(
+        #     TaskRequest,
+        #     domain=[TaskRequest(task_type="open", name="oven_area_oven_door")],
+        # )
+        task_sym = variable(TaskRequest, domain=[open_task])
         effect_sym = variable(Effect, domain=effects)
         motion_sym = variable(Motion, domain=motions)
 
@@ -396,7 +398,7 @@ class TestBodyMotionProblem:
         self.present_results(results, robot)
         print(len(results))
         # print(motion)
-        # assert len(results) == len(drawers)
+        assert len(results) == len(drawers)
         names = []
         for r in results:
             task, motion, effect = r.values()
@@ -432,8 +434,7 @@ class TestBodyMotionProblem:
 
         query = an(
             set_of(task_sym, motion_sym, effect_sym).where(
-                satisfies_request,
-                causes_opening,
+                satisfies_request, causes_opening, can_execute
             )
         )
 
@@ -543,7 +544,6 @@ class TestBodyMotionProblem:
         effects, motions, _, _, _ = self._extend_world(world)
 
         motion = motions[0]
-
         # Need a trajectory for CanExecute to return True
         motion.trajectory = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
         robot = PR2.from_world(world)
