@@ -1,0 +1,14 @@
+[
+  "case.milk == 1",
+  "case.aquatic == 1",
+  "case.feathers == 1",
+  "case.backbone == 0 and case.breathes == 0",
+  "case.fins == 0",
+  "case.feathers == 1",
+  "case.eggs == 1 and case.backbone == 0",
+  "case.backbone == 1",
+  "case.backbone == 1 and case.tail == 1",
+  "case.backbone == 0 and case.eggs == 0",
+  "case.breathes == 0",
+  "case.legs == 0"
+]

@@ -2,8 +2,10 @@ import inspect
 import sys
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Callable
 from uuid import UUID
 
+import typing_extensions
 from typing_extensions import List, Type, Generic, TYPE_CHECKING
 from typing_extensions import TypeVar, get_origin, get_args
 
@@ -26,7 +28,11 @@ def classes_of_module(module) -> List[Type]:
 def behaves_like_a_built_in_class(
     clazz: Type,
 ) -> bool:
-    return is_builtin_class(clazz) or clazz == UUID or (inspect.isclass(clazz) and issubclass(clazz, Enum))
+    return (
+        is_builtin_class(clazz)
+        or clazz == UUID
+        or (inspect.isclass(clazz) and issubclass(clazz, Enum))
+    )
 
 
 def is_builtin_class(clazz: Type) -> bool:
@@ -61,3 +67,18 @@ def get_generic_type_param(cls, generic_base):
         if issubclass(get_origin(base), generic_base):
             return get_args(base)
     return None
+
+
+def get_type_hint_of_keyword_argument(callable_: Callable, name: str):
+    """
+    :param callable_: A callable to inspect
+    :param name: The name of the argument
+    :return: The type hint of the argument
+    """
+    hints = typing_extensions.get_type_hints(
+        callable_,
+        globalns=getattr(callable_, "__globals__", None),
+        localns=None,
+        include_extras=True,  # keeps Annotated[...] / other extras if you use them
+    )
+    return hints.get(name)

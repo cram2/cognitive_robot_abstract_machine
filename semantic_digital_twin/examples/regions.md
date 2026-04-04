@@ -30,7 +30,7 @@ First, let's create a simple table with one leg.
 
 ```{code-cell} ipython3
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection, Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -44,7 +44,7 @@ root = Body(name=PrefixedName("root"))
 table_leg = Body(name=PrefixedName("leg"))
 leg_shapes = [
     Box(
-        origin=TransformationMatrix(reference_frame=table_leg),
+        origin=HomogeneousTransformationMatrix(reference_frame=table_leg),
         scale=Scale(0.1, 0.1, 0.6),
     )
 ]
@@ -54,7 +54,7 @@ table_leg.visual = leg_shapes
 table_top = Body(name=PrefixedName("top"))
 table_top_shapes = [
     Box(
-        origin=TransformationMatrix(reference_frame=table_top),
+        origin=HomogeneousTransformationMatrix(reference_frame=table_top),
         scale=Scale(1, 1, 0.05),
     )
 ]
@@ -68,7 +68,7 @@ with world.modify_world():
     leg_to_top = FixedConnection(
         parent=table_leg,
         child=table_top,
-        parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+        parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
             z=0.3, reference_frame=table_leg
         ),
     )
@@ -83,7 +83,7 @@ table_surface = Region(
 )
 
 surface = Box(
-    origin=TransformationMatrix.from_xyz_rpy(z=0.05 / 2, reference_frame=table_surface),
+    origin=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.05 / 2, reference_frame=table_surface),
     scale=Scale(1, 1, 0.001),
 )
 table_surface.area = [surface]
@@ -107,7 +107,7 @@ We can now see that if we move the table, we also move the region.
 print(table_surface.global_pose.to_position().to_np()[:3])
 
 with world.modify_world():
-    root_to_leg.origin = TransformationMatrix.from_xyz_rpy(
+    root_to_leg.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1.0, y=2.0, reference_frame=table_leg
     )
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, MISSING
 from functools import lru_cache
+from inspect import isclass
+from typing import Union, Type
 
 from typing_extensions import TypeVar, Type, List, Optional
 
@@ -53,7 +55,11 @@ def inheritance_path_length(child_class: Type, parent_class: Type) -> Optional[i
     :param parent_class: The parent class.
     :return: The minimum path length between `child_class` and `parent_class` or None if no path exists.
     """
-    if not issubclass(child_class, parent_class):
+    if not (
+        isclass(child_class)
+        and isclass(parent_class)
+        and issubclass(child_class, parent_class)
+    ):
         return None
 
     return _inheritance_path_length(child_class, parent_class, 0)
@@ -79,3 +85,48 @@ def _inheritance_path_length(
             for base in child_class.__bases__
             if issubclass(base, parent_class)
         )
+
+
+def module_and_class_name(t: Union[Type, _SpecialForm]) -> str:
+    return f"{t.__module__}.{t.__name__}"
+
+
+def get_default_value(dataclass_type, field_name):
+    """
+    Return the default value for a given field in a dataclass.
+
+    :param dataclass_type: The dataclass type to get the default value for.
+    :param field_name: The name of the field to get the default value for.
+
+    :return: The default value for the field.
+    """
+    for f in fields(dataclass_type):
+        if f.name != field_name:
+            continue
+        if f.default is not MISSING:
+            return f.default
+        elif f.default_factory is not MISSING:  # handles mutable defaults
+            return f.default_factory()
+        else:
+            raise KeyError(f"No default value for field '{field_name}'")
+    return None
+
+
+def get_default_values_for_dataclass(dataclass_type):
+    """
+    Return a dict mapping field names to their default values.
+    Only includes fields that actually define a default.
+
+    :param dataclass_type: The dataclass type to get the default values for.
+
+    :return: A dict mapping field names to their default values.
+    """
+    defaults = {}
+
+    for f in fields(dataclass_type):
+        if f.default is not MISSING:
+            defaults[f.name] = f.default
+        elif f.default_factory is not MISSING:
+            defaults[f.name] = f.default_factory()
+
+    return defaults

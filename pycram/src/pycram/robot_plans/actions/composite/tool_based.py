@@ -5,29 +5,25 @@ from dataclasses import dataclass
 from time import sleep
 from typing import Tuple
 
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     SemanticAnnotation,
 )
 from typing_extensions import Union, Optional, Iterable
 
-from ...motions.gripper import MoveTCPMotion
-from .... import utils
-from ....datastructures.pose import PoseStamped
-from ....has_parameters import has_parameters
-from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.enums import (
+from pycram.robot_plans.motions.gripper import MoveToolCenterPointMotion
+from pycram import utils
+from pycram.datastructures.enums import (
     Arms,
     AxisIdentifier,
     Grasp,
     ApproachDirection,
     VerticalAlignment,
 )
-from ....robot_description import RobotDescription
-from ....robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.base import ActionDescription
 
 
-@has_parameters
 @dataclass
 class MixingAction(ActionDescription):
     """
@@ -67,21 +63,9 @@ class MixingAction(ActionDescription):
             spiral = lt.transform_pose(p, "map")
             spiral.pose.position.z += height_offset
             World.current_world.add_vis_axis(spiral)
-            MoveTCPMotion(spiral, self.arm).perform()
+            MoveToolCenterPointMotion(spiral, self.arm).perform()
 
         World.current_world.remove_vis_axis()
-
-    @classmethod
-    def description(
-        cls,
-        object_: Union[Iterable[Body], Body],
-        tool: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
-        arm: Optional[Union[Iterable[Arms], Arms]] = None,
-        technique: Optional[Union[Iterable[str], str]] = None,
-    ):
-        return PartialDesignator(
-            cls, object_=object_, tool=tool, arm=arm, technique=technique
-        )
 
 
 @dataclass
@@ -130,7 +114,7 @@ class PouringAction(ActionDescription):
         pose = lt.transform_pose(pose, "map")
 
         World.current_world.add_vis_axis(pose)
-        MoveTCPMotion(
+        MoveToolCenterPointMotion(
             pose,
             self.arm,
             allow_gripper_collision=False,
@@ -143,14 +127,14 @@ class PouringAction(ActionDescription):
         )
         World.current_world.add_vis_axis(pour_pose)
 
-        MoveTCPMotion(
+        MoveToolCenterPointMotion(
             pour_pose,
             self.arm,
             allow_gripper_collision=False,
             movement_type=MovementType.CARTESIAN,
         ).perform()
         sleep(3)
-        MoveTCPMotion(
+        MoveToolCenterPointMotion(
             pose,
             self.arm,
             allow_gripper_collision=False,
@@ -158,19 +142,6 @@ class PouringAction(ActionDescription):
         ).perform()
 
         World.current_world.remove_vis_axis()
-
-    @classmethod
-    def description(
-        cls,
-        object_: Union[Iterable[Body], Body],
-        tool: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
-        arm: Optional[Union[Iterable[Arms], Arms]] = None,
-        technique: Optional[Union[Iterable[str], str]] = None,
-        angle: Optional[Union[Iterable[float], float]] = 90,
-    ):
-        return PartialDesignator(
-            cls, object_=object_, tool=tool, arm=arm, technique=technique, angle=angle
-        )
 
 
 @dataclass
@@ -241,24 +212,6 @@ class CuttingAction(ActionDescription):
             lift_pose = new_pose.copy()
             lift_pose.pose.position.z += height
 
-    @classmethod
-    def description(
-        cls,
-        object_: Union[Iterable[Body], Body],
-        tool: Union[Iterable[SemanticAnnotation], SemanticAnnotation],
-        arm: Optional[Union[Iterable[Arms], Arms]] = None,
-        technique: Optional[Union[Iterable[str], str]] = None,
-        slice_thickness: Optional[float] = 0.03,
-    ):
-        return PartialDesignator(
-            cls,
-            object_=object_,
-            tool=tool,
-            arm=arm,
-            technique=technique,
-            slice_thickness=slice_thickness,
-        )
-
     def calculate_slices(self, obj_length):
         if self.technique == "Halving":
             return 1, 0
@@ -276,7 +229,7 @@ class CuttingAction(ActionDescription):
         return 0, 0
 
     @staticmethod
-    def perpendicular_pose(slice_pose, angle) -> PoseStamped:
+    def perpendicular_pose(slice_pose, angle) -> Pose:
         pose_rotated = slice_pose
         rotation_quaternion = utils.axis_angle_to_quaternion([0, 0, 1], angle)
         pose_rotated.rotate_by_quaternion(rotation_quaternion)
@@ -284,7 +237,7 @@ class CuttingAction(ActionDescription):
 
     @staticmethod
     def get_rotation_offset_from_axis_preference(
-        pose_a, pose_b: PoseStamped
+        pose_a, pose_b: Pose
     ) -> Tuple[int, float]:
         """
         Compute a discrete rotation offset (-90 or 90 degrees) to align this pose's local axes with the direction
@@ -298,8 +251,3 @@ class CuttingAction(ActionDescription):
         fy, ay = pose_a.is_facing_2d_axis(pose_b, axis=AxisIdentifier.Y)
 
         return (-90 if abs(ax) > abs(ay) else 90), ay
-
-
-CuttingActionDescription = CuttingAction.description
-PouringActionDescription = PouringAction.description
-MixingActionDescription = MixingAction.description

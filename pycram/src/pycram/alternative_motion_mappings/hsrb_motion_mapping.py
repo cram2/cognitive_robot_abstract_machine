@@ -1,12 +1,33 @@
-from dataclasses import dataclass
+try:
+    from nav2_msgs.action import NavigateToPose
+except ModuleNotFoundError:
+    NavigateToPose = None
+from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
+    NavigateActionServerTask,
+)
+from semantic_digital_twin.robots.hsrb import HSRB
+from pycram.datastructures.enums import ExecutionType
+from pycram.view_manager import ViewManager
+from pycram.robot_plans import MoveMotion, MoveToolCenterPointMotion, LookingMotion
 
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-
-from ..robot_plans.motions.base import AlternativeMotionMapping
+from pycram.robot_plans.motions.base import AlternativeMotion
 
 
-class HSRBTCPMotionMapping(AlternativeMotionMapping):
+class HSRBMoveMotion(MoveMotion, AlternativeMotion[HSRB]):
+    """
+    Uses a Nav2 action server to move the base of the real HSRB
+    """
+
+    execution_type = ExecutionType.REAL
+
+    def perform(self):
+        return
 
     @property
-    def motion_chart(self):
-        return self.robot_view.get_motion_chart("hsrb_tcp_motion")
+    def _motion_chart(self) -> NavigateActionServerTask:
+        return NavigateActionServerTask(
+            target_pose=self.target,
+            base_link=self.robot.root,
+            action_topic="/hsrb/move_base",
+            message_type=NavigateToPose,
+        )

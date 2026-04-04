@@ -2,12 +2,19 @@ from dataclasses import dataclass
 
 from typing_extensions import List, Optional
 
-from ..predicate import Symbol
-from ..symbol_graph import SymbolGraph, WrappedInstance, PredicateClassRelation
-from ...ormatic.dao import AlternativeMapping, T
+from krrood.symbol_graph.symbol_graph import (
+    SymbolGraph,
+    WrappedInstance,
+    PredicateClassRelation,
+    Symbol,
+)
+from krrood.ormatic.data_access_objects.alternative_mappings import (
+    AlternativeMapping,
+    T,
+)
 
 
-@dataclass
+@dataclass(eq=False)
 class SymbolGraphMapping(AlternativeMapping[SymbolGraph]):
     """
     Mapping specific for SymbolGraph.
@@ -34,7 +41,7 @@ class SymbolGraphMapping(AlternativeMapping[SymbolGraph]):
         return result
 
 
-@dataclass
+@dataclass(eq=False)
 class WrappedInstanceMapping(AlternativeMapping[WrappedInstance]):
     instance: Optional[Symbol]
 

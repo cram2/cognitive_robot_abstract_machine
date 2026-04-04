@@ -16,12 +16,18 @@ from krrood.symbolic_math.symbolic_math import (
     Scalar,
     VariableParameters,
 )
-from ..spatial_types import HomogeneousTransformationMatrix, RotationMatrix, Vector3
-from ..world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    RotationMatrix,
+    Vector3,
+)
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 if TYPE_CHECKING:
-    from ..world import World
-    from ..world_description.world_entity import KinematicStructureEntity
+    from semantic_digital_twin.world import World
+    from semantic_digital_twin.world_description.world_entity import (
+        KinematicStructureEntity,
+    )
 
 _large_value = np.inf
 """
@@ -242,7 +248,7 @@ class InverseKinematicsSolver:
         sense[-6:] = 5  # equality constraints
 
         # Solve QP
-        (xstar, fval, exitflag, info) = daqp.solve(
+        xstar, fval, exitflag, info = daqp.solve(
             qp_matrices.H,
             qp_matrices.g,
             qp_matrices.A,
@@ -388,7 +394,7 @@ class QPProblem:
     def _setup_weights(self):
         """Setup quadratic and linear weights for the QP problem."""
         dof_weights = [
-            0.001 * (1.0 / min(1.0, dof.upper_limits.velocity)) ** 2
+            0.001 * (1.0 / min(1.0, dof.limits.upper.velocity)) ** 2
             for dof in self.active_dofs
         ]
         slack_weights = [2500 * (1.0 / 0.2) ** 2] * 6
@@ -474,15 +480,15 @@ class ConstraintBuilder:
         upper_constraints = []
 
         for dof in active_dofs:
-            ll = max(-self.maximum_velocity, dof.lower_limits.velocity)
-            ul = min(self.maximum_velocity, dof.upper_limits.velocity)
+            ll = max(-self.maximum_velocity, dof.limits.lower.velocity)
+            ul = min(self.maximum_velocity, dof.limits.upper.velocity)
 
             if dof.has_position_limits():
                 ll = sm.max(
-                    dof.lower_limits.position - dof.variables.position, Scalar(ll)
+                    dof.limits.lower.position - dof.variables.position, Scalar(ll)
                 )
                 ul = sm.min(
-                    dof.upper_limits.position - dof.variables.position, Scalar(ul)
+                    dof.limits.upper.position - dof.variables.position, Scalar(ul)
                 )
 
             lower_constraints.append(ll)

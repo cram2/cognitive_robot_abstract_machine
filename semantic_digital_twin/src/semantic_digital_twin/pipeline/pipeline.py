@@ -6,12 +6,16 @@ from typing import List, Callable
 
 import numpy as np
 
-from ..spatial_types import Point3
-from ..spatial_types.spatial_types import HomogeneousTransformationMatrix
-from ..semantic_annotations.factories import SemanticAnnotationFactory
-from ..world import World
-from ..world_description.geometry import TriangleMesh, FileMesh
-from ..world_description.world_entity import Body
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasRootKinematicStructureEntity,
+)
+from semantic_digital_twin.spatial_types import Point3
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.geometry import Mesh
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -78,7 +82,7 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
             vertices = []
 
             for coll in body.collision:
-                if isinstance(coll, (FileMesh, TriangleMesh)):
+                if isinstance(coll, Mesh):
                     mesh = coll.mesh
                     if mesh.vertices.shape[0] > 0:
                         vertices.append(mesh.vertices.copy())
@@ -96,7 +100,7 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
             center = (mins + maxs) / 2.0
 
             for coll in body.collision:
-                if isinstance(coll, (FileMesh, TriangleMesh)):
+                if isinstance(coll, Mesh):
                     m = coll.mesh
                     if m.vertices.shape[0] > 0:
                         m.vertices -= center
@@ -132,6 +136,11 @@ class BodyFactoryReplace(Step):
     Replace bodies in the world that match a given condition with new structures created by a factory.
     """
 
+    annotation_creator: Callable[[Body, World], HasRootKinematicStructureEntity]
+    """
+    A callable that takes a Body, and creates a new semantic annotation (including a new body) for it, and adds them to the world.
+    """
+
     body_condition: Callable[[Body], bool] = lambda x: bool(
         re.compile(r"^dresser_\d+.*$").fullmatch(x.name.name)
     )
@@ -139,26 +148,21 @@ class BodyFactoryReplace(Step):
     Condition to filter bodies that should be replaced. Defaults to matching bodies containing "dresser_" followed by digits in their name.
     """
 
-    factory_creator: Callable[[Body], SemanticAnnotationFactory] = None
-    """
-    A callable that takes a Body and returns a ViewFactory to create the new structure.
-    """
-
     def _apply(self, world: World) -> World:
         filtered_bodies = [body for body in world.bodies if self.body_condition(body)]
 
         for body in filtered_bodies:
-            factory = self.factory_creator(body)
+            semantic_annotation = self.annotation_creator(body, world)
+            new_world = world.move_branch_to_new_world(semantic_annotation.root)
             parent_connection = body.parent_connection
             if parent_connection is None:
-                return factory.create()
+                return new_world
 
             for entity in world.get_kinematic_structure_entities_of_branch(body):
                 world.remove_kinematic_structure_entity(entity)
 
             world.remove_kinematic_structure_entity(body)
 
-            new_world = factory.create()
             parent_connection.child = new_world.root
             world.merge_world(new_world, parent_connection)
 

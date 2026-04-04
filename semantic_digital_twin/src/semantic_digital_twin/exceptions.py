@@ -1,7 +1,8 @@
-from __future__ import annotations
+from __future__ import annotations, absolute_import
 
-from dataclasses import dataclass
-from typing import Dict
+import traceback
+from dataclasses import dataclass, field
+from typing import Dict, Callable
 from uuid import UUID
 
 from typing_extensions import (
@@ -10,23 +11,47 @@ from typing_extensions import (
     Type,
     TYPE_CHECKING,
     Callable,
-    Tuple,
     Union,
     Any,
 )
 
 from krrood.adapters.exceptions import JSONSerializationError
 from krrood.utils import DataclassException
-from .datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.definitions import JointStateType
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
-    from .world import World
-    from .world_description.world_entity import (
+    from semantic_digital_twin.world import World
+    from semantic_digital_twin.world_description.geometry import Scale
+    from semantic_digital_twin.world_description.world_entity import (
         SemanticAnnotation,
         WorldEntity,
         KinematicStructureEntity,
     )
-    from .spatial_types.spatial_types import FloatVariable, SymbolicMathType
+    from semantic_digital_twin.spatial_types.spatial_types import (
+        FloatVariable,
+        SymbolicMathType,
+        SpatialType,
+    )
+    from semantic_digital_twin.spatial_types import Vector3
+    from semantic_digital_twin.world_description.degree_of_freedom import (
+        DegreeOfFreedomLimits,
+    )
+    from semantic_digital_twin.world_description.world_modification import (
+        WorldModification,
+    )
+
+
+@dataclass
+class NoJointStateWithType(DataclassException):
+    """
+    Raised when a JointState type is search which is not defined
+    """
+
+    joint_state: JointStateType
+
+    def __post_init__(self):
+        self.message = f"There is no JointState with the type: {self.joint_state}"
 
 
 @dataclass
@@ -47,10 +72,56 @@ class UnknownWorldModification(DataclassException):
 
 
 @dataclass
+class MismatchingIDsInWorldModification(DataclassException):
+    """
+    Raised when the UUIDs of a world modification during application are not consistent with the UUIDs assigned during initialization.
+    """
+
+    modification_type: Type[WorldModification]
+
+    original_uuids: list[UUID]
+    """
+    The original UUIDs of the Modification.
+    """
+
+    actual_uuids: list[UUID]
+    """
+    The actual UUIDs of the Modification.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"The world modification of type {self.modification_type.__name__} was initialized the following UUIDs: {self.original_uuids}"
+            f"But during the application of those modifications, the UUIDs were {self.actual_uuids}."
+            f"Somehow the original UUIDs were overridden, which should not happen."
+        )
+
+
+@dataclass
 class LogicalError(DataclassException):
     """
     An error that happens due to mistake in the logical operation or usage of the API during runtime.
     """
+
+
+@dataclass
+class NegativeConnectionVelocity(DataclassException):
+    """
+    An error that happens when a negative velocity limit is provided for a connection.
+    """
+
+    connection_name: Union[str, PrefixedName]
+    """
+    The name of the connection for which the velocity limit is negative.
+    """
+
+    velocity: float
+    """
+    The negative velocity limit.
+    """
+
+    def __post_init__(self):
+        self.message = f"Velocity limit must be non-negative, got {self.velocity} for joint {self.connection_name}"
 
 
 @dataclass
@@ -80,6 +151,32 @@ class IncorrectWorldStateValueShapeError(DataclassException, ValueError):
 
 
 @dataclass
+class WrongWorldModelVersion(LogicalError):
+    """
+    Raised when a specific world model version is required.
+    """
+
+    expected_version: int
+    actual_version: int
+
+    def __post_init__(self):
+        self.message = f"Expected world model version {self.expected_version}, but got {self.actual_version}."
+
+
+@dataclass
+class NonMonotonicTimeError(LogicalError):
+    """
+    Raised when attempting to append a world state with a time that is not strictly greater than the last time.
+    """
+
+    last_time: float
+    attempted_time: float
+
+    def __post_init__(self):
+        self.message = f"Time must be strictly increasing. Last time: {self.last_time}, attempted time: {self.attempted_time}"
+
+
+@dataclass
 class MismatchingCommandLengthError(DataclassException, ValueError):
     """
     An exception raised when the length of a command does not match the expected length.
@@ -100,6 +197,107 @@ class UsageError(LogicalError):
 
 
 @dataclass
+class InvalidConnectionLimits(UsageError):
+    """
+    Raised when the lower limit is not less than the upper limit for a degree of freedom.
+    """
+
+    name: PrefixedName
+    """
+    The name of the degree of freedom.
+    """
+
+    limits: DegreeOfFreedomLimits
+    """
+    The invalid limits.
+    """
+
+    def __post_init__(self):
+        self.message = f"Lower limit for {self.name} must be less than upper limit. Given limits: {self.limits}."
+
+
+@dataclass
+class MismatchingWorld(UsageError):
+    """
+    Raised when two entities belong to different worlds.
+    """
+
+    expected_world: World
+    """
+    The expected world.
+    """
+
+    given_world: World
+    """
+    The given world.
+    """
+
+    def __post_init__(self):
+        self.message = f"The two entities have mismatching worlds. Expected world: {self.expected_world}, given world: {self.given_world}"
+
+
+@dataclass
+class MissingSemanticAnnotationError(UsageError):
+    """
+    Raised when a semantic annotation is required but missing.
+    """
+
+    semantic_annotation_class: Type[SemanticAnnotation]
+    """
+    The semantic annotation class that requires another semantic annotation.
+    """
+
+    missing_semantic_annotation_class: Type[SemanticAnnotation]
+    """
+    The missing semantic annotation class.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"The semantic annotation of type {self.missing_semantic_annotation_class.__name__} is required"
+            f" by {self.semantic_annotation_class.__name__}, but is missing."
+        )
+
+
+@dataclass
+class InvalidPlaneDimensions(UsageError):
+    """
+    Raised when the depth of a plane is not less than its width or height.
+    """
+
+    scale: Scale
+    """
+    The scale of the plane.
+    """
+
+    clazz: Type
+    """
+    The class for which the dimensions are invalid.
+    """
+
+    def __post_init__(self):
+        self.message = f"The Dimensions {self.scale} are invalid for the class {self.clazz.__name__}"
+
+
+@dataclass
+class InvalidHingeActiveAxis(UsageError):
+    """
+    Raised when an invalid axis is provided.
+    """
+
+    axis: Vector3
+    """
+    The invalid axis.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Axis {self.axis} provided when trying to calculate the hinge position is invalid. "
+            f"If you think this is incorrect, consider extending Door.calculate_world_T_hinge_based_on_handle"
+        )
+
+
+@dataclass
 class AddingAnExistingSemanticAnnotationError(UsageError):
     semantic_annotation: SemanticAnnotation
 
@@ -108,11 +306,46 @@ class AddingAnExistingSemanticAnnotationError(UsageError):
 
 
 @dataclass
+class SemanticAnnotationNotInWorldError(UsageError):
+    semantic_annotation: SemanticAnnotation
+
+    def __post_init__(self):
+        self.message = f"Semantic annotation {self.semantic_annotation} does not belong to a world."
+
+
+@dataclass
 class MissingWorldModificationContextError(UsageError):
     function: Callable
 
     def __post_init__(self):
         self.message = f"World function '{self.function.__name__}' was called without a 'with world.modify_world():' context manager."
+
+
+@dataclass
+class MismatchingPublishChangesAttribute(UsageError):
+    """
+    Raised when trying to enter a world modification context with a different publish_changes policy than the currently active world modification context.
+    """
+
+    active_publish_changes: bool
+    """
+    The publish_changes of the currently active world modification context.
+    """
+    proposed_publish_changes: bool
+    """
+    The publish_changes of the world modification context that is being entered.
+    """
+
+    def __post_init__(self):
+        self.message = f"Cannot enter context with publish_changes={self.proposed_publish_changes} when the currently active modification context has publish_changes={self.active_publish_changes}. Make sure to not nest contexts with different publish_changes states."
+
+
+@dataclass
+class MissingPublishChangesKWARG(UsageError):
+    kwargs: Dict[str, Any]
+
+    def __post_init__(self):
+        self.message = f"publish_changes must be provided as a keyword argument, but got {self.kwargs}. If you see this exception you probably notified a synchronizer without setting publish_changes, which will cause hard to debug issues."
 
 
 @dataclass
@@ -146,6 +379,22 @@ class ReferenceFrameMismatchError(SpatialTypesError):
 
 
 @dataclass
+class MissingReferenceFrameError(SpatialTypesError):
+    """
+    Represents an error that occurs when a spatial type lacks a reference frame, even though its required for the
+    current operation
+    """
+
+    spatial_type: SpatialType
+    """
+    Spatial type that lacks a reference frame.
+    """
+
+    def __post_init__(self):
+        self.message = f"Spatial type {self.spatial_type} has no reference frame."
+
+
+@dataclass
 class ParsingError(DataclassException, Exception):
     """
     An error that happens during parsing of files.
@@ -166,6 +415,14 @@ class WorldEntityNotFoundError(UsageError):
             self.message = f"WorldEntity with name {self.name_or_hash} not found"
         else:
             self.message = f"WorldEntity with hash {self.name_or_hash} not found"
+
+
+@dataclass
+class WorldEntityWithIDNotFoundError(UsageError):
+    id: UUID
+
+    def __post_init__(self):
+        self.message = f"WorldEntity with id {self.id} not found"
 
 
 @dataclass
@@ -192,12 +449,12 @@ class SpatialTypeNotJsonSerializable(NotJsonSerializable):
 
 
 @dataclass
-class KinematicStructureEntityNotInKwargs(JSONSerializationError):
-    kinematic_structure_entity_id: UUID
+class WorldEntityWithIDNotInKwargs(JSONSerializationError):
+    world_entity_id: UUID
 
     def __post_init__(self):
         self.message = (
-            f"Kinematic structure entity '{self.kinematic_structure_entity_id}' is not in the kwargs of the "
+            f"World entity '{self.world_entity_id}' is not in the kwargs of the "
             f"method that created it."
         )
 
@@ -208,3 +465,80 @@ class AmbiguousNameError(ValueError):
 
 class UnresolvedNameError(ValueError):
     """Raised when no semantic annotation class matches a given name."""
+
+@dataclass
+class RootNodeNotFoundError(DataclassException):
+    """
+    Raised when the root node cannot be found or is ambiguous in a scene graph.
+    """
+
+    candidates: List[str]
+    """The candidate node names that were considered as potential roots."""
+
+    def __post_init__(self):
+        self.message = f"Could not determine unique root node. Candidates: {self.candidates}"
+
+@dataclass
+class CollisionCheckingError(DataclassException):
+    message: str = field(kw_only=True, default=None, init=False)
+
+
+@dataclass
+class InvalidCollisionCheckError(CollisionCheckingError):
+    collision_check: CollisionCheck
+
+
+@dataclass
+class NegativeCollisionCheckingDistanceError(InvalidCollisionCheckError):
+    def __post_init__(self):
+        super().__post_init__()
+        self.message = f"Distance must be positive, got {self.collision_check.distance}"
+
+
+@dataclass
+class InvalidBodiesInCollisionCheckError(InvalidCollisionCheckError):
+    def __post_init__(self):
+        super().__post_init__()
+        self.message = f"Body_a and body_b must be different, got {self.collision_check.body_a} and {self.collision_check.body_b}"
+
+
+@dataclass
+class BodyHasNoGeometryError(InvalidCollisionCheckError):
+    def __post_init__(self):
+        super().__post_init__()
+        self.message = ""
+        if not self.collision_check.body_a.has_collision():
+            self.message += (
+                f"Body {self.collision_check.body_a.name} has collision geometry."
+            )
+        if not self.collision_check.body_b.has_collision():
+            self.message += (
+                f"Body {self.collision_check.body_b.name} has collision geometry."
+            )
+
+
+@dataclass
+class AtomicWorldModificationNotAtomic(DataclassException):
+    """
+    Exception raised when atomic world modifications are overlapping.
+    If this exception is raised, it means that somewhere in the code a function decorated with @atomic_world_modification
+    triggered another function decorated with it. This must not happen ever!
+    """
+
+    modification: Callable
+    """
+    The callable that tried to atomically modify the world.
+    """
+
+    world: World
+    """
+    The world where this happened.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"World {self.world} is already being modified atomically by "
+            f"{self.world._current_active_atomic_world_modification.__name__}.\n"
+            f"{self.modification.__name__} tried to perform an atomic world modification anyways."
+        )
+        super().__post_init__()

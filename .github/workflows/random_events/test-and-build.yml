@@ -1,0 +1,67 @@
+name: Run tests and build the Python distribution
+
+on:
+  push:
+    branches:
+      - master
+
+  # --------------------------------------------------------------------------------------------------------------------
+
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+      python-versions:
+        required: true
+        type: string
+        default: "cp38-cp38"
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+defaults:
+  run:
+    shell: bash
+    working-directory: random_events
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+concurrency:
+  group: 'random-events-building-and-deployment'
+  cancel-in-progress: true
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+jobs:
+  test-and-build:
+    name: Build and Test the Python distribution
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout 🛎
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+
+      # ----------------------------------------------------------------------------------------------------------------
+
+      - name: Setup python 🐍
+        uses: actions/setup-python@v4
+        with:
+            python-version: "3.12"
+            cache: pip
+            
+      # ----------------------------------------------------------------------------------------------------------------
+
+      - name: Install dependencies
+        run: |
+          pip install pytest
+          pip install -r requirements-dev.txt
+
+      # ----------------------------------------------------------------------------------------------------------------
+
+      - name: Run Tests 🎓
+        run: |
+          pytest ../test/random_events_test

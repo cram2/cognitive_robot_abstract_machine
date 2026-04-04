@@ -7,8 +7,8 @@ from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
-from ..ros import Time
-from ..ros import create_publisher
+from pycram.ros import Time
+from pycram.ros import create_publisher
 
 
 class JointStatePublisher:

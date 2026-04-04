@@ -6,12 +6,12 @@ import numpy as np
 import trimesh
 from trimesh import Scene
 
-from ..datastructures.types import NpMatrix4x4
-from ..world_description.world_entity import Body
-from ..spatial_types.spatial_types import GenericSpatialType
+from semantic_digital_twin.datastructures.types import NpMatrix4x4
+from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.spatial_types.spatial_types import GenericSpatialType
 
 if TYPE_CHECKING:
-    from ..world import World
+    from semantic_digital_twin.world import World
 
 
 class RayTracer:

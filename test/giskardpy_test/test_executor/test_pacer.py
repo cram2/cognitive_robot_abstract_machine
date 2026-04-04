@@ -3,6 +3,7 @@ from time import perf_counter
 import numpy as np
 
 from giskardpy.executor import SimulationPacer, Executor
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode, EndMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import CountSeconds
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -53,9 +54,11 @@ def test_with_executor():
     msc.add_node(EndMotion.when_true(counter))
 
     kin_sim = Executor(
-        world=World(),
+        context=MotionStatechartContext(
+            world=World(),
+            qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
+        ),
         pacer=SimulationPacer(real_time_factor=2.0),
-        controller_config=QPControllerConfig.create_with_simulation_defaults(),
     )
     kin_sim.compile(msc)
     kin_sim.tick_until_end(timeout=1000)

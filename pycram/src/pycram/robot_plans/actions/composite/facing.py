@@ -4,26 +4,25 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 import numpy as np
-from typing_extensions import Union, Optional, Type, Any, Iterable
+from typing_extensions import Optional, Any
 
-from ..core.navigation import LookAtActionDescription, NavigateActionDescription
-from ....config.action_conf import ActionConfig
-from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
-from ....has_parameters import has_parameters
-from ....language import SequentialPlan
-from ....robot_plans.actions.base import ActionDescription
-from ....tf_transformations import quaternion_from_euler
+from pycram.config.action_conf import ActionConfig
+from pycram.plans.factories import sequential
+from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.core.navigation import NavigateAction, LookAtAction
+from semantic_digital_twin.spatial_types import (
+    Quaternion,
+)
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
-@has_parameters
 @dataclass
 class FaceAtAction(ActionDescription):
     """
     Turn the robot chassis such that is faces the ``pose`` and after that perform a look at action.
     """
 
-    pose: PoseStamped
+    pose: Pose
     """
     The pose to face 
     """
@@ -34,29 +33,33 @@ class FaceAtAction(ActionDescription):
 
     def execute(self) -> None:
         # get the robot position
-        robot_position = PoseStamped.from_spatial_type(self.robot_view.root.global_pose)
+        robot_position = self.robot.root.global_transform
 
         # calculate orientation for robot to face the object
         angle = (
             np.arctan2(
-                robot_position.position.y - self.pose.position.y,
-                robot_position.position.x - self.pose.position.x,
+                robot_position.y - self.pose.y,
+                robot_position.x - self.pose.x,
             )
             + np.pi
         )
-        orientation = list(quaternion_from_euler(0, 0, angle, axes="sxyz"))
 
         # create new robot pose
-        new_robot_pose = PoseStamped.from_list(
-            robot_position.position.to_list(), orientation, self.world.root
+        new_robot_pose = Pose(
+            robot_position.to_position(),
+            Quaternion.from_rpy(0, 0, angle),
+            reference_frame=self.world.root,
         )
 
-        # turn robot
-        SequentialPlan(
-            self.context,
-            NavigateActionDescription(new_robot_pose, self.keep_joint_states),
-            # look at target
-            LookAtActionDescription(self.pose),
+        self.add_subplan(
+            sequential(
+                [
+                    NavigateAction(
+                        new_robot_pose, self.keep_joint_states
+                    ),  # turn robot
+                    LookAtAction(self.pose),  # look at the target
+                ]
+            )
         ).perform()
 
     def validate(
@@ -64,18 +67,3 @@ class FaceAtAction(ActionDescription):
     ):
         # The validation will be done in the LookAtActionPerformable.perform() method so no need to validate here.
         pass
-
-    @classmethod
-    def description(
-        cls,
-        pose: Union[Iterable[PoseStamped], PoseStamped],
-        keep_joint_states: Union[
-            Iterable[bool], bool
-        ] = ActionConfig.face_at_keep_joint_states,
-    ) -> PartialDesignator[Type[FaceAtAction]]:
-        return PartialDesignator(
-            FaceAtAction, pose=pose, keep_joint_states=keep_joint_states
-        )
-
-
-FaceAtActionDescription = FaceAtAction.description

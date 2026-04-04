@@ -10,15 +10,14 @@ from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
 
-from .tf_transformations import quaternion_from_euler
+from pycram.tf_transformations import quaternion_from_euler
 from random_events.interval import closed_open
 from typing_extensions import Optional, Type
 
-from .costmaps import Costmap, OccupancyCostmap, VisibilityCostmap
+from pycram.locations.costmaps import Costmap, OccupancyCostmap, VisibilityCostmap
 import matplotlib.colorbar
-from .datastructures.pose import PoseStamped
-from .ros import create_publisher, Duration
-from .units import meter
+from pycram.datastructures.pose import PoseStamped
+from pycram.ros import create_publisher, Duration
 
 from pint import Quantity
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
@@ -62,28 +61,28 @@ class ProbabilisticCostmap:
 
     costmap: Costmap
     """
-    The legacy costmap.
+    The legacy locations.
     """
 
     origin: PoseStamped
     """
-    The origin of the costmap.
+    The origin of the locations.
     """
 
     size: Quantity
     """
-    The side length of the costmap. The costmap is a square.
+    The side length of the locations. The locations is a square.
     """
 
     distribution: Optional[ProbabilisticCircuit] = None
     """
-    The distribution associated with the costmap.
+    The distribution associated with the locations.
     """
 
     def __init__(
         self,
         origin: PoseStamped,
-        size: Quantity = 2 * meter,
+        size: Quantity = 2,
         max_cells=10000,
         costmap_type: Type[Costmap] = OccupancyCostmap,
         world: Optional[World] = None,
@@ -96,7 +95,7 @@ class ProbabilisticCostmap:
 
         # calculate the number of cells per axis
         number_of_cells = int(np.sqrt(max_cells))
-        resolution = self.size.to(meter) / number_of_cells
+        resolution = size / number_of_cells
 
         if costmap_type == OccupancyCostmap:
             robot_bounding_box = BoundingBoxCollection(
@@ -129,7 +128,7 @@ class ProbabilisticCostmap:
                 world=self.world,
             )
         else:
-            raise NotImplementedError(f"Unknown costmap type {costmap_type}")
+            raise NotImplementedError(f"Unknown locations type {costmap_type}")
         self.create_distribution()
 
     @cached_property
@@ -138,13 +137,13 @@ class ProbabilisticCostmap:
 
     def create_event_from_map(self) -> Event:
         """
-        :return: The event that is encoded by the costmaps map.
+        :return: The event that is encoded by the locations map.
         """
         area = Event()
         for rectangle in self.costmap.partitioning_rectangles():
             rectangle.translate(self.origin.position.x, self.origin.position.y)
             area.simple_sets.add(
-                SimpleEvent(
+                SimpleEvent.from_data(
                     {
                         self.x: closed_open(rectangle.x_lower, rectangle.x_upper),
                         self.y: closed_open(rectangle.y_lower, rectangle.y_upper),
@@ -155,13 +154,13 @@ class ProbabilisticCostmap:
 
     def create_distribution(self):
         """
-        Create a probabilistic circuit from the costmap.
+        Create a probabilistic circuit from the locations.
         """
         self.distribution = uniform_measure_of_event(self.create_event_from_map())
 
     def sample_to_pose(self, sample: np.ndarray) -> PoseStamped:
         """
-        Convert a sample from the costmap to a pose.
+        Convert a sample from the locations to a pose.
 
         :param sample: The sample to convert
         :return: The pose corresponding to the sample
@@ -181,7 +180,7 @@ class ProbabilisticCostmap:
 
     def visualize(self):
         """
-        Visualize the costmap for rviz.
+        Visualize the locations for rviz.
         """
         samples = self.distribution.sample(1000)
         likelihoods = self.distribution.likelihood(samples)

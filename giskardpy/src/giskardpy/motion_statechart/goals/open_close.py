@@ -3,17 +3,17 @@ from __future__ import division
 from dataclasses import dataclass, field
 from typing import Optional
 
-from giskardpy.motion_statechart.context import BuildContext
-from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.graph_node import Goal, NodeArtifacts
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from krrood.symbolic_math.symbolic_math import trinary_logic_and
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.graph_node import Goal, NodeArtifacts
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 
 
 @dataclass(eq=False, repr=False)
@@ -36,12 +36,12 @@ class Open(Goal):
 
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
 
-    def expand(self, context: BuildContext) -> None:
+    def expand(self, context: MotionStatechartContext) -> None:
         self.connection = self.environment_link.get_first_parent_connection_of_type(
             ActiveConnection1DOF
         )
 
-        max_position = self.connection.dof.upper_limits.position
+        max_position = self.connection.dof.limits.upper.position
         if self.goal_joint_state is None:
             self.goal_joint_state = max_position
         else:
@@ -51,22 +51,22 @@ class Open(Goal):
             [
                 JointPositionList(
                     name="hinge goal",
-                    goal_state=JointState({self.connection: self.goal_joint_state}),
+                    goal_state=JointState.from_mapping(
+                        {self.connection: self.goal_joint_state}
+                    ),
                     weight=self.weight,
                 ),
                 CartesianPose(
                     name="hold handle",
                     root_link=self.environment_link,
                     tip_link=self.tip_link,
-                    goal_pose=HomogeneousTransformationMatrix(
-                        reference_frame=self.tip_link, child_frame=self.tip_link
-                    ),
+                    goal_pose=Pose(reference_frame=self.tip_link),
                     weight=self.weight,
                 ),
             ]
         )
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(
             observation=trinary_logic_and(
                 *[node.observation_variable for node in self.nodes]
@@ -94,12 +94,12 @@ class Close(Open):
 
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
 
-    def expand(self, context: BuildContext) -> None:
+    def expand(self, context: MotionStatechartContext) -> None:
         self.connection = self.environment_link.get_first_parent_connection_of_type(
             ActiveConnection1DOF
         )
 
-        min_position = self.connection.dof.lower_limits.position
+        min_position = self.connection.dof.limits.lower.position
         if self.goal_joint_state is None:
             self.goal_joint_state = min_position
         else:
@@ -109,22 +109,22 @@ class Close(Open):
             [
                 JointPositionList(
                     name="hinge goal",
-                    goal_state=JointState({self.connection: self.goal_joint_state}),
+                    goal_state=JointState.from_mapping(
+                        {self.connection: self.goal_joint_state}
+                    ),
                     weight=self.weight,
                 ),
                 CartesianPose(
                     name="hold handle",
                     root_link=self.environment_link,
                     tip_link=self.tip_link,
-                    goal_pose=HomogeneousTransformationMatrix(
-                        reference_frame=self.tip_link, child_frame=self.tip_link
-                    ),
+                    goal_pose=Pose(reference_frame=self.tip_link),
                     weight=self.weight,
                 ),
             ]
         )
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(
             observation=trinary_logic_and(
                 *[node.observation_variable for node in self.nodes]

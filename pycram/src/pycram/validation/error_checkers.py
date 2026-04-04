@@ -1,8 +1,11 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
 import numpy as np
-from ..tf_transformations import quaternion_multiply, quaternion_inverse
+
+from pycram.datastructures.enums import JointType
+from pycram.tf_transformations import quaternion_multiply, quaternion_inverse
 from typing_extensions import (
     List,
     Union,
@@ -14,10 +17,8 @@ from typing_extensions import (
     Tuple,
 )
 
-from ..datastructures.enums import JointType
-
 if TYPE_CHECKING:
-    from ..datastructures.pose import PoseStamped
+    from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
 class ErrorChecker(ABC):
@@ -319,7 +320,7 @@ class MultiJointPositionErrorChecker(IterableErrorChecker):
         return calculate_joint_position_error(value_1, value_2)
 
 
-def calculate_pose_error(pose_1: "PoseStamped", pose_2: "PoseStamped") -> List[float]:
+def calculate_pose_error(pose_1: Pose, pose_2: Pose) -> List[float]:
     """
     Calculate the error between two poses.
 
@@ -328,9 +329,11 @@ def calculate_pose_error(pose_1: "PoseStamped", pose_2: "PoseStamped") -> List[f
     :return: The error between the two poses.
     """
     return [
-        calculate_position_error(pose_1.position.to_list(), pose_2.position.to_list()),
+        calculate_position_error(
+            pose_1.to_position().to_list(), pose_2.to_position().to_list()
+        ),
         calculate_orientation_error(
-            pose_1.orientation.to_list(), pose_2.orientation.to_list()
+            pose_1.to_quaternion().to_list(), pose_2.to_quaternion().to_list()
         ),
     ]
 

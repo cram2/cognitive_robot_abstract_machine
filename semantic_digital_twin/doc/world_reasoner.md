@@ -1,3 +1,14 @@
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: python3
+---
+
 # World Reasoner
 
 The world reasoner {py:class}`semantic_digital_twin.reasoner.WorldReasoner` is a class that uses [Ripple Down Rules](https://github.com/AbdelrhmanBassiouny/ripple_down_rules/tree/main)
@@ -85,8 +96,8 @@ the function as shown bellow:
 from dataclasses import dataclass, field
 from posixpath import dirname
 from typing_extensions import Any, Callable, ClassVar, Dict, List, Optional, Type, Union
-from ripple_down_rules.rdr import GeneralRDR
-from ripple_down_rules.datastructures.dataclasses import CaseQuery
+from krrood.ripple_down_rules.rdr import GeneralRDR
+from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.world import World
@@ -105,8 +116,8 @@ You can write a filter on the current semantic annotations of type Drawer as fol
 from dataclasses import dataclass, field
 from posixpath import dirname
 from typing_extensions import Any, Callable, ClassVar, Dict, List, Optional, Type, Union
-from ripple_down_rules.rdr import GeneralRDR
-from ripple_down_rules.datastructures.dataclasses import CaseQuery
+from krrood.ripple_down_rules.rdr import GeneralRDR
+from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.world import World

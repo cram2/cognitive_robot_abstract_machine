@@ -10,32 +10,46 @@ on:
         description: "Library folder name (relative to repo root)"
         required: true
         type: string
+      repo_lowercase:
+        description: "Lowercase repository name with tag"
+        required: true
+        type: string
 
 jobs:
-  to-lowercase:
-    runs-on: ubuntu-latest
-    outputs:
-      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
-    steps:
-      - id: lowercase
-        run: |
-          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
   test:
-    needs: to-lowercase
     runs-on: ubuntu-latest
     container:
-      image: ${{ needs.to-lowercase.outputs.repo_lowercase }}
+      image: ${{ inputs.repo_lowercase }}
     steps:
       - uses: actions/checkout@v4
         with:
           path: cognitive_robot_abstract_machine
           submodules: recursive
 
+      - name: Initialize submodules explicitly
+        run: |
+          cd cognitive_robot_abstract_machine
+          git config --global --add safe.directory "*"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
       - name: Install dependencies
         run: |
           cd cognitive_robot_abstract_machine
           source /opt/ros/cram-env/bin/activate
+          sudo apt-get update
+          sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
           poetry install
+
+      - name: Restore cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /github/home/.cache/semantic_digital_twin
+          key: ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}
+            ${{ runner.os }}-cache-${{ inputs.lib }}
+            ${{ runner.os }}-cache-
 
       - name: Build ORM
         if: ${{inputs.lib == 'pycram' || inputs.lib == 'semantic_digital_twin'}}
@@ -49,4 +63,14 @@ jobs:
         run: |
           source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
+          if [[ "${{ inputs.lib }}" == "probabilistic_model" ]]; then
+            export QT_QPA_PLATFORM=offscreen
+          fi
           python -m pytest -sv cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+
+      - name: Save cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /github/home/.cache/semantic_digital_twin
+          key: ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}-${{ github.run_id }}

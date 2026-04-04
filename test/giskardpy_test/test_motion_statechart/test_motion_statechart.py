@@ -9,9 +9,8 @@ import pytest
 
 from giskardpy.data_types.exceptions import DuplicateNameException
 from giskardpy.executor import Executor, SimulationPacer
-from giskardpy.model.collision_matrix_manager import CollisionRequest
-from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
@@ -25,8 +24,16 @@ from giskardpy.motion_statechart.exceptions import (
     NonObservationVariableError,
     NodeAlreadyBelongsToDifferentNodeError,
 )
+from giskardpy.motion_statechart.goals.cartesian_goals import (
+    DifferentialDriveBaseGoal,
+    CartesianPoseStraight,
+)
 from giskardpy.motion_statechart.goals.collision_avoidance import (
-    CollisionAvoidance,
+    ExternalCollisionAvoidance,
+    SelfCollisionAvoidance,
+    ExternalCollisionDistanceMonitor,
+    SelfCollisionDistanceMonitor,
+    UpdateTemporaryCollisionRules,
 )
 from giskardpy.motion_statechart.goals.open_close import Open, Close
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
@@ -45,7 +52,7 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
     Print,
     Pulse,
     CountSeconds,
-    CountTicks,
+    CountControlCycles,
 )
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -59,9 +66,13 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianVelocityLimit,
     CartesianPositionVelocityLimit,
     CartesianRotationVelocityLimit,
+    CartesianPositionTrajectory,
 )
 from giskardpy.motion_statechart.tasks.feature_functions import (
     AngleGoal,
+    AlignPerpendicular,
+    DistanceGoal,
+    HeightGoal,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
@@ -78,26 +89,33 @@ from giskardpy.motion_statechart.test_nodes.test_nodes import (
 )
 from giskardpy.qp.constraint import EqualityConstraint
 from giskardpy.qp.constraint_collection import ConstraintCollection
-from giskardpy.qp.exceptions import HardConstraintsViolatedException
+from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.utils.math import angle_between_vector
 from krrood.symbolic_math.symbolic_math import (
     trinary_logic_and,
     trinary_logic_not,
     trinary_logic_or,
     FloatVariable,
+    shortest_angular_distance,
 )
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    KinematicStructureEntityKwargsTracker,
+    WorldEntityWithIDKwargsTracker,
+)
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AvoidCollisionBetweenGroups,
+    AvoidExternalCollisions,
+    AvoidAllCollisions,
+    AllowAllCollisions,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.semantic_annotations.factories import (
-    DoorFactory,
-    SemanticPositionDescription,
-    HandleFactory,
-    HorizontalSemanticDirection,
-    VerticalSemanticDirection,
+from semantic_digital_twin.robots.abstract_robot import Manipulator, AbstractRobot
+from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.robots.minimal_robot import MinimalRobot
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+    Door,
+    Hinge,
 )
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -105,16 +123,77 @@ from semantic_digital_twin.spatial_types import (
     RotationMatrix,
 )
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     ActiveConnection1DOF,
     FixedConnection,
+    OmniDrive,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_digital_twin.world_description.geometry import Cylinder
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
+from semantic_digital_twin.world_description.geometry import (
+    Cylinder,
+    Box,
+    Scale,
+    Color,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    KinematicStructureEntity,
+)
+from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
+from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
+    WorldStateTrajectoryPlotter,
+)
+
+
+@pytest.fixture()
+def better_pr2_pose():
+    return {
+        "r_shoulder_pan_joint": -1.7125,
+        "r_shoulder_lift_joint": -0.25672,
+        "r_upper_arm_roll_joint": -1.46335,
+        "r_elbow_flex_joint": -2.12,
+        "r_forearm_roll_joint": 1.76632,
+        "r_wrist_flex_joint": -0.10001,
+        "r_wrist_roll_joint": 0.05106,
+        "l_shoulder_pan_joint": 1.9652,
+        "l_shoulder_lift_joint": -0.26499,
+        "l_upper_arm_roll_joint": 1.3837,
+        "l_elbow_flex_joint": -2.12,
+        "l_forearm_roll_joint": 16.99,
+        "l_wrist_flex_joint": -0.10001,
+        "l_wrist_roll_joint": 0,
+        "torso_lift_joint": 0.2,
+        "l_gripper_l_finger_joint": 0.55,
+        "r_gripper_l_finger_joint": 0.55,
+        "head_pan_joint": 0,
+        "head_tilt_joint": 0,
+    }
+
+
+@pytest.fixture(scope="function")
+def pr2_with_box(pr2_world_copy) -> World:
+    with pr2_world_copy.modify_world():
+        box = Body(
+            name=PrefixedName("box"),
+            visual=ShapeCollection(shapes=[Box(scale=Scale(1, 1, 1))]),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(1, 1, 1))]),
+        )
+        root_C_box = FixedConnection(
+            parent=pr2_world_copy.root,
+            child=box,
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=1.2, z=0.3, reference_frame=pr2_world_copy.root
+            ),
+        )
+        pr2_world_copy.add_connection(root_C_box)
+    return pr2_world_copy
 
 
 def test_condition_to_str():
@@ -139,7 +218,7 @@ def test_condition_to_str():
     assert a == '("ConstTrueNode#0" and ("ConstTrueNode#1" or not "ConstTrueNode#2"))'
 
 
-def test_motion_statechart_to_dot():
+def test_motion_statechart_to_dot(tmp_path):
     msc = MotionStatechart()
     node1 = ConstTrueNode()
     msc.add_node(node1)
@@ -151,120 +230,7 @@ def test_motion_statechart_to_dot():
     end.start_condition = trinary_logic_and(
         node1.observation_variable, node2.observation_variable
     )
-    msc.draw("muh.pdf")
-
-
-def test_motion_statechart():
-    msc = MotionStatechart()
-
-    node1 = ConstTrueNode()
-    msc.add_node(node1)
-    node2 = ConstTrueNode()
-    msc.add_node(node2)
-    node3 = ConstTrueNode()
-    msc.add_node(node3)
-    end = EndMotion()
-    msc.add_node(end)
-
-    node1.start_condition = trinary_logic_or(
-        node3.observation_variable, node2.observation_variable
-    )
-    end.start_condition = node1.observation_variable
-
-    kin_sim = Executor(world=World())
-    kin_sim.compile(motion_statechart=msc)
-
-    assert len(msc.nodes) == 4
-    assert len(msc.edges) == 3
-    kin_sim.tick_until_end()
-
-    assert len(msc.history) == 5
-    # %% node1
-    assert msc.history.get_life_cycle_history_of_node(node1) == [
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-    ]
-    assert msc.history.get_observation_history_of_node(node1) == [
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-    ]
-    # %% node2
-    assert msc.history.get_life_cycle_history_of_node(node2) == [
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-    ]
-    assert msc.history.get_observation_history_of_node(node2) == [
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-    ]
-    # %% node3
-    assert msc.history.get_life_cycle_history_of_node(node3) == [
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-    ]
-    assert msc.history.get_observation_history_of_node(node3) == [
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-    ]
-    # %% end
-    assert msc.history.get_life_cycle_history_of_node(end) == [
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-    ]
-    assert msc.history.get_observation_history_of_node(end) == [
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.TRUE,
-    ]
-
-
-def test_sequence_goal():
-    msc = MotionStatechart()
-    node = Sequence(
-        nodes=[
-            ConstTrueNode(),
-            ConstTrueNode(),
-            ConstTrueNode(),
-            ConstTrueNode(),
-        ]
-    )
-    msc.add_node(node)
-    msc.add_node(EndMotion.when_true(node))
-
-    kin_sim = Executor(world=World())
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end()
-    msc.draw("muh.pdf")
-    assert kin_sim.control_cycles == 7
-    assert msc.nodes[0].life_cycle_state == LifeCycleValues.RUNNING
-    assert msc.nodes[1].life_cycle_state == LifeCycleValues.RUNNING
-    assert msc.nodes[2].life_cycle_state == LifeCycleValues.DONE
-    assert msc.nodes[3].life_cycle_state == LifeCycleValues.DONE
-    assert msc.nodes[4].life_cycle_state == LifeCycleValues.DONE
-    assert msc.nodes[5].life_cycle_state == LifeCycleValues.DONE
+    msc.draw(str(tmp_path / "muh.pdf"))
 
 
 def test_print():
@@ -283,24 +249,12 @@ def test_print():
     print_node2.start_condition = node1.observation_variable
     end.start_condition = print_node2.observation_variable
 
-    kin_sim = Executor(world=World())
+    kin_sim = Executor(MotionStatechartContext(world=World()))
     kin_sim.compile(motion_statechart=msc)
 
     assert len(msc.nodes) == 4
     assert len(msc.edges) == 3
 
-    assert print_node1.observation_state == ObservationStateValues.UNKNOWN
-    assert node1.observation_state == ObservationStateValues.UNKNOWN
-    assert print_node2.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-
-    assert print_node1.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert node1.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert print_node2.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert not msc.is_end_motion()
-
-    kin_sim.tick()
     assert print_node1.observation_state == ObservationStateValues.UNKNOWN
     assert node1.observation_state == ObservationStateValues.UNKNOWN
     assert print_node2.observation_state == ObservationStateValues.UNKNOWN
@@ -361,25 +315,7 @@ def test_print():
     assert msc.is_end_motion()
 
 
-def test_cancel_motion():
-    msc = MotionStatechart()
-    node1 = ConstTrueNode()
-    msc.add_node(node1)
-    cancel = CancelMotion(exception=Exception("krrood_test"))
-    msc.add_node(cancel)
-    cancel.start_condition = node1.observation_variable
-
-    kin_sim = Executor(world=World())
-    kin_sim.compile(motion_statechart=msc)
-
-    kin_sim.tick()  # first tick, cancel motion node1 turns true
-    kin_sim.tick()  # second tick, cancel goes into running
-    with pytest.raises(Exception):
-        kin_sim.tick()  # third tick, cancel goes true and triggers
-    msc.draw("muh.pdf")
-
-
-def test_draw_with_invisible_node():
+def test_draw_with_invisible_node(tmp_path):
     msc = MotionStatechart()
     msc.add_nodes(
         [
@@ -397,80 +333,9 @@ def test_draw_with_invisible_node():
     s1n2.plot_specs.visible = False
     s2n2.plot_specs.visible = False
 
-    kin_sim = Executor(world=World())
+    kin_sim = Executor(MotionStatechartContext(world=World()))
     kin_sim.compile(motion_statechart=msc)
-    msc.draw("muh.pdf")
-
-
-def test_joint_goal():
-    world = World()
-    with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        tip = Body(name=PrefixedName("tip"))
-        tip2 = Body(name=PrefixedName("tip2"))
-        ul = DerivativeMap()
-        ul.velocity = 1
-        ll = DerivativeMap()
-        ll.velocity = -1
-        dof = DegreeOfFreedom(
-            name=PrefixedName("dof", "a"), lower_limits=ll, upper_limits=ul
-        )
-        world.add_degree_of_freedom(dof)
-        root_C_tip = RevoluteConnection(
-            parent=root, child=tip, axis=Vector3.Z(), dof_id=dof.id
-        )
-        world.add_connection(root_C_tip)
-
-        dof = DegreeOfFreedom(
-            name=PrefixedName("dof", "b"), lower_limits=ll, upper_limits=ul
-        )
-        world.add_degree_of_freedom(dof)
-        root_C_tip2 = RevoluteConnection(
-            parent=root, child=tip2, axis=Vector3.Z(), dof_id=dof.id
-        )
-        world.add_connection(root_C_tip2)
-
-    msc = MotionStatechart()
-
-    task1 = JointPositionList(goal_state=JointState({root_C_tip: 1}))
-    always_true = ConstTrueNode()
-    msc.add_node(always_true)
-    msc.add_node(task1)
-    end = EndMotion()
-    msc.add_node(end)
-
-    task1.start_condition = always_true.observation_variable
-    end.start_condition = trinary_logic_and(
-        task1.observation_variable, always_true.observation_variable
-    )
-
-    kin_sim = Executor(
-        world=world,
-    )
-    kin_sim.compile(motion_statechart=msc)
-
-    assert task1.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-    assert task1.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    msc.draw("muh.pdf")
-    kin_sim.tick_until_end()
-    msc.draw("muh.pdf")
-    assert len(msc.history) == 6
-    assert (
-        msc.history.get_observation_history_of_node(task1)[-1]
-        == ObservationStateValues.TRUE
-    )
-    assert (
-        msc.history.get_observation_history_of_node(end)[-1]
-        == ObservationStateValues.TRUE
-    )
-    assert (
-        msc.history.get_life_cycle_history_of_node(task1)[-1] == LifeCycleValues.RUNNING
-    )
-    assert (
-        msc.history.get_life_cycle_history_of_node(end)[-1] == LifeCycleValues.RUNNING
-    )
+    msc.draw(str(tmp_path / "muh.pdf"))
 
 
 class TestConditions:
@@ -499,7 +364,9 @@ class TestConditions:
         msc.add_node(Sequence([node]))
 
         kin_sim = Executor(
-            world=World(),
+            MotionStatechartContext(
+                world=World(),
+            )
         )
         with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
             kin_sim.compile(motion_statechart=msc)
@@ -511,7 +378,9 @@ class TestConditions:
         msc.add_node(Sequence([node]))
 
         kin_sim = Executor(
-            world=World(),
+            MotionStatechartContext(
+                world=World(),
+            )
         )
         with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
             kin_sim.compile(motion_statechart=msc)
@@ -525,14 +394,16 @@ def test_two_goals(pr2_world_state_reset: World):
     msc = MotionStatechart()
     msc.add_nodes(
         [
-            JointPositionList(goal_state=JointState({torso_joint: 0.1})),
+            JointPositionList(goal_state=JointState.from_mapping({torso_joint: 0.1})),
             local_min := LocalMinimumReached(),
         ]
     )
     msc.add_node(EndMotion.when_true(local_min))
 
     kin_sim = Executor(
-        world=pr2_world_state_reset,
+        MotionStatechartContext(
+            world=pr2_world_state_reset,
+        )
     )
     kin_sim.compile(motion_statechart=msc)
 
@@ -541,12 +412,16 @@ def test_two_goals(pr2_world_state_reset: World):
 
     msc = MotionStatechart()
     msc.add_node(
-        joint_goal := JointPositionList(goal_state=JointState({r_wrist_roll_joint: 1}))
+        joint_goal := JointPositionList(
+            goal_state=JointState.from_mapping({r_wrist_roll_joint: 1})
+        )
     )
     msc.add_node(EndMotion.when_true(joint_goal))
 
     kin_sim = Executor(
-        world=pr2_world_state_reset,
+        MotionStatechartContext(
+            world=pr2_world_state_reset,
+        )
     )
     kin_sim.compile(motion_statechart=msc)
 
@@ -555,263 +430,6 @@ def test_two_goals(pr2_world_state_reset: World):
     assert np.allclose(pr2_world_state_reset.state.velocities, 0)
     assert np.allclose(pr2_world_state_reset.state.accelerations, 0)
     assert np.allclose(pr2_world_state_reset.state.jerks, 0)
-
-
-def test_reset():
-    msc = MotionStatechart()
-    node1 = ConstTrueNode()
-    msc.add_node(node1)
-    node2 = ConstTrueNode()
-    msc.add_node(node2)
-    node3 = ConstTrueNode()
-    msc.add_node(node3)
-    end = EndMotion()
-    msc.add_node(end)
-    node1.reset_condition = node2.observation_variable
-    node2.start_condition = node1.observation_variable
-    node3.start_condition = node2.observation_variable
-    node2.end_condition = node2.observation_variable
-    end.start_condition = trinary_logic_and(
-        node1.observation_variable,
-        node2.observation_variable,
-        node3.observation_variable,
-    )
-
-    kin_sim = Executor(world=World())
-    kin_sim.compile(motion_statechart=msc)
-    msc.draw("muh.pdf")
-
-    kin_sim.tick()
-    assert node1.observation_state == ObservationStateValues.UNKNOWN
-    assert node2.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert node2.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert not msc.is_end_motion()
-
-    kin_sim.tick()
-    assert node1.observation_state == ObservationStateValues.TRUE
-    assert node2.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert node2.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert not msc.is_end_motion()
-
-    kin_sim.tick()
-    assert node1.observation_state == ObservationStateValues.TRUE
-    assert node2.observation_state == ObservationStateValues.TRUE
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-    assert node1.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert node2.life_cycle_state == LifeCycleValues.DONE
-    assert node3.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert not msc.is_end_motion()
-
-    kin_sim.tick()
-    assert node1.observation_state == ObservationStateValues.UNKNOWN
-    assert node2.observation_state == ObservationStateValues.TRUE
-    assert node3.observation_state == ObservationStateValues.TRUE
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert node2.life_cycle_state == LifeCycleValues.DONE
-    assert node3.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert not msc.is_end_motion()
-
-    kin_sim.tick()
-    assert node1.observation_state == ObservationStateValues.TRUE
-    assert node2.observation_state == ObservationStateValues.TRUE
-    assert node3.observation_state == ObservationStateValues.TRUE
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-    assert node1.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert node2.life_cycle_state == LifeCycleValues.DONE
-    assert node3.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
-    assert not msc.is_end_motion()
-
-    kin_sim.tick()
-    assert node1.observation_state == ObservationStateValues.UNKNOWN
-    assert node2.observation_state == ObservationStateValues.TRUE
-    assert node3.observation_state == ObservationStateValues.TRUE
-    assert end.observation_state == ObservationStateValues.TRUE
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert node2.life_cycle_state == LifeCycleValues.DONE
-    assert node3.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
-    assert msc.is_end_motion()
-
-
-def test_nested_goals():
-    msc = MotionStatechart()
-
-    node1 = ConstTrueNode(name="w")
-    msc.add_node(node1)
-
-    outer = TestNestedGoal()
-    msc.add_node(outer)
-    outer.start_condition = node1.observation_variable
-
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = outer.observation_variable
-
-    json_data = msc.to_json()
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-    msc_copy = MotionStatechart.from_json(new_json_data)
-
-    for node in msc.nodes:
-        assert node.index == msc_copy.get_node_by_index(node.index).index
-
-    kin_sim = Executor(world=World())
-    node1 = msc_copy.get_nodes_by_type(ConstTrueNode)[0]
-    outer = msc_copy.get_nodes_by_type(TestNestedGoal)[0]
-    end = msc_copy.get_nodes_by_type(EndMotion)[0]
-    kin_sim.compile(motion_statechart=msc_copy)
-
-    assert node1.depth == 0
-    assert outer.depth == 0
-    assert end.depth == 0
-    assert outer.inner.depth == 1
-    assert outer.inner.sub_node1.depth == 2
-    assert outer.inner.sub_node2.depth == 2
-
-    msc_copy.draw("muh.pdf")
-    assert node1.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.inner.sub_node1.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.inner.sub_node2.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.inner.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-
-    assert node1.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert outer.inner.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert outer.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert not msc_copy.is_end_motion()
-
-    kin_sim.tick()
-    msc_copy.draw("muh.pdf")
-    assert node1.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.inner.sub_node1.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.inner.sub_node2.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.inner.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert outer.inner.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert outer.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert not msc_copy.is_end_motion()
-
-    kin_sim.tick()
-    msc_copy.draw("muh.pdf")
-    assert node1.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.sub_node1.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.inner.sub_node2.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.inner.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert not msc_copy.is_end_motion()
-
-    kin_sim.tick()
-    msc_copy.draw("muh.pdf")
-    assert node1.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.sub_node1.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.sub_node2.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.inner.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.DONE
-    assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert not msc_copy.is_end_motion()
-
-    kin_sim.tick()
-    msc_copy.draw("muh.pdf")
-    assert node1.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.sub_node1.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.sub_node2.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.observation_state == ObservationStateValues.UNKNOWN
-    assert outer.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.DONE
-    assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert not msc_copy.is_end_motion()
-
-    kin_sim.tick()
-    msc_copy.draw("muh.pdf")
-    assert node1.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.sub_node1.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.sub_node2.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.observation_state == ObservationStateValues.TRUE
-    assert outer.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.DONE
-    assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert not msc_copy.is_end_motion()
-
-    kin_sim.tick()
-    msc_copy.draw("muh.pdf")
-    assert node1.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.sub_node1.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.sub_node2.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.observation_state == ObservationStateValues.TRUE
-    assert outer.observation_state == ObservationStateValues.TRUE
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.DONE
-    assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
-    assert not msc_copy.is_end_motion()
-
-    kin_sim.tick()
-    msc_copy.draw("muh.pdf")
-    assert node1.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.sub_node1.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.sub_node2.observation_state == ObservationStateValues.TRUE
-    assert outer.inner.observation_state == ObservationStateValues.TRUE
-    assert outer.observation_state == ObservationStateValues.TRUE
-    assert end.observation_state == ObservationStateValues.TRUE
-
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.DONE
-    assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
-    assert outer.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
-    assert msc_copy.is_end_motion()
 
 
 @dataclass(eq=False, repr=False)
@@ -843,122 +461,522 @@ def test_thread_payload_monitor_non_blocking_and_caching():
     assert val1 == ObservationStateValues.TRUE
 
 
-def test_goal():
-    msc = MotionStatechart()
+class TestMotionStatechartLogic:
 
-    node1 = ConstTrueNode()
-    msc.add_node(node1)
+    def test_transition_triggers(self, tmp_path):
+        msc = MotionStatechart()
 
-    goal = TestGoal()
-    msc.add_node(goal)
+        changer = ChangeStateOnEvents()
+        msc.add_node(changer)
 
-    goal.start_condition = node1.observation_variable
+        node1 = Pulse()
+        msc.add_node(node1)
 
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = goal.observation_variable
+        node2 = Pulse()
+        msc.add_node(node2)
+        node2.start_condition = node1.observation_variable
 
-    kin_sim = Executor(world=World())
+        node3 = Pulse()
+        msc.add_node(node3)
+        node3.start_condition = trinary_logic_and(
+            trinary_logic_not(node1.observation_variable),
+            trinary_logic_not(node2.observation_variable),
+        )
 
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end()
-    assert len(msc.history) == 7
-    # %% goal
-    assert msc.history.get_life_cycle_history_of_node(goal) == [
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-    ]
-    assert msc.history.get_observation_history_of_node(goal) == [
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-    ]
-    # %% node1
-    assert msc.history.get_life_cycle_history_of_node(node1) == [
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-    ]
-    assert msc.history.get_observation_history_of_node(node1) == [
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-    ]
-    # %% sub_node1
-    assert msc.history.get_life_cycle_history_of_node(goal.sub_node1) == [
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.DONE,
-        LifeCycleValues.DONE,
-        LifeCycleValues.DONE,
-        LifeCycleValues.DONE,
-    ]
-    assert msc.history.get_observation_history_of_node(goal.sub_node1) == [
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-    ]
-    # %% sub_node2
-    assert msc.history.get_life_cycle_history_of_node(goal.sub_node2) == [
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-    ]
-    assert msc.history.get_observation_history_of_node(goal.sub_node2) == [
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-        ObservationStateValues.TRUE,
-    ]
-    # %% sub_node2
-    assert msc.history.get_life_cycle_history_of_node(end) == [
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.RUNNING,
-    ]
-    assert msc.history.get_observation_history_of_node(end) == [
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.UNKNOWN,
-        ObservationStateValues.TRUE,
-    ]
-    msc.draw("muh.pdf")
+        node4 = Pulse()
+        msc.add_node(node4)
+        node4.start_condition = node3.observation_variable
+
+        changer.start_condition = node1.observation_variable
+        changer.pause_condition = node2.observation_variable
+        changer.end_condition = node3.observation_variable
+        changer.reset_condition = node4.observation_variable
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        kin_sim.compile(motion_statechart=msc)
+
+        assert changer.state is None
+
+        kin_sim.tick()
+        msc.draw(str(tmp_path / "muh.pdf"))
+        assert changer.life_cycle_state == LifeCycleValues.RUNNING
+        assert changer.state == "on_start"
+
+        kin_sim.tick()
+        msc.draw(str(tmp_path / "muh.pdf"))
+        assert changer.life_cycle_state == LifeCycleValues.PAUSED
+        assert changer.state == "on_pause"
+
+        kin_sim.tick()
+        msc.draw(str(tmp_path / "muh.pdf"))
+        assert changer.life_cycle_state == LifeCycleValues.RUNNING
+        assert changer.state == "on_unpause"
+
+        kin_sim.tick()
+        msc.draw(str(tmp_path / "muh.pdf"))
+        assert changer.life_cycle_state == LifeCycleValues.DONE
+        assert changer.state == "on_end"
+
+        kin_sim.tick()
+        msc.draw(str(tmp_path / "muh.pdf"))
+        assert changer.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert changer.state == "on_reset"
+
+    def test_not_not_in_motion_statechart(self):
+        node = ConstTrueNode()
+        with pytest.raises(NotInMotionStatechartError):
+            muh = node.observation_variable
+        with pytest.raises(NotInMotionStatechartError):
+            muh = node.life_cycle_variable
+        with pytest.raises(NotInMotionStatechartError):
+            node.start_condition = node.observation_variable
+        with pytest.raises(NotInMotionStatechartError):
+            node.pause_condition = node.observation_variable
+        with pytest.raises(NotInMotionStatechartError):
+            node.end_condition = node.observation_variable
+        with pytest.raises(NotInMotionStatechartError):
+            node.reset_condition = node.observation_variable
+
+    def test_cancel_motion(self, tmp_path):
+        msc = MotionStatechart()
+        node1 = ConstTrueNode()
+        msc.add_node(node1)
+        cancel = CancelMotion(exception=Exception("muh"))
+        msc.add_node(cancel)
+        cancel.start_condition = node1.observation_variable
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        kin_sim.compile(motion_statechart=msc)
+
+        kin_sim.tick()  # first tick, cancel goes into running
+        with pytest.raises(Exception):
+            kin_sim.tick()  # second tick, cancel goes true and triggers
+        msc.draw(str(tmp_path / "muh.pdf"))
+
+    def test_motion_statechart(self):
+        msc = MotionStatechart()
+
+        node1 = ConstTrueNode()
+        msc.add_node(node1)
+        node2 = ConstTrueNode()
+        msc.add_node(node2)
+        node3 = ConstTrueNode()
+        msc.add_node(node3)
+        end = EndMotion()
+        msc.add_node(end)
+
+        node1.start_condition = trinary_logic_or(
+            node3.observation_variable, node2.observation_variable
+        )
+        end.start_condition = node1.observation_variable
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        kin_sim.compile(motion_statechart=msc)
+
+        assert len(msc.nodes) == 4
+        assert len(msc.edges) == 3
+        kin_sim.tick_until_end()
+
+        assert len(msc.history) == 5
+        # %% node1
+        assert msc.history.get_life_cycle_history_of_node(node1) == [
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+        ]
+        assert msc.history.get_observation_history_of_node(node1) == [
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+        ]
+        # %% node2
+        assert msc.history.get_life_cycle_history_of_node(node2) == [
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+        ]
+        assert msc.history.get_observation_history_of_node(node2) == [
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+        ]
+        # %% node3
+        assert msc.history.get_life_cycle_history_of_node(node3) == [
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+        ]
+        assert msc.history.get_observation_history_of_node(node3) == [
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+        ]
+        # %% end
+        assert msc.history.get_life_cycle_history_of_node(end) == [
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+        ]
+        assert msc.history.get_observation_history_of_node(end) == [
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.TRUE,
+        ]
+
+    def test_goal(self, tmp_path):
+        msc = MotionStatechart()
+
+        node1 = ConstTrueNode()
+        msc.add_node(node1)
+
+        goal = TestGoal()
+        msc.add_node(goal)
+
+        goal.start_condition = node1.observation_variable
+
+        end = EndMotion()
+        msc.add_node(end)
+        end.start_condition = goal.observation_variable
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        assert len(msc.history) == 7
+        # %% goal
+        assert msc.history.get_life_cycle_history_of_node(goal) == [
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+        ]
+        assert msc.history.get_observation_history_of_node(goal) == [
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+        ]
+        # %% node1
+        assert msc.history.get_life_cycle_history_of_node(node1) == [
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+        ]
+        assert msc.history.get_observation_history_of_node(node1) == [
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+        ]
+        # %% sub_node1
+        assert msc.history.get_life_cycle_history_of_node(goal.sub_node1) == [
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.DONE,
+            LifeCycleValues.DONE,
+            LifeCycleValues.DONE,
+            LifeCycleValues.DONE,
+        ]
+        assert msc.history.get_observation_history_of_node(goal.sub_node1) == [
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+        ]
+        # %% sub_node2
+        assert msc.history.get_life_cycle_history_of_node(goal.sub_node2) == [
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+        ]
+        assert msc.history.get_observation_history_of_node(goal.sub_node2) == [
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+            ObservationStateValues.TRUE,
+        ]
+        # %% sub_node2
+        assert msc.history.get_life_cycle_history_of_node(end) == [
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.NOT_STARTED,
+            LifeCycleValues.RUNNING,
+            LifeCycleValues.RUNNING,
+        ]
+        assert msc.history.get_observation_history_of_node(end) == [
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.UNKNOWN,
+            ObservationStateValues.TRUE,
+        ]
+        msc.draw(str(tmp_path / "muh.pdf"))
+
+    def test_reset(self, tmp_path):
+        msc = MotionStatechart()
+        node1 = ConstTrueNode()
+        msc.add_node(node1)
+        node2 = ConstTrueNode()
+        msc.add_node(node2)
+        node3 = ConstTrueNode()
+        msc.add_node(node3)
+        end = EndMotion()
+        msc.add_node(end)
+        node1.reset_condition = node2.observation_variable
+        node2.start_condition = node1.observation_variable
+        node3.start_condition = node2.observation_variable
+        node2.end_condition = node2.observation_variable
+        end.start_condition = trinary_logic_and(
+            node1.observation_variable,
+            node2.observation_variable,
+            node3.observation_variable,
+        )
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        kin_sim.compile(motion_statechart=msc)
+        msc.draw(str(tmp_path / "muh.pdf"))
+
+        kin_sim.tick()
+        assert node1.observation_state == ObservationStateValues.TRUE
+        assert node2.observation_state == ObservationStateValues.UNKNOWN
+        assert end.observation_state == ObservationStateValues.UNKNOWN
+        assert node1.life_cycle_state == LifeCycleValues.RUNNING
+        assert node2.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert not msc.is_end_motion()
+
+        kin_sim.tick()
+        assert node1.observation_state == ObservationStateValues.TRUE
+        assert node2.observation_state == ObservationStateValues.TRUE
+        assert end.observation_state == ObservationStateValues.UNKNOWN
+        assert node1.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node2.life_cycle_state == LifeCycleValues.DONE
+        assert node3.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert not msc.is_end_motion()
+
+        kin_sim.tick()
+        assert node1.observation_state == ObservationStateValues.UNKNOWN
+        assert node2.observation_state == ObservationStateValues.TRUE
+        assert node3.observation_state == ObservationStateValues.TRUE
+        assert end.observation_state == ObservationStateValues.UNKNOWN
+        assert node1.life_cycle_state == LifeCycleValues.RUNNING
+        assert node2.life_cycle_state == LifeCycleValues.DONE
+        assert node3.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert not msc.is_end_motion()
+
+        kin_sim.tick()
+        assert node1.observation_state == ObservationStateValues.TRUE
+        assert node2.observation_state == ObservationStateValues.TRUE
+        assert node3.observation_state == ObservationStateValues.TRUE
+        assert end.observation_state == ObservationStateValues.UNKNOWN
+        assert node1.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node2.life_cycle_state == LifeCycleValues.DONE
+        assert node3.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        assert not msc.is_end_motion()
+
+        kin_sim.tick()
+        assert node1.observation_state == ObservationStateValues.UNKNOWN
+        assert node2.observation_state == ObservationStateValues.TRUE
+        assert node3.observation_state == ObservationStateValues.TRUE
+        assert end.observation_state == ObservationStateValues.TRUE
+        assert node1.life_cycle_state == LifeCycleValues.RUNNING
+        assert node2.life_cycle_state == LifeCycleValues.DONE
+        assert node3.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        assert msc.is_end_motion()
+
+    def test_nested_goals(self):
+        msc = MotionStatechart()
+
+        node1 = ConstTrueNode(name="w")
+        msc.add_node(node1)
+
+        outer = TestNestedGoal()
+        msc.add_node(outer)
+        outer.start_condition = node1.observation_variable
+
+        end = EndMotion()
+        msc.add_node(end)
+        end.start_condition = outer.observation_variable
+
+        json_data = msc.to_json()
+        json_str = json.dumps(json_data)
+        new_json_data = json.loads(json_str)
+        msc_copy = MotionStatechart.from_json(new_json_data)
+
+        for node in msc.nodes:
+            assert node.index == msc_copy.get_node_by_index(node.index).index
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        node1 = msc_copy.get_nodes_by_type(ConstTrueNode)[0]
+        outer = msc_copy.get_nodes_by_type(TestNestedGoal)[0]
+        end = msc_copy.get_nodes_by_type(EndMotion)[0]
+        kin_sim.compile(motion_statechart=msc_copy)
+
+        assert node1.depth == 0
+        assert outer.depth == 0
+        assert end.depth == 0
+        assert outer.inner.depth == 1
+        assert outer.inner.sub_node1.depth == 2
+        assert outer.inner.sub_node2.depth == 2
+
+        assert node1.observation_state == ObservationStateValues.UNKNOWN
+        assert outer.inner.sub_node1.observation_state == ObservationStateValues.UNKNOWN
+        assert outer.inner.sub_node2.observation_state == ObservationStateValues.UNKNOWN
+        assert outer.inner.observation_state == ObservationStateValues.UNKNOWN
+        assert outer.observation_state == ObservationStateValues.UNKNOWN
+        assert end.observation_state == ObservationStateValues.UNKNOWN
+
+        assert node1.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert outer.inner.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert outer.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert not msc_copy.is_end_motion()
+
+        kin_sim.tick()
+        assert node1.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.sub_node1.observation_state == ObservationStateValues.UNKNOWN
+        assert outer.inner.sub_node2.observation_state == ObservationStateValues.UNKNOWN
+        assert outer.inner.observation_state == ObservationStateValues.UNKNOWN
+        assert outer.observation_state == ObservationStateValues.UNKNOWN
+        assert end.observation_state == ObservationStateValues.UNKNOWN
+
+        assert node1.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert not msc_copy.is_end_motion()
+
+        kin_sim.tick()
+        assert node1.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.sub_node1.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.sub_node2.observation_state == ObservationStateValues.UNKNOWN
+        assert outer.inner.observation_state == ObservationStateValues.UNKNOWN
+        assert outer.observation_state == ObservationStateValues.UNKNOWN
+        assert end.observation_state == ObservationStateValues.UNKNOWN
+
+        assert node1.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.DONE
+        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert not msc_copy.is_end_motion()
+
+        kin_sim.tick()
+        assert node1.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.sub_node1.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.sub_node2.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.observation_state == ObservationStateValues.UNKNOWN
+        assert outer.observation_state == ObservationStateValues.UNKNOWN
+        assert end.observation_state == ObservationStateValues.UNKNOWN
+
+        assert node1.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.DONE
+        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert not msc_copy.is_end_motion()
+
+        kin_sim.tick()
+        assert node1.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.sub_node1.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.sub_node2.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.observation_state == ObservationStateValues.TRUE
+        assert outer.observation_state == ObservationStateValues.UNKNOWN
+        assert end.observation_state == ObservationStateValues.UNKNOWN
+
+        assert node1.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.DONE
+        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert not msc_copy.is_end_motion()
+
+        kin_sim.tick()
+        assert node1.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.sub_node1.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.sub_node2.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.observation_state == ObservationStateValues.TRUE
+        assert outer.observation_state == ObservationStateValues.TRUE
+        assert end.observation_state == ObservationStateValues.UNKNOWN
+
+        assert node1.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.DONE
+        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        assert not msc_copy.is_end_motion()
+
+        kin_sim.tick()
+        assert node1.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.sub_node1.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.sub_node2.observation_state == ObservationStateValues.TRUE
+        assert outer.inner.observation_state == ObservationStateValues.TRUE
+        assert outer.observation_state == ObservationStateValues.TRUE
+        assert end.observation_state == ObservationStateValues.TRUE
+
+        assert node1.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.DONE
+        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
+        assert outer.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        assert msc_copy.is_end_motion()
 
 
 def test_set_seed_configuration(pr2_world_state_reset):
@@ -969,14 +987,16 @@ def test_set_seed_configuration(pr2_world_state_reset):
         "torso_lift_joint"
     )
 
-    node1 = SetSeedConfiguration(seed_configuration=JointState({connection: goal}))
+    node1 = SetSeedConfiguration(
+        seed_configuration=JointState.from_mapping({connection: goal})
+    )
     end = EndMotion()
     msc.add_node(node1)
     msc.add_node(end)
     node1.end_condition = node1.observation_variable
     end.start_condition = node1.observation_variable
 
-    kin_sim = Executor(world=pr2_world_state_reset)
+    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
     kin_sim.compile(motion_statechart=msc)
 
     kin_sim.tick_until_end()
@@ -1013,7 +1033,7 @@ def test_set_seed_odometry(pr2_world_state_reset):
     node1.end_condition = node1.observation_variable
     end.start_condition = node1.observation_variable
 
-    kin_sim = Executor(world=pr2_world_state_reset)
+    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
     kin_sim.compile(motion_statechart=msc)
 
     kin_sim.tick_until_end()
@@ -1030,79 +1050,182 @@ def test_set_seed_odometry(pr2_world_state_reset):
     )
 
 
-def test_continuous_joint(pr2_world_state_reset):
-    msc = MotionStatechart()
-    joint_goal = JointPositionList(
-        goal_state=JointState.from_str_dict(
-            {
-                "r_wrist_roll_joint": -np.pi,
-                "l_wrist_roll_joint": -2.1 * np.pi,
-            },
-            world=pr2_world_state_reset,
-        ),
-    )
-    msc.add_node(joint_goal)
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = joint_goal.observation_variable
+class TestJointTasks:
+    def test_joint_goal(self, tmp_path):
+        world = World()
+        with world.modify_world():
+            root = Body(name=PrefixedName("root"))
+            tip = Body(name=PrefixedName("tip"))
+            tip2 = Body(name=PrefixedName("tip2"))
+            ul = DerivativeMap()
+            ul.velocity = 1
+            ll = DerivativeMap()
+            ll.velocity = -1
+            dof = DegreeOfFreedom(
+                name=PrefixedName("dof", "a"),
+                limits=DegreeOfFreedomLimits(lower=ll, upper=ul),
+            )
+            world.add_degree_of_freedom(dof)
+            root_C_tip = RevoluteConnection(
+                parent=root, child=tip, axis=Vector3.Z(), dof_id=dof.id
+            )
+            world.add_connection(root_C_tip)
 
-    kin_sim = Executor(
-        world=pr2_world_state_reset,
-    )
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end()
+            dof = DegreeOfFreedom(
+                name=PrefixedName("dof", "b"),
+                limits=DegreeOfFreedomLimits(lower=ll, upper=ul),
+            )
+            world.add_degree_of_freedom(dof)
+            root_C_tip2 = RevoluteConnection(
+                parent=root, child=tip2, axis=Vector3.Z(), dof_id=dof.id
+            )
+            world.add_connection(root_C_tip2)
 
+        msc = MotionStatechart()
 
-def test_revolute_joint(pr2_world_state_reset):
-    msc = MotionStatechart()
-    joint_goal = JointPositionList(
-        goal_state=JointState.from_str_dict(
-            {
-                "head_pan_joint": 0.041880780651479044,
-                "head_tilt_joint": -0.37,
-            },
-            world=pr2_world_state_reset,
-        ),
-    )
-    msc.add_node(joint_goal)
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = joint_goal.observation_variable
+        task1 = JointPositionList(goal_state=JointState.from_mapping({root_C_tip: 1}))
+        always_true = ConstTrueNode()
+        msc.add_node(always_true)
+        msc.add_node(task1)
+        end = EndMotion()
+        msc.add_node(end)
 
-    kin_sim = Executor(
-        world=pr2_world_state_reset,
-    )
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end()
+        task1.start_condition = always_true.observation_variable
+        end.start_condition = trinary_logic_and(
+            task1.observation_variable, always_true.observation_variable
+        )
 
+        kin_sim = Executor(
+            MotionStatechartContext(
+                world=world,
+                qp_controller_config=QPControllerConfig(
+                    target_frequency=20,
+                    prediction_horizon=7,
+                ),
+            )
+        )
+        kin_sim.compile(motion_statechart=msc)
 
-def test_cart_goal_1eef(pr2_world_state_reset: World):
-    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
-    )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "base_footprint"
-    )
-    tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=-0.2, reference_frame=tip
-    )
+        assert task1.observation_state == ObservationStateValues.UNKNOWN
+        assert end.observation_state == ObservationStateValues.UNKNOWN
+        assert task1.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        msc.draw(str(tmp_path / "muh.pdf"))
+        kin_sim.tick_until_end()
+        msc.draw(str(tmp_path / "muh.pdf"))
+        assert len(msc.history) == 6
+        assert (
+            msc.history.get_observation_history_of_node(task1)[-1]
+            == ObservationStateValues.TRUE
+        )
+        assert (
+            msc.history.get_observation_history_of_node(end)[-1]
+            == ObservationStateValues.TRUE
+        )
+        assert (
+            msc.history.get_life_cycle_history_of_node(task1)[-1]
+            == LifeCycleValues.RUNNING
+        )
+        assert (
+            msc.history.get_life_cycle_history_of_node(end)[-1]
+            == LifeCycleValues.RUNNING
+        )
 
-    msc = MotionStatechart()
-    cart_goal = CartesianPose(
-        root_link=root,
-        tip_link=tip,
-        goal_pose=tip_goal,
-    )
-    msc.add_node(cart_goal)
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = cart_goal.observation_variable
+    def test_continuous_joint(self, pr2_world_state_reset):
+        r_wrist_roll_joint = pr2_world_state_reset.get_connection_by_name(
+            "r_wrist_roll_joint"
+        )
+        l_wrist_roll_joint = pr2_world_state_reset.get_connection_by_name(
+            "l_wrist_roll_joint"
+        )
+        msc = MotionStatechart()
+        joint_goal = JointPositionList(
+            goal_state=JointState.from_mapping(
+                {
+                    r_wrist_roll_joint: -np.pi,
+                    l_wrist_roll_joint: -2.1 * np.pi,
+                },
+            ),
+        )
+        msc.add_node(joint_goal)
+        end = EndMotion()
+        msc.add_node(end)
+        end.start_condition = joint_goal.observation_variable
 
-    kin_sim = Executor(
-        world=pr2_world_state_reset,
-    )
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end()
+        kin_sim = Executor(
+            MotionStatechartContext(
+                world=pr2_world_state_reset,
+            )
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        assert np.isclose(
+            shortest_angular_distance(r_wrist_roll_joint.position, -np.pi),
+            0,
+            atol=0.005,
+        )
+        assert np.isclose(
+            shortest_angular_distance(l_wrist_roll_joint.position, -2.1 * np.pi),
+            0,
+            atol=0.005,
+        )
+
+    def test_revolute_joint(self, pr2_world_state_reset):
+        head_pan_joint = pr2_world_state_reset.get_connection_by_name("head_pan_joint")
+        head_tilt_joint = pr2_world_state_reset.get_connection_by_name(
+            "head_tilt_joint"
+        )
+        msc = MotionStatechart()
+        joint_goal = JointPositionList(
+            goal_state=JointState.from_mapping(
+                {
+                    head_pan_joint: 0.042,
+                    head_tilt_joint: -0.37,
+                },
+            ),
+        )
+        msc.add_node(joint_goal)
+        end = EndMotion()
+        msc.add_node(end)
+        end.start_condition = joint_goal.observation_variable
+
+        kin_sim = Executor(
+            MotionStatechartContext(
+                world=pr2_world_state_reset,
+            )
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        assert np.isclose(head_pan_joint.position, 0.042, atol=1e-3)
+        assert np.isclose(head_tilt_joint.position, -0.37, atol=1e-2)
+
+    def test_joint_sequence(self, pr2_world_state_reset):
+        msc = MotionStatechart()
+        msc.add_node(
+            sequence := Sequence(
+                [
+                    JointPositionList(
+                        goal_state=JointState.from_str_dict(
+                            {"torso_lift_joint": 0.1}, world=pr2_world_state_reset
+                        )
+                    ),
+                    JointPositionList(
+                        goal_state=JointState.from_str_dict(
+                            {"torso_lift_joint": 0.2}, world=pr2_world_state_reset
+                        )
+                    ),
+                ]
+            )
+        )
+        msc.add_node(EndMotion.when_true(sequence))
+
+        kin_sim = Executor(
+            MotionStatechartContext(
+                world=pr2_world_state_reset,
+            )
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
 
 
 def test_long_goal(pr2_world_state_reset: World):
@@ -1122,7 +1245,7 @@ def test_long_goal(pr2_world_state_reset: World):
                 goal_state=JointState.from_str_dict(
                     {
                         "torso_lift_joint": 0.2999225173357618,
-                        "head_pan_joint": 0.041880780651479044,
+                        "head_pan_joint": 0.042,
                         "head_tilt_joint": -0.37,
                         "r_upper_arm_roll_joint": -0.9487714747527726,
                         "r_shoulder_pan_joint": -1.0047307505973626,
@@ -1147,7 +1270,9 @@ def test_long_goal(pr2_world_state_reset: World):
     msc.add_node(EndMotion.when_true(cart_goal))
 
     kin_sim = Executor(
-        world=pr2_world_state_reset,
+        MotionStatechartContext(
+            world=pr2_world_state_reset,
+        )
     )
     kin_sim.compile(motion_statechart=msc)
     t = time.perf_counter()
@@ -1157,13 +1282,242 @@ def test_long_goal(pr2_world_state_reset: World):
     print(diff / kin_sim.control_cycles)
 
 
+class TestCartesianPositionTrajectory:
+
+    def _points_to_np(self, positions: list[Point3] | np.ndarray) -> np.ndarray:
+        """
+        Convert a sequence of `Point3` or an `ndarray` of shape (N, 3) into an `ndarray` of shape (N, 3).
+        """
+        if isinstance(positions, np.ndarray):
+            if positions.ndim != 2 or positions.shape[1] != 3:
+                raise ValueError("positions ndarray must have shape (N, 3)")
+            return positions.astype(float)
+        pts = [
+            p.to_np()[:-1] if isinstance(p, Point3) else np.asarray(p, dtype=float)
+            for p in positions
+        ]
+        arr = np.vstack(pts).astype(float)
+        if arr.ndim != 2 or arr.shape[1] != 3:
+            raise ValueError("positions must convert to shape (N, 3)")
+        return arr
+
+    def compare_trajectories(
+        self,
+        positions: list[Point3] | np.ndarray,
+        world_state_trajectory: WorldStateTrajectory,
+        root_link: KinematicStructureEntity,
+        tip_link: KinematicStructureEntity,
+        tolerance: float = 0.01,
+    ):
+        """
+        Compare an executed Cartesian path against a reference list of positions.
+
+        The executed path is reconstructed from the `world_state_trajectory` by computing
+        forward kinematics for `tip_link` in the `root_link` frame at each recorded state.
+        For each executed point, the minimum Euclidean distance to the reference path is
+        computed. Aggregate statistics and pass/fail against `tolerance` are returned.
+
+        :param positions: Reference path as `Point3` iterable or an array of shape (N, 3). All points are with respect to root_link
+        :param world_state_trajectory: Recorded joint-space trajectory with access to the world.
+        :param root_link: Root kinematic frame for forward kinematics.
+        :param tip_link: Tip kinematic frame for forward kinematics.
+        :param tolerance: Maximum allowed distance to the reference path for all samples.
+        :return: Dictionary containing distances per sample and summary metrics.
+        """
+        ref_np = self._points_to_np(positions)
+
+        world = world_state_trajectory.world
+        executed_points = []
+
+        # Reconstruct executed Cartesian path by FK at each recorded state
+        for state_view in world_state_trajectory.values():
+            # Temporarily set the world's state to the recorded one
+            world.state._data[:] = state_view.data
+            world.notify_state_change()
+            p = (
+                world.compute_forward_kinematics(root_link, tip_link)
+                .to_position()
+                .evaluate()[:-1]
+                .astype(float)
+            )
+            executed_points.append(p.copy())
+
+        executed_np = np.vstack(executed_points)
+
+        # Distance of each executed point to the nearest reference point
+        def _min_dist_to_ref(p: np.ndarray) -> float:
+            return float(np.min(np.linalg.norm(executed_np - p, axis=1)))
+
+        distances = np.apply_along_axis(_min_dist_to_ref, 1, ref_np)
+
+        assert np.max(distances) <= tolerance
+
+    def test_cartesian_position_trajectory_spiral(self, cylinder_bot_world: World):
+        points = []
+        a = 0.05  # spiral growth factor (tunes how fast radius grows)
+
+        for i in range(10000):
+            t = (
+                i * np.pi / 5000.0
+            )  # angle parameter; adjust divisor for tighter/looser turns
+            r = a * t  # radius grows linearly with t
+            points.append(
+                Point3(
+                    r * np.cos(t),
+                    r * np.sin(t),
+                    0,
+                    reference_frame=cylinder_bot_world.root,
+                )
+            )
+        msc = MotionStatechart()
+        cart_traj = CartesianPositionTrajectory(
+            root_link=cylinder_bot_world.root,
+            tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            goal_points=points,
+        )
+        msc.add_node(cart_traj)
+        msc.add_node(EndMotion.when_true(cart_traj))
+
+        kin_sim = Executor(
+            context=MotionStatechartContext(
+                world=cylinder_bot_world,
+            ),
+            trajectory_plotter=WorldStateTrajectoryPlotter(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        self.compare_trajectories(
+            points,
+            kin_sim.trajectory_plotter.world_state_trajectory,
+            cart_traj.root_link,
+            cart_traj.tip_link,
+        )
+
+    def test_cartesian_position_trajectory_circle(self, cylinder_bot_world: World):
+        points = []
+        a = 0.1
+
+        for i in range(5000):
+            t = (
+                i * np.pi / 500.0
+            )  # angle parameter; adjust divisor for tighter/looser turns
+            points.append(
+                Point3(
+                    a * np.cos(t),
+                    a * np.sin(t),
+                    0,
+                    reference_frame=cylinder_bot_world.root,
+                )
+            )
+        msc = MotionStatechart()
+        cart_traj = CartesianPositionTrajectory(
+            root_link=cylinder_bot_world.root,
+            tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            goal_points=points,
+            maximum_skip_ahead=20,
+        )
+        msc.add_node(cart_traj)
+        msc.add_node(EndMotion.when_true(cart_traj))
+
+        kin_sim = Executor(
+            context=MotionStatechartContext(
+                world=cylinder_bot_world,
+            ),
+            trajectory_plotter=WorldStateTrajectoryPlotter(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        self.compare_trajectories(
+            points,
+            kin_sim.trajectory_plotter.world_state_trajectory,
+            cart_traj.root_link,
+            cart_traj.tip_link,
+        )
+
+    def test_cartesian_position_trajectory_spiral_pr2(
+        self, pr2_world_state_reset: World, better_pr2_pose
+    ):
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+
+        SetSeedConfiguration(
+            seed_configuration=JointState.from_str_dict(
+                better_pr2_pose, world=pr2_world_state_reset
+            )
+        ).on_start(MotionStatechartContext(world=pr2_world_state_reset))
+
+        points = []
+        root_points = []
+        a = 0.05  # spiral growth factor (tunes how fast radius grows)
+        for i in range(10000):
+            t = (
+                i * np.pi / 5000.0
+            )  # angle parameter; adjust divisor for tighter/looser turns
+            r = a * t  # radius grows linearly with t
+            point = Point3(
+                r * np.cos(t),
+                r * np.sin(t),
+                0,
+                reference_frame=tip,
+            )
+            points.append(point)
+            root_points.append(pr2_world_state_reset.transform(point, root))
+        msc = MotionStatechart()
+
+        msc.add_node(
+            cart_traj := CartesianPositionTrajectory(
+                root_link=root,
+                tip_link=tip,
+                goal_points=points,
+            )
+        )
+        msc.add_node(EndMotion.when_true(cart_traj))
+
+        kin_sim = Executor(
+            context=MotionStatechartContext(
+                world=pr2_world_state_reset,
+            ),
+            trajectory_plotter=WorldStateTrajectoryPlotter(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        self.compare_trajectories(
+            root_points,
+            kin_sim.trajectory_plotter.world_state_trajectory,
+            cart_traj.root_link,
+            cart_traj.tip_link,
+        )
+
+
 class TestCartesianTasks:
     """Test suite for all Cartesian motion tasks."""
 
-    # ===== EXISTING TESTS (moved from standalone functions into this class) =====
+    def test_simple_cartesian_pose(self, cylinder_bot_world: World):
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                goal := CartesianPose(
+                    root_link=cylinder_bot_world.root,
+                    tip_link=tip,
+                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=1, reference_frame=cylinder_bot_world.root
+                    ),
+                ),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(goal))
+
+        kin_sim = Executor(MotionStatechartContext(world=cylinder_bot_world))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
 
     def test_cart_goal_1eef(self, pr2_world_state_reset: World):
-        """Single CartesianPose goal test."""
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -1173,6 +1527,7 @@ class TestCartesianTasks:
         tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=-0.2, reference_frame=tip
         )
+        expected = pr2_world_state_reset.transform(tip_goal, root)
 
         msc = MotionStatechart()
         cart_goal = CartesianPose(
@@ -1185,134 +1540,219 @@ class TestCartesianTasks:
         msc.add_node(end)
         end.start_condition = cart_goal.observation_variable
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(
+            MotionStatechartContext(
+                world=pr2_world_state_reset,
+            )
+        )
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
+        assert np.allclose(
+            kin_sim.context.world.compute_forward_kinematics(root, tip),
+            expected,
+            atol=cart_goal.threshold,
+        )
 
-def test_cart_goal_sequence_at_build(pr2_world_state_reset: World):
-    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    def test_front_facing_orientation(self, hsr_world_setup: World):
+        """Test combined position and orientation control in parallel."""
+        with hsr_world_setup.modify_world():
+            box = Body(
+                name=PrefixedName("muh"),
+                collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
+            )
+            connection = FixedConnection(
+                parent=hsr_world_setup.root,
+                child=box,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=2, z=0.5
+                ),
+            )
+            hsr_world_setup.add_connection(connection)
 
-    tip_goal1 = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=-2, reference_frame=tip
-    )
-    tip_goal2 = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=0.2, reference_frame=tip
-    )
+        hsr = hsr_world_setup.get_semantic_annotations_by_type(HSRB)[0]
+        hand = hsr_world_setup.get_semantic_annotations_by_type(Manipulator)[0]
+        msc = MotionStatechart()
+        orientation_goal = hand.front_facing_orientation.to_rotation_matrix()
+        orientation_goal.reference_frame = hsr_world_setup.get_body_by_name(
+            "base_footprint"
+        )
+        msc.add_node(
+            goal := Parallel(
+                [
+                    CartesianOrientation(
+                        root_link=hsr_world_setup.root,
+                        tip_link=hand.tool_frame,
+                        goal_orientation=orientation_goal,
+                    ),
+                    CartesianPosition(
+                        root_link=hsr_world_setup.root,
+                        tip_link=hand.tool_frame,
+                        goal_point=hsr_world_setup.bodies[
+                            -1
+                        ].global_transform.to_position(),
+                    ),
+                ]
+            )
+        )
+        msc.add_node(EndMotion.when_true(goal))
 
-    msc = MotionStatechart()
-    cart_goal1 = CartesianPose(
-        root_link=root,
-        tip_link=tip,
-        goal_pose=tip_goal1,
-    )
-    msc.add_node(cart_goal1)
+        kin_sim = Executor(MotionStatechartContext(world=hsr_world_setup))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
 
-    cart_goal2 = CartesianPose(
-        root_link=root,
-        tip_link=tip,
-        goal_pose=tip_goal2,
-        binding_policy=GoalBindingPolicy.Bind_at_build,
-    )
-    msc.add_node(cart_goal2)
+    def test_cart_goal_sequence_at_build(self, pr2_world_state_reset: World):
+        """
+        Test CartesianPose sequence with Bind_at_build policy.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
 
-    cart_goal1.end_condition = cart_goal1.observation_variable
-    cart_goal2.start_condition = cart_goal1.observation_variable
+        tip_goal1 = HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=-2, reference_frame=tip
+        )
+        tip_goal2 = HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=0.2, reference_frame=tip
+        )
 
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = trinary_logic_and(
-        cart_goal1.observation_variable, cart_goal2.observation_variable
-    )
+        msc = MotionStatechart()
+        cart_goal1 = CartesianPose(
+            root_link=root,
+            tip_link=tip,
+            goal_pose=tip_goal1,
+        )
+        msc.add_node(cart_goal1)
 
-    kin_sim = Executor(
-        world=pr2_world_state_reset,
-    )
+        cart_goal2 = CartesianPose(
+            root_link=root,
+            tip_link=tip,
+            goal_pose=tip_goal2,
+            binding_policy=GoalBindingPolicy.Bind_at_build,
+        )
+        msc.add_node(cart_goal2)
 
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end()
+        cart_goal1.end_condition = cart_goal1.observation_variable
+        cart_goal2.start_condition = cart_goal1.observation_variable
 
-    fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
-    assert np.allclose(fk, tip_goal2.to_np(), atol=cart_goal2.threshold)
+        end = EndMotion()
+        msc.add_node(end)
+        end.start_condition = trinary_logic_and(
+            cart_goal1.observation_variable, cart_goal2.observation_variable
+        )
 
+        kin_sim = Executor(
+            MotionStatechartContext(
+                world=pr2_world_state_reset,
+            )
+        )
 
-def test_cart_goal_sequence_on_start(pr2_world_state_reset: World):
-    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
 
-    tip_goal1 = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=-0.2, reference_frame=tip
-    )
-    tip_goal2 = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=0.2, reference_frame=tip
-    )
+        fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
+        assert np.allclose(fk, tip_goal2.to_np(), atol=cart_goal2.threshold)
 
-    msc = MotionStatechart()
-    cart_goal1 = CartesianPose(
-        root_link=root,
-        tip_link=tip,
-        goal_pose=tip_goal1,
-    )
-    msc.add_node(cart_goal1)
+    def test_cart_goal_sequence_on_start(self, pr2_world_state_reset: World):
+        """
+        Test CartesianPose sequence with Bind_on_start policy (default).
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
 
-    cart_goal2 = CartesianPose(
-        root_link=root,
-        tip_link=tip,
-        goal_pose=tip_goal2,
-    )
-    msc.add_node(cart_goal2)
+        tip_goal1 = HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=-0.2, reference_frame=tip
+        )
+        tip_goal2 = HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=0.2, reference_frame=tip
+        )
 
-    cart_goal1.end_condition = cart_goal1.observation_variable
-    cart_goal2.start_condition = cart_goal1.observation_variable
+        msc = MotionStatechart()
+        cart_goal1 = CartesianPose(
+            root_link=root,
+            tip_link=tip,
+            goal_pose=tip_goal1,
+        )
+        msc.add_node(cart_goal1)
 
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = trinary_logic_and(
-        cart_goal1.observation_variable, cart_goal2.observation_variable
-    )
+        cart_goal2 = CartesianPose(
+            root_link=root,
+            tip_link=tip,
+            goal_pose=tip_goal2,
+        )
+        msc.add_node(cart_goal2)
 
-    kin_sim = Executor(
-        world=pr2_world_state_reset,
-    )
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end()
+        cart_goal1.end_condition = cart_goal1.observation_variable
+        cart_goal2.start_condition = cart_goal1.observation_variable
 
-    fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
-    expected = np.eye(4)
-    assert np.allclose(fk, expected, atol=cart_goal2.threshold)
+        end = EndMotion()
+        msc.add_node(end)
+        end.start_condition = trinary_logic_and(
+            cart_goal1.observation_variable, cart_goal2.observation_variable
+        )
 
+        kin_sim = Executor(
+            MotionStatechartContext(
+                world=pr2_world_state_reset,
+            )
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
 
-def test_CartesianOrientation(pr2_world_state_reset: World):
-    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+        fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
+        expected = np.eye(4)
+        assert np.allclose(fk, expected, atol=cart_goal2.threshold)
 
-    tip_goal = RotationMatrix.from_axis_angle(Vector3.Z(), 4.0, reference_frame=tip)
+    def test_CartesianOrientation(self, pr2_world_state_reset: World):
+        """Test basic CartesianOrientation goal."""
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
 
-    msc = MotionStatechart()
-    cart_goal = CartesianOrientation(
-        root_link=root,
-        tip_link=tip,
-        goal_orientation=tip_goal,
-    )
-    msc.add_node(cart_goal)
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = cart_goal.observation_variable
+        tip_goal = RotationMatrix.from_axis_angle(Vector3.Z(), 4.0, reference_frame=tip)
 
-    kin_sim = Executor(
-        world=pr2_world_state_reset,
-    )
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end()
+        msc = MotionStatechart()
+        cart_goal = CartesianOrientation(
+            root_link=root,
+            tip_link=tip,
+            goal_orientation=tip_goal,
+        )
+        msc.add_node(cart_goal)
+        end = EndMotion()
+        msc.add_node(end)
+        end.start_condition = cart_goal.observation_variable
 
-    fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
-    assert np.allclose(fk, tip_goal.to_np(), atol=cart_goal.threshold)
+        kin_sim = Executor(
+            MotionStatechartContext(
+                world=pr2_world_state_reset,
+            )
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
 
-    def test_cartesian_position_sequence_at_build(self, pr2_world: World):
-        """Test CartesianPosition with Bind_at_build policy."""
-        tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
-        root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+        fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
+        assert np.allclose(fk, tip_goal.to_np(), atol=cart_goal.threshold)
+
+    def test_cartesian_position_sequence_at_build(self, pr2_world_state_reset: World):
+        """
+        Test CartesianPosition with Bind_at_build policy.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
 
         tip_goal1 = Point3(-0.2, 0, 0, reference_frame=tip)
         tip_goal2 = Point3(0.2, 0, 0, reference_frame=tip)
@@ -1343,21 +1783,27 @@ def test_CartesianOrientation(pr2_world_state_reset: World):
             cart_goal1.observation_variable, cart_goal2.observation_variable
         )
 
-        kin_sim = Executor(world=pr2_world)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
-        fk = pr2_world.compute_forward_kinematics_np(root, tip)
-        # goal2 was captured at build time, so should end at that position
+        fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
+        # goal2 was captured at build time, so should end at that absolute position
         expected = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=0.2, reference_frame=pr2_world.root
+            pos_x=0.2, reference_frame=pr2_world_state_reset.root
         ).to_np()
         assert np.allclose(fk[:3, 3], expected[:3, 3], atol=cart_goal2.threshold)
 
-    def test_cartesian_position_sequence_on_start(self, pr2_world: World):
-        """Test CartesianPosition with Bind_on_start policy (default)."""
-        tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
-        root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+    def test_cartesian_position_sequence_on_start(self, pr2_world_state_reset: World):
+        """
+        Test CartesianPosition with Bind_on_start policy (default).
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
 
         tip_goal1 = Point3(-0.2, 0, 0, reference_frame=tip)
         tip_goal2 = Point3(0.2, 0, 0, reference_frame=tip)
@@ -1388,19 +1834,68 @@ def test_CartesianOrientation(pr2_world_state_reset: World):
             cart_goal1.observation_variable, cart_goal2.observation_variable
         )
 
-        kin_sim = Executor(world=pr2_world)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
-        fk = pr2_world.compute_forward_kinematics_np(root, tip)
+        fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
         # Both goals captured when tasks start, so should return near origin
         expected = np.eye(4)
         assert np.allclose(fk[:3, 3], expected[:3, 3], atol=cart_goal2.threshold)
 
-    def test_cartesian_orientation_sequence_at_build(self, pr2_world: World):
-        """Test CartesianOrientation with Bind_at_build policy."""
-        tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
-        root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+    def test_cartesian_position_with_sequence_node(self, pr2_world_state_reset: World):
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
+
+        tip_goal1 = Point3(-0.2, 0, 0, reference_frame=tip)
+        tip_goal2 = Point3(0.2, 0, 0, reference_frame=tip)
+
+        msc = MotionStatechart()
+        cart_goal1 = CartesianPosition(
+            root_link=root,
+            tip_link=tip,
+            goal_point=tip_goal1,
+            binding_policy=GoalBindingPolicy.Bind_on_start,
+        )
+
+        cart_goal2 = CartesianPosition(
+            root_link=root,
+            tip_link=tip,
+            goal_point=tip_goal2,
+            binding_policy=GoalBindingPolicy.Bind_on_start,
+        )
+        msc.add_node(seq := Sequence(nodes=[cart_goal1, cart_goal2]))
+
+        msc.add_node(EndMotion.when_true(seq))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
+        # Both goals captured when tasks start, so should return near origin
+        expected = np.eye(4)
+        assert np.allclose(fk[:3, 3], expected[:3, 3], atol=cart_goal2.threshold)
+
+    def test_cartesian_orientation_sequence_at_build(
+        self, pr2_world_state_reset: World
+    ):
+        """
+        Test CartesianOrientation with Bind_at_build policy.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
+
+        # Store initial orientation for comparison
+        initial_fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
 
         tip_rot1 = RotationMatrix.from_axis_angle(
             Vector3.Z(), np.pi / 6, reference_frame=tip
@@ -1435,19 +1930,28 @@ def test_CartesianOrientation(pr2_world_state_reset: World):
             cart_goal1.observation_variable, cart_goal2.observation_variable
         )
 
-        kin_sim = Executor(world=pr2_world)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
-        fk = pr2_world.compute_forward_kinematics_np(root, tip)
+        fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
+
         # goal2 captured at build, so ends at -pi/6 from original
         expected = tip_rot2.to_np()
         assert np.allclose(fk, expected, atol=cart_goal2.threshold)
 
-    def test_cartesian_orientation_sequence_on_start(self, pr2_world: World):
-        """Test CartesianOrientation with Bind_on_start policy (default)."""
-        tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
-        root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+    def test_cartesian_orientation_sequence_on_start(
+        self, pr2_world_state_reset: World
+    ):
+        """
+        Test CartesianOrientation with Bind_on_start policy (default).
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
 
         tip_rot1 = RotationMatrix.from_axis_angle(
             Vector3.Z(), np.pi / 6, reference_frame=tip
@@ -1482,19 +1986,27 @@ def test_CartesianOrientation(pr2_world_state_reset: World):
             cart_goal1.observation_variable, cart_goal2.observation_variable
         )
 
-        kin_sim = Executor(world=pr2_world)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
-        fk = pr2_world.compute_forward_kinematics_np(root, tip)
+        fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
         # Both goals captured when tasks start, so rotates +pi/6 then -pi/6 = back to origin
         expected = np.eye(4)
         assert np.allclose(fk, expected, atol=cart_goal2.threshold)
 
-    def test_cartesian_position_straight(self, pr2_world: World):
-        """Test CartesianPositionStraight basic functionality."""
-        tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
-        root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+    def test_cartesian_position_straight(self, pr2_world_state_reset: World):
+        """
+        Test CartesianPositionStraight basic functionality.
+
+        Verifies that the tip reaches the goal and (ideally) follows a straight path.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
 
         goal_point = Point3(0.1, 0, 0, reference_frame=tip)
 
@@ -1511,12 +2023,528 @@ def test_CartesianOrientation(pr2_world_state_reset: World):
         msc.add_node(end)
         end.start_condition = cart_straight.observation_variable
 
-        kin_sim = Executor(world=pr2_world)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        # Verify goal was achieved
+        assert cart_straight.observation_state == ObservationStateValues.TRUE
+
+    def test_cartesian_pose_straight(self, pr2_world_state_reset: World):
+        """Test CartesianPositionStraight basic functionality."""
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
+
+        goal_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+            0.1, 2, 0, reference_frame=tip
+        )
+
+        msc = MotionStatechart()
+        cart_straight = CartesianPoseStraight(
+            root_link=root,
+            tip_link=tip,
+            goal_pose=goal_pose,
+            binding_policy=GoalBindingPolicy.Bind_on_start,
+        )
+        msc.add_node(cart_straight)
+        msc.add_node(EndMotion.when_true(cart_straight))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
         # Verify task detected completion
         assert cart_straight.observation_state == ObservationStateValues.TRUE
+
+        assert np.allclose(
+            cart_straight.goal_pose.to_np(), goal_pose.to_np(), atol=0.015
+        )
+
+
+class TestDiffDriveBaseGoal:
+    @pytest.mark.parametrize(
+        "goal_pose",
+        [
+            Pose.from_xyz_rpy(x=0.489, y=-0.598, z=0.000),
+            Pose.from_xyz_quaternion(
+                pos_x=-0.026,
+                pos_y=0.569,
+                pos_z=0.0,
+                quat_x=0.0,
+                quat_y=0.0,
+                quat_z=0.916530200374776,
+                quat_w=0.3999654882623912,
+            ),
+            Pose.from_xyz_rpy(x=1, y=1, yaw=np.pi / 4),
+            Pose.from_xyz_rpy(x=2, y=0, yaw=-np.pi / 4),
+            Pose.from_xyz_rpy(yaw=-np.pi / 4),
+            Pose.from_xyz_rpy(x=-1, y=-1, yaw=np.pi / 4),
+            Pose.from_xyz_rpy(x=-2, y=-1, yaw=-np.pi / 4),
+            Pose.from_xyz_rpy(x=0.01, y=0.5, yaw=np.pi / 8),
+            Pose.from_xyz_rpy(x=-0.01, y=-0.5, yaw=np.pi / 5),
+            Pose.from_xyz_rpy(x=1.1, y=2.0, yaw=-np.pi),
+            Pose.from_xyz_rpy(y=1),
+        ],
+    )
+    def test_drive(
+        self,
+        cylinder_bot_diff_world,
+        goal_pose: Pose,
+    ):
+        bot = cylinder_bot_diff_world.get_body_by_name("bot")
+        msc = MotionStatechart()
+        goal_pose.reference_frame = cylinder_bot_diff_world.root
+        msc.add_node(goal := DifferentialDriveBaseGoal(goal_pose=goal_pose))
+        msc.add_node(EndMotion.when_true(goal))
+
+        kin_sim = Executor(MotionStatechartContext(world=cylinder_bot_diff_world))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert np.allclose(
+            cylinder_bot_diff_world.compute_forward_kinematics(
+                cylinder_bot_diff_world.root, bot
+            ),
+            goal_pose,
+            atol=1e-2,
+        )
+
+
+class TestFeatureFunctions:
+    """Test suite for feature function tasks (HeightGoal, DistanceGoal, etc.)."""
+
+    def test_height_goal_within_bounds(self, pr2_world_state_reset: World):
+        """
+        Test that HeightGoal successfully constrains the vertical distance
+        between tip and reference points within specified bounds.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+
+        tip_point = Point3(0, 0, 0, reference_frame=tip)
+        reference_point = Point3(0, 0, 0, reference_frame=root)
+
+        lower_limit = 0.3
+        upper_limit = 0.5
+
+        msc = MotionStatechart()
+        height_goal = HeightGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=lower_limit,
+            upper_limit=upper_limit,
+        )
+        msc.add_node(height_goal)
+        msc.add_node(EndMotion.when_true(height_goal))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert height_goal.observation_state == ObservationStateValues.TRUE
+
+        # Compute actual height difference
+        root_P_tip = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_point
+        )
+        root_P_ref = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        height_diff = (root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3])[2]
+
+        assert (
+            lower_limit <= height_diff <= upper_limit
+        ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+
+    def test_height_goal_negative_bounds(self, pr2_world_state_reset: World):
+        """
+        Test HeightGoal with negative height bounds (tip below reference).
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+
+        tip_point = Point3(0, 0, 0, reference_frame=tip)
+        reference_point = Point3(0, 0, 1.0, reference_frame=root)
+
+        lower_limit = -0.5
+        upper_limit = -0.2
+
+        msc = MotionStatechart()
+        height_goal = HeightGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=lower_limit,
+            upper_limit=upper_limit,
+        )
+        msc.add_node(height_goal)
+        msc.add_node(EndMotion.when_true(height_goal))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert height_goal.observation_state == ObservationStateValues.TRUE
+
+        # Verify actual height difference
+        root_P_tip = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_point
+        )
+        root_P_ref = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        height_diff = (root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3])[2]
+
+        assert (
+            lower_limit <= height_diff <= upper_limit
+        ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+
+    def test_distance_goal_within_bounds(self, pr2_world_state_reset: World):
+        """
+        Test that DistanceGoal successfully constrains the horizontal distance
+        (in x-y plane) between tip and reference points within specified bounds.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+
+        tip_point = Point3(0, 0, 0, reference_frame=tip)
+        reference_point = Point3(0, 0, 0, reference_frame=root)
+
+        lower_limit = 0.5
+        upper_limit = 0.7
+
+        msc = MotionStatechart()
+        distance_goal = DistanceGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=lower_limit,
+            upper_limit=upper_limit,
+        )
+        msc.add_node(distance_goal)
+        msc.add_node(EndMotion.when_true(distance_goal))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert distance_goal.observation_state == ObservationStateValues.TRUE
+
+        # Compute actual horizontal distance
+        root_P_tip = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_point
+        )
+        root_P_ref = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
+        # Distance in x-y plane only (ignore z)
+        horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
+
+        assert (
+            lower_limit <= horizontal_distance <= upper_limit
+        ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+
+    def test_distance_goal_zero_distance(self, pr2_world_state_reset: World):
+        """
+        Test DistanceGoal with bounds that include zero (tip and reference at same x-y position).
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+
+        tip_point = Point3(0, 0, 0, reference_frame=tip)
+        # Reference point at same x-y but different z
+        reference_point = Point3(0, 0, 0.5, reference_frame=root)
+
+        lower_limit = 0.0
+        upper_limit = 0.1
+
+        msc = MotionStatechart()
+        distance_goal = DistanceGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=lower_limit,
+            upper_limit=upper_limit,
+        )
+        msc.add_node(distance_goal)
+        msc.add_node(EndMotion.when_true(distance_goal))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert distance_goal.observation_state == ObservationStateValues.TRUE
+
+        # Verify horizontal distance is near zero
+        root_P_tip = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_point
+        )
+        root_P_ref = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
+        horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
+
+        assert (
+            lower_limit <= horizontal_distance <= upper_limit
+        ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+
+    def test_distance_goal_ignores_z_axis(self, pr2_world_state_reset: World):
+        """
+        Test that DistanceGoal only considers x-y plane distance and ignores z-axis.
+        Even with large z difference, if x-y distance is within bounds, goal succeeds.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+
+        tip_point = Point3(0, 0, 0, reference_frame=tip)
+        # Reference point at specific x-y position but very different z
+        reference_point = Point3(0.3, 0.4, 2.0, reference_frame=root)
+
+        lower_limit = 0.45
+        upper_limit = 0.55
+
+        msc = MotionStatechart()
+        distance_goal = DistanceGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=lower_limit,
+            upper_limit=upper_limit,
+        )
+        msc.add_node(distance_goal)
+        msc.add_node(EndMotion.when_true(distance_goal))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert distance_goal.observation_state == ObservationStateValues.TRUE
+
+        # Verify z difference is large but goal still succeeded
+        root_P_tip = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_point
+        )
+        root_P_ref = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
+
+        horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
+
+        assert (
+            lower_limit <= horizontal_distance <= upper_limit
+        ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+
+    def test_height_and_distance_combined(self, pr2_world_state_reset: World):
+        """
+        Test combining HeightGoal and DistanceGoal in parallel to constrain
+        both vertical and horizontal distances simultaneously.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+
+        tip_point = Point3(0, 0, 0, reference_frame=tip)
+        reference_point = Point3(0, 0, 0, reference_frame=root)
+
+        height_lower = 0.3
+        height_upper = 0.5
+
+        distance_lower = 0.4
+        distance_upper = 0.6
+
+        msc = MotionStatechart()
+        combined_goal = Parallel(
+            [
+                HeightGoal(
+                    root_link=root,
+                    tip_link=tip,
+                    tip_point=tip_point,
+                    reference_point=reference_point,
+                    lower_limit=height_lower,
+                    upper_limit=height_upper,
+                ),
+                DistanceGoal(
+                    root_link=root,
+                    tip_link=tip,
+                    tip_point=tip_point,
+                    reference_point=reference_point,
+                    lower_limit=distance_lower,
+                    upper_limit=distance_upper,
+                ),
+            ]
+        )
+        msc.add_node(combined_goal)
+        msc.add_node(EndMotion.when_true(combined_goal))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert combined_goal.observation_state == ObservationStateValues.TRUE
+
+        # Verify both constraints are satisfied
+        root_P_tip = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_point
+        )
+        root_P_ref = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
+
+        height_diff = diff[2]
+        horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
+
+        assert (
+            height_lower <= height_diff <= height_upper
+        ), f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
+        assert (
+            distance_lower <= horizontal_distance <= distance_upper
+        ), f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+
+    def test_distance_height_angle_perpendicular_combined(
+        self, pr2_world_state_reset: World
+    ):
+        """
+        Test combining DistanceGoal, HeightGoal, and AlignPerpendicular
+        to constrain horizontal distance, vertical distance, and perpendicular
+        alignment simultaneously.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+
+        tip_point = Point3(0, 0, 0, reference_frame=tip)
+        reference_point = Point3(0, 0, 0, reference_frame=root)
+
+        tip_normal = Vector3(1, 0, 0, reference_frame=tip)
+        reference_normal = Vector3(1, 0, 0, reference_frame=root)
+
+        height_lower = 0.3
+        height_upper = 0.5
+
+        distance_lower = 0.4
+        distance_upper = 0.6
+
+        perpendicular_threshold = 0.01
+
+        msc = MotionStatechart()
+        height_goal = HeightGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=height_lower,
+            upper_limit=height_upper,
+        )
+        distance_goal = DistanceGoal(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+            lower_limit=distance_lower,
+            upper_limit=distance_upper,
+        )
+        align_perpendicular = AlignPerpendicular(
+            root_link=root,
+            tip_link=tip,
+            tip_normal=tip_normal,
+            reference_normal=reference_normal,
+            threshold=perpendicular_threshold,
+        )
+
+        combined_goal = Parallel([height_goal, distance_goal, align_perpendicular])
+        msc.add_node(combined_goal)
+        msc.add_node(EndMotion.when_true(combined_goal))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert combined_goal.observation_state == ObservationStateValues.TRUE
+        assert height_goal.observation_state == ObservationStateValues.TRUE
+        assert distance_goal.observation_state == ObservationStateValues.TRUE
+        assert align_perpendicular.observation_state == ObservationStateValues.TRUE
+
+        root_P_tip = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_point
+        )
+        root_P_ref = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=reference_point
+        )
+        diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
+
+        height_diff = diff[2]
+        horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
+
+        assert (
+            height_lower <= height_diff <= height_upper
+        ), f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
+        assert (
+            distance_lower <= horizontal_distance <= distance_upper
+        ), f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+
+        root_V_tip_normal = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_normal
+        )
+        root_V_tip_normal.scale(1)
+        root_V_ref_normal = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=reference_normal
+        )
+        root_V_ref_normal.scale(1)
+
+        v_tip_normal = root_V_tip_normal.to_np()[:3]
+        v_ref_normal = root_V_ref_normal.to_np()[:3]
+
+        eps = 1e-9
+        assert np.linalg.norm(v_ref_normal) > eps, "reference normal became zero-length"
+        assert np.linalg.norm(v_tip_normal) > eps, "tip normal became zero-length"
+
+        perp_angle = angle_between_vector(v_tip_normal, v_ref_normal)
+        target = np.pi / 2
+
+        assert abs(perp_angle - target) <= perpendicular_threshold, (
+            f"AlignPerpendicular failed: final angle {perp_angle:.6f} rad, "
+            f"target {target:.6f} rad, threshold {perpendicular_threshold:.6f} rad"
+        )
 
 
 def test_pointing(pr2_world_state_reset: World):
@@ -1542,7 +2570,9 @@ def test_pointing(pr2_world_state_reset: World):
     end.start_condition = pointing.observation_variable
 
     kin_sim = Executor(
-        world=pr2_world_state_reset,
+        MotionStatechartContext(
+            world=pr2_world_state_reset,
+        )
     )
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
@@ -1572,7 +2602,9 @@ def test_pointing_cone(pr2_world_state_reset: World):
     end.start_condition = pointing_cone.observation_variable
 
     kin_sim = Executor(
-        world=pr2_world_state_reset,
+        MotionStatechartContext(
+            world=pr2_world_state_reset,
+        )
     )
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
@@ -1626,7 +2658,9 @@ def test_align_planes(pr2_world_state_reset: World):
     end.start_condition = align_planes.observation_variable
 
     kin_sim = Executor(
-        world=pr2_world_state_reset,
+        MotionStatechartContext(
+            world=pr2_world_state_reset,
+        )
     )
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
@@ -1652,6 +2686,59 @@ def test_align_planes(pr2_world_state_reset: World):
     assert (
         angle <= align_planes.threshold
     ), f"AlignPlanes failed: final angle {angle:.6f} rad > threshold {align_planes.threshold:.6f} rad"
+
+
+def test_align_perpendicular(pr2_world_state_reset: World):
+    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        "r_gripper_tool_frame"
+    )
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+
+    msc = MotionStatechart()
+
+    goal_normal = Vector3.X(reference_frame=root)
+    tip_normal = Vector3.X(reference_frame=tip)
+
+    align_perp = AlignPerpendicular(
+        root_link=root,
+        tip_link=tip,
+        reference_normal=goal_normal,
+        tip_normal=tip_normal,
+    )
+    msc.add_node(align_perp)
+
+    end = EndMotion()
+    msc.add_node(end)
+    end.start_condition = align_perp.observation_variable
+
+    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick_until_end()
+
+    # Check if the angle between normals is (approximately) 90 degrees
+    root_V_goal_normal = pr2_world_state_reset.transform(
+        target_frame=root, spatial_object=goal_normal
+    )
+    root_V_goal_normal.scale(1)
+    root_V_tip_normal = pr2_world_state_reset.transform(
+        target_frame=root, spatial_object=tip_normal
+    )
+    root_V_tip_normal.scale(1)
+
+    v_tip = root_V_tip_normal.to_np()[:3]
+    v_goal = root_V_goal_normal.to_np()[:3]
+
+    eps = 1e-9
+    assert np.linalg.norm(v_goal) > eps, "goal normal became zero-length"
+    assert np.linalg.norm(v_tip) > eps, "tip normal became zero-length"
+
+    angle = angle_between_vector(v_tip, v_goal)
+    target = np.pi / 2
+
+    assert abs(angle - target) <= align_perp.threshold, (
+        f"AlignPerpendicular failed: final angle {angle:.6f} rad, "
+        f"target {target:.6f} rad, threshold {align_perp.threshold:.6f} rad"
+    )
 
 
 def test_angle_goal(pr2_world_state_reset: World):
@@ -1684,7 +2771,7 @@ def test_angle_goal(pr2_world_state_reset: World):
 
     msc.add_node(EndMotion.when_true(angle_goal))
 
-    kin_sim = Executor(world=pr2_world_state_reset)
+    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
 
@@ -1729,7 +2816,7 @@ class TestVelocityTasks:
         run until end and return (control_cycles, executor)
         """
         msc = self._build_msc(goal_node=goal_node, limit_node=limit_node)
-        kin_sim = Executor(world=world)
+        kin_sim = Executor(MotionStatechartContext(world=world))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
         return kin_sim.control_cycles, kin_sim
@@ -1763,6 +2850,7 @@ class TestVelocityTasks:
                 root_link=root,
                 tip_link=tip,
                 goal_point=Point3(1, 0, 0, reference_frame=tip),
+                weight=DefaultWeights.WEIGHT_ABOVE_CA,
             )
         else:
             goal = CartesianOrientation(
@@ -1771,6 +2859,7 @@ class TestVelocityTasks:
                 goal_orientation=RotationMatrix.from_rpy(
                     yaw=np.pi / 2, reference_frame=tip
                 ),
+                weight=DefaultWeights.WEIGHT_ABOVE_CA,
             )
 
         low_weight_limit = limit_cls(
@@ -1783,7 +2872,7 @@ class TestVelocityTasks:
         )
         msc.add_node(cancel_motion)
 
-        kin_sim = Executor(world=pr2_world_state_reset)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
         kin_sim.compile(motion_statechart=msc)
 
         with pytest.raises(Exception):
@@ -1876,84 +2965,6 @@ class TestVelocityTasks:
         ), f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
 
 
-def test_transition_triggers():
-    msc = MotionStatechart()
-
-    changer = ChangeStateOnEvents()
-    msc.add_node(changer)
-
-    node1 = Pulse()
-    msc.add_node(node1)
-
-    node2 = Pulse()
-    msc.add_node(node2)
-    node2.start_condition = node1.observation_variable
-
-    node3 = Pulse()
-    msc.add_node(node3)
-    node3.start_condition = trinary_logic_and(
-        trinary_logic_not(node1.observation_variable),
-        trinary_logic_not(node2.observation_variable),
-    )
-
-    node4 = Pulse()
-    msc.add_node(node4)
-    node4.start_condition = node3.observation_variable
-
-    changer.start_condition = node1.observation_variable
-    changer.pause_condition = node2.observation_variable
-    changer.end_condition = node3.observation_variable
-    changer.reset_condition = node4.observation_variable
-
-    kin_sim = Executor(world=World())
-    kin_sim.compile(motion_statechart=msc)
-
-    assert changer.state is None
-
-    kin_sim.tick()
-    msc.draw("muh.pdf")
-    kin_sim.tick()
-    msc.draw("muh.pdf")
-    assert changer.life_cycle_state == LifeCycleValues.RUNNING
-    assert changer.state == "on_start"
-
-    kin_sim.tick()
-    msc.draw("muh.pdf")
-    assert changer.life_cycle_state == LifeCycleValues.PAUSED
-    assert changer.state == "on_pause"
-
-    kin_sim.tick()
-    msc.draw("muh.pdf")
-    assert changer.life_cycle_state == LifeCycleValues.RUNNING
-    assert changer.state == "on_unpause"
-
-    kin_sim.tick()
-    msc.draw("muh.pdf")
-    assert changer.life_cycle_state == LifeCycleValues.DONE
-    assert changer.state == "on_end"
-
-    kin_sim.tick()
-    msc.draw("muh.pdf")
-    assert changer.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert changer.state == "on_reset"
-
-
-def test_not_not_in_motion_statechart():
-    node = ConstTrueNode()
-    with pytest.raises(NotInMotionStatechartError):
-        muh = node.observation_variable
-    with pytest.raises(NotInMotionStatechartError):
-        muh = node.life_cycle_variable
-    with pytest.raises(NotInMotionStatechartError):
-        node.start_condition = node.observation_variable
-    with pytest.raises(NotInMotionStatechartError):
-        node.pause_condition = node.observation_variable
-    with pytest.raises(NotInMotionStatechartError):
-        node.end_condition = node.observation_variable
-    with pytest.raises(NotInMotionStatechartError):
-        node.reset_condition = node.observation_variable
-
-
 def test_counting():
     class FakeClock:
         def __init__(self):
@@ -1983,8 +2994,9 @@ def test_counting():
     )
 
     kin_sim = Executor(
-        world=World(),
-        pacer=SimulationPacer(real_time_factor=None),
+        MotionStatechartContext(
+            world=World(),
+        )
     )
     kin_sim.compile(motion_statechart=msc)
 
@@ -2006,17 +3018,17 @@ def test_counting():
 
 def test_count_ticks():
     msc = MotionStatechart()
-    msc.add_node(counter := CountTicks(ticks=3))
+    msc.add_node(counter := CountControlCycles(control_cycles=3))
     msc.add_node(EndMotion.when_true(counter))
-    kin_sim = Executor(world=World())
+    kin_sim = Executor(MotionStatechartContext(world=World()))
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
-    # ending tacks 2 ticks, one to turn EndMotion to Running and one more to turn it to true
-    assert kin_sim.control_cycles == 3 + 2
+    # ending tacks 4 ticks, one to turn EndMotion to true
+    assert kin_sim.control_cycles == 3 + 1
 
 
 class TestEndMotion:
-    def test_end_motion_when_all_done1(self):
+    def test_end_motion_when_all_done1(self, tmp_path):
         msc = MotionStatechart()
         msc.add_nodes(
             [
@@ -2028,14 +3040,16 @@ class TestEndMotion:
         msc.add_node(end)
 
         kin_sim = Executor(
-            world=World(),
+            MotionStatechartContext(
+                world=World(),
+            )
         )
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
-        msc.draw("muh.pdf")
+        msc.draw(str(tmp_path / "muh.pdf"))
         assert end.life_cycle_state == LifeCycleValues.RUNNING
 
-    def test_end_motion_when_all_done2(self):
+    def test_end_motion_when_all_done2(self, tmp_path):
         msc = MotionStatechart()
         msc.add_nodes(
             [
@@ -2047,15 +3061,17 @@ class TestEndMotion:
         msc.add_node(end)
 
         kin_sim = Executor(
-            world=World(),
+            MotionStatechartContext(
+                world=World(),
+            )
         )
         kin_sim.compile(motion_statechart=msc)
         with pytest.raises(TimeoutError):
             kin_sim.tick_until_end()
-        msc.draw("muh.pdf")
+        msc.draw(str(tmp_path / "muh.pdf"))
         assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
 
-    def test_end_motion_when_any_done1(self):
+    def test_end_motion_when_any_done1(self, tmp_path):
         msc = MotionStatechart()
         msc.add_nodes(
             [
@@ -2067,14 +3083,16 @@ class TestEndMotion:
         msc.add_node(end)
 
         kin_sim = Executor(
-            world=World(),
+            MotionStatechartContext(
+                world=World(),
+            )
         )
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
-        msc.draw("muh.pdf")
+        msc.draw(str(tmp_path / "muh.pdf"))
         assert end.life_cycle_state == LifeCycleValues.RUNNING
 
-    def test_end_motion_when_any_done2(self):
+    def test_end_motion_when_any_done2(self, tmp_path):
         msc = MotionStatechart()
         msc.add_nodes(
             [
@@ -2086,12 +3104,14 @@ class TestEndMotion:
         msc.add_node(end)
 
         kin_sim = Executor(
-            world=World(),
+            MotionStatechartContext(
+                world=World(),
+            )
         )
         kin_sim.compile(motion_statechart=msc)
         with pytest.raises(TimeoutError):
             kin_sim.tick_until_end()
-        msc.draw("muh.pdf")
+        msc.draw(str(tmp_path / "muh.pdf"))
         assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
 
     def test_goals_cannot_have_end_motion(self):
@@ -2099,28 +3119,62 @@ class TestEndMotion:
         msc.add_node(Sequence([ConstTrueNode(), EndMotion()]))
         with pytest.raises(EndMotionInGoalError):
             kin_sim = Executor(
-                world=World(),
+                MotionStatechartContext(
+                    world=World(),
+                )
             )
             kin_sim.compile(motion_statechart=msc)
 
 
-class TestParallel:
+class TestTemplates:
+
+    def test_sequence_goal(self, tmp_path):
+        msc = MotionStatechart()
+        node = Sequence(
+            nodes=[
+                ConstTrueNode(),
+                ConstTrueNode(),
+                ConstTrueNode(),
+                ConstTrueNode(),
+            ]
+        )
+        msc.add_node(node)
+        msc.add_node(EndMotion.when_true(node))
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        msc.draw(str(tmp_path / "muh.pdf"))
+        assert kin_sim.control_cycles == 6
+        assert msc.nodes[1].life_cycle_state == LifeCycleValues.RUNNING
+        assert msc.nodes[2].life_cycle_state == LifeCycleValues.DONE
+        assert msc.nodes[3].life_cycle_state == LifeCycleValues.DONE
+        assert msc.nodes[4].life_cycle_state == LifeCycleValues.DONE
+        assert msc.nodes[5].life_cycle_state == LifeCycleValues.DONE
+
     def test_parallel(self):
         msc = MotionStatechart()
         msc.add_nodes(
             [
-                parallel := Parallel([CountTicks(ticks=3), CountTicks(ticks=5)]),
+                parallel := Parallel(
+                    [
+                        CountControlCycles(control_cycles=3),
+                        CountControlCycles(control_cycles=5),
+                    ]
+                ),
             ]
         )
         msc.add_node(EndMotion.when_true(parallel))
 
         kin_sim = Executor(
-            world=World(),
+            MotionStatechartContext(
+                world=World(),
+            )
         )
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
-        # 5 (longest ticker) + 1 (for parallel to turn True) + 2 (for end to trigger)
-        assert kin_sim.control_cycles == 8
+        # 5 (longest ticker) + 1 (for parallel to turn True) + 1 (for end to trigger)
+        assert kin_sim.control_cycles == 7
 
     def test_parallel_with_tasks(self, pr2_world_state_reset: World):
         map = pr2_world_state_reset.root
@@ -2149,52 +3203,118 @@ class TestParallel:
         msc.add_node(EndMotion.when_true(parallel))
 
         kin_sim = Executor(
-            world=pr2_world_state_reset,
+            MotionStatechartContext(
+                world=pr2_world_state_reset,
+            )
         )
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
+    def test_parallel_minimum_success(self):
+        """Test that Parallel completes when minimum_success nodes are True"""
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                parallel := Parallel(
+                    [
+                        CountControlCycles(control_cycles=2),
+                        CountControlCycles(control_cycles=4),
+                        CountControlCycles(control_cycles=6),
+                    ],
+                    minimum_success=2,
+                ),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(parallel))
+
+        kin_sim = Executor(
+            MotionStatechartContext(world=World()),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        # 4 (second ticker completes) + 1 (for parallel to turn True) + 1 (for end to trigger)
+        assert kin_sim.control_cycles == 6
+
+    def test_parallel_minimum_success_zero(self):
+        """Test that Parallel completes when no node is True"""
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                parallel := Parallel(
+                    [
+                        CountControlCycles(control_cycles=3),
+                        CountControlCycles(control_cycles=5),
+                        CountControlCycles(control_cycles=7),
+                    ],
+                    minimum_success=0,
+                ),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(parallel))
+
+        kin_sim = Executor(
+            MotionStatechartContext(world=World()),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        # 0 (no ticker completes) + 1 (for parallel to turn True) + 1 (for end to trigger)
+        assert kin_sim.control_cycles == 2
+
 
 class TestOpenClose:
-    def test_open(self, pr2_world_state_reset):
-        factory = DoorFactory(
-            name=PrefixedName("door"),
-            handle_factory=HandleFactory(name=PrefixedName("handle")),
-            semantic_position=SemanticPositionDescription(
-                horizontal_direction_chain=[
-                    HorizontalSemanticDirection.RIGHT,
-                    HorizontalSemanticDirection.FULLY_CENTER,
-                ],
-                vertical_direction_chain=[VerticalSemanticDirection.FULLY_CENTER],
-            ),
-        )
-        door_world = factory.create()
-        with pr2_world_state_reset.modify_world():
+    def test_open(self, pr2_world_copy, tmp_path):
+
+        with pr2_world_copy.modify_world():
+            door = Door.create_with_new_body_in_world(
+                name=PrefixedName("door"),
+                world=pr2_world_copy,
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world_copy.root
+                ),
+            )
+
+            handle = Handle.create_with_new_body_in_world(
+                name=PrefixedName("handle"),
+                world=pr2_world_copy,
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=1.5,
+                    y=0.45,
+                    z=1,
+                    yaw=np.pi,
+                    reference_frame=pr2_world_copy.root,
+                ),
+            )
+
             lower_limits = DerivativeMap()
             lower_limits.position = -np.pi / 2
             lower_limits.velocity = -1
             upper_limits = DerivativeMap()
             upper_limits.position = np.pi / 2
             upper_limits.velocity = 1
-            dof = DegreeOfFreedom(
-                lower_limits=lower_limits,
-                upper_limits=upper_limits,
-                name=PrefixedName("hinge"),
-            )
-            pr2_world_state_reset.add_degree_of_freedom(dof)
-            root_T_door = RevoluteConnection(
-                dof_id=dof.id,
-                parent=pr2_world_state_reset.root,
-                child=door_world.root,
-                axis=-Vector3.Z(),
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world_state_reset.root
-                ),
-            )
-            pr2_world_state_reset.merge_world(door_world, root_connection=root_T_door)
 
-        r_tip = pr2_world_state_reset.get_body_by_name("r_gripper_tool_frame")
-        handle = pr2_world_state_reset.get_semantic_annotations_by_type(Handle)[0].body
+            hinge = Hinge.create_with_new_body_in_world(
+                name=PrefixedName("hinge"),
+                world=pr2_world_copy,
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=1.5,
+                    y=-0.5,
+                    z=1,
+                    yaw=np.pi,
+                    reference_frame=pr2_world_copy.root,
+                ),
+                connection_limits=DegreeOfFreedomLimits(
+                    lower=lower_limits, upper=upper_limits
+                ),
+                active_axis=Vector3.Z(),
+            )
+
+            door.add_handle(handle)
+            door.add_hinge(hinge=hinge)
+
+        root_C_hinge = door.hinge.root.parent_connection
+
+        r_tip = pr2_world_copy.get_body_by_name("r_gripper_tool_frame")
+        handle = pr2_world_copy.get_semantic_annotations_by_type(Handle)[0].root
         open_goal = 1
         close_goal = -1
 
@@ -2204,7 +3324,7 @@ class TestOpenClose:
                 Sequence(
                     [
                         CartesianPose(
-                            root_link=pr2_world_state_reset.root,
+                            root_link=pr2_world_copy.root,
                             tip_link=r_tip,
                             goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 yaw=np.pi, reference_frame=handle
@@ -2218,7 +3338,7 @@ class TestOpenClose:
                                     goal_joint_state=open_goal,
                                 ),
                                 opened := JointPositionReached(
-                                    connection=root_T_door,
+                                    connection=root_C_hinge,
                                     position=open_goal,
                                     name="opened",
                                 ),
@@ -2232,7 +3352,7 @@ class TestOpenClose:
                                     goal_joint_state=close_goal,
                                 ),
                                 closed := JointPositionReached(
-                                    connection=root_T_door,
+                                    connection=root_C_hinge,
                                     position=close_goal,
                                     name="closed",
                                 ),
@@ -2245,33 +3365,458 @@ class TestOpenClose:
         msc.add_node(EndMotion.when_true(msc.nodes[0]))
 
         kin_sim = Executor(
-            world=pr2_world_state_reset,
+            MotionStatechartContext(
+                world=pr2_world_copy,
+            )
         )
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
-        msc.draw("muh.pdf")
+        msc.draw(str(tmp_path / "muh.pdf"))
 
         assert opened.observation_state == ObservationStateValues.TRUE
         assert closed.observation_state == ObservationStateValues.TRUE
 
 
 class TestCollisionAvoidance:
-    def test_collision_avoidance(self, box_bot_world: World):
-        tip = box_bot_world.get_kinematic_structure_entity_by_name("bot")
+    def test_external_collision_avoidance(self, cylinder_bot_world: World):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
+        env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
 
         msc = MotionStatechart()
         msc.add_nodes(
             [
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AvoidCollisionBetweenGroups(
+                            buffer_zone_distance=0.05,
+                            violated_distance=0.0,
+                            body_group_a=[tip],
+                            body_group_b=[env1],
+                        )
+                    ]
+                ),
+                distance_violated := ExternalCollisionDistanceMonitor(
+                    body=robot.root, threshold=0.049
+                ),
                 CartesianPose(
-                    root_link=box_bot_world.root,
+                    root_link=cylinder_bot_world.root,
                     tip_link=tip,
                     goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
-                        x=1, reference_frame=box_bot_world.root
+                        x=1, reference_frame=cylinder_bot_world.root
                     ),
                 ),
-                CollisionAvoidance(
-                    collision_entries=[CollisionRequest.avoid_all_collision()],
+                ExternalCollisionAvoidance(robot=robot),
+                local_min := LocalMinimumReached(),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(local_min))
+        msc.add_node(CancelMotion.when_true(distance_violated))
+
+        json_data = msc.to_json()
+        json_str = json.dumps(json_data)
+        new_json_data = json.loads(json_str)
+
+        tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
+        kwargs = tracker.create_kwargs()
+        msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
+
+        kin_sim = Executor(
+            MotionStatechartContext(world=cylinder_bot_world),
+            pacer=SimulationPacer(real_time_factor=2),
+        )
+        kin_sim.compile(motion_statechart=msc_copy)
+
+        kin_sim.tick_until_end(500)
+        collisions = kin_sim.context.world.collision_manager.compute_collisions()
+        assert len(collisions.contacts) == 1
+        assert collisions.contacts[0].distance > 0.049
+        assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
+
+    def test_external_collision_avoidance_battle(self):
+        strong_robot_world = World()
+        with strong_robot_world.modify_world():
+            strong = Body(
+                name=PrefixedName("strong"),
+                collision=ShapeCollection(
+                    [Cylinder(width=0.1, height=0.1, color=Color(R=1, G=0, B=0, A=1))]
                 ),
+            )
+            strong_robot_world.add_body(strong)
+            strong_robot_sa = MinimalRobot.from_world(strong_robot_world)
+
+        weak_robot_world = World()
+        with weak_robot_world.modify_world():
+            weak = Body(
+                name=PrefixedName("weak"),
+                collision=ShapeCollection(
+                    [Cylinder(width=0.1, height=0.1, color=Color(R=0, G=0, B=1, A=1))]
+                ),
+            )
+            weak_robot_world.add_body(weak)
+            weak_robot_sa = MinimalRobot.from_world(weak_robot_world)
+
+        world = World()
+
+        with world.modify_world():
+            wall = Body(
+                name=PrefixedName("wall"),
+                collision=ShapeCollection([Box(scale=Scale(x=0.1, y=10, z=0.1))]),
+            )
+            map = Body(name=PrefixedName("map"))
+            world.add_connection(
+                FixedConnection(
+                    parent=map,
+                    child=wall,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=0.5
+                    ),
+                )
+            )
+            strong_odom = Body(name=PrefixedName("strong_odom"))
+            world.add_connection(
+                FixedConnection(
+                    parent=map,
+                    child=strong_odom,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        y=0.5
+                    ),
+                )
+            )
+            weak_odom = Body(name=PrefixedName("weak_odom"))
+            world.add_connection(
+                FixedConnection(
+                    parent=map,
+                    child=weak_odom,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        y=-0.5
+                    ),
+                )
+            )
+
+            # %% attach robots
+            world.merge_world(
+                strong_robot_world,
+                omni1 := OmniDrive.create_with_dofs(
+                    world=world,
+                    parent=strong_odom,
+                    child=strong_robot_world.root,
+                ),
+            )
+            world.merge_world(
+                weak_robot_world,
+                omni2 := OmniDrive.create_with_dofs(
+                    world=world,
+                    parent=weak_odom,
+                    child=weak_robot_world.root,
+                ),
+            )
+            omni1.has_hardware_interface = True
+            omni2.has_hardware_interface = True
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AvoidCollisionBetweenGroups(
+                            buffer_zone_distance=0.05,
+                            violated_distance=0.0,
+                            body_group_a=[weak],
+                            body_group_b=[wall],
+                        ),
+                        AvoidCollisionBetweenGroups(
+                            buffer_zone_distance=0.05,
+                            violated_distance=0.0,
+                            body_group_a=[strong],
+                            body_group_b=[wall],
+                        ),
+                    ]
+                ),
+                CartesianPose(
+                    root_link=map,
+                    tip_link=strong,
+                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=1, reference_frame=strong
+                    ),
+                    weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
+                ),
+                CartesianPose(
+                    root_link=map,
+                    tip_link=weak,
+                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=1, reference_frame=weak
+                    ),
+                    weight=DefaultWeights.WEIGHT_BELOW_CA,
+                ),
+                ExternalCollisionAvoidance(robot=weak_robot_sa),
+                ExternalCollisionAvoidance(robot=strong_robot_sa),
+                local_min := LocalMinimumReached(),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(local_min))
+        # msc.add_node(CancelMotion.when_true(distance_violated))
+
+        kin_sim = Executor(
+            MotionStatechartContext(world=world),
+            pacer=SimulationPacer(real_time_factor=1),
+        )
+        kin_sim.compile(motion_statechart=msc)
+
+        kin_sim.tick_until_end(500)
+
+        assert (
+            0.05
+            > world.collision_manager.collision_detector.check_collision_between_bodies(
+                body_a=strong, body_b=wall, distance=1
+            ).distance
+            > -0.01
+        )
+
+        assert (
+            world.collision_manager.collision_detector.check_collision_between_bodies(
+                body_a=weak, body_b=wall, distance=1
+            ).distance
+            > 0.049
+        )
+
+    def test_external_collision_avoidance_with_weight_above_ca(
+        self, cylinder_bot_world: World
+    ):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
+        env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AvoidCollisionBetweenGroups(
+                            buffer_zone_distance=0.05,
+                            violated_distance=0.0,
+                            body_group_a=[tip],
+                            body_group_b=[env1],
+                        )
+                    ]
+                ),
+                distance_violated := ExternalCollisionDistanceMonitor(
+                    body=robot.root, threshold=0.0
+                ),
+                CartesianPose(
+                    root_link=cylinder_bot_world.root,
+                    tip_link=tip,
+                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=1, reference_frame=cylinder_bot_world.root
+                    ),
+                    weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
+                ),
+                ExternalCollisionAvoidance(robot=robot),
+                local_min := LocalMinimumReached(),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(local_min))
+        msc.add_node(CancelMotion.when_true(distance_violated))
+
+        json_data = msc.to_json()
+        json_str = json.dumps(json_data)
+        new_json_data = json.loads(json_str)
+
+        tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
+        kwargs = tracker.create_kwargs()
+        msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
+
+        kin_sim = Executor(
+            MotionStatechartContext(world=cylinder_bot_world),
+            pacer=SimulationPacer(real_time_factor=1),
+        )
+        kin_sim.compile(motion_statechart=msc_copy)
+
+        kin_sim.tick_until_end(500)
+        collisions = kin_sim.context.world.collision_manager.compute_collisions()
+        assert len(collisions.contacts) == 1
+        assert collisions.contacts[0].distance < 0.049
+        assert collisions.contacts[0].distance > 0.0
+        assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
+
+    def test_update_collision_matrix_later(self, cylinder_bot_world: World):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
+        env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AvoidCollisionBetweenGroups(
+                            buffer_zone_distance=0.05,
+                            violated_distance=0.0,
+                            body_group_a=[tip],
+                            body_group_b=[env1],
+                        )
+                    ]
+                ),
+                ExternalCollisionAvoidance(robot=robot),
+                cart_goal_reached := CartesianPose(
+                    root_link=cylinder_bot_world.root,
+                    tip_link=tip,
+                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=1, reference_frame=cylinder_bot_world.root
+                    ),
+                ),
+                Sequence(
+                    [
+                        LocalMinimumReached(),
+                        UpdateTemporaryCollisionRules(
+                            temporary_rules=[AllowAllCollisions()]
+                        ),
+                    ]
+                ),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(cart_goal_reached))
+
+        kin_sim = Executor(
+            MotionStatechartContext(world=cylinder_bot_world),
+        )
+        kin_sim.compile(motion_statechart=msc)
+
+        kin_sim.tick_until_end(500)
+        msc.draw("muh.pdf")
+        cylinder_bot_world.collision_manager.clear_temporary_rules()
+        cylinder_bot_world.collision_manager.add_temporary_rule(AvoidAllCollisions())
+        cylinder_bot_world.collision_manager.update_collision_matrix()
+        collisions = kin_sim.context.world.collision_manager.compute_collisions()
+        assert len(collisions.contacts) == 1
+        assert collisions.contacts[0].distance < 0.049
+        assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
+
+    def test_consumer_cleanup_after_cancel(self, cylinder_bot_world: World):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
+        env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AvoidCollisionBetweenGroups(
+                            buffer_zone_distance=0.05,
+                            violated_distance=0.0,
+                            body_group_a=[tip],
+                            body_group_b=[env1],
+                        ),
+                    ]
+                ),
+                CartesianPose(
+                    root_link=cylinder_bot_world.root,
+                    tip_link=tip,
+                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=1, reference_frame=cylinder_bot_world.root
+                    ),
+                ),
+                ExternalCollisionAvoidance(robot=robot),
+                local_min := LocalMinimumReached(),
+            ]
+        )
+        msc.add_node(
+            Sequence(
+                [
+                    CountControlCycles(control_cycles=5),
+                    CancelMotion(exception=Exception("muh")),
+                ]
+            )
+        )
+        msc.add_node(EndMotion.when_true(local_min))
+
+        kin_sim = Executor(MotionStatechartContext(world=cylinder_bot_world))
+        kin_sim.compile(motion_statechart=msc)
+
+        with pytest.raises(Exception, match="muh"):
+            kin_sim.tick_until_end(500)
+        assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
+
+    def test_multiple_external_collision_avoidance_motions(
+        self, cylinder_bot_world: World
+    ):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
+
+        def run_motion(goal_x):
+            msc = MotionStatechart()
+            msc.add_nodes(
+                [
+                    UpdateTemporaryCollisionRules(
+                        temporary_rules=[
+                            AvoidCollisionBetweenGroups(
+                                buffer_zone_distance=0.05,
+                                violated_distance=0.0,
+                                body_group_a=[tip],
+                                body_group_b=[env1],
+                            ),
+                        ]
+                    ),
+                    CartesianPose(
+                        root_link=cylinder_bot_world.root,
+                        tip_link=tip,
+                        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            x=goal_x, reference_frame=cylinder_bot_world.root
+                        ),
+                    ),
+                    ExternalCollisionAvoidance(robot=robot),
+                    local_min := LocalMinimumReached(),
+                ]
+            )
+            msc.add_node(EndMotion.when_true(local_min))
+
+            kin_sim = Executor(MotionStatechartContext(world=cylinder_bot_world))
+            kin_sim.compile(motion_statechart=msc)
+            kin_sim.tick_until_end(500)
+            return kin_sim
+
+        # First motion
+        run_motion(1.0)
+        assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
+
+        # Second motion
+        run_motion(0.5)
+        assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
+
+    def test_self_collision_avoidance(self, self_collision_bot_world: World):
+
+        robot = self_collision_bot_world.get_semantic_annotations_by_type(
+            AbstractRobot
+        )[0]
+        l_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name("l_tip")
+        r_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name("r_tip")
+        l_thumb = self_collision_bot_world.get_kinematic_structure_entity_by_name(
+            "l_thumb"
+        )
+        r_thumb = self_collision_bot_world.get_kinematic_structure_entity_by_name(
+            "r_thumb"
+        )
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AvoidCollisionBetweenGroups(
+                            buffer_zone_distance=0.25,
+                            violated_distance=0.0,
+                            body_group_a={l_thumb},
+                            body_group_b={r_thumb},
+                        ),
+                    ]
+                ),
+                SelfCollisionAvoidance(robot=robot),
                 local_min := LocalMinimumReached(),
             ]
         )
@@ -2281,129 +3826,185 @@ class TestCollisionAvoidance:
         json_str = json.dumps(json_data)
         new_json_data = json.loads(json_str)
 
-        tracker = KinematicStructureEntityKwargsTracker.from_world(box_bot_world)
+        tracker = WorldEntityWithIDKwargsTracker.from_world(self_collision_bot_world)
         kwargs = tracker.create_kwargs()
         msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
 
-        kin_sim = Executor(
-            world=box_bot_world,
-            collision_checker=CollisionCheckerLib.bpb,
-        )
+        kin_sim = Executor(MotionStatechartContext(world=self_collision_bot_world))
         kin_sim.compile(motion_statechart=msc_copy)
 
-        msc_copy.draw("muh.pdf")
+        # 4 because of the base nodes + 20 that are added by self collision avoidance
+        assert len(msc_copy.nodes) == 4 + 20
+
         kin_sim.tick_until_end(500)
-        kin_sim.collision_scene.check_collisions()
-        contact_distance = (
-            kin_sim.collision_scene.closest_points.external_collisions[tip]
-            .data[0]
-            .contact_distance
+        collisions = kin_sim.context.world.collision_manager.compute_collisions()
+        assert len(collisions.contacts) == 1
+        for contact in collisions.contacts:
+            assert contact.distance > 0.249
+        assert len(self_collision_bot_world.collision_manager.collision_consumers) == 0
+
+    def test_avoid_collision_go_around_corner(self, pr2_with_box):
+        r_tip = pr2_with_box.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
         )
-        assert contact_distance > 0.049
-
-    def test_hard_constraints_violated(self, box_bot_world: World):
-        root = box_bot_world.root
-        with box_bot_world.modify_world():
-            env2 = Body(
-                name=PrefixedName("environment2"),
-                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
-            )
-            env_connection = FixedConnection(
-                parent=root,
-                child=env2,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    0.75
-                ),
-            )
-            box_bot_world.add_connection(env_connection)
-
-            env3 = Body(
-                name=PrefixedName("environment3"),
-                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
-            )
-            env_connection = FixedConnection(
-                parent=root,
-                child=env3,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    1.25
-                ),
-            )
-            box_bot_world.add_connection(env_connection)
-            env4 = Body(
-                name=PrefixedName("environment4"),
-                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
-            )
-            env_connection = FixedConnection(
-                parent=root,
-                child=env4,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=1, y=-0.25
-                ),
-            )
-            box_bot_world.add_connection(env_connection)
-            env5 = Body(
-                name=PrefixedName("environment5"),
-                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
-            )
-            env_connection = FixedConnection(
-                parent=root,
-                child=env5,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=1, y=0.25
-                ),
-            )
-            box_bot_world.add_connection(env_connection)
-
-        tip = box_bot_world.get_kinematic_structure_entity_by_name("bot")
+        robot = pr2_with_box.get_semantic_annotations_by_type(AbstractRobot)[0]
 
         msc = MotionStatechart()
         msc.add_node(
+            UpdateTemporaryCollisionRules(
+                temporary_rules=[
+                    AvoidExternalCollisions(
+                        buffer_zone_distance=0.1, violated_distance=0.0, robot=robot
+                    )
+                ]
+            )
+        )
+        msc.add_node(
             Sequence(
                 [
-                    SetOdometry(
-                        base_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
-                            x=1, reference_frame=box_bot_world.root
+                    SetSeedConfiguration(
+                        seed_configuration=JointState.from_str_dict(
+                            {
+                                "r_elbow_flex_joint": -1.29610152504,
+                                "r_forearm_roll_joint": -0.0301682323805,
+                                "r_shoulder_lift_joint": 1.20324921318,
+                                "r_shoulder_pan_joint": -0.73456435706,
+                                "r_upper_arm_roll_joint": -0.70790051778,
+                                "r_wrist_flex_joint": -0.10001,
+                                "r_wrist_roll_joint": 0.258268529825,
+                                "l_elbow_flex_joint": -1.29610152504,
+                                "l_forearm_roll_joint": 0.0301682323805,
+                                "l_shoulder_lift_joint": 1.20324921318,
+                                "l_shoulder_pan_joint": 0.73456435706,
+                                "l_upper_arm_roll_joint": 0.70790051778,
+                                "l_wrist_flex_joint": -0.1001,
+                                "l_wrist_roll_joint": -0.258268529825,
+                                "torso_lift_joint": 0.2,
+                                "head_pan_joint": 0,
+                                "head_tilt_joint": 0,
+                                "l_gripper_l_finger_joint": 0.55,
+                                "r_gripper_l_finger_joint": 0.55,
+                            },
+                            world=pr2_with_box,
                         )
                     ),
                     Parallel(
                         [
                             CartesianPose(
-                                root_link=box_bot_world.root,
-                                tip_link=tip,
-                                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
-                                    x=1, reference_frame=box_bot_world.root
+                                root_link=pr2_with_box.root,
+                                tip_link=r_tip,
+                                goal_pose=HomogeneousTransformationMatrix.from_xyz_axis_angle(
+                                    x=0.8,
+                                    y=-0.38,
+                                    z=0.84,
+                                    axis=Vector3.Y(),
+                                    angle=np.pi / 2.0,
+                                    reference_frame=pr2_with_box.root,
                                 ),
+                                weight=DefaultWeights.WEIGHT_BELOW_CA,
                             ),
-                            CollisionAvoidance(
-                                collision_entries=[
-                                    CollisionRequest.avoid_all_collision()
-                                ],
-                            ),
+                            ExternalCollisionAvoidance(robot=robot),
                         ]
                     ),
                 ]
             )
         )
+        msc.add_node(
+            distance_violated := ExternalCollisionDistanceMonitor(
+                body=pr2_with_box.get_kinematic_structure_entity_by_name(
+                    "r_gripper_palm_link"
+                ),
+                threshold=0.0,
+            ),
+        )
         msc.add_node(local_min := LocalMinimumReached())
         msc.add_node(EndMotion.when_true(local_min))
+        msc.add_node(CancelMotion.when_true(distance_violated))
 
-        json_data = msc.to_json()
-        json_str = json.dumps(json_data)
-        new_json_data = json.loads(json_str)
+        kin_sim = Executor(MotionStatechartContext(world=pr2_with_box))
+        kin_sim.compile(motion_statechart=msc)
 
-        tracker = KinematicStructureEntityKwargsTracker.from_world(box_bot_world)
-        kwargs = tracker.create_kwargs()
-        msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
+        kin_sim.tick_until_end(500)
+
+    def test_avoid_self_collision_with_l_arm(self, pr2_with_box):
+        r_tip = pr2_with_box.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        l_forearm_link = pr2_with_box.get_kinematic_structure_entity_by_name(
+            "l_forearm_link"
+        )
+        r_palm_link = pr2_with_box.get_kinematic_structure_entity_by_name(
+            "r_gripper_palm_link"
+        )
+        base_footprint = pr2_with_box.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+        robot = pr2_with_box.get_semantic_annotations_by_type(AbstractRobot)[0]
+
+        msc = MotionStatechart()
+        msc.add_node(
+            Sequence(
+                [
+                    SetSeedConfiguration(
+                        seed_configuration=JointState.from_str_dict(
+                            {
+                                "r_elbow_flex_joint": -1.43286344265,
+                                "r_forearm_roll_joint": -1.26465060073,
+                                "r_shoulder_lift_joint": 0.47990329056,
+                                "r_shoulder_pan_joint": -0.281272240139,
+                                "r_upper_arm_roll_joint": -0.528415402668,
+                                "r_wrist_flex_joint": -1.18811419869,
+                                "r_wrist_roll_joint": 2.26884630124,
+                                "l_elbow_flex_joint": 0.0,
+                                "l_forearm_roll_joint": 0.0,
+                                "l_shoulder_lift_joint": 0.0,
+                                "l_shoulder_pan_joint": 0.0,
+                                "l_upper_arm_roll_joint": 0.0,
+                                "l_wrist_flex_joint": 0.0,
+                                "l_wrist_roll_joint": 0.0,
+                            },
+                            world=pr2_with_box,
+                        )
+                    ),
+                    Parallel(
+                        [
+                            CartesianPose(
+                                root_link=base_footprint,
+                                tip_link=r_tip,
+                                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                                    0.2, reference_frame=r_tip
+                                ),
+                                weight=DefaultWeights.WEIGHT_ABOVE_CA,
+                            ),
+                            SelfCollisionAvoidance(robot=robot),
+                        ],
+                    ),
+                ],
+            ),
+        )
+        msc.add_node(
+            contact := SelfCollisionDistanceMonitor(
+                body_a=r_palm_link, body_b=l_forearm_link, threshold=0.01
+            )
+        )
+        msc.add_node(local_min := LocalMinimumReached())
+        msc.add_node(EndMotion.when_true(local_min))
+        msc.add_node(CancelMotion.when_true(contact))
 
         kin_sim = Executor(
-            world=box_bot_world,
-            collision_checker=CollisionCheckerLib.bpb,
+            MotionStatechartContext(
+                world=pr2_with_box,
+                qp_controller_config=QPControllerConfig(
+                    target_frequency=100,
+                    prediction_horizon=30,
+                ),
+            )
         )
-        kin_sim.compile(motion_statechart=msc_copy)
+        kin_sim.compile(motion_statechart=msc)
 
-        msc_copy.draw("muh.pdf")
-        with pytest.raises(HardConstraintsViolatedException):
-            kin_sim.tick_until_end()
+        assert len(msc.nodes) == 75
+
+        kin_sim.tick_until_end(500)
 
 
 def test_constraint_collection(pr2_world_state_reset: World):
@@ -2426,22 +4027,22 @@ def test_constraint_collection(pr2_world_state_reset: World):
         frame_P_current=Point3(0, 0, 0, reference_frame=tip),
         frame_P_goal=Point3(0, 0, 0, reference_frame=tip),
         reference_velocity=0.1,
-        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
     )
-    assert len(col.eq_constraints) >= 3
+    assert len(col.equality_constraints) >= 3
 
     for i in range(3):
         col.add_equality_constraint(
             reference_velocity=0.1 * i,
             equality_bound=0.0,
-            weight=DefaultWeights.WEIGHT_BELOW_CA,
+            quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
             task_expression=expr,
         )
 
     col.add_inequality_constraint(
         name="same_name",
         reference_velocity=0.2,
-        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
         lower_error=0.1,
         upper_error=0.2,
@@ -2452,7 +4053,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
             name="same_name",
             reference_velocity=0.2,
             equality_bound=0.0,
-            weight=DefaultWeights.WEIGHT_BELOW_CA,
+            quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
             task_expression=expr,
         )
 
@@ -2461,7 +4062,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
         name="same_name",
         reference_velocity=0.2,
         equality_bound=0.0,
-        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
     )
 
@@ -2476,7 +4077,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
         name="same_name",
         reference_velocity=0.2,
         equality_bound=0.0,
-        weight=DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
     )
     constraint = EqualityConstraint(
@@ -2514,13 +4115,13 @@ class TestLifeCycleTransitions:
                 [
                     ConstTrueNode(),
                     TestRunAfterStop(),
-                    CountTicks(name="delay endmotion", ticks=5),
+                    CountControlCycles(name="delay endmotion", control_cycles=5),
                 ]
             )
         )
         msc.add_node(EndMotion.when_true(sequence))
 
-        kin_sim = Executor(world=World())
+        kin_sim = Executor(MotionStatechartContext(world=World()))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
@@ -2540,13 +4141,13 @@ class TestLifeCycleTransitions:
                 [
                     ConstTrueNode(),
                     TestRunAfterStopFromPause(),
-                    CountTicks(name="delay endmotion", ticks=5),
+                    CountControlCycles(name="delay endmotion", control_cycles=5),
                 ]
             )
         )
         msc.add_node(EndMotion.when_true(sequence))
 
-        kin_sim = Executor(world=World())
+        kin_sim = Executor(MotionStatechartContext(world=World()))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
@@ -2564,7 +4165,7 @@ class TestLifeCycleTransitions:
         """
         msc = MotionStatechart()
 
-        node1 = CountTicks(ticks=1)
+        node1 = CountControlCycles(control_cycles=1)
         node2 = ConstTrueNode()
         node3 = ConstTrueNode()
 
@@ -2574,9 +4175,8 @@ class TestLifeCycleTransitions:
         node3.start_condition = node1.observation_variable
         node3.end_condition = node2.observation_variable
 
-        kin_sim = Executor(world=World())
+        kin_sim = Executor(MotionStatechartContext(world=World()))
         kin_sim.compile(motion_statechart=msc)
-        kin_sim.tick()
         kin_sim.tick()
 
         assert node3.life_cycle_state == LifeCycleValues.RUNNING
@@ -2597,9 +4197,8 @@ class TestLifeCycleTransitions:
         node = TestEndBeforeStart()
         msc.add_node(node)
 
-        kin_sim = Executor(world=World())
+        kin_sim = Executor(MotionStatechartContext(world=World()))
         kin_sim.compile(motion_statechart=msc)
-        kin_sim.tick()
         kin_sim.tick()
 
         assert node.node3.life_cycle_state == LifeCycleValues.RUNNING
@@ -2616,9 +4215,9 @@ class TestLifeCycleTransitions:
         """
         msc = MotionStatechart()
 
-        count_node1 = CountTicks(ticks=1, name="node1")
-        count_node2 = CountTicks(ticks=2, name="node2")
-        end_count_node1 = CountTicks(ticks=11, name="end_node1")
+        count_node1 = CountControlCycles(control_cycles=1, name="node1")
+        count_node2 = CountControlCycles(control_cycles=2, name="node2")
+        end_count_node1 = CountControlCycles(control_cycles=11, name="end_node1")
         pulse_node1 = Pulse(name="pulse1")
         pulse_node2 = Pulse(name="pulse2")
 
@@ -2646,7 +4245,7 @@ class TestLifeCycleTransitions:
         count_node2.reset_condition = pulse_node2.observation_variable
         pulse_node1.reset_condition = pulse_node2.observation_variable
 
-        kin_sim = Executor(world=World())
+        kin_sim = Executor(MotionStatechartContext(world=World()))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
@@ -2871,7 +4470,7 @@ class TestLifeCycleTransitions:
 
         unpause.pause_condition = pulse.observation_variable
 
-        kin_sim = Executor(world=World())
+        kin_sim = Executor(MotionStatechartContext(world=World()))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 
@@ -2880,3 +4479,21 @@ class TestLifeCycleTransitions:
 
         assert unpause.count_ticks1.observation_state == ObservationStateValues.TRUE
         assert unpause.observation_state == ObservationStateValues.TRUE
+
+    def test_long_pause(self):
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                node1 := Parallel([ConstTrueNode(), ConstFalseNode()]),
+                pulse := Pulse(length=5),
+            ]
+        )
+        node1.pause_condition = pulse.observation_variable
+        msc.add_node(EndMotion.when_false(pulse))
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        msc.plot_gantt_chart()
+
+        assert len(msc.history) == 5

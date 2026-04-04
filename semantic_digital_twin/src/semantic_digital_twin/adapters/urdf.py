@@ -1,37 +1,46 @@
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from typing_extensions import Optional, Tuple, Union, List, Dict
+from typing_extensions import Optional, Tuple, Union, List
 from urdf_parser_py import urdf as urdfpy
 
-from ..datastructures.prefixed_name import PrefixedName
-from ..exceptions import ParsingError
-from ..spatial_types.derivatives import Derivatives, DerivativeMap
-from ..spatial_types.spatial_types import HomogeneousTransformationMatrix, Vector3
-from ..utils import (
+from semantic_digital_twin.adapters.package_resolver import (
+    CompositePathResolver,
+    PathResolver,
+)
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import NegativeConnectionVelocity
+from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
+from semantic_digital_twin.utils import (
     suppress_stdout_stderr,
     hacky_urdf_parser_fix,
     robot_name_from_urdf_string,
 )
-from ..world import World
-from ..world_description.connections import (
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
     FixedConnection,
 )
-from ..world_description.degree_of_freedom import DegreeOfFreedom
-from ..world_description.geometry import (
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
+from semantic_digital_twin.world_description.geometry import (
     Box,
     Sphere,
     Cylinder,
-    FileMesh,
+    Mesh,
     Scale,
     Color,
 )
-from ..world_description.shape_collection import ShapeCollection
-from ..world_description.world_entity import Body, Connection
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body, Connection
 
 connection_type_map = {  # 'unknown': JointType.UNKNOWN,
     "revolute": RevoluteConnection,
@@ -80,6 +89,11 @@ def urdf_joint_to_limits(
         upper_limits.position = upper
 
     velocity = getattr(limit, "velocity", None) if limit is not None else None
+
+    if velocity is not None and velocity < 0:
+        raise NegativeConnectionVelocity(
+            connection_name=urdf_joint.name, velocity=velocity
+        )
     lower_limits.velocity = -velocity if velocity is not None else None
     upper_limits.velocity = velocity if velocity is not None else None
 
@@ -92,15 +106,15 @@ def urdf_joint_to_limits(
         offset = urdf_joint.mimic.offset if urdf_joint.mimic.offset is not None else 0
 
         for d2 in Derivatives.range(Derivatives.position, Derivatives.velocity):
-            lower_limits.data[d2] -= offset
-            upper_limits.data[d2] -= offset
+            lower_limits[d2] -= offset
+            upper_limits[d2] -= offset
             if multiplier < 0:
-                upper_limits.data[d2], lower_limits.data[d2] = (
-                    lower_limits.data[d2],
-                    upper_limits.data[d2],
+                upper_limits[d2], lower_limits[d2] = (
+                    lower_limits[d2],
+                    upper_limits[d2],
                 )
-            upper_limits.data[d2] /= multiplier
-            lower_limits.data[d2] /= multiplier
+            upper_limits[d2] /= multiplier
+            lower_limits[d2] /= multiplier
     return lower_limits, upper_limits
 
 
@@ -121,12 +135,9 @@ class URDFParser:
     The prefix for every name used in this world.
     """
 
-    package_resolver: Optional[Dict[str, str]] = None
+    path_resolver: PathResolver = field(default_factory=CompositePathResolver)
     """
-    The package resolver to use for resolving package paths in the URDF file. If ROS is installed, ROS will be used
-     to resolve the paths, otherwise the package_resolver must be provided if the URDF file contains package paths.
-     The key is the package name and the value is the path to the package. You can also set the environment variable
-     `ROS_PACKAGE_PATH` to a colon-separated list of package paths, which will be used as the package resolver.
+    The path resolver to use for resolving URIs in the URDF file.
     """
 
     def __post_init__(self):
@@ -134,21 +145,35 @@ class URDFParser:
         self.parsed = urdfpy.URDF.from_xml_string(self.urdf)
         if self.prefix is None:
             self.prefix = robot_name_from_urdf_string(self.urdf)
-        if self.package_resolver is None:
-            package_paths = os.environ.get("ROS_PACKAGE_PATH", "").split(":")
-            self.package_resolver = {
-                os.path.basename(path): path
-                for path in package_paths
-                if os.path.exists(path)
-            }
 
     @classmethod
-    def from_file(cls, file_path: str, prefix: Optional[str] = None) -> URDFParser:
+    def from_file(
+        cls,
+        file_path: str,
+        prefix: Optional[str] = None,
+        path_resolver: Optional[PathResolver] = None,
+    ) -> URDFParser:
+        if file_path.endswith(".xacro"):
+            return cls.from_xacro(file_path, prefix)
+
+        path_resolver = path_resolver or CompositePathResolver()
+
+        file_path = path_resolver.resolve(file_path)
         if file_path is not None:
             with open(file_path, "r") as file:
                 # Since parsing URDF causes a lot of warning messages which can't be deactivated, we suppress them
                 with suppress_stdout_stderr():
                     urdf = file.read()
+        urdf_parser = URDFParser(urdf=urdf, prefix=prefix)
+        urdf_parser.path_resolver = path_resolver
+        return urdf_parser
+
+    @classmethod
+    def from_xacro(cls, xacro_path: str, prefix: Optional[str] = None) -> URDFParser:
+        from xacro import process_file
+
+        xacro_path = CompositePathResolver().resolve(xacro_path)
+        urdf = process_file(xacro_path).toxml()
         return URDFParser(urdf=urdf, prefix=prefix)
 
     def parse(self) -> World:
@@ -227,8 +252,7 @@ class URDFParser:
         if dof_name not in [d.name for d in world.degrees_of_freedom]:
             dof = DegreeOfFreedom(
                 name=dof_name,
-                lower_limits=lower_limits,
-                upper_limits=upper_limits,
+                limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
             )
             world.add_degree_of_freedom(dof)
         else:
@@ -323,7 +347,7 @@ class URDFParser:
                 res.append(
                     Cylinder(
                         origin=origin_transform,
-                        width=geom.geometry.radius,
+                        width=geom.geometry.radius * 2,
                         height=geom.geometry.length,
                         color=color,
                     )
@@ -332,45 +356,10 @@ class URDFParser:
                 if geom.geometry.filename is None:
                     raise ValueError("Mesh geometry must have a filename.")
                 res.append(
-                    FileMesh(
+                    Mesh(
                         origin=origin_transform,
-                        filename=self.parse_file_path(geom.geometry.filename),
+                        filename=self.path_resolver.resolve(geom.geometry.filename),
                         scale=Scale(*(geom.geometry.scale or (1, 1, 1))),
                     )
                 )
         return ShapeCollection(res, reference_frame=body)
-
-    def parse_file_path(self, file_path: str) -> str:
-        """
-        Parses a file path which contains a ros package to a path in the local file system.
-
-        :param file_path: The path to the URDF file.
-        :return: The parsed and processed file path.
-        """
-        if "package://" in file_path:
-            # Splits the file path at '//' to get the package  and the rest of the path
-            package_split = file_path.split("//")
-            # Splits the path after the // to get the package name and the rest of the path
-            package_name = package_split[1].split("/")[0]
-            try:
-                from ament_index_python.packages import get_package_share_directory
-
-                package_path = get_package_share_directory(package_name)
-            except (ImportError, LookupError):
-                if self.package_resolver:
-                    if package_name in self.package_resolver:
-                        package_path = self.package_resolver[package_name]
-                    else:
-                        raise ParsingError(
-                            message=f"Package '{package_name}' not found in package resolver and "
-                            f"ROS is not installed."
-                        )
-                else:
-                    raise ParsingError(
-                        message="No ROS install found while the URDF file contains references to "
-                        "ROS packages."
-                    )
-            file_path = file_path.replace("package://" + package_name, package_path)
-        if "file://" in file_path:
-            file_path = file_path.replace("file://", "./")
-        return file_path

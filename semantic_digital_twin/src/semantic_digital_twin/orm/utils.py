@@ -1,7 +1,11 @@
 import os
+from functools import lru_cache
 
 from sqlalchemy.exc import OperationalError
-from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from krrood.ormatic.utils import create_engine
+from semantic_digital_twin.orm.exceptions import DatabaseNotAvailableError
 
 
 def persistent_database_available() -> bool:
@@ -16,7 +20,7 @@ def persistent_database_available() -> bool:
     :return: Indicates whether the persistent database is accessible
     """
     semantic_digital_twin_database_uri = os.environ.get(
-        "semantic_digital_twin_DATABASE_URI"
+        "SEMANTIC_DIGITAL_TWIN_DATABASE_URI"
     )
     if semantic_digital_twin_database_uri is None:
         return False
@@ -28,3 +32,16 @@ def persistent_database_available() -> bool:
     except OperationalError as e:
         return False
     return True
+
+
+@lru_cache
+def semantic_digital_twin_sessionmaker():
+    """
+    Creates a session maker for the semantic digital twin database.
+    This requires the environment variable `SEMANTIC_DIGITAL_TWIN_DATABASE_URI` to be set to a reachable database.
+    """
+    uri = os.environ.get("SEMANTIC_DIGITAL_TWIN_DATABASE_URI")
+    if uri is None:
+        raise DatabaseNotAvailableError()
+    engine = create_engine(uri)
+    return sessionmaker(bind=engine)

@@ -4,5 +4,5 @@ import logging
 __version__ = "2.0.5"
 
 
-logger = logging.Logger("krrood")
+logger = logging.getLogger("krrood")
 logger.setLevel(logging.INFO)

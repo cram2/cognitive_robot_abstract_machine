@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from typing_extensions import TYPE_CHECKING, Type
 
 if TYPE_CHECKING:
-    from .property_descriptor import PropertyDescriptor
+    from krrood.ontomatic.property_descriptor.property_descriptor import (
+        PropertyDescriptor,
+    )
 
 
 @dataclass

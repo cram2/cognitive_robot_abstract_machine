@@ -3,11 +3,11 @@ from __future__ import annotations
 import logging
 
 import matplotlib.pyplot as plt
-from .geometry import BoundingBox
-from .shape_collection import BoundingBoxCollection
-from ..datastructures.variables import SpatialVariables
-from ..world import World
-from .world_entity import SemanticAnnotation, SemanticEnvironmentAnnotation
+from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.shape_collection import BoundingBoxCollection
+from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import SemanticAnnotation, SemanticEnvironmentAnnotation
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ from random_events.product_algebra import SimpleEvent, Event
 from rtree import index
 from sortedcontainers import SortedSet
 
-from ..spatial_types import Point3, HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import Point3, HomogeneousTransformationMatrix
 
 
 class PoseOccupiedError(Exception):
@@ -175,7 +175,7 @@ class GraphOfConvexSets:
         Plot the free space of the environment in blue.
         :return: A list of traces that can be put into a plotly figure.
         """
-        free_space = Event(*[node.simple_event for node in self.graph.nodes()])
+        free_space = Event.from_simple_sets(*[node.simple_event for node in self.graph.nodes()])
         return free_space.plot(color="blue")
 
     def plot_occupied_space(self) -> List[go.Mesh3d]:
@@ -183,7 +183,7 @@ class GraphOfConvexSets:
         Plot the occupied space of the environment in red.
         :return: A list of traces that can be put into a plotly figure.
         """
-        free_space = Event(*[node.simple_event for node in self.graph.nodes()])
+        free_space = Event.from_simple_sets(*[node.simple_event for node in self.graph.nodes()])
         occupied_space = ~free_space & self.search_space.event
         return occupied_space.plot(color="red")
 
@@ -542,9 +542,9 @@ class GraphOfConvexSets:
 
         free_space = ~obstacles & search_event
 
-        SimpleEvent({SpatialVariables.z.value: reals()})
+        SimpleEvent.from_data({SpatialVariables.z.value: reals()})
         # create floor level
-        z_event = SimpleEvent({SpatialVariables.z.value: reals()}).as_composite_set()
+        z_event = SimpleEvent.from_data({SpatialVariables.z.value: reals()}).as_composite_set()
         z_event.fill_missing_variables(SpatialVariables.xy)
         free_space.fill_missing_variables(SortedSet([SpatialVariables.z.value]))
         free_space &= z_event

@@ -1,0 +1,7 @@
+[
+  "def _get_value(case):\n    has_milk = case.milk == 1\n    return has_milk",
+  "def _get_value(case):\n    is_aquatic = case.aquatic == 1\n    return is_aquatic",
+  "def _get_value(case):\n    has_feathers = case.feathers == 1\n    return has_feathers",
+  "def _get_value(case):\n    no_backbone = case.backbone == 0\n    cannot_breath = case.breathes == 0\n    return no_backbone and cannot_breath",
+  "def _get_value(case):\n    has_no_fins = case.fins == 0\n    return has_no_fins"
+]

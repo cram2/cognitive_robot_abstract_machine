@@ -6,11 +6,11 @@ from dataclasses import dataclass, field
 from typing_extensions import Dict, Any
 
 import krrood.symbolic_math.symbolic_math as sm
-from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json
-from .world_entity import WorldEntityWithID
-from ..datastructures.prefixed_name import PrefixedName
-from ..exceptions import UsageError
-from ..spatial_types.derivatives import Derivatives, DerivativeMap
+from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
+from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import UsageError, InvalidConnectionLimits
+from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 
 
 @dataclass(eq=False, init=False)
@@ -81,6 +81,32 @@ class JerkVariable(sm.FloatVariable):
         return self.dof._world.state[self.dof.id].jerk
 
 
+@dataclass
+class DegreeOfFreedomLimits:
+    """
+    A class representing the limits of a degree of freedom.
+    """
+
+    lower: DerivativeMap[float] = field(default=None)
+    """
+    Lower limits of the degree of freedom.
+    """
+
+    upper: DerivativeMap[float] = field(default=None)
+    """
+    Upper limits of the degree of freedom.
+    """
+
+    def __post_init__(self):
+        self.lower = self.lower or DerivativeMap()
+        self.upper = self.upper or DerivativeMap()
+
+    def __deepcopy__(self, memo):
+        return DegreeOfFreedomLimits(
+            lower=deepcopy(self.lower), upper=deepcopy(self.upper)
+        )
+
+
 @dataclass(eq=False)
 class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     """
@@ -91,8 +117,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     and provides methods to get and set limits for these derivatives.
     """
 
-    lower_limits: DerivativeMap[float] = field(default_factory=DerivativeMap)
-    upper_limits: DerivativeMap[float] = field(default_factory=DerivativeMap)
+    limits: DegreeOfFreedomLimits = field(default=None)
     """
     Lower and upper bounds for each derivative
     """
@@ -116,31 +141,34 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     """
 
     def __post_init__(self):
-        self.lower_limits = self.lower_limits or DerivativeMap()
-        self.upper_limits = self.upper_limits or DerivativeMap()
+        self.limits = self.limits or DegreeOfFreedomLimits()
+        lower = self.limits.lower.position
+        upper = self.limits.upper.position
+        if lower is not None and upper is not None and lower > upper:
+            raise InvalidConnectionLimits(self.name, self.limits)
 
     def create_variables(self):
         """
         Creates a variable for each derivative, that refer to the corresponding values of this dof.
         """
         assert self._world is not None
-        self.variables.data[Derivatives.position] = PositionVariable(
+        self.variables.position = PositionVariable(
             name=str(PrefixedName("position", prefix=str(self.name))), dof=self
         )
-        self.variables.data[Derivatives.velocity] = VelocityVariable(
+        self.variables.velocity = VelocityVariable(
             name=str(PrefixedName("velocity", prefix=str(self.name))), dof=self
         )
-        self.variables.data[Derivatives.acceleration] = AccelerationVariable(
+        self.variables.acceleration = AccelerationVariable(
             name=str(PrefixedName("acceleration", prefix=str(self.name))), dof=self
         )
-        self.variables.data[Derivatives.jerk] = JerkVariable(
+        self.variables.jerk = JerkVariable(
             name=str(PrefixedName("jerk", prefix=str(self.name))), dof=self
         )
 
     def has_position_limits(self) -> bool:
         try:
-            lower_limit = self.lower_limits.position
-            upper_limit = self.upper_limits.position
+            lower_limit = self.limits.lower.position
+            upper_limit = self.limits.upper.position
             return lower_limit is not None or upper_limit is not None
         except KeyError:
             return False
@@ -148,27 +176,29 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
-            "lower_limits": self.lower_limits.to_json(),
-            "upper_limits": self.upper_limits.to_json(),
-            "name": self.name.to_json(),
+            "lower_limits": to_json(self.limits.lower),
+            "upper_limits": to_json(self.limits.upper),
+            "name": to_json(self.name),
+            "has_hardware_interface": self.has_hardware_interface,
         }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> DegreeOfFreedom:
         uuid = from_json(data["id"])
-        lower_limits = DerivativeMap.from_json(data["lower_limits"], **kwargs)
-        upper_limits = DerivativeMap.from_json(data["upper_limits"], **kwargs)
+        lower_limits = from_json(data["lower_limits"], **kwargs)
+        upper_limits = from_json(data["upper_limits"], **kwargs)
         return cls(
-            name=PrefixedName.from_json(data["name"]),
-            lower_limits=lower_limits,
-            upper_limits=upper_limits,
+            name=from_json(data["name"]),
+            limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
             id=uuid,
+            has_hardware_interface=data["has_hardware_interface"],
         )
 
     def __deepcopy__(self, memo):
         result = DegreeOfFreedom(
-            lower_limits=deepcopy(self.lower_limits),
-            upper_limits=deepcopy(self.upper_limits),
+            limits=DegreeOfFreedomLimits(
+                lower=deepcopy(self.limits.lower), upper=deepcopy(self.limits.upper)
+            ),
             name=deepcopy(self.name),
             has_hardware_interface=self.has_hardware_interface,
             id=self.id,
@@ -199,23 +229,19 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
                 message="Cannot overwrite limits of mimic DOFs, use .raw_dof._overwrite_dof_limits instead."
             )
         for derivative in Derivatives.range(Derivatives.position, Derivatives.jerk):
-            if new_lower_limits.data[derivative] is not None:
-                if self.lower_limits.data[derivative] is None:
-                    self.lower_limits.data[derivative] = new_lower_limits.data[
-                        derivative
-                    ]
+            if new_lower_limits[derivative] is not None:
+                if self.limits.lower[derivative] is None:
+                    self.limits.lower[derivative] = new_lower_limits[derivative]
                 else:
-                    self.lower_limits.data[derivative] = max(
-                        new_lower_limits.data[derivative],
-                        self.lower_limits.data[derivative],
+                    self.limits.lower[derivative] = max(
+                        new_lower_limits[derivative],
+                        self.limits.lower[derivative],
                     )
-            if new_upper_limits.data[derivative] is not None:
-                if self.upper_limits.data[derivative] is None:
-                    self.upper_limits.data[derivative] = new_upper_limits.data[
-                        derivative
-                    ]
+            if new_upper_limits[derivative] is not None:
+                if self.limits.upper[derivative] is None:
+                    self.limits.upper[derivative] = new_upper_limits[derivative]
                 else:
-                    self.upper_limits.data[derivative] = min(
-                        new_upper_limits.data[derivative],
-                        self.upper_limits.data[derivative],
+                    self.limits.upper[derivative] = min(
+                        new_upper_limits[derivative],
+                        self.limits.upper[derivative],
                     )

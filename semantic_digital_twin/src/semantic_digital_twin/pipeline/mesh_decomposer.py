@@ -8,11 +8,11 @@ import coacd
 import numpy as np
 import trimesh
 
-from .pipeline import Step
-from ..world import World
-from ..world_description.geometry import TriangleMesh, Shape, Mesh
-from ..world_description.shape_collection import ShapeCollection
-from ..world_description.world_entity import Body
+from semantic_digital_twin.pipeline.pipeline import Step
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.geometry import Shape, Mesh
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 class ApproximationMode(StrEnum):
@@ -55,14 +55,14 @@ class MeshDecomposer(Step, ABC):
     """
 
     @abstractmethod
-    def apply_to_mesh(self, mesh: Mesh) -> List[TriangleMesh]:
+    def apply_to_mesh(self, mesh: Mesh) -> List[Mesh]:
         """
         Apply the mesh decomposition to a given mesh.
         Returns a list of TriangleMesh objects representing the decomposed convex parts.
         """
         ...
 
-    def apply_to_shape(self, shape: Shape) -> List[TriangleMesh]:
+    def apply_to_shape(self, shape: Shape) -> List[Mesh]:
         """
         Apply the mesh decomposition to a given shape.
         If the shape is a Mesh, it will be decomposed into multiple TriangleMesh objects.
@@ -184,7 +184,7 @@ class COACDMeshDecomposer(MeshDecomposer):
     Random seed used for sampling.
     """
 
-    def apply_to_mesh(self, mesh: Mesh) -> List[TriangleMesh]:
+    def apply_to_mesh(self, mesh: Mesh) -> List[Mesh]:
         """
         Apply the COACD mesh decomposition to a given mesh.
         Returns a list of TriangleMesh objects representing the decomposed convex parts.
@@ -223,7 +223,7 @@ class COACDMeshDecomposer(MeshDecomposer):
 
         for vs, fs in parts:
             new_geometry.append(
-                TriangleMesh(mesh=trimesh.Trimesh(vs, fs), origin=mesh.origin)
+                Mesh.from_trimesh(mesh=trimesh.Trimesh(vs, fs), origin=mesh.origin)
             )
 
         return new_geometry

@@ -31,6 +31,9 @@ A major inspiration for the development of KRROOD is the book
   - Express symbolic rules and rule trees over your domain model
   - Run inference to derive new knowledge from existing facts and relationships
 
+- Utilities for Graphs
+  - Visualize query graphs and rule trees.
+
 ### When to Use KRROOD
 
 - You have a rich domain model and want first-class, object-oriented knowledge representation

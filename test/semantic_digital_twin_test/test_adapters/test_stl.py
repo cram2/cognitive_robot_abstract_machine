@@ -1,8 +1,11 @@
 import os
 import unittest
 
+from importlib.resources import files
+from pathlib import Path
+
 from semantic_digital_twin.adapters.mesh import STLParser
-from semantic_digital_twin.world_description.geometry import FileMesh
+from semantic_digital_twin.world_description.geometry import Mesh
 
 
 class STLAdapterTestCase(unittest.TestCase):
@@ -10,10 +13,16 @@ class STLAdapterTestCase(unittest.TestCase):
     def setUp(self):
         # Set up any necessary resources or state before each krrood_test
         self.milk_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "resources", "stl", "milk.stl"
+            Path(files("semantic_digital_twin")).parent.parent,
+            "resources",
+            "stl",
+            "milk.stl",
         )
         self.cup = os.path.join(
-            os.path.dirname(__file__), "..", "..", "resources", "stl", "jeroen_cup.stl"
+            Path(files("semantic_digital_twin")).parent.parent,
+            "resources",
+            "stl",
+            "jeroen_cup.stl",
         )
 
     def test_stl_parsing_construct(self):
@@ -28,9 +37,7 @@ class STLAdapterTestCase(unittest.TestCase):
         self.assertEqual(len(world.kinematic_structure_entities), 1)
         self.assertEqual(len(world.kinematic_structure_entities[0].collision), 1)
         self.assertEqual(len(world.kinematic_structure_entities[0].visual), 1)
-        self.assertEqual(
-            FileMesh, type(world.kinematic_structure_entities[0].collision[0])
-        )
+        self.assertEqual(Mesh, type(world.kinematic_structure_entities[0].collision[0]))
 
     def test_parse_and_merge(self):
         milk_world = STLParser(self.milk_path).parse()

@@ -1,2 +1,2 @@
-from .actions import *
-from .motions import *
+from pycram.robot_plans.actions import *
+from pycram.robot_plans.motions import *

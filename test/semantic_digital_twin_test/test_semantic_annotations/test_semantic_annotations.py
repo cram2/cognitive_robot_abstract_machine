@@ -1,12 +1,15 @@
 import logging
 
-from krrood.entity_query_language.entity_result_processors import an
-from krrood.entity_query_language.entity import entity, variable, in_, inference
+from krrood.entity_query_language.factories import entity, variable, in_, inference, an
 from numpy.ma.testutils import (
     assert_equal,
 )  # You could replace this with numpy's regular assert for better compatibility
 
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
@@ -16,7 +19,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 try:
-    from ripple_down_rules.user_interface.gui import RDRCaseViewer
+    from krrood.ripple_down_rules.user_interface.gui import RDRCaseViewer
     from PyQt6.QtWidgets import QApplication
 except ImportError as e:
     logging.debug(e)
@@ -49,11 +52,9 @@ class TestSemanticAnnotation(SemanticAnnotation):
 
     def add_entity(self, body: KinematicStructureEntity):
         self.entity_list.append(body)
-        body._semantic_annotations.add(self)
 
     def add_semantic_annotation(self, semantic_annotation: SemanticAnnotation):
         self.semantic_annotations.append(semantic_annotation)
-        semantic_annotation._semantic_annotations.add(self)
 
     @property
     def chain(self) -> list[KinematicStructureEntity]:
@@ -75,14 +76,15 @@ class TestSemanticAnnotation(SemanticAnnotation):
 
 
 def test_semantic_annotation_hash(apartment_world_setup):
-    semantic_annotation1 = Handle(body=apartment_world_setup.bodies[0])
+    semantic_annotation1 = Handle(root=apartment_world_setup.bodies[0])
+    semantic_annotation2 = Handle(root=apartment_world_setup.bodies[0])
     with apartment_world_setup.modify_world():
         apartment_world_setup.add_semantic_annotation(semantic_annotation1)
-    assert hash(semantic_annotation1) == hash(
-        (Handle, apartment_world_setup.bodies[0].id)
-    )
+        apartment_world_setup.add_semantic_annotation(semantic_annotation2)
 
-    semantic_annotation2 = Handle(body=apartment_world_setup.bodies[0])
+    # hash of semantic annotations should be based on their properties, not ids
+    assert id(semantic_annotation1) != id(semantic_annotation2)
+    assert hash(semantic_annotation1) == hash(semantic_annotation2)
     assert semantic_annotation1 == semantic_annotation2
 
 
@@ -127,11 +129,10 @@ def test_aggregate_bodies(kitchen_world):
     ]
 
     assert_equal(
-        world_semantic_annotation.kinematic_structure_entities,
+        set(world_semantic_annotation.kinematic_structure_entities),
         set(kitchen_world.kinematic_structure_entities)
         - {
             kitchen_world.kinematic_structure_entities[0],
-            kitchen_world.kinematic_structure_entities[19],
         },
     )
 
@@ -139,11 +140,10 @@ def test_aggregate_bodies(kitchen_world):
 def test_handle_semantic_annotation_eql(apartment_world_setup):
     body = variable(type_=Body, domain=apartment_world_setup.bodies)
     query = an(
-        entity(inference(Handle)(body=body)).where(
+        entity(inference(Handle)(root=body)).where(
             in_("handle", body.name.name.lower())
         )
     )
-
     handles = list(query.evaluate())
     assert len(handles) > 0
 
@@ -152,9 +152,8 @@ def test_handle_semantic_annotation_eql(apartment_world_setup):
     "semantic_annotation_type, update_existing_semantic_annotations, scenario",
     [
         (Handle, False, None),
-        (Container, False, None),
         (Drawer, False, None),
-        (Cabinet, False, None),
+        (Wardrobe, False, None),
         (Door, False, None),
     ],
 )
@@ -178,25 +177,29 @@ def test_generated_semantic_annotations(kitchen_world):
         "semantic_annotations"
     ]
     drawer_container_names = [
-        v.body.name.name for v in found_semantic_annotations if isinstance(v, Container)
+        v.root.name.name
+        for v in found_semantic_annotations
+        if isinstance(v, HasCaseAsRootBody)
     ]
-    assert len(drawer_container_names) == 14
+    assert len(drawer_container_names) == 19
 
 
 @pytest.mark.order("second_to_last")
 def test_apartment_semantic_annotations(apartment_world_setup):
     world_reasoner = WorldReasoner(apartment_world_setup)
     world_reasoner.fit_semantic_annotations(
-        [Handle, Container, Drawer, Cabinet],
+        [Handle, Drawer, Wardrobe],
         world_factory=lambda: apartment_world_setup,
         scenario=None,
     )
 
     found_semantic_annotations = world_reasoner.infer_semantic_annotations()
     drawer_container_names = [
-        v.body.name.name for v in found_semantic_annotations if isinstance(v, Container)
+        v.root.name.name
+        for v in found_semantic_annotations
+        if isinstance(v, HasCaseAsRootBody)
     ]
-    assert len(drawer_container_names) == 19
+    assert len(drawer_container_names) == 27
 
 
 def fit_rules_and_assert_semantic_annotations(
@@ -216,74 +219,44 @@ def fit_rules_and_assert_semantic_annotations(
     )
 
 
-def test_semantic_annotation_serde_once(apartment_world_setup):
+def test_semantic_annotation_serialization_deserialization_once(apartment_world_setup):
     handle_body = apartment_world_setup.bodies[0]
     door_body = apartment_world_setup.bodies[1]
 
-    handle = Handle(body=handle_body)
-    door = Door(body=door_body, handle=handle)
+    handle = Handle(root=handle_body)
+    door = Door(root=door_body, handle=handle)
     with apartment_world_setup.modify_world():
         apartment_world_setup.add_semantic_annotation(handle)
         apartment_world_setup.add_semantic_annotation(door)
 
     door_se = door.to_json()
-    door_de = Door.from_json(door_se)
-
-    assert door == door_de
-    assert type(door.handle) == type(door_de.handle)
-    assert type(door.body) == type(door_de.body)
-
-
-def test_semantic_annotation_serde_multiple(apartment_world_setup):
-    handle_body = apartment_world_setup.bodies[0]
-    door_body = apartment_world_setup.bodies[1]
-
-    handle = Handle(body=handle_body)
-    door = Door(body=door_body, handle=handle)
 
     with apartment_world_setup.modify_world():
-        apartment_world_setup.add_semantic_annotation(handle)
-        apartment_world_setup.add_semantic_annotation(door)
+        apartment_world_setup.remove_semantic_annotation(door)
 
-    door_se1 = door.to_json()
-    door_de1 = Door.from_json(door_se1)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(apartment_world_setup)
+    kwargs = tracker.create_kwargs()
 
-    assert door == door_de1
-    assert type(door.handle) == type(door_de1.handle)
-    assert type(door.body) == type(door_de1.body)
+    door_de = Door.from_json(door_se, **kwargs)
 
-    door_se2 = door_de1.to_json()
-    door_de2 = Door.from_json(door_se2)
-
-    assert door == door_de2
-    assert type(door.handle) == type(door_de2.handle)
-    assert type(door.body) == type(door_de2.body)
+    assert type(door.handle) == type(door_de.handle)
+    assert type(door.root) == type(door_de.root)
 
 
 def test_minimal_robot_annotation(pr2_world_state_reset):
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "urdf",
-    )
-    pr2 = os.path.join(urdf_dir, "pr2_kinematic_tree.urdf")
-    pr2_parser = URDFParser.from_file(file_path=pr2)
-    world_with_pr2 = pr2_parser.parse()
-    with world_with_pr2.modify_world():
-        MinimalRobot.from_world(world_with_pr2)
-        pr2_root = world_with_pr2.root
+    urdf_path = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+    world_copy = URDFParser.from_xacro(urdf_path).parse()
+    with world_copy.modify_world():
+        MinimalRobot.from_world(world_copy)
+        pr2_root = world_copy.root
         localization_body = Body(name=PrefixedName("odom_combined"))
-        world_with_pr2.add_kinematic_structure_entity(localization_body)
+        world_copy.add_kinematic_structure_entity(localization_body)
         c_root_bf = OmniDrive.create_with_dofs(
-            parent=localization_body, child=pr2_root, world=world_with_pr2
+            parent=localization_body, child=pr2_root, world=world_copy
         )
-        world_with_pr2.add_connection(c_root_bf)
+        world_copy.add_connection(c_root_bf)
 
-    robot = world_with_pr2.get_semantic_annotations_by_type(MinimalRobot)[0]
-    pr2 = PR2.from_world(pr2_world_state_reset)
+    robot = world_copy.get_semantic_annotations_by_type(AbstractRobot)[0]
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(AbstractRobot)[0]
     assert len(robot.bodies) == len(pr2.bodies)
     assert len(robot.connections) == len(pr2.connections)

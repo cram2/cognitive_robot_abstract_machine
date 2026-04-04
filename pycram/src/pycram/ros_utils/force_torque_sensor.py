@@ -6,10 +6,10 @@ from geometry_msgs.msg import WrenchStamped
 from semantic_digital_twin.world import World
 from std_msgs.msg import Header
 
-from ..datastructures.enums import FilterConfig
-from ..filter import Butterworth
-from ..ros import Time
-from ..ros import create_publisher, create_subscriber
+from pycram.datastructures.enums import FilterConfig
+from pycram.filter import Butterworth
+from pycram.ros import Time
+from pycram.ros import create_publisher, create_subscriber
 
 logger = logging.getLogger(__name__)
 

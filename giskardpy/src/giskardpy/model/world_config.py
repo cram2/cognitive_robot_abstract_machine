@@ -5,9 +5,12 @@ from abc import ABC
 from dataclasses import dataclass, field
 
 import numpy as np
+from sqlalchemy import select
 
+from krrood.ormatic.data_access_objects.helper import get_dao_class
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
@@ -33,13 +36,6 @@ class WorldConfig(ABC):
         Implement this method to configure the initial world using it's self. methods.
         """
 
-    @abc.abstractmethod
-    def setup_collision_config(self):
-        """
-        This method is called after the robot is connected to the controller and connections have
-        the controlled flag.
-        """
-
 
 class EmptyWorld(WorldConfig):
     def setup_world(self):
@@ -63,7 +59,7 @@ class WorldWithFixedRobot(WorldConfig):
     def setup_world(self):
         map = Body(name=self.root_name)
 
-        urdf_parser = URDFParser(urdf=self.urdf)
+        urdf_parser = URDFParser(urdf=self.urdf, prefix="")
         world_with_robot = urdf_parser.parse()
         self.urdf_view.from_world(world_with_robot)
         self.robot_root = world_with_robot.root
@@ -90,7 +86,7 @@ class WorldWithOmniDriveRobot(WorldConfig):
         )
         self.world.add_connection(self.localization)
 
-        urdf_parser = URDFParser(urdf=self.urdf)
+        urdf_parser = URDFParser(urdf=self.urdf, prefix="")
         world_with_robot = urdf_parser.parse()
         self.robot = self.urdf_view.from_world(world_with_robot)
 
@@ -159,3 +155,26 @@ class WorldWithDiffDriveRobot(WorldConfig):
             },
             robot_group_name=self.robot_group_name,
         )
+
+
+@dataclass
+class WorldFromDatabaseConfig(WorldConfig):
+    """
+    This world config loads a world from the semantic digital twin database at the given primary key.
+    """
+
+    primary_key: int = 1
+    """Primary key of the world in the semantic digital twin database."""
+
+    def setup_collision_config(self):
+        pass
+
+    def setup_world(self):
+        ormatic_world_class = get_dao_class(World)
+        session = semantic_digital_twin_sessionmaker()()
+        world_dao = session.scalar(
+            select(ormatic_world_class).where(
+                ormatic_world_class.database_id == self.primary_key
+            )
+        )
+        self.world = world_dao.from_dao()

@@ -1,0 +1,1 @@
+["len([atom for atom in case.atoms if atom.element == Element.C]) > 0", "case.ind1 == 0"]

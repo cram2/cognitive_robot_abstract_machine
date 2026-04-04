@@ -10,7 +10,7 @@ from typing_extensions import TextIO, TYPE_CHECKING
 import jinja2
 
 if TYPE_CHECKING:
-    from .ormatic import ORMatic
+    from krrood.ormatic.ormatic import ORMatic
 
 logger = logging.getLogger(__name__)
 

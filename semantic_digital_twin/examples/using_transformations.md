@@ -14,11 +14,11 @@ kernelspec:
 (using-transformations)=
 # Using Transformations
 
-This tutorial introduces the mathematical idea of rigid-body transformations and how to use our `TransformationMatrix` to place and move things in a world.
+This tutorial introduces the mathematical idea of rigid-body transformations and how to use our `HomogeneousTransformationMatrix` to place and move things in a world.
 
 You will learn:
 - What a rigid transform is (position + orientation)
-- How to create transforms using `TransformationMatrix.from_xyz_rpy`
+- How to create transforms using `HomogeneousTransformationMatrix.from_xyz_rpy`
 - How to compose transforms using the `@` operator (parent_T_child style)
 - How the `reference_frame` parameter determines which axes a motion is expressed in
 
@@ -33,7 +33,7 @@ We will create a simple world with a square base plate and a small camera box mo
 
 ```{code-cell} ipython3
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -65,10 +65,10 @@ camera_body = Body(
 
 
 # Place the base: put it slightly above the ground so the top sits at z≈0.05
-world_T_base = TransformationMatrix.from_xyz_rpy(z=0.025, reference_frame=root)
+world_T_base = HomogeneousTransformationMatrix.from_xyz_rpy(z=0.025, reference_frame=root)
 
 # Place the camera relative to the base: forward along base-y and a bit upward, yawed by +30°
-base_T_camera = TransformationMatrix.from_xyz_rpy(
+base_T_camera = HomogeneousTransformationMatrix.from_xyz_rpy(
     y=0.25,
     z=0.10,
     yaw=math.radians(30),
@@ -102,16 +102,16 @@ A rigid transform is a mapping between two Cartesian coordinate frames. It has:
   - pitch = rotation about y
   - yaw = rotation about z
 
-Mathematically it is a 4×4 homogeneous matrix. Our `TransformationMatrix` wraps these values and provides convenient factories like `from_xyz_rpy(...)`.
+Mathematically it is a 4×4 homogeneous matrix. Our `HomogeneousTransformationMatrix` wraps these values and provides convenient factories like `from_xyz_rpy(...)`.
 
 ```{code-cell} ipython3
 # Compose transforms: world_T_camera = world_T_base @ base_T_camera
 world_T_camera = world_T_base @ base_T_camera
 print(
     "Camera position in world frame:",
-    "x=%.3f" % float(world_T_camera.x.to_np()),
-    "y=%.3f" % float(world_T_camera.y.to_np()),
-    "z=%.3f" % float(world_T_camera.z.to_np()),
+    "x=%.3f" % float(world_T_camera.x.to_np().item()),
+    "y=%.3f" % float(world_T_camera.y.to_np().item()),
+    "z=%.3f" % float(world_T_camera.z.to_np().item()),
 )
 ```
 
@@ -124,7 +124,7 @@ Suppose we want to move the camera 0.1 m forward along its own x-axis and rotate
 
 ```{code-cell} ipython3
 # Move and rotate in the camera's own frame
-camera_T_camera_offset = TransformationMatrix.from_xyz_rpy(
+camera_T_camera_offset = HomogeneousTransformationMatrix.from_xyz_rpy(
     x=0.10,  # forward along camera-x
     yaw=math.radians(45),  # about camera-z
     reference_frame=camera_body,
@@ -146,7 +146,7 @@ If we rotate the base in the world by 90° yaw, the camera comes along because i
 
 ```{code-cell} ipython3
 # Pure rotation in the base frame (no translation)
-base_T_base_rot = TransformationMatrix.from_xyz_rpy(yaw=math.radians(90), reference_frame=base_body)
+base_T_base_rot = HomogeneousTransformationMatrix.from_xyz_rpy(yaw=math.radians(90), reference_frame=base_body)
 new_world_T_base = world_T_base @ base_T_base_rot
 
 with world.modify_world():
@@ -158,6 +158,6 @@ rt.scene.show("jupyter")
 ```
 
 ## Where to go next
-- Style guide on transformations and naming: https://cram2.github.io/semantic_digital_twin/style_guide.html
-- API docs for `TransformationMatrix`: https://cram2.github.io/semantic_digital_twin/autoapi/semantic_digital_twin/spatial_types/spatial_types/index.html#semantic_digital_twin.spatial_types.spatial_types.TransformationMatrix
+- Style guide on transformations and naming: https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/style_guide.html
+- API docs for `HomogeneousTransformationMatrix`: https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/autoapi/semantic_digital_twin/spatial_types/spatial_types/index.html#semantic_digital_twin.spatial_types.spatial_types.HomogeneousTransformationMatrix
 - Now try the exercise: [](using-transformations-exercise)

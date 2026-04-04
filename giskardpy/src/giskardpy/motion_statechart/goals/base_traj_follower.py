@@ -2,8 +2,6 @@ from __future__ import division
 
 from dataclasses import field, dataclass
 
-from line_profiler import profile
-
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Goal
@@ -32,7 +30,6 @@ class BaseTrajFollower(Goal):
         self.add_trans_constraints()
         self.add_rot_constraints()
 
-    @profile
     def x_symbol(
         self,
         t: int,
@@ -44,7 +41,6 @@ class BaseTrajFollower(Goal):
         )
         return symbol_manager.get_symbol(expr)
 
-    @profile
     def current_traj_point(
         self,
         free_variable_name: PrefixedName,
@@ -66,7 +62,6 @@ class BaseTrajFollower(Goal):
             ),
         )
 
-    @profile
     def make_odom_T_base_footprint_goal(
         self, t_in_s: float, derivative: Derivatives = Derivatives.position
     ):
@@ -81,7 +76,6 @@ class BaseTrajFollower(Goal):
         )
         return odom_T_base_footprint_goal
 
-    @profile
     def make_map_T_base_footprint_goal(
         self, t_in_s: float, derivative: Derivatives = Derivatives.position
     ):
@@ -93,7 +87,6 @@ class BaseTrajFollower(Goal):
         )
         return map_T_odom @ odom_T_base_footprint_goal
 
-    @profile
     def trans_error_at(self, t_in_s: float):
         odom_T_base_footprint_goal = self.make_odom_T_base_footprint_goal(t_in_s)
         map_T_odom = context.world.compute_forward_kinematics(
@@ -111,7 +104,6 @@ class BaseTrajFollower(Goal):
         error = (frame_P_goal - frame_P_current) / context.qp_controller.mpc_dt
         return error[0], error[1]
 
-    @profile
     def add_trans_constraints(self):
         errors_x = []
         errors_y = []
@@ -167,7 +159,6 @@ class BaseTrajFollower(Goal):
                 name="/vel y",
             )
 
-    @profile
     def rot_error_at(self, t_in_s: int):
         rotation_goal = self.current_traj_point(self.joint.yaw.name, t_in_s)
         rotation_current = self.joint.yaw.variables.position
@@ -177,7 +168,6 @@ class BaseTrajFollower(Goal):
         )
         return error
 
-    @profile
     def add_rot_constraints(self):
         errors = []
         for t in range(context.qp_controller.prediction_horizon):

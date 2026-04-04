@@ -7,7 +7,7 @@ from typing import Callable
 
 from typing_extensions import Dict
 
-from ..ros import get_node_names, wait_for_service, get_service_proxy, ServiceException
+from pycram.ros import get_node_names, wait_for_service, get_service_proxy, ServiceException
 
 try:
     from iai_apartment_kitchen_msgs.srv import Authenticateuser

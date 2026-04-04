@@ -29,7 +29,7 @@ tmp/
 /cfg/cpp/
 /cfg/*.py
 
-# Ignore generated docs
+# Ignore generated doc
 *.dox
 *.wikidoc
 
@@ -46,6 +46,7 @@ CMakeLists.txt.user
 srv/_*.py
 *.pcd
 *.pyc
+*.pyo
 qtcreator-*
 *.user
 *.prof
@@ -68,3 +69,25 @@ poetry.lock
 
 # Created during tests
 file::memory:
+
+dist
+
+# probabilistic model dependent
+mlruns
+mlartifacts
+.drawio
+
+# Documentation build artifacts
+**/_build/
+**/.jupyter_cache/
+**/test_tmp/
+semantic_digital_twin/resources/output
+
+# test generated files
+*.pkl
+test/krrood_test/test_ripple_down_rules/*.dot
+test/krrood_test/test_ripple_down_rules/*.svg
+test/krrood_test/test_ripple_down_rules/test_results/
+test/**/*.pdf
+test/krrood_test/test_ripple_down_rules/test_generated_rdrs
+

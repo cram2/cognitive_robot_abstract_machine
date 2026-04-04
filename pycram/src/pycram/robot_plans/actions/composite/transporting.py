@@ -6,38 +6,35 @@ from typing import List
 
 import numpy as np
 
+from krrood.entity_query_language.factories import (
+    an,
+    entity,
+    variable,
+    underspecified,
+)
+from pycram.locations.locations import CostmapLocation
+from pycram.plans.factories import sequential, execute_single
+from pycram.robot_plans.actions.composite.facing import FaceAtAction
+from pycram.robot_plans.actions.core.container import OpenAction
+from pycram.robot_plans.actions.core.navigation import NavigateAction
+from pycram.robot_plans.actions.core.pick_up import PickUpAction
+from pycram.robot_plans.actions.core.placing import PlaceAction
+from pycram.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
+from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import Union, Optional, Type, Any, Iterable
+from typing_extensions import Optional, Any
 
-from .facing import FaceAtActionDescription
-from ..core import (
-    ParkArmsActionDescription,
-    NavigateActionDescription,
-    PickUpActionDescription,
-    PlaceActionDescription,
-    OpenActionDescription,
-)
-from ....config.action_conf import ActionConfig
-from ....datastructures.enums import Arms, Grasp, VerticalAlignment
-from ....datastructures.grasp import GraspDescription
-from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
-from ....designators.location_designator import (
-    ProbabilisticCostmapLocation,
-    CostmapLocation,
-    GiskardLocation,
-)
-from ....designators.object_designator import BelieveObject
-from ....failures import ObjectUnfetchable, ConfigurationNotReached
-from ....has_parameters import has_parameters
-from ....language import SequentialPlan
-from ....robot_description import RobotDescription
-from ....robot_plans.actions.base import ActionDescription
+from pycram.config.action_conf import ActionConfig
+from pycram.datastructures.enums import Arms
+from pycram.datastructures.grasp import GraspDescription, GraspPose
+
+from pycram.plans.failures import ConfigurationNotReached, BodyUnfetchable
+from pycram.robot_plans.actions.base import ActionDescription
 
 
-@has_parameters
 @dataclass
 class TransportAction(ActionDescription):
     """
@@ -48,26 +45,16 @@ class TransportAction(ActionDescription):
     """
     Object designator_description describing the object that should be transported.
     """
-    target_location: PoseStamped
+
+    target_location: Pose
     """
     Target Location to which the object should be transported
     """
+
     arm: Optional[Arms]
     """
     Arm that should be used
     """
-    place_rotation_agnostic: Optional[bool] = False
-    """
-    If True, the robot will place the object in the same orientation as it is itself, no matter how the object was grasped.
-    """
-
-    _pre_perform_callbacks = []
-    """
-    List to save the callbacks which should be called before performing the action.
-    """
-
-    def __post_init__(self):
-        super().__post_init__()
 
     def inside_container(self) -> List[Body]:
         bodies = []
@@ -78,75 +65,103 @@ class TransportAction(ActionDescription):
                 bodies.append(body)
         return bodies
 
-    def execute(self) -> None:
-        if containers := self.inside_container():
-            for container in containers:
-                sem_anno = container.get_semantic_annotations_by_type(Drawer)
-                if sem_anno:
-                    SequentialPlan(
-                        self.context,
-                        OpenActionDescription(sem_anno[0].handle.body, self.arm),
-                    ).perform()
-        SequentialPlan(self.context, ParkArmsActionDescription(Arms.BOTH)).perform()
-        pickup_loc = CostmapLocation(
-            target=PoseStamped.from_spatial_type(self.object_designator.global_pose),
-            reachable_arm=self.arm,
-            reachable_for=self.robot_view,
-        )
-        pickup_loc.plan_node = self.plan_node
-        # Tries to find a pick-up position for the robot that uses the given arm
-        pickup_pose = pickup_loc.resolve()
-        if not pickup_pose:
-            raise ObjectUnfetchable(
-                f"Found no pose for the robot to grasp the object: {self.object_designator} with arm: {self.arm}"
-            )
+    def open_container(self, container: Body):
 
-        SequentialPlan(
-            self.context,
-            NavigateActionDescription(pickup_pose, True),
-            PickUpActionDescription(
-                self.object_designator,
-                pickup_pose.arm,
-                grasp_description=pickup_pose.grasp_description,
-            ),
-            ParkArmsActionDescription(Arms.BOTH),
-            NavigateActionDescription(
-                CostmapLocation(
+        drawer_annotation = an(
+            entity(
+                drawer := variable(Drawer, domain=self.world.semantic_annotations)
+            ).where(drawer.root == container)
+        )
+        drawer_annotation = list(drawer_annotation.evaluate())
+        if len(drawer_annotation) == 0:
+            return
+        handle = drawer_annotation[0].handle.root
+
+        self.add_subplan(
+            sequential(
+                [
+                    NavigateAction(
+                        CostmapLocation(
+                            handle.global_pose,
+                            reachable_arm=self.arm,
+                            reachable=True,
+                            context=self.plan.context,
+                        ).resolve(),
+                        True,
+                    ),
+                    OpenAction(handle, self.arm),
+                ]
+            )
+        ).perform()
+
+    def execute(self) -> None:
+        for container in self.inside_container():
+            self.open_container(container)
+
+        self.add_subplan(execute_single(ParkArmsAction(Arms.BOTH))).perform()
+        pickup_loc = CostmapLocation(
+            target=self.object_designator.global_pose,
+            reachable_arm=self.arm,
+            reachable=True,
+            context=self.plan_node.plan.context,
+        )
+        # Tries to find a pick-up position for the robot that uses the given arm
+
+        pickup_pose = pickup_loc.ground()
+
+        if not pickup_pose:
+            raise BodyUnfetchable(self.object_designator, self.arm)
+
+        self.add_subplan(
+            sequential(
+                [
+                    NavigateAction(pickup_pose, True),
+                    PickUpAction(
+                        self.object_designator,
+                        pickup_pose.arm,
+                        grasp_description=pickup_pose.grasp_description,
+                    ),
+                    ParkArmsAction(Arms.BOTH),
+                    MoveTorsoAction(TorsoState.HIGH),
+                    self._make_navigate_action_for_placing(
+                        pickup_pose.grasp_description
+                    ),
+                ]
+            )
+        ).perform()
+
+        self.add_subplan(self._make_place_plan(pickup_pose)).perform()
+
+    def _make_place_plan(self, pickup_pose: GraspPose):
+
+        return sequential(
+            children=[
+                self._make_navigate_action_for_placing(pickup_pose.grasp_description),
+                PlaceAction(
+                    self.object_designator, self.target_location, pickup_pose.arm
+                ),
+                ParkArmsAction(Arms.BOTH),
+            ]
+        )
+
+    def _make_navigate_action_for_placing(self, grasp_description: GraspDescription):
+        """
+        :param grasp_description: The grasp description that should be used for placing the object.
+        :return: The navigate action that will be used to place the object.
+        """
+        return underspecified(NavigateAction)(
+            target_location=variable(
+                Pose,
+                domain=CostmapLocation(
                     target=self.target_location,
                     reachable_arm=self.arm,
-                    reachable_for=self.robot_view,
+                    reachable=True,
+                    context=self.plan.context,
+                    grasp_description=grasp_description,
                 ),
-                True,
             ),
-        ).perform()
-
-        if self.place_rotation_agnostic:
-            # Placing rotation agnostic currently means that the robot will position its gripper in the same orientation
-            # as it is itself, no matter how the object was grasped
-            robot_rotation = robot_desig_resolved.get_pose().orientation
-            self.target_location.orientation = robot_rotation
-            approach_direction = GraspDescription(
-                pickup_pose.grasp_description.approach_direction,
-                VerticalAlignment.NoAlignment,
-                False,
-            )
-            side_grasp = np.array(
-                robot_desig_resolved.robot_description.get_arm_chain(
-                    pickup_pose.arm
-                ).end_effector.grasps[approach_direction]
-            )
-            # Inverting the quaternion for the used grasp to cancel it out during placing, since placing considers the
-            # object orientation relative to the gripper )
-            side_grasp *= np.array([-1, -1, -1, 1])
-            self.target_location.rotate_by_quaternion(side_grasp.tolist())
-
-        SequentialPlan(
-            self.context,
-            PlaceActionDescription(
-                self.object_designator, self.target_location, pickup_pose.arm
-            ),
-            ParkArmsActionDescription(Arms.BOTH),
-        ).perform()
+            keep_joint_states=True,
+        )
 
     def validate(
         self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
@@ -154,24 +169,7 @@ class TransportAction(ActionDescription):
         # The validation of each core action is done in the action itself, so no more validation needed here.
         pass
 
-    @classmethod
-    def description(
-        cls,
-        object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
-        arm: Union[Iterable[Arms], Arms] = None,
-        place_rotation_agnostic: Optional[bool] = False,
-    ) -> PartialDesignator[Type[TransportAction]]:
-        return PartialDesignator(
-            TransportAction,
-            object_designator=object_designator,
-            target_location=target_location,
-            arm=arm,
-            place_rotation_agnostic=place_rotation_agnostic,
-        )
 
-
-@has_parameters
 @dataclass
 class PickAndPlaceAction(ActionDescription):
     """
@@ -182,7 +180,7 @@ class PickAndPlaceAction(ActionDescription):
     """
     Object designator_description describing the object that should be transported.
     """
-    target_location: PoseStamped
+    target_location: Pose
     """
     Target Location to which the object should be transported
     """
@@ -194,28 +192,22 @@ class PickAndPlaceAction(ActionDescription):
     """
     Description of the grasp to pick up the target
     """
-    _pre_perform_callbacks = []
-    """
-    List to save the callbacks which should be called before performing the action.
-    """
-
-    def __post_init__(self):
-        super().__post_init__()
 
     def execute(self) -> None:
-        SequentialPlan(
-            self.context,
-            ParkArmsActionDescription(Arms.BOTH),
-            PickUpActionDescription(
-                self.object_designator,
-                self.arm,
-                grasp_description=self.grasp_description,
-            ),
-            ParkArmsActionDescription(Arms.BOTH),
-            PlaceActionDescription(
-                self.object_designator, self.target_location, self.arm
-            ),
-            ParkArmsActionDescription(Arms.BOTH),
+        self.add_subplan(
+            sequential(
+                [
+                    ParkArmsAction(Arms.BOTH),
+                    PickUpAction(
+                        self.object_designator,
+                        self.arm,
+                        grasp_description=self.grasp_description,
+                    ),
+                    ParkArmsAction(Arms.BOTH),
+                    PlaceAction(self.object_designator, self.target_location, self.arm),
+                    ParkArmsAction(Arms.BOTH),
+                ]
+            )
         ).perform()
 
     def validate(
@@ -226,31 +218,14 @@ class PickAndPlaceAction(ActionDescription):
         else:
             raise ValueError("Object not moved to the target location")
 
-    @classmethod
-    def description(
-        cls,
-        object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
-        arm: Union[Iterable[Arms], Arms] = None,
-        grasp_description=GraspDescription,
-    ) -> PartialDesignator[Type[PickAndPlaceAction]]:
-        return PartialDesignator(
-            PickAndPlaceAction,
-            object_designator=object_designator,
-            target_location=target_location,
-            arm=arm,
-            grasp_description=grasp_description,
-        )
 
-
-@has_parameters
 @dataclass
 class MoveAndPlaceAction(ActionDescription):
     """
     Navigate to `standing_position`, then turn towards the object and pick it up.
     """
 
-    standing_position: PoseStamped
+    standing_position: Pose
     """
     The pose to stand before trying to pick up the object
     """
@@ -260,7 +235,7 @@ class MoveAndPlaceAction(ActionDescription):
     The object to pick up
     """
 
-    target_location: PoseStamped
+    target_location: Pose
     """
     The location to place the object.
     """
@@ -276,13 +251,14 @@ class MoveAndPlaceAction(ActionDescription):
     """
 
     def execute(self):
-        SequentialPlan(
-            self.context,
-            NavigateActionDescription(self.standing_position, self.keep_joint_states),
-            FaceAtActionDescription(self.target_location, self.keep_joint_states),
-            PlaceActionDescription(
-                self.object_designator, self.target_location, self.arm
-            ),
+        self.add_subplan(
+            sequential(
+                [
+                    NavigateAction(self.standing_position, self.keep_joint_states),
+                    FaceAtAction(self.target_location, self.keep_joint_states),
+                    PlaceAction(self.object_designator, self.target_location, self.arm),
+                ]
+            )
         ).perform()
 
     def validate(
@@ -291,34 +267,14 @@ class MoveAndPlaceAction(ActionDescription):
         # The validation will be done in each of the core action perform methods so no need to validate here.
         pass
 
-    @classmethod
-    def description(
-        cls,
-        standing_position: Union[Iterable[PoseStamped], PoseStamped],
-        object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
-        arm: Union[Iterable[Arms], Arms] = None,
-        keep_joint_states: Union[
-            Iterable[bool], bool
-        ] = ActionConfig.navigate_keep_joint_states,
-    ) -> PartialDesignator[Type[MoveAndPlaceAction]]:
-        return PartialDesignator(
-            MoveAndPlaceAction,
-            standing_position=standing_position,
-            object_designator=object_designator,
-            target_location=target_location,
-            arm=arm,
-        )
 
-
-@has_parameters
 @dataclass
 class MoveAndPickUpAction(ActionDescription):
     """
     Navigate to `standing_position`, then turn towards the object and pick it up.
     """
 
-    standing_position: PoseStamped
+    standing_position: Pose
     """
     The pose to stand before trying to pick up the object
     """
@@ -343,23 +299,18 @@ class MoveAndPickUpAction(ActionDescription):
     Keep the joint states of the robot the same during the navigation.
     """
 
-    _pre_perform_callbacks = []
-    """
-    List to save the callbacks which should be called before performing the action.
-    """
-
-    def __post_init__(self):
-        super().__post_init__()
-
     def execute(self):
-        obj_pose = PoseStamped.from_spatial_type(self.object_designator.global_pose)
-        SequentialPlan(
-            self.context,
-            NavigateActionDescription(self.standing_position, self.keep_joint_states),
-            FaceAtActionDescription(obj_pose, self.keep_joint_states),
-            PickUpActionDescription(
-                self.object_designator, self.arm, self.grasp_description
-            ),
+        obj_pose = Pose.from_spatial_type(self.object_designator.global_transform)
+        self.add_subplan(
+            sequential(
+                [
+                    NavigateAction(self.standing_position, self.keep_joint_states),
+                    FaceAtAction(obj_pose, self.keep_joint_states),
+                    PickUpAction(
+                        self.object_designator, self.arm, self.grasp_description
+                    ),
+                ]
+            )
         ).perform()
 
     def validate(
@@ -368,28 +319,7 @@ class MoveAndPickUpAction(ActionDescription):
         # The validation will be done in each of the core action perform methods so no need to validate here.
         pass
 
-    @classmethod
-    def description(
-        cls,
-        standing_position: Union[Iterable[PoseStamped], PoseStamped],
-        object_designator: Union[Iterable[PoseStamped], PoseStamped],
-        arm: Union[Iterable[Arms], Arms] = None,
-        grasp_description: Union[Iterable[Grasp], Grasp] = None,
-        keep_joint_states: Union[
-            Iterable[bool], bool
-        ] = ActionConfig.navigate_keep_joint_states,
-    ) -> PartialDesignator[Type[MoveAndPickUpAction]]:
-        return PartialDesignator(
-            MoveAndPickUpAction,
-            standing_position=standing_position,
-            object_designator=object_designator,
-            arm=arm,
-            grasp_description=grasp_description,
-            keep_joint_states=keep_joint_states,
-        )
 
-
-@has_parameters
 @dataclass
 class EfficientTransportAction(ActionDescription):
     """
@@ -398,7 +328,7 @@ class EfficientTransportAction(ActionDescription):
     """
 
     object_designator: Body
-    target_location: PoseStamped
+    target_location: Pose
 
     def _choose_best_arm(self, robot: Body, obj: Body) -> Arms:
         """
@@ -473,20 +403,3 @@ class EfficientTransportAction(ActionDescription):
         ).perform()
 
         ParkArmsActionDescription(Arms.BOTH).perform()
-
-    @classmethod
-    def description(
-        cls,
-        object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
-    ) -> PartialDesignator[Type["EfficientTransportAction"]]:
-        return PartialDesignator(
-            cls, object_designator=object_designator, target_location=target_location
-        )
-
-
-TransportActionDescription = TransportAction.description
-PickAndPlaceActionDescription = PickAndPlaceAction.description
-MoveAndPlaceActionDescription = MoveAndPlaceAction.description
-MoveAndPickUpActionDescription = MoveAndPickUpAction.description
-EfficientTransportActionDescription = EfficientTransportAction.description

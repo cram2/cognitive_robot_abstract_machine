@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
+from krrood.entity_query_language.factories import underspecified
 from krrood.symbolic_math.exceptions import (
     UnsupportedOperationError,
     WrongDimensionsError,
@@ -1883,3 +1884,19 @@ class TestQuaternion:
         q2 = np.array(q2)
         expected = np.dot(q1.T, q2)
         assert np.allclose(result, expected)
+
+
+def test_underspecification_of_vector():
+    q = underspecified(Vector3)(x=1, y=2, z=3).resolve()
+    q = q.where(q.variable.x > 0)
+    v1 = q.construct_instance()
+    assert v1.x == 1
+    assert v1.y == 2
+    assert v1.z == 3
+
+
+def test_underspecification_of_transformation():
+    q = underspecified(HomogeneousTransformationMatrix.from_xyz_rpy)(x=1).resolve()
+    q = q.where(q.variable.x > 0)
+    t1 = q.construct_instance()
+    assert t1.x == 1

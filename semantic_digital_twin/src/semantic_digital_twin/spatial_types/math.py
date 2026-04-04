@@ -1,5 +1,5 @@
 import numpy as np
-from ..datastructures.types import AnyMatrix4x4, NpMatrix4x4
+from semantic_digital_twin.datastructures.types import AnyMatrix4x4, NpMatrix4x4
 
 
 def inverse_frame(f1_T_f2: NpMatrix4x4) -> NpMatrix4x4:

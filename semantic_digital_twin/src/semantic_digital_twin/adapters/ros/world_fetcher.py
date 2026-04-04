@@ -7,13 +7,9 @@ from rclpy.node import Node
 from rclpy.service import Service
 from std_srvs.srv import Trigger
 
-from ..world_entity_kwargs_tracker import KinematicStructureEntityKwargsTracker
-from ...world import World
-from ...world_description.world_modification import (
-    WorldModelModification,
-    WorldModelModificationBlock,
-)
-from .messages import WorldModelSnapshot
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
+from semantic_digital_twin.world import World
+from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 
 
 @dataclass
@@ -162,27 +158,12 @@ def fetch_world_from_service(
     # fetch world
     response = client.call(Trigger.Request())
 
-    tracker = KinematicStructureEntityKwargsTracker()
+    # New format is an object {"modifications": [...], "state": {...}}.
+    world = World()
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
     kwargs = tracker.create_kwargs()
 
-    # New format is an object {"modifications": [...], "state": {...}}.
     payload = json.loads(response.message)
-    snapshot = WorldModelSnapshot.from_json(payload, **kwargs)
-    modifications = list(snapshot.modifications)
-
-    world = World()
-    for modification_block in modifications:
-        modification_block.apply(world)
-
-    # Apply latest state snapshot after all modification blocks
-    if snapshot.ids and snapshot.states:
-        indices = [world.state._index.get(_id) for _id in snapshot.ids]
-        assign_pairs = [
-            (i, float(s)) for i, s in zip(indices, snapshot.states) if i is not None
-        ]
-        if assign_pairs:
-            for i, s in assign_pairs:
-                world.state.data[0, i] = s
-            world.notify_state_change()
+    WorldModelSnapshot.apply_to_json_snapshot_to_world(world, payload, **kwargs)
 
     return world

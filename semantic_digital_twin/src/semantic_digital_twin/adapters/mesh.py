@@ -1,12 +1,12 @@
 import os
 from dataclasses import dataclass
 
-from ..world_description.geometry import FileMesh
-from ..datastructures.prefixed_name import PrefixedName
-from ..spatial_types import HomogeneousTransformationMatrix
-from ..world import World
-from ..world_description.shape_collection import ShapeCollection
-from ..world_description.world_entity import Body
+from semantic_digital_twin.world_description.geometry import Mesh
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -28,7 +28,7 @@ class MeshParser:
         """
         file_name = os.path.basename(self.file_path)
 
-        mesh_shape = FileMesh(
+        mesh_shape = Mesh(
             origin=HomogeneousTransformationMatrix(), filename=self.file_path
         )
         body = Body(

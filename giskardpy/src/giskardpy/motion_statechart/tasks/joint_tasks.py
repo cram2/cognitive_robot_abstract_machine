@@ -1,84 +1,47 @@
-from dataclasses import field, dataclass, InitVar
-from typing import Optional, Dict, List, Tuple, Union, Any
-
-from krrood.adapters.json_serializer import SubclassJSONSerializer
-from typing_extensions import Self
+from dataclasses import field, dataclass
+from typing import Optional, Dict, List, Tuple, Union
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.exceptions import NodeInitializationError
-from giskardpy.motion_statechart.context import BuildContext
-from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.graph_node import NodeArtifacts
-from giskardpy.motion_statechart.graph_node import Task
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     ActiveConnection,
     PrismaticConnection,
     ActiveConnection1DOF,
 )
-
-
-@dataclass
-class JointState(SubclassJSONSerializer):
-    mapping: InitVar[Dict[ActiveConnection1DOF, float]]
-
-    _connections: List[ActiveConnection1DOF] = field(init=False, default_factory=list)
-    _target_values: List[float] = field(init=False, default_factory=list)
-
-    def __post_init__(self, mapping: Dict[ActiveConnection1DOF, float]):
-        for connection, target in mapping.items():
-            self._connections.append(connection)
-            self._target_values.append(target)
-
-    def __len__(self):
-        return len(self._connections)
-
-    def items(self):
-        return zip(self._connections, self._target_values)
-
-    @classmethod
-    def from_str_dict(cls, mapping: Dict[str, float], world: World):
-        mapping = {
-            world.get_connection_by_name(connection_name): target
-            for connection_name, target in mapping.items()
-        }
-        return cls(mapping=mapping)
-
-    @classmethod
-    def from_lists(cls, connections: List[ActiveConnection1DOF], targets: List[float]):
-        return cls(mapping=dict(zip(connections, targets)))
-
-    def to_json(self) -> Dict[str, Any]:
-        return {
-            **super().to_json(),
-            "_connections": [
-                connection.name.to_json() for connection in self._connections
-            ],
-            "_target_values": self._target_values,
-        }
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        world: World = kwargs["world"]
-        connections = [
-            world.get_connection_by_name(PrefixedName.from_json(name, **kwargs))
-            for name in data["_connections"]
-        ]
-        target_values = data["_target_values"]
-        return cls.from_lists(connections, target_values)
+from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.exceptions import NodeInitializationError
+from giskardpy.motion_statechart.graph_node import NodeArtifacts
+from giskardpy.motion_statechart.graph_node import Task
 
 
 @dataclass(eq=False, repr=False)
 class JointPositionList(Task):
-    goal_state: JointState = field(kw_only=True)
-    threshold: float = field(default=0.01, kw_only=True)
-    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
-    max_velocity: float = field(default=1.0, kw_only=True)
+    """
+    Moves the robot to a given joint position.
+    """
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    goal_state: JointState = field(kw_only=True)
+    """
+    The goal joint state.
+    """
+    threshold: float = field(default=0.01, kw_only=True)
+    """
+    If all joint position errors are smaller than this threshold, the task's observation state is true.
+    """
+    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
+    """
+    The weight of this task.
+    """
+    max_velocity: float = field(default=1.0, kw_only=True)
+    """
+    The maximum velocity of the joints.
+    """
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         if len(self.goal_state) == 0:
             raise NodeInitializationError(node=self, reason="empty goal_state")
 
@@ -100,7 +63,7 @@ class JointPositionList(Task):
                 name=str(connection.name),
                 reference_velocity=velocity,
                 equality_bound=error,
-                weight=self.weight,
+                quadratic_weight=self.weight,
                 task_expression=current,
             )
             errors.append(sm.abs(error) < self.threshold)
@@ -110,8 +73,8 @@ class JointPositionList(Task):
     def apply_limits_to_target(
         self, target: float, connection: ActiveConnection1DOF
     ) -> sm.Scalar:
-        ul_pos = connection.dof.upper_limits.position
-        ll_pos = connection.dof.lower_limits.position
+        ul_pos = connection.dof.limits.upper.position
+        ll_pos = connection.dof.limits.lower.position
         if ll_pos is not None:
             target = sm.limit(target, ll_pos, ul_pos)
         return target
@@ -119,66 +82,9 @@ class JointPositionList(Task):
     def apply_limits_to_velocity(
         self, velocity: float, connection: ActiveConnection1DOF
     ) -> sm.Scalar:
-        ul_vel = connection.dof.upper_limits.velocity
-        ll_vel = connection.dof.lower_limits.velocity
+        ul_vel = connection.dof.limits.upper.velocity
+        ll_vel = connection.dof.limits.lower.velocity
         return sm.limit(velocity, ll_vel, ul_vel)
-
-
-@dataclass
-class MirrorJointPosition(Task):
-    mapping: Dict[Union[PrefixedName, str], str] = field(default_factory=lambda: dict)
-    threshold: float = 0.01
-    weight: Optional[float] = None
-    max_velocity: Optional[float] = None
-
-    def __post_init__(self):
-        if self.weight is None:
-            self.weight = DefaultWeights.WEIGHT_BELOW_CA
-        if self.max_velocity is None:
-            self.max_velocity = 1.0
-        self.current_positions = []
-        self.goal_positions = []
-        self.velocity_limits = []
-        self.connections = []
-        goal_state = {}
-        for joint_name, target_joint_name in self.mapping.items():
-            connection = context.world.get_connection_by_name(joint_name)
-            self.connections.append(connection)
-            target_connection = context.world.get_connection_by_name(target_joint_name)
-
-            ll_vel = connection.dof.lower_limits
-            ul_vel = connection.dof.upper_limits
-            velocity_limit = sm.limit(self.max_velocity, ll_vel, ul_vel)
-            self.current_positions.append(connection.position)
-            self.goal_positions.append(target_connection.position)
-            self.velocity_limits.append(velocity_limit)
-            goal_state[joint_name.name] = self.goal_positions[-1]
-
-        for connection, current, goal, velocity_limit in zip(
-            self.connections,
-            self.current_positions,
-            self.goal_positions,
-            self.velocity_limits,
-        ):
-            if (
-                isinstance(connection, RevoluteConnection)
-                and not connection.dof.has_position_limits()
-            ):
-                error = sm.shortest_angular_distance(current, goal)
-            else:
-                error = goal - current
-
-            self.add_equality_constraint(
-                name=f"{self.name}/{connection.name}",
-                reference_velocity=velocity_limit,
-                equality_bound=0,
-                weight=self.weight,
-                task_expression=error,
-            )
-        joint_monitor = JointGoalReached(
-            goal_state=goal_state, threshold=self.threshold
-        )
-        self.observation_expression = joint_monitor.observation_expression
 
 
 @dataclass
@@ -213,15 +119,15 @@ class JointPositionLimitList(Task):
             )
             self.connections.append(connection)
 
-            ll_pos = connection.dof.lower_limits.position
-            ul_pos = connection.dof.upper_limits.position
+            ll_pos = connection.dof.limits.lower.position
+            ul_pos = connection.dof.limits.upper.position
 
             if ll_pos is not None:
                 lower_limit = min(ul_pos, max(ll_pos, lower_limit))
                 upper_limit = min(ul_pos, max(ll_pos, upper_limit))
 
-            ll_vel = connection.dof.lower_limits.velocity
-            ul_vel = connection.dof.upper_limits.velocity
+            ll_vel = connection.dof.limits.lower.velocity
+            ul_vel = connection.dof.limits.upper.velocity
 
             velocity_limit = min(ul_vel, max(ll_vel, self.max_velocity))
 
@@ -363,7 +269,7 @@ class JointVelocity(Task):
         for connection in self.connections:
             current_joint = connection.dof.variables.position
             try:
-                limit_expr = connection.dof.upper_limits.velocity
+                limit_expr = connection.dof.limits.upper.velocity
                 max_velocity = sm.min(self.max_velocity, limit_expr)
             except IndexError:
                 max_velocity = self.max_velocity
@@ -399,9 +305,9 @@ class AvoidJointLimits(Task):
                 weight = self.weight
                 connection_symbol = connection.dof.variables.position
                 percentage = self.percentage / 100.0
-                lower_limit = connection.dof.lower_limits.position
-                upper_limit = connection.dof.upper_limits.position
-                max_velocity = sm.min(100, connection.dof.upper_limits.velocity)
+                lower_limit = connection.dof.limits.lower.position
+                upper_limit = connection.dof.limits.upper.position
+                max_velocity = sm.min(100, connection.dof.limits.upper.velocity)
 
                 joint_range = upper_limit - lower_limit
                 center = (upper_limit + lower_limit) / 2.0

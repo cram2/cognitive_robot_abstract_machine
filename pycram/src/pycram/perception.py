@@ -50,7 +50,7 @@ class PerceptionQuery:
                 [
                     (
                         body
-                        if self.region.contains(body.global_pose.to_position())
+                        if self.region.contains(body.global_transform.to_position())
                         else None
                     )
                     for body in bodies

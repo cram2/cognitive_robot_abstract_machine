@@ -1,12 +1,14 @@
 import matplotlib
 
+from giskardpy.motion_statechart.context import MotionStatechartContext
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pytest
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from giskardpy.motion_statechart.monitors.payload_monitors import CountTicks
+from giskardpy.motion_statechart.monitors.payload_monitors import CountControlCycles
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.plotters.gantt_chart_plotter import (
     HistoryGanttChartPlotter,
@@ -58,11 +60,11 @@ def _render_and_capture_axes(plotter: HistoryGanttChartPlotter, monkeypatch):
 def test_main_and_final_widths_control_cycles(monkeypatch, ticks):
     # Build a small statechart that runs for `ticks` control cycles
     msc = MotionStatechart()
-    counter = CountTicks(ticks=ticks)
+    counter = CountControlCycles(control_cycles=ticks)
     msc.add_node(counter)
     msc.add_node(EndMotion.when_true(counter))
 
-    kin = Executor(world=World())
+    kin = Executor(context=MotionStatechartContext(world=World()))
     kin.compile(msc)
     kin.tick_until_end(ticks + 5)
 
@@ -99,7 +101,7 @@ def test_long_labels_not_clipped_on_right(monkeypatch):
     msc.add_nodes([n1, n2])
     msc.add_node(EndMotion.when_true(n2))
 
-    kin = Executor(world=World())
+    kin = Executor(context=MotionStatechartContext(world=World()))
     kin.compile(msc)
     kin.tick()
 
@@ -117,11 +119,11 @@ def test_long_labels_not_clipped_on_right(monkeypatch):
 
 def test_x_axis_units_control_cycles_vs_seconds(monkeypatch):
     msc = MotionStatechart()
-    counter = CountTicks(ticks=5)
+    counter = CountControlCycles(control_cycles=5)
     msc.add_nodes([counter])
     msc.add_node(EndMotion.when_true(counter))
 
-    kin = Executor(world=World())
+    kin = Executor(context=MotionStatechartContext(world=World()))
     kin.compile(msc)
     kin.tick_until_end()
 
@@ -133,7 +135,7 @@ def test_x_axis_units_control_cycles_vs_seconds(monkeypatch):
     assert tuple(ax_main_cycles.get_xlim())[0] == 0.0
 
     # Seconds (with context)
-    context = kin.build_context
+    context = kin.context
     plotter_seconds = HistoryGanttChartPlotter(
         msc, context=context, second_width_in_cm=2.0
     )
@@ -155,7 +157,7 @@ def test_tree_glyphs_in_labels(monkeypatch):
     msc.add_nodes([root1, nested])
     msc.add_node(EndMotion.when_true(root1))
 
-    kin = Executor(world=World())
+    kin = Executor(context=MotionStatechartContext(world=World()))
     kin.compile(msc)
     kin.tick()
 

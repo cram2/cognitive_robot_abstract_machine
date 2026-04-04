@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import List, Type, Union
 
-from ..reasoning.predicates import LeftOf, RightOf
-from ..robots.abstract_robot import Neck, Arm
+from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
+from semantic_digital_twin.robots.abstract_robot import Neck, Arm
 
 
 @dataclass
@@ -83,17 +83,29 @@ class SpecifiesLeftRightArm(HasArms, ABC):
         assert (
             len(self.arms) == 2
         ), f"Must have exactly two arms to specify left and right arm, but found {len(self.arms)}."
-        pov = self.root.global_pose
+        pov = self.root.global_transform
         first_arm = self.arms[0]
         second_arm = self.arms[1]
-        first_arm_chain = list(first_arm.bodies)
-        second_arm_chain = list(second_arm.bodies)
+        # the arms may share a root, but the first body after the root should be different
+        first_arm_body_after_root = list(first_arm.bodies)[1]
+        world_P_first_body = (
+            first_arm_body_after_root.center_of_mass
+            if first_arm_body_after_root.has_collision()
+            else first_arm_body_after_root.global_transform.to_position()
+        )
+
+        second_arm_body_after_root = list(second_arm.bodies)[1]
+        world_P_second_body = (
+            second_arm_body_after_root.center_of_mass
+            if second_arm_body_after_root.has_collision()
+            else second_arm_body_after_root.global_transform.to_position()
+        )
 
         return (
             first_arm
             if relation(
-                first_arm_chain[1],
-                second_arm_chain[1],
+                world_P_first_body,
+                world_P_second_body,
                 pov,
             )()
             else second_arm

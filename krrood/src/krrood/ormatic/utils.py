@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import datetime
+import importlib
 import inspect
 import json
+import logging
+import pkgutil
 import types
 from contextlib import suppress
 from enum import Enum
-from types import ModuleType
+from functools import lru_cache
+from typing import Type, Dict, Any
 
 import sqlalchemy
 from sqlalchemy import (
@@ -15,22 +19,19 @@ from sqlalchemy import (
     MetaData,
     create_engine as create_sqlalchemy_engine,
     URL,
+    Column,
 )
-from sqlalchemy.orm import DeclarativeBase
 from typing_extensions import (
     TypeVar,
-    _SpecialForm,
     Type,
     List,
     Iterable,
     Union,
-    Tuple,
-    Dict,
     Any,
+    get_type_hints,
 )
 
-from .dao import AlternativeMapping, DataAccessObject
-from ..adapters.json_serializer import to_json, from_json
+from krrood.adapters.json_serializer import to_json, from_json
 
 
 class classproperty:
@@ -60,9 +61,42 @@ def classes_of_module(module: types.ModuleType) -> List[Type]:
     return result
 
 
+def classes_of_package(package: types.ModuleType, recursive=True) -> List[Type]:
+    """
+    Get all classes that are defined in a given python package.
+    This does not include classes that are imported from other packages.
+
+    :param package: The package to inspect.
+    :param recursive: Whether to include classes from sub-packages.
+    :return: All classes of the given package.
+    """
+    result = classes_of_module(package)
+
+    for loader, modname, ispkg in pkgutil.walk_packages(
+        package.__path__, package.__name__ + "."
+    ):
+        if not recursive and modname.count(".") > package.__name__.count(".") + 1:
+            continue
+
+        try:
+            module = importlib.import_module(modname)
+        except Exception:
+            logging.warning(f"Module {modname} cannot be parsed")
+            continue
+        result.extend(classes_of_module(module))
+
+        if not recursive and ispkg:
+            # If not recursive, we don't want to descend into sub-packages
+            # walk_packages with path restricted usually handles this,
+            # but if we only want the immediate next level:
+            pass
+
+    return result
+
+
 T = TypeVar("T")
 
-leaf_types = (int, float, str, Enum, datetime.datetime, bool)
+leaf_types = (int, float, str, Enum, datetime.datetime, bool, type(Ellipsis))
 
 
 def _drop_fk_constraints(engine: Engine, tables: Iterable[str]) -> None:
@@ -104,7 +138,7 @@ def drop_database(engine: Engine) -> None:
      dropping of objects occurs without conflict. For MySQL/MariaDB, foreign key
     checks are disabled temporarily during the process.
 
-     This method differs from sqlalchemy `MetaData.drop_all <https://docs.sqlalchemy.org/en/20/core/metadata.html#sqlalchemy.schema.MetaData.drop_all>`_\ such that databases containing cyclic
+     This method differs from sqlalchemy `MetaData.drop_all <https://docs.sqlalchemy.org/en/20/core/metadata.html#sqlalchemy.schema.MetaData.drop_all>`_ such that databases containing cyclic
      backreferences are also droppable.
 
      :param engine: The SQLAlchemy Engine instance connected to the target database
@@ -142,10 +176,6 @@ class InheritanceStrategy(Enum):
     SINGLE = "single"
 
 
-def module_and_class_name(t: Union[Type, _SpecialForm]) -> str:
-    return f"{t.__module__}.{t.__name__}"
-
-
 def is_direct_subclass(cls: Type, *bases: Type) -> bool:
     """
     :param cls: The class to check.
@@ -156,40 +186,6 @@ def is_direct_subclass(cls: Type, *bases: Type) -> bool:
     return cls in bases or (set(cls.__bases__) & set(bases))
 
 
-def get_classes_of_ormatic_interface(
-    interface: ModuleType,
-) -> Tuple[List[Type], List[Type[AlternativeMapping]], Dict]:
-    """
-    Get all classes and alternative mappings of an existing ormatic interface.
-
-    :param interface: The ormatic interface to extract the information from.
-    :return: A list of classes and a list of alternative mappings used in the interface.
-    """
-    classes = []
-    alternative_mappings = []
-    classes_of_ormatic_interface = classes_of_module(interface)
-    type_mappings = {}
-
-    for cls in filter(
-        lambda x: issubclass(x, DataAccessObject), classes_of_ormatic_interface
-    ):
-        original_class = cls.original_class()
-
-        if issubclass(original_class, AlternativeMapping):
-            alternative_mappings.append(original_class)
-            classes.append(original_class.original_class())
-        else:
-            classes.append(original_class)
-
-    # get the type mappings from the direct subclass of declarative base
-    for cls in filter(
-        lambda x: is_direct_subclass(x, DeclarativeBase), classes_of_ormatic_interface
-    ):
-        type_mappings.update(cls.type_mappings)
-
-    return classes, alternative_mappings, type_mappings
-
-
 def create_engine(url: Union[str, URL], **kwargs: Any) -> Engine:
     """
     Check https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine for more information.
@@ -197,9 +193,35 @@ def create_engine(url: Union[str, URL], **kwargs: Any) -> Engine:
     :param url: The database URL.
     :return: An SQLAlchemy engine that uses the JSON (de)serializer from KRROOD.
     """
+
     return create_sqlalchemy_engine(
         url,
         json_serializer=lambda x: json.dumps(to_json(x)),
         json_deserializer=lambda x: from_json(json.loads(x)),
         **kwargs,
     )
+
+
+def is_data_column(column: Column) -> bool:
+    """
+    Check if a column contains data.
+
+    :param column: The SQLAlchemy column to check.
+    :return: True if it is a data column.
+    """
+    return (
+        not column.primary_key
+        and len(column.foreign_keys) == 0
+        and column.name != "polymorphic_type"
+    )
+
+
+@lru_cache(maxsize=None)
+def _get_type_hints_cached(clazz: Type) -> Dict[str, Any]:
+    """
+    Get type hints for a class.
+    """
+    try:
+        return get_type_hints(clazz)
+    except Exception:
+        return {}

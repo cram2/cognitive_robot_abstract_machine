@@ -2,10 +2,9 @@ import os
 
 import pytest
 
-from krrood.entity_query_language.entity import entity, variable
-from krrood.entity_query_language.entity_result_processors import an
-from krrood.entity_query_language.symbol_graph import SymbolGraph
-from ..dataset.example_classes import Position
+from krrood.entity_query_language.factories import entity, variable, an
+from krrood.symbol_graph.symbol_graph import SymbolGraph
+from ..dataset.example_classes import KRROODPosition
 
 try:
     import pydot
@@ -33,12 +32,12 @@ def test_memory_leak():
     """
 
     def create_data():
-        point = Position(1, 2, 3)
+        point = KRROODPosition(1, 2, 3)
         return point
 
     create_data()
 
-    q = an(entity(variable(Position, domain=None)))
+    q = an(entity(variable(KRROODPosition, domain=None)))
     result = list(q.evaluate())
 
     assert result == []

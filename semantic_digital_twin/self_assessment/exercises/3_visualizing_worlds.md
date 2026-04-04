@@ -26,9 +26,8 @@ You will:
 :tags: [remove-input]
 import os
 import logging
-
+from pkg_resources import resource_filename
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.utils import get_semantic_digital_twin_directory_root
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 
 logging.disable(logging.CRITICAL)
@@ -36,15 +35,16 @@ logging.disable(logging.CRITICAL)
 
 ## 1. Visualize 
 Your goal:
+- Construct a `TFPublisher` for the loaded world and store it in a variable named `tf_publisher`
 - Construct a `VizMarkerPublisher` for the loaded world and store it in a variable named `viz`
 
 ```{code-cell} ipython3
 :tags: [exercise]
-root = get_semantic_digital_twin_directory_root(os.getcwd())
+root = resource_filename("semantic_digital_twin", "../../")
 table_urdf = os.path.join(root, "resources", "urdf", "table.urdf")
 world = URDFParser.from_file(table_urdf).parse()
 
-from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 import threading
 import rclpy
 
@@ -54,11 +54,12 @@ viz = ...
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-root = get_semantic_digital_twin_directory_root(os.getcwd())
+root = resource_filename("semantic_digital_twin", "../../")
 table_urdf = os.path.join(root, "resources", "urdf", "table.urdf")
 world = URDFParser.from_file(table_urdf).parse()
 
-from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 import threading
 import rclpy
 rclpy.init()
@@ -67,12 +68,14 @@ node = rclpy.create_node("semantic_digital_twin")
 thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
 thread.start()
 
-viz = VizMarkerPublisher(world=world, node=node)
+tf_publisher = TFPublisher(_world=world, node=node)
+viz = VizMarkerPublisher(_world=world, node=node)
 ```
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 
 assert viz is not ..., "Instantiate a VizMarkerPublisher and assign it to `viz`."
+assert isinstance(tf_publisher, TFPublisher), "Make sure you are using the TFPublisher"
 assert isinstance(viz, VizMarkerPublisher), "Make sure you are using the VizMarkerPublisher"
 ```

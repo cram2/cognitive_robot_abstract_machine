@@ -5,24 +5,24 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Tuple, List
 
-from typing_extensions import Union, Optional, Type, Dict, Any, Iterable
+from typing_extensions import Optional, Dict, Any
 
-from ....datastructures.enums import AxisIdentifier
-from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import Vector3Stamped
-from ....failures import TorsoGoalNotReached, ConfigurationNotReached
-from ....has_parameters import has_parameters
-from ....language import SequentialPlan
-from ....robot_description import RobotDescription
-from ....robot_descriptions.pr2_states import *
-from ....robot_descriptions.hsrb_states import *
-from ....robot_plans.actions.base import ActionDescription
-from ....robot_plans.motions.gripper import MoveGripperMotion
-from ....robot_plans.motions.robot_body import MoveJointsMotion
-from ....validation.goal_validator import create_multiple_joint_goal_validator
+from pycram.datastructures.enums import AxisIdentifier, Arms
+
+from pycram.datastructures.trajectory import PoseTrajectory
+from pycram.plans.factories import execute_single, sequential
+from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.motions.gripper import MoveGripperMotion, MoveTCPWaypointsMotion
+from pycram.robot_plans.motions.robot_body import MoveJointsMotion
+from pycram.validation.goal_validator import create_multiple_joint_goal_validator
+from pycram.view_manager import ViewManager
+from semantic_digital_twin.datastructures.definitions import (
+    TorsoState,
+    GripperState,
+    StaticJointState,
+)
 
 
-@has_parameters
 @dataclass
 class MoveTorsoAction(ActionDescription):
     """
@@ -35,12 +35,14 @@ class MoveTorsoAction(ActionDescription):
     """
 
     def execute(self) -> None:
-        jm = JointStateManager()
-        joint_state = jm.get_joint_state(self.torso_state, self.robot_view)[0]
-
-        SequentialPlan(
-            self.context,
-            MoveJointsMotion(joint_state.joint_names, joint_state.joint_positions),
+        joint_state = self.robot.torso.get_joint_state_by_type(self.torso_state)
+        self.add_subplan(
+            execute_single(
+                MoveJointsMotion(
+                    [c.name.name for c in joint_state.connections],
+                    joint_state.target_values,
+                ),
+            )
         ).perform()
 
     def validate(
@@ -66,14 +68,7 @@ class MoveTorsoAction(ActionDescription):
         if not validator.goal_achieved:
             raise TorsoGoalNotReached(validator)
 
-    @classmethod
-    def description(
-        cls, torso_state: Union[Iterable[TorsoState], TorsoState]
-    ) -> PartialDesignator[Type[MoveTorsoAction]]:
-        return PartialDesignator(MoveTorsoAction, torso_state=torso_state)
 
-
-@has_parameters
 @dataclass
 class SetGripperAction(ActionDescription):
     """
@@ -84,17 +79,18 @@ class SetGripperAction(ActionDescription):
     """
     The gripper that should be set 
     """
-    motion: GripperStateEnum
+    motion: GripperState
     """
     The motion that should be set on the gripper
     """
 
     def execute(self) -> None:
         arms = [Arms.LEFT, Arms.RIGHT] if self.gripper == Arms.BOTH else [self.gripper]
-        for arm in arms:
-            SequentialPlan(
-                self.context, MoveGripperMotion(gripper=arm, motion=self.motion)
-            ).perform()
+        self.add_subplan(
+            sequential(
+                [MoveGripperMotion(gripper=arm, motion=self.motion) for arm in arms]
+            )
+        ).perform()
 
     def validate(
         self,
@@ -106,16 +102,7 @@ class SetGripperAction(ActionDescription):
         """
         pass
 
-    @classmethod
-    def description(
-        cls,
-        gripper: Union[Iterable[Arms], Arms],
-        motion: Union[Iterable[GripperState], GripperState] = None,
-    ) -> PartialDesignator[Type[SetGripperAction]]:
-        return PartialDesignator(SetGripperAction, gripper=gripper, motion=motion)
 
-
-@has_parameters
 @dataclass
 class ParkArmsAction(ActionDescription):
     """
@@ -130,17 +117,22 @@ class ParkArmsAction(ActionDescription):
     def execute(self) -> None:
         joint_names, joint_poses = self.get_joint_poses()
 
-        SequentialPlan(
-            self.context, MoveJointsMotion(names=joint_names, positions=joint_poses)
+        self.add_subplan(
+            execute_single(MoveJointsMotion(names=joint_names, positions=joint_poses))
         ).perform()
 
     def get_joint_poses(self) -> Tuple[List[str], List[float]]:
         """
         :return: The joint positions that should be set for the arm to be in the park position.
         """
-        jm = JointStateManager()
-        park_state = jm.get_arm_state(self.arm, StaticJointState.Park, self.robot_view)
-        return park_state.joint_names, park_state.joint_positions
+        arm_chain = ViewManager().get_all_arm_views(self.arm, self.robot)
+        names = []
+        values = []
+        for arm in arm_chain:
+            joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
+            names.extend([c.name.name for c in joint_state.connections])
+            values.extend(joint_state.target_values)
+        return names, values
 
     def validate(
         self,
@@ -162,14 +154,7 @@ class ParkArmsAction(ActionDescription):
                 validator, configuration_type=StaticJointState.Park
             )
 
-    @classmethod
-    def description(
-        cls, arm: Union[Iterable[Arms], Arms]
-    ) -> PartialDesignator[Type[ParkArmsAction]]:
-        return PartialDesignator(cls, arm=arm)
 
-
-@has_parameters
 @dataclass
 class CarryAction(ActionDescription):
     """
@@ -211,17 +196,18 @@ class CarryAction(ActionDescription):
         tip_normal = self.axis_to_vector3_stamped(self.tip_axis, link=self.tip_link)
         root_normal = self.axis_to_vector3_stamped(self.root_axis, link=self.root_link)
 
-        SequentialPlan(
-            self.context,
-            MoveJointsMotion(
-                names=list(joint_poses.keys()),
-                positions=list(joint_poses.values()),
-                align=self.align,
-                tip_link=self.tip_link,
-                tip_normal=tip_normal,
-                root_link=self.root_link,
-                root_normal=root_normal,
-            ),
+        self.add_subplan(
+            execute_single(
+                MoveJointsMotion(
+                    names=list(joint_poses.keys()),
+                    positions=list(joint_poses.values()),
+                    align=self.align,
+                    tip_link=self.tip_link,
+                    tip_normal=tip_normal,
+                    root_link=self.root_link,
+                    root_normal=root_normal,
+                )
+            )
         ).perform()
 
     def get_joint_poses(self) -> Dict[str, float]:
@@ -243,14 +229,13 @@ class CarryAction(ActionDescription):
 
     def axis_to_vector3_stamped(
         self, axis: AxisIdentifier, link: str = "base_link"
-    ) -> Vector3Stamped:
+    ) -> Vector3:
         v = {
-            AxisIdentifier.X: Vector3Stamped(x=1.0, y=0.0, z=0.0),
-            AxisIdentifier.Y: Vector3Stamped(x=0.0, y=1.0, z=0.0),
-            AxisIdentifier.Z: Vector3Stamped(x=0.0, y=0.0, z=1.0),
+            AxisIdentifier.X: Vector3(x=1.0, y=0.0, z=0.0),
+            AxisIdentifier.Y: Vector3(x=0.0, y=1.0, z=0.0),
+            AxisIdentifier.Z: Vector3(x=0.0, y=0.0, z=1.0),
         }[axis]
         v.frame_id = link
-        v.header.stamp = datetime.datetime.now()
         return v
 
     def validate(
@@ -273,28 +258,38 @@ class CarryAction(ActionDescription):
                 validator, configuration_type=StaticJointState.Park
             )
 
-    @classmethod
-    def description(
-        cls,
-        arm: Union[Iterable[Arms], Arms],
-        align: Optional[bool] = False,
-        tip_link: Optional[str] = None,
-        tip_axis: Optional[AxisIdentifier] = None,
-        root_link: Optional[str] = None,
-        root_axis: Optional[AxisIdentifier] = None,
-    ) -> PartialDesignator[Type[CarryAction]]:
-        return PartialDesignator(
-            cls,
-            arm=arm,
-            align=align,
-            tip_link=tip_link,
-            tip_axis=tip_axis,
-            root_link=root_link,
-            root_axis=root_axis,
+
+@dataclass
+class FollowToolCenterPointPathAction(ActionDescription):
+    """
+    Represents an action to move a robotic arm's TCP (Tool Center Point) along a
+    path of poses.
+    """
+
+    target_locations: PoseTrajectory
+    """
+    Path poses for the TCP motion.
+    """
+
+    arm: Arms
+    """
+    Entry from the enum for which arm should be parked.
+    """
+
+    def execute(self) -> None:
+        target_locations = list(self.target_locations.poses)
+
+        motion = MoveTCPWaypointsMotion(
+            target_locations,
+            self.arm,
+            allow_gripper_collision=True,
         )
 
+        self.add_subplan(execute_single(motion)).perform()
 
-MoveTorsoActionDescription = MoveTorsoAction.description
-SetGripperActionDescription = SetGripperAction.description
-ParkArmsActionDescription = ParkArmsAction.description
-CarryActionDescription = CarryAction.description
+    def validate(
+        self,
+        result: Optional[Any] = None,
+        max_wait_time: timedelta = timedelta(seconds=2),
+    ):
+        pass

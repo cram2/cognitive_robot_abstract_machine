@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from krrood.entity_query_language.predicate import Symbol
+from krrood.symbol_graph.symbol_graph import Symbol
 
 
 @dataclass

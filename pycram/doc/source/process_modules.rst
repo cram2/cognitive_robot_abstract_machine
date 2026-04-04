@@ -66,7 +66,7 @@ Obtaining a Manager from Plans
 ------------------------------
 Motion designators delegate to the manager at execution time. For instance,
 ``robot_plans.motions.robot_body.MoveJointsMotion.perform`` retrieves a manager with
-``ProcessModuleManager().get_manager(self.robot_view)`` and then calls the appropriate module’s ``execute`` method.
+``ProcessModuleManager().get_manager(self.robot)`` and then calls the appropriate module’s ``execute`` method.
 This keeps designators stateless and allows the manager to inject the right execution behavior based on the current
 robot and context without changing plan code.
 

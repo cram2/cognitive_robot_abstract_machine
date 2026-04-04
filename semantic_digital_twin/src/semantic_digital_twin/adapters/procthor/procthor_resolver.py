@@ -8,16 +8,16 @@ from typing import Optional, Type
 from typing_extensions import List
 
 from semantic_digital_twin.semantic_annotations.mixins import (
-    HasBody,
+    HasRootBody,
 )
-from ...world_description.world_entity import SemanticAnnotation
+from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
 
 @dataclass
 class ProcthorResolver:
     """Central resolver that deterministically maps a ProcTHOR name to exactly one class."""
 
-    classes: List[Type[HasBody]] = field(default_factory=list)
+    classes: List[Type[HasRootBody]] = field(default_factory=list)
 
     def resolve(self, name: str) -> Optional[Type[SemanticAnnotation]]:
         """

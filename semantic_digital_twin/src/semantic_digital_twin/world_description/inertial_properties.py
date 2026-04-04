@@ -1,35 +1,44 @@
 from __future__ import annotations
-
 from dataclasses import dataclass, field
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, Any
 
 import numpy as np
 from numpy._typing import NDArray
 from typing_extensions import Self, TypeVar
 
-from ..spatial_types import Point3, RotationMatrix
+from krrood.adapters.json_serializer import SubclassJSONSerializer
+from semantic_digital_twin.spatial_types import Point3, RotationMatrix
 
 
 @dataclass
-class NPMatrix3x3:
-    data: NDArray
+class NPMatrix3x3(SubclassJSONSerializer):
+    data: Optional[NDArray] = None
 
     def __post_init__(self):
-        assert self.data.shape == (3, 3), "Matrix must be 3x3"
+        if self.data is not None:
+            assert self.data.shape == (3, 3), "Matrix must be 3x3"
 
     def __matmul__(self, other: GenericMatrix3x3Type) -> GenericMatrix3x3Type:
         return NPMatrix3x3(data=self.data @ other.data)
+
+    def to_json(self) -> Dict[str, Any]:
+        return {**super().to_json(), "data": self.data.tolist()}
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(data=np.array(data["data"]))
 
 
 GenericMatrix3x3Type = TypeVar("GenericMatrix3x3Type", bound=NPMatrix3x3)
 
 
 @dataclass
-class NPVector3:
-    data: NDArray
+class NPVector3(SubclassJSONSerializer):
+    data: Optional[NDArray] = None
 
     def __post_init__(self):
-        assert self.data.shape == (3,), "Vector must be 3-dimensional"
+        if self.data is not None:
+            assert self.data.shape == (3,), "Vector must be 3-dimensional"
 
     @classmethod
     def from_values(cls, x: float, y: float, z: float) -> Self:
@@ -43,6 +52,13 @@ class NPVector3:
     def as_matrix(self) -> NPMatrix3x3:
         """Return a 3x3 matrix with the vector on the diagonal."""
         return NPMatrix3x3(data=np.diag(self.data))
+
+    def to_json(self) -> Dict[str, Any]:
+        return {**super().to_json(), "data": self.data.tolist()}
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        return cls(data=np.array(data["data"]))
 
 
 @dataclass(eq=False)
@@ -101,6 +117,8 @@ class InertiaTensor(NPMatrix3x3):
 
     def __post_init__(self):
         super().__post_init__()
+        if self.data is None:
+            return
         diag = np.diag(self.data)
         assert np.all(
             diag >= 0.0

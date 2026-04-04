@@ -3,13 +3,12 @@ import logging
 from threading import Lock, RLock
 from typing import Any
 
-from ..ros import create_action_client
-from ..ros import get_node_names
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from pycram.ros import create_action_client
+from pycram.ros import get_node_names
 
 from typing_extensions import List, Callable, Optional
 
-from ..datastructures.pose import PoseStamped
-from ..designator import ObjectDesignatorDescription
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +148,7 @@ def query_all_objects() -> dict:
 
 
 @init_robokudo_interface
-def query_object(obj_desc: ObjectDesignatorDescription) -> dict:
+def query_object(obj_desc: Any) -> dict:
     """Query RoboKudo for an object that fits the description."""
     goal = QueryGoal()
     goal.obj.type = str(obj_desc.types[0])
@@ -189,12 +188,12 @@ def query_human_attributes() -> Any:
 
 
 @init_robokudo_interface
-def query_waving_human() -> PoseStamped:
+def query_waving_human() -> Pose:
     """Query RoboKudo for detecting a waving human."""
     result = send_query(obj_type="human")
     if result and result.res:
         try:
-            pose = PoseStamped.from_pose_stamped(result.res[0].pose[0])
+            pose = Pose.from_pose_stamped(result.res[0].pose[0])
             return pose
         except IndexError:
             pass

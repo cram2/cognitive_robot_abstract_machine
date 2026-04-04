@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .utils import T
+from krrood.entity_query_language.utils import T, ensure_hashable
 
 """
 Cache utilities.
@@ -36,10 +36,17 @@ class SeenSet:
             # Empty constraint means everything is covered
             self.all_seen = True
             return
+
+        if self.keys:
+            assignment = {k: v for k, v in assignment.items() if k in self.keys}
+        else:
+            assignment = dict(assignment)
+
         # Maintain exact-match set only when all keys are present
         if self.keys and all(k in assignment for k in self.keys):
-            self.exact.add(tuple(assignment[k] for k in self.keys))
-        self.constraints.append(dict(assignment))
+            self.exact.add(tuple(ensure_hashable(assignment[k]) for k in self.keys))
+
+        self.constraints.append(assignment)
 
     def check(self, assignment: Dict) -> bool:
         """
@@ -56,8 +63,8 @@ class SeenSet:
             return False
 
         # Fast exact-key path when all keys are present
-        if self.exact_contains(assignment):
-            return True
+        if self.keys and all(k in assignment for k in self.keys):
+            return self.exact_contains(assignment)
 
         # Fallback to coverage check using constraints
         for constraint in self.constraints:
@@ -74,10 +81,9 @@ class SeenSet:
         exists in the cache. This is an O(1) membership test and does not consult
         the coverage trie.
         """
-        if self.keys and all(k in assignment for k in self.keys):
-            t = tuple(assignment[k] for k in self.keys)
-            if t in self.exact:
-                return True
+        t = tuple(ensure_hashable(assignment[k]) for k in self.keys)
+        if t in self.exact:
+            return True
         return False
 
     def clear(self):
@@ -114,14 +120,24 @@ class ReEnterableLazyIterable(Generic[T]):
 
     def __iter__(self):
         """
-        Iterate over the values, materializing them as they are iterated over.
+        Iterate over the values, materializing them as they are iterated over. This allows multiple iterations over
+        the iterable simultaneously, and it also allows for efficient access to previously materialized values.
 
         :return: An iterator over the values.
         """
-        yield from self.materialized_values
-        for v in self.iterable:
-            self.materialized_values.append(v)
-            yield v
+        index = 0
+        while True:
+            if index < len(self.materialized_values):
+                yield self.materialized_values[index]
+                index += 1
+            else:
+                try:
+                    v = next(self.iterable)
+                    self.materialized_values.append(v)
+                    yield v
+                    index += 1
+                except StopIteration:
+                    return
 
     def __bool__(self):
         """

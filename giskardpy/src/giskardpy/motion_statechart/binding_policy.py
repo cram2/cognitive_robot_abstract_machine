@@ -1,21 +1,18 @@
 from dataclasses import dataclass, field, InitVar
+from enum import Enum
 
-import numpy as np
-
-from giskardpy.motion_statechart.auxilary_variable_manager import (
-    AuxiliaryVariableManager,
-)
-from giskardpy.motion_statechart.context import BuildContext
-from giskardpy.utils.utils import JsonSerializableEnum
+from krrood.symbolic_math.float_variable_data import FloatVariableData
+from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from giskardpy.motion_statechart.context import MotionStatechartContext
 
 
-class GoalBindingPolicy(JsonSerializableEnum):
+class GoalBindingPolicy(Enum):
     """
     This policy should be used together with ForwardKinematicsBinding.
     """
@@ -39,8 +36,10 @@ class ForwardKinematicsBinding:
     ..warning:: Ensure to keep a reference to this instance in the MotionStatechartNode.
     """
 
-    build_context: InitVar[BuildContext]
-    """Current context of the build() of a MotionStatechartNode."""
+    float_variable_data: FloatVariableData
+    """
+    Reference to the FloatVariableData used for storing variables for the forward kinematics.
+    """
     name: PrefixedName
     """
     Name of the Binding. It is used for naming the auxiliary variables.
@@ -51,16 +50,20 @@ class ForwardKinematicsBinding:
     tip: KinematicStructureEntity
     """Tip of the kinematic chain."""
 
-    _root_T_tip_np: np.ndarray | None = field(init=False)
-    """The current state of the TransformationMatrix root_T_tip."""
     _root_T_tip_expr: HomogeneousTransformationMatrix | None = field(
         default=None, init=False
     )
     """The TransformationMatrix root_T_tip, represented using auxiliary variables."""
 
-    def __post_init__(self, build_context: BuildContext):
-        self.bind(build_context.world)
-        self._create_transformation_matrix(build_context.auxiliary_variable_manager)
+    def __post_init__(self):
+        self._root_T_tip_expr = HomogeneousTransformationMatrix.create_with_variables(
+            str(self.name)
+        )
+        self._root_T_tip_expr.reference_frame = self.root
+        self._root_T_tip_expr.child_frame = self.tip
+        self._matrix_index = self.float_variable_data.register_expression(
+            self._root_T_tip_expr
+        )
 
     @property
     def root_T_tip(self):
@@ -72,21 +75,6 @@ class ForwardKinematicsBinding:
         Call during on_start() etc. of a MotionStatechartNode.
         :param world: The world used for computing the forward kinematics.
         """
-        self._root_T_tip_np = world.compute_forward_kinematics_np(self.root, self.tip)
-
-    def _create_transformation_matrix(
-        self, auxiliary_variable_manager: AuxiliaryVariableManager
-    ) -> HomogeneousTransformationMatrix:
-        """
-        Creates the TransformationMatrix root_T_tip, represented using auxiliary variables.
-        :param auxiliary_variable_manager: The AuxiliaryVariableManager used for creating the auxiliary variables.
-        """
-        if self._root_T_tip_expr is None:
-            tm = auxiliary_variable_manager.create_transformation_matrix(
-                name=PrefixedName("root_T_tip", str(self.name)),
-                provider=lambda: self._root_T_tip_np,
-            )
-            tm.reference_frame = self.root
-            tm.child_frame = self.tip
-            self._root_T_tip_expr = tm
-        return self._root_T_tip_expr
+        root_T_tip = world.compute_forward_kinematics_np(self.root, self.tip)
+        root_T_tip_flat = root_T_tip[:3, :4].T.flatten()
+        self.float_variable_data.set_value(self._root_T_tip_expr, root_T_tip_flat)

@@ -2,8 +2,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import MultipleResultsFound
 
-from krrood.entity_query_language.failures import MultipleSolutionFound
-from ..dataset.example_classes import Position, Pose
+from krrood.entity_query_language.exceptions import MultipleSolutionFound
+from ..dataset.example_classes import KRROODPosition, KRROODPose
 from ..dataset.semantic_world_like_classes import (
     World,
     Body,
@@ -13,53 +13,54 @@ from ..dataset.semantic_world_like_classes import (
     Container,
 )
 from ..dataset.ormatic_interface import (
-    PositionDAO,
-    PoseDAO,
-    OrientationDAO,
+    KRROODPositionDAO,
+    KRROODPoseDAO,
+    KRROODOrientationDAO,
     FixedConnectionDAO,
     PrismaticConnectionDAO,
     BodyDAO,
 )
-from krrood.entity_query_language.entity import (
-    variable,
+from krrood.entity_query_language.factories import (
     entity,
-    contains,
+    variable,
     and_,
     or_,
+    contains,
     in_,
+    an,
+    the,
 )
-from krrood.entity_query_language.entity_result_processors import an, the
-from krrood.ormatic.dao import to_dao
+from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
 
 
 def test_translate_simple_greater(session, database):
-    session.add(PositionDAO(x=1, y=2, z=3))
-    session.add(PositionDAO(x=1, y=2, z=4))
+    session.add(KRROODPositionDAO(x=1, y=2, z=3))
+    session.add(KRROODPositionDAO(x=1, y=2, z=4))
     session.commit()
 
-    position = variable(type_=Position, domain=[])
+    position = variable(type_=KRROODPosition, domain=[])
     query = an(entity(position).where(position.z > 3))
 
     translator = eql_to_sql(query, session)
-    query_by_hand = select(PositionDAO).where(PositionDAO.z > 3)
+    query_by_hand = select(KRROODPositionDAO).where(KRROODPositionDAO.z > 3)
 
     assert str(translator.sql_query) == str(query_by_hand)
 
     results = translator.evaluate()
 
     assert len(results) == 1
-    assert isinstance(results[0], PositionDAO)
+    assert isinstance(results[0], KRROODPositionDAO)
     assert results[0].z == 4
 
 
 def test_translate_or_condition(session, database):
-    session.add(PositionDAO(x=1, y=2, z=3))
-    session.add(PositionDAO(x=1, y=2, z=4))
-    session.add(PositionDAO(x=2, y=9, z=10))
+    session.add(KRROODPositionDAO(x=1, y=2, z=3))
+    session.add(KRROODPositionDAO(x=1, y=2, z=4))
+    session.add(KRROODPositionDAO(x=2, y=9, z=10))
     session.commit()
 
-    position = variable(type_=Position, domain=[])
+    position = variable(type_=KRROODPosition, domain=[])
     query = an(
         entity(position).where(
             or_(position.z == 4, position.x == 2),
@@ -68,8 +69,8 @@ def test_translate_or_condition(session, database):
 
     translator = eql_to_sql(query, session)
 
-    query_by_hand = select(PositionDAO).where(
-        (PositionDAO.z == 4) | (PositionDAO.x == 2)
+    query_by_hand = select(KRROODPositionDAO).where(
+        (KRROODPositionDAO.z == 4) | (KRROODPositionDAO.x == 2)
     )
     assert str(translator.sql_query) == str(query_by_hand)
 
@@ -85,23 +86,27 @@ def test_translate_or_condition(session, database):
 
 def test_translate_join_one_to_one(session, database):
     session.add(
-        PoseDAO(
-            position=PositionDAO(x=1, y=2, z=3),
-            orientation=OrientationDAO(w=1.0, x=0.0, y=0.0, z=0.0),
+        KRROODPoseDAO(
+            position=KRROODPositionDAO(x=1, y=2, z=3),
+            orientation=KRROODOrientationDAO(w=1.0, x=0.0, y=0.0, z=0.0),
         )
     )
     session.add(
-        PoseDAO(
-            position=PositionDAO(x=1, y=2, z=4),
-            orientation=OrientationDAO(w=1.0, x=0.0, y=0.0, z=0.0),
+        KRROODPoseDAO(
+            position=KRROODPositionDAO(x=1, y=2, z=4),
+            orientation=KRROODOrientationDAO(w=1.0, x=0.0, y=0.0, z=0.0),
         )
     )
     session.commit()
 
-    pose = variable(type_=Pose, domain=[])
+    pose = variable(type_=KRROODPose, domain=[])
     query = an(entity(pose).where(pose.position.z > 3))
     translator = eql_to_sql(query, session)
-    query_by_hand = select(PoseDAO).join(PoseDAO.position).where(PositionDAO.z > 3)
+    query_by_hand = (
+        select(KRROODPoseDAO)
+        .join(KRROODPoseDAO.position)
+        .where(KRROODPositionDAO.z > 3)
+    )
 
     assert str(translator.sql_query) == str(query_by_hand)
 
@@ -109,18 +114,18 @@ def test_translate_join_one_to_one(session, database):
 
     # Assert: only the pose with position.z == 4 should match
     assert len(result) == 1
-    assert isinstance(result[0], PoseDAO)
+    assert isinstance(result[0], KRROODPoseDAO)
     assert result[0].position is not None
     assert result[0].position.z == 4
 
 
 def test_translate_in_operator(session, database):
-    session.add(PositionDAO(x=1, y=2, z=3))
-    session.add(PositionDAO(x=5, y=2, z=6))
-    session.add(PositionDAO(x=7, y=8, z=9))
+    session.add(KRROODPositionDAO(x=1, y=2, z=3))
+    session.add(KRROODPositionDAO(x=5, y=2, z=6))
+    session.add(KRROODPositionDAO(x=7, y=8, z=9))
     session.commit()
 
-    position = variable(Position, domain=[])
+    position = variable(KRROODPosition, domain=[])
     query = an(
         entity(position).where(
             in_(position.x, [1, 7]),
@@ -130,7 +135,7 @@ def test_translate_in_operator(session, database):
     # Act
     translator = eql_to_sql(query, session)
 
-    query_by_hand = select(PositionDAO).where(PositionDAO.x.in_([1, 7]))
+    query_by_hand = select(KRROODPositionDAO).where(KRROODPositionDAO.x.in_([1, 7]))
     assert str(translator.sql_query) == str(query_by_hand)
 
     result = translator.evaluate()
@@ -141,14 +146,14 @@ def test_translate_in_operator(session, database):
 
 
 def test_the_quantifier(session, database):
-    position_daos = [PositionDAO(x=1, y=2, z=3), PositionDAO(x=5, y=2, z=6)]
-    positions = [Position(x=dao.x, y=dao.y, z=dao.z) for dao in position_daos]
+    position_daos = [KRROODPositionDAO(x=1, y=2, z=3), KRROODPositionDAO(x=5, y=2, z=6)]
+    positions = [KRROODPosition(x=dao.x, y=dao.y, z=dao.z) for dao in position_daos]
     session.add_all(position_daos)
     session.commit()
 
     def get_query(domain=None):
         position = variable(
-            type_=Position,
+            type_=KRROODPosition,
             domain=domain,
         )
         query = the(
@@ -159,10 +164,10 @@ def test_the_quantifier(session, database):
         return query
 
     with pytest.raises(MultipleSolutionFound):
-        result = get_query(positions).evaluate()
+        result = get_query(positions).tolist()
 
     translator = eql_to_sql(get_query(), session)
-    query_by_hand = select(PositionDAO).where(PositionDAO.y == 2)
+    query_by_hand = select(KRROODPositionDAO).where(KRROODPositionDAO.y == 2)
     assert str(translator.sql_query) == str(query_by_hand)
 
     with pytest.raises(MultipleResultsFound):
@@ -192,11 +197,8 @@ def test_equal(session, database):
     prismatic_connection = variable(
         PrismaticConnection,
         domain=world.connections,
-        name="prismatic_connection",
     )
-    fixed_connection = variable(
-        FixedConnection, domain=world.connections, name="fixed_connection"
-    )
+    fixed_connection = variable(FixedConnection, domain=world.connections)
 
     # Write the query body
     query = an(
@@ -210,6 +212,8 @@ def test_equal(session, database):
         PrismaticConnectionDAO,
         onclause=PrismaticConnectionDAO.child_id == FixedConnectionDAO.parent_id,
     )
+
+    assert len(session.scalars(query_by_hand).all()) == 1
     assert str(translator.sql_query) == str(query_by_hand)
 
     result = translator.evaluate()
@@ -243,19 +247,14 @@ def test_complicated_equal(session, database):
 
     # Query for the kinematic tree of the drawer which has more than one component.
     # Declare the placeholders
-    parent_container = variable(
-        type_=Container, domain=world.bodies, name="parent_connection"
-    )
+    parent_container = variable(type_=Container, domain=world.bodies)
     prismatic_connection = variable(
         type_=PrismaticConnection,
         domain=world.connections,
-        name="prismatic_connection",
     )
-    drawer_body = variable(type_=Container, domain=world.bodies, name="drawer_body")
-    fixed_connection = variable(
-        type_=FixedConnection, domain=world.connections, name="fixed_connection"
-    )
-    handle = variable(type_=Handle, domain=world.bodies, name="handle")
+    drawer_body = variable(type_=Container, domain=world.bodies)
+    fixed_connection = variable(type_=FixedConnection, domain=world.connections)
+    handle = variable(type_=Handle, domain=world.bodies)
 
     # Write the query body - this was previously failing with "Attribute chain ended on a relationship"
     query = the(
@@ -281,7 +280,7 @@ def test_contains(session, database):
     session.add(BodyDAO(name="Body3", size=1))
     session.commit()
 
-    b = variable(type_=Body, domain=[], name="b")
+    b = variable(type_=Body, domain=[])
     query = an(
         entity(b).where(
             contains("Body1TestName", b.name),

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing_extensions import Type
 
-from ..utils import DataclassException
+from krrood.utils import DataclassException
 
 JSON_TYPE_NAME = "__json_type__"  # the key used in JSON dicts to identify the class
 

@@ -15,10 +15,12 @@ from typing_extensions import (
     TypeVar,
 )
 
-from ...entity_query_language.predicate import Symbol
+from krrood.symbol_graph.symbol_graph import Symbol
 
 if TYPE_CHECKING:
-    from .property_descriptor import PropertyDescriptor
+    from krrood.ontomatic.property_descriptor.property_descriptor import (
+        PropertyDescriptor,
+    )
 
 
 monitored_type_map: Dict[Type, Type[MonitoredContainer]] = {}
@@ -39,10 +41,10 @@ class MonitoredContainer(Generic[T], ABC):
 
     For example like here, the Set[Person] will be internally replaced with a MonitoredSet[Person] by the
     descriptor, this allows for catching additions/insertions/removals to the Set and applying implicit inferences:
+    >>> from krrood.symbol_graph.symbol_graph import Symbol
     >>> from dataclasses import dataclass, field
     >>> from typing_extensions import Set
     >>> from krrood.ontomatic.property_descriptor.property_descriptor import PropertyDescriptor
-    >>> from krrood.entity_query_language.predicate import Symbol
     ...
     >>> @dataclass
     >>> class Person(Symbol):

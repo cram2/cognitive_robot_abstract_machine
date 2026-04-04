@@ -57,7 +57,7 @@ from semantic_digital_twin.world import World
 from multiverse_simulator import MultiverseSimulatorState, MultiverseViewer
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.world_entity import Body
@@ -75,7 +75,7 @@ start_time = time.time()
 time.sleep(1.0)
 print(f"Time to start creating a new body: {time.time() - start_time}s")
 new_body = Body(name=PrefixedName("test_body"))
-box_origin = TransformationMatrix.from_xyz_rpy(
+box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
     x=0.2, y=0.4, z=-0.3, roll=0, pitch=0.5, yaw=0, reference_frame=new_body
 )
 box = Box(
