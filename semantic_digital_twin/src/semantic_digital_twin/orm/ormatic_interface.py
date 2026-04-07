@@ -36,7 +36,6 @@ import semantic_digital_twin.mixin
 import semantic_digital_twin.orm.exceptions
 import semantic_digital_twin.orm.model
 import semantic_digital_twin.pipeline.gltf_loader
-import semantic_digital_twin.pipeline.mesh_decomposer
 import semantic_digital_twin.pipeline.pipeline
 import semantic_digital_twin.reasoning.predicates
 import semantic_digital_twin.reasoning.reasoner

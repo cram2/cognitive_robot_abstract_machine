@@ -128,6 +128,7 @@ class MJCFParser:
         collisions = []
         for mujoco_geom in mujoco_body.geoms:
             shape = self.parse_geom(mujoco_geom=mujoco_geom)
+            shape.origin.reference_frame = body
             shape.simulator_additional_properties.append(
                 MujocoGeom(
                     solver_impedance=mujoco_geom.solimp.tolist(),

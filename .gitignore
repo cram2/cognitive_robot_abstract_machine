@@ -91,3 +91,4 @@ test/krrood_test/test_ripple_down_rules/test_results/
 test/**/*.pdf
 test/krrood_test/test_ripple_down_rules/test_generated_rdrs
 
+!semantic_digital_twin/resources/ply/chair_texture.png

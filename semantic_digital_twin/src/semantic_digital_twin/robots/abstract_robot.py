@@ -16,7 +16,6 @@ from typing_extensions import (
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.doc.examples.test_tmp.regions import connection
 from semantic_digital_twin.exceptions import NoJointStateWithType
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent

@@ -42,13 +42,13 @@ CRAM consists of the following sub-packages:
    and optimization-based task-space control to control the whole
    body of a robot.
 
--  `KRROOD <(https://cram2.github.io/cognitive_robot_abstract_machine/krrood)>`__
+-  `KRROOD <https://cram2.github.io/cognitive_robot_abstract_machine/krrood>`__
    is a Python framework that integrates symbolic knowledge
    representation, powerful querying, and rule-based reasoning through
    intuitive, object-oriented abstractions.
 
 -  `Probabilistic
-   Model <(https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model)>`__
+   Model <https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model>`__
    is a Python library that offers a clean and
    unified API for probabilistic models, similar to scikit-learn for
    classical machine learning.

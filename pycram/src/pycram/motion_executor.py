@@ -107,7 +107,8 @@ class MotionExecutor:
 
                 executor.tick()
                 counter += 1
-
+                if executor.motion_statechart.is_end_motion():
+                    break
         except TimeoutError as e:
             failed_nodes = [
                 (
@@ -121,6 +122,10 @@ class MotionExecutor:
             failed_nodes = list(filter(None, failed_nodes))
             logger.error(f"Failed Nodes: {failed_nodes}")
             raise e
+        finally:
+            executor._set_velocity_acceleration_jerk_to_zero()
+            executor.motion_statechart.cleanup_nodes(context=executor.context)
+            executor.context.cleanup()
 
     def _monitor_interrupt(self, giskard_wrapper, kill_event: threading.Event):
         while True:

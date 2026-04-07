@@ -891,9 +891,7 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
         :param kwargs: additional keyword arguments the subclass might need
         :return:
         """
-        raise NotImplementedError(
-            "ConnectionWithDofs.create_with_dofs is not implemented."
-        )
+        raise NotImplementedError(f"{cls}.create_with_dofs is not implemented.")
 
     def _find_references_in_world(self, world: World) -> Tuple[
         KinematicStructureEntity,

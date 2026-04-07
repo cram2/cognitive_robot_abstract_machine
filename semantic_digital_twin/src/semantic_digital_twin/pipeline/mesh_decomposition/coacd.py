@@ -1,5 +1,4 @@
 import logging
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Optional, List
@@ -8,11 +7,8 @@ import coacd
 import numpy as np
 import trimesh
 
-from semantic_digital_twin.pipeline.pipeline import Step
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.geometry import Shape, Mesh
-from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
+from semantic_digital_twin.world_description.geometry import Mesh
 
 
 class ApproximationMode(StrEnum):
@@ -46,63 +42,6 @@ class PreprocessingMode(StrEnum):
 
 
 @dataclass
-class MeshDecomposer(Step, ABC):
-    """
-    MeshDecomposer is an abstract base class for decomposing complex 3D meshes into simpler convex components.
-    It provides methods to apply the decomposition to meshes, shapes, bodies, and entire worlds.
-    Subclasses should implement the `apply_to_mesh` method to define the specific decomposition algorithm.
-    3D meshes are represented using the `trimesh` library, and the decomposed parts are returned as a list of `TriangleMesh` objects.
-    """
-
-    @abstractmethod
-    def apply_to_mesh(self, mesh: Mesh) -> List[Mesh]:
-        """
-        Apply the mesh decomposition to a given mesh.
-        Returns a list of TriangleMesh objects representing the decomposed convex parts.
-        """
-        ...
-
-    def apply_to_shape(self, shape: Shape) -> List[Mesh]:
-        """
-        Apply the mesh decomposition to a given shape.
-        If the shape is a Mesh, it will be decomposed into multiple TriangleMesh objects.
-        Otherwise, the shape will be returned as is in a list.
-        """
-        new_geometry = []
-        if isinstance(shape, Mesh):
-            new_geometry = self.apply_to_mesh(shape)
-        else:
-            new_geometry.append(shape)
-
-        return new_geometry
-
-    def apply_to_body(self, body: Body) -> Body:
-        """
-        Apply the mesh decomposition to all shapes in a given body.
-        The body's collision shapes will be replaced with the decomposed shapes.
-        Returns the modified body.
-        """
-        new_geometry = []
-        for shape in body.visual:
-            decomposed_shapes = self.apply_to_shape(shape)
-            new_geometry.extend(decomposed_shapes)
-
-        body.collision = ShapeCollection(new_geometry)
-        return body
-
-    def _apply(self, world: World) -> World:
-        """
-        Apply the mesh decomposition to all bodies in a given world.
-        Each body's collision shapes will be replaced with the decomposed shapes.
-        Returns the modified world.
-        """
-        for body in world.bodies:
-            self.apply_to_body(body)
-
-        return world
-
-
-@dataclass
 class COACDMeshDecomposer(MeshDecomposer):
     """
     COACDMeshDecomposer is a class for decomposing complex 3D meshes into simpler convex components
@@ -115,28 +54,37 @@ class COACDMeshDecomposer(MeshDecomposer):
 
     threshold: float = 0.05
     """
-    Concavity threshold for terminating the decomposition (0.01 - 1)
+    Determines how much the decomposed parts can deviate from the original shape. 
+    A lower value leads to more pieces and higher precision, while a higher value allows for a 
+    "looser," simpler approximation.
     """
 
     max_convex_hull: Optional[int] = None
     """
-    Maximum number of convex hulls in the result. 
+    Limits the total number of convex pieces generated. 
+    If set to None, the algorithm will keep creating pieces until the threshold is met.
     Works only when merge is enabled (may introduce convex hull with a concavity larger than the threshold)
     """
 
     preprocess_mode: PreprocessingMode = PreprocessingMode.AUTO
     """
-    Manifold preprocessing mode.
+    Determines if the mesh is cleaned before processing.
     """
 
     preprocess_resolution: int = 50
     """
-    Resolution for manifold preprocess (20~100)
+    The grid size used during the initial cleanup phase. 
+    Low values are fast but might "melt" away small features of 
+    your model before the main decomposition even starts.
+    Range: 20 - 100
     """
 
     resolution: int = 2000
     """
-    Sampling resolution for Hausdorff distance calculation (1 000 - 10 000)
+    Defines the sampling density of the input mesh. 
+    Think of it like the "DPI" of a printer; a higher resolution captures 
+    finer details of the surface but increases the time it takes to calculate the decomposition.
+    Range: 1 000 - 10 000
     """
 
     search_nodes: int = 20
@@ -156,27 +104,39 @@ class COACDMeshDecomposer(MeshDecomposer):
 
     pca: bool = False
     """
-    Enable PCA pre-processing
+    Enable PCA pre-processing.
+    Stands for Principal Component Analysis. 
+    If enabled, it uses the orientation of the object’s volume to align the decomposition cuts. 
+    It’s great for long, thin objects but can sometimes ignore local symmetry.
     """
 
     merge: bool = True
     """
     Enable merge postprocessing.
+    After splitting the mesh, 
+    the algorithm checks if any adjacent pieces are "convex enough" to be joined back together. 
+    This helps keep the final count of pieces low without sacrificing much accuracy.
     """
 
     max_convex_hull_vertices: Optional[int] = None
     """
     Maximum vertex value for each convex hull, only when decimate is enabled.
+    Limits how many "corners" (vertices) each individual convex piece can have. 
+    This is vital for physics engines (like Bullet or PhysX) which often have a hard limit (e.g., 32 or 64 vertices)
+    for real-time performance.
     """
 
     extrude_margin: Optional[float] = None
     """
-    Extrude margin, only when extrude is enabled
+    Extrude margin, only when extrude is enabled.
+    Adds a small "padding" or thickness to the generated pieces. 
+    Useful if you're experiencing "tunneling" 
+    in physics simulations where objects pass through each other.
     """
 
     approximation_mode: ApproximationMode = ApproximationMode.BOX
     """
-    Approximation mode to use.
+    Defines the shape of the primitives used during the search phase.
     """
 
     seed: int = field(default_factory=lambda: np.random.randint(2**32))

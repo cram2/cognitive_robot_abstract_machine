@@ -21,6 +21,8 @@ parts:
         - file: examples/graph_of_convex_sets
         - file: examples/multiverse
         - file: examples/adding_robots
+        - file: datasets
+
 - caption: Developer Guide
   chapters:
     - file: developer_guide
@@ -31,6 +33,7 @@ parts:
     - file: world_reasoner
     - file: world_synchronization
     - file: style_guide
+
 - caption: Self-Assessment
   chapters:
     - file: self_assessment/quizzes_intro
@@ -47,6 +50,7 @@ parts:
         - file: self_assessment/quizzes/persistence_of_annotated_worlds_quiz
         - file: self_assessment/quizzes/graph_of_convex_sets_quiz
     - file: self_assessment/exercises_intro
+
 - caption: References
   chapters:
     - file: autoapi/index
