@@ -1,26 +1,51 @@
 import os
 from copy import deepcopy
+
+import numpy as np
+import pandas as pd
 import pytest
 import rclpy
 from matplotlib import pyplot as plt
 
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import match_variable, match, variable_from, variable, underspecified
+from krrood.entity_query_language.factories import (
+    match_variable,
+    match,
+    variable_from,
+    variable,
+    underspecified,
+)
 from krrood.entity_query_language.query.match import Match
 from krrood.ormatic.utils import create_engine, drop_database
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from krrood_test.dataset.example_classes import KRROODPose, KRROODPosition, KRROODOrientation
-from probabilistic_model.probabilistic_circuit.relational.learn_rspn import LearnRSPN
+from krrood_test.dataset.example_classes import (
+    KRROODPose,
+    KRROODPosition,
+    KRROODOrientation,
+)
+from probabilistic_model.probabilistic_circuit.relational.learn_rspn import (
+    LearnRSPN,
+    fill_dataframe_with_parts,
+)
 from probabilistic_model.probabilistic_circuit.relational.main import Nation
-from probabilistic_model.probabilistic_circuit.relational.rspns import RSPNSpecification, RSPNTemplate
+from probabilistic_model.probabilistic_circuit.relational.rspns import (
+    RSPNSpecification,
+    RSPNTemplate,
+)
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
 from pycram.robot_plans.actions.composite.transporting import MoveAndPickUpAction
-from semantic_digital_twin.orm.model import QuaternionMapping, Point3Mapping, PoseMapping
+from semantic_digital_twin.orm.model import (
+    QuaternionMapping,
+    Point3Mapping,
+    PoseMapping,
+)
 from semantic_digital_twin.robots.abstract_robot import Manipulator
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
 from sqlalchemy.orm import Session, session
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
@@ -54,6 +79,7 @@ def database():
     session.expunge_all()
     session.close()
 
+
 def test_move_and_pick_up(database, mutable_model_world):
     world, robot_view, context = mutable_model_world
 
@@ -62,9 +88,15 @@ def test_move_and_pick_up(database, mutable_model_world):
     milk_variable = variable_from([milk])
 
     move_and_pick_up_description = underspecified(MoveAndPickUpAction)(
-        standing_position=underspecified(PoseMapping.from_point_mapping_quaternion_mapping)(
-            point_mapping=underspecified(Point3Mapping)(x=..., y=..., z=..., reference_frame=None),
-            quaternion_mapping=underspecified(QuaternionMapping)(x=..., y=..., z=..., w=..., reference_frame=None),
+        standing_position=underspecified(
+            PoseMapping.from_point_mapping_quaternion_mapping
+        )(
+            point_mapping=underspecified(Point3Mapping)(
+                x=..., y=..., z=..., reference_frame=None
+            ),
+            quaternion_mapping=underspecified(QuaternionMapping)(
+                x=..., y=..., z=..., w=..., reference_frame=None
+            ),
             reference_frame=variable_from([robot_view.root]),
         ),
         object_designator=milk_variable,
@@ -82,31 +114,42 @@ def test_move_and_pick_up(database, mutable_model_world):
 
     parameters = UnderspecifiedParameters(move_and_pick_up_description)
 
-    #sampling
+    # sampling
     move_and_pick_up_distribution = fully_factorized(parameters.variables.values())
 
-    probabilistic_registry = DictRegistry({MoveAndPickUpAction: move_and_pick_up_distribution})
+    probabilistic_registry = DictRegistry(
+        {MoveAndPickUpAction: move_and_pick_up_distribution}
+    )
 
     sample = move_and_pick_up_distribution.sample(1)
 
     backend = ProbabilisticBackend(probabilistic_registry, number_of_samples=50)
 
-
     values = list(backend.evaluate(move_and_pick_up_description))
 
-    #----------------- database stuff
+    # ----------------- database stuff
 
     wrapped_class = WrappedClass(MoveAndPickUpAction)
     rspn_spec = RSPNSpecification(spec=wrapped_class)
+    # rspn = RSPNTemplate(rspn_spec)
+    # avg log likelihood auf den traingsdaten und dann auf dem gelernten circuit, der sollte hoehere log likelihood haben
 
     template = LearnRSPN(MoveAndPickUpAction, values)
+    df = fill_dataframe_with_parts({}, values, MoveAndPickUpAction)
+    nparray = pd.DataFrame(df).to_numpy()
+    print(nparray)
+    print(
+        f"Log likelihood of the move and pick up distribution: {np.mean(move_and_pick_up_distribution.log_likelihood(nparray))}"
+    )
+    assert np.mean(template.probabilistic_circuit.log_likelihood(nparray)) > np.mean(
+        move_and_pick_up_distribution.log_likelihood(nparray)
+    )
     template.probabilistic_circuit.plot_structure()
 
     # template = RSPNTemplate(class_spec=rspn_spec)
     # template.probabilistic_circuit.plot_structure()
     plt.savefig(f"test_{datetime.datetime.now()}.png")
     plt.close()
-
 
     # grounded = template.ground(values[0])
     # grounded.probabilistic_circuit.plot_structure()

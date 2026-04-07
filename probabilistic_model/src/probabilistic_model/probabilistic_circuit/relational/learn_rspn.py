@@ -9,7 +9,8 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tupl
 
 from krrood.ormatic.data_access_objects.helper import get_alternative_mapping
 from probabilistic_model.probabilistic_circuit.relational.rspns import (
-    RSPNTemplate, RSPNSpecification,
+    RSPNTemplate,
+    RSPNSpecification,
 )
 from random_events.variable import variable_from_name_and_type
 from ...learning.jpt.jpt import JointProbabilityTree
@@ -34,11 +35,13 @@ def get_aggregate_statistics(instance: Any) -> List[Tuple[Any, str]]:
 
     return statistics
 
-def fill_dataframe_with_parts(df_data: Dict[str, List[float]], instances: List[Any], cls: Type, path: str = "") -> Dict[str, List[float]]:
+
+def fill_dataframe_with_parts(
+    df_data: Dict[str, List[float]], instances: List[Any], cls: Type, path: str = ""
+) -> Dict[str, List[float]]:
     # if cls has an alternative mapping, use that instead
     alternative_mapping = get_alternative_mapping(cls)
     if alternative_mapping:
-        print("alternative_class", alternative_mapping)
         cls = alternative_mapping
         new_instances = []
         for instance in instances:
@@ -51,10 +54,7 @@ def fill_dataframe_with_parts(df_data: Dict[str, List[float]], instances: List[A
         instances = new_instances
 
     specification = RSPNSpecification(cls)
-    if specification.exchangeable_parts:
-        print("exchangeable_parts", specification.exchangeable_parts)
     if issubclass(cls, enum.Enum):
-        print("enum", cls)
         for instance in instances:
             print(instance.value)
             df_data.setdefault(cls.__name__, []).append(instance.value)
@@ -78,8 +78,9 @@ def fill_dataframe_with_parts(df_data: Dict[str, List[float]], instances: List[A
                 return df_data
             new_instances.append(getattr(instance, part.public_name))
         new_path = f"{path}.{part.public_name}" if path else part.public_name
-        df_data = fill_dataframe_with_parts(df_data, new_instances, part.type_endpoint, new_path)
-
+        df_data = fill_dataframe_with_parts(
+            df_data, new_instances, part.type_endpoint, new_path
+        )
 
     return df_data
 
@@ -99,7 +100,6 @@ def LearnRSPN(cls: Any, instances: List[Any]) -> RSPNTemplate:
     df_data = fill_dataframe_with_parts(df_data, instances, cls)
     # print("----------------------")
     # print("final df_data", df_data)
-    print(df_data.keys())
     copy = df_data.copy()
     for col, val in df_data.items():
         if not isinstance(val[0], (float, int) or enum.Enum):

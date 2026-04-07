@@ -264,7 +264,9 @@ class LeafUnit(Unit):
         self.result_of_current_query = self.distribution.log_likelihood(events)
 
     def cumulative_distribution(self, events: npt.NDArray):
-        self.result_of_current_query = self.distribution.cumulative_distribution_function(events)
+        self.result_of_current_query = (
+            self.distribution.cumulative_distribution_function(events)
+        )
 
     def probability_of_simple_event(self, event: SimpleEvent):
         self.result_of_current_query = self.distribution.probability_of_simple_event(
@@ -1003,6 +1005,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                             ],
                         ]
                     )
+                    print(f"unit:{unit.variables} , {unit.result_of_current_query}")
                 else:
                     unit: InnerUnit
                     unit.log_forward()  # Synch trheads 1
@@ -1514,7 +1517,9 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         layers = self.layers
 
         # get the positions of the nodes
-        positions = self.breadth_first_search_layout(scale=scale, align=PlotAlignment.VERTICAL)
+        positions = self.breadth_first_search_layout(
+            scale=scale, align=PlotAlignment.VERTICAL
+        )
         position_for_variable_name = {
             node: (x + variable_name_offset, y) for node, (x, y) in positions.items()
         }
