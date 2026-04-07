@@ -76,5 +76,5 @@ class MoveToReach(LearnableAction):
                 arm=...,
             ),
             context=context,
-        )
+        ).plan
         return plan
