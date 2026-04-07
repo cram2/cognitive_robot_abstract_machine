@@ -58,11 +58,6 @@ def pose_grasp_world(tracy_world):
         collision=ShapeCollection([Box(scale=Scale(0.07, 0.07, 0.1))]),
         visual=ShapeCollection([Box(scale=Scale(0.07, 0.07, 0.1))]),
     )
-    hindrance_box = Body(
-        name=PrefixedName("hindrance_box"),
-        collision=ShapeCollection([Box(scale=Scale(0.07, 0.07, 0.1))]),
-        visual=ShapeCollection([Box(scale=Scale(0.07, 0.07, 0.1))]),
-    )
     with copy_world.modify_world():
         connection = Connection6DoF.create_with_dofs(
             copy_world,
@@ -74,16 +69,6 @@ def pose_grasp_world(tracy_world):
             ),
         )
         copy_world.add_connection(connection)
-        # connection2 = Connection6DoF.create_with_dofs(
-        #     copy_world,
-        #     copy_world.root,
-        #     hindrance_box,
-        #     PrefixedName("hindrance_box_connection"),
-        #     HomogeneousTransformationMatrix.from_xyz_rpy(
-        #         0.8, 0.6, 0.93, reference_frame=tracy_world.root
-        #     ),
-        # )
-        # copy_world.add_connection(connection2)
 
     return copy_world, copy_view, Context(copy_world, copy_view)
 

@@ -24,10 +24,7 @@ from semantic_digital_twin.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.world_description.world_entity import (
-    Body,
-    KinematicStructureEntity,
-)
+from semantic_digital_twin.world_description.world_entity import Body
 
 from pycram.datastructures.enums import Arms
 from pycram.robot_plans.motions.base import BaseMotion
@@ -84,18 +81,6 @@ class CollisionAwareArmMotion(BaseMotion):
     def perform(self):
         pass
 
-    @property
-    def _hand(self):
-        return ViewManager.get_end_effector_view(self.arm, self.robot)
-
-    @property
-    def _tool_frame(self) -> KinematicStructureEntity:
-        return self._hand.tool_frame
-
-    @property
-    def _hand_bodies(self) -> List[Body]:
-        return list(self._hand.bodies)
-
     def _with_collision_avoidance(
         self, tasks: List[Task], minimum_success: int = 1
     ) -> Task:
@@ -103,13 +88,15 @@ class CollisionAwareArmMotion(BaseMotion):
             if len(tasks) == 1:
                 return tasks[0]
             return Parallel(tasks, minimum_success=minimum_success)
+        hand = ViewManager.get_end_effector_view(self.arm, self.robot)
         allow_rule = make_rule_for_allowing_collision_between_two_groups(
-            self._hand_bodies, self.allowed_collision_bodies, robot=self._hand._robot
+            list(hand.bodies), self.allowed_collision_bodies, robot=hand._robot
         )
         motion = Parallel(
             [
                 *tasks,
-                # ExternalCollisionAvoidance(robot=self._hand._robot),
+                ExternalCollisionAvoidance(robot=hand._robot),
+                SelfCollisionAvoidance(robot=hand._robot),
             ],
             minimum_success=minimum_success,
         )
@@ -132,7 +119,7 @@ class PoseGraspMotion(CollisionAwareArmMotion):
     @property
     def _motion_chart(self) -> Task:
         world = self.world
-        tool_frame = self._tool_frame
+        tool_frame = ViewManager.get_end_effector_view(self.arm, self.robot).tool_frame
 
         grasp_rotation = self.grasp_pose.to_rotation_matrix()
         grasp_z_axis = grasp_rotation.z_vector()
@@ -178,7 +165,7 @@ class RetractMotion(CollisionAwareArmMotion):
     """Maximum velocity during retract."""
 
     def _compute_goal(self) -> CartesianPosition:
-        tool_frame = self._tool_frame
+        tool_frame = ViewManager.get_end_effector_view(self.arm, self.robot).tool_frame
         if self.direction == RetractDirection.WORLD_Z:
             goal_point = tool_frame.global_pose.to_position() + Vector3(
                 0, 0, self.distance, reference_frame=self.world.root
@@ -198,7 +185,7 @@ class RetractMotion(CollisionAwareArmMotion):
 
     @property
     def _motion_chart(self) -> Task:
-        tool_frame = self._tool_frame
+        tool_frame = ViewManager.get_end_effector_view(self.arm, self.robot).tool_frame
         retract_position = self._compute_goal()
         keep_orientation = CartesianOrientation(
             root_link=self.world.root,
