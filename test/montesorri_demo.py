@@ -38,7 +38,7 @@ class TestMultiverseEpisodeSegmenter(TestCase):
             position_shift=Vector3(0, 0, 0),
         )
         cls.episode_executor = EpisodeSegmenterExecutor(
-            context=cls.context, player=cls.file_player
+            context=cls.context, player=cls.file_player, ignored_objects=["iCub"]
         )
         cls.episode_executor.spawn_scene(
             models_dir="/home/sorin/dev/Segmind/resources/multiverse_episodes/icub_montessori_no_hands/models/"
