@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import datetime
-import threading
 from threading import RLock
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 
 from semantic_digital_twin.world import World
 from typing_extensions import Callable, Any, Optional, Dict, Generator
+
+from segmind import set_logger_level, LogLevel, logger
+
+
+set_logger_level(LogLevel.DEBUG)
 
 try:
     from pycram.worlds.multiverse import Multiverse
@@ -182,11 +185,11 @@ class EpisodePlayer(PropagatingThread, ABC):
         def wrapper(*args, **kwargs) -> Any:
             with cls.pause_resume_lock:
                 if cls._instance.status == PlayerStatus.PLAYING:
-                    print("Pausing player")
+                    logger.debug("Pausing player")
                     cls._instance.pause()
                     result = func(*args, **kwargs)
                     cls._instance.resume()
-                    print("Resuming player")
+                    logger.debug("Resuming player")
                     return result
                 else:
                     return func(*args, **kwargs)

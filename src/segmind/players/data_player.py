@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from threading import RLock
 from segmind import set_logger_level, LogLevel, logger
 from typing_extensions import Callable, Optional, Dict, Generator, List
-from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
@@ -136,9 +135,7 @@ class DataPlayer(EpisodePlayer, ABC):
             self.ready = True
 
             with self.frame_callback_lock:
-                # logger.debug(f"Processing frame {self.frame_callbacks}")
                 for cb in self.frame_callbacks:
-                    #    logger.debug(f"Calling frame callback: {cb}")
                     cb(dt)
 
             if self._status == PlayerStatus.STOPPED:
@@ -169,7 +166,6 @@ class DataPlayer(EpisodePlayer, ABC):
                             z=objects_poses[obj].z,
                             roll=objects_poses[obj].to_quaternion()[0],
                             pitch=objects_poses[obj].to_quaternion()[1],
-                            #yaw=objects_poses[obj].to_quaternion()[2],
                         )
                     )
 
@@ -225,12 +221,6 @@ class FilePlayer(DataPlayer, ABC):
             os.path.dirname(self.file_path), "models"
         )
 
-        self.copy_model_files_to_world_data_dir()
         self.position_shift: Optional[Vector3] = position_shift
 
-    def copy_model_files_to_world_data_dir(self):
-        """
-        Copy the model files to the world data directory.
-        """
-        # Copy the entire folder and its contents
-        # shutil.copytree(self.models_dir, self.world.conf.cache_dir + "/objects", dirs_exist_ok=True)
+

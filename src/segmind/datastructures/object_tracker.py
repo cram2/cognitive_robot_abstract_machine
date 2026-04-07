@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 from dataclasses import dataclass
 from datetime import timedelta
 from threading import RLock
@@ -7,7 +8,7 @@ from typing import Callable, Tuple
 
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Type, Optional, TYPE_CHECKING, Dict, Set
-
+from segmind import logger, set_logger_level, LogLevel
 import numpy as np
 
 
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
     from .events import Event, EventUnion
     from ..detectors.base import SegmindContext
 
+set_logger_level(LogLevel.DEBUG)
 
 @dataclass
 class ObjectTracker:
@@ -476,7 +478,7 @@ class ObjectTracker:
             try:
                 return np.where(time_stamps > timestamp)[0][0]
             except IndexError:
-                print(f"No events after timestamp {timestamp}")
+                logger.error(f"No events after timestamp {timestamp}")
                 return None
 
     def get_index_of_first_event_before(self, timestamp: float) -> Optional[int]:
@@ -500,7 +502,7 @@ class ObjectTracker:
             try:
                 return np.where(time_stamps < timestamp)[0][-1]
             except IndexError:
-                print(f"No events before timestamp {timestamp}")
+                logger.error(f"No events before timestamp {timestamp}")
                 return None
 
     def get_events_between_two_events(self, event1: Event, event2: Event) -> List[Event]:
@@ -547,7 +549,7 @@ class ObjectTracker:
                 events = [self._event_history[i] for i in indices]
                 return events
             except IndexError:
-                print(f"No events between timestamps {timestamp1}, {timestamp2}")
+                logger.error(f"No events between timestamps {timestamp1}, {timestamp2}")
                 return []
 
     def get_event_where(self, conditions: Callable[[Event], bool], events: Optional[List[Event]] = None) -> List[Event]:

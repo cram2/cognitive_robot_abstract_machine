@@ -32,7 +32,13 @@ class AbstractInteractionDetector(AbstractDetector):
 @dataclass
 class PlacingDetector(AbstractInteractionDetector):
     """
+    Represents a class detection mechanism for identifying and managing new
+    placing events from observed system interactions.
 
+    This class is typically used to analyze specific event types, such as stop
+    motion and support events, and identify correlations that form the basis
+    of new placing events. By ensuring that placing events are uniquely paired,
+    the class helps maintain consistency and prevent duplication of events.
     """
 
     def update_context_and_events(self, obj: List[Body]) -> List[Event]:

@@ -20,41 +20,8 @@ from semantic_digital_twin.reasoning.predicates import contact
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-# ToDo: there is a lot of duplication with SupportDetector, so we have to make it more robust
 @dataclass(eq=False, repr=False)
-class BaseContactDetector(AbstractDetector, ABC):
-    """
-    Abstract base class for contact-based detectors.
-    Provides shared functionality for detecting contacts between
-    bodies and generating events when contact relationships change.
-    """
-
-
-    def get_contact_bodies(self, tracked_objects: List[Body]) -> Dict[Body, Set[Body]]:
-        """
-        Computes the contact relationships for a set of tracked objects.
-
-        Iterates over all bodies with collision enabled and checks whether
-        they are in contact with the tracked objects.
-
-        :param tracked_objects: List of bodies that should be checked for contacts.
-        :return: Dictionary mapping each tracked body to the set of bodies
-            it is currently in contact with.
-        """
-
-        contact_bodies: Dict[Body, Set[Body]] = {}
-        bodies_with_collision = self.context.world.bodies_with_collision
-        for obj in tracked_objects:
-            for body in bodies_with_collision:
-                if body is obj:
-                    continue
-                if contact(obj, body):
-                    contact_bodies.setdefault(obj, set()).add(body)
-        return contact_bodies
-
-
-@dataclass(eq=False, repr=False)
-class ContactDetector(BaseContactDetector):
+class ContactDetector(AbstractDetector):
     """
     Detector responsible for identifying newly established contacts
     between bodies.
@@ -74,7 +41,7 @@ class ContactDetector(BaseContactDetector):
         :return: List of ContactEvent instances generated during this update.
         """
 
-        new_contact_pairs = self.get_contact_bodies(tracked_objects)
+        new_contact_pairs = self.get_relation(tracked_objects, contact)
         latest_contact_bodies = self.context.latest_contact_bodies
         events = []
         for obj, contact_list in new_contact_pairs.items():
@@ -93,7 +60,7 @@ class ContactDetector(BaseContactDetector):
 
 
 @dataclass(eq=False, repr=False)
-class LossOfContactDetector(BaseContactDetector):
+class LossOfContactDetector(AbstractDetector):
     """
     Detector responsible for identifying when previously existing
     contacts between bodies are lost.
@@ -114,7 +81,7 @@ class LossOfContactDetector(BaseContactDetector):
         :return: List of LossOfContactEvent instances generated during this update.
         """
 
-        new_contact_pairs = self.get_contact_bodies(tracked_objects)
+        new_contact_pairs = self.get_relation(tracked_objects, contact)
         latest_contact_bodies = self.context.latest_contact_bodies
         events = []
         for obj, contact_list in list(latest_contact_bodies.items()):
@@ -165,7 +132,7 @@ class MotionDetector(AbstractDetector):
         for obj in tracked_objs:
             latest_poses = self.context.latest_poses.setdefault(obj, [])
             latest_poses.append(obj.global_pose)
-            if len(latest_poses) > self.window_size:
+            if len(latest_poses) >= self.window_size:
                 event = self.check_obj_movement(obj)
                 if event:
                     events.append(event)
@@ -196,7 +163,7 @@ class MotionDetector(AbstractDetector):
     def _calculate_is_moving(self, obj: Body) -> bool:
         """
         Determines whether an object is moving by evaluating the distance between its
-        two latest recorded positions.
+        recorded positions within the window.
 
         Parameters:
         obj (Body): The object for which the motion status is being calculated.
@@ -207,10 +174,13 @@ class MotionDetector(AbstractDetector):
         """
 
         latest_poses = self.context.latest_poses[obj]
-        p1 = np.array(latest_poses[-1].to_position().to_list())
-        p2 = np.array(latest_poses[-2].to_position().to_list())
-        distance = np.linalg.norm(p1 - p2)
-        return distance > self.distance_threshold
+        p_last = np.array(latest_poses[-1].to_position().to_list())
+        for p in latest_poses[:-1]:
+            p_prev = np.array(p.to_position().to_list())
+            distance = np.linalg.norm(p_last - p_prev)
+            if distance > self.distance_threshold:
+                return True
+        return False
 
 
 @dataclass(eq=False, repr=False)
@@ -251,7 +221,6 @@ class TranslationDetector(MotionDetector):
                 self.context.latest_motion_events[obj] = new_event
                 return new_event
             else:
-                latest_motion_event.current_pose = latest_poses[-1]
                 return None
 
         return None
@@ -315,11 +284,12 @@ class RotationDetector(MotionDetector):
 
     def check_obj_movement(self, obj: Body) -> Optional[Event]:
         latest_poses = self.context.latest_poses[obj]
-        # Check orientation closeness using quaternions.
-        is_moving = not np.allclose(
-            latest_poses[-1].to_quaternion().to_list(),
-            latest_poses[-2].to_quaternion().to_list(),
-        )
+        is_moving = False
+        q_last = latest_poses[-1].to_quaternion().to_list()
+        for p in latest_poses[:-1]:
+            if not np.allclose(q_last, p.to_quaternion().to_list()):
+                is_moving = True
+                break
         self.context.object_moving_status[obj] = is_moving
         return self._check_movement_and_trigger_event(obj)
 
@@ -338,7 +308,6 @@ class RotationDetector(MotionDetector):
                 self.context.latest_motion_events[obj] = new_event
                 return new_event
             else:
-                latest_motion_event.current_pose = latest_poses[-1]
                 return None
 
         return None
@@ -354,10 +323,12 @@ class StopRotationDetector(MotionDetector):
     def check_obj_movement(self, obj: Body) -> Optional[Event]:
         latest_poses = self.context.latest_poses[obj]
         # Check orientation closeness using quaternions.
-        is_moving = not np.allclose(
-            latest_poses[-1].to_quaternion().to_list(),
-            latest_poses[-2].to_quaternion().to_list(),
-        )
+        is_moving = False
+        q_last = latest_poses[-1].to_quaternion().to_list()
+        for p in latest_poses[:-1]:
+            if not np.allclose(q_last, p.to_quaternion().to_list()):
+                is_moving = True
+                break
         self.context.object_moving_status[obj] = is_moving
         return self._check_movement_and_trigger_event(obj)
 

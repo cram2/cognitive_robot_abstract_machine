@@ -30,6 +30,13 @@ class DetectorStateChart(MotionStatechart):
     pass
 
 
+IndexedBodyPairs = Dict[Body, Set[Body]]
+"""
+Type hint for dictionaries mapping bodies to sets of bodies
+"""
+
+#ToDo: Make SegmindContext aware of the detectors,
+# so the parameters will be added when the detector is added to the context.
 @dataclass
 class SegmindContext(MotionStatechartContext):
     """
@@ -37,11 +44,6 @@ class SegmindContext(MotionStatechartContext):
 
     Stores the latest detected contact and support relationships
     between bodies in the simulation as well as the event logger.
-    """
-
-    IndexedBodyPairs = Dict[Body, Set[Body]]
-    """
-    Type hint for dictionaries mapping bodies to sets of bodies
     """
 
     object_moving_status: Dict[Body, bool] = field(default_factory=dict)
@@ -138,6 +140,20 @@ class AbstractDetector(ABC, DetectorStateChartNode):
         for e in events:
             self.context.logger.log_event(e)
         return ObservationStateValues.TRUE if events else ObservationStateValues.FALSE
+
+
+    def get_relation(self, tracked_objects: List[Body], predicate) -> Dict[Body, Set[Body]]:
+
+        related_bodies: Dict[Body, Set[Body]] = {}
+        bodies_with_collision = self.context.world.bodies_with_collision
+        for obj in tracked_objects:
+            for body in bodies_with_collision:
+                if body is obj:
+                    continue
+                if predicate(obj, body):
+                    related_bodies.setdefault(obj, set()).add(body)
+        return related_bodies
+
 
 
     @abstractmethod

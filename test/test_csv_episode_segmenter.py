@@ -1,10 +1,5 @@
 import datetime
-import logging
 import os
-import shutil
-import threading
-from os.path import dirname
-from pathlib import Path
 from unittest import TestCase
 from segmind import logger, set_logger_level, LogLevel
 import rclpy

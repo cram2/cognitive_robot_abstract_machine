@@ -61,9 +61,6 @@ def text_to_speech(text: str):
             except pygame.error:
                 pass
 
-            # time.sleep(1)
-
-            # Play the loaded mp3 file
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():
                 time.sleep(0.1)
@@ -93,13 +90,6 @@ class PropagatingThread(threading.Thread, ABC):
         """
         self.kill_event.set()
         self._join()
-
-    # def join(self, timeout=None):
-    #     self._join(timeout)
-    #     super().join(timeout)
-    #     if self.exc is not None:
-    #         pytest.fail(f"Exception in event detector {self}: {self.exc}")
-    #         raise self.exc  # Propagate the exception to the main thread
 
     @abstractmethod
     def _join(self, timeout=None):
@@ -174,8 +164,7 @@ class Imaginator:
         support_obj = Body(support_name, Supporter, None, support, color=support.color)
         support_position = obj_aabb.base_origin
         support_obj.set_position(support_position)
-        # cp = support_obj.closest_points(0.05)
-        # contacted_objects = cp.get_objects_that_have_points()
+
         from .detectors.atomic_event_detectors import AbstractContactDetector
 
         contact_points, _ = AbstractContactDetector.get_contact_points_for_body(
@@ -268,7 +257,7 @@ def is_translation_difference_small(trans_diff: List[float], threshold: float) -
     :return: A boolean value that represents the condition for the translation difference to be considered as small.
     """
     return np.linalg.norm(trans_diff) <= threshold
-    # return all([diff <= threshold for diff in trans_diff])
+
 
 
 def calculate_translation(position_1: List[float], position_2: List[float]) -> List:

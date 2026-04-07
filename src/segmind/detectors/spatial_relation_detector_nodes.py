@@ -17,39 +17,7 @@ from segmind.detectors.base import AbstractDetector
 
 
 @dataclass(eq=False, repr=False)
-class BaseSupportDetector(AbstractDetector):
-    """
-    Abstract base class for support-based detectors.
-
-    Provides shared functionality for detecting support between
-    bodies and generating events when support relationships change.
-    """
-
-    def get_support_pairs(self, tracked_objects: List[Body]) -> Dict[Body, Set[Body]]:
-        """
-        Computes support relationships.
-
-        :param tracked_objects: Bodies that should be checked.
-        :return: Mapping of body → supporting bodies.
-        """
-        support_pairs: Dict[Body, Set[Body]] = {}
-        bodies_with_collision = self.context.world.bodies_with_collision
-        for obj in tracked_objects:
-            for body in bodies_with_collision:
-                if obj is body:
-                    continue
-                if is_supported_by(obj, body, max_intersection_height=0.06):
-                    support_pairs.setdefault(obj, set()).add(body)
-        return support_pairs
-
-    def update_context_and_events(
-        self, objects_to_check: List[Body]
-    ) -> List[Event]:
-        pass
-
-
-@dataclass(eq=False, repr=False)
-class SupportDetector(BaseSupportDetector):
+class SupportDetector(AbstractDetector):
     """
     Class for detecting and updating newly established support relationships.
 
@@ -72,7 +40,7 @@ class SupportDetector(BaseSupportDetector):
 
         events = []
         latest_support = self.context.latest_support
-        new_support_pairs = self.get_support_pairs(objects_to_check)
+        new_support_pairs = self.get_relation(objects_to_check, is_supported_by)
         for body, support in new_support_pairs.items():
             new_supports = (
                 support
@@ -92,7 +60,7 @@ class SupportDetector(BaseSupportDetector):
 
 
 @dataclass(eq=False, repr=False)
-class LossOfSupportDetector(BaseSupportDetector):
+class LossOfSupportDetector(AbstractDetector):
     """
     Detects and manages the loss of support relationships among objects.
 
@@ -116,7 +84,7 @@ class LossOfSupportDetector(BaseSupportDetector):
 
         events = []
         latest_support = self.context.latest_support
-        new_support_pairs = self.get_support_pairs(objects_to_check)
+        new_support_pairs = self.get_relation(objects_to_check, is_supported_by)
         for body, support in list(latest_support.items()):
             loss_supports = (
                 support

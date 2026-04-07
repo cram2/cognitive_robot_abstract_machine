@@ -4,6 +4,7 @@ from segmind.datastructures.events import (
     LossOfContactEvent,
     SupportEvent,
     LossOfSupportEvent, LossOfContainmentEvent, ContainmentEvent, InsertionEvent,
+    TranslationEvent, StopTranslationEvent, PickUpEvent, PlacingEvent,
 )
 from segmind.detectors.base import SegmindContext
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
@@ -93,7 +94,7 @@ class TestMotionStatechart:
             == 4
         )
 
-        rclpy.shutdown()
+        # rclpy.shutdown()
 
     def test_support_detector(self):
         world = setup_support_world()
@@ -145,7 +146,7 @@ class TestMotionStatechart:
 
         assert (len([i for i in logger.get_events() if isinstance(i, LossOfSupportEvent)]) == 1)
 
-        rclpy.shutdown()
+        # rclpy.shutdown()
 
     def test_containment_detector(self):
         world = setup_support_world()
@@ -194,7 +195,7 @@ class TestMotionStatechart:
         assert len([i for i in logger.get_events() if isinstance(i, LossOfContainmentEvent)]) == 1
 
 
-        rclpy.shutdown()
+        # rclpy.shutdown()
 
     def test_insertion_detector(self):
         world = setup_support_world()
@@ -245,27 +246,240 @@ class TestMotionStatechart:
         assert len([i for i in logger.get_events() if isinstance(i, InsertionEvent)]) == 1
 
     def test_pickup(self):
-        pass
+        world = setup_support_world()
+        self.visualize(world)
+        logger = EventLogger()
+        self.context = SegmindContext(
+            world=world,
+            logger=logger,
+        )
+        self.statechart = SegmindStatechart()
+        sc = self.statechart.build_statechart(self.context)
+
+        cylinder = world.get_body_by_name("cylinder_body")
+        table = world.get_body_by_name("table_body")
+
+        self.segmind_executor = EpisodeSegmenterExecutor(context=self.context)
+        self.segmind_executor.compile(sc)
+
+        # Initial state: supported by table
+        cylinder.parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=table.global_pose.x,
+                y=table.global_pose.y,
+                z=table.global_pose.z + 0.2,
+            )
+        )
+        self.segmind_executor.tick()
+        self.segmind_executor.tick()
+        assert len([i for i in logger.get_events() if isinstance(i, SupportEvent)]) == 1
+
+        # Move cylinder up to trigger Translation and LossOfSupport
+        # We need a few ticks for TranslationDetector window
+        for i in range(5):
+            cylinder.parent_connection.origin = (
+                HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=table.global_pose.x,
+                    y=table.global_pose.y,
+                    z=table.global_pose.z + 0.3 + i * 0.1,
+                )
+            )
+            self.segmind_executor.tick()
+
+        assert len([i for i in logger.get_events() if isinstance(i, TranslationEvent)]) >= 1
+        assert len([i for i in logger.get_events() if isinstance(i, LossOfSupportEvent)]) == 1
+        assert len([i for i in logger.get_events() if isinstance(i, PickUpEvent)]) == 1
+
+        # # rclpy.shutdown()
 
     def test_placing(self):
-        pass
+        world = setup_support_world()
+        self.visualize(world)
+        logger = EventLogger()
+        self.context = SegmindContext(
+            world=world,
+            logger=logger,
+        )
+        self.statechart = SegmindStatechart()
+        sc = self.statechart.build_statechart(self.context)
+
+        cylinder = world.get_body_by_name("cylinder_body")
+        table = world.get_body_by_name("table_body")
+
+        self.segmind_executor = EpisodeSegmenterExecutor(context=self.context)
+        self.segmind_executor.compile(sc)
+
+        # Start moving
+        for i in range(5):
+            cylinder.parent_connection.origin = (
+                HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=table.global_pose.x,
+                    y=table.global_pose.y,
+                    z=table.global_pose.z + 0.5 - i * 0.05,
+                )
+            )
+            self.segmind_executor.tick()
+
+        assert len([i for i in logger.get_events() if isinstance(i, TranslationEvent)]) >= 1
+
+        # Place on table (SupportEvent + StopTranslationEvent)
+        cylinder.parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=table.global_pose.x,
+                y=table.global_pose.y,
+                z=table.global_pose.z + 0.2,
+            )
+        )
+        # Tick multiple times to ensure StopTranslation is detected (window-based)
+        for _ in range(5):
+            self.segmind_executor.tick()
+
+        assert len([i for i in logger.get_events() if isinstance(i, SupportEvent)]) == 1
+        assert len([i for i in logger.get_events() if isinstance(i, StopTranslationEvent)]) == 1
+        assert len([i for i in logger.get_events() if isinstance(i, PlacingEvent)]) == 1
+
+        # rclpy.shutdown()
 
     def test_translation(self):
-        pass
+        world = setup_contact_world()
+        self.visualize(world)
+        logger = EventLogger()
+        self.context = SegmindContext(
+            world=world,
+            logger=logger,
+        )
+        self.statechart = SegmindStatechart()
+        sc = self.statechart.build_statechart(self.context)
+
+        cylinder = world.get_body_by_name("cylinder_body")
+
+        self.segmind_executor = EpisodeSegmenterExecutor(context=self.context)
+        self.segmind_executor.compile(sc)
+
+        assert len([i for i in logger.get_events() if isinstance(i, TranslationEvent)]) == 0
+
+        # Move cylinder
+        for i in range(5):
+            cylinder.parent_connection.origin = (
+                HomogeneousTransformationMatrix.from_xyz_rpy(x=1 + i * 0.1, y=-3, z=0.25)
+            )
+            self.segmind_executor.tick()
+
+        assert len([i for i in logger.get_events() if isinstance(i, TranslationEvent)]) == 1
+
+        # rclpy.shutdown()
 
     def test_stop_translation(self):
-        pass
+        world = setup_contact_world()
+        self.visualize(world)
+        logger = EventLogger()
+        self.context = SegmindContext(
+            world=world,
+            logger=logger,
+        )
+        self.statechart = SegmindStatechart()
+        sc = self.statechart.build_statechart(self.context)
+
+        cylinder = world.get_body_by_name("cylinder_body")
+
+        self.segmind_executor = EpisodeSegmenterExecutor(context=self.context)
+        self.segmind_executor.compile(sc)
+
+        # Move cylinder
+        for i in range(5):
+            cylinder.parent_connection.origin = (
+                HomogeneousTransformationMatrix.from_xyz_rpy(x=1 + i * 0.1, y=-3, z=0.25)
+            )
+            self.segmind_executor.tick()
+
+        assert len([i for i in logger.get_events() if isinstance(i, TranslationEvent)]) == 1
+
+        # Stop moving
+        for _ in range(5):
+            self.segmind_executor.tick()
+
+        assert len([i for i in logger.get_events() if isinstance(i, StopTranslationEvent)]) == 1
+
+        # rclpy.shutdown()
 
     def test_rotation(self):
-        pass
+        world = setup_contact_world()
+        self.visualize(world)
+        logger = EventLogger()
+        self.context = SegmindContext(
+            world=world,
+            logger=logger,
+        )
+        
+        from segmind.detectors.atomic_event_detectors_nodes import RotationDetector
+        self.statechart = SegmindStatechart()
+        sc = self.statechart.build_statechart(self.context)
+        rotation_detector = RotationDetector(name="rotation_detector", context=self.context)
+        sc.add_node(rotation_detector)
+
+        cylinder = world.get_body_by_name("cylinder_body")
+
+        self.segmind_executor = EpisodeSegmenterExecutor(context=self.context)
+        self.segmind_executor.compile(sc)
+
+        from segmind.datastructures.events import RotationEvent
+        assert len([i for i in logger.get_events() if isinstance(i, RotationEvent)]) == 0
+
+        # Rotate cylinder
+        for i in range(5):
+            cylinder.parent_connection.origin = (
+                HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=-3, z=0.25, roll=i*0.1)
+            )
+            self.segmind_executor.tick()
+
+        assert len([i for i in logger.get_events() if isinstance(i, RotationEvent)]) >= 1
+
+        # rclpy.shutdown()
 
     def test_stop_rotation(self):
-        pass
+        world = setup_contact_world()
+        self.visualize(world)
+        logger = EventLogger()
+        self.context = SegmindContext(
+            world=world,
+            logger=logger,
+        )
+        
+        from segmind.detectors.atomic_event_detectors_nodes import RotationDetector, StopRotationDetector
+        self.statechart = SegmindStatechart()
+        sc = self.statechart.build_statechart(self.context)
+        sc.add_node(RotationDetector(name="rotation_detector", context=self.context))
+        sc.add_node(StopRotationDetector(name="stop_rotation_detector", context=self.context))
+
+        cylinder = world.get_body_by_name("cylinder_body")
+
+        self.segmind_executor = EpisodeSegmenterExecutor(context=self.context)
+        self.segmind_executor.compile(sc)
+
+        from segmind.datastructures.events import RotationEvent, StopRotationEvent
+        
+        assert len([i for i in logger.get_events() if isinstance(i, RotationEvent)]) == 0
+
+        # Rotate
+        for i in range(5):
+            cylinder.parent_connection.origin = (
+                HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=-3, z=0.25, roll=i*0.1)
+            )
+            self.segmind_executor.tick()
+        assert len([i for i in logger.get_events() if isinstance(i, RotationEvent)]) >= 1
+
+        # Stop rotating
+        for _ in range(5):
+            self.segmind_executor.tick()
+        assert len([i for i in logger.get_events() if isinstance(i, StopRotationEvent)]) >= 1
+
+        # rclpy.shutdown()
 
 
 
     def visualize(self, world):
-        rclpy.init()
+        if not rclpy.ok():
+            rclpy.init()
         node = rclpy.create_node("test_node")
         viz = VizMarkerPublisher(_world=world, node=node)
         viz.with_tf_publisher()
