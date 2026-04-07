@@ -44,10 +44,12 @@ from semantic_digital_twin.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
+    PrismaticConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
@@ -1001,3 +1003,49 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
         container_event = outer_box.as_composite_set() - inner_box.as_composite_set()
 
         return container_event
+
+
+@dataclass(eq=False)
+class HasFillLevel:
+    """
+    Mixin that adds a virtual fill-level DOF to any semantic annotation.
+
+    The fill level is represented as a virtual :class:`PrismaticConnection` whose
+    position encodes fill in the range ``[0, 1]``. Call :meth:`initialize_fill_level`
+    once after the annotation is placed in a world.
+    """
+
+    fill_connection: Optional[PrismaticConnection] = field(default=None, kw_only=True)
+    """The virtual connection whose position encodes fill level in [0, 1]."""
+
+    def initialize_fill_level(
+        self, world: World, parent_body: Body, initial_fill: float = 1.0
+    ) -> None:
+        """
+        Create the virtual fill-level DOF and attach it to the world.
+
+        :param world: The world to add the fill-level DOF to.
+        :param parent_body: The body the fill-level DOF is attached to.
+        :param initial_fill: Starting fill level in [0, 1].
+        """
+        phantom = Body(name=PrefixedName(f"{parent_body.name.name}_fill_level_phantom"))
+        with world.modify_world():
+            world.add_body(phantom)
+            connection = PrismaticConnection.create_with_dofs(
+                world=world,
+                parent=parent_body,
+                child=phantom,
+                axis=Vector3(0, 0, 1),
+                dof_limits=DegreeOfFreedomLimits(
+                    lower=DerivativeMap(position=0.0),
+                    upper=DerivativeMap(position=1.0),
+                ),
+            )
+            world.add_connection(connection)
+        self.fill_connection = connection
+        world.set_positions_1DOF_connection({connection: initial_fill})
+
+    @property
+    def fill_level(self) -> float:
+        """Current fill level in ``[0, 1]``."""
+        return float(self.fill_connection.position)
