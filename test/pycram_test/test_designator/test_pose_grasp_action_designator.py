@@ -1,12 +1,12 @@
 from copy import deepcopy
 from dataclasses import dataclass
+from typing import Generator
 
 import numpy
 import pytest
 
 from pycram.datastructures.dataclasses import Context
-from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from pycram.datastructures.grasp import GraspDescription
+from pycram.datastructures.enums import Arms
 from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import sequential
 from pycram.plans.failures import PlanFailure
@@ -34,15 +34,22 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 @dataclass(eq=False)
 class GraspableBox(HasGraspPose):
-    """Minimal concrete HasGraspPose implementation for testing."""
+    """Concrete HasGraspPose with one grasp pose per side of the box (4 yaw orientations).
 
-    def __post_init__(self):
-        super().__post_init__()
-        if self.grasp_pose is None:
-            self.grasp_pose = Pose.from_xyz_rpy(
+    If grasp_pose is explicitly set to a falsy non-None value the object yields no
+    grasp poses (used by precondition tests). If it is set to a Pose instance that
+    single pose is yielded instead.
+    """
+
+    def grasp_poses(self) -> Generator[Pose, None, None]:
+        if self.grasp_pose is not None:
+            yield from super().grasp_poses()
+            return
+        for yaw in [0, numpy.pi / 2, numpy.pi, 3 * numpy.pi / 2]:
+            yield Pose.from_xyz_rpy(
                 roll=numpy.pi / 2,
                 pitch=numpy.pi,
-                yaw=numpy.pi / 2,
+                yaw=yaw,
                 reference_frame=self.root,
             )
 
@@ -73,13 +80,29 @@ def pose_grasp_world(tracy_world):
     return copy_world, copy_view, Context(copy_world, copy_view)
 
 
-def _compute_grasp_pose(world, view, body_name: str, arm: Arms) -> Pose:
-    """Derive a valid grasp pose for a body using GraspDescription."""
-    arm_view = ViewManager.get_arm_view(arm, view)
-    grasp_desc = GraspDescription(
-        ApproachDirection.FRONT, VerticalAlignment.TOP, arm_view.manipulator
+@pytest.fixture
+def pose_grasp_world_with_obstacle(pose_grasp_world):
+    """Extends pose_grasp_world with an obstacle box that blocks the first grasp pose (yaw=0)."""
+    copy_world, copy_view, context = pose_grasp_world
+
+    obstacle = Body(
+        name=PrefixedName("obstacle_box"),
+        collision=ShapeCollection([Box(scale=Scale(0.07, 0.07, 0.1))]),
+        visual=ShapeCollection([Box(scale=Scale(0.07, 0.07, 0.1))]),
     )
-    return grasp_desc.grasp_pose(world.get_body_by_name(body_name))
+    with copy_world.modify_world():
+        connection = Connection6DoF.create_with_dofs(
+            copy_world,
+            copy_world.root,
+            obstacle,
+            PrefixedName("obstacle_box_connection"),
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                0.79568, 0.68311, 0.87959, reference_frame=copy_world.root
+            ),
+        )
+        copy_world.add_connection(connection)
+
+    return copy_world, copy_view, context
 
 
 def test_pose_grasp_precondition_fails_without_grasp_pose(pose_grasp_world):
@@ -108,9 +131,8 @@ def test_pose_grasp_action(pose_grasp_world, rclpy_node):
     VizMarkerPublisher(_world=pose_grasp_world[0], node=rclpy_node).with_tf_publisher()
     world, view, context = pose_grasp_world
     box_body = world.get_body_by_name("grasp_box")
-    grasp_pose = _compute_grasp_pose(world, view, "grasp_box", Arms.LEFT)
 
-    obj = GraspableBox(root=box_body, _world=world, grasp_pose=grasp_pose)
+    obj = GraspableBox(root=box_body, _world=world)
     with world.modify_world():
         world.add_semantic_annotation(obj)
 
@@ -148,3 +170,34 @@ def test_pose_grasp_and_lift_action(pose_grasp_world, rclpy_node):
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
     assert world.get_connection(left_arm.manipulator.tool_frame, box_body) is not None
+
+
+def test_pose_grasp_action_skips_blocked_pose(
+    pose_grasp_world_with_obstacle, rclpy_node
+):
+    """The obstacle blocks the first grasp pose (yaw=0); the action must fall back to a free pose."""
+    VizMarkerPublisher(
+        _world=pose_grasp_world_with_obstacle[0], node=rclpy_node
+    ).with_tf_publisher()
+    world, view, context = pose_grasp_world_with_obstacle
+    box_body = world.get_body_by_name("grasp_box")
+
+    obj = GraspableBox(root=box_body, _world=world)
+    with world.modify_world():
+        world.add_semantic_annotation(obj)
+
+    action = PoseGraspAction(target=obj, arm=Arms.LEFT)
+
+    with simulated_robot:
+        sequential(
+            [ParkArmsAction(Arms.BOTH), action],
+            context,
+        ).perform()
+
+    left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
+    tool_frame_position = (
+        left_arm.manipulator.tool_frame.global_pose.to_position().to_np()
+    )
+    box_world_position = box_body.global_pose.to_position().to_np()
+    assert tool_frame_position[:3] == pytest.approx(box_world_position[:3], abs=0.02)
+    assert action._resolved_grasp_pose is not None
