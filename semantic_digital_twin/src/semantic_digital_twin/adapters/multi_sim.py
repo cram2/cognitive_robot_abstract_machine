@@ -1,7 +1,6 @@
 import logging
 import inspect
 import os
-import shutil
 import trimesh
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -30,14 +29,14 @@ from spatial_types.spatial_types import (
     Quaternion,
 )
 from world import World
-from world_description.connections import (
+from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
     ActiveConnection1DOF,
     FixedConnection,
     Connection6DoF,
 )
-from world_description.geometry import (
+from semantic_digital_twin.world_description.geometry import (
     Box,
     Cylinder,
     Sphere,
@@ -45,7 +44,7 @@ from world_description.geometry import (
     Mesh,
     Color,
 )
-from world_description.world_entity import (
+from semantic_digital_twin.world_description.world_entity import (
     Region,
     Body,
     KinematicStructureEntity,
@@ -121,7 +120,6 @@ class GeomVisibilityAndCollisionType(IntEnum):
     """
 
 
-@dataclass
 class MultiSimError(Exception):
     """Base class for all MultiSim-related exceptions."""
 
@@ -663,14 +661,12 @@ class CameraConverter(EntityConverter, ABC):
         return camera_props
 
 
-@dataclass
 class MujocoError(MultiSimError):
     """
     Base class for all MuJoCo-related exceptions.
     """
 
 
-@dataclass
 class MujocoEntityNotFoundError(MujocoError):
     """
     Raised when a MuJoCo entity of a given type and name cannot be found.
