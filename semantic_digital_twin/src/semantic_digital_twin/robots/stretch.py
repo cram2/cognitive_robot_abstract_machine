@@ -9,14 +9,13 @@ from pathlib import Path
 from semantic_digital_twin.robots.abstract_robot import (
     AbstractRobot,
     Arm,
-    Neck,
     Finger,
     ParallelGripper,
     Camera,
     Torso,
     Base,
 )
-from semantic_digital_twin.robots.robot_mixins import HasNeck, HasArms
+from semantic_digital_twin.robots.robot_mixins import HasArms
 from semantic_digital_twin.collision_checking.collision_rules import (
     SelfCollisionMatrixRule,
     AvoidExternalCollisions,
@@ -35,7 +34,7 @@ from semantic_digital_twin.world_description.connections import ActiveConnection
 
 
 @dataclass(eq=False)
-class Stretch(AbstractRobot, HasArms, HasNeck):
+class Stretch(AbstractRobot, HasArms):
     """
     Class that describes the Stretch Robot.
     """
@@ -126,16 +125,16 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
             _world=self._world,
         )
 
-        neck = Neck(
-            name=PrefixedName("neck", prefix=self.name.name),
-            sensors=[camera_color, camera_depth, camera_infra1, camera_infra2],
-            root=self._world.get_body_by_name("link_head"),
-            tip=self._world.get_body_by_name("link_head_tilt"),
-            pitch_body=self._world.get_body_by_name("link_head_tilt"),
-            yaw_body=self._world.get_body_by_name("link_head_pan"),
-            _world=self._world,
-        )
-        self.add_neck(neck)
+        # neck = Neck(
+        #     name=PrefixedName("neck", prefix=self.name.name),
+        #     sensors=[camera_color, camera_depth, camera_infra1, camera_infra2],
+        #     root=self._world.get_body_by_name("link_head"),
+        #     tip=self._world.get_body_by_name("link_head_tilt"),
+        #     pitch_body=self._world.get_body_by_name("link_head_tilt"),
+        #     yaw_body=self._world.get_body_by_name("link_head_pan"),
+        #     _world=self._world,
+        # )
+        # self.add_neck(neck)
 
         # Create torso
         torso = Torso(

@@ -3,12 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Self
 
-from semantic_digital_twin.robots.robot_mixins import HasNeck, SpecifiesLeftRightArm
-from semantic_digital_twin.datastructures.definitions import StaticJointState, GripperState, TorsoState
+from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm
+from semantic_digital_twin.datastructures.definitions import (
+    StaticJointState,
+    GripperState,
+    TorsoState,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import (
-    Neck,
     Finger,
     ParallelGripper,
     Arm,
@@ -23,7 +26,7 @@ from semantic_digital_twin.world_description.connections import FixedConnection
 
 
 @dataclass(eq=False)
-class Armar(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
+class Armar(AbstractRobot, SpecifiesLeftRightArm):
     """
     Class that describes the Armar Robot.
     """
@@ -132,16 +135,16 @@ class Armar(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                 _world=world,
             )
 
-            neck = Neck(
-                name=PrefixedName("neck", prefix=armar.name.name),
-                sensors=[camera],
-                root=world.get_body_by_name("lower_neck_link"),
-                tip=world.get_body_by_name("upper_neck_link"),
-                pitch_body=world.get_body_by_name("neck_2_pitch_link"),
-                yaw_body=world.get_body_by_name("neck_1_yaw_link"),
-                _world=world,
-            )
-            armar.add_neck(neck)
+            # neck = Neck(
+            #     name=PrefixedName("neck", prefix=armar.name.name),
+            #     sensors=[camera],
+            #     root=world.get_body_by_name("lower_neck_link"),
+            #     tip=world.get_body_by_name("upper_neck_link"),
+            #     pitch_body=world.get_body_by_name("neck_2_pitch_link"),
+            #     yaw_body=world.get_body_by_name("neck_1_yaw_link"),
+            #     _world=world,
+            # )
+            # armar.add_neck(neck)
 
             # Create torso
             torso = Torso(

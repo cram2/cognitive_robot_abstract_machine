@@ -3,12 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Self
 
-from semantic_digital_twin.robots.robot_mixins import HasNeck, SpecifiesLeftRightArm
-from semantic_digital_twin.datastructures.definitions import StaticJointState, GripperState, TorsoState
+from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm
+from semantic_digital_twin.datastructures.definitions import (
+    StaticJointState,
+    GripperState,
+    TorsoState,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import (
-    Neck,
     Finger,
     ParallelGripper,
     Arm,
@@ -23,7 +26,7 @@ from semantic_digital_twin.world_description.connections import FixedConnection
 
 
 @dataclass(eq=False)
-class Justin(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
+class Justin(AbstractRobot, SpecifiesLeftRightArm):
     """
     Class that describes the Justin Robot.
     """
@@ -174,17 +177,16 @@ class Justin(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                 maximal_height=1.85,
                 _world=world,
             )
-
-            neck = Neck(
-                name=PrefixedName("neck", prefix=justin.name.name),
-                sensors=[camera],
-                root=world.get_body_by_name("torso4"),
-                tip=world.get_body_by_name("head2"),
-                pitch_body=world.get_body_by_name("head1"),
-                yaw_body=world.get_body_by_name("head2"),
-                _world=world,
-            )
-            justin.add_neck(neck)
+            # neck = Neck(
+            #     name=PrefixedName("neck", prefix=justin.name.name),
+            #     sensors=[camera],
+            #     root=world.get_body_by_name("torso4"),
+            #     tip=world.get_body_by_name("head2"),
+            #     pitch_body=world.get_body_by_name("head1"),
+            #     yaw_body=world.get_body_by_name("head2"),
+            #     _world=world,
+            # )
+            # justin.add_neck(neck)
 
             # Create torso
             torso = Torso(

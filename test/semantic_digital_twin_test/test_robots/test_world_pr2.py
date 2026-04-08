@@ -545,3 +545,9 @@ def test_split_chain_of_connections(pr2_world_state_reset):
     ]
     assert result1_names == chain1
     assert result2_names == chain2
+
+
+def test_pr2_mock_and_validate():
+    PR2.mock_from_urdf_file_and_validate(
+        "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+    )

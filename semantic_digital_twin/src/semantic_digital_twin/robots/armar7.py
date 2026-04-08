@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Self
 
-from semantic_digital_twin.robots.robot_mixins import HasNeck, SpecifiesLeftRightArm
+from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm
 from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     GripperState,
@@ -12,7 +12,6 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import (
-    Neck,
     Finger,
     Arm,
     Camera,
@@ -32,7 +31,7 @@ from semantic_digital_twin.world_description.connections import (
 
 
 @dataclass(eq=False)
-class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
+class Armar7(AbstractRobot, SpecifiesLeftRightArm):
     """
     Class that describes the Armar7 Robot.
     """
@@ -327,16 +326,16 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             _world=self._world,
         )
 
-        neck = Neck(
-            name=PrefixedName("neck", prefix=self.name.name),
-            sensors=[camera],
-            root=self._world.get_body_by_name("Neck_Root_link"),
-            tip=self._world.get_body_by_name("Head_Root_link"),
-            pitch_body=self._world.get_body_by_name("Neck_2_Pitch_link"),
-            yaw_body=self._world.get_body_by_name("Neck_1_Yaw_link"),
-            _world=self._world,
-        )
-        self.add_neck(neck)
+        # neck = Neck(
+        #     name=PrefixedName("neck", prefix=self.name.name),
+        #     sensors=[camera],
+        #     root=self._world.get_body_by_name("Neck_Root_link"),
+        #     tip=self._world.get_body_by_name("Head_Root_link"),
+        #     pitch_body=self._world.get_body_by_name("Neck_2_Pitch_link"),
+        #     yaw_body=self._world.get_body_by_name("Neck_1_Yaw_link"),
+        #     _world=self._world,
+        # )
+        # self.add_neck(neck)
 
         # Create torso
         torso = Torso(

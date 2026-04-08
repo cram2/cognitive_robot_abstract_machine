@@ -8,7 +8,7 @@ from typing import Self
 from importlib.resources import files
 from pathlib import Path
 
-from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm
+from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm, HasTorso
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -26,7 +26,6 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import (
-    Neck,
     Finger,
     ParallelGripper,
     Arm,
@@ -42,22 +41,19 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     FixedConnection,
 )
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False)
-class PR2(AbstractRobot, SpecifiesLeftRightArm):
+class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso):
     """
     Represents the Personal Robot 2 (PR2), which was originally created by Willow Garage.
     The PR2 robot consists of two arms, each with a parallel gripper, a head with a camera, and a prismatic torso
     """
 
     @classmethod
-    def _get_structural_root_body(cls, world: World) -> Self:
-        return cls(
-            name=PrefixedName(name="pr2", prefix=world.name),
-            root=world.get_body_by_name("base_footprint"),
-            _world=world,
-        )
+    def _get_structural_root_body(cls, world: World) -> Body:
+        return world.get_body_by_name("base_footprint")
 
     def _setup_collision_rules(self):
         """
@@ -151,6 +147,7 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm):
             manipulator=left_gripper,
             world=world,
         )
+        self.add_arm(left_arm)
 
         # Create right arm
         right_gripper_thumb = Finger.create_and_add_to_world(
@@ -182,7 +179,16 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm):
             manipulator=right_gripper,
             world=world,
         )
-        return [left_arm, right_arm]
+        self.add_arm(right_arm)
+
+    def _setup_torso(self):
+        torso = Torso.create_and_add_to_world(
+            name=PrefixedName("torso", prefix=self.name.name),
+            root_name="torso_lift_link",
+            tip_name="torso_lift_link",
+            world=self._world,
+        )
+        self.add_torso(torso)
 
     def _setup_semantic_annotations(self):
 
@@ -196,26 +202,6 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm):
             maximal_height=1.60,
             _world=self._world,
         )
-
-        neck = Neck(
-            name=PrefixedName("neck", prefix=self.name.name),
-            sensors=[camera],
-            root=self._world.get_body_by_name("head_pan_link"),
-            tip=self._world.get_body_by_name("head_tilt_link"),
-            pitch_body=self._world.get_body_by_name("head_tilt_link"),
-            yaw_body=self._world.get_body_by_name("head_pan_link"),
-            _world=self._world,
-        )
-        self.add_neck(neck)
-
-        # Create torso
-        torso = Torso(
-            name=PrefixedName("torso", prefix=self.name.name),
-            root=self._world.get_body_by_name("torso_lift_link"),
-            tip=self._world.get_body_by_name("torso_lift_link"),
-            _world=self._world,
-        )
-        self.add_torso(torso)
 
         # Create the robot base
         base = Base(

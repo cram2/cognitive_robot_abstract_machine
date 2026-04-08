@@ -9,7 +9,6 @@ from pathlib import Path
 from semantic_digital_twin.robots.abstract_robot import (
     AbstractRobot,
     Arm,
-    Neck,
     Finger,
     ParallelGripper,
     Camera,
@@ -17,7 +16,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     FieldOfView,
     Base,
 )
-from semantic_digital_twin.robots.robot_mixins import HasNeck, SpecifiesLeftRightArm
+from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -43,7 +42,7 @@ from semantic_digital_twin.world_description.connections import (
 
 
 @dataclass(eq=False)
-class Tiago(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
+class Tiago(AbstractRobot, SpecifiesLeftRightArm):
     """
     Class that describes the Take It And Go Robot (TIAGo).
     """
@@ -138,16 +137,16 @@ class Tiago(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             _world=self._world,
         )
 
-        neck = Neck(
-            name=PrefixedName("neck", prefix=self.name.name),
-            sensors=[camera],
-            root=self._world.get_body_by_name("torso_lift_link"),
-            tip=self._world.get_body_by_name("head_2_link"),
-            pitch_body=self._world.get_body_by_name("head_2_link"),
-            yaw_body=self._world.get_body_by_name("head_1_link"),
-            _world=self._world,
-        )
-        self.add_neck(neck)
+        # neck = Neck(
+        #     name=PrefixedName("neck", prefix=self.name.name),
+        #     sensors=[camera],
+        #     root=self._world.get_body_by_name("torso_lift_link"),
+        #     tip=self._world.get_body_by_name("head_2_link"),
+        #     pitch_body=self._world.get_body_by_name("head_2_link"),
+        #     yaw_body=self._world.get_body_by_name("head_1_link"),
+        #     _world=self._world,
+        # )
+        # self.add_neck(neck)
 
         # Create torso
         torso = Torso(

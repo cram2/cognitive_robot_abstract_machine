@@ -26,10 +26,9 @@ from semantic_digital_twin.robots.abstract_robot import (
     Arm,
     Camera,
     FieldOfView,
-    Neck,
     AbstractRobot,
 )
-from semantic_digital_twin.robots.robot_mixins import HasNeck, SpecifiesLeftRightArm
+from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -39,7 +38,7 @@ from semantic_digital_twin.world_description.connections import (
 
 
 @dataclass(eq=False)
-class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
+class Tracy(AbstractRobot, SpecifiesLeftRightArm):
     """
     Represents two UR10e Arms on a table, with a pole between them holding a small camera.
      Example can be found at: https://vib.ai.uni-bremen.de/page/comingsoon/the-tracebot-laboratory/
@@ -139,15 +138,15 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
         )
 
         # Probably should be classified as "Neck", as that implies that i can move.
-        neck = Neck(
-            name=PrefixedName("neck", prefix=self.name.name),
-            sensors=[camera],
-            root=self._world.get_body_by_name("camera_pole"),
-            tip=self._world.get_body_by_name("camera_link"),
-            _world=self._world,
-        )
-
-        self.add_kinematic_chain(neck)
+        # neck = Neck(
+        #     name=PrefixedName("neck", prefix=self.name.name),
+        #     sensors=[camera],
+        #     root=self._world.get_body_by_name("camera_pole"),
+        #     tip=self._world.get_body_by_name("camera_link"),
+        #     _world=self._world,
+        # )
+        #
+        # self.add_kinematic_chain(neck)
 
     def _setup_collision_rules(self):
         srdf_path = os.path.join(

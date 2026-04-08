@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod, ABC
 from collections import defaultdict
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -12,8 +13,13 @@ from typing_extensions import (
     Self,
     DefaultDict,
     List,
+    assert_never,
 )
 
+from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
+from krrood.class_diagrams.class_diagram import WrappedClass
+from krrood.class_diagrams.wrapped_field import WrappedField
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -53,6 +59,8 @@ from semantic_digital_twin.world_description.world_modification import (
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
+
+logger = logging.getLogger(__name__)
 
 _REQUIRED_FOR_ROBOT_SETUP_KEY = "__required_for_robot_setup__"
 
@@ -131,6 +139,31 @@ class RobotPart(HasRootBody, ABC):
         **kwargs,
     ) -> Self: ...
 
+    def _print_out_missing_fields(self):
+        wrapped_class = WrappedClass(self.__class__)
+        introspector = DataclassOnlyIntrospector()
+        for field_ in introspector.discover(self.__class__):
+            value = getattr(self, field_.public_name)
+            wrapped_field = WrappedField(wrapped_class, field_.field)
+            type_endpoint = wrapped_field.type_endpoint
+
+            if isinstance(value, (list, set)) and issubclass(
+                wrapped_field.contained_type, RobotPart
+            ):
+
+                if not value:
+                    logger.info(
+                        f"The field {field_.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
+                    )
+                else:
+                    for robot_part in value:
+                        robot_part._print_out_missing_fields()
+
+            elif issubclass(type_endpoint, RobotPart) and value is None:
+                logger.info(
+                    f"The field {field_.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
+                )
+
 
 @dataclass(eq=False)
 class KinematicChain(RobotPart, ABC):
@@ -177,6 +210,8 @@ class KinematicChain(RobotPart, ABC):
         Returns the connections of the kinematic chain.
         This is a list of connections between the bodies in the kinematic chain
         """
+        if self.root == self.tip:
+            return [self.root.parent_connection]
         return self._world.compute_chain_of_connections(self.root, self.tip)
 
 
@@ -263,9 +298,11 @@ class Manipulator(RobotPart, ABC):
     The axis of the manipulator's tool frame that is facing forward.
     """
 
+    is_controlled = True
+
     def __post_init__(self):
         rotation_matrix = RotationMatrix.from_quaternion(self.front_facing_orientation)
-        raise NotImplementedError("Luca Implement this correctly!")
+        # raise NotImplementedError("Luca Implement this correctly!")
         self.front_facing_axis = rotation_matrix[:2, 0]
 
 
@@ -637,13 +674,64 @@ class AbstractRobot(Agent, ABC):
 
             setup_methods = robot._get_robot_setup_methods()
             for name, setup_method in setup_methods.items():
-                setup_method(robot)
+                setup_method()
 
             robot._setup_collision_rules()
             robot._setup_velocity_limits()
             robot._setup_hardware_interfaces()
             robot._setup_joint_states()
         return robot
+
+    @classmethod
+    def mock_from_urdf_file_and_validate(cls, urdf_file: str):
+        world = URDFParser.from_file(urdf_file).parse(mock_geometry=True)
+        self = cls.from_world(world)
+        self.validate()
+
+    def validate(self) -> bool:
+
+        wrapped_class = WrappedClass(self.__class__)
+        introspector = DataclassOnlyIntrospector()
+        for field_ in introspector.discover(self.__class__):
+            value = getattr(self, field_.public_name)
+            wrapped_field = WrappedField(wrapped_class, field_.field)
+            type_endpoint = wrapped_field.type_endpoint
+
+            if isinstance(value, (list, set)) and issubclass(
+                wrapped_field.contained_type, RobotPart
+            ):
+                if not value:
+                    logger.info(
+                        f"The field {field_.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
+                    )
+                else:
+                    for robot_part in value:
+                        robot_part._print_out_missing_fields()
+            elif issubclass(type_endpoint, RobotPart):
+                logger.info(
+                    f"The field {field_.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
+                )
+
+        self_world_copy = deepcopy(self._world)
+
+        assert all(
+            (original_b.id == copy_b.id)
+            for original_b, copy_b in zip(self_world_copy.bodies, self._world.bodies)
+        )
+        assert all(
+            (original_s.id == copy_s.id)
+            for original_s, copy_s in zip(
+                self_world_copy.semantic_annotations, self._world.semantic_annotations
+            )
+        )
+        assert all(
+            (hash(original_c) == hash(copy_c))
+            for original_c, copy_c in zip(
+                self_world_copy.connections, self._world.connections
+            )
+        )
+
+        return True
 
     @classmethod
     @abstractmethod
@@ -720,28 +808,6 @@ class AbstractRobot(Agent, ABC):
         self.sensors.append(sensor)
         self._semantic_annotations.add(sensor)
         sensor.assign_to_robot(self)
-
-    def add_torso(self, torso: Torso):
-        """
-        Adds a torso to the robot's collection of kinematic chains.
-        """
-        if self.torso is not None:
-            raise ValueError(
-                f"Robot {self.name} already has a torso: {self.torso.name}."
-            )
-        self.torso = torso
-        self._semantic_annotations.add(torso)
-        torso.assign_to_robot(self)
-
-    def add_base(self, base: Base):
-        """
-        Adds the given base to the robot
-        """
-        if self.base is not None:
-            raise ValueError(f"Robot {self.name} already has a base: {self.base.name}.")
-        self.base = base
-        self._semantic_annotations.add(base)
-        base.assign_to_robot(self)
 
     def add_kinematic_chain(self, kinematic_chain: KinematicChain):
         """

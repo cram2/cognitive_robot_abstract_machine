@@ -3,12 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Self
 
-from semantic_digital_twin.robots.robot_mixins import HasNeck, HasArms
-from semantic_digital_twin.datastructures.definitions import StaticJointState, GripperState, TorsoState
+from semantic_digital_twin.robots.robot_mixins import HasArms
+from semantic_digital_twin.datastructures.definitions import (
+    StaticJointState,
+    GripperState,
+    TorsoState,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import (
-    Neck,
     Finger,
     ParallelGripper,
     Arm,
@@ -23,7 +26,7 @@ from semantic_digital_twin.world_description.connections import FixedConnection
 
 
 @dataclass(eq=False)
-class Donbot(AbstractRobot, HasArms, HasNeck):
+class Donbot(AbstractRobot, HasArms):
     """
     Class that describes the Donbot Robot.
     """
@@ -99,14 +102,14 @@ class Donbot(AbstractRobot, HasArms, HasNeck):
                 _world=world,
             )
 
-            neck = Neck(
-                name=PrefixedName("neck", prefix=donbot.name.name),
-                sensors=[camera],
-                root=world.get_body_by_name("ur5_base_link"),
-                tip=world.get_body_by_name("ur5_base_link"),
-                _world=world,
-            )
-            donbot.add_neck(neck)
+            # neck = Neck(
+            #     name=PrefixedName("neck", prefix=donbot.name.name),
+            #     sensors=[camera],
+            #     root=world.get_body_by_name("ur5_base_link"),
+            #     tip=world.get_body_by_name("ur5_base_link"),
+            #     _world=world,
+            # )
+            # donbot.add_neck(neck)
 
             # Create torso
             torso = Torso(

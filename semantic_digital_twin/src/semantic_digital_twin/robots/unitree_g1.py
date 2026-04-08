@@ -23,7 +23,6 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import (
-    Neck,
     Finger,
     Arm,
     Camera,
@@ -33,7 +32,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     Base,
     HumanoidGripper,
 )
-from semantic_digital_twin.robots.robot_mixins import HasNeck, SpecifiesLeftRightArm
+from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -43,7 +42,7 @@ from semantic_digital_twin.world_description.connections import (
 
 
 @dataclass(eq=False)
-class UnitreeG1(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
+class UnitreeG1(AbstractRobot, SpecifiesLeftRightArm):
     """
     A class representing the Unitree G1 robot by the Unitree Robotics team.
     """
@@ -208,14 +207,14 @@ class UnitreeG1(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             _world=self._world,
         )
 
-        neck = Neck(
-            name=PrefixedName("neck", prefix=self.name.name),
-            sensors=[camera],
-            root=self._world.get_body_by_name("torso_link"),
-            tip=self._world.get_body_by_name("d435_link"),
-            _world=self._world,
-        )
-        self.add_neck(neck)
+        # neck = Neck(
+        #     name=PrefixedName("neck", prefix=self.name.name),
+        #     sensors=[camera],
+        #     root=self._world.get_body_by_name("torso_link"),
+        #     tip=self._world.get_body_by_name("d435_link"),
+        #     _world=self._world,
+        # )
+        # self.add_neck(neck)
 
         # Create torso
         torso = Torso(
