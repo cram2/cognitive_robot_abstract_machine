@@ -36,7 +36,7 @@
     <visual name="SM_root_link_visual_0">
       <origin xyz="0.0 0.0 0.3138580024242401" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_root_link_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_root_link_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_root_link_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -59,7 +59,7 @@
     <visual name="SM_r_hip_1_visual_0">
       <origin xyz="-0.02160000056028366 0.040550000965595245 0.3138580024242401" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_hip_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_hip_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_hip_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -82,7 +82,7 @@
     <visual name="SM_r_hip_2_visual_0">
       <origin xyz="0.025699999183416367 0.07365000247955322 0.3228580057621002" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_hip_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_hip_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_hip_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -103,7 +103,7 @@
     <visual name="SM_r_hip_3_visual_0">
       <origin xyz="-0.010999999940395355 0.07365000247955322 0.412557989358902" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_hip_3_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_hip_3_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_hip_3_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -126,7 +126,7 @@
     <visual name="SM_r_upper_leg_visual_0">
       <origin xyz="-0.010999999940395355 0.058649998158216476 0.483458012342453" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_upper_leg_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_upper_leg_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_upper_leg_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -149,7 +149,7 @@
     <visual name="SM_r_lower_leg_visual_0">
       <origin xyz="-0.026000000536441803 0.08354999870061874 0.5896580219268799" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_lower_leg_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_lower_leg_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_lower_leg_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -172,7 +172,7 @@
     <visual name="SM_r_ankle_1_visual_0">
       <origin xyz="-0.026000000536441803 0.08304999768733978 0.8456469774246216" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_ankle_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_ankle_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_ankle_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -195,7 +195,7 @@
     <visual name="SM_r_ankle_2_visual_0">
       <origin xyz="0.026750000193715096 0.06485000252723694 0.8806470036506653" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_ankle_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_ankle_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_ankle_2_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -216,7 +216,7 @@
     <visual name="SM_r_foot_rear_visual_0">
       <origin xyz="0.01075000036507845 0.06485000252723694 0.9464470148086548" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_foot_rear_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_foot_rear_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_foot_rear_visual_0_material">
         <color rgba="1.0 0.51 0.0 1.0"/>
@@ -249,7 +249,7 @@
     <visual name="SM_r_foot_front_visual_0">
       <origin xyz="-0.10849999636411667 0.06485000252723694 0.9464470148086548" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_foot_front_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_foot_front_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_foot_front_visual_0_material">
         <color rgba="1.0 0.51 0.0 1.0"/>
@@ -272,7 +272,7 @@
     <visual name="SM_l_hip_1_visual_0">
       <origin xyz="-0.02160000056028366 -0.040449999272823334 0.3138580024242401" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_hip_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_hip_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_hip_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -295,7 +295,7 @@
     <visual name="SM_l_hip_2_visual_0">
       <origin xyz="0.02565000019967556 -0.07355000078678131 0.3228580057621002" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_hip_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_hip_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_hip_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -316,7 +316,7 @@
     <visual name="SM_l_hip_3_visual_0">
       <origin xyz="-0.011049999855458736 -0.07355000078678131 0.412557989358902" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_hip_3_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_hip_3_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_hip_3_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -339,7 +339,7 @@
     <visual name="SM_l_upper_leg_visual_0">
       <origin xyz="-0.011049999855458736 -0.05855000019073486 0.483458012342453" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_upper_leg_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_upper_leg_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_upper_leg_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -362,7 +362,7 @@
     <visual name="SM_l_lower_leg_visual_0">
       <origin xyz="-0.02604999952018261 -0.08344999700784683 0.5896580219268799" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_lower_leg_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_lower_leg_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_lower_leg_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -385,7 +385,7 @@
     <visual name="SM_l_ankle_1_visual_0">
       <origin xyz="-0.02604999952018261 -0.08295000344514847 0.8456469774246216" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_ankle_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_ankle_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_ankle_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -408,7 +408,7 @@
     <visual name="SM_l_ankle_2_visual_0">
       <origin xyz="0.02669999934732914 -0.06475000083446503 0.8806470036506653" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_ankle_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_ankle_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_ankle_2_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -429,7 +429,7 @@
     <visual name="SM_l_foot_front_visual_0">
       <origin xyz="-0.10854999721050262 -0.06475000083446503 0.9464470148086548" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_foot_front_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_foot_front_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_foot_front_visual_0_material">
         <color rgba="1.0 0.51 0.0 1.0"/>
@@ -450,7 +450,7 @@
     <visual name="SM_l_foot_rear_visual_0">
       <origin xyz="0.010700000450015068 -0.06475000083446503 0.9464470148086548" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_foot_rear_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_foot_rear_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_foot_rear_visual_0_material">
         <color rgba="1.0 0.51 0.0 1.0"/>
@@ -485,7 +485,7 @@
     <visual name="SM_torso_1_visual_0">
       <origin xyz="0.0 0.0 0.25335800647735596" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_torso_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_torso_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_torso_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -508,7 +508,7 @@
     <visual name="SM_torso_2_visual_0">
       <origin xyz="0.0 0.0 0.18085800111293793" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_torso_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_torso_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_torso_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -531,7 +531,7 @@
     <visual name="SM_chest_visual_0">
       <origin xyz="0.0 0.0 0.1163880005478859" rpy="0.0 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_chest_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_chest_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_chest_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -576,7 +576,7 @@
     <visual name="SM_neck_1_visual_0">
       <origin xyz="0.00865000020712614 0.0 0.04899999871850014" rpy="-1.5707963705062866 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_head_neck_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_head_neck_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_neck_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -599,7 +599,7 @@
     <visual name="SM_neck_2_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="-1.5707963705062866 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_head_neck_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_head_neck_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_neck_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -622,7 +622,7 @@
     <visual name="SM_neck_3_visual_0">
       <origin xyz="0.0 0.0 -0.009500499814748764" rpy="-1.5707963705062866 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_head_neck_3_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_head_neck_3_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_neck_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -645,7 +645,7 @@
     <visual name="SM_head_visual_0">
       <origin xyz="0.0 0.0 -0.07865049690008163" rpy="-1.5707963705062866 0.0 -1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_head_head_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_head_head_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_head_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -758,7 +758,7 @@
     <visual name="SM_r_shoulder_1_visual_0">
       <origin xyz="0.030411234125494957 0.02914046309888363 0.019095774739980698" rpy="-0.0668872520327568 0.244452565908432 -1.8408154249191284"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_shoulder_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_shoulder_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_shoulder_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -781,7 +781,7 @@
     <visual name="SM_r_shoulder_2_visual_0">
       <origin xyz="0.023893259465694427 0.14064089953899384 0.017434528097510338" rpy="-0.12008540332317352 0.2297886610031128 -1.8533143997192383"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_shoulder_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_shoulder_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_shoulder_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -802,7 +802,7 @@
     <visual name="SM_r_shoulder_3_visual_0">
       <origin xyz="0.030743205919861794 0.14064067602157593 0.07173451036214828" rpy="-0.12008540332317352 0.2297886610031128 -1.8533143997192383"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_shoulder_3_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_shoulder_3_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_shoulder_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -825,7 +825,7 @@
     <visual name="SM_r_upper_arm_visual_0">
       <origin xyz="0.030743123963475227 0.1406402587890625 0.09423445165157318" rpy="-0.12008540332317352 0.2297886610031128 -1.8533143997192383"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_upperarm_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_upperarm_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_upper_arm_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -848,7 +848,7 @@
     <visual name="SM_r_elbow_1_visual_0">
       <origin xyz="0.020743191242218018 0.13914062082767487 0.21793478727340698" rpy="-0.12008540332317352 0.2297886610031128 -1.8533143997192383"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_elbow_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_elbow_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_elbow_1_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -871,7 +871,7 @@
     <visual name="SM_r_forearm_visual_0">
       <origin xyz="0.03574306145310402 0.14114026725292206 0.27323484420776367" rpy="-0.12008540332317352 0.2297886610031128 -1.8533143997192383"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_forearm_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_forearm_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_forearm_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -894,7 +894,7 @@
     <visual name="SM_r_wrist_1_visual_0">
       <origin xyz="0.019443107768893242 0.14314770698547363 0.380734920501709" rpy="-0.12008540332317352 0.2297886610031128 -1.8533143997192383"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_r_wrist_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_r_wrist_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_wrist_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -917,7 +917,7 @@
     <visual name="SM_r_hand_visual_0">
       <origin xyz="0.0027160674799233675 -0.0015567999798804522 -0.0024823539424687624" rpy="-1.5707963705062866 0.26179930567741394 2.069615773247005e-13"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightHandPalm.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightHandPalm.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -926,7 +926,7 @@
     <visual name="SM_r_hand_visual_1">
       <origin xyz="-0.05765429884195328 -0.005556799937039614 0.013693831861019135" rpy="-1.5707963705062866 -0.26179930567741394 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightTopCover.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightTopCover.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_r_hand_visual_1_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -949,7 +949,7 @@
     <visual name="SM_r_hand_thumb_0_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 3.1415927410125732 1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightThumb0.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightThumb0.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_thumb_0_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -972,7 +972,7 @@
     <visual name="SM_r_hand_thumb_1_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightThumb1.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightThumb1.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_thumb_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -995,7 +995,7 @@
     <visual name="SM_r_hand_thumb_2_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightThumb2.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightThumb2.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_thumb_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1018,7 +1018,7 @@
     <visual name="SM_r_hand_thumb_3_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightThumb3.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightThumb3.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_thumb_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1053,7 +1053,7 @@
     <visual name="SM_r_hand_index_0_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightIndex0.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightIndex0.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_index_0_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1076,7 +1076,7 @@
     <visual name="SM_r_hand_index_1_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightIndex1.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightIndex1.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_index_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1099,7 +1099,7 @@
     <visual name="SM_r_hand_index_2_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightIndex2.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightIndex2.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_index_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1122,7 +1122,7 @@
     <visual name="SM_r_hand_index_3_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightIndex3.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightIndex3.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_index_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1157,7 +1157,7 @@
     <visual name="SM_r_hand_middle_0_visual_0">
       <origin xyz="0.0 0.0 0.0035000001080334187" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightMiddle0.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightMiddle0.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_middle_0_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1180,7 +1180,7 @@
     <visual name="SM_r_hand_middle_1_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightMiddle1.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightMiddle1.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_middle_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1203,7 +1203,7 @@
     <visual name="SM_r_hand_middle_2_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightMiddle2.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightMiddle2.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_middle_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1226,7 +1226,7 @@
     <visual name="SM_r_hand_middle_3_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightMiddle3.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightMiddle3.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_middle_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1261,7 +1261,7 @@
     <visual name="SM_r_hand_ring_0_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightRing0.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightRing0.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_ring_0_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1284,7 +1284,7 @@
     <visual name="SM_r_hand_ring_1_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightRing1.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightRing1.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_ring_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1307,7 +1307,7 @@
     <visual name="SM_r_hand_ring_2_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightRing2.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightRing2.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_ring_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1330,7 +1330,7 @@
     <visual name="SM_r_hand_ring_3_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightRing3.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightRing3.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_ring_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1365,7 +1365,7 @@
     <visual name="SM_r_hand_little_0_visual_0">
       <origin xyz="0.0 0.0 0.003800000064074993" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightLittle0.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightLittle0.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_little_0_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1388,7 +1388,7 @@
     <visual name="SM_r_hand_little_1_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightLittle1.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightLittle1.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_little_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1411,7 +1411,7 @@
     <visual name="SM_r_hand_little_2_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightLittle2.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightLittle2.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_little_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1434,7 +1434,7 @@
     <visual name="SM_r_hand_little_3_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_RightLittle3.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_RightLittle3.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_r_hand_little_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1481,7 +1481,7 @@
     <visual name="SM_l_shoulder_1_visual_0">
       <origin xyz="0.03041122294962406 -0.029140478000044823 0.0190957672894001" rpy="-0.06688748300075531 -0.24445247650146484 -1.3007776737213135"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_shoulder_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_shoulder_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_shoulder_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1504,7 +1504,7 @@
     <visual name="SM_l_shoulder_2_visual_0">
       <origin xyz="0.026393096894025803 -0.14064030349254608 0.017434481531381607" rpy="-0.12008543312549591 -0.22978873550891876 -1.2882781028747559"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_shoulder_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_shoulder_2_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_shoulder_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1525,7 +1525,7 @@
     <visual name="SM_l_shoulder_3_visual_0">
       <origin xyz="0.030743230134248734 -0.14064067602157593 0.07173451781272888" rpy="-0.12008543312549591 -0.22978873550891876 -1.2882781028747559"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_shoulder_3_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_shoulder_3_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_shoulder_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1548,7 +1548,7 @@
     <visual name="SM_l_upper_arm_visual_0">
       <origin xyz="0.030743148177862167 -0.1406402438879013 0.09423445910215378" rpy="-0.12008543312549591 -0.22978873550891876 -1.2882781028747559"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_upperarm_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_upperarm_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_upper_arm_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -1571,7 +1571,7 @@
     <visual name="SM_l_elbow_1_visual_0">
       <origin xyz="0.020743217319250107 -0.13914059102535248 0.21793480217456818" rpy="-0.12008543312549591 -0.22978873550891876 -1.2882781028747559"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_elbow_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_elbow_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_elbow_1_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -1594,7 +1594,7 @@
     <visual name="SM_l_forearm_visual_0">
       <origin xyz="0.03574308753013611 -0.14114023745059967 0.27323487401008606" rpy="-0.12008543312549591 -0.22978873550891876 -1.2882781028747559"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_forearm_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_forearm_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_forearm_visual_0_material">
         <color rgba="0.3 0.3 0.3 1.0"/>
@@ -1617,7 +1617,7 @@
     <visual name="SM_l_wrist_1_visual_0">
       <origin xyz="0.01914307288825512 -0.14314714074134827 0.38073450326919556" rpy="-0.12008543312549591 -0.22978873550891876 -1.2882781028747559"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/sim_icub3_l_wrist_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
+        <mesh filename="file://iCub/meshes/stl/sim_icub3_l_wrist_1_prt.stl" scale="0.0010000000474974513 0.0010000000474974513 0.0010000000474974513"/>
       </geometry>
       <material name="SM_l_wrist_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1640,7 +1640,7 @@
     <visual name="SM_l_hand_visual_0">
       <origin xyz="-0.0027160674799233675 -0.0015567999798804522 -0.0024823539424687624" rpy="1.5707963705062866 -0.26179930567741394 3.3224480235523256e-17"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftHandPalm.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftHandPalm.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1649,7 +1649,7 @@
     <visual name="SM_l_hand_visual_1">
       <origin xyz="0.05765429884195328 -0.005556799937039614 0.013693831861019135" rpy="-1.5707963705062866 -0.26179930567741394 5.746937229130156e-17"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftTopCover.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftTopCover.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_visual_1_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1684,7 +1684,7 @@
     <visual name="SM_l_hand_thumb_0_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftThumb0.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftThumb0.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_thumb_0_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1707,7 +1707,7 @@
     <visual name="SM_l_hand_thumb_1_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftThumb1.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftThumb1.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_thumb_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1730,7 +1730,7 @@
     <visual name="SM_l_hand_thumb_2_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftThumb2.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftThumb2.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_thumb_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1753,7 +1753,7 @@
     <visual name="SM_l_hand_thumb_3_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 3.1415927410125732 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftThumb3.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftThumb3.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_thumb_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1788,7 +1788,7 @@
     <visual name="SM_l_hand_index_0_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftIndex0.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftIndex0.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_index_0_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1811,7 +1811,7 @@
     <visual name="SM_l_hand_index_1_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftIndex1.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftIndex1.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_index_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1834,7 +1834,7 @@
     <visual name="SM_l_hand_index_2_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftIndex2.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftIndex2.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_index_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1857,7 +1857,7 @@
     <visual name="SM_l_hand_index_3_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftIndex3.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftIndex3.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_index_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1892,7 +1892,7 @@
     <visual name="SM_l_hand_middle_0_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftMiddle0.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftMiddle0.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_middle_0_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1915,7 +1915,7 @@
     <visual name="SM_l_hand_middle_1_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftMiddle1.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftMiddle1.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_middle_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1938,7 +1938,7 @@
     <visual name="SM_l_hand_middle_2_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftMiddle2.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftMiddle2.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_middle_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1961,7 +1961,7 @@
     <visual name="SM_l_hand_middle_3_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftMiddle3.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftMiddle3.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_middle_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -1996,7 +1996,7 @@
     <visual name="SM_l_hand_ring_0_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftRing0.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftRing0.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_ring_0_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -2019,7 +2019,7 @@
     <visual name="SM_l_hand_ring_1_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="1.5707963705062866 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftRing1.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftRing1.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_ring_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -2042,7 +2042,7 @@
     <visual name="SM_l_hand_ring_2_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftRing2.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftRing2.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_ring_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -2065,7 +2065,7 @@
     <visual name="SM_l_hand_ring_3_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftRing3.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftRing3.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_ring_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -2100,7 +2100,7 @@
     <visual name="SM_l_hand_little_0_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="-3.1415927410125732 -1.5707963705062866 1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftLittle0.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftLittle0.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_little_0_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -2123,7 +2123,7 @@
     <visual name="SM_l_hand_little_1_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 3.1415927410125732 1.5707963705062866"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftLittle1.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftLittle1.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_little_1_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -2146,7 +2146,7 @@
     <visual name="SM_l_hand_little_2_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftLittle2.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftLittle2.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_little_2_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
@@ -2169,7 +2169,7 @@
     <visual name="SM_l_hand_little_3_visual_0">
       <origin xyz="0.0 0.0 0.0" rpy="3.1415927410125732 0.0 3.1415927410125732"/>
       <geometry>
-        <mesh filename="/home/sorin/dev/Segmind/iCub/meshes/stl/full_LeftLittle3.stl" scale="1.0 1.0 1.0"/>
+        <mesh filename="file://iCub/meshes/stl/full_LeftLittle3.stl" scale="1.0 1.0 1.0"/>
       </geometry>
       <material name="SM_l_hand_little_3_visual_0_material">
         <color rgba="0.9 0.9 0.9 1.0"/>
