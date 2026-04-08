@@ -27,7 +27,7 @@ class SegmindStatechart:
     relation history, and logging utilities.
     """
 
-    def build_statechart(self, context: SegmindContext):
+    def build_statechart(self, context: SegmindContext) -> DetectorStateChart:
         """
         Build a statechart with various detector nodes.
 
@@ -37,12 +37,8 @@ class SegmindStatechart:
         containment detection. Once initialized, the statechart is populated with these
         nodes for future state management.
 
-        Parameters:
-        context (SegmindContext): The context object that contains the necessary information
-                                  and resources required by all detectors.
-
-        Returns:
-        DetectorStateChart: A statechart instance populated with initialized detection nodes.
+        :param context: The shared context for the statechart.
+        :return: A statechart instance with detector nodes.
         """
 
         sc = DetectorStateChart()

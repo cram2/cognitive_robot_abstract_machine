@@ -48,13 +48,9 @@ class PlacingDetector(AbstractInteractionDetector):
         to detect new events that can be generated. This function ensures distinct
         events are created by maintaining exclusivity through a pairing mechanism.
 
-        Args:
-            obj (List[Body]): Input list of body objects to be processed. Currently
-                              not utilized in the function logic.
 
-        Returns:
-            List[Event]: A list of PlacingEvent instances generated after analyzing
-                         stop translation and support events.
+        :param obj: List of bodies to analyze for potential placing events.
+        :return: List of generated placing events based on observed interactions.
         """
         stop_translation_event = [
             i
@@ -111,12 +107,8 @@ class PickUpDetector(AbstractInteractionDetector):
         timestamp, determines if they are exclusive, and creates a new event when conditions
         are met.
 
-        Parameters:
-            obj (List[Body]): A list of body objects to update the context and analyze events.
-
-        Returns:
-            List[Event]: A list of generated events based on the processed relationships
-            between translation and loss of support events.
+        :param obj: List of bodies to analyze for potential pickup events.
+        :return: List of generated pickup events based on observed interactions.
         """
         translation_event = [
             i

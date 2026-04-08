@@ -39,7 +39,6 @@ class HasPrimaryTrackedObject:
         self.tracked_object = tracked_object
 
     def __post_init__(self):
-        self.tracked_object_frozen_cp = self.tracked_object_frozen_cp
         self.world_frozen_cp = self.tracked_object._world.__deepcopy__(
             memo={id(self.tracked_object._world): self.tracked_object._world}
         )

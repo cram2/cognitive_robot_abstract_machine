@@ -166,13 +166,8 @@ class ContainmentDetector(BaseContainmentDetector):
         objects, compares the current containment status against the latest tracked
         data, and generates events for any newly identified containment relationships.
 
-        Parameters:
-        objects_to_check: List[Body]
-            A list of objects to evaluate for containment pairs.
-
-        Returns:
-        List[Event]
-            A list of containment events generated based on new containment pairs.
+        :param objects_to_check: List of Body objects to check for containment changes.
+        :return: List of ContainmentEvent objects representing newly established containments.
         """
         new_containment_pairs = self.get_containment_pairs(objects_to_check)
         latest_containment = self.context.latest_containments
@@ -206,10 +201,6 @@ class LossOfContainmentDetector(BaseContainmentDetector):
     class extends BaseContainmentDetector and utilizes its utilities for containment
     verification and context management.
 
-    Methods:
-        update_context_and_events: Updates the containment context with new states and generates
-        loss of containment events.
-
     """
     def update_context_and_events(
         self, objects_to_check: List[Body]
@@ -222,14 +213,8 @@ class LossOfContainmentDetector(BaseContainmentDetector):
         stored state in the context. If any containments have been lost, it removes
         them from the context and generates corresponding events.
 
-        Parameters:
-        objects_to_check: List[Body]
-            A list of Body objects to verify for updated containment relationships.
-
-        Returns:
-        List[Event]
-            A list of events representing the loss of containments between tracked
-            objects and their corresponding contained objects.
+        :param objects_to_check: List of Body objects to check for containment loss.
+        :return: List of LossOfContainmentEvent objects representing the loss of containment.
         """
         new_containment_pairs = self.get_containment_pairs(objects_to_check)
         latest_containment = self.context.latest_containments
@@ -280,11 +265,8 @@ class InsertionDetector(AbstractDetector):
         pairs that have already been processed and ensures exclusivity during event
         generation.
 
-        Args:
-            tracked_objs (List[Body]): List of tracked objects to analyze.
-
-        Returns:
-            List[Event]: A list of generated events after processing the tracked objects.
+        :param tracked_objs: List of Body objects to analyze for insertion events.
+        :return List of InsertionEvent objects representing detected insertions.
         """
         events = []
         contact_events = [i for i in self.context.logger.get_events() if isinstance(i, ContactEvent)]

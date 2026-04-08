@@ -143,6 +143,13 @@ class AbstractDetector(ABC, DetectorStateChartNode):
 
 
     def get_relation(self, tracked_objects: List[Body], predicate) -> Dict[Body, Set[Body]]:
+        """
+        Get the relation between tracked objects.
+
+        :param tracked_objects: List of bodies to check for contact changes.
+        :param predicate: Function that returns true if the objects are related.
+        :return: Dictionary mapping bodies to sets of related bodies.
+        """
 
         related_bodies: Dict[Body, Set[Body]] = {}
         bodies_with_collision = self.context.world.bodies_with_collision

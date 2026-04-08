@@ -61,10 +61,8 @@ class ObjectTracker:
         status storage. It uses the object's context and body information
         to retrieve this status.
 
-        Returns
-        -------
-        bool
-            Indicates True if the object is moving, otherwise False.
+        :return: Indicates True if the object is moving, otherwise False.
+        :rtype: bool
         """
         with self._lock:
             return self.context.object_moving_status[self.body]
@@ -77,8 +75,8 @@ class ObjectTracker:
         The event is appended to the event history, and the history is
         then sorted based on the timestamp of each event.
 
-        Parameters:
-            event (Event): The event to be added to the history.
+        :param event: The event to be added to the history.
+        :type event: Event
         """
         with self._lock:
             self._event_history.append(event)
@@ -93,8 +91,8 @@ class ObjectTracker:
         The event history is thread-safe and is accessed under a lock
         to ensure consistent data.
 
-        Returns:
-            List[Event]: A list of events recorded in the event history.
+        :return: A list of events recorded in the event history.
+        :rtype: List[Event]
         """
         with self._lock:
             return self._event_history
@@ -115,11 +113,8 @@ class ObjectTracker:
         """
         Retrieves the most recent event from the event history.
 
-        Returns
-        -------
-        Optional[Event]
-            The latest event from the event history, or None if the
-            history is empty.
+        :return: The latest event from the event history, or None if the history is empty.
+        :rtype: Optional[Event]
         """
         with self._lock:
             try:
@@ -135,12 +130,8 @@ class ObjectTracker:
         This method searches through the event history in reverse order to find the
         most recent event that matches the given event type.
 
-        Args:
-            event_type (Type[Event]): The type of the event to search for.
-
-        Returns:
-            Optional[Event]: The most recent event of the specified type if found,
-            otherwise None.
+        :param event_type: The type of the event to search for.
+        :return: The most recent event of the specified type if found, otherwise None.
         """
         with self._lock:
             for event in reversed(self._event_history):
@@ -157,12 +148,8 @@ class ObjectTracker:
         prior to the given timestamp. If such an event is found, it is returned;
         otherwise, None is returned.
 
-        Parameters:
-        timestamp (float): The reference timestamp to compare against.
-
-        Returns:
-        Optional[Event]: The first event occurring before the given timestamp, or
-        None if no such event exists.
+        :param timestamp: The reference timestamp to compare against.
+        :return: The first event occurring before the given timestamp, or None if no such event exists.
         """
         with self._lock:
             first_event_index = self.get_index_of_first_event_before(timestamp)
@@ -175,15 +162,11 @@ class ObjectTracker:
         Uses the provided timestamp to locate the first event in the event
         history that occurs after the specified time.
 
-        Parameters:
-        timestamp: float
-            The reference timestamp, in seconds, after which the event is
-            searched for.
+        :param timestamp: The reference timestamp, in seconds, after which the event is searched for.
+        :type timestamp: float
 
-        Returns:
-        Optional[Event]
-            The first event occurring after the given timestamp, or None if
-            no such event exists.
+        :return: The first event occurring after the given timestamp, or None if no such event exists.
+        :rtype: Optional[Event]
         """
         with self._lock:
             first_event_index = self.get_index_of_first_event_after(timestamp)
@@ -194,48 +177,32 @@ class ObjectTracker:
         """
         Returns the nearest event of a specified type to a given event.
 
-        This method finds and returns the nearest event of a given event type that is
-        close to the provided event's timestamp. Optionally, a tolerance can be
-        specified to limit the search to a specific time range.
+        :param event: The reference event.
+        :type event: Event
+        :param event_type: The type of event to search for.
+        :type event_type: Type[Event]
+        :param tolerance: Maximum allowed time difference.
+        :type tolerance: Optional[timedelta]
 
-        Parameters:
-        event: Event
-            The reference event whose timestamp will be used for finding the nearest
-            event.
-        event_type: Type[Event]
-            The type of event to search for.
-        tolerance: Optional[timedelta]
-            A timedelta object specifying the maximum allowable time difference
-            between the reference event's timestamp and the candidate event. If None,
-            no tolerance limit will be applied.
-
-        Returns:
-        Optional[EventUnion]
-            The nearest event of the specified type to the provided event. Returns None
-            if no event of the specified type is found within the given tolerance.
+        :return: The nearest matching event or None.
+        :rtype: Optional[EventUnion]
         """
         return self.get_nearest_event_of_type_to_timestamp(event.timestamp, event_type, tolerance)
 
     def get_nearest_event_of_type_to_timestamp(self, timestamp: float, event_type: Type[Event],
                                                tolerance: Optional[timedelta] = None) -> Optional[Event]:
         """
-        Finds the nearest event of a specified type to a given timestamp within an optional tolerance.
+        Finds the nearest event of a specified type to a timestamp.
 
-        This method searches for the event of the specified type in the event history whose
-        timestamp is closest to the provided timestamp. An optional tolerance can be specified
-        to limit the search to only events within the defined time range. If a matching event is
-        found, it returns the event, otherwise returns None.
+        :param timestamp: Reference timestamp.
+        :type timestamp: float
+        :param event_type: Event type to search for.
+        :type event_type: Type[Event]
+        :param tolerance: Maximum allowed time difference.
+        :type tolerance: Optional[timedelta]
 
-        Parameters:
-            timestamp (float): The reference timestamp to which the nearest event is to be found.
-            event_type (Type[Event]): The type of event to search for in the event history.
-            tolerance (Optional[timedelta]): The maximum allowed time difference between the
-                                              reference timestamp and the event's timestamp. If
-                                              None, no tolerance is applied.
-
-        Returns:
-            Optional[Event]: The event of the specified type closest to the given timestamp, or
-                             None if no such event is found.
+        :return: Closest event or None.
+        :rtype: Optional[Event]
         """
         with self._lock:
             time_stamps = self.time_stamps_array
@@ -249,24 +216,15 @@ class ObjectTracker:
 
     def get_nearest_event_to(self, timestamp: float, tolerance: Optional[timedelta] = None) -> Optional[Event]:
         """
-        Finds the nearest event to the given timestamp.
+        Finds the nearest event to a timestamp.
 
-        This method searches for an event in the stored event history whose
-        timestamp is closest to the provided timestamp. An optional tolerance
-        can be specified to restrict the maximum difference between the
-        timestamp and the nearest event's timestamp.
+        :param timestamp: Target timestamp.
+        :type timestamp: float
+        :param tolerance: Optional tolerance.
+        :type tolerance: Optional[timedelta]
 
-        Parameters:
-            timestamp (float): The target timestamp to which the nearest event
-                should be identified.
-            tolerance (Optional[timedelta], optional): The maximum allowable
-                difference between the given timestamp and the nearest event's
-                timestamp. Default is None, meaning no restriction.
-
-        Returns:
-            Optional[Event]: The event from the event history that is closest
-                to the provided timestamp. Returns None if no such event is
-                found or if the tolerance is exceeded.
+        :return: Nearest event or None.
+        :rtype: Optional[Event]
         """
         with self._lock:
             time_stamps = self.time_stamps_array
@@ -277,23 +235,17 @@ class ObjectTracker:
     def _get_nearest_index(self, time_stamps: np.ndarray,
                            timestamp: float, tolerance: Optional[timedelta] = None) -> Optional[int]:
         """
-        Finds the nearest index in a sorted array of timestamps to a given timestamp.
+        Finds the nearest index to a timestamp.
 
-        This method determines the index of the timestamp in the provided array that is
-        closest to the given timestamp. If a tolerance is specified, the method ensures
-        that the nearest timestamp is within the tolerance range. If no timestamp meets
-        this condition, the method returns None.
+        :param time_stamps: Array of timestamps.
+        :type time_stamps: np.ndarray
+        :param timestamp: Target timestamp.
+        :type timestamp: float
+        :param tolerance: Optional tolerance.
+        :type tolerance: Optional[timedelta]
 
-        Parameters:
-        time_stamps (np.ndarray): A sorted array of timestamps.
-        timestamp (float): The target timestamp to find the nearest value for.
-        tolerance (Optional[timedelta]): A tolerance value within which the
-            difference between the nearest timestamp and the given timestamp is
-            acceptable. Defaults to None.
-
-        Returns:
-        Optional[int]: The index of the nearest timestamp if within the allowed
-            tolerance, otherwise None.
+        :return: Index or None.
+        :rtype: Optional[int]
         """
         with self._lock:
             nearest_event_index = np.argmin(np.abs(time_stamps - timestamp))
@@ -301,68 +253,45 @@ class ObjectTracker:
                 return None
             return nearest_event_index
 
-    def get_nearest_event_to_event_with_conditions(self, event: Event, conditions: Callable[[Event], bool]) -> Optional[Event]:
+    def get_nearest_event_to_event_with_conditions(self, event: Event, conditions: Callable[[Event], bool]) -> Optional[
+        Event]:
         """
-        Finds the nearest event to a given event that satisfies the specified conditions.
+        Finds nearest event to another event matching conditions.
 
-        The method identifies events sorted by their proximity to the given event and
-        applies the provided conditions to filter them. If no event satisfies the
-        conditions, None is returned.
+        :param event: Reference event.
+        :type event: Event
+        :param conditions: Filtering function.
+        :type conditions: Callable[[Event], bool]
 
-        Args:
-            event: The reference event to which the proximity is evaluated.
-            conditions: A callable function that determines whether an event satisfies
-                the specified conditions.
-
-        Returns:
-            An Event object that is nearest to the specified event and satisfies the
-            conditions, or None if no such event is found.
+        :return: Matching event or None.
+        :rtype: Optional[Event]
         """
         with self._lock:
             events = self.get_events_sorted_by_nearest_to_event(event)
             found_events = self.get_event_where(conditions, events=[e[0] for e in events])
-            if len(found_events) == 0:
-                return None
-            else:
-                return found_events[0]
+            return found_events[0] if found_events else None
 
     def get_events_sorted_by_nearest_to_event(self, event: Event):
         """
-        Gets events sorted by their proximity to a specified event.
+        Sorts events by proximity to an event.
 
-        This method retrieves events and sorts them based on their
-        closeness in time to the provided event's timestamp. It
-        uses the `event.timestamp` attribute to determine the
-        proximity of other events.
+        :param event: Reference event.
+        :type event: Event
 
-        Args:
-            event (Event): The event whose timestamp will be used to
-            calculate proximity for sorting.
-
-        Returns:
-            list: A list of events sorted by their closeness to the
-            specified event's timestamp.
+        :return: Sorted events.
+        :rtype: list
         """
         return self.get_events_sorted_by_nearest_to_timestamp(event.timestamp)
 
     def get_events_sorted_by_nearest_to_timestamp(self, timestamp: float) -> List[Tuple[Event, float]]:
         """
-        Returns a list of events sorted by their temporal proximity to the given timestamp.
+        Sorts events by proximity to a timestamp.
 
-        This method computes the absolute difference between the provided timestamp and
-        each event's timestamp, then sorts the events in ascending order of those
-        differences. It ensures thread safety while accessing shared data and the
-        returned list contains tuples where each tuple consists of an event and its
-        corresponding time difference.
+        :param timestamp: Reference timestamp.
+        :type timestamp: float
 
-        Parameters:
-            timestamp (float): The reference timestamp to evaluate temporal proximity
-                               for the events.
-
-        Returns:
-            List[Tuple[Event, float]]: A list of tuples where each tuple contains an
-                                       event and the absolute time difference between
-                                       the event's timestamp and the provided timestamp.
+        :return: List of (event, time difference).
+        :rtype: List[Tuple[Event, float]]
         """
         with self._lock:
             time_stamps = self.time_stamps_array
@@ -373,37 +302,29 @@ class ObjectTracker:
 
     def get_first_event_of_type_after_event(self, event_type: Type[Event], event: Event) -> Optional[EventUnion]:
         """
-        Gets the first event of a specified type that occurs after the given event.
+        Gets the first event of a type after an event.
 
-        This method searches for an event of the specified type that has a timestamp
-        occurring after the given event's timestamp. If no such event exists, it
-        returns None.
+        :param event_type: Event type.
+        :type event_type: Type[Event]
+        :param event: Reference event.
+        :type event: Event
 
-        Args:
-            event_type: The type of event to search for.
-            event: The reference event after which the search is performed.
-
-        Returns:
-            The first event of the specified type occurring after the given event, or
-            None if no matching event is found.
+        :return: Matching event or None.
+        :rtype: Optional[EventUnion]
         """
         return self.get_first_event_of_type_after_timestamp(event_type, event.timestamp)
 
     def get_first_event_of_type_after_timestamp(self, event_type: Type[Event], timestamp: float) -> Optional[Event]:
         """
-        Retrieves the first event of a specified type that occurs after a given timestamp.
+        Gets first event of a type after a timestamp.
 
-        Searches through an event history starting from the first event that occurs
-        after the provided timestamp. Returns the first event of the specified type
-        if found; otherwise, returns None.
+        :param event_type: Event type.
+        :type event_type: Type[Event]
+        :param timestamp: Reference timestamp.
+        :type timestamp: float
 
-        Args:
-            event_type (Type[Event]): The type of event to search for.
-            timestamp (float): The timestamp after which the search should begin.
-
-        Returns:
-            Optional[Event]: The first event of the specified type occurring after
-            the given timestamp, or None if no such event exists.
+        :return: Matching event or None.
+        :rtype: Optional[Event]
         """
         with self._lock:
             start_index = self.get_index_of_first_event_after(timestamp)
@@ -414,131 +335,97 @@ class ObjectTracker:
 
     def get_first_event_of_type_before_event(self, event_type: Type[Event], event: Event) -> Optional[EventUnion]:
         """
-        Returns the first event of a specified type that occurred before a given event.
+        Gets first event of a type before an event.
 
-        This method retrieves the earliest event of a specified type that occurred prior to the timestamp of the provided
-        event. If no such event is found, the method returns None.
+        :param event_type: Event type.
+        :type event_type: Type[Event]
+        :param event: Reference event.
+        :type event: Event
 
-        Parameters:
-        event_type: Type[Event]
-            The type of event to search for.
-        event: Event
-            The reference event to determine the timestamp before which the search is conducted.
-
-        Returns:
-        Optional[EventUnion]
-            The first event of the specified type found before the given event, or None if no such event exists.
+        :return: Matching event or None.
+        :rtype: Optional[EventUnion]
         """
         return self.get_first_event_of_type_before_timestamp(event_type, event.timestamp)
 
     def get_first_event_of_type_before_timestamp(self, event_type: Type[Event], timestamp: float) -> Optional[Event]:
         """
-        Retrieves the first event of a specified type that occurred before the given
-        timestamp. This function searches the event history in reverse order, starting
-        from the most recent event before the provided timestamp.
+        Gets first event of a type before a timestamp.
 
-        Parameters:
-        event_type: Type[Event]
-            The type of event to look for in the event history.
-        timestamp: float
-            The reference timestamp. The function looks for the first event that
-            occurred before this time.
+        :param event_type: Event type.
+        :type event_type: Type[Event]
+        :param timestamp: Reference timestamp.
+        :type timestamp: float
 
-        Returns:
-        Optional[Event]
-            The first event of the specified type that occurred before the given
-            timestamp, or None if no such event is found.
+        :return: Matching event or None.
+        :rtype: Optional[Event]
         """
         with self._lock:
             start_index = self.get_index_of_first_event_before(timestamp)
             if start_index is not None:
-                for event in reversed(self._event_history[:min(start_index+1, len(self._event_history))]):
+                for event in reversed(self._event_history[:min(start_index + 1, len(self._event_history))]):
                     if isinstance(event, event_type):
                         return event
 
     def get_index_of_first_event_after(self, timestamp: float) -> Optional[int]:
         """
-        Returns the index of the first event occurring after the specified timestamp.
+        Gets index of first event after timestamp.
 
-        This method searches through an array of event timestamps and identifies the
-        index of the first event that occurs strictly after the provided timestamp. If
-        no such event is found, it returns None.
+        :param timestamp: Reference timestamp.
+        :type timestamp: float
 
-        Parameters:
-        timestamp: float
-            The timestamp to compare events against.
-
-        Returns:
-        Optional[int]
-            The index of the first event occurring after the specified timestamp, or
-            None if no such event exists.
+        :return: Index or None.
+        :rtype: Optional[int]
         """
         with self._lock:
             time_stamps = self.time_stamps_array
             try:
                 return np.where(time_stamps > timestamp)[0][0]
             except IndexError:
-                logger.error(f"No events after timestamp {timestamp}")
                 return None
 
     def get_index_of_first_event_before(self, timestamp: float) -> Optional[int]:
         """
-        Finds the index of the first event that occurred before the given timestamp.
+        Gets index of first event before timestamp.
 
-        This method iterates through the `time_stamps_array` to check if there are
-        timestamps that are less than the specified `timestamp`. It returns the
-        index of the most recent such event or `None` if no such event exists.
+        :param timestamp: Reference timestamp.
+        :type timestamp: float
 
-        Args:
-            timestamp: Timestamp to compare against the elements in the
-            `time_stamps_array`.
-
-        Returns:
-            The index of the first event occurring before the provided
-            timestamp or `None` if no such event is found.
+        :return: Index or None.
+        :rtype: Optional[int]
         """
         with self._lock:
             time_stamps = self.time_stamps_array
             try:
                 return np.where(time_stamps < timestamp)[0][-1]
             except IndexError:
-                logger.error(f"No events before timestamp {timestamp}")
                 return None
 
     def get_events_between_two_events(self, event1: Event, event2: Event) -> List[Event]:
         """
-        Returns a list of events that occur between two specified events, excluding the boundary events.
+        Gets events between two events.
 
-        This method identifies all the events that have timestamps falling between the timestamps
-        of the two given events. The returned list excludes the starting and ending events provided
-        as inputs.
+        :param event1: Start event.
+        :type event1: Event
+        :param event2: End event.
+        :type event2: Event
 
-        Parameters:
-        event1 (Event): The starting event. Its timestamp defines the lower bound of the time range.
-        event2 (Event): The ending event. Its timestamp defines the upper bound of the time range.
-
-        Returns:
-        List[Event]: A list of Event objects that are between the timestamps of event1 and event2,
-        excluding event1 and event2 themselves.
+        :return: Events between them.
+        :rtype: List[Event]
         """
         return [e for e in self.get_events_between_timestamps(event1.timestamp, event2.timestamp)
                 if e not in [event1, event2]]
 
     def get_events_between_timestamps(self, timestamp1: float, timestamp2: float) -> List[Event]:
         """
-        Retrieves events between two specified timestamps.
+        Gets events between timestamps.
 
-        This method searches within the stored event history for events whose
-        timestamps fall within the specified range. The timestamps are evaluated
-        in ascending order, so the order of the input timestamps does not matter.
+        :param timestamp1: First timestamp.
+        :type timestamp1: float
+        :param timestamp2: Second timestamp.
+        :type timestamp2: float
 
-        Parameters:
-            timestamp1 (float): The first timestamp defining the range.
-            timestamp2 (float): The second timestamp defining the range.
-
-        Returns:
-            List[Event]: A list of events occurring between the specified timestamps.
-            If no events exist in the given range, an empty list is returned.
+        :return: List of events.
+        :rtype: List[Event]
         """
         with self._lock:
             time_stamps = self.time_stamps_array
@@ -554,23 +441,15 @@ class ObjectTracker:
 
     def get_event_where(self, conditions: Callable[[Event], bool], events: Optional[List[Event]] = None) -> List[Event]:
         """
-        Filters events based on a given condition.
+        Filters events by condition.
 
-        This method iterates through a list of events and checks
-        each event against a provided condition. It returns a list
-        containing all events that meet the specified condition. If no
-        event list is provided, the method operates on the default event
-        history.
+        :param conditions: Condition function.
+        :type conditions: Callable[[Event], bool]
+        :param events: Optional event list.
+        :type events: Optional[List[Event]]
 
-        Parameters:
-        conditions (Callable[[Event], bool]): A callable function that takes
-            an Event object and returns a boolean indicating whether the
-            event meets the condition.
-        events (Optional[List[Event]]): A list of events to filter. If None,
-            the default event history is used.
-
-        Returns:
-        List[Event]: A list of events that satisfy the specified condition.
+        :return: Matching events.
+        :rtype: List[Event]
         """
         events = events if events is not None else self._event_history
         return [event for event in events if conditions(event)]
