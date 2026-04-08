@@ -19,7 +19,7 @@ dependencies = [
   "krrood",
   "random-events",
   "probabilistic_model",
-  "multiverse_simulators"
+  "physics_simulators"
 ]
 
 [tool.uv.workspace]
@@ -30,7 +30,7 @@ members = [
   "krrood",
   "random_events",
   "probabilistic_model",
-  "multiverse_simulators"
+  "physics_simulators"
 ]
 
 [tool.uv.sources]
@@ -40,7 +40,7 @@ semantic_digital_twin = { workspace = true }
 krrood                = { workspace = true }
 probabilistic_model   = { workspace = true }
 random_events         = { workspace = true }
-multiverse_simulators = { workspace = true }
+physics_simulators    = { workspace = true }
 
 [tool.poetry]
 package-mode = false
@@ -52,7 +52,7 @@ semantic_digital_twin = { path = "semantic_digital_twin", develop = true }
 krrood = { path = "krrood", develop = true }
 random_events = { path = "random_events", develop = true }
 probabilistic_model = { path = "probabilistic_model", develop = true }
-multiverse_simulators = { path = "multiverse_simulators", develop = true }
+physics_simulators = { path = "physics_simulators", develop = true }
 
 [tool.setuptools]
 packages = []

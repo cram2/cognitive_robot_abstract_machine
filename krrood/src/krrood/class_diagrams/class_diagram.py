@@ -39,7 +39,7 @@ from krrood.class_diagrams.attribute_introspector import (
 from krrood.class_diagrams.utils import Role, get_generic_type_param
 from krrood.class_diagrams.wrapped_field import WrappedField
 
-from krrood.class_diagrams.failures import ClassIsUnMappedInClassDiagram
+from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.predicate import PropertyDescriptor

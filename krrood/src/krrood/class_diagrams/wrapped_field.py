@@ -25,7 +25,7 @@ from typing_extensions import (
     Union,
 )
 
-from krrood.class_diagrams.failures import MissingContainedTypeOfContainer
+from krrood.class_diagrams.exceptions import MissingContainedTypeOfContainer
 from krrood.class_diagrams.utils import behaves_like_a_built_in_class
 from krrood.utils import module_and_class_name
 
