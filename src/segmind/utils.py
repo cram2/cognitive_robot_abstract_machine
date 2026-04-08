@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -12,11 +11,7 @@ from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import BoundingBox, Color
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import List, Optional, Tuple
-
-
-
-
+from typing_extensions import List, Optional
 from pycram.tf_transformations import quaternion_inverse, quaternion_multiply
 
 set_logger_level(LogLevel.DEBUG)
@@ -24,7 +19,7 @@ try:
     from semantic_world.views import Container
 except ImportError:
     Container = None
-    print(
+    logger.debug(
         "Container view is not available. Some functionalities may not work as expected."
     )
 
