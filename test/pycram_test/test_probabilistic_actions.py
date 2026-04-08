@@ -33,9 +33,10 @@ def test_move_to_reach(empty_pr2_world, rclpy_node):
     pr2 = PR2.from_world(empty_pr2_world)
     training_environment = MoveToReach.training_environment(pr2)
     pub = VizMarkerPublisher(
-        _world=training_environment.plan.world,
+        _world=empty_pr2_world,
         node=rclpy_node,
     )
     pub.with_tf_publisher()
-
+    print(training_environment.plan)
     training_environment.generate_episode()
+    print(training_environment.plan)

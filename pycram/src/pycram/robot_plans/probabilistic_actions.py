@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Any
 
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import (
     underspecified,
@@ -9,11 +10,12 @@ from krrood.entity_query_language.factories import (
     variable,
 )
 from pycram.datastructures.dataclasses import Context
-from pycram.datastructures.enums import Arms
+from pycram.datastructures.enums import Arms, MovementType
 from pycram.datastructures.grasp import GraspDescription
+from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import sequential, execute_single
 from pycram.plans.plan import Plan
-from pycram.robot_plans import MoveToolCenterPointMotion
+from pycram.robot_plans import MoveToolCenterPointMotion, BaseMotion
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.navigation import NavigateAction
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Manipulator
@@ -34,7 +36,8 @@ class TrainingEnvironment:
     """
 
     def generate_episode(self) -> Any:
-        self.plan.perform()
+        with simulated_robot:
+            self.plan.perform()
 
 
 @dataclass
@@ -46,6 +49,42 @@ class LearnableAction(ActionDescription, ABC):
 
 
 @dataclass
+class MoveManipulatorMotion(BaseMotion):
+    """
+    Moves the Tool center point (TCP) of the robot
+    """
+
+    target: Pose
+    """
+    Target pose to which the TCP should be moved
+    """
+
+    manipulator: Manipulator
+    """
+    The Manipulator to move to the target pose
+    """
+
+    allow_gripper_collision: bool = False
+    """
+    If the gripper can collide with something
+    """
+
+    def perform(self):
+        return
+
+    @property
+    def _motion_chart(self):
+        root = self.world.root if self.robot.full_body_controlled else self.robot.root
+        task = CartesianPose(
+            root_link=root,
+            tip_link=self.manipulator.tool_frame,
+            goal_pose=self.target,
+            name="MoveTCP",
+        )
+        return task
+
+
+@dataclass
 class MoveToReach(LearnableAction):
     """
     Let the robot reach a specific pose.
@@ -54,6 +93,11 @@ class MoveToReach(LearnableAction):
     standing_pose: Pose
     """
     The pose that the robot should stand at.
+    """
+
+    manipulator: Manipulator
+    """
+    The Manipulator to move to the target pose
     """
 
     target_pose: Pose
@@ -71,8 +115,10 @@ class MoveToReach(LearnableAction):
             sequential(
                 [
                     NavigateAction(self.standing_pose),
-                    MoveToolCenterPointMotion(
-                        self.target_pose, self.arm, allow_gripper_collision=False
+                    MoveManipulatorMotion(
+                        self.target_pose,
+                        self.manipulator,
+                        allow_gripper_collision=False,
                     ),
                 ]
             )
@@ -80,9 +126,7 @@ class MoveToReach(LearnableAction):
 
     @classmethod
     def training_environment(cls, robot: AbstractRobot) -> TrainingEnvironment:
-        world = World()
-
-        world.merge_world(robot._world)
+        world = robot._world
 
         target_pose = Pose.from_xyz_rpy(x=0, y=0, z=0)
 
@@ -95,6 +139,7 @@ class MoveToReach(LearnableAction):
             standing_pose=underspecified(Pose.from_xyz_rpy)(
                 x=..., y=..., z=..., roll=0, pitch=0, yaw=...
             ),
+            manipulator=variable(Manipulator, world.semantic_annotations),
             grasp_description=underspecified(GraspDescription)(
                 approach_direction=...,
                 vertical_alignment=...,
