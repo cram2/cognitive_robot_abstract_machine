@@ -38,5 +38,5 @@ for nb in "${notebooks[@]}"; do
   echo "============================================================"
   echo "Executing notebook: $nb"
   echo "============================================================"
-  treon --thread 1 -v
+  treon --thread 1 -v "$nb"
 done
