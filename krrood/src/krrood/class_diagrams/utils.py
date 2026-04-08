@@ -112,8 +112,8 @@ def get_type_hints_of_object(object_: Any) -> Dict[str, Any]:
                 local_namespace[e.name] = getattr(module, e.name)
                 continue
             try:
-                source = inspect.getsource(object_)
-                scope = get_scope_from_imports(source=source)
+                source_path = inspect.getsourcefile(object_)
+                scope = get_scope_from_imports(file_path=source_path)
                 if e.name in scope:
                     local_namespace[e.name] = scope[e.name]
                     continue

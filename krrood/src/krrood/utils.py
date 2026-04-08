@@ -681,7 +681,10 @@ def get_scope_from_imports(
     if file_path and source is None:
         with open(file_path, "r") as f:
             source = f.read()
-    tree = tree or ast.parse(source, filename=file_path)
+    if file_path is None:
+        tree = tree or ast.parse(source)
+    else:
+        tree = tree or ast.parse(source, filename=file_path)
 
     scope = {}
 
