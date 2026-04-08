@@ -49,7 +49,7 @@ class UnitreeG1(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
     """
 
     @classmethod
-    def _init_empty_robot(cls, world: World) -> Self:
+    def _get_structural_root_body(cls, world: World) -> Self:
         return cls(
             name=PrefixedName(name="unitree_g1", prefix=world.name),
             root=world.get_body_by_name("pelvis"),

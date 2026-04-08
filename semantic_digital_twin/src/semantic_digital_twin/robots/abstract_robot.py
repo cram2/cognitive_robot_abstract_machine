@@ -4,6 +4,7 @@ import logging
 from abc import abstractmethod, ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
+from typing import Callable
 
 from typing_extensions import (
     TYPE_CHECKING,
@@ -53,6 +54,13 @@ from semantic_digital_twin.world_description.world_modification import (
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
+_REQUIRED_FOR_ROBOT_SETUP_KEY = "__required_for_robot_setup__"
+
+
+def required_for_robot_setup(function: Callable) -> Callable:
+    setattr(function, _REQUIRED_FOR_ROBOT_SETUP_KEY, True)
+    return function
+
 
 @dataclass(eq=False)
 class RobotPart(HasRootBody, ABC):
@@ -77,7 +85,7 @@ class RobotPart(HasRootBody, ABC):
         """
         if not self.is_controlled:
             raise NotImplementedError(
-                "Adding joint states is only supported for robot parts that are controlled by a controller."
+                "Adding joint states is only supported for robot parts that can be controlled."
             )
         self.joint_states.append(joint_state)
         joint_state.assign_to_robot(self._robot)
@@ -97,6 +105,7 @@ class RobotPart(HasRootBody, ABC):
     def is_controlled(self) -> bool:
         return any((c for c in self.connections if c.is_controlled))
 
+    @classmethod
     def create_with_new_body_in_world(
         cls,
         name: PrefixedName,
@@ -113,9 +122,18 @@ class RobotPart(HasRootBody, ABC):
             "The bodies needed for RobotParts should already exist in the world, by parsing a URDF"
         )
 
+    @classmethod
+    @abstractmethod
+    def create_and_add_to_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        **kwargs,
+    ) -> Self: ...
+
 
 @dataclass(eq=False)
-class KinematicChain(RobotPart):
+class KinematicChain(RobotPart, ABC):
     """
     A kinematic chain in a robot, starting from a root body, and ending in a specific tip body.
     A kinematic chain can have multiple sensors. There are no assumptions about the
@@ -131,6 +149,10 @@ class KinematicChain(RobotPart):
     """
     A collection of sensors in the kinematic chain, such as cameras or other sensors.
     """
+
+    @synchronized_attribute_modification
+    def add_sensors(self, sensors: List[Sensor]):
+        self.sensors.extend(sensors)
 
     @property
     def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
@@ -194,6 +216,31 @@ class Arm(KinematicChain):
 
         return kinematic_structure_entities
 
+    @classmethod
+    def create_and_add_to_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        root_name: str,
+        tip_name: str,
+        manipulator: Manipulator,
+        sensors: List[Sensor] = None,
+    ) -> Self:
+        if manipulator._world is not world:
+            raise ValueError(
+                "The manipulator must be part of the given world, but it is not."
+            )
+        self = cls(
+            name=name,
+            root=world.get_body_by_name(root_name),
+            tip=world.get_body_by_name(tip_name),
+        )
+        world.add_semantic_annotation(self)
+        self.add_manipulator(manipulator)
+        if sensors is not None:
+            self.add_sensors(sensors)
+        return self
+
 
 @dataclass(eq=False)
 class Manipulator(RobotPart, ABC):
@@ -233,6 +280,30 @@ class Finger(KinematicChain):
     The frame of the finger tip. Could be used to align the finger with, for example, a button.
     """
 
+    @classmethod
+    def create_and_add_to_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        root_name: str,
+        tip_name: str,
+        finger_tip_frame_name: Optional[str] = None,
+        sensors: List[Sensor] = None,
+    ) -> Self:
+        finger_tip_frame = None
+        if finger_tip_frame_name is not None:
+            finger_tip_frame = world.get_body_by_name(finger_tip_frame_name)
+        self = cls(
+            name=name,
+            root=world.get_body_by_name(root_name),
+            tip=world.get_body_by_name(tip_name),
+            finger_tip_frame=finger_tip_frame,
+        )
+        world.add_semantic_annotation(self)
+        if sensors is not None:
+            self.add_sensors(sensors)
+        return self
+
 
 @dataclass(eq=False)
 class ParallelGripper(Manipulator):
@@ -251,6 +322,40 @@ class ParallelGripper(Manipulator):
     The finger of the parallel gripper, which is the part that moves in parallel to the thumb to grasp objects.
     """
 
+    @synchronized_attribute_modification
+    def add_finger(self, finger: Finger):
+        self.finger = finger
+
+    @synchronized_attribute_modification
+    def add_thumb(self, thumb: Finger):
+        self.thumb = thumb
+
+    @classmethod
+    def create_and_add_to_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        root_name: str,
+        tool_frame_name: str,
+        front_facing_orientation: Quaternion,
+        finger: Finger,
+        thumb: Finger,
+    ) -> Self:
+        if finger._world is not world or thumb._world is not world:
+            raise ValueError(
+                "The finger and thumb must be part of the given world, but they are not."
+            )
+        self = cls(
+            name=name,
+            root=world.get_body_by_name(root_name),
+            tool_frame=world.get_body_by_name(tool_frame_name),
+            front_facing_orientation=front_facing_orientation,
+        )
+        world.add_semantic_annotation(self)
+        self.add_thumb(thumb)
+        self.add_finger(finger)
+        return self
+
 
 @dataclass(eq=False)
 class HumanoidGripper(Manipulator):
@@ -268,6 +373,40 @@ class HumanoidGripper(Manipulator):
     """
     The fingers of the humanoid gripper, which are the parts that move in parallel to the thumb to grasp objects.
     """
+
+    @synchronized_attribute_modification
+    def add_fingers(self, fingers: List[Finger]):
+        self.fingers.extend(fingers)
+
+    @synchronized_attribute_modification
+    def add_thumb(self, thumb: Finger):
+        self.thumb = thumb
+
+    @classmethod
+    def create_and_add_to_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        root_name: str,
+        tool_frame_name: str,
+        front_facing_orientation: Quaternion,
+        fingers: List[Finger],
+        thumb: Finger,
+    ) -> Self:
+        if thumb._world is not world or any(f._world is not world for f in fingers):
+            raise ValueError(
+                "The fingers and thumb must be part of the given world, but they are not."
+            )
+        self = cls(
+            name=name,
+            root=world.get_body_by_name(root_name),
+            tool_frame=world.get_body_by_name(tool_frame_name),
+            front_facing_orientation=front_facing_orientation,
+        )
+        world.add_semantic_annotation(self)
+        self.add_thumb(thumb)
+        self.add_fingers(fingers)
+        return self
 
 
 @dataclass(eq=False)
@@ -301,12 +440,55 @@ class Camera(Sensor):
     minimal_height: float = 0.0
     maximal_height: float = 1.0
 
+    @classmethod
+    def create_and_add_to_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        root_name: str,
+        forward_facing_axis: Vector3,
+        field_of_view: FieldOfView,
+        minimal_height: float,
+        maximal_height: float,
+        default_camera: bool = False,
+    ) -> Self:
+        self = cls(
+            name=name,
+            root=world.get_body_by_name(root_name),
+            forward_facing_axis=forward_facing_axis,
+            field_of_view=field_of_view,
+            default_camera=default_camera,
+            minimal_height=minimal_height,
+            maximal_height=maximal_height,
+        )
+        world.add_semantic_annotation(self)
+        return self
+
 
 @dataclass(eq=False)
 class Torso(KinematicChain):
     """
     A Torso is a kinematic chain connecting the base of the robot with a collection of other kinematic chains.
     """
+
+    @classmethod
+    def create_and_add_to_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        root_name: str,
+        tip_name: str,
+        sensors: List[Sensor] = None,
+    ) -> Self:
+        self = cls(
+            name=name,
+            root=world.get_body_by_name(root_name),
+            tip=world.get_body_by_name(tip_name),
+        )
+        world.add_semantic_annotation(self)
+        if sensors is not None:
+            self.add_sensors(sensors)
+        return self
 
 
 @dataclass(eq=False)
@@ -336,6 +518,25 @@ class Base(KinematicChain):
         )
         return bb_collection.bounding_box()
 
+    @classmethod
+    def create_and_add_to_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        root_name: str,
+        tip_name: str,
+        sensors: List[Sensor] = None,
+    ) -> Self:
+        self = cls(
+            name=name,
+            root=world.get_body_by_name(root_name),
+            tip=world.get_body_by_name(tip_name),
+        )
+        world.add_semantic_annotation(self)
+        if sensors is not None:
+            self.add_sensors(sensors)
+        return self
+
 
 @dataclass(eq=False)
 class AbstractRobot(Agent, ABC):
@@ -349,40 +550,50 @@ class AbstractRobot(Agent, ABC):
     => If a kinematic chain contains both a manipulator and a sensor, it will be part of both collections
     """
 
-    torso: Optional[Torso] = None
-    """
-    The torso of the robot, which is a kinematic chain connecting the base with a collection of other kinematic chains.
-    """
+    # torso: Optional[Torso] = None
+    # """
+    # The torso of the robot, which is a kinematic chain connecting the base with a collection of other kinematic chains.
+    # """
 
-    base: Optional[Base] = None
-    """
-    The base of the robot, the part closes to the floor
-    """
+    # base: Optional[Base] = None
+    # """
+    # The base of the robot, the part closes to the floor
+    # """
 
-    manipulators: List[Manipulator] = field(default_factory=list)
-    """
-    A collection of manipulators in the robot, such as grippers.
-    """
+    # manipulators: List[Manipulator] = field(default_factory=list)
+    # """
+    # A collection of manipulators in the robot, such as grippers.
+    # """
 
-    sensors: List[Sensor] = field(default_factory=list)
-    """
-    A collection of sensors in the robot, such as cameras.
-    """
+    # sensors: List[Sensor] = field(default_factory=list)
+    # """
+    # A collection of sensors in the robot, such as cameras.
+    # """
+    #
+    # manipulator_chains: List[KinematicChain] = field(default_factory=list)
+    # """
+    # A collection of all kinematic chains containing a manipulator, such as a gripper.
+    # """
+    #
+    # sensor_chains: List[KinematicChain] = field(default_factory=list)
+    # """
+    # A collection of all kinematic chains containing a sensor, such as a camera.
+    # """
 
-    manipulator_chains: List[KinematicChain] = field(default_factory=list)
-    """
-    A collection of all kinematic chains containing a manipulator, such as a gripper.
-    """
+    # full_body_controlled: bool = field(default=False, kw_only=True)
+    # """
+    # Whether this robots needs full-body control to be able to operate effectively
+    # """
 
-    sensor_chains: List[KinematicChain] = field(default_factory=list)
-    """
-    A collection of all kinematic chains containing a sensor, such as a camera.
-    """
+    def _get_robot_setup_methods(self):
+        names = set()
 
-    full_body_controlled: bool = field(default=False, kw_only=True)
-    """
-    Whether this robots needs full-body control to be able to operate effectively 
-    """
+        for base in type(self).__mro__[1:]:
+            for name, obj in vars(base).items():
+                if getattr(obj, _REQUIRED_FOR_ROBOT_SETUP_KEY, None) is not None:
+                    names.add(name)
+
+        return {name: getattr(self, name) for name in names}
 
     @property
     def controlled_connections(self) -> list[ActiveConnection]:
@@ -417,9 +628,17 @@ class AbstractRobot(Agent, ABC):
         :return: A robot semantic annotation.
         """
         with world.modify_world():
-            robot = cls._init_empty_robot(world)
-            robot._setup_semantic_annotations()
+            robot_root_body = cls._get_structural_root_body(world)
+            robot = cls(
+                name=PrefixedName(cls.__name__, world.name),
+                root=robot_root_body,
+            )
             world.add_semantic_annotation(robot)
+
+            setup_methods = robot._get_robot_setup_methods()
+            for name, setup_method in setup_methods.items():
+                setup_method(robot)
+
             robot._setup_collision_rules()
             robot._setup_velocity_limits()
             robot._setup_hardware_interfaces()
@@ -428,7 +647,7 @@ class AbstractRobot(Agent, ABC):
 
     @classmethod
     @abstractmethod
-    def _init_empty_robot(cls, world: World) -> Self: ...
+    def _get_structural_root_body(cls, world: World) -> Body: ...
 
     @abstractmethod
     def _setup_semantic_annotations(self): ...

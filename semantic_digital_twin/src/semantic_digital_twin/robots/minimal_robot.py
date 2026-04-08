@@ -9,8 +9,13 @@ from semantic_digital_twin.robots.abstract_robot import (
     AbstractRobot,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import OmniDrive, ActiveConnection
-from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
+from semantic_digital_twin.world_description.connections import (
+    OmniDrive,
+    ActiveConnection,
+)
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
 
 
 @dataclass
@@ -33,12 +38,14 @@ class MinimalRobot(AbstractRobot):
     def _setup_semantic_annotations(self): ...
 
     @classmethod
-    def _init_empty_robot(cls, world: World) -> Self:
+    def _get_structural_root_body(cls, world: World) -> Self:
         return cls(
             name=PrefixedName(name="generic_robot", prefix=world.name),
             root=world.root,
             _world=world,
-            bodies_of_branch=world.get_kinematic_structure_entities_of_branch(world.root)
+            bodies_of_branch=world.get_kinematic_structure_entities_of_branch(
+                world.root
+            ),
         )
 
     def _setup_collision_rules(self):

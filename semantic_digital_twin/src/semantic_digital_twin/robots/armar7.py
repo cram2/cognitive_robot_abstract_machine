@@ -350,7 +350,7 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
         self._world.add_semantic_annotation(self)
 
     @classmethod
-    def _init_empty_robot(cls, world: World) -> Self:
+    def _get_structural_root_body(cls, world: World) -> Self:
         return cls(
             name=PrefixedName(name="armar7", prefix=world.name),
             # the actual root here is called "root", but this is such a generic name that i fear it will be

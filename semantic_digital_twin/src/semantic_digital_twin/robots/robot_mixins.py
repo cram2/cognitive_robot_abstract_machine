@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, wraps
 from typing import List, Type, Union
 
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
-from semantic_digital_twin.robots.abstract_robot import Arm, Torso
+from semantic_digital_twin.robots.abstract_robot import (
+    Arm,
+    Torso,
+    Base,
+    required_for_robot_setup,
+    AbstractRobot,
+)
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
@@ -33,8 +39,10 @@ class HasArms(ABC):
         """
         self.arms.append(arm)
 
+    @required_for_robot_setup
     @abstractmethod
-    def _create_arms(self) -> list[Arm]: ...
+    def _setup_arms(self) -> list[Arm]: ...
+
 
 @dataclass(eq=False)
 class SpecifiesLeftRightArm(HasArms, ABC):
@@ -76,6 +84,7 @@ class SpecifiesLeftRightArm(HasArms, ABC):
             else second_arm
         )
 
+
 @dataclass(eq=False)
 class HasTorso(ABC):
     """
@@ -91,6 +100,21 @@ class HasTorso(ABC):
     def add_torso(self, torso: Torso):
         self.torso = torso
 
+    @required_for_robot_setup
     @abstractmethod
-    def _create_torso(self) -> Arm: ...
+    def _setup_torso(self): ...
 
+
+@dataclass(eq=False)
+class HasMobileBase(ABC):
+
+    base: Base = field(init=False, default=None, repr=False)
+    full_body_controlled: bool = field(default=False, kw_only=True)
+
+    @synchronized_attribute_modification
+    def add_base(self, base: Base):
+        self.base = base
+
+    @required_for_robot_setup
+    @abstractmethod
+    def _setup_base(self): ...

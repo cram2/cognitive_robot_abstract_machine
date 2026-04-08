@@ -9,7 +9,6 @@ from pathlib import Path
 from semantic_digital_twin.robots.abstract_robot import (
     AbstractRobot,
     Arm,
-    Neck,
     Finger,
     ParallelGripper,
     Camera,
@@ -17,7 +16,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     FieldOfView,
     Base,
 )
-from semantic_digital_twin.robots.robot_mixins import HasNeck, HasArms
+from semantic_digital_twin.robots.robot_mixins import HasArms
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -43,13 +42,13 @@ from semantic_digital_twin.world_description.connections import (
 
 
 @dataclass(eq=False)
-class HSRB(AbstractRobot, HasArms, HasNeck):
+class HSRB(AbstractRobot, HasArms):
     """
     Class that describes the Human Support Robot variant B (https://upmroboticclub.wordpress.com/robot/).
     """
 
     @classmethod
-    def _init_empty_robot(cls, world: World) -> Self:
+    def _get_structural_root_body(cls, world: World) -> Self:
         return cls(
             name=PrefixedName("hsrb", prefix=world.name),
             root=world.get_body_by_name("base_footprint"),

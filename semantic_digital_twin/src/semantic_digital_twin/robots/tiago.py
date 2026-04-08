@@ -49,7 +49,7 @@ class Tiago(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
     """
 
     @classmethod
-    def _init_empty_robot(cls, world: World) -> Self:
+    def _get_structural_root_body(cls, world: World) -> Self:
         return cls(
             name=PrefixedName("tiago", prefix=world.name),
             root=world.get_body_by_name("base_footprint"),
@@ -365,7 +365,7 @@ class TiagoMujoco(AbstractRobot, SpecifiesLeftRightArm):
     """
 
     @classmethod
-    def _init_empty_robot(cls, world: World) -> Self:
+    def _get_structural_root_body(cls, world: World) -> Self:
         return cls(
             name=PrefixedName("tiago", prefix=world.name),
             root=world.get_body_by_name("base_link"),
