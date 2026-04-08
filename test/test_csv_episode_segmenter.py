@@ -1,5 +1,6 @@
 import datetime
 import os
+from os.path import dirname
 from unittest import TestCase
 from segmind import logger, set_logger_level, LogLevel
 import rclpy
@@ -42,7 +43,7 @@ class TestMultiverseEpisodeSegmenter(TestCase):
     @classmethod
     def setUpClass(cls):
         multiverse_episodes_dir = (
-            "/home/sorin/dev/Segmind/resources/multiverse_episodes"
+            f"{dirname(__file__)}/../resources/multiverse_episodes"
         )
         selected_episode = "icub_montessori_no_hands"
         episode_dir = os.path.join(multiverse_episodes_dir, selected_episode)
@@ -64,10 +65,13 @@ class TestMultiverseEpisodeSegmenter(TestCase):
             time_between_frames=datetime.timedelta(milliseconds=4),
             position_shift=Vector3(0, 0, 0),
         )
-        cls.episode_segmenter = EpisodeSegmenterExecutor(player=cls.file_player, context=cls.context)
+        cls.episode_segmenter = EpisodeSegmenterExecutor(player=cls.file_player, context=cls.context, ignored_objects=["iCub"])
         cls.episode_segmenter.spawn_scene(
             models_dir=models_dir
         )
 
     def test_csv_replay(self):
         self.episode_segmenter.start()
+        assert self.episode_segmenter.player.is_alive()
+
+
