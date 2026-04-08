@@ -6,12 +6,11 @@ from unittest import TestCase
 from typing_extensions import List, Dict, Union, Tuple
 
 from krrood.ripple_down_rules.utils import (
-    extract_imports,
     make_set,
     stringify_hint,
-    get_relative_import,
     get_imports_from_types,
 )
+from krrood.utils import get_scope_from_imports, get_relative_import
 
 
 class UtilsTestCase(TestCase):
@@ -25,7 +24,7 @@ class UtilsTestCase(TestCase):
             f.write("print('Hello World')\n")
 
         expected_scope = {"os": os, "make_set": make_set}
-        actual_imports = extract_imports(file_path)
+        actual_imports = get_scope_from_imports(file_path)
         self.assertEqual(expected_scope, actual_imports)
 
         # Clean up

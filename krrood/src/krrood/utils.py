@@ -60,7 +60,7 @@ class DataclassException(Exception):
 
 def get_full_class_name(cls):
     """
-    Returns the full name of a class, including the module name.
+    Return the full name of a class, including the module name.
 
     :param cls: The class.
     :return: The full name of the class
@@ -576,6 +576,8 @@ def get_imports_from_types(
 def run_black_on_file(filename: str):
     """
     Format the file with black
+
+    :param filename: The name of the file to format.
     """
     command = [sys.executable, "-m", "black", filename]
     run_subprocess_on_file(command)
@@ -584,12 +586,20 @@ def run_black_on_file(filename: str):
 def run_ruff_on_file(filename: str):
     """
     Format the file with ruff
+
+    :param filename: The name of the file to format.
     """
     command = ["ruff", "check", "--fix", filename]
     run_subprocess_on_file(command)
 
 
 def run_subprocess_on_file(command: List[str]):
+    """
+    Run a subprocess command and handle errors.
+
+    :param command: The command to run as a list of arguments.
+    :raises RuntimeError: If the subprocess command fails.
+    """
     try:
         result = subprocess.run(command, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
@@ -606,6 +616,10 @@ def get_generic_type_param(cls, generic_base: Type[T]) -> Optional[List[Type[T]]
 
     Example:
         get_generic_type_param(Employee, Role) -> (<class '__main__.Person'>,)
+
+    :param cls: The subclass to check.
+    :param generic_base: The generic base class to check against.
+    :return: A list of concrete type parameters, or None if not found.
     """
     for base in getattr(cls, "__orig_bases__", []):
         base_origin = get_origin(base)
@@ -628,12 +642,13 @@ def get_scope_from_imports(
     source: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Creates a scope dictionary from imports in a Python file or an AST tree.
+    Create a scope dictionary from imports in a Python file or an AST tree.
 
     :param file_path: The path to the Python file to extract imports from.
     :param tree: An AST tree to extract imports from. If provided, file_path is ignored.
     :param package_name: The name of the package to use for relative imports.
     :param source: The source code to extract imports from. If provided, file_path and tree are ignored.
+    :return: A dictionary representing the scope with imported modules and their attributes.
     """
     if tree is None and file_path is None and source is None:
         raise ValueError("Either file_path, tree, or source must be provided")
@@ -663,6 +678,10 @@ def get_scope_from_imports(
 def _import_module_safely(module_name: str, package_name: Optional[str]) -> Optional[types.ModuleType]:
     """
     Attempt to import a module with an optional package context and return the module or None on failure.
+
+    :param module_name: The name of the module to import.
+    :param package_name: The package name to use for relative imports, or None for absolute imports.
+    :return: The imported module or None if import fails.
     """
     module = get_module_object(module_name, package_name)
     if module is not None:
@@ -709,7 +728,12 @@ def _resolve_relative_import(
 ) -> tuple[Optional[str], Optional[str]]:
     """
     Resolve relative import context and possibly adjust module and package names based on file location.
-    Returns a tuple of (resolved_module_name, resolved_package_name).
+
+    :param file_path: The path to the file containing the import statement.
+    :param node: The import from node to process.
+    :param module_name: The module name to resolve.
+    :param package_name: The package name to use for relative imports.
+    :return: a tuple of (resolved_module_name, resolved_package_name).
     """
     resolved_module = module_name
     resolved_package = package_name
@@ -741,6 +765,10 @@ def _resolve_relative_import(
 def _handle_import_node(node: ast.Import, scope: Dict[str, Any], package_name: Optional[str]) -> None:
     """
     Process a standard import node and update the provided scope mapping.
+
+    :param node: The import node to process.
+    :param scope: The scope mapping to update.
+    :param package_name: The package name to use for relative imports.
     """
     for alias in node.names:
         module_name = alias.name
@@ -757,7 +785,12 @@ def _handle_import_from_node(
 ) -> Optional[str]:
     """
     Process a from-import node and update the provided scope mapping.
-    Returns the (possibly) updated package_name to mimic original behavior.
+
+    :param node: The from-import node to process.
+    :param scope: The scope mapping to update.
+    :param file_path: The path to the file containing the import statement.
+    :param package_name: The package name to use for relative imports.
+    :return: the (possibly) updated package_name to mimic original behavior.
     """
     module_name = node.module
 
