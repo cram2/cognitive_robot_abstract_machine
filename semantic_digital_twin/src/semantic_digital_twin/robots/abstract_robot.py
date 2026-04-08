@@ -69,6 +69,7 @@ def required_for_robot_setup(function: Callable) -> Callable:
     setattr(function, _REQUIRED_FOR_ROBOT_SETUP_KEY, True)
     return function
 
+
 _REQUIRED_FOR_JOINT_STATE_SETUP_KEY = "__required_for_joint_state_setup__"
 
 
