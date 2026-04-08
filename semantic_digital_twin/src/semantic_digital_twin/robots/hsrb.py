@@ -14,7 +14,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     Camera,
     Torso,
     FieldOfView,
-    Base,
+    MobileBase,
 )
 from semantic_digital_twin.robots.robot_mixins import HasArms
 from semantic_digital_twin.collision_checking.collision_matrix import (
@@ -176,10 +176,9 @@ class HSRB(AbstractRobot, HasArms):
         )
         self.add_torso(torso)
 
-        base = Base(
+        base = MobileBase(
             name=PrefixedName("base", prefix=self.name.name),
             root=self._world.get_body_by_name("base_link"),
-            tip=self._world.get_body_by_name("base_link"),
             _world=self._world,
         )
 

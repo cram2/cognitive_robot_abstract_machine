@@ -18,7 +18,6 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
 )
 from semantic_digital_twin.collision_checking.collision_rules import (
     SelfCollisionMatrixRule,
-    AvoidAllCollisions,
     AvoidExternalCollisions,
     AvoidSelfCollisions,
 )
@@ -37,7 +36,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     FieldOfView,
     Torso,
     AbstractRobot,
-    Base,
+    MobileBase,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
@@ -118,7 +117,7 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
             ]
         )
 
-    def _setup_arm_semantic_annotations(self) -> list[Arm]:
+    def _setup_arm_semantic_annotations(self):
         world = self._world
         # Create left arm
         left_gripper_thumb = Finger.create_and_add_to_world(
@@ -185,40 +184,12 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
         )
         self.add_arm(right_arm)
 
-    def _setup_torso(self):
+    def _setup_arm_hardware_interfaces(self):
+        for arm in self.arms:
+            for connection in arm.active_connections:
+                connection.has_hardware_interface = True
 
-        # Create camera and neck
-        camera = Camera.create_and_add_to_world(
-            name=PrefixedName("wide_stereo_optical_frame", prefix=self.name.name),
-            root_name="wide_stereo_optical_frame",
-            forward_facing_axis=Vector3(0, 0, 1),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
-            minimal_height=1.27,
-            maximal_height=1.60,
-            world=self._world,
-        )
-
-        torso = Torso.create_and_add_to_world(
-            name=PrefixedName("torso", prefix=self.name.name),
-            root_name="torso_lift_link",
-            tip_name="torso_lift_link",
-            world=self._world,
-            sensors=[camera],
-        )
-        self.add_torso(torso)
-
-    def _setup_base(self):
-        # Create the robot base
-        base = Base.create_and_add_to_world(
-            name=PrefixedName("base", prefix=self.name.name),
-            root_name="base_link",
-            tip_name="base_link",
-            world=self._world,
-        )
-
-        self.add_base(base)
-
-    def _setup_joint_states(self):
+    def _setup_arm_joint_state(self):
         right_arm_park = JointState.from_mapping(
             name=PrefixedName("right_park", prefix=self.name.name),
             mapping=dict(
@@ -303,6 +274,33 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
         self.right_arm.manipulator.add_joint_state(right_gripper_close)
         self.right_arm.manipulator.add_joint_state(right_gripper_open)
 
+    def _setup_torso_semantic_annotations(self):
+
+        # Create camera and neck
+        camera = Camera.create_and_add_to_world(
+            name=PrefixedName("wide_stereo_optical_frame", prefix=self.name.name),
+            root_name="wide_stereo_optical_frame",
+            forward_facing_axis=Vector3(0, 0, 1),
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            minimal_height=1.27,
+            maximal_height=1.60,
+            world=self._world,
+        )
+
+        torso = Torso.create_and_add_to_world(
+            name=PrefixedName("torso", prefix=self.name.name),
+            root_name="base_link",
+            tip_name="head_tilt_link",
+            world=self._world,
+            sensors=[camera],
+        )
+        self.add_torso(torso)
+
+    def _setup_torso_hardware_interfaces(self):
+        for connection in self.torso.active_connections:
+            connection.has_hardware_interface = True
+
+    def _setup_torso_joint_state(self):
         torso_joint = [self._world.get_connection_by_name("torso_lift_joint")]
 
         torso_low = JointState.from_mapping(
@@ -326,6 +324,18 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
         self.torso.add_joint_state(torso_low)
         self.torso.add_joint_state(torso_mid)
         self.torso.add_joint_state(torso_high)
+
+    def _setup_base_semantic_annotations(self):
+        # Create the robot base
+        base = MobileBase.create_and_add_to_world(
+            name=PrefixedName("base", prefix=self.name.name),
+            root_name="base_link",
+            world=self._world,
+        )
+        self.add_mobile_base(base)
+
+    def _setup_base_joint_state(self):
+        return
 
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(

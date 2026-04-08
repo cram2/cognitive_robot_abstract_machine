@@ -3,24 +3,30 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property, wraps
-from typing import List, Type, Union
+from typing import List, Type, Union, TYPE_CHECKING
 
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
-from semantic_digital_twin.robots.abstract_robot import (
-    Arm,
-    Torso,
-    Base,
-    required_for_robot_setup,
-    AbstractRobot,
-    required_for_joint_state_setup,
-)
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
 
+if TYPE_CHECKING:
+    from semantic_digital_twin.robots.abstract_robot import (
+        Arm,
+        Torso,
+        MobileBase,
+    )
+
 
 @dataclass(eq=False)
-class HasArms(ABC):
+class HasRobotPart(ABC):
+
+    @abstractmethod
+    def _setup_robot_parts(self): ...
+
+
+@dataclass(eq=False)
+class HasArms(HasRobotPart, ABC):
     """
     Mixin class for robots that have arms.
     """
@@ -40,11 +46,18 @@ class HasArms(ABC):
         """
         self.arms.append(arm)
 
-    @required_for_robot_setup
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+        self._setup_arm_semantic_annotations()
+        self._setup_arm_hardware_interfaces()
+        self._setup_arm_joint_state()
+
     @abstractmethod
     def _setup_arm_semantic_annotations(self): ...
 
-    @required_for_joint_state_setup
+    @abstractmethod
+    def _setup_arm_hardware_interfaces(self): ...
+
     @abstractmethod
     def _setup_arm_joint_state(self): ...
 
@@ -91,7 +104,7 @@ class SpecifiesLeftRightArm(HasArms, ABC):
 
 
 @dataclass(eq=False)
-class HasTorso(ABC):
+class HasTorso(HasRobotPart, ABC):
     """
     Mixin class for robots that have a torso.
     """
@@ -105,21 +118,35 @@ class HasTorso(ABC):
     def add_torso(self, torso: Torso):
         self.torso = torso
 
-    @required_for_robot_setup
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+        self._setup_torso_semantic_annotations()
+        self._setup_torso_hardware_interfaces()
+        self._setup_torso_joint_state()
+
     @abstractmethod
-    def _setup_torso(self): ...
+    def _setup_torso_semantic_annotations(self): ...
+
+    @abstractmethod
+    def _setup_torso_hardware_interfaces(self): ...
+
+    @abstractmethod
+    def _setup_torso_joint_state(self): ...
 
 
 @dataclass(eq=False)
-class HasMobileBase(ABC):
+class HasMobileBase(HasRobotPart, ABC):
 
-    base: Base = field(init=False, default=None, repr=False)
+    mobile_base: MobileBase = field(init=False, default=None, repr=False)
     full_body_controlled: bool = field(default=False, kw_only=True)
 
     @synchronized_attribute_modification
-    def add_base(self, base: Base):
-        self.base = base
+    def add_mobile_base(self, mobile_base: MobileBase):
+        self.mobile_base = mobile_base
 
-    @required_for_robot_setup
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+        self._setup_base_semantic_annotations()
+
     @abstractmethod
-    def _setup_base(self): ...
+    def _setup_base_semantic_annotations(self): ...

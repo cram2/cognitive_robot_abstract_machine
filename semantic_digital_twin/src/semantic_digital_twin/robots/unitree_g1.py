@@ -29,7 +29,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     FieldOfView,
     Torso,
     AbstractRobot,
-    Base,
+    MobileBase,
     HumanoidGripper,
 )
 from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm
@@ -226,10 +226,9 @@ class UnitreeG1(AbstractRobot, SpecifiesLeftRightArm):
         self.add_torso(torso)
 
         # Create the robot base
-        base = Base(
+        base = MobileBase(
             name=PrefixedName("base", prefix=self.name.name),
             root=self._world.get_body_by_name("pelvis"),
-            tip=self._world.get_body_by_name("pelvis"),
             _world=self._world,
         )
 

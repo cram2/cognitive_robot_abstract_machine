@@ -19,7 +19,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     Torso,
     AbstractRobot,
     HumanoidGripper,
-    Base,
+    MobileBase,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 
@@ -169,10 +169,9 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm):
         pass
 
     def _setup_semantic_annotations(self):
-        base = Base(
+        base = MobileBase(
             name=PrefixedName("base", prefix=self.name.name),
             root=self._world.get_body_by_name("Platform_body_link"),
-            tip=self._world.get_body_by_name("Platform_body_link"),
             main_axis=Vector3.Y(),
             _world=self._world,
         )

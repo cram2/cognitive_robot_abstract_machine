@@ -13,7 +13,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     ParallelGripper,
     Camera,
     Torso,
-    Base,
+    MobileBase,
 )
 from semantic_digital_twin.robots.robot_mixins import HasArms
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -145,10 +145,9 @@ class Stretch(AbstractRobot, HasArms):
         )
         self.add_torso(torso)
 
-        base = Base(
+        base = MobileBase(
             name=PrefixedName("base", prefix=self.name.name),
             root=self._world.get_body_by_name("base_link"),
-            tip=self._world.get_body_by_name("base_link"),
             _world=self._world,
             main_axis=Vector3(0, -1, 0, self._world.get_body_by_name("base_link")),
         )

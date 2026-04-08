@@ -5,7 +5,6 @@ from abc import abstractmethod, ABC
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Callable
 
 from typing_extensions import (
     TYPE_CHECKING,
@@ -13,7 +12,6 @@ from typing_extensions import (
     Self,
     DefaultDict,
     List,
-    assert_never,
 )
 
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
@@ -24,6 +22,7 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import NoJointStateWithType
+from semantic_digital_twin.robots.robot_mixins import HasRobotPart
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -43,9 +42,6 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.geometry import BoundingBox, Scale
-from semantic_digital_twin.world_description.shape_collection import (
-    BoundingBoxCollection,
-)
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     Connection,
@@ -61,21 +57,6 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 logger = logging.getLogger(__name__)
-
-_REQUIRED_FOR_ROBOT_SETUP_KEY = "__required_for_robot_setup__"
-
-
-def required_for_robot_setup(function: Callable) -> Callable:
-    setattr(function, _REQUIRED_FOR_ROBOT_SETUP_KEY, True)
-    return function
-
-
-_REQUIRED_FOR_JOINT_STATE_SETUP_KEY = "__required_for_joint_state_setup__"
-
-
-def required_for_joint_state_setup(function: Callable) -> Callable:
-    setattr(function, _REQUIRED_FOR_JOINT_STATE_SETUP_KEY, True)
-    return function
 
 
 @dataclass(eq=False)
@@ -222,6 +203,14 @@ class KinematicChain(RobotPart, ABC):
         if self.root == self.tip:
             return [self.root.parent_connection]
         return self._world.compute_chain_of_connections(self.root, self.tip)
+
+    @property
+    def active_connections(self) -> list[ActiveConnection]:
+        return [
+            connection
+            for connection in self.connections
+            if isinstance(connection, ActiveConnection)
+        ]
 
 
 @dataclass(eq=False)
@@ -538,7 +527,7 @@ class Torso(KinematicChain):
 
 
 @dataclass(eq=False)
-class Base(KinematicChain):
+class MobileBase(RobotPart):
     """
     The base of a robot
     """
@@ -550,19 +539,9 @@ class Base(KinematicChain):
 
     @property
     def bounding_box(self) -> BoundingBox:
-        bounding_boxes = [
-            kse.collision.as_bounding_box_collection_in_frame(
-                self._world.root
-            ).bounding_box()
-            for kse in self._world.compute_chain_of_kinematic_structure_entities(
-                self.root, self.tip
-            )
-            if kse.collision is not None
-        ]
-        bb_collection = BoundingBoxCollection(
-            bounding_boxes, reference_frame=self._world.root
-        )
-        return bb_collection.bounding_box()
+        return self.root.collision.as_bounding_box_collection_in_frame(
+            self._world.root
+        ).bounding_box()
 
     @classmethod
     def create_and_add_to_world(
@@ -570,22 +549,17 @@ class Base(KinematicChain):
         name: PrefixedName,
         world: World,
         root_name: str,
-        tip_name: str,
-        sensors: List[Sensor] = None,
     ) -> Self:
         self = cls(
             name=name,
             root=world.get_body_by_name(root_name),
-            tip=world.get_body_by_name(tip_name),
         )
         world.add_semantic_annotation(self)
-        if sensors is not None:
-            self.add_sensors(sensors)
         return self
 
 
 @dataclass(eq=False)
-class AbstractRobot(Agent, ABC):
+class AbstractRobot(Agent, HasRobotPart, ABC):
     """
     Specification of an abstract robot. A robot consists of:
     - a root body, which is the base of the robot
@@ -631,15 +605,8 @@ class AbstractRobot(Agent, ABC):
     # Whether this robots needs full-body control to be able to operate effectively
     # """
 
-    def _get_robot_setup_methods(self):
-        names = set()
-
-        for base in type(self).__mro__[1:]:
-            for name, obj in vars(base).items():
-                if getattr(obj, _REQUIRED_FOR_ROBOT_SETUP_KEY, None) is not None:
-                    names.add(name)
-
-        return {name: getattr(self, name) for name in names}
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
 
     @property
     def controlled_connections(self) -> list[ActiveConnection]:
@@ -680,15 +647,10 @@ class AbstractRobot(Agent, ABC):
                 root=robot_root_body,
             )
             world.add_semantic_annotation(robot)
-
-            setup_methods = robot._get_robot_setup_methods()
-            for name, setup_method in setup_methods.items():
-                setup_method()
-
+            robot._setup_hardware_interfaces()
+            robot._setup_robot_parts()
             robot._setup_collision_rules()
             robot._setup_velocity_limits()
-            robot._setup_hardware_interfaces()
-            robot._setup_joint_states()
         return robot
 
     @classmethod
@@ -747,9 +709,6 @@ class AbstractRobot(Agent, ABC):
     def _get_structural_root_body(cls, world: World) -> Body: ...
 
     @abstractmethod
-    def _setup_semantic_annotations(self): ...
-
-    @abstractmethod
     def _setup_collision_rules(self): ...
 
     def _setup_velocity_limits(self):
@@ -760,9 +719,6 @@ class AbstractRobot(Agent, ABC):
 
     @abstractmethod
     def _setup_hardware_interfaces(self): ...
-
-    @abstractmethod
-    def _setup_joint_states(self): ...
 
     @property
     def drive(self) -> Optional[OmniDrive]:
