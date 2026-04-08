@@ -69,6 +69,13 @@ def required_for_robot_setup(function: Callable) -> Callable:
     setattr(function, _REQUIRED_FOR_ROBOT_SETUP_KEY, True)
     return function
 
+_REQUIRED_FOR_JOINT_STATE_SETUP_KEY = "__required_for_joint_state_setup__"
+
+
+def required_for_joint_state_setup(function: Callable) -> Callable:
+    setattr(function, _REQUIRED_FOR_JOINT_STATE_SETUP_KEY, True)
+    return function
+
 
 @dataclass(eq=False)
 class RobotPart(HasRootBody, ABC):
@@ -87,6 +94,7 @@ class RobotPart(HasRootBody, ABC):
     Fixed joint states that are defined for this robot annotation. 
     """
 
+    @synchronized_attribute_modification
     def add_joint_state(self, joint_state: JointState):
         """
         Adds a joint state to this semantic annotation.

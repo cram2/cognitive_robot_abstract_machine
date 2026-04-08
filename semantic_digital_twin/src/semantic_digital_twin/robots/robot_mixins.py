@@ -11,7 +11,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     Torso,
     Base,
     required_for_robot_setup,
-    AbstractRobot,
+    AbstractRobot, required_for_joint_state_setup,
 )
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
@@ -41,7 +41,11 @@ class HasArms(ABC):
 
     @required_for_robot_setup
     @abstractmethod
-    def _setup_arms(self) -> list[Arm]: ...
+    def _setup_arm_semantic_annotations(self): ...
+
+    @required_for_joint_state_setup
+    @abstractmethod
+    def _setup_arm_joint_state(self): ...
 
 
 @dataclass(eq=False)

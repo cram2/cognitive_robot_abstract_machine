@@ -8,7 +8,11 @@ from typing import Self
 from importlib.resources import files
 from pathlib import Path
 
-from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm, HasTorso
+from semantic_digital_twin.robots.robot_mixins import (
+    SpecifiesLeftRightArm,
+    HasTorso,
+    HasMobileBase,
+)
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -45,7 +49,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False)
-class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso):
+class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
     """
     Represents the Personal Robot 2 (PR2), which was originally created by Willow Garage.
     The PR2 robot consists of two arms, each with a parallel gripper, a head with a camera, and a prismatic torso
@@ -114,7 +118,7 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso):
             ]
         )
 
-    def _setup_arms(self) -> list[Arm]:
+    def _setup_arm_semantic_annotations(self) -> list[Arm]:
         world = self._world
         # Create left arm
         left_gripper_thumb = Finger.create_and_add_to_world(
@@ -182,33 +186,34 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso):
         self.add_arm(right_arm)
 
     def _setup_torso(self):
+
+        # Create camera and neck
+        camera = Camera.create_and_add_to_world(
+            name=PrefixedName("wide_stereo_optical_frame", prefix=self.name.name),
+            root_name="wide_stereo_optical_frame",
+            forward_facing_axis=Vector3(0, 0, 1),
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            minimal_height=1.27,
+            maximal_height=1.60,
+            world=self._world,
+        )
+
         torso = Torso.create_and_add_to_world(
             name=PrefixedName("torso", prefix=self.name.name),
             root_name="torso_lift_link",
             tip_name="torso_lift_link",
             world=self._world,
+            sensors=[camera],
         )
         self.add_torso(torso)
 
-    def _setup_semantic_annotations(self):
-
-        # Create camera and neck
-        camera = Camera(
-            name=PrefixedName("wide_stereo_optical_frame", prefix=self.name.name),
-            root=self._world.get_body_by_name("wide_stereo_optical_frame"),
-            forward_facing_axis=Vector3(0, 0, 1),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
-            minimal_height=1.27,
-            maximal_height=1.60,
-            _world=self._world,
-        )
-
+    def _setup_base(self):
         # Create the robot base
-        base = Base(
+        base = Base.create_and_add_to_world(
             name=PrefixedName("base", prefix=self.name.name),
-            root=self._world.get_body_by_name("base_link"),
-            tip=self._world.get_body_by_name("base_link"),
-            _world=self._world,
+            root_name="base_link",
+            tip_name="base_link",
+            world=self._world,
         )
 
         self.add_base(base)
