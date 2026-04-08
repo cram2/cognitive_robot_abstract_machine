@@ -1,4 +1,7 @@
-from krrood.entity_query_language.backends import EntityQueryLanguageBackend
+from krrood.entity_query_language.backends import (
+    EntityQueryLanguageBackend,
+    ProbabilisticBackend,
+)
 from krrood.entity_query_language.factories import underspecified, variable_from
 from pycram.datastructures.enums import (
     Arms,
@@ -29,6 +32,33 @@ def test_underspecified_action(mutable_model_world):
             ]
         ),
         keep_joint_states=True,
+    )
+
+    plan = execute_single(action_like=action, context=context).plan
+    with simulated_robot:
+        plan.perform()
+    assert len(plan.nodes) == 3
+    assert plan.root.status == TaskStatus.SUCCEEDED
+    assert plan.root.children[0].status == TaskStatus.SUCCEEDED
+
+
+def test_underspecified_action_with_ellipsis(mutable_model_world):
+    """
+    Test that an underspecified action can be executed when a factory for a spatial type is used with ellipsis
+    """
+    world, robot, context = mutable_model_world
+    context.query_backend = ProbabilisticBackend()
+    action = underspecified(NavigateAction)(
+        target_location=underspecified(Pose.from_xyz_rpy)(
+            x=...,
+            y=...,
+            z=...,
+            roll=0,
+            pitch=0,
+            yaw=0,
+            reference_frame=world.root,
+        ),
+        keep_joint_states=...,
     )
 
     plan = execute_single(action_like=action, context=context).plan

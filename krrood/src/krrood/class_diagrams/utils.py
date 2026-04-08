@@ -90,6 +90,7 @@ def get_type_hint_of_keyword_argument(callable_: Callable, name: str):
     )
     return hints.get(name)
 
+
 def get_type_hints_of_object(object_: Any) -> Dict[str, Any]:
     """
     Get the type hints of an object. This is a workaround for the fact that get_type_hints() does not work with objects
@@ -112,8 +113,8 @@ def get_type_hints_of_object(object_: Any) -> Dict[str, Any]:
                 local_namespace[e.name] = getattr(module, e.name)
                 continue
             try:
-                source = inspect.getsource(object_)
-                scope = get_scope_from_imports(source=source)
+                source_path = inspect.getsourcefile(object_)
+                scope = get_scope_from_imports(file_path=source_path)
                 if e.name in scope:
                     local_namespace[e.name] = scope[e.name]
                     continue

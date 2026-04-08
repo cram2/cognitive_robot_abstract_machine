@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import assert_never
 
 import random_events_lib as rl
-from typing_extensions import Self, Dict, Any, Optional, Iterable, Type
+from typing_extensions import Self, Dict, Any, Optional, Iterable, Type, Union, List
 
 from random_events.interval import reals, Interval, closed, singleton, SimpleInterval
 from random_events.set import Set, SetElement
@@ -216,3 +216,29 @@ def variable_from_name_and_type(name: str, type_: Type) -> Variable:
         assert_never((name, type_))
 
     return result
+
+
+def most_appropriate_variable_type(
+    union: Iterable[Type],
+) -> Optional[Union[*compatible_types]]:
+    """
+    Get the most appropriate type for a random events variable from a union of types.
+    The most appropriate type is the one, where the mathematical interpretation as set has the highest cardinality.
+
+    :param union: The union of types.
+    :return: The most appropriate type.
+    """
+
+    if float in union:
+        return float
+
+    elif int in union:
+        return int
+
+    elif enum.Enum in union:
+        return enum.Enum
+
+    elif bool in union:
+        return bool
+    else:
+        return None

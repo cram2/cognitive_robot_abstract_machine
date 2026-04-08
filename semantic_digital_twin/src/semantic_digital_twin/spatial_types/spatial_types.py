@@ -1919,6 +1919,18 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def y(self) -> sm.Scalar:
         return self[1, 3]
 
+    @property
+    def roll(self) -> sm.Scalar:
+        return self.to_rotation_matrix().to_rpy()[0]
+
+    @property
+    def pitch(self) -> sm.Scalar:
+        return self.to_rotation_matrix().to_rpy()[1]
+
+    @property
+    def yaw(self):
+        return self.to_rotation_matrix().to_rpy()[2]
+
     @y.setter
     def y(self, value: sm.ScalarData):
         self[1, 3] = value

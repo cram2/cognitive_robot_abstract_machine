@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import types
 import typing
 from dataclasses import dataclass, field
 from functools import cached_property
+from inspect import isclass
 from typing import Dict, Optional
 
 import numpy as np
-from typing_extensions import Any
+from typing_extensions import Any, get_args
 
 import random_events.variable
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
@@ -64,7 +66,7 @@ class UnderspecifiedParameters:
 
         for attribute_match in self.statement.matches_with_variables:
             name = attribute_match.name_from_variable_access_path
-
+            assigned_type = attribute_match.assigned_variable._type_
             if isinstance(attribute_match.assigned_value, SymbolicExpression):
                 random_events_variable = random_events.variable.Symbolic(
                     name=name,
@@ -72,14 +74,28 @@ class UnderspecifiedParameters:
                 )
                 result[random_events_variable.name] = random_events_variable
                 continue
-            if attribute_match.assigned_variable._type_ is None or not issubclass(
-                attribute_match.assigned_variable._type_,
-                random_events.variable.compatible_types,
-            ):
+            elif assigned_type is None:
+                continue
+            elif type(assigned_type) is types.UnionType:
+                target_type = random_events.variable.most_appropriate_variable_type(
+                    get_args(assigned_type)
+                )
+
+            elif not isclass(assigned_type):
                 continue
 
+            elif issubclass(
+                assigned_type,
+                random_events.variable.compatible_types,
+            ):
+                target_type = attribute_match.assigned_variable._type_
+
+            else:
+                continue
+            if target_type is None:
+                continue
             random_events_variable = random_events.variable.variable_from_name_and_type(
-                name, attribute_match.assigned_variable._type_
+                name, target_type
             )
 
             result[random_events_variable.name] = random_events_variable

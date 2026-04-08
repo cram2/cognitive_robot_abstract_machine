@@ -15,6 +15,7 @@ from importlib.util import resolve_name
 from inspect import isclass
 from os.path import dirname
 from pathlib import Path
+from textwrap import dedent
 from typing import Union, Type, Optional, Callable, Tuple, List, Iterable, Dict, Any
 
 from typing_extensions import (
@@ -681,7 +682,11 @@ def get_scope_from_imports(
     if file_path and source is None:
         with open(file_path, "r") as f:
             source = f.read()
-    tree = tree or ast.parse(source, filename=file_path)
+    if file_path is None:
+        source = dedent(source)
+        tree = tree or ast.parse(source)
+    else:
+        tree = tree or ast.parse(source, filename=file_path)
 
     scope = {}
 
