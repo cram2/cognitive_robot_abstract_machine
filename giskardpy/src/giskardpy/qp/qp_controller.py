@@ -449,8 +449,12 @@ class QPController:
         qp_data_raw = self.qp_data_factory.evaluate(
             world_state, life_cycle_state, float_variables
         )
-        qp_data_filtered = qp_data_raw.apply_filters()
-        xdot_full = self.qp_solver.solver_call(qp_data_filtered)
+        qp_data_filtered: QPDataExplicit = qp_data_raw.apply_filters()
+        try:
+            xdot_full = self.qp_solver.solver_call(qp_data_filtered)
+        except Exception as e:
+            print(qp_data_filtered.pretty_print_problem())
+            raise e
         return self.xdot_to_control_commands(xdot_full)
 
     def xdot_to_control_commands(self, xdot: np.ndarray) -> np.ndarray:

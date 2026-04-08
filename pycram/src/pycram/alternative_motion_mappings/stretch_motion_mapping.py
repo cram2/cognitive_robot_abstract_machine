@@ -1,10 +1,13 @@
 from copy import deepcopy
 
+from nav2_msgs.action import NavigateToPose
+
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.goals.open_close import Close
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
+from giskardpy.motion_statechart.ros2_nodes.ros_tasks import NavigateActionServerTask
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.pointing import Pointing
@@ -23,7 +26,7 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
     gripper is pointing at the goal pose and then uses full body control to move the TCP to the goal.
     """
 
-    execution_type = ExecutionType.SIMULATED
+    execution_type = (ExecutionType.SIMULATED, ExecutionType.REAL)
 
     def perform(self):
         return
@@ -69,6 +72,27 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
         return DifferentialDriveBaseGoal(
             goal_pose=self.target,
         )
+
+
+class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
+    """
+    Uses a Nav2 action server to move the base of the real HSRB
+    """
+
+    execution_type = ExecutionType.REAL
+
+    def perform(self):
+        return
+
+    @property
+    def _motion_chart(self) -> NavigateActionServerTask:
+        return NavigateActionServerTask(
+            target_pose=self.target,
+            base_link=self.robot.root,
+            action_topic="/hsrb/move_base",
+            message_type=NavigateToPose,
+        )
+
 
 
 class StretchClose(ClosingMotion, AlternativeMotion[Stretch]):

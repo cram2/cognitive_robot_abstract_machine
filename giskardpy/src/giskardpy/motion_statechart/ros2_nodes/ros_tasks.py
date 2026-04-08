@@ -159,6 +159,7 @@ class NavigateActionServerTask(
         The observation is true if the robot is within 1cm of the target pose.
         """
         super().build_msg(context)
+        super().build(context)
         artifacts = NodeArtifacts()
         root_T_goal = context.world.transform(
             target_frame=context.world.root, spatial_object=self.target_pose

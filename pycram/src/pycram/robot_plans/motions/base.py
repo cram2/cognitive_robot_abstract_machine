@@ -7,6 +7,7 @@ from inspect import signature
 from typing import Optional
 
 from giskardpy.motion_statechart.graph_node import Task
+from krrood.adapters.json_serializer import list_like_classes
 from krrood.ormatic.data_access_objects.base import HasGeneric
 from pycram.plans.designator import Designator
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
@@ -41,7 +42,7 @@ class AlternativeMotion(HasGeneric[T], ABC):
             if (
                 issubclass(alternative, motion.__class__)
                 and alternative.original_class() == robot_view.__class__
-                and MotionExecutor.execution_type == alternative.execution_type
+                and MotionExecutor.execution_type in (alternative.execution_type if isinstance(alternative.execution_type, list_like_classes) else [alternative.execution_type])
             ):
                 return alternative
         return None

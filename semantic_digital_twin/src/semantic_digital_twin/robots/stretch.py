@@ -175,7 +175,7 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
         )
 
     def _setup_velocity_limits(self):
-        vel_limits = defaultdict(lambda: 1)
+        vel_limits = defaultdict(lambda: 0.1)
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
     def _setup_hardware_interfaces(self):
@@ -215,7 +215,7 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
 
         gripper_open = JointState.from_mapping(
             name=PrefixedName("gripper_open", prefix=self.name.name),
-            mapping=dict(zip(gripper_joints, [0.59, 0.59])),
+            mapping=dict(zip(gripper_joints, [0.19, 0.19])),
             state_type=GripperState.OPEN,
         )
 
