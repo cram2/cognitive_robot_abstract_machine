@@ -11,7 +11,8 @@ from semantic_digital_twin.robots.abstract_robot import (
     Torso,
     Base,
     required_for_robot_setup,
-    AbstractRobot, required_for_joint_state_setup,
+    AbstractRobot,
+    required_for_joint_state_setup,
 )
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
