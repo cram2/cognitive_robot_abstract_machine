@@ -30,6 +30,10 @@ from typing_extensions import (
 from typing_extensions import List
 from typing_extensions import Type, Set
 
+from krrood.adapters.json_serializer import from_json, to_json
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.collision_checking.collision_manager import CollisionManager
 from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
@@ -101,6 +105,7 @@ from semantic_digital_twin.world_description.world_modification import (
     RemoveSemanticAnnotationModification,
     AddActuatorModification,
     RemoveActuatorModification,
+    WorldModificationWithLiveReference,
 )
 from semantic_digital_twin.world_description.world_state import WorldState
 
@@ -1758,6 +1763,11 @@ class World(HasSimulatorProperties):
         ..warning::
             Super destructive, world will be unusable after this call.
         """
+        # semantic_annotations need to be reversed because they are in order in which they are added, and they need to
+        # be removed in reverse order
+        for semantic_annotation in reversed(self.semantic_annotations):
+            self.remove_semantic_annotation(semantic_annotation)
+
         for kinematic_structure_entity in self.kinematic_structure_entities:
             self.remove_kinematic_structure_entity(kinematic_structure_entity)
 
@@ -1766,9 +1776,6 @@ class World(HasSimulatorProperties):
 
         for degree_of_freedom in copy(self.degrees_of_freedom):
             self.remove_degree_of_freedom(degree_of_freedom)
-
-        for semantic_annotation in self.semantic_annotations:
-            self.remove_semantic_annotation(semantic_annotation)
 
     def is_empty(self):
         """
@@ -1823,36 +1830,13 @@ class World(HasSimulatorProperties):
         memo[me_id] = new_world
 
         with new_world.modify_world():
-            for body in self.bodies:
-                new_body = Body(
-                    name=body.name,
-                    id=body.id,
-                    visual=body.visual.copy_for_world(new_world),
-                    collision=body.collision.copy_for_world(new_world),
+            for modification_block in self._model_manager.model_modification_blocks:
+                modification_block.update_references_for_world_and_apply(
+                    world=new_world
                 )
-                new_world.add_kinematic_structure_entity(new_body)
-            for region in self.regions:
-                new_region = Region(
-                    name=region.name,
-                    area=region.area,
-                    id=region.id,
-                )
-                new_world.add_kinematic_structure_entity(new_region)
-            for dof in self.degrees_of_freedom:
-                new_dof = DegreeOfFreedom(
-                    name=dof.name,
-                    limits=DegreeOfFreedomLimits(
-                        lower=dof.limits.lower,
-                        upper=dof.limits.upper,
-                    ),
-                    id=dof.id,
-                )
-                new_world.add_degree_of_freedom(new_dof)
-                new_world.state[dof.id] = self.state[dof.id].data
-                new_dof.has_hardware_interface = dof.has_hardware_interface
-            for connection in self.connections:
-                new_connection = connection.copy_for_world(new_world)
-                new_world.add_connection(new_connection)
+
+            new_world.state.merge_state(self.state)
+
         return new_world
 
     def visualize_world_structure(self) -> Image:

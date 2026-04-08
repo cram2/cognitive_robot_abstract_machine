@@ -4,8 +4,7 @@ import hashlib
 import inspect
 import uuid
 from abc import ABC, abstractmethod
-from collections import deque
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from copy import deepcopy
 from dataclasses import dataclass, field
 from dataclasses import fields
@@ -15,8 +14,9 @@ from uuid import UUID, uuid4
 import numpy as np
 import trimesh
 import trimesh.boolean
+from typing_extensions import List, Optional, TYPE_CHECKING, Tuple
+from typing_extensions import Set
 from typing_extensions import (
-    Deque,
     Type,
     TypeVar,
     Dict,
@@ -24,8 +24,6 @@ from typing_extensions import (
     Self,
     ClassVar,
 )
-from typing_extensions import List, Optional, TYPE_CHECKING, Tuple
-from typing_extensions import Set
 
 from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
@@ -498,6 +496,14 @@ class Body(KinematicStructureEntity):
             filter(lambda sem: isinstance(sem, type_), self._semantic_annotations)
         )
 
+    def copy_for_world(self, new_world: World) -> Self:
+        return Body(
+            name=self.name,
+            id=self.id,
+            visual=self.visual.copy_for_world(new_world),
+            collision=self.collision.copy_for_world(new_world),
+        )
+
 
 @dataclass(eq=False)
 class Region(KinematicStructureEntity):
@@ -541,6 +547,13 @@ class Region(KinematicStructureEntity):
             shape.origin.reference_frame = result
         result.area = area
         return result
+
+    def copy_for_world(self, new_world: World) -> Self:
+        return Region(
+            name=self.name,
+            id=self.id,
+            area=self.area.copy_for_world(new_world),
+        )
 
 
 GenericKinematicStructureEntity = TypeVar(

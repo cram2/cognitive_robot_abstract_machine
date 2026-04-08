@@ -74,7 +74,25 @@ class WorldModification(ABC):
 
 
 @dataclass
-class AddKinematicStructureEntityModification(WorldModification):
+class WorldModificationWithLiveReference(WorldModification, ABC):
+    """
+    An abstract base class representing a modification to the world which may be synchronized, and which contains a live
+     reference to an entity in the world, as those cases may sometimes be treated differently (see World.__deepcopy__).
+    """
+
+    @abstractmethod
+    def update_reference_for_world(self, world: World) -> Self:
+        """
+        Update the reference to the entity in the world to point to the corresponding entity in the given world. This is used
+        when applying modifications to a copied world, to ensure that the references in the modifications point to the entities
+        in the copied world rather than the original world.
+
+        :param world: The world to update the reference for.
+        """
+
+
+@dataclass
+class AddKinematicStructureEntityModification(WorldModificationWithLiveReference):
     """
     Addition of a body to the world.
     """
@@ -110,6 +128,9 @@ class AddKinematicStructureEntityModification(WorldModification):
             )
         world.add_kinematic_structure_entity(self.kinematic_structure_entity)
 
+    def update_reference_for_world(self, world: World) -> Self:
+        return self.__class__(self.kinematic_structure_entity.copy_for_world(world))
+
 
 @dataclass
 class RemoveKinematicStructureEntityModification(WorldModification):
@@ -133,7 +154,7 @@ class RemoveKinematicStructureEntityModification(WorldModification):
 
 
 @dataclass
-class AddConnectionModification(WorldModification):
+class AddConnectionModification(WorldModificationWithLiveReference):
     """
     Addition of a connection to the world.
     """
@@ -166,6 +187,9 @@ class AddConnectionModification(WorldModification):
             )
         world.add_connection(self.connection.copy_for_world(world))
 
+    def update_reference_for_world(self, world: World) -> Self:
+        return self.__class__(self.connection.copy_for_world(world))
+
 
 @dataclass
 class RemoveConnectionModification(WorldModification):
@@ -194,7 +218,7 @@ class RemoveConnectionModification(WorldModification):
 
 
 @dataclass
-class AddDegreeOfFreedomModification(WorldModification):
+class AddDegreeOfFreedomModification(WorldModificationWithLiveReference):
     """
     Addition of a degree of freedom to the world.
     """
@@ -221,6 +245,9 @@ class AddDegreeOfFreedomModification(WorldModification):
                 [self.degree_of_freedom.id],
             )
         world.add_degree_of_freedom(self.degree_of_freedom)
+
+    def update_reference_for_world(self, world: World) -> Self:
+        return self.__class__(self.degree_of_freedom.copy_for_world(world))
 
 
 @dataclass
@@ -282,7 +309,7 @@ class RemoveSemanticAnnotationModification(WorldModification):
 
 
 @dataclass
-class AddActuatorModification(WorldModification):
+class AddActuatorModification(WorldModificationWithLiveReference):
     actuator: Actuator
 
     original_actuator_id: Optional[UUID] = field(default=None)
@@ -303,6 +330,9 @@ class AddActuatorModification(WorldModification):
             )
 
         world.add_actuator(self.actuator)
+
+    def update_reference_for_world(self, world: World) -> Self:
+        return self.__class__(self.actuator.copy_for_world(world))
 
 
 @dataclass
@@ -330,6 +360,20 @@ class WorldModelModificationBlock:
 
     def apply(self, world: World):
         for modification in self.modifications:
+            modification.apply(world)
+
+    def update_references_for_world_and_apply(self, world: World):
+        """
+        Update the references in the modifications to point to the corresponding entities in the given world, and
+        then apply the modifications to the world. This is used when applying modifications to a copied world, to
+        ensure that the references in the modifications point to the entities in the copied world rather than the original world.
+
+        :param world: The world to update the references for.
+        """
+        for modification in self.modifications:
+            if isinstance(modification, WorldModificationWithLiveReference):
+                modification = modification.update_reference_for_world(world)
+
             modification.apply(world)
 
     @classmethod

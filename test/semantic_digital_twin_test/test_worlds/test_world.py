@@ -1,3 +1,4 @@
+import os
 from copy import deepcopy
 from dataclasses import dataclass
 from uuid import UUID
@@ -6,6 +7,8 @@ import numpy as np
 import pytest
 from numpy.testing import assert_raises
 
+from conftest import world_with_urdf_factory
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     DuplicateWorldEntityError,
@@ -15,6 +18,7 @@ from semantic_digital_twin.exceptions import (
     WrongWorldModelVersion,
     NonMonotonicTimeError,
 )
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Milk
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
@@ -644,6 +648,53 @@ def test_copy_world(world_setup):
     assert all(
         hash(k) in world_copy._world_entity_hash_table.keys()
         for k in world.kinematic_structure_entities
+    )
+
+
+def test_copy_big_world():
+    urdf_dir = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+    pr2_world = world_with_urdf_factory(urdf_dir, PR2, OmniDrive)
+    apartment_world = URDFParser.from_file(
+        os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "..",
+            "pycram",
+            "resources",
+            "worlds",
+            "apartment.urdf",
+        )
+    ).parse()
+
+    apartment_world.merge_world(pr2_world)
+    apartment_world_copy = deepcopy(apartment_world)
+
+    assert all(
+        b_original.id == b_copy.id
+        for b_original, b_copy in zip(
+            apartment_world.bodies, apartment_world_copy.bodies
+        )
+    )
+    assert all(
+        s_original.id == s_copy.id
+        for s_original, s_copy in zip(
+            apartment_world.semantic_annotations,
+            apartment_world_copy.semantic_annotations,
+        )
+    )
+    assert all(
+        d_original.id == d_copy.id
+        for d_original, d_copy in zip(
+            apartment_world.degrees_of_freedom,
+            apartment_world_copy.degrees_of_freedom,
+        )
+    )
+    assert all(
+        hash(c_original) == hash(c_copy)
+        for c_original, c_copy in zip(
+            apartment_world.connections, apartment_world_copy.connections
+        )
     )
 
 
