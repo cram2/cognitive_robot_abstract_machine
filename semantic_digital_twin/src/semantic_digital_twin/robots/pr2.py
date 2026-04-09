@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Self
 
 from importlib.resources import files
 from pathlib import Path
@@ -211,11 +210,7 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
             name=PrefixedName("left_park", prefix=self.name.name),
             mapping=dict(
                 zip(
-                    [
-                        c
-                        for c in self.left_arm.connections
-                        if type(c) != FixedConnection
-                    ],
+                    [c for c in self.left_arm.active_connections],
                     [
                         1.712,
                         -0.264,
@@ -285,6 +280,7 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
             minimal_height=1.27,
             maximal_height=1.60,
             world=self._world,
+            default_camera=True,
         )
 
         torso = Torso.create_and_add_to_world(

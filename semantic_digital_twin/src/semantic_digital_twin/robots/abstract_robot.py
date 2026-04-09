@@ -10,7 +10,10 @@ from typing import List, Type, Union, TYPE_CHECKING, Optional
 
 from typing_extensions import Self, DefaultDict
 
-from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
+from krrood.class_diagrams.attribute_introspector import (
+    DataclassOnlyIntrospector,
+    DiscoveredAttribute,
+)
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -20,6 +23,7 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     OmniDrive,
     ActiveConnection1DOF,
+    Drive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import Body
@@ -32,6 +36,7 @@ from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
     RobotPart,
     Camera,
+    Manipulator,
 )
 
 if TYPE_CHECKING:
@@ -72,6 +77,20 @@ class HasRobotPart(ABC):
 
         return robot_parts
 
+    @property
+    def manipulators(self) -> list[RobotPart]:
+        """
+        A collection of all manipulators in the robot.
+        """
+        return [part for part in self._robot_parts if isinstance(part, Manipulator)]
+
+    @property
+    def sensors(self) -> list[RobotPart]:
+        """
+        A collection of all sensors in the robot.
+        """
+        return [part for part in self._robot_parts if isinstance(part, Camera)]
+
 
 @dataclass(eq=False)
 class HasArms(HasRobotPart, ABC):
@@ -108,10 +127,6 @@ class HasArms(HasRobotPart, ABC):
 
     @abstractmethod
     def _setup_arm_joint_state(self): ...
-
-    @property
-    def manipulators(self):
-        return [arm.manipulator for arm in self.arms]
 
 
 @dataclass(eq=False)
@@ -211,49 +226,8 @@ class HasMobileBase(HasRobotPart, ABC):
 @dataclass(eq=False)
 class AbstractRobot(Agent, HasRobotPart, ABC):
     """
-    Specification of an abstract robot. A robot consists of:
-    - a root body, which is the base of the robot
-    - an optional torso, which is a kinematic chain (usually without a manipulator) connecting the base with a collection
-        of other kinematic chains
-    - an optional collection of manipulator chains, each containing a manipulator, such as a gripper
-    - an optional collection of sensor chains, each containing a sensor, such as a camera
-    => If a kinematic chain contains both a manipulator and a sensor, it will be part of both collections
+    Specification of an abstract robot
     """
-
-    # torso: Optional[Torso] = None
-    # """
-    # The torso of the robot, which is a kinematic chain connecting the base with a collection of other kinematic chains.
-    # """
-
-    # base: Optional[Base] = None
-    # """
-    # The base of the robot, the part closes to the floor
-    # """
-
-    # manipulators: List[Manipulator] = field(default_factory=list)
-    # """
-    # A collection of manipulators in the robot, such as grippers.
-    # """
-
-    # sensors: List[Sensor] = field(default_factory=list)
-    # """
-    # A collection of sensors in the robot, such as cameras.
-    # """
-    #
-    # manipulator_chains: List[KinematicChain] = field(default_factory=list)
-    # """
-    # A collection of all kinematic chains containing a manipulator, such as a gripper.
-    # """
-    #
-    # sensor_chains: List[KinematicChain] = field(default_factory=list)
-    # """
-    # A collection of all kinematic chains containing a sensor, such as a camera.
-    # """
-
-    # full_body_controlled: bool = field(default=False, kw_only=True)
-    # """
-    # Whether this robots needs full-body control to be able to operate effectively
-    # """
 
     def _setup_robot_parts(self):
         super()._setup_robot_parts()
@@ -324,37 +298,38 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
                 wrapped_field.contained_type, RobotPart
             ):
                 if not value:
-                    logger.info(
-                        f"The field {field_.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
-                    )
+                    self._print_out_missing_field(field_)
                 else:
                     for robot_part in value:
                         robot_part._print_out_missing_fields()
             elif issubclass(type_endpoint, RobotPart):
-                logger.info(
-                    f"The field {field_.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
-                )
+                self._print_out_missing_field(field_)
 
         self_world_copy = deepcopy(self._world)
 
         assert all(
-            (original_b.id == copy_b.id)
+            (original_b == copy_b)
             for original_b, copy_b in zip(self_world_copy.bodies, self._world.bodies)
         )
         assert all(
-            (original_s.id == copy_s.id)
+            (original_s == copy_s)
             for original_s, copy_s in zip(
                 self_world_copy.semantic_annotations, self._world.semantic_annotations
             )
         )
         assert all(
-            (hash(original_c) == hash(copy_c))
+            (original_c == copy_c)
             for original_c, copy_c in zip(
                 self_world_copy.connections, self._world.connections
             )
         )
 
         return True
+
+    def _print_out_missing_field(self, field: DiscoveredAttribute):
+        logger.info(
+            f"The field {field.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
+        )
 
     @classmethod
     @abstractmethod
@@ -373,13 +348,13 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
     def _setup_other_hardware_interfaces(self): ...
 
     @property
-    def drive(self) -> Optional[OmniDrive]:
+    def drive(self) -> Optional[Drive]:
         """
         The connection which the robot uses for driving.
         """
         try:
             parent_connection = self.root.parent_connection
-            if isinstance(parent_connection, OmniDrive):
+            if isinstance(parent_connection, Drive):
                 return parent_connection
         except AttributeError:
             pass

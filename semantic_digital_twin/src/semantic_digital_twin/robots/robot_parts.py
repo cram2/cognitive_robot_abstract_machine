@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod, ABC
-from collections import defaultdict
-from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -11,7 +9,6 @@ from typing_extensions import (
     TYPE_CHECKING,
     Optional,
     Self,
-    DefaultDict,
     List,
 )
 
@@ -20,8 +17,6 @@ from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.factories import (
     variable,
-    the,
-    an,
     a,
     entity,
     contains,
@@ -35,9 +30,7 @@ from semantic_digital_twin.exceptions import (
     DuplicateRobotAssignmentsError,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
     Vector3,
     Quaternion,
@@ -45,11 +38,8 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 )
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
-    OmniDrive,
-    ActiveConnection1DOF,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
-    DegreeOfFreedom,
     DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.geometry import BoundingBox, Scale

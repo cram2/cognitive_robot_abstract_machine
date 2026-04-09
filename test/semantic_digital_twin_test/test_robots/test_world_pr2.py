@@ -418,13 +418,11 @@ def test_pr2_semantic_annotation(pr2_world_state_reset):
     assert len(pr2.manipulators) == 2
     assert len(pr2.arms) == 2
     assert len(pr2.sensors) == 1
-    assert len(pr2.sensor_chains) == 1
-    assert pr2.neck == list(pr2.sensor_chains)[0]
     assert pr2.torso.name.name == "torso"
-    assert len(pr2.torso.sensors) == 0
-    assert list(pr2.sensor_chains)[0].sensors == pr2.sensors
+    assert len(pr2.torso.sensors) == 1
     assert pr2.left_arm and pr2.right_arm
     assert pr2.left_arm != pr2.right_arm
+    assert pr2.sensors[0] == pr2.get_default_camera()
 
 
 def test_specifies_left_right_arm_mixin(pr2_world_state_reset):

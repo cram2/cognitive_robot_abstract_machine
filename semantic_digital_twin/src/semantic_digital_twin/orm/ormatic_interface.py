@@ -5781,8 +5781,27 @@ class RevoluteConnectionDAO(
     }
 
 
-class DifferentialDriveDAO(
+class DriveDAO(
     ActiveConnectionDAO,
+    DataAccessObject[semantic_digital_twin.world_description.connections.Drive],
+):
+
+    __tablename__ = "DriveDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ActiveConnectionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "DriveDAO",
+        "inherit_condition": database_id == ActiveConnectionDAO.database_id,
+    }
+
+
+class DifferentialDriveDAO(
+    DriveDAO,
     DataAccessObject[
         semantic_digital_twin.world_description.connections.DifferentialDrive
     ],
@@ -5791,9 +5810,7 @@ class DifferentialDriveDAO(
     __tablename__ = "DifferentialDriveDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(ActiveConnectionDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
+        ForeignKey(DriveDAO.database_id), primary_key=True, use_existing_column=True
     )
 
     x_id: Mapped[uuid.UUID] = mapped_column(
@@ -5817,21 +5834,19 @@ class DifferentialDriveDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "DifferentialDriveDAO",
-        "inherit_condition": database_id == ActiveConnectionDAO.database_id,
+        "inherit_condition": database_id == DriveDAO.database_id,
     }
 
 
 class OmniDriveDAO(
-    ActiveConnectionDAO,
+    DriveDAO,
     DataAccessObject[semantic_digital_twin.world_description.connections.OmniDrive],
 ):
 
     __tablename__ = "OmniDriveDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(ActiveConnectionDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
+        ForeignKey(DriveDAO.database_id), primary_key=True, use_existing_column=True
     )
 
     x_id: Mapped[uuid.UUID] = mapped_column(
@@ -5858,7 +5873,7 @@ class OmniDriveDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "OmniDriveDAO",
-        "inherit_condition": database_id == ActiveConnectionDAO.database_id,
+        "inherit_condition": database_id == DriveDAO.database_id,
     }
 
 
