@@ -21,6 +21,7 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.robots.abstract_robot import AbstractRobot, RobotPart
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.geometry import Scale
     from semantic_digital_twin.world_description.world_entity import (
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_modification import (
         WorldModification,
     )
+    from semantic_digital_twin.collision_checking.collision_matrix import CollisionCheck
 
 
 @dataclass
@@ -357,6 +359,29 @@ class DuplicateWorldEntityError(UsageError):
 
 
 @dataclass
+class DuplicateRobotAssignments(UsageError):
+    """
+    Raised when a robot part is assigned to multiple robots, which should not happen.
+    """
+
+    robot_part: RobotPart
+    """
+    The robot part that is assigned to multiple robots.
+    """
+
+    robots: list[AbstractRobot]
+    """
+    The robots that are already assigned to the robot part.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Robot part {self.robot_part} is assigned to multiple robots: {self.robots}."
+            f" Each robot part should be assigned to at most one robot."
+        )
+
+
+@dataclass
 class DuplicateKinematicStructureEntityError(UsageError):
     names: List[PrefixedName]
 
@@ -434,6 +459,21 @@ class AlreadyBelongsToAWorldError(UsageError):
         self.message = f"Cannot add a {self.type_trying_to_add} that already belongs to another world {self.world.name}."
 
 
+@dataclass
+class DoesNotBelongToAWorldError(UsageError):
+    """
+    Raised when trying to use a world entity that does not belong to any world in a context where it must belong to a world.
+    """
+
+    world_entity: WorldEntity
+    """
+    The world entity that does not belong to a world.
+    """
+
+    def __post_init__(self):
+        self.message = f"WorldEntity {self.world_entity} does not belong to a world."
+
+
 class NotJsonSerializable(JSONSerializationError): ...
 
 
@@ -466,6 +506,7 @@ class AmbiguousNameError(ValueError):
 class UnresolvedNameError(ValueError):
     """Raised when no semantic annotation class matches a given name."""
 
+
 @dataclass
 class RootNodeNotFoundError(DataclassException):
     """
@@ -476,7 +517,10 @@ class RootNodeNotFoundError(DataclassException):
     """The candidate node names that were considered as potential roots."""
 
     def __post_init__(self):
-        self.message = f"Could not determine unique root node. Candidates: {self.candidates}"
+        self.message = (
+            f"Could not determine unique root node. Candidates: {self.candidates}"
+        )
+
 
 @dataclass
 class CollisionCheckingError(DataclassException):

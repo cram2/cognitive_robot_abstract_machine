@@ -379,7 +379,6 @@ def pr2_world_setup():
 @pytest.fixture(scope="function")
 def pr2_world_copy(pr2_world_setup):
     result = deepcopy(pr2_world_setup)
-    PR2.from_world(result)
     return result
 
 
@@ -618,7 +617,6 @@ def pr2_apartment_world(pr2_world_setup, apartment_world_setup):
         -> apartment urdf
     """
     pr2_copy = deepcopy(pr2_world_setup)
-    PR2.from_world(pr2_copy)  # semantic annotations are lost on copy
     apartment_copy = deepcopy(apartment_world_setup)
 
     pr2_copy.merge_world(apartment_copy)
@@ -633,7 +631,7 @@ def simple_pr2_world_setup(pr2_world_setup, simple_apartment_setup):
     apartment_world = deepcopy(simple_apartment_setup)
     pr2_copy = deepcopy(pr2_world_setup)
     pr2_copy.merge_world(apartment_world)
-    robot_view = PR2.from_world(pr2_copy)  # semantic annotations are lost on copy
+    robot_view = pr2_copy.get_semantic_annotations_by_type(PR2)[0]
     return pr2_copy, robot_view, Context(pr2_copy, robot_view)
 
 
@@ -679,7 +677,6 @@ def tiago_apartment_world(tiago_world, apartment_world_setup):
 @pytest.fixture
 def pr2_world_state_reset(pr2_world_setup):
     world = deepcopy(pr2_world_setup)
-    PR2.from_world(world)  # semantic annotations are lost on copy
     state = world.state._data.copy()
     yield world
     world.state._data[:] = state

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Self, Tuple, Set
+from typing import Iterable, Optional, Self, Tuple, Set, TYPE_CHECKING
 
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
@@ -31,13 +31,11 @@ from semantic_digital_twin.exceptions import (
     InvalidHingeActiveAxis,
     MissingSemanticAnnotationError,
 )
-from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
@@ -58,6 +56,9 @@ from semantic_digital_twin.world_description.world_entity import (
     Connection,
     KinematicStructureEntity,
 )
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
 
 
 @dataclass(eq=False)
@@ -504,6 +505,8 @@ class Wall(HasApertures):
 
     @property
     def doors(self) -> Iterable[Door]:
+        from semantic_digital_twin.reasoning.predicates import InsideOf
+
         return [
             door
             for door in self._world.get_semantic_annotations_by_type(Door)
@@ -718,16 +721,12 @@ class Milk(Food, IsPerceivable):
     A container of milk.
     """
 
-    ...
-
 
 @dataclass(eq=False)
 class SaltContainer(HasRootBody, IsPerceivable):
     """
     A container of salt.
     """
-
-    ...
 
 
 @dataclass(eq=False)

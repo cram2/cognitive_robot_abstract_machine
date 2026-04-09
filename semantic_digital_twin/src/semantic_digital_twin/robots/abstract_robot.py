@@ -5,6 +5,7 @@ from abc import abstractmethod, ABC
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, field
+from typing import Any
 
 from typing_extensions import (
     TYPE_CHECKING,
@@ -17,11 +18,22 @@ from typing_extensions import (
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
-from semantic_digital_twin.adapters.urdf import URDFParser
+from krrood.entity_query_language.factories import (
+    variable,
+    the,
+    an,
+    a,
+    entity,
+    contains,
+)
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import NoJointStateWithType
+from semantic_digital_twin.exceptions import (
+    NoJointStateWithType,
+    DoesNotBelongToAWorldError,
+    DuplicateRobotAssignments,
+)
 from semantic_digital_twin.robots.robot_mixins import HasRobotPart
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
@@ -45,6 +57,7 @@ from semantic_digital_twin.world_description.geometry import BoundingBox, Scale
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     Connection,
+    WorldEntity,
 )
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -66,15 +79,30 @@ class RobotPart(HasRootBody, ABC):
     of tip bodies.
     """
 
-    _robot: AbstractRobot = field(init=False, default=None, repr=False)
-    """
-    The robot this semantic annotation belongs to
-    """
-
     joint_states: list[JointState] = field(default_factory=list)
     """
     Fixed joint states that are defined for this robot annotation. 
     """
+
+    def __post_init__(self):
+        introspector = DataclassOnlyIntrospector()
+        for field_ in introspector.discover(self.__class__):
+            value = getattr(self, field_.public_name)
+            if isinstance(value, (list, set)):
+                for v in value:
+                    self._raise_if_not_in_world(v)
+            elif isinstance(value, dict):
+                for item in value.values():
+                    self._raise_if_not_in_world(item)
+            else:
+                self._raise_if_not_in_world(value)
+
+    def _raise_if_not_in_world(self, object_of_interest: Any):
+        if (
+            isinstance(object_of_interest, WorldEntity)
+            and object_of_interest._world is None
+        ):
+            raise DoesNotBelongToAWorldError(object_of_interest)
 
     @synchronized_attribute_modification
     def add_joint_state(self, joint_state: JointState):
@@ -154,6 +182,45 @@ class RobotPart(HasRootBody, ABC):
                     f"The field {field_.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
                 )
 
+    @property
+    def _robot_parts(self) -> list[RobotPart]:
+        """
+        Serves as a generic interface to access all robot parts assigned to a robot part.
+        Returns a list of all robot parts assigned directly to this robot part.
+        """
+        wrapped_class = WrappedClass(self.__class__)
+        introspector = DataclassOnlyIntrospector()
+        robot_parts = []
+        for field_ in introspector.discover(self.__class__):
+            value = getattr(self, field_.public_name)
+            wrapped_field = WrappedField(wrapped_class, field_.field)
+
+            if isinstance(value, (list, set)) and issubclass(
+                wrapped_field.contained_type, RobotPart
+            ):
+                robot_parts.extend(value)
+                for robot_part in value:
+                    robot_parts.extend(robot_part._robot_parts)
+            elif isinstance(value, RobotPart):
+                robot_parts.append(value)
+                robot_parts.extend(value._robot_parts)
+
+        return robot_parts
+
+    @property
+    def _robot(self) -> Optional[AbstractRobot]:
+        robot_variable = variable(AbstractRobot, self._world.semantic_annotations)
+        robot = (
+            a(entity(robot_variable))
+            .where(contains(robot_variable._robot_parts, self))
+            .tolist()
+        )
+        if len(robot) == 0:
+            return None
+        elif len(robot) > 1:
+            raise DuplicateRobotAssignments(robot_part=self, robots=robot)
+        return robot[0]
+
 
 @dataclass(eq=False)
 class KinematicChain(RobotPart, ABC):
@@ -219,7 +286,7 @@ class Arm(KinematicChain):
     Represents an arm of a robot, which is a kinematic chain with a manipulator.
     """
 
-    manipulator: Optional[Manipulator] = field(init=False, default=None, repr=False)
+    manipulator: Optional[Manipulator] = field(default=None)
     """
     The manipulator of the kinematic chain, if it exists. This is usually a gripper or similar device.
     """
@@ -291,7 +358,7 @@ class Manipulator(RobotPart, ABC):
     The orientation of the manipulator's tool frame, which is usually the front-facing orientation.
     """
 
-    front_facing_axis: Vector3 = field(kw_only=True, init=False)
+    front_facing_axis: Vector3 = field(init=False)
     """
     The axis of the manipulator's tool frame that is facing forward.
     """
@@ -299,6 +366,7 @@ class Manipulator(RobotPart, ABC):
     is_controlled = True
 
     def __post_init__(self):
+        super().__post_init__()
         rotation_matrix = RotationMatrix.from_quaternion(self.front_facing_orientation)
         # raise NotImplementedError("Luca Implement this correctly!")
         self.front_facing_axis = rotation_matrix[:2, 0]
@@ -347,12 +415,12 @@ class ParallelGripper(Manipulator):
     that always needs to touch an object when grasping it, ensuring a stable grasp.
     """
 
-    thumb: Finger = field(init=False, default=None, repr=False)
+    thumb: Optional[Finger] = field(default=None)
     """
     The thumb of the parallel gripper, which is the part that always needs to touch an object when grasping it.
     """
 
-    finger: Finger = field(init=False, default=None, repr=False)
+    finger: Optional[Finger] = field(default=None)
     """
     The finger of the parallel gripper, which is the part that moves in parallel to the thumb to grasp objects.
     """
@@ -655,6 +723,8 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
 
     @classmethod
     def mock_from_urdf_file_and_validate(cls, urdf_file: str):
+        from semantic_digital_twin.adapters.urdf import URDFParser
+
         world = URDFParser.from_file(urdf_file).parse(mock_geometry=True)
         self = cls.from_world(world)
         self.validate()
@@ -796,3 +866,28 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
             if isinstance(sensor, Camera) and sensor.default_camera:
                 return sensor
         return [s for s in self.sensors if isinstance(s, Camera)][0]
+
+    @property
+    def _robot_parts(self) -> list[RobotPart]:
+        """
+        Serves as a generic interface to access all robot parts assigned to a robot part.
+        Returns a list of all robot parts assigned directly to this robot part.
+        """
+        wrapped_class = WrappedClass(self.__class__)
+        introspector = DataclassOnlyIntrospector()
+        robot_parts = []
+        for field_ in introspector.discover(self.__class__):
+            value = getattr(self, field_.public_name)
+            wrapped_field = WrappedField(wrapped_class, field_.field)
+
+            if isinstance(value, (list, set)) and issubclass(
+                wrapped_field.contained_type, RobotPart
+            ):
+                robot_parts.extend(value)
+                for robot_part in value:
+                    robot_parts.extend(robot_part._robot_parts)
+            elif isinstance(value, RobotPart):
+                robot_parts.append(value)
+                robot_parts.extend(value._robot_parts)
+
+        return robot_parts

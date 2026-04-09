@@ -468,6 +468,7 @@ class AttributeUpdateModification(WorldModification):
             else:
                 obj = self._resolve_item(world, diff.added_values[0])
                 setattr(entity, diff.attribute_name, obj)
+        world._model_manager.current_model_modification_block.append(self)
 
     def update_world_references_in_updated_kwargs(self, world: World):
         tracker = WorldEntityWithIDKwargsTracker.from_world(world)

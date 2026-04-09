@@ -3,9 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property, wraps
-from typing import List, Type, Union, TYPE_CHECKING
+from typing import List, Type, Union, TYPE_CHECKING, Optional
 
-from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
@@ -16,6 +15,7 @@ if TYPE_CHECKING:
         Torso,
         MobileBase,
     )
+    from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
 
 
 @dataclass(eq=False)
@@ -61,6 +61,10 @@ class HasArms(HasRobotPart, ABC):
     @abstractmethod
     def _setup_arm_joint_state(self): ...
 
+    @property
+    def manipulators(self):
+        return [arm.manipulator for arm in self.arms]
+
 
 @dataclass(eq=False)
 class SpecifiesLeftRightArm(HasArms, ABC):
@@ -70,10 +74,14 @@ class SpecifiesLeftRightArm(HasArms, ABC):
 
     @cached_property
     def left_arm(self):
+        from semantic_digital_twin.reasoning.predicates import LeftOf
+
         return self._assign_left_right_arms(LeftOf)
 
     @cached_property
     def right_arm(self):
+        from semantic_digital_twin.reasoning.predicates import RightOf
+
         return self._assign_left_right_arms(RightOf)
 
     def _assign_left_right_arms(self, relation: Type[Union[LeftOf, RightOf]]) -> Arm:
@@ -109,7 +117,7 @@ class HasTorso(HasRobotPart, ABC):
     Mixin class for robots that have a torso.
     """
 
-    torso: Torso = field(init=False, default=None, repr=False)
+    torso: Optional[Torso] = field(default=None)
     """
     The torso of the robot, represented as an arm.
     """
@@ -137,7 +145,7 @@ class HasTorso(HasRobotPart, ABC):
 @dataclass(eq=False)
 class HasMobileBase(HasRobotPart, ABC):
 
-    mobile_base: MobileBase = field(init=False, default=None, repr=False)
+    mobile_base: Optional[MobileBase] = field(default=None)
     full_body_controlled: bool = field(default=False, kw_only=True)
 
     @synchronized_attribute_modification

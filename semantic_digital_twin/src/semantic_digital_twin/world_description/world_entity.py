@@ -9,6 +9,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from dataclasses import fields
 from functools import lru_cache, cached_property
+from typing import assert_never
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -600,12 +601,17 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
         return set(n.lower() for n in camel_case_split(cls.__name__))
 
     def __hash__(self):
-        return hash(
-            tuple(
-                [self.__class__]
-                + sorted([kse.id for kse in self.kinematic_structure_entities])
-            )
-        )
+        introspector = DataclassOnlyIntrospector()
+        result = [self.__class__]
+        for field_ in introspector.discover(self.__class__):
+            value = getattr(self, field_.public_name)
+            if isinstance(value, (list, set)):
+                result.extend(
+                    [v for v in value if isinstance(v, KinematicStructureEntity)]
+                )
+            elif isinstance(value, KinematicStructureEntity):
+                result.append(value)
+        return hash(tuple(result))
 
     def __eq__(self, other):
         return hash(self) == hash(other)
