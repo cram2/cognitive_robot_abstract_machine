@@ -69,20 +69,19 @@ class JSONPlayer(FilePlayer):
             if obj_name == "5" or obj_name == "2":
                 continue
             for det in obj_data:
-
                 R = det["R"]
                 t = det["t"]
-
-                rotation_matrix = np.array(R).reshape(3, 3)
-                obj_orientation = self.rotation_matrix_to_quaternion(rotation_matrix)
-
-                obj_pose = Pose.from_xyz_rpy(
-                    x=t[0],
-                    y=t[1],
-                    z=t[2],
-                    roll=obj_orientation[1],
-                    pitch=obj_orientation[2],
-                    yaw=obj_orientation[3],
+                r = np.array(R).reshape(3, 3)
+                q = self.rotation_matrix_to_quaternion(r)
+                q = q / np.linalg.norm(q)
+                obj_pose = Pose.from_xyz_quaternion(
+                    pos_x=t[0],
+                    pos_y=t[1],
+                    pos_z=t[2],
+                    quat_x=q[0],
+                    quat_y=q[1],
+                    quat_z=q[2],
+                    quat_w=q[3],
                 )
                 obj_pose.timestamp = det["time"]
                 body_name = self.obj_id_to_name[int(obj_name)]
@@ -90,6 +89,46 @@ class JSONPlayer(FilePlayer):
                 objects_poses[body] = obj_pose
 
         return objects_poses
+
+    def rotation_matrix_to_quaternion(self, R):
+        """
+        Transformation of a rotation matrix into a quaternion.
+
+        :param R: rotation matrix
+        :return: quaternion
+        """
+        q = np.zeros(4)
+        trace = np.trace(R)
+
+        if trace > 0:
+            s = 0.5 / np.sqrt(trace + 1.0)
+            q[0] = 0.25 / s
+            q[1] = (R[2, 1] - R[1, 2]) * s
+            q[2] = (R[0, 2] - R[2, 0]) * s
+            q[3] = (R[1, 0] - R[0, 1]) * s
+        else:
+            if R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+                s = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
+                q[0] = (R[2, 1] - R[1, 2]) / s
+                q[1] = 0.25 * s
+                q[2] = (R[0, 1] + R[1, 0]) / s
+                q[3] = (R[0, 2] + R[2, 0]) / s
+            elif R[1, 1] > R[2, 2]:
+                s = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
+                q[0] = (R[0, 2] - R[2, 0]) / s
+                q[1] = (R[0, 1] + R[1, 0]) / s
+                q[2] = 0.25 * s
+                q[3] = (R[1, 2] + R[2, 1]) / s
+            else:
+                s = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
+                q[0] = (R[1, 0] - R[0, 1]) / s
+                q[1] = (R[0, 2] + R[2, 0]) / s
+                q[2] = (R[1, 2] + R[2, 1]) / s
+                q[3] = 0.25 * s
+
+        q_xyzw=[q[1], q[2], q[3], q[0]]
+        return q_xyzw
+
 
     def get_name_from_id(self, obj_id: int) -> str:
         if self.obj_id_to_name and obj_id in self.obj_id_to_name:
@@ -99,38 +138,6 @@ class JSONPlayer(FilePlayer):
     def get_body_from_name(self, obj_name):
         return self.world.get_body_by_name(obj_name)
 
-
-    def rotation_matrix_to_quaternion(self, R: np.ndarray) -> np.ndarray:
-        # Basic conversion (w, x, y, z)
-        trace = np.trace(R)
-
-        if trace > 0:
-            s = 0.5 / np.sqrt(trace + 1.0)
-            w = 0.25 / s
-            x = (R[2, 1] - R[1, 2]) * s
-            y = (R[0, 2] - R[2, 0]) * s
-            z = (R[1, 0] - R[0, 1]) * s
-        else:
-            if R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
-                s = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
-                w = (R[2, 1] - R[1, 2]) / s
-                x = 0.25 * s
-                y = (R[0, 1] + R[1, 0]) / s
-                z = (R[0, 2] + R[2, 0]) / s
-            elif R[1, 1] > R[2, 2]:
-                s = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
-                w = (R[0, 2] - R[2, 0]) / s
-                x = (R[0, 1] + R[1, 0]) / s
-                y = 0.25 * s
-                z = (R[1, 2] + R[2, 1]) / s
-            else:
-                s = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
-                w = (R[1, 0] - R[0, 1]) / s
-                x = (R[0, 2] + R[2, 0]) / s
-                y = (R[1, 2] + R[2, 1]) / s
-                z = 0.25 * s
-
-        return np.array([w, x, y, z])
 
     def transform_to_stl(self, path: str):
         for filename in os.listdir(path):
