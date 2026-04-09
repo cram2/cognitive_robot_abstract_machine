@@ -206,6 +206,18 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         """
         raise NotImplementedError
 
+    def apply_mapping_on_external_root(self, instance: Any) -> Any:
+        """
+        Apply the mapping on the given instance by following the access path and applying the mapping at each step.
+
+        :param instance: The instance to apply the mapping on.
+        :return: An iterable of the mapped values.
+        """
+        current = instance
+        for domain_mapping in self._access_path_:
+            current = next(domain_mapping._apply_mapping_(current))
+        return current
+
 
 @dataclass(eq=False, repr=False)
 class Attribute(MappedVariable):

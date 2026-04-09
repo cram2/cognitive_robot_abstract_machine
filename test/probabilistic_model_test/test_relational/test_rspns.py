@@ -17,6 +17,8 @@ from krrood.entity_query_language.factories import (
     underspecified,
 )
 from krrood.entity_query_language.query.match import Match
+from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.ormatic.utils import create_engine, drop_database
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
@@ -28,6 +30,9 @@ from krrood_test.dataset.example_classes import (
 from probabilistic_model.probabilistic_circuit.relational.learn_rspn import (
     LearnRSPN,
     fill_dataframe_with_parts,
+    get_features_of_class,
+    FeatureExtractor,
+    preprocess_dataframe,
 )
 from probabilistic_model.probabilistic_circuit.relational.main import Nation
 from probabilistic_model.probabilistic_circuit.relational.rspns import (
@@ -80,7 +85,8 @@ def database():
     session.close()
 
 
-def test_move_and_pick_up(database, mutable_model_world):
+@pytest.fixture(scope="function")
+def data_preparation(mutable_model_world):
     world, robot_view, context = mutable_model_world
 
     milk = world.get_body_by_name("milk.stl")
@@ -121,33 +127,60 @@ def test_move_and_pick_up(database, mutable_model_world):
         {MoveAndPickUpAction: move_and_pick_up_distribution}
     )
 
-    sample = move_and_pick_up_distribution.sample(1)
-
     backend = ProbabilisticBackend(probabilistic_registry, number_of_samples=50)
 
     values = list(backend.evaluate(move_and_pick_up_description))
+    return values, move_and_pick_up_distribution
 
-    # ----------------- database stuff
 
-    wrapped_class = WrappedClass(MoveAndPickUpAction)
-    rspn_spec = RSPNSpecification(spec=wrapped_class)
-    # rspn = RSPNTemplate(rspn_spec)
-    # avg log likelihood auf den traingsdaten und dann auf dem gelernten circuit, der sollte hoehere log likelihood haben
+def test_features_extraction(database, data_preparation):
+    values, move_and_pick_up_distribution = data_preparation
 
-    template = LearnRSPN(MoveAndPickUpAction, values)
-    df = fill_dataframe_with_parts({}, values, MoveAndPickUpAction)
-    nparray = pd.DataFrame(df).to_numpy()
-    print(nparray)
-    print(
-        f"Log likelihood of the move and pick up distribution: {np.mean(move_and_pick_up_distribution.log_likelihood(nparray))}"
+    features = get_features_of_class(
+        to_dao(values[0]), variable(MoveAndPickUpAction, []), [], set()
     )
-    assert np.mean(template.probabilistic_circuit.log_likelihood(nparray)) > np.mean(
-        move_and_pick_up_distribution.log_likelihood(nparray)
+
+    feature_extractor = FeatureExtractor(features)
+    to_data_access_object_state = ToDataAccessObjectState()
+    data_access_objects = [
+        to_dao(sample, state=to_data_access_object_state) for sample in values
+    ]
+    dataframe = feature_extractor.create_dataframe(data_access_objects)
+
+    assert [
+        dataframe[column].dtype in (np.float64, np.int64)
+        for column in dataframe.columns
+    ]
+    assert dataframe.shape == (len(values), len(features))
+
+
+def test_move_and_pick_up(database, mutable_model_world, data_preparation):
+    values, move_and_pick_up_distribution = data_preparation
+
+    # avg log likelihood auf den traingsdaten und dann auf dem gelernten circuit, der sollte hoehere log likelihood haben
+    data_access_objects = [to_dao(value) for value in values]
+    template = LearnRSPN(MoveAndPickUpAction, data_access_objects)
+    feature_extractor = FeatureExtractor(
+        get_features_of_class(
+            to_dao(values[0]), variable(MoveAndPickUpAction, []), [], set()
+        )
+    )
+    dataframe = feature_extractor.create_dataframe(data_access_objects)
+    dataframe = preprocess_dataframe(feature_extractor.features, dataframe)
+    sorted = dataframe.sort_index(axis=1)
+    final = sorted.to_numpy()
+    move_and_pick_up_distribution.plot_structure()
+    plt.savefig(f"test_move_and_pick_up_{datetime.datetime.now()}.png")
+    # assert sorted.columns == [v.name for v in move_and_pick_up_distribution.variables]
+    print("distribution", move_and_pick_up_distribution.leaves)
+    print("likelihood", move_and_pick_up_distribution.likelihood(final))
+    print(
+        f"Log likelihood of the move and pick up distribution: {np.mean(move_and_pick_up_distribution.log_likelihood(final))}"
+    )
+    assert np.mean(template.probabilistic_circuit.log_likelihood(final)) > np.mean(
+        move_and_pick_up_distribution.log_likelihood(final)
     )
     template.probabilistic_circuit.plot_structure()
-
-    # template = RSPNTemplate(class_spec=rspn_spec)
-    # template.probabilistic_circuit.plot_structure()
     plt.savefig(f"test_{datetime.datetime.now()}.png")
     plt.close()
 

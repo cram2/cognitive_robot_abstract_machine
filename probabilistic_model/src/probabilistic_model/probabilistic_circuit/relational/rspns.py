@@ -6,11 +6,16 @@ from typing import List
 import copy
 from dataclasses import dataclass, field
 
+import sqlalchemy
+from sqlalchemy.orm import ONETOMANY, MANYTOMANY, MANYTOONE
+
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.ormatic.data_access_objects.dao import DataAccessObject
+from krrood.ormatic.utils import is_data_column
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 from probabilistic_model.distributions.distributions import UnivariateDistribution
-from random_events.variable import Continuous, Integer, Symbolic
+from random_events.variable import Continuous, Integer, Symbolic, compatible_types
 from typing_extensions import Any
 
 from probabilistic_model.distributions.gaussian import GaussianDistribution
@@ -43,6 +48,7 @@ class RSPNPredicate:
     Abstract class to declare a predicate that can be used in an RSPN.
     This is just for type clarity and does not have any functionality on its own.
     """
+
     pass
 
 
@@ -96,33 +102,29 @@ class RSPNSpecification:
     """
     Specification for an RSPN class template.
     """
-    spec: Union[WrappedClass, Type] = field(init=True)
+
+    spec: Type[DataAccessObject] = field(init=True)
     """
     The wrapped class that is supposed to be an RSPN.
     """
 
     def __post_init__(self):
-        if not isinstance(self.spec, WrappedClass):
-            self.spec = WrappedClass(self.spec)
-
         self.attributes = []
         self.unique_parts = []
         self.exchangeable_parts = []
         self.relations = []
 
-        # # Enums are not correctly added to WrappedClass fields currently
-        # if isinstance(self.spec.clazz, type) and issubclass(self.spec.clazz, enum.Enum):
-        #     self.attributes.extend([WrappedField(self.spec, type(enum_field.value)) for enum_field in self.spec.clazz])
+        mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(self.spec)
 
-        for field in self.spec.fields:
-            if field.is_builtin_type:
-                self.attributes.append(field)
-            elif field.is_container:
-                self.exchangeable_parts.append(field)
-            elif field.is_enum:
-                self.unique_parts.append(field)
-            else:
-                self.unique_parts.append(field)
+        for relationship in mapper.relationships:
+            if relationship.direction == MANYTOONE:
+                self.unique_parts.append(relationship.key)
+            # not many to many since we have the association table
+            elif relationship.direction == ONETOMANY:
+                self.exchangeable_parts.append(relationship.key)
+        for column in mapper.columns:
+            if is_data_column(column) and column not in mapper.relationships:
+                self.attributes.append(column)
 
 
 @dataclass
@@ -155,12 +157,18 @@ class RSPNTemplate:
 
     def __post_init__(self):
         self.probabilistic_circuit = (
-                self.probabilistic_circuit or ProbabilisticCircuit()
+            self.probabilistic_circuit or ProbabilisticCircuit()
         )
         if len(self.probabilistic_circuit) == 0:
             self.edt_over_relations = []
-            self.unique_parts = [RSPNTemplate(RSPNSpecification(WrappedClass(part.resolved_type))) for part in self.class_spec.unique_parts]
-            self.exchangeable_parts = [RSPNTemplate(RSPNSpecification(WrappedClass(part.contained_type))) for part in self.class_spec.exchangeable_parts]
+            self.unique_parts = [
+                RSPNTemplate(RSPNSpecification(WrappedClass(part.resolved_type)))
+                for part in self.class_spec.unique_parts
+            ]
+            self.exchangeable_parts = [
+                RSPNTemplate(RSPNSpecification(WrappedClass(part.contained_type)))
+                for part in self.class_spec.exchangeable_parts
+            ]
 
             self._prepare_structure()
 
@@ -172,9 +180,14 @@ class RSPNTemplate:
 
     def add_attributes(self, product):
         for attribute in self.class_spec.attributes:
-            #TODO Flexible Distributions
+            # TODO Flexible Distributions
             product.add_subcircuit(
-                leaf(GaussianDistribution(Continuous(attribute.name), 0, 1), self.probabilistic_circuit)
+                leaf(
+                    GaussianDistribution(
+                        variable=Continuous(attribute.name), location=0, scale=1
+                    ),
+                    self.probabilistic_circuit,
+                )
             )
 
     # def fix_edt_over_relations(self, product):
@@ -217,7 +230,9 @@ class RSPNTemplate:
         ):  # if it has more than just the root product
             for leaf_node in self.probabilistic_circuit.leaves:
                 dist = leaf_node.distribution
-                if dist.variable.name in [attribute.name for attribute in self.class_spec.attributes]:
+                if dist.variable.name in [
+                    attribute.name for attribute in self.class_spec.attributes
+                ]:
                     learned_distributions[dist.variable.name] = dist
 
         for attribute in self.class_spec.attributes:

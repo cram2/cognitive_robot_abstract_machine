@@ -1005,7 +1005,6 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                             ],
                         ]
                     )
-                    print(f"unit:{unit.variables} , {unit.result_of_current_query}")
                 else:
                     unit: InnerUnit
                     unit.log_forward()  # Synch trheads 1
