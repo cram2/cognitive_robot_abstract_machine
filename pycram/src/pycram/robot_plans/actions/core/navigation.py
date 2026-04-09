@@ -5,12 +5,13 @@ from datetime import timedelta
 
 from typing_extensions import Optional, Any
 
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from pycram.config.action_conf import ActionConfig
 from pycram.plans.factories import execute_single
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.motions.navigation import MoveMotion
 from pycram.robot_plans.motions.robot_body import LookingMotion
-from semantic_digital_twin.robots.abstract_robot import Camera
+from semantic_digital_twin.robots.abstract_robot import Camera, Manipulator
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 

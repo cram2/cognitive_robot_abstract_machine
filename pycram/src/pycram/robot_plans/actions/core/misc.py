@@ -6,9 +6,15 @@ from datetime import timedelta
 from typing_extensions import Optional, Type, Any
 
 from pycram.datastructures.enums import DetectionTechnique, DetectionState
+from pycram.datastructures.grasp import GraspDescription
 from pycram.perception import PerceptionQuery
+from pycram.plans.factories import sequential
+from pycram.robot_plans import MoveManipulatorMotion
 from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.core.navigation import NavigateAction
+from semantic_digital_twin.robots.abstract_robot import Manipulator
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Region,
@@ -76,3 +82,44 @@ class DetectAction(ActionDescription):
         return
         # if not result:
         #     raise PerceptionObjectNotFound(self.object_designator, self.technique, self.region)
+
+
+@dataclass
+class MoveToReachHub(ActionDescription):
+    """
+    Let the robot reach a specific pose.
+    """
+
+    standing_pose: Pose
+    """
+    The pose that the robot should stand at.
+    """
+
+    manipulator: Manipulator
+    """
+    The Manipulator to move to the target pose
+    """
+
+    target_pose: Pose
+    """
+    Pose that should be reached.
+    """
+
+    grasp_description: GraspDescription
+    """
+    The semantic description that should be used for the reaching
+    """
+
+    def execute(self):
+        self.add_subplan(
+            sequential(
+                [
+                    MoveManipulatorMotion(
+                        self.target_pose,
+                        self.manipulator,
+                        allow_gripper_collision=False,
+                    ),
+                    NavigateAction(self.standing_pose),
+                ]
+            )
+        ).perform()

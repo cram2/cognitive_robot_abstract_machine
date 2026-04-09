@@ -211,6 +211,7 @@ class ProbabilisticBackend(GenerativeBackend):
     number_of_samples: int = field(kw_only=True, default=50)
     """
     The number of samples to generate.
+    This is only used if the query does not specify a limit.
     """
 
     def _evaluate(self, expression: Match[T]) -> Iterable[T]:
@@ -235,7 +236,9 @@ class ProbabilisticBackend(GenerativeBackend):
         else:
             truncated = conditioned
 
-        samples = truncated.sample(self.number_of_samples)
+        number_of_samples = expression.expression._limit_ or self.number_of_samples
+
+        samples = truncated.sample(number_of_samples)
 
         # create new objects with the values from the samples
         for sample in samples:
@@ -243,3 +246,5 @@ class ProbabilisticBackend(GenerativeBackend):
                 truncated.variables, sample
             )
             yield instance
+
+        raise StopIteration
