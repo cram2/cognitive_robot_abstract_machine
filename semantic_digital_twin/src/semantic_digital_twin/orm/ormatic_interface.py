@@ -46,7 +46,7 @@ import semantic_digital_twin.pipeline.pipeline
 import semantic_digital_twin.reasoning.predicates
 import semantic_digital_twin.reasoning.reasoner
 import semantic_digital_twin.reasoning.world_reasoner
-import semantic_digital_twin.robots.robot_parts
+import semantic_digital_twin.robots.abstract_robot
 import semantic_digital_twin.robots.armar
 import semantic_digital_twin.robots.armar7
 import semantic_digital_twin.robots.boxy
@@ -59,7 +59,7 @@ import semantic_digital_twin.robots.minimal_robot
 import semantic_digital_twin.robots.mmp_dresden
 import semantic_digital_twin.robots.panda
 import semantic_digital_twin.robots.pr2
-import semantic_digital_twin.robots.abstract_robot
+import semantic_digital_twin.robots.robot_parts
 import semantic_digital_twin.robots.stretch
 import semantic_digital_twin.robots.tiago
 import semantic_digital_twin.robots.tracy
@@ -2321,7 +2321,7 @@ class ExternalCollisionVariableManagerDAO(
 
 
 class FieldOfViewDAO(
-    Base, DataAccessObject[semantic_digital_twin.robots.abstract_robot.FieldOfView]
+    Base, DataAccessObject[semantic_digital_twin.robots.robot_parts.FieldOfView]
 ):
 
     __tablename__ = "FieldOfViewDAO"
@@ -2384,7 +2384,7 @@ class FrozenIndexBoxDAO(
 
 
 class HasRobotPartDAO(
-    Base, DataAccessObject[semantic_digital_twin.robots.robot_mixins.HasRobotPart]
+    Base, DataAccessObject[semantic_digital_twin.robots.abstract_robot.HasRobotPart]
 ):
 
     __tablename__ = "HasRobotPartDAO"
@@ -2404,7 +2404,8 @@ class HasRobotPartDAO(
 
 
 class HasArmsDAO(
-    HasRobotPartDAO, DataAccessObject[semantic_digital_twin.robots.robot_mixins.HasArms]
+    HasRobotPartDAO,
+    DataAccessObject[semantic_digital_twin.robots.abstract_robot.HasArms],
 ):
 
     __tablename__ = "HasArmsDAO"
@@ -2430,7 +2431,7 @@ class HasArmsDAO(
 
 class HasMobileBaseDAO(
     HasRobotPartDAO,
-    DataAccessObject[semantic_digital_twin.robots.robot_mixins.HasMobileBase],
+    DataAccessObject[semantic_digital_twin.robots.abstract_robot.HasMobileBase],
 ):
 
     __tablename__ = "HasMobileBaseDAO"
@@ -2494,7 +2495,7 @@ class HasSimulatorPropertiesDAO(
 
 class HasTorsoDAO(
     HasRobotPartDAO,
-    DataAccessObject[semantic_digital_twin.robots.robot_mixins.HasTorso],
+    DataAccessObject[semantic_digital_twin.robots.abstract_robot.HasTorso],
 ):
 
     __tablename__ = "HasTorsoDAO"
@@ -4422,7 +4423,7 @@ class SpatialTypeNotJsonSerializableDAO(
 
 class SpecifiesLeftRightArmDAO(
     HasArmsDAO,
-    DataAccessObject[semantic_digital_twin.robots.robot_mixins.SpecifiesLeftRightArm],
+    DataAccessObject[semantic_digital_twin.robots.abstract_robot.SpecifiesLeftRightArm],
 ):
 
     __tablename__ = "SpecifiesLeftRightArmDAO"
@@ -6806,7 +6807,8 @@ class AgentDAO(
 
 
 class AbstractRobotDAO(
-    AgentDAO, DataAccessObject[semantic_digital_twin.robots.robot_mixins.AbstractRobot]
+    AgentDAO,
+    DataAccessObject[semantic_digital_twin.robots.abstract_robot.AbstractRobot],
 ):
 
     __tablename__ = "AbstractRobotDAO"
@@ -9004,8 +9006,7 @@ class ProcthorBoxDAO(
 
 
 class RobotPartDAO(
-    HasRootBodyDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.RobotPart],
+    HasRootBodyDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.RobotPart]
 ):
 
     __tablename__ = "RobotPartDAO"
@@ -9033,7 +9034,7 @@ class RobotPartDAO(
 
 class KinematicChainDAO(
     RobotPartDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.KinematicChain],
+    DataAccessObject[semantic_digital_twin.robots.robot_parts.KinematicChain],
 ):
 
     __tablename__ = "KinematicChainDAO"
@@ -9067,7 +9068,7 @@ class KinematicChainDAO(
 
 
 class ArmDAO(
-    KinematicChainDAO, DataAccessObject[semantic_digital_twin.robots.abstract_robot.Arm]
+    KinematicChainDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.Arm]
 ):
 
     __tablename__ = "ArmDAO"
@@ -9095,8 +9096,7 @@ class ArmDAO(
 
 
 class FingerDAO(
-    KinematicChainDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.Finger],
+    KinematicChainDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.Finger]
 ):
 
     __tablename__ = "FingerDAO"
@@ -9124,8 +9124,7 @@ class FingerDAO(
 
 
 class TorsoDAO(
-    KinematicChainDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.Torso],
+    KinematicChainDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.Torso]
 ):
 
     __tablename__ = "TorsoDAO"
@@ -9143,8 +9142,7 @@ class TorsoDAO(
 
 
 class ManipulatorDAO(
-    RobotPartDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.Manipulator],
+    RobotPartDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.Manipulator]
 ):
 
     __tablename__ = "ManipulatorDAO"
@@ -9182,7 +9180,7 @@ class ManipulatorDAO(
 
 class HumanoidGripperDAO(
     ManipulatorDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.HumanoidGripper],
+    DataAccessObject[semantic_digital_twin.robots.robot_parts.HumanoidGripper],
 ):
 
     __tablename__ = "HumanoidGripperDAO"
@@ -9219,7 +9217,7 @@ class HumanoidGripperDAO(
 
 class ParallelGripperDAO(
     ManipulatorDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.ParallelGripper],
+    DataAccessObject[semantic_digital_twin.robots.robot_parts.ParallelGripper],
 ):
 
     __tablename__ = "ParallelGripperDAO"
@@ -9255,8 +9253,7 @@ class ParallelGripperDAO(
 
 
 class MobileBaseDAO(
-    RobotPartDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.MobileBase],
+    RobotPartDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.MobileBase]
 ):
 
     __tablename__ = "MobileBaseDAO"
@@ -9285,7 +9282,7 @@ class MobileBaseDAO(
 
 
 class SensorDAO(
-    RobotPartDAO, DataAccessObject[semantic_digital_twin.robots.abstract_robot.Sensor]
+    RobotPartDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.Sensor]
 ):
 
     __tablename__ = "SensorDAO"
@@ -9301,7 +9298,7 @@ class SensorDAO(
 
 
 class CameraDAO(
-    SensorDAO, DataAccessObject[semantic_digital_twin.robots.abstract_robot.Camera]
+    SensorDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.Camera]
 ):
 
     __tablename__ = "CameraDAO"
