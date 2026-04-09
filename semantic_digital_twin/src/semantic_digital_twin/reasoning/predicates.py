@@ -36,7 +36,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.robots.abstract_robot import (
+    from semantic_digital_twin.robots.robot_parts import (
         Camera,
     )
 

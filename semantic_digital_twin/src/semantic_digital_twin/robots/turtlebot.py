@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.robot_mixins import AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 
 

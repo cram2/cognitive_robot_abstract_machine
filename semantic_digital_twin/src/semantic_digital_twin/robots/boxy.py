@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Self
 
-from semantic_digital_twin.robots.robot_mixins import (
+from semantic_digital_twin.robots.abstract_robot import (
     SpecifiesLeftRightArm,
     AbstractRobot,
 )
@@ -14,7 +14,7 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import (
+from semantic_digital_twin.robots.robot_parts import (
     Finger,
     ParallelGripper,
     Arm,

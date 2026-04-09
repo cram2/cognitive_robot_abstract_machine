@@ -16,7 +16,7 @@ from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import sequential
 from pycram.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch

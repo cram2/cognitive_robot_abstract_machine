@@ -13,7 +13,7 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
     SelfCollisionVariableManager,
     ExternalCollisionVariableManager,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types import (
     Vector3,
     Point3,

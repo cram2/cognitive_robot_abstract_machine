@@ -21,7 +21,7 @@ from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
     ModelChangeCallback,
 )
-from semantic_digital_twin.robots.robot_mixins import AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,

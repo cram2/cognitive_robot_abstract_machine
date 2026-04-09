@@ -41,7 +41,7 @@ from semantic_digital_twin.orm.model import (
     QuaternionMapping,
     PoseMapping,
 )
-from semantic_digital_twin.robots.abstract_robot import (
+from semantic_digital_twin.robots.robot_parts import (
     Manipulator,
 )
 

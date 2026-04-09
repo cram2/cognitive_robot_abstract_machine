@@ -9,7 +9,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 from typing_extensions import Optional, Union, List
 
-from semantic_digital_twin.robots.abstract_robot import Manipulator, AbstractRobot
+from semantic_digital_twin.robots.robot_parts import Manipulator, AbstractRobot
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vector3, Quaternion
 from semantic_digital_twin.world_description.world_entity import Body, KinematicStructureEntity

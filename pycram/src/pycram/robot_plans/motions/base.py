@@ -9,7 +9,7 @@ from typing import Optional
 from giskardpy.motion_statechart.graph_node import Task
 from krrood.ormatic.data_access_objects.base import HasGeneric
 from pycram.plans.designator import Designator
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from pycram.datastructures.enums import ExecutionType
 from typing_extensions import TypeVar, ClassVar, Type
 

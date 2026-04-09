@@ -13,7 +13,7 @@ from matplotlib import colors
 from skimage.measure import label
 from typing_extensions import Tuple, List, Optional, Iterator, Callable
 
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,

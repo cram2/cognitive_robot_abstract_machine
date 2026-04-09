@@ -9,7 +9,7 @@ from typing_extensions import List
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.reasoning.predicates import LeftOf
-from semantic_digital_twin.robots.abstract_robot import KinematicChain
+from semantic_digital_twin.robots.robot_parts import KinematicChain
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.tracy import Tracy

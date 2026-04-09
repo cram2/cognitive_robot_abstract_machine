@@ -108,7 +108,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AllowAllCollisions,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import Manipulator, AbstractRobot
+from semantic_digital_twin.robots.robot_parts import Manipulator, AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (

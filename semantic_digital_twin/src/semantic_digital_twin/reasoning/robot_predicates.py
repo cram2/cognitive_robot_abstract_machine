@@ -31,8 +31,8 @@ from semantic_digital_twin.collision_checking.pybullet_collision_detector import
 from semantic_digital_twin.collision_checking.trimesh_collision_detector import (
     FCLCollisionDetector,
 )
-from semantic_digital_twin.robots.abstract_robot import ParallelGripper
-from semantic_digital_twin.robots.robot_mixins import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import ParallelGripper
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body

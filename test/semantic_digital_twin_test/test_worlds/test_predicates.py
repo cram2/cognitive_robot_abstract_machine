@@ -26,7 +26,7 @@ from semantic_digital_twin.reasoning.robot_predicates import (
     blocking,
     is_body_in_gripper,
 )
-from semantic_digital_twin.robots.abstract_robot import Camera, ParallelGripper
+from semantic_digital_twin.robots.robot_parts import Camera, ParallelGripper
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world import World

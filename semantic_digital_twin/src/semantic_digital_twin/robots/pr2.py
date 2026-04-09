@@ -8,7 +8,7 @@ from typing import Self
 from importlib.resources import files
 from pathlib import Path
 
-from semantic_digital_twin.robots.robot_mixins import (
+from semantic_digital_twin.robots.abstract_robot import (
     SpecifiesLeftRightArm,
     HasTorso,
     HasMobileBase,
@@ -29,7 +29,7 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import (
+from semantic_digital_twin.robots.robot_parts import (
     Finger,
     ParallelGripper,
     Arm,

@@ -6,7 +6,7 @@ from typing import Self
 from importlib.resources import files
 from pathlib import Path
 
-from semantic_digital_twin.robots.abstract_robot import (
+from semantic_digital_twin.robots.robot_parts import (
     Arm,
     Finger,
     ParallelGripper,
@@ -14,7 +14,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     Torso,
     MobileBase,
 )
-from semantic_digital_twin.robots.robot_mixins import HasArms, AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import HasArms, AbstractRobot
 from semantic_digital_twin.collision_checking.collision_rules import (
     SelfCollisionMatrixRule,
     AvoidExternalCollisions,

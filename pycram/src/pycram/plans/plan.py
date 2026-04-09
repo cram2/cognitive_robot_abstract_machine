@@ -26,7 +26,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 )
 from pycram.plans.designator import Designator
 from pycram.plans.plan_entity import PlanEntity
-from semantic_digital_twin.robots.robot_mixins import AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 from pycram.plans.plan_node import (
     PlanNode,

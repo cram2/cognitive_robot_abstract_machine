@@ -132,7 +132,7 @@ import semantic_digital_twin.pipeline.pipeline
 import semantic_digital_twin.reasoning.predicates
 import semantic_digital_twin.reasoning.reasoner
 import semantic_digital_twin.reasoning.world_reasoner
-import semantic_digital_twin.robots.abstract_robot
+import semantic_digital_twin.robots.robot_parts
 import semantic_digital_twin.robots.armar
 import semantic_digital_twin.robots.armar7
 import semantic_digital_twin.robots.boxy
@@ -144,7 +144,7 @@ import semantic_digital_twin.robots.kevin
 import semantic_digital_twin.robots.minimal_robot
 import semantic_digital_twin.robots.panda
 import semantic_digital_twin.robots.pr2
-import semantic_digital_twin.robots.robot_mixins
+import semantic_digital_twin.robots.abstract_robot
 import semantic_digital_twin.robots.stretch
 import semantic_digital_twin.robots.tiago
 import semantic_digital_twin.robots.tracy

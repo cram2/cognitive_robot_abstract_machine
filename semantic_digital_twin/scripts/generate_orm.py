@@ -20,7 +20,7 @@ import semantic_digital_twin.collision_checking.collision_variable_managers
 import semantic_digital_twin.orm.model
 import semantic_digital_twin.orm.ormatic_interface
 import semantic_digital_twin.reasoning.predicates
-import semantic_digital_twin.robots.abstract_robot
+import semantic_digital_twin.robots.robot_parts
 import semantic_digital_twin.robots.hsrb
 import semantic_digital_twin.robots.pr2
 import semantic_digital_twin.semantic_annotations.semantic_annotations

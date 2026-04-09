@@ -29,7 +29,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
     CollisionMatrix,
     CollisionCheck,
 )
-from semantic_digital_twin.robots.robot_mixins import AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
@@ -296,7 +296,7 @@ class AllowNonRobotCollisions(AllowCollisionRule):
         """
         Disable collision checks between bodies that do not belong to any robot.
         """
-        from semantic_digital_twin.robots.robot_mixins import AbstractRobot
+        from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 
         # Bodies that are part of any robot and participate in collisions
         robot_bodies: set[Body] = {
