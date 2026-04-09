@@ -13,6 +13,7 @@ from random_events.set import Set
 from random_events.variable import Symbolic
 from typing_extensions import (
     TYPE_CHECKING,
+    Generator,
     List,
     Optional,
     Self,
@@ -41,6 +42,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -412,6 +414,25 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
             active_axis=active_axis,
             connection_limits=connection_limits,
         )
+
+
+@dataclass(eq=False)
+class HasGraspPose(HasRootBody, ABC):
+    """
+    A mixin class for semantic annotations that have a grasp pose.
+    """
+
+    grasp_pose: Optional[Pose] = field(kw_only=True, default=None)
+    """
+    The static grasp pose of the semantic annotation.
+    """
+
+    def grasp_poses(self) -> Generator[Pose, None, None]:
+        """
+        Yield grasp poses for this semantic annotation.
+        """
+        if self.grasp_pose is not None:
+            yield self.grasp_pose
 
 
 @dataclass(eq=False)
