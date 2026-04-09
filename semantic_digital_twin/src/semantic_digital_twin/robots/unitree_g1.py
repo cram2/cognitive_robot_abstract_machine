@@ -28,11 +28,13 @@ from semantic_digital_twin.robots.abstract_robot import (
     Camera,
     FieldOfView,
     Torso,
-    AbstractRobot,
     MobileBase,
     HumanoidGripper,
 )
-from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm
+from semantic_digital_twin.robots.robot_mixins import (
+    SpecifiesLeftRightArm,
+    AbstractRobot,
+)
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -48,7 +50,7 @@ class UnitreeG1(AbstractRobot, SpecifiesLeftRightArm):
     """
 
     @classmethod
-    def _get_structural_root_body(cls, world: World) -> Self:
+    def _get_robot_root_body(cls, world: World) -> Self:
         return cls(
             name=PrefixedName(name="unitree_g1", prefix=world.name),
             root=world.get_body_by_name("pelvis"),
@@ -365,7 +367,7 @@ class UnitreeG1(AbstractRobot, SpecifiesLeftRightArm):
         )
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
-    def _setup_hardware_interfaces(self):
+    def _setup_other_hardware_interfaces(self):
         controlled_joints = [
             "waist_yaw_joint",
             "waist_roll_joint",

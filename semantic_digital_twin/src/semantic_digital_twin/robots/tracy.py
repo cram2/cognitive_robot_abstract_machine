@@ -26,9 +26,11 @@ from semantic_digital_twin.robots.abstract_robot import (
     Arm,
     Camera,
     FieldOfView,
+)
+from semantic_digital_twin.robots.robot_mixins import (
+    SpecifiesLeftRightArm,
     AbstractRobot,
 )
-from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -53,7 +55,7 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm):
         )
 
     @classmethod
-    def _get_structural_root_body(cls, world: World) -> Self:
+    def _get_robot_root_body(cls, world: World) -> Self:
         return cls(
             name=PrefixedName(name="tracy", prefix=world.name),
             root=world.get_body_by_name("table"),
@@ -176,7 +178,7 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm):
         vel_limits = defaultdict(lambda: 0.2)
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
-    def _setup_hardware_interfaces(self):
+    def _setup_other_hardware_interfaces(self):
         controlled_joints = [
             "left_shoulder_pan_joint",
             "left_shoulder_lift_joint",

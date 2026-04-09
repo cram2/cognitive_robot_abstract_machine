@@ -11,13 +11,13 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.exceptions import DoesNotBelongToAWorldError
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.abstract_robot import (
-    AbstractRobot,
     Manipulator,
     Finger,
     ParallelGripper,
 )
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.robot_mixins import AbstractRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.spatial_types import Quaternion
 from semantic_digital_twin.testing import *

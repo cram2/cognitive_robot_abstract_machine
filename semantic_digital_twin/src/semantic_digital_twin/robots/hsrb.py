@@ -7,7 +7,6 @@ from importlib.resources import files
 from pathlib import Path
 
 from semantic_digital_twin.robots.abstract_robot import (
-    AbstractRobot,
     Arm,
     Finger,
     ParallelGripper,
@@ -16,7 +15,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     FieldOfView,
     MobileBase,
 )
-from semantic_digital_twin.robots.robot_mixins import HasArms
+from semantic_digital_twin.robots.robot_mixins import HasArms, AbstractRobot
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -48,7 +47,7 @@ class HSRB(AbstractRobot, HasArms):
     """
 
     @classmethod
-    def _get_structural_root_body(cls, world: World) -> Self:
+    def _get_robot_root_body(cls, world: World) -> Self:
         return cls(
             name=PrefixedName("hsrb", prefix=world.name),
             root=world.get_body_by_name("base_footprint"),
@@ -238,7 +237,7 @@ class HSRB(AbstractRobot, HasArms):
         vel_limits = defaultdict(lambda: 1)
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
-    def _setup_hardware_interfaces(self):
+    def _setup_other_hardware_interfaces(self):
         controlled_joints = [
             "arm_flex_joint",
             "arm_lift_joint",

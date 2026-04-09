@@ -5,7 +5,10 @@ from typing import Self
 
 import numpy as np
 
-from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm
+from semantic_digital_twin.robots.robot_mixins import (
+    SpecifiesLeftRightArm,
+    AbstractRobot,
+)
 from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     GripperState,
@@ -20,7 +23,6 @@ from semantic_digital_twin.robots.abstract_robot import (
     Camera,
     FieldOfView,
     Torso,
-    AbstractRobot,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World

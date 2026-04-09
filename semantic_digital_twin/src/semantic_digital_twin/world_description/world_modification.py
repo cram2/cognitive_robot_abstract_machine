@@ -16,6 +16,7 @@ from krrood.adapters.json_serializer import (
 from semantic_digital_twin.exceptions import (
     MissingWorldModificationContextError,
     MismatchingIDsInWorldModification,
+    WorldEntityWithIDNotFoundError,
 )
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithID,
@@ -360,7 +361,10 @@ class WorldModelModificationBlock:
 
     def apply(self, world: World):
         for modification in self.modifications:
-            modification.apply(world)
+            try:
+                modification.apply(world)
+            except WorldEntityWithIDNotFoundError as e:
+                ...
 
     def update_references_for_world_and_apply(self, world: World):
         """

@@ -500,15 +500,15 @@ class DuplicateKinematicStructureEntityErrorDAO_names_association(
     )
 
 
-class DuplicateRobotAssignmentsDAO_robots_association(
+class DuplicateRobotAssignmentsErrorDAO_robots_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "_70045933384218784314514497665103914217814787473120681575288856"
+    __tablename__ = "_68211936433118714298639438955270567124903021105789333075935746"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_duplicaterobotassignmentsdao_id: Mapped[int] = mapped_column(
-        ForeignKey("DuplicateRobotAssignmentsDAO.database_id")
+    source_duplicaterobotassignmentserrordao_id: Mapped[int] = mapped_column(
+        ForeignKey("DuplicateRobotAssignmentsErrorDAO.database_id")
     )
     target_abstractrobotdao_id: Mapped[int] = mapped_column(
         ForeignKey("AbstractRobotDAO.database_id")
@@ -4814,12 +4814,12 @@ class DuplicateKinematicStructureEntityErrorDAO(
     }
 
 
-class DuplicateRobotAssignmentsDAO(
+class DuplicateRobotAssignmentsErrorDAO(
     UsageErrorDAO,
-    DataAccessObject[semantic_digital_twin.exceptions.DuplicateRobotAssignments],
+    DataAccessObject[semantic_digital_twin.exceptions.DuplicateRobotAssignmentsError],
 ):
 
-    __tablename__ = "DuplicateRobotAssignmentsDAO"
+    __tablename__ = "DuplicateRobotAssignmentsErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(UsageErrorDAO.database_id),
@@ -4836,17 +4836,17 @@ class DuplicateRobotAssignmentsDAO(
     robot_part: Mapped[RobotPartDAO] = relationship(
         "RobotPartDAO", uselist=False, foreign_keys=[robot_part_id], post_update=True
     )
-    robots: Mapped[builtins.list[DuplicateRobotAssignmentsDAO_robots_association]] = (
-        relationship(
-            "DuplicateRobotAssignmentsDAO_robots_association",
-            collection_class=builtins.list,
-            cascade="all, delete-orphan",
-            foreign_keys="[DuplicateRobotAssignmentsDAO_robots_association.source_duplicaterobotassignmentsdao_id]",
-        )
+    robots: Mapped[
+        builtins.list[DuplicateRobotAssignmentsErrorDAO_robots_association]
+    ] = relationship(
+        "DuplicateRobotAssignmentsErrorDAO_robots_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[DuplicateRobotAssignmentsErrorDAO_robots_association.source_duplicaterobotassignmentserrordao_id]",
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "DuplicateRobotAssignmentsDAO",
+        "polymorphic_identity": "DuplicateRobotAssignmentsErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
     }
 
@@ -6806,8 +6806,7 @@ class AgentDAO(
 
 
 class AbstractRobotDAO(
-    AgentDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.AbstractRobot],
+    AgentDAO, DataAccessObject[semantic_digital_twin.robots.robot_mixins.AbstractRobot]
 ):
 
     __tablename__ = "AbstractRobotDAO"

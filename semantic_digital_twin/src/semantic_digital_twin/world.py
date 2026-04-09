@@ -440,6 +440,9 @@ class World(HasSimulatorProperties):
         self.collision_manager = CollisionManager(
             _world=self, collision_detector=BulletCollisionDetector(_world=self)
         )
+        self._world_entity_hash_table[hash(self.collision_manager)] = (
+            self.collision_manager
+        )
 
     def __hash__(self):
         return hash((id(self), self._model_manager.version))

@@ -416,7 +416,7 @@ def test_pr2_semantic_annotation(pr2_world_state_reset):
     pr2_world_state_reset._notify_model_change()
 
     assert len(pr2.manipulators) == 2
-    assert len(pr2.manipulator_chains) == 2
+    assert len(pr2.arms) == 2
     assert len(pr2.sensors) == 1
     assert len(pr2.sensor_chains) == 1
     assert pr2.neck == list(pr2.sensor_chains)[0]

@@ -12,6 +12,7 @@ from semantic_digital_twin.robots.robot_mixins import (
     SpecifiesLeftRightArm,
     HasTorso,
     HasMobileBase,
+    AbstractRobot,
 )
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
@@ -35,7 +36,6 @@ from semantic_digital_twin.robots.abstract_robot import (
     Camera,
     FieldOfView,
     Torso,
-    AbstractRobot,
     MobileBase,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
@@ -55,7 +55,7 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
     """
 
     @classmethod
-    def _get_structural_root_body(cls, world: World) -> Body:
+    def _get_robot_root_body(cls, world: World) -> Body:
         return world.get_body_by_name("base_footprint")
 
     def _setup_collision_rules(self):
@@ -168,7 +168,7 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
 
         right_gripper = ParallelGripper.create_and_add_to_world(
             name=PrefixedName("right_gripper", prefix=self.name.name),
-            root_name="torso_lift_link",
+            root_name="r_gripper_palm_link",
             tool_frame_name="r_gripper_tool_frame",
             front_facing_orientation=Quaternion(0, 0, 0, 1),
             thumb=right_gripper_thumb,
@@ -350,25 +350,10 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
         )
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
-    def _setup_hardware_interfaces(self):
+    def _setup_other_hardware_interfaces(self):
         controlled_joints = [
-            "torso_lift_joint",
             "head_pan_joint",
             "head_tilt_joint",
-            "r_shoulder_pan_joint",
-            "r_shoulder_lift_joint",
-            "r_upper_arm_roll_joint",
-            "r_forearm_roll_joint",
-            "r_elbow_flex_joint",
-            "r_wrist_flex_joint",
-            "r_wrist_roll_joint",
-            "l_shoulder_pan_joint",
-            "l_shoulder_lift_joint",
-            "l_upper_arm_roll_joint",
-            "l_forearm_roll_joint",
-            "l_elbow_flex_joint",
-            "l_wrist_flex_joint",
-            "l_wrist_roll_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(

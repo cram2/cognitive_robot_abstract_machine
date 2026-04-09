@@ -2,13 +2,15 @@ from dataclasses import dataclass
 from typing import Self
 
 from semantic_digital_twin.robots.abstract_robot import (
-    AbstractRobot,
     Arm,
     Finger,
     ParallelGripper,
 )
-from semantic_digital_twin.robots.robot_mixins import HasArms
-from semantic_digital_twin.datastructures.definitions import StaticJointState, GripperState
+from semantic_digital_twin.robots.robot_mixins import HasArms, AbstractRobot
+from semantic_digital_twin.datastructures.definitions import (
+    StaticJointState,
+    GripperState,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import Quaternion

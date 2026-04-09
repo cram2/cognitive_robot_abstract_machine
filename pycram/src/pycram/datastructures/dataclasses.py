@@ -10,7 +10,7 @@ from typing_extensions import (
 from krrood.entity_query_language.backends import QueryBackend, EntityQueryLanguageBackend
 from pycram.plans.plan import Plan
 from pycram.plans.plan_entity import PlanEntity
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_mixins import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3
 from semantic_digital_twin.world import World
 

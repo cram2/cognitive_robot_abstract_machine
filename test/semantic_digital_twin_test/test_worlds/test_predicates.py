@@ -177,7 +177,6 @@ def test_get_visible_objects(pr2_world_copy: World):
 
 def test_occluding_bodies(pr2_world_state_reset: World):
     world = deepcopy(pr2_world_state_reset)
-    PR2.from_world(world)
     world.get_body_by_name("base_footprint").parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
     )

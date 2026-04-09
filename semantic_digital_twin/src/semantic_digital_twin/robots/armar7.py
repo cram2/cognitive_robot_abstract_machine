@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Self
 
-from semantic_digital_twin.robots.robot_mixins import SpecifiesLeftRightArm
+from semantic_digital_twin.robots.robot_mixins import (
+    SpecifiesLeftRightArm,
+    AbstractRobot,
+)
 from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     GripperState,
@@ -17,7 +20,6 @@ from semantic_digital_twin.robots.abstract_robot import (
     Camera,
     FieldOfView,
     Torso,
-    AbstractRobot,
     HumanoidGripper,
     MobileBase,
 )
@@ -162,7 +164,7 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm):
     def _setup_velocity_limits(self):
         pass
 
-    def _setup_hardware_interfaces(self):
+    def _setup_other_hardware_interfaces(self):
         pass
 
     def _setup_collision_rules(self):
@@ -348,7 +350,7 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm):
         self._world.add_semantic_annotation(self)
 
     @classmethod
-    def _get_structural_root_body(cls, world: World) -> Self:
+    def _get_robot_root_body(cls, world: World) -> Self:
         return cls(
             name=PrefixedName(name="armar7", prefix=world.name),
             # the actual root here is called "root", but this is such a generic name that i fear it will be

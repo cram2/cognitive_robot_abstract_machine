@@ -359,7 +359,7 @@ class DuplicateWorldEntityError(UsageError):
 
 
 @dataclass
-class DuplicateRobotAssignments(UsageError):
+class DuplicateRobotAssignmentsError(UsageError):
     """
     Raised when a robot part is assigned to multiple robots, which should not happen.
     """

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Self
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import (
+from semantic_digital_twin.robots.robot_mixins import (
     AbstractRobot,
 )
 from semantic_digital_twin.world import World
@@ -26,7 +26,7 @@ class MinimalRobot(AbstractRobot):
     """
 
     @classmethod
-    def _get_structural_root_body(cls, world: World) -> Self:
+    def _get_robot_root_body(cls, world: World) -> Self:
         return world.root
 
     def _setup_collision_rules(self):
@@ -36,7 +36,7 @@ class MinimalRobot(AbstractRobot):
         vel_limits = defaultdict(lambda: 1.0)
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
-    def _setup_hardware_interfaces(self):
+    def _setup_other_hardware_interfaces(self):
         for connection in self.connections:
             if isinstance(connection, ActiveConnection):
                 connection.has_hardware_interface = True
