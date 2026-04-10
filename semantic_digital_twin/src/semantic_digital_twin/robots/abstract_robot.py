@@ -37,6 +37,7 @@ from semantic_digital_twin.robots.robot_parts import (
     RobotPart,
     Camera,
     Manipulator,
+    Sensor,
 )
 
 if TYPE_CHECKING:
@@ -85,11 +86,11 @@ class HasRobotPart(ABC):
         return [part for part in self._robot_parts if isinstance(part, Manipulator)]
 
     @property
-    def sensors(self) -> list[RobotPart]:
+    def sensors(self) -> list[Sensor]:
         """
         A collection of all sensors in the robot.
         """
-        return [part for part in self._robot_parts if isinstance(part, Camera)]
+        return [part for part in self._robot_parts if isinstance(part, Sensor)]
 
 
 @dataclass(eq=False)
@@ -183,6 +184,31 @@ class SpecifiesLeftRightArm(HasArms, ABC):
             )()
             else second_arm
         )
+
+
+@dataclass(eq=False)
+class HasExternalSensors(HasRobotPart, ABC):
+    """
+    Mixin class for robots that have an external camera.
+    """
+
+    _external_sensors: List[Sensor] = field(default_factory=list)
+    """
+    A collection of external sensors in the robot.
+    """
+
+    @synchronized_attribute_modification
+    def add_external_sensor(self, sensor: Sensor):
+        self._external_sensors.append(sensor)
+
+    @abstractmethod
+    def _setup_external_sensors(self): ...
+
+    @property
+    def sensors(self) -> list[Sensor]:
+        sensors = super().sensors
+        sensors.extend(self._external_sensors)
+        return sensors
 
 
 @dataclass(eq=False)
