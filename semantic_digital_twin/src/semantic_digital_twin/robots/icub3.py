@@ -192,7 +192,11 @@ class ICub3(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
             name=PrefixedName("left_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(
-                    [c for c in left_arm.connections if isinstance(c, ActiveConnection1DOF)],
+                    [
+                        c
+                        for c in left_arm.connections
+                        if isinstance(c, ActiveConnection1DOF)
+                    ],
                     [0.0] * len(list(left_arm.connections)),
                 )
             ),
@@ -205,7 +209,11 @@ class ICub3(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
             name=PrefixedName("right_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(
-                    [c for c in right_arm.connections if isinstance(c, ActiveConnection1DOF)],
+                    [
+                        c
+                        for c in right_arm.connections
+                        if isinstance(c, ActiveConnection1DOF)
+                    ],
                     [0.0] * len(list(right_arm.connections)),
                 )
             ),
@@ -325,7 +333,7 @@ class ICub3(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
             minimal_height=1.27,
             maximal_height=1.85,
             world=world,
-            default_camera=True
+            default_camera=True,
         )
 
         # Create torso
@@ -343,7 +351,9 @@ class ICub3(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
 
     def _setup_torso_joint_state(self):
         torso = self.torso
-        torso_joint = [c for c in torso.connections if isinstance(c, ActiveConnection1DOF)]
+        torso_joint = [
+            c for c in torso.connections if isinstance(c, ActiveConnection1DOF)
+        ]
 
         torso_low = JointState.from_mapping(
             name=PrefixedName("torso_low", prefix=self.name.name),
