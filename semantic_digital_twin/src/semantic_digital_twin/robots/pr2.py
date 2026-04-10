@@ -321,7 +321,7 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
         self.torso.add_joint_state(torso_mid)
         self.torso.add_joint_state(torso_high)
 
-    def _setup_base_semantic_annotations(self):
+    def _setup_mobile_base_semantic_annotations(self):
         # Create the robot base
         base = MobileBase.create_and_add_to_world(
             name=PrefixedName("base", prefix=self.name.name),

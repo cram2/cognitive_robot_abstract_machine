@@ -274,7 +274,7 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasMobileBase, HasTorso):
         self.right_arm.manipulator.add_joint_state(right_gripper_close)
         self.right_arm.manipulator.add_joint_state(right_gripper_open)
 
-    def _setup_base_semantic_annotations(self):
+    def _setup_mobile_base_semantic_annotations(self):
         base = MobileBase.create_and_add_to_world(
             name=PrefixedName("base", prefix=self.name.name),
             root_name="Platform_body_link",

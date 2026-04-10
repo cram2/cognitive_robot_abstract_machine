@@ -604,6 +604,12 @@ class MobileBase(RobotPart):
     Axis along which the robot manipulates
     """
 
+    full_body_controlled: bool = field(default=False, kw_only=True)
+    """
+    If True, the robot can move its entire body during a motion. 
+    If False, only the robot will always stand still when moving an arm.
+    """
+
     @property
     def bounding_box(self) -> BoundingBox:
         return self.root.collision.as_bounding_box_collection_in_frame(
@@ -617,9 +623,16 @@ class MobileBase(RobotPart):
         world: World,
         root_name: str,
         main_axis: Vector3,
+        full_body_controlled: bool,
+        sensors: List[Sensor] = None,
     ) -> Self:
         self = cls(
-            name=name, root=world.get_body_by_name(root_name), main_axis=main_axis
+            name=name,
+            root=world.get_body_by_name(root_name),
+            main_axis=main_axis,
+            full_body_controlled=full_body_controlled,
         )
+        if sensors is not None:
+            self.add_sensors(sensors)
         world.add_semantic_annotation(self)
         return self

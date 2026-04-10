@@ -7,6 +7,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     HasArms,
     AbstractRobot,
     HasMobileBase,
+    HasOneArm,
 )
 from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
@@ -33,7 +34,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False)
-class Donbot(AbstractRobot, HasArms, HasMobileBase):
+class Donbot(AbstractRobot, HasOneArm, HasMobileBase):
     """
     Class that describes the Donbot Robot.
     """
@@ -102,24 +103,28 @@ class Donbot(AbstractRobot, HasArms, HasMobileBase):
         self.add_arm(arm)
 
     def _setup_arm_hardware_interfaces(self):
-        pass
+        for connection in self.arm.active_connections:
+            connection.has_hardware_interface = True
 
     def _setup_arm_joint_state(self):
-        arm = self.arms[0]
         arm_park = JointState.from_mapping(
             name=PrefixedName("arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(
-                    [c for c in arm.connections if isinstance(c, ActiveConnection1DOF)],
+                    [
+                        c
+                        for c in self.arm.connections
+                        if isinstance(c, ActiveConnection1DOF)
+                    ],
                     [3.23, -1.51, -1.57, 0.0, 1.57, -1.65],
                 )
             ),
             state_type=StaticJointState.PARK,
         )
 
-        arm.add_joint_state(arm_park)
+        self.arm.add_joint_state(arm_park)
 
-        gripper = arm.manipulator
+        gripper = self.arm.manipulator
         gripper_joints = [
             c for c in gripper.connections if isinstance(c, ActiveConnection1DOF)
         ]
@@ -139,5 +144,5 @@ class Donbot(AbstractRobot, HasArms, HasMobileBase):
         gripper.add_joint_state(gripper_close)
         gripper.add_joint_state(gripper_open)
 
-    def _setup_base_semantic_annotations(self):
+    def _setup_mobile_base_semantic_annotations(self):
         pass

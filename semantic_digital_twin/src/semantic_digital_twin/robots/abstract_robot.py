@@ -130,6 +130,17 @@ class HasArms(HasRobotPart, ABC):
 
 
 @dataclass(eq=False)
+class HasOneArm(HasArms, ABC):
+    """
+    Mixin class for robots that have exactly one arm.
+    """
+
+    @property
+    def arm(self) -> Arm:
+        return self.arms[0]
+
+
+@dataclass(eq=False)
 class SpecifiesLeftRightArm(HasArms, ABC):
     """
     Mixin class for robots that have two arms and can specify which is the left and which is the right arm.
@@ -209,7 +220,6 @@ class HasTorso(HasRobotPart, ABC):
 class HasMobileBase(HasRobotPart, ABC):
 
     mobile_base: Optional[MobileBase] = field(default=None)
-    full_body_controlled: bool = field(default=False, kw_only=True)
 
     @synchronized_attribute_modification
     def add_mobile_base(self, mobile_base: MobileBase):
@@ -217,10 +227,10 @@ class HasMobileBase(HasRobotPart, ABC):
 
     def _setup_robot_parts(self):
         super()._setup_robot_parts()
-        self._setup_base_semantic_annotations()
+        self._setup_mobile_base_semantic_annotations()
 
     @abstractmethod
-    def _setup_base_semantic_annotations(self): ...
+    def _setup_mobile_base_semantic_annotations(self): ...
 
 
 @dataclass(eq=False)
