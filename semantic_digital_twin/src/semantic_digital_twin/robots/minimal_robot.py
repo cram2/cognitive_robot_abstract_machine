@@ -1,20 +1,15 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Self
 
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import (
     AbstractRobot,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
-    OmniDrive,
     ActiveConnection,
-)
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
 )
 
 
