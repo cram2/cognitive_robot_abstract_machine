@@ -5,9 +5,12 @@ from typing import Self
 
 import numpy as np
 
+from pycram.robot_descriptions.mmp_dresden_states import left_arm
 from semantic_digital_twin.robots.abstract_robot import (
     SpecifiesLeftRightArm,
     AbstractRobot,
+    HasTorso,
+    HasMobileBase,
 )
 from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
@@ -23,14 +26,19 @@ from semantic_digital_twin.robots.robot_parts import (
     Camera,
     FieldOfView,
     Torso,
+    HumanoidGripper,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.connections import (
+    FixedConnection,
+    ActiveConnection1DOF,
+)
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False)
-class ICub3(AbstractRobot, SpecifiesLeftRightArm):
+class ICub3(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
     """
     Class that describes the iCub3 Robot.
     """
@@ -42,322 +50,322 @@ class ICub3(AbstractRobot, SpecifiesLeftRightArm):
         ...
 
     @classmethod
-    def from_world(cls, world: World) -> Self:
-        """
-        Creates a iCub3 robot view from the given world.
+    def _get_robot_root_body(cls, world: World) -> Body:
+        return world.get_body_by_name("base_footprint")
 
-        :param world: The world from which to create the robot view.
+    def _setup_collision_rules(self):
+        pass
 
-        :return: A iCub3 robot view.
-        """
+    def _setup_other_hardware_interfaces(self):
+        pass
 
-        with world.modify_world():
-            icub3 = cls(
-                name=PrefixedName(name="icub3", prefix=world.name),
-                root=world.get_body_by_name("base_footprint"),
-                _world=world,
-            )
+    def _setup_arm_semantic_annotations(self):
+        world = self._world
 
-            # Create left arm
-            left_gripper_thumb = Finger(
-                name=PrefixedName("left_gripper_thumb", prefix=icub3.name.name),
-                root=world.get_body_by_name("l_hand_thumb_0"),
-                tip=world.get_body_by_name("l_hand_thumb_tip"),
-                _world=world,
-            )
+        # Create left arm
+        left_gripper_thumb = Finger.create_and_add_to_world(
+            name=PrefixedName("left_gripper_thumb", prefix=self.name.name),
+            root_name="l_hand_thumb_0",
+            tip_name="l_hand_thumb_tip",
+            world=world,
+        )
 
-            left_gripper_index_finger = Finger(
-                name=PrefixedName("left_gripper_index_finger", prefix=icub3.name.name),
-                root=world.get_body_by_name("l_hand_index_0"),
-                tip=world.get_body_by_name("l_hand_index_tip"),
-                _world=world,
-            )
+        left_gripper_index_finger = Finger.create_and_add_to_world(
+            name=PrefixedName("left_gripper_index_finger", prefix=self.name.name),
+            root_name="l_hand_index_0",
+            tip_name="l_hand_index_tip",
+            world=world,
+        )
 
-            left_gripper_middle_finger = Finger(
-                name=PrefixedName("left_gripper_middle_finger", prefix=icub3.name.name),
-                root=world.get_body_by_name("l_hand_middle_0"),
-                tip=world.get_body_by_name("l_hand_middle_tip"),
-                _world=world,
-            )
+        left_gripper_middle_finger = Finger.create_and_add_to_world(
+            name=PrefixedName("left_gripper_middle_finger", prefix=self.name.name),
+            root_name="l_hand_middle_0",
+            tip_name="l_hand_middle_tip",
+            world=world,
+        )
 
-            left_gripper_ring_finger = Finger(
-                name=PrefixedName("left_gripper_ring_finger", prefix=icub3.name.name),
-                root=world.get_body_by_name("l_hand_ring_0"),
-                tip=world.get_body_by_name("l_hand_ring_tip"),
-                _world=world,
-            )
+        left_gripper_ring_finger = Finger.create_and_add_to_world(
+            name=PrefixedName("left_gripper_ring_finger", prefix=self.name.name),
+            root_name="l_hand_ring_0",
+            tip_name="l_hand_ring_tip",
+            world=world,
+        )
 
-            left_gripper_little_finger = Finger(
-                name=PrefixedName("left_gripper_little_finger", prefix=icub3.name.name),
-                root=world.get_body_by_name("l_hand_little_0"),
-                tip=world.get_body_by_name("l_hand_little_tip"),
-                _world=world,
-            )
+        left_gripper_little_finger = Finger.create_and_add_to_world(
+            name=PrefixedName("left_gripper_little_finger", prefix=self.name.name),
+            root_name="l_hand_little_0",
+            tip_name="l_hand_little_tip",
+            world=world,
+        )
 
-            left_gripper = ParallelGripper(
-                name=PrefixedName("left_gripper", prefix=icub3.name.name),
-                root=world.get_body_by_name("l_hand"),
-                tool_frame=world.get_body_by_name("l_gripper_tool_frame"),
-                front_facing_orientation=Quaternion(0.5, 0.5, 0.5, 0.5),
-                front_facing_axis=Vector3(0, 0, 1),
-                thumb=left_gripper_thumb,
-                finger=left_gripper_index_finger,
-                _world=world,
-            )
-            left_arm = Arm(
-                name=PrefixedName("left_arm", prefix=icub3.name.name),
-                root=world.get_body_by_name("root_link"),
-                tip=world.get_body_by_name("l_hand"),
-                manipulator=left_gripper,
-                _world=world,
-            )
+        left_gripper = HumanoidGripper.create_and_add_to_world(
+            name=PrefixedName("left_gripper", prefix=self.name.name),
+            root_name="l_hand",
+            tool_frame_name="l_gripper_tool_frame",
+            front_facing_orientation=Quaternion(0.5, 0.5, 0.5, 0.5),
+            thumb=left_gripper_thumb,
+            fingers=[
+                left_gripper_index_finger,
+                left_gripper_middle_finger,
+                left_gripper_ring_finger,
+                left_gripper_little_finger,
+            ],
+            world=world,
+        )
+        left_arm = Arm.create_and_add_to_world(
+            name=PrefixedName("left_arm", prefix=self.name.name),
+            root_name="root_link",
+            tip_name="l_hand",
+            manipulator=left_gripper,
+            world=world,
+        )
 
-            icub3.add_arm(left_arm)
+        self.add_arm(left_arm)
 
-            # Create right arm
-            right_gripper_thumb = Finger(
-                name=PrefixedName("right_gripper_thumb", prefix=icub3.name.name),
-                root=world.get_body_by_name("r_hand_thumb_0"),
-                tip=world.get_body_by_name("r_hand_thumb_tip"),
-                _world=world,
-            )
-            right_gripper_index_finger = Finger(
-                name=PrefixedName("right_gripper_index_finger", prefix=icub3.name.name),
-                root=world.get_body_by_name("r_hand_index_0"),
-                tip=world.get_body_by_name("r_hand_index_tip"),
-                _world=world,
-            )
-            right_gripper_middle_finger = Finger(
-                name=PrefixedName(
-                    "right_gripper_middle_finger", prefix=icub3.name.name
-                ),
-                root=world.get_body_by_name("r_hand_middle_0"),
-                tip=world.get_body_by_name("r_hand_middle_tip"),
-                _world=world,
-            )
-            right_gripper_ring_finger = Finger(
-                name=PrefixedName("right_gripper_ring_finger", prefix=icub3.name.name),
-                root=world.get_body_by_name("r_hand_ring_0"),
-                tip=world.get_body_by_name("r_hand_ring_tip"),
-                _world=world,
-            )
-            right_gripper_little_finger = Finger(
-                name=PrefixedName(
-                    "right_gripper_little_finger", prefix=icub3.name.name
-                ),
-                root=world.get_body_by_name("r_hand_little_0"),
-                tip=world.get_body_by_name("r_hand_little_tip"),
-                _world=world,
-            )
+        # Create right arm
+        right_gripper_thumb = Finger.create_and_add_to_world(
+            name=PrefixedName("right_gripper_thumb", prefix=self.name.name),
+            root_name="r_hand_thumb_0",
+            tip_name="r_hand_thumb_tip",
+            world=world,
+        )
+        right_gripper_index_finger = Finger.create_and_add_to_world(
+            name=PrefixedName("right_gripper_index_finger", prefix=self.name.name),
+            root_name="r_hand_index_0",
+            tip_name="r_hand_index_tip",
+            world=world,
+        )
+        right_gripper_middle_finger = Finger.create_and_add_to_world(
+            name=PrefixedName("right_gripper_middle_finger", prefix=self.name.name),
+            root_name="r_hand_middle_0",
+            tip_name="r_hand_middle_tip",
+            world=world,
+        )
+        right_gripper_ring_finger = Finger.create_and_add_to_world(
+            name=PrefixedName("right_gripper_ring_finger", prefix=self.name.name),
+            root_name="r_hand_ring_0",
+            tip_name="r_hand_ring_tip",
+            world=world,
+        )
+        right_gripper_little_finger = Finger.create_and_add_to_world(
+            name=PrefixedName("right_gripper_little_finger", prefix=self.name.name),
+            root_name="r_hand_little_0",
+            tip_name="r_hand_little_tip",
+            world=world,
+        )
 
-            right_gripper = ParallelGripper(
-                name=PrefixedName("right_gripper", prefix=icub3.name.name),
-                root=world.get_body_by_name("r_hand"),
-                tool_frame=world.get_body_by_name("r_gripper_tool_frame"),
-                front_facing_orientation=Quaternion(0, 0, -0.707, 0.707),
-                front_facing_axis=Vector3(0, 0, 1),
-                thumb=right_gripper_thumb,
-                finger=right_gripper_index_finger,
-                _world=world,
-            )
-            right_arm = Arm(
-                name=PrefixedName("right_arm", prefix=icub3.name.name),
-                root=world.get_body_by_name("root_link"),
-                tip=world.get_body_by_name("r_hand"),
-                manipulator=right_gripper,
-                _world=world,
-            )
+        right_gripper = HumanoidGripper.create_and_add_to_world(
+            name=PrefixedName("right_gripper", prefix=self.name.name),
+            root_name="r_hand",
+            tool_frame_name="r_gripper_tool_frame",
+            front_facing_orientation=Quaternion(0, 0, -0.707, 0.707),
+            thumb=right_gripper_thumb,
+            fingers=[
+                right_gripper_index_finger,
+                right_gripper_middle_finger,
+                right_gripper_ring_finger,
+                right_gripper_little_finger,
+            ],
+            world=world,
+        )
+        right_arm = Arm.create_and_add_to_world(
+            name=PrefixedName("right_arm", prefix=self.name.name),
+            root_name="root_link",
+            tip_name="r_hand",
+            manipulator=right_gripper,
+            world=world,
+        )
 
-            icub3.add_arm(right_arm)
+        self.add_arm(right_arm)
 
-            # Create camera and neck
-            camera = Camera(
-                name=PrefixedName("eye_camera", prefix=icub3.name.name),
-                root=world.get_body_by_name("head"),
-                forward_facing_axis=Vector3(1, 0, 0),
-                field_of_view=FieldOfView(
-                    horizontal_angle=0.99483, vertical_angle=0.75049
-                ),
-                minimal_height=1.27,
-                maximal_height=1.85,
-                _world=world,
-            )
+    def _setup_arm_hardware_interfaces(self):
+        pass
 
-            # neck = Neck(
-            #     name=PrefixedName("neck", prefix=icub3.name.name),
-            #     sensors=[camera],
-            #     root=world.get_body_by_name("chest"),
-            #     tip=world.get_body_by_name("head"),
-            #     pitch_body=world.get_body_by_name("neck_pitch"),
-            #     yaw_body=world.get_body_by_name("neck_yaw"),
-            #     _world=world,
-            # )
-            # icub3.add_neck(neck)
+    def _setup_arm_joint_state(self):
+        left_arm = self.left_arm
+        right_arm = self.right_arm
+        left_gripper = left_arm.manipulator
+        right_gripper = right_arm.manipulator
 
-            # Create torso
-            torso = Torso(
-                name=PrefixedName("torso", prefix=icub3.name.name),
-                root=world.get_body_by_name("root_link"),
-                tip=world.get_body_by_name("chest"),
-                _world=world,
-            )
-            icub3.add_torso(torso)
+        # Create states
+        left_arm_park = JointState.from_mapping(
+            name=PrefixedName("left_arm_park", prefix=self.name.name),
+            mapping=dict(
+                zip(
+                    [c for c in left_arm.connections if isinstance(c, ActiveConnection1DOF)],
+                    [0.0] * len(list(left_arm.connections)),
+                )
+            ),
+            state_type=StaticJointState.PARK,
+        )
 
-            # Create states
-            left_arm_park = JointState.from_mapping(
-                name=PrefixedName("left_arm_park", prefix=icub3.name.name),
-                mapping=dict(
-                    zip(
-                        [c for c in left_arm.connections if type(c) != FixedConnection],
-                        [0.0] * len(list(left_arm.connections)),
-                    )
-                ),
-                state_type=StaticJointState.PARK,
-            )
+        left_arm.add_joint_state(left_arm_park)
 
-            left_arm.add_joint_state(left_arm_park)
+        right_arm_park = JointState.from_mapping(
+            name=PrefixedName("right_arm_park", prefix=self.name.name),
+            mapping=dict(
+                zip(
+                    [c for c in right_arm.connections if isinstance(c, ActiveConnection1DOF)],
+                    [0.0] * len(list(right_arm.connections)),
+                )
+            ),
+            state_type=StaticJointState.PARK,
+        )
 
-            right_arm_park = JointState.from_mapping(
-                name=PrefixedName("right_arm_park", prefix=icub3.name.name),
-                mapping=dict(
-                    zip(
-                        [
-                            c
-                            for c in right_arm.connections
-                            if type(c) != FixedConnection
-                        ],
-                        [0.0] * len(list(right_arm.connections)),
-                    )
-                ),
-                state_type=StaticJointState.PARK,
-            )
+        right_arm.add_joint_state(right_arm_park)
 
-            right_arm.add_joint_state(right_arm_park)
+        left_gripper_joints = [
+            c for c in left_gripper.connections if isinstance(c, ActiveConnection1DOF)
+        ]
 
-            left_gripper_joints = [
-                c for c in left_gripper.connections if type(c) != FixedConnection
-            ]
+        left_gripper_open = JointState.from_mapping(
+            name=PrefixedName("left_gripper_open", prefix=self.name.name),
+            mapping=dict(
+                zip(
+                    left_gripper_joints,
+                    [0.0] * len(list(left_gripper_joints)),
+                )
+            ),
+            state_type=GripperState.OPEN,
+        )
 
-            left_gripper_open = JointState.from_mapping(
-                name=PrefixedName("left_gripper_open", prefix=icub3.name.name),
-                mapping=dict(
-                    zip(
-                        left_gripper_joints,
-                        [0.0] * len(list(left_gripper_joints)),
-                    )
-                ),
-                state_type=GripperState.OPEN,
-            )
+        left_gripper_close = JointState.from_mapping(
+            name=PrefixedName("left_gripper_close", prefix=self.name.name),
+            mapping=dict(
+                zip(
+                    left_gripper_joints,
+                    [
+                        np.pi / 2,
+                        np.pi / 2,
+                        np.pi / 2,
+                        np.pi / 2,
+                        -0.3490658503988659,
+                        np.pi / 2,
+                        np.pi / 2,
+                        np.pi / 2,
+                        0.3490658503988659,
+                        np.pi / 2,
+                        np.pi / 2,
+                        np.pi / 2,
+                        0.3490658503988659,
+                        np.pi / 2,
+                        np.pi / 2,
+                        np.pi / 2,
+                        0.3490658503988659,
+                        np.pi / 2,
+                        np.pi / 2,
+                        np.pi / 2,
+                    ],
+                )
+            ),
+            state_type=GripperState.CLOSE,
+        )
 
-            left_gripper_close = JointState.from_mapping(
-                name=PrefixedName("left_gripper_close", prefix=icub3.name.name),
-                mapping=dict(
-                    zip(
-                        left_gripper_joints,
-                        [
-                            np.pi / 2,
-                            np.pi / 2,
-                            np.pi / 2,
-                            np.pi / 2,
-                            -0.3490658503988659,
-                            np.pi / 2,
-                            np.pi / 2,
-                            np.pi / 2,
-                            0.3490658503988659,
-                            np.pi / 2,
-                            np.pi / 2,
-                            np.pi / 2,
-                            0.3490658503988659,
-                            np.pi / 2,
-                            np.pi / 2,
-                            np.pi / 2,
-                            0.3490658503988659,
-                            np.pi / 2,
-                            np.pi / 2,
-                            np.pi / 2,
-                        ],
-                    )
-                ),
-                state_type=GripperState.CLOSE,
-            )
+        left_gripper.add_joint_state(left_gripper_close)
+        left_gripper.add_joint_state(left_gripper_open)
 
-            left_gripper.add_joint_state(left_gripper_close)
-            left_gripper.add_joint_state(left_gripper_open)
+        right_gripper_joints = [
+            c for c in right_gripper.connections if isinstance(c, ActiveConnection1DOF)
+        ]
 
-            right_gripper_joints = [
-                c for c in right_gripper.connections if type(c) != FixedConnection
-            ]
+        right_gripper_open = JointState.from_mapping(
+            name=PrefixedName("right_gripper_open", prefix=self.name.name),
+            mapping=dict(
+                zip(
+                    right_gripper_joints,
+                    [0.0] * len(list(right_gripper_joints)),
+                )
+            ),
+            state_type=GripperState.OPEN,
+        )
 
-            right_gripper_open = JointState.from_mapping(
-                name=PrefixedName("right_gripper_open", prefix=icub3.name.name),
-                mapping=dict(
-                    zip(
-                        right_gripper_joints,
-                        [0.0] * len(list(right_gripper_joints)),
-                    )
-                ),
-                state_type=GripperState.OPEN,
-            )
+        right_gripper_close = JointState.from_mapping(
+            name=PrefixedName("right_gripper_close", prefix=self.name.name),
+            mapping=dict(
+                zip(
+                    right_gripper_joints,
+                    [
+                        np.pi / 2,
+                        np.pi / 2,
+                        np.pi / 2,
+                        np.pi / 2,
+                        -0.3490658503988659,
+                        np.pi / 2,
+                        np.pi / 2,
+                        np.pi / 2,
+                        0.3490658503988659,
+                        np.pi / 2,
+                        np.pi / 2,
+                        np.pi / 2,
+                        0.3490658503988659,
+                        np.pi / 2,
+                        np.pi / 2,
+                        np.pi / 2,
+                        0.3490658503988659,
+                        np.pi / 2,
+                        np.pi / 2,
+                        np.pi / 2,
+                    ],
+                )
+            ),
+            state_type=GripperState.CLOSE,
+        )
 
-            right_gripper_close = JointState.from_mapping(
-                name=PrefixedName("right_gripper_close", prefix=icub3.name.name),
-                mapping=dict(
-                    zip(
-                        right_gripper_joints,
-                        [
-                            np.pi / 2,
-                            np.pi / 2,
-                            np.pi / 2,
-                            np.pi / 2,
-                            -0.3490658503988659,
-                            np.pi / 2,
-                            np.pi / 2,
-                            np.pi / 2,
-                            0.3490658503988659,
-                            np.pi / 2,
-                            np.pi / 2,
-                            np.pi / 2,
-                            0.3490658503988659,
-                            np.pi / 2,
-                            np.pi / 2,
-                            np.pi / 2,
-                            0.3490658503988659,
-                            np.pi / 2,
-                            np.pi / 2,
-                            np.pi / 2,
-                        ],
-                    )
-                ),
-                state_type=GripperState.CLOSE,
-            )
+        right_gripper.add_joint_state(right_gripper_close)
+        right_gripper.add_joint_state(right_gripper_open)
 
-            right_gripper.add_joint_state(right_gripper_close)
-            right_gripper.add_joint_state(right_gripper_open)
+    def _setup_torso_semantic_annotations(self):
+        world = self._world
+        # Create camera and neck
+        camera = Camera.create_and_add_to_world(
+            name=PrefixedName("eye_camera", prefix=self.name.name),
+            root_name="head",
+            forward_facing_axis=Vector3(1, 0, 0),
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            minimal_height=1.27,
+            maximal_height=1.85,
+            world=world,
+            default_camera=True
+        )
 
-            torso_joint = [world.get_connection_by_name("torso_roll")]
+        # Create torso
+        torso = Torso.create_and_add_to_world(
+            name=PrefixedName("torso", prefix=self.name.name),
+            root_name="root_link",
+            tip_name="chest",
+            world=world,
+            sensors=[camera],
+        )
+        self.add_torso(torso)
 
-            torso_low = JointState.from_mapping(
-                name=PrefixedName("torso_low", prefix=icub3.name.name),
-                mapping=dict(zip(torso_joint, [0.0])),
-                state_type=TorsoState.LOW,
-            )
+    def _setup_torso_hardware_interfaces(self):
+        pass
 
-            torso_mid = JointState.from_mapping(
-                name=PrefixedName("torso_mid", prefix=icub3.name.name),
-                mapping=dict(zip(torso_joint, [0.0])),
-                state_type=TorsoState.MID,
-            )
+    def _setup_torso_joint_state(self):
+        torso = self.torso
+        torso_joint = [c for c in torso.connections if isinstance(c, ActiveConnection1DOF)]
 
-            torso_high = JointState.from_mapping(
-                name=PrefixedName("torso_high", prefix=icub3.name.name),
-                mapping=dict(zip(torso_joint, [0.0])),
-                state_type=TorsoState.HIGH,
-            )
+        torso_low = JointState.from_mapping(
+            name=PrefixedName("torso_low", prefix=self.name.name),
+            mapping=dict(zip(torso_joint, [0.0])),
+            state_type=TorsoState.LOW,
+        )
 
-            torso.add_joint_state(torso_low)
-            torso.add_joint_state(torso_mid)
-            torso.add_joint_state(torso_high)
+        torso_mid = JointState.from_mapping(
+            name=PrefixedName("torso_mid", prefix=self.name.name),
+            mapping=dict(zip(torso_joint, [0.0])),
+            state_type=TorsoState.MID,
+        )
 
-            world.add_semantic_annotation(icub3)
+        torso_high = JointState.from_mapping(
+            name=PrefixedName("torso_high", prefix=self.name.name),
+            mapping=dict(zip(torso_joint, [0.0])),
+            state_type=TorsoState.HIGH,
+        )
 
-        return icub3
+        torso.add_joint_state(torso_low)
+        torso.add_joint_state(torso_mid)
+        torso.add_joint_state(torso_high)
+
+    def _setup_mobile_base_semantic_annotations(self):
+        pass

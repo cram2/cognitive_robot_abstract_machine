@@ -334,6 +334,8 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
             )
         )
 
+        assert self_world_copy.get_semantic_annotations_by_type(AbstractRobot)[0].get_default_camera() is not None
+
         return True
 
     def _print_out_missing_field(self, field: DiscoveredAttribute):
