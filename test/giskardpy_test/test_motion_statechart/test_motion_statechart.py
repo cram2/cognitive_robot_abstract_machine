@@ -108,7 +108,8 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AllowAllCollisions,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.robot_parts import Manipulator, AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import Manipulator
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -3444,7 +3445,7 @@ class TestCollisionAvoidance:
                 ),
             )
             strong_robot_world.add_body(strong)
-            strong_robot_sa = MinimalRobot.from_world(strong_robot_world)
+        strong_robot_sa = MinimalRobot.from_world(strong_robot_world)
 
         weak_robot_world = World()
         with weak_robot_world.modify_world():
@@ -3504,6 +3505,7 @@ class TestCollisionAvoidance:
                     child=strong_robot_world.root,
                 ),
             )
+            strong_robot_sa = world.get_semantic_annotation_by_id(strong_robot_sa.id)
             world.merge_world(
                 weak_robot_world,
                 omni2 := OmniDrive.create_with_dofs(
@@ -3512,6 +3514,7 @@ class TestCollisionAvoidance:
                     child=weak_robot_world.root,
                 ),
             )
+            weak_robot_sa = world.get_semantic_annotation_by_id(weak_robot_sa.id)
             omni1.has_hardware_interface = True
             omni2.has_hardware_interface = True
 
