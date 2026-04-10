@@ -1289,6 +1289,10 @@ class World(HasSimulatorProperties):
         :param branch_root: The root of the branch to be moved.
         :param new_parent: The new parent of the branch.
         """
+        # Ensure FK is up to date before computing the relative pose
+        # can be problematic in a large merge world block
+        self.update_forward_kinematics()
+
         new_connection = None
         new_parent_T_root = self.compute_forward_kinematics(new_parent, branch_root)
         old_connection = branch_root.parent_connection
