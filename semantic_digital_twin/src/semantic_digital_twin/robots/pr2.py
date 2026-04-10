@@ -327,6 +327,8 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
             name=PrefixedName("base", prefix=self.name.name),
             root_name="base_link",
             world=self._world,
+            main_axis=Vector3.X(),
+            full_body_controlled=False,
         )
         self.add_mobile_base(base)
 

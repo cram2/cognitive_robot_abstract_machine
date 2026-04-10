@@ -451,11 +451,7 @@ def test_tracy_semantic_annotation(tracy_world):
     tracy_world._notify_model_change()
 
     assert len(tracy.manipulators) == 2
-    assert len(tracy.manipulator_chains) == 2
     assert len(tracy.sensors) == 1
-    assert len(tracy.sensor_chains) == 1
-    assert tracy.torso is None
-    assert list(tracy.sensor_chains)[0].sensors == tracy.sensors
 
 
 def test_hsrb_semantic_annotation(hsr_world_setup):
@@ -463,12 +459,9 @@ def test_hsrb_semantic_annotation(hsr_world_setup):
     hsr_world_setup._notify_model_change()
 
     assert len(hsrb.manipulators) == 1
-    assert len(hsrb.manipulator_chains) == 1
-    assert hsrb.neck is not None
     assert len(hsrb.arms) == 1
 
     assert len(hsrb.sensors) == 5
-    assert len(hsrb.sensor_chains) == 2
     assert hsrb.torso is not None
 
 

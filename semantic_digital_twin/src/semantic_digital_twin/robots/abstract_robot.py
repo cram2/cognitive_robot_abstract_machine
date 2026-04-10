@@ -201,6 +201,10 @@ class HasExternalSensors(HasRobotPart, ABC):
     def add_external_sensor(self, sensor: Sensor):
         self._external_sensors.append(sensor)
 
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+        self._setup_external_sensors()
+
     @abstractmethod
     def _setup_external_sensors(self): ...
 

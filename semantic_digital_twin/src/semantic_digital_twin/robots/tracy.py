@@ -54,11 +54,7 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasExternalSensors):
 
     @classmethod
     def _get_robot_root_body(cls, world: World) -> Self:
-        return cls(
-            name=PrefixedName(name="tracy", prefix=world.name),
-            root=world.get_body_by_name("table"),
-            world=world,
-        )
+        return world.get_body_by_name("table")
 
     def _setup_arm_semantic_annotations(self):
         # Create left arm
@@ -81,7 +77,6 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasExternalSensors):
             root_name="left_robotiq_85_base_link",
             tool_frame_name="l_gripper_tool_frame",
             front_facing_orientation=Quaternion(0.5, 0.5, 0.5, 0.5),
-            front_facing_axis=Vector3(0, 0, 1),
             thumb=left_gripper_thumb,
             finger=left_gripper_finger,
             world=self._world,
@@ -113,7 +108,6 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasExternalSensors):
             root_name="right_robotiq_85_base_link",
             tool_frame_name="r_gripper_tool_frame",
             front_facing_orientation=Quaternion(0.5, 0.5, 0.5, 0.5),
-            front_facing_axis=Vector3(0, 0, 1),
             thumb=right_gripper_thumb,
             finger=right_gripper_finger,
             world=self._world,
