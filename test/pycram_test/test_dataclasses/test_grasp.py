@@ -60,8 +60,7 @@ def immutable_simple_pr2_holding_world(simple_pr2_world_setup):
     tcp = copy_world.get_body_by_name("l_gripper_tool_frame")
     with copy_world.modify_world():
         copy_world.move_branch(milk, tcp)
-    view = PR2.from_world(copy_world)
-    return copy_world, view, Context(copy_world, view)
+    return copy_world, robot_view, Context(copy_world, robot_view)
 
 
 def test_grasp_pose_front(immutable_simple_pr2_world):

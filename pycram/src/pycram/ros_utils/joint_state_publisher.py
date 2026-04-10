@@ -3,7 +3,7 @@ import time
 import threading
 import atexit
 
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header

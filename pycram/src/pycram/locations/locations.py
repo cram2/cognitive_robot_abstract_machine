@@ -44,7 +44,7 @@ from pycram.view_manager import ViewManager
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
 )
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -127,7 +127,7 @@ class CostmapLocation(Location):
         ground_pose = deepcopy(target)
         ground_pose.z = 0
 
-        base_bb = self.robot.base.bounding_box
+        base_bb = self.robot.mobile_base.bounding_box
 
         occupancy = OccupancyCostmap(
             distance_to_obstacle=(base_bb.depth / 2 + base_bb.width / 2) / 2,
@@ -141,7 +141,7 @@ class CostmapLocation(Location):
         final_map = occupancy
 
         if visible:
-            camera = list(self.robot.neck.sensors)[0]
+            camera = self.robot.get_default_camera()
             visible = VisibilityCostmap(
                 min_height=camera.minimal_height,
                 max_height=camera.maximal_height,
@@ -185,9 +185,9 @@ class CostmapLocation(Location):
 
         test_world.name = "Test World"
 
-        robot = self.robot
+        robot_id = self.robot.id
 
-        test_robot = robot.from_world(test_world)
+        test_robot = test_world.get_semantic_annotation_by_id(robot_id)
 
         objects_in_hand = list(
             set(test_world.get_kinematic_structure_entities_of_branch(test_robot.root))
@@ -199,7 +199,7 @@ class CostmapLocation(Location):
         final_map.number_of_samples = 600
         final_map.orientation_generator = (
             OrientationGenerator.orientation_generator_for_axis(
-                list(self.robot.base.main_axis.to_np())
+                list(self.robot.mobile_base.main_axis.to_np())
             )
         )
 

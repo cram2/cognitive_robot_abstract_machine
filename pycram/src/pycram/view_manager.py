@@ -3,11 +3,10 @@ from dataclasses import dataclass
 from typing_extensions import Optional, Tuple
 
 from pycram.datastructures.enums import Arms
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.robot_parts import (
-    AbstractRobot,
     Manipulator,
     KinematicChain,
-    Neck,
 )
 
 
@@ -53,16 +52,3 @@ class ViewManager:
         elif arm == Arms.BOTH:
             return robot_view.arms
         return None
-
-    @staticmethod
-    def get_neck_view(robot_view: AbstractRobot) -> Optional[Neck]:
-        """
-        Get the neck view for a given robot view.
-
-        :param robot_view: The robot view to search in.
-        :return: The Neck object representing the neck.
-        """
-        if getattr(robot_view, "neck", Neck):
-            return robot_view.neck
-        else:
-            raise ValueError(f"The robot view {robot_view} has no neck.")
