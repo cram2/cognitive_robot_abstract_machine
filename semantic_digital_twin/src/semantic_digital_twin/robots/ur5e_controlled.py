@@ -6,7 +6,11 @@ from semantic_digital_twin.robots.robot_parts import (
     Finger,
     ParallelGripper,
 )
-from semantic_digital_twin.robots.abstract_robot import HasArms, AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import (
+    HasArms,
+    AbstractRobot,
+    HasOneArm,
+)
 from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     GripperState,
@@ -17,10 +21,11 @@ from semantic_digital_twin.spatial_types import Quaternion
 from semantic_digital_twin.spatial_types.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False)
-class UR5Controlled(AbstractRobot, HasArms):
+class UR5Controlled(AbstractRobot, HasOneArm):
     """
     Class that describes the UR5 controlled Robot.
     """
@@ -32,107 +37,98 @@ class UR5Controlled(AbstractRobot, HasArms):
         ...
 
     @classmethod
-    def from_world(cls, world: World) -> Self:
-        """
-        Creates a UR5 controlled robot view from the given world.
+    def _get_robot_root_body(cls, world: World) -> Body:
+        return world.get_body_by_name("base_link")
 
-        :param world: The world from which to create the robot view.
+    def _setup_collision_rules(self):
+        pass
 
-        :return: A UR5 controlled robot view.
-        """
+    def _setup_other_hardware_interfaces(self):
+        pass
 
-        with world.modify_world():
-            ur5_controlled = cls(
-                name=PrefixedName("ur5_controlled", prefix=world.name),
-                root=world.get_body_by_name("base_link"),
-                _world=world,
-            )
+    def _setup_arm_semantic_annotations(self):
+        world = self._world
+        # Create arm
+        gripper_thumb = Finger.create_and_add_to_world(
+            name=PrefixedName("gripper_thumb", prefix=self.name.name),
+            root_name="robotiq_85_left_finger_link",
+            tip_name="robotiq_85_left_finger_tip_link",
+            world=world,
+        )
 
-            # Create arm
-            gripper_thumb = Finger(
-                name=PrefixedName("gripper_thumb", prefix=ur5_controlled.name.name),
-                root=world.get_body_by_name("robotiq_85_left_finger_link"),
-                tip=world.get_body_by_name("robotiq_85_left_finger_tip_link"),
-                _world=world,
-            )
+        gripper_finger = Finger.create_and_add_to_world(
+            name=PrefixedName("gripper_finger", prefix=self.name.name),
+            root_name="robotiq_85_right_finger_link",
+            tip_name="robotiq_85_right_finger_tip_link",
+            world=world,
+        )
 
-            gripper_finger = Finger(
-                name=PrefixedName("gripper_finger", prefix=ur5_controlled.name.name),
-                root=world.get_body_by_name("robotiq_85_right_finger_link"),
-                tip=world.get_body_by_name("robotiq_85_right_finger_tip_link"),
-                _world=world,
-            )
+        gripper = ParallelGripper.create_and_add_to_world(
+            name=PrefixedName("gripper", prefix=self.name.name),
+            root_name="robotiq_gripper-2F-85_link",
+            tool_frame_name="right_pad",
+            front_facing_orientation=Quaternion(0, 0, 0, 1),
+            thumb=gripper_thumb,
+            finger=gripper_finger,
+            world=world,
+        )
 
-            gripper = ParallelGripper(
-                name=PrefixedName("gripper", prefix=ur5_controlled.name.name),
-                root=world.get_body_by_name("robotiq_gripper-2F-85_link"),
-                tool_frame=world.get_body_by_name("right_pad"),
-                front_facing_orientation=Quaternion(0, 0, 0, 1),
-                front_facing_axis=Vector3(0, 0, 1),
-                thumb=gripper_thumb,
-                finger=gripper_finger,
-                _world=world,
-            )
+        arm = Arm.create_and_add_to_world(
+            name=PrefixedName("arm", prefix=self.name.name),
+            root_name="base_link",
+            tip_name="wrist_3_link",
+            manipulator=gripper,
+            world=world,
+        )
 
-            arm = Arm(
-                name=PrefixedName("arm", prefix=ur5_controlled.name.name),
-                root=world.get_body_by_name("base_link"),
-                tip=world.get_body_by_name("wrist_3_link"),
-                manipulator=gripper,
-                _world=world,
-            )
+        self.add_arm(arm)
 
-            ur5_controlled.add_arm(arm)
+    def _setup_arm_hardware_interfaces(self):
+        pass
 
-            # Create states
-            arm_park = JointState.from_mapping(
-                name=PrefixedName("arm_park", prefix=ur5_controlled.name.name),
-                mapping=dict(
-                    zip(
-                        [c for c in arm.connections if type(c) != FixedConnection],
-                        [3.14, -1.56, 1.58, -1.57, -1.57, 0.0],
-                    )
-                ),
-                state_type=StaticJointState.PARK,
-            )
+    def _setup_arm_joint_state(self):
+        gripper = self.arm.manipulator
+        # Create states
+        arm_park = JointState.from_mapping(
+            name=PrefixedName("arm_park", prefix=self.name.name),
+            mapping=dict(
+                zip(
+                    [c for c in self.arm.connections if type(c) != FixedConnection],
+                    [3.14, -1.56, 1.58, -1.57, -1.57, 0.0],
+                )
+            ),
+            state_type=StaticJointState.PARK,
+        )
 
-            arm.add_joint_state(arm_park)
+        self.arm.add_joint_state(arm_park)
 
-            gripper_joints = [
-                c for c in gripper.connections if type(c) != FixedConnection
-            ]
+        gripper_joints = [c for c in gripper.connections if type(c) != FixedConnection]
 
-            gripper_open = JointState.from_mapping(
-                name=PrefixedName("gripper_open", prefix=ur5_controlled.name.name),
-                mapping=dict(
-                    zip(
-                        gripper_joints,
-                        [
-                            0.798,
-                            0.00366,
-                            0.796,
-                            -0.793,
-                            0.798,
-                            0.00366,
-                            0.796,
-                            -0.793,
-                        ],
-                    )
-                ),
-                state_type=GripperState.OPEN,
-            )
+        gripper_open = JointState.from_mapping(
+            name=PrefixedName("gripper_open", prefix=self.name.name),
+            mapping=dict(
+                zip(
+                    gripper_joints,
+                    [
+                        0.798,
+                        0.00366,
+                        0.796,
+                        -0.793,
+                        0.798,
+                        0.00366,
+                        0.796,
+                        -0.793,
+                    ],
+                )
+            ),
+            state_type=GripperState.OPEN,
+        )
 
-            gripper_close = JointState.from_mapping(
-                name=PrefixedName("gripper_close", prefix=ur5_controlled.name.name),
-                mapping=dict(
-                    zip(gripper_joints, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-                ),
-                state_type=GripperState.CLOSE,
-            )
+        gripper_close = JointState.from_mapping(
+            name=PrefixedName("gripper_close", prefix=self.name.name),
+            mapping=dict(zip(gripper_joints, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])),
+            state_type=GripperState.CLOSE,
+        )
 
-            gripper.add_joint_state(gripper_open)
-            gripper.add_joint_state(gripper_close)
-
-            world.add_semantic_annotation(ur5_controlled)
-
-        return ur5_controlled
+        gripper.add_joint_state(gripper_open)
+        gripper.add_joint_state(gripper_close)
