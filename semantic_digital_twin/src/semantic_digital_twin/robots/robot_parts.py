@@ -75,6 +75,11 @@ class RobotPart(HasRootBody, ABC):
     Fixed joint states that are defined for this robot annotation. 
     """
 
+    sensors: List[Sensor] = field(default_factory=list)
+    """
+    A collection of sensors in the kinematic chain, such as cameras or other sensors.
+    """
+
     def __post_init__(self):
         introspector = DataclassOnlyIntrospector()
         for field_ in introspector.discover(self.__class__):
@@ -106,6 +111,10 @@ class RobotPart(HasRootBody, ABC):
             )
         self.joint_states.append(joint_state)
         joint_state.assign_to_robot(self._robot)
+
+    @synchronized_attribute_modification
+    def add_sensors(self, sensors: List[Sensor]):
+        self.sensors.extend(sensors)
 
     def get_joint_state_by_type(self, state_type: JointStateType) -> JointState:
         """
@@ -227,15 +236,6 @@ class KinematicChain(RobotPart, ABC):
     """
     The tip body of the kinematic chain, which is the last body in the chain.
     """
-
-    sensors: List[Sensor] = field(default_factory=list)
-    """
-    A collection of sensors in the kinematic chain, such as cameras or other sensors.
-    """
-
-    @synchronized_attribute_modification
-    def add_sensors(self, sensors: List[Sensor]):
-        self.sensors.extend(sensors)
 
     @property
     def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
@@ -436,6 +436,7 @@ class ParallelGripper(Manipulator):
         front_facing_orientation: Quaternion,
         finger: Finger,
         thumb: Finger,
+        sensors: List[Sensor] = None,
     ) -> Self:
         if finger._world is not world or thumb._world is not world:
             raise ValueError(
@@ -450,6 +451,8 @@ class ParallelGripper(Manipulator):
         world.add_semantic_annotation(self)
         self.add_thumb(thumb)
         self.add_finger(finger)
+        if sensors is not None:
+            self.add_sensors(sensors)
         return self
 
 
@@ -488,6 +491,7 @@ class HumanoidGripper(Manipulator):
         front_facing_orientation: Quaternion,
         fingers: List[Finger],
         thumb: Finger,
+        sensors: List[Sensor] = None,
     ) -> Self:
         if thumb._world is not world or any(f._world is not world for f in fingers):
             raise ValueError(
@@ -502,6 +506,8 @@ class HumanoidGripper(Manipulator):
         world.add_semantic_annotation(self)
         self.add_thumb(thumb)
         self.add_fingers(fingers)
+        if sensors is not None:
+            self.add_sensors(sensors)
         return self
 
 

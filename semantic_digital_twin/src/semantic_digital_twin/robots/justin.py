@@ -6,6 +6,8 @@ from typing import Self
 from semantic_digital_twin.robots.abstract_robot import (
     SpecifiesLeftRightArm,
     AbstractRobot,
+    HasTorso,
+    HasMobileBase,
 )
 from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
@@ -28,7 +30,7 @@ from semantic_digital_twin.world_description.connections import FixedConnection
 
 
 @dataclass(eq=False)
-class Justin(AbstractRobot, SpecifiesLeftRightArm):
+class Justin(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
     """
     Class that describes the Justin Robot.
     """
