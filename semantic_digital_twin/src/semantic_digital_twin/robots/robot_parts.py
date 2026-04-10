@@ -610,10 +610,10 @@ class MobileBase(RobotPart):
         name: PrefixedName,
         world: World,
         root_name: str,
+        main_axis: Vector3,
     ) -> Self:
         self = cls(
-            name=name,
-            root=world.get_body_by_name(root_name),
+            name=name, root=world.get_body_by_name(root_name), main_axis=main_axis
         )
         world.add_semantic_annotation(self)
         return self
