@@ -500,8 +500,6 @@ class TiagoMujoco(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase)
         self.right_arm.manipulator.add_joint_state(right_gripper_close)
         self.right_arm.manipulator.add_joint_state(right_gripper_open)
 
-
-
     def _setup_torso_semantic_annotations(self):
 
         # Create torso
@@ -541,7 +539,6 @@ class TiagoMujoco(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase)
         self.torso.add_joint_state(torso_mid)
         self.torso.add_joint_state(torso_high)
 
-
     def _setup_mobile_base_semantic_annotations(self):
         base = MobileBase.create_and_add_to_world(
             name=PrefixedName("base", prefix=self.name.name),
@@ -552,7 +549,6 @@ class TiagoMujoco(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase)
         )
 
         self.add_mobile_base(base)
-
 
     def _setup_collision_rules(self):
         pass
