@@ -89,9 +89,9 @@ def stop_multisim_if_running(multi_sim: MujocoSim) -> None:
         return
     multi_sim.stop_simulation()
 
-def test_multi_sim_5_times():
+def test_multi_sim_10_times():
     scene_url = Sage10kDatasetLoader.available_scenes()[0]
-    for _ in range(5):
+    for _ in range(10):
         loader = Sage10kDatasetLoader()
         scene = loader.create_scene(scene_url=scene_url)
 
