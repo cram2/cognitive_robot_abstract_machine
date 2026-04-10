@@ -18,6 +18,7 @@ from pycram.plans.factories import sequential, execute_single
 from pycram.plans.failures import (
     NavigationGoalNotReachedError,
     ManipulatorDidNotReachTarget,
+    PlanFailure,
 )
 from pycram.plans.plan import Plan
 
@@ -50,7 +51,10 @@ class TrainingEnvironment:
 
     def generate_episode(self) -> Any:
         with simulated_robot:
-            self.plan.perform()
+            try:
+                self.plan.perform()
+            except (PlanFailure, StopIteration):
+                pass
 
 
 @dataclass

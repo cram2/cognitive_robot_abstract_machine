@@ -21,33 +21,33 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 def test_move_to_reach(pr2_world_copy, rclpy_node):
     [pr2] = pr2_world_copy.get_semantic_annotations_by_type(PR2)
-    training_environment = MoveToReach.training_environment(pr2)
+    training_environment = MoveToReach.training_environment(pr2, limit=50)
     pub = VizMarkerPublisher(
         _world=pr2_world_copy,
         node=rclpy_node,
     )
-    target_pose = Pose.from_xyz_rpy(
-        x=1,
-        y=1,
-        z=1,
-        reference_frame=pr2_world_copy.root,
-    )
-
-    context = Context(
-        robot=pr2, world=pr2_world_copy, query_backend=ProbabilisticBackend()
-    )
-    manipulator = pr2.manipulators[0]
-    pub.with_tf_publisher()
-    with simulated_robot:
-        execute_single(
-            MoveToReach(
-                standing_pose=target_pose,
-                manipulator=manipulator,
-                target_pose=target_pose,
-                grasp_description=None,
-            ),
-            context,
-        ).perform()
+    # target_pose = Pose.from_xyz_rpy(
+    #     x=1,
+    #     y=1,
+    #     z=1,
+    #     reference_frame=pr2_world_copy.root,
+    # )
+    #
+    # context = Context(
+    #     robot=pr2, world=pr2_world_copy, query_backend=ProbabilisticBackend()
+    # )
+    # manipulator = pr2.manipulators[0]
+    # pub.with_tf_publisher()
+    # with simulated_robot:
+    #     execute_single(
+    #         MoveToReach(
+    #             standing_pose=target_pose,
+    #             manipulator=manipulator,
+    #             target_pose=target_pose,
+    #             grasp_description=None,
+    #         ),
+    #         context,
+    #     ).perform()
 
     training_environment.generate_episode()
 

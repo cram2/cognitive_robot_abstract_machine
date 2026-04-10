@@ -318,7 +318,6 @@ class UnderspecifiedNode(PlanNode):
         for grounded_action in self._action_iterator:
             new_child = ActionNode(designator=grounded_action)
             self.add_child(new_child)
-            time.sleep(1.0)
             try:
                 new_child.perform()
             except PlanFailure:
