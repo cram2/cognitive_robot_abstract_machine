@@ -175,7 +175,9 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasMobileBase, HasTorso):
         self.add_arm(right_arm)
 
     def _setup_arm_hardware_interfaces(self):
-        pass
+        for arm in self.arms:
+            for connection in arm.active_connections:
+                connection.has_hardware_interface = True
 
     def _setup_arm_joint_state(self):
         left_arm_park = JointState.from_mapping(
@@ -280,6 +282,7 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasMobileBase, HasTorso):
             root_name="Platform_body_link",
             main_axis=Vector3.Y(),
             world=self._world,
+            full_body_controlled=False,
         )
 
         self.add_mobile_base(base)
@@ -295,6 +298,7 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasMobileBase, HasTorso):
             minimal_height=1.371500015258789,
             maximal_height=1.7365000247955322,
             world=self._world,
+            default_camera=True,
         )
 
         # Create torso
@@ -310,7 +314,8 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasMobileBase, HasTorso):
         self._world.add_semantic_annotation(self)
 
     def _setup_torso_hardware_interfaces(self):
-        pass
+        for connection in self.torso.active_connections:
+            connection.has_hardware_interface = True
 
     def _setup_torso_joint_state(self):
         torso_joints = [
@@ -347,12 +352,8 @@ class Armar7(AbstractRobot, SpecifiesLeftRightArm, HasMobileBase, HasTorso):
 
     @classmethod
     def _get_robot_root_body(cls, world: World) -> Self:
-        return cls(
-            name=PrefixedName(name="armar7", prefix=world.name),
-            # the actual root here is called "root", but this is such a generic name that i fear it will be
-            # duplicated in the world
-            root=world.get_body_by_name(
-                "Dummy_Platform_link"
-            ).parent_kinematic_structure_entity,
-            _world=world,
-        )
+        # the actual root here is called "root", but this is such a generic name that i fear it will be
+        # duplicated in the world
+        return world.get_body_by_name(
+            "Dummy_Platform_link"
+        ).parent_kinematic_structure_entity

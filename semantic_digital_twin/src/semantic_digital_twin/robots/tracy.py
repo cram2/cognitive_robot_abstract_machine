@@ -220,6 +220,7 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasExternalSensors):
             minimal_height=0.8,
             maximal_height=1.7,
             world=self._world,
+            default_camera=True,
         )
         self.add_external_sensor(camera)
 

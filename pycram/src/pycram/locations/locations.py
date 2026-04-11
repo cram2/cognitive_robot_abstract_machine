@@ -364,7 +364,7 @@ class AccessingLocation(Location):
         ground_pose = handle.global_pose
         ground_pose.z = 0
 
-        base_bb = self.robot.base.bounding_box
+        base_bb = self.robot.mobile_base.bounding_box
         occupancy = OccupancyCostmap(
             robot_view=self.robot,
             distance_to_obstacle=(base_bb.depth / 2 + base_bb.width / 2) / 2,
@@ -432,7 +432,7 @@ class AccessingLocation(Location):
         :yield: A location designator containing the pose and the arms that can be used.
         """
         test_world = deepcopy(self.world)
-        test_robot = self.robot.from_world(test_world)
+        test_robot = test_world.get_semantic_annotation_by_id(self.robot.id)
 
         final_map = self.setup_costmaps(self.handle)
 
@@ -452,7 +452,7 @@ class AccessingLocation(Location):
             except RobotInCollision:
                 continue
 
-            for arm_chain in test_robot.manipulator_chains:
+            for arm_chain in test_robot.arms:
                 grasp = GraspDescription(
                     ApproachDirection.FRONT,
                     VerticalAlignment.NoAlignment,
@@ -510,7 +510,7 @@ class GiskardLocation(Location):
         ground_pose = deepcopy(pose)
         ground_pose.z = 0.0
 
-        base_bb = self.robot.base.bounding_box
+        base_bb = self.robot.mobile_base.bounding_box
 
         occupancy_map = OccupancyCostmap(
             resolution=0.02,
@@ -592,7 +592,7 @@ class GiskardLocation(Location):
         test_world = deepcopy(self.world)
         test_world.name = "Test World"
 
-        test_robot = self.robot.__class__.from_world(test_world)
+        test_robot = test_world.get_semantic_annotation_by_id(self.robot.id)
         test_ee = test_world._get_world_entity_by_hash(hash(ee.manipulator.tool_frame))
         with test_world.modify_world():
             test_robot._setup_collision_rules()

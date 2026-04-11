@@ -76,7 +76,6 @@ class Tiago(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
             root_name="gripper_left_base_link",
             tool_frame_name="gripper_left_grasping_frame",
             front_facing_orientation=Quaternion(0, 0, 0, 1),
-            front_facing_axis=Vector3(1, 0, 0),
             thumb=left_gripper_thumb,
             finger=left_gripper_finger,
             world=self._world,
@@ -211,6 +210,7 @@ class Tiago(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
             minimal_height=1.0665,
             maximal_height=1.4165,
             world=self._world,
+            default_camera=True,
         )
 
         # Create torso
@@ -373,7 +373,6 @@ class TiagoMujoco(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase)
             root_name="arm_left_7_link",
             tool_frame_name="arm_left_7_link",
             front_facing_orientation=Quaternion(0, 0, 0, 1),
-            front_facing_axis=Vector3(1, 0, 0),
             thumb=left_gripper_thumb,
             finger=left_gripper_finger,
             world=self._world,
@@ -406,7 +405,6 @@ class TiagoMujoco(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase)
             root_name="arm_right_7_link",
             tool_frame_name="arm_right_7_link",
             front_facing_orientation=Quaternion(0, 0, 0, 1),
-            front_facing_axis=Vector3(0, 0, 1),
             thumb=right_gripper_thumb,
             finger=right_gripper_finger,
             world=self._world,

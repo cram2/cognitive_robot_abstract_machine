@@ -20,13 +20,13 @@ from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.math import inverse_frame
 from semantic_digital_twin.utils import copy_lru_cache
-from semantic_digital_twin.world_description.world_entity import Connection, KinematicStructureEntity
+from semantic_digital_twin.world_description.world_entity import (
+    Connection,
+    KinematicStructureEntity,
+)
 
-if TYPE_CHECKING:
-    from semantic_digital_twin.world import World
 
-
-@dataclass
+@dataclass(eq=False)
 class ForwardKinematicsManager(ModelChangeCallback):
     """
     Visitor class for collection various forward kinematics expressions in a world model.
@@ -66,7 +66,7 @@ class ForwardKinematicsManager(ModelChangeCallback):
         self.recompute()  # we need to recompute because other model updaters might need fk.
 
     def __hash__(self):
-        return hash(id(self))
+        return hash((id(self), self._world))
 
     def update_root_T_kse_expression_cache(self):
         self.root_T_kse_expression_cache = {

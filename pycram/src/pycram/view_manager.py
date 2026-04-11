@@ -44,7 +44,7 @@ class ViewManager:
         :return: The Manipulator object representing the arm.
         """
         if len(robot_view.arms) == 1:
-            return (robot_view.manipulator_chains[0],)
+            return (robot_view.arms[0],)
         elif arm == Arms.LEFT:
             return (robot_view.left_arm,)
         elif arm == Arms.RIGHT:

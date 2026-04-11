@@ -972,7 +972,7 @@ class World(HasSimulatorProperties):
     def _get_world_entity_by_name_from_iterable(
         self,
         name: Union[str, PrefixedName],
-        world_entity_iterable: Iterable[GenericWorldEntity],
+        world_entity_iterable: list[GenericWorldEntity],
     ) -> GenericWorldEntity:
         """
         If more than one world entity matches the specified name, or if no world entity is found,

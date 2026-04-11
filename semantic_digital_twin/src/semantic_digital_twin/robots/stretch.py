@@ -131,6 +131,7 @@ class Stretch(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
             maximal_height=1.322,
             world=self._world,
             field_of_view=field_of_view,
+            default_camera=True,
         )
 
         camera_depth = Camera.create_and_add_to_world(
@@ -141,6 +142,7 @@ class Stretch(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
             maximal_height=1.307,
             world=self._world,
             field_of_view=field_of_view,
+            default_camera=False,
         )
 
         camera_infra1 = Camera.create_and_add_to_world(
@@ -151,6 +153,7 @@ class Stretch(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
             maximal_height=1.307,
             world=self._world,
             field_of_view=field_of_view,
+            default_camera=False,
         )
 
         camera_infra2 = Camera.create_and_add_to_world(
@@ -161,6 +164,7 @@ class Stretch(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
             maximal_height=1.257,
             world=self._world,
             field_of_view=field_of_view,
+            default_camera=False,
         )
 
         # Create torso

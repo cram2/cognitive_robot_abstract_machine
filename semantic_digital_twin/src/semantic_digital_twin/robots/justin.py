@@ -147,7 +147,6 @@ class Justin(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
             root_name="right_arm7",
             tool_frame_name="r_gripper_tool_frame",
             front_facing_orientation=Quaternion(0.707, 0.707, 0.707, 0.707),
-            front_facing_axis=Vector3(0, 0, 1),
             thumb=right_gripper_thumb,
             finger=right_gripper_tip_finger,
             world=world,
@@ -340,6 +339,7 @@ class Justin(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
             minimal_height=1.27,
             maximal_height=1.85,
             world=world,
+            default_camera=True,
         )
 
         # Create torso

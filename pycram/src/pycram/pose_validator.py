@@ -67,7 +67,7 @@ def visibility_validator(
     else:
         gen_body = object_or_pose
     r_t = world.ray_tracer
-    camera = list(robot.neck.sensors)[0]
+    camera = robot.get_default_camera()
     ray = r_t.ray_test(
         camera.bodies[0].global_transform.to_position().to_np()[:3],
         gen_body.global_transform.to_position().to_np()[:3],

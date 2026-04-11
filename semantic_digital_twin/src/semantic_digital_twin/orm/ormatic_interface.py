@@ -52,7 +52,6 @@ import semantic_digital_twin.robots.donbot
 import semantic_digital_twin.robots.hsrb
 import semantic_digital_twin.robots.justin
 import semantic_digital_twin.robots.minimal_robot
-import semantic_digital_twin.robots.mmp_dresden
 import semantic_digital_twin.robots.panda
 import semantic_digital_twin.robots.pr2
 import semantic_digital_twin.robots.robot_parts
@@ -293,6 +292,25 @@ class HasArmsDAO_arms_association(Base, AssociationDataAccessObject):
     target_armdao_id: Mapped[int] = mapped_column(ForeignKey("ArmDAO.database_id"))
 
     target: Mapped[ArmDAO] = relationship("ArmDAO", foreign_keys=[target_armdao_id])
+
+
+class HasExternalSensorsDAO_external_sensors_association(
+    Base, AssociationDataAccessObject
+):
+
+    __tablename__ = "_50711837570951649789426454588627807950295261509596692386737536"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_hasexternalsensorsdao_id: Mapped[int] = mapped_column(
+        ForeignKey("HasExternalSensorsDAO.database_id")
+    )
+    target_sensordao_id: Mapped[int] = mapped_column(
+        ForeignKey("SensorDAO.database_id")
+    )
+
+    target: Mapped[SensorDAO] = relationship(
+        "SensorDAO", foreign_keys=[target_sensordao_id]
+    )
 
 
 class HasSimulatorPropertiesDAO_simulator_additional_properties_association(
@@ -821,19 +839,6 @@ class JustinDAO_arms_association(Base, AssociationDataAccessObject):
     target: Mapped[ArmDAO] = relationship("ArmDAO", foreign_keys=[target_armdao_id])
 
 
-class MMPDresdenDAO_arms_association(Base, AssociationDataAccessObject):
-
-    __tablename__ = "_76226530430595008126369695010372107757787552155808979552563469"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_mmpdresdendao_id: Mapped[int] = mapped_column(
-        ForeignKey("MMPDresdenDAO.database_id")
-    )
-    target_armdao_id: Mapped[int] = mapped_column(ForeignKey("ArmDAO.database_id"))
-
-    target: Mapped[ArmDAO] = relationship("ArmDAO", foreign_keys=[target_armdao_id])
-
-
 class PR2DAO_arms_association(Base, AssociationDataAccessObject):
 
     __tablename__ = "_49273599836236285861569898369081450352533377006027440005328289"
@@ -891,6 +896,21 @@ class TiagoMujocoDAO_arms_association(Base, AssociationDataAccessObject):
     target_armdao_id: Mapped[int] = mapped_column(ForeignKey("ArmDAO.database_id"))
 
     target: Mapped[ArmDAO] = relationship("ArmDAO", foreign_keys=[target_armdao_id])
+
+
+class TracyDAO_external_sensors_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "_10533297508199256157475726159610475071812553563423605158347402"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_tracydao_id: Mapped[int] = mapped_column(ForeignKey("TracyDAO.database_id"))
+    target_sensordao_id: Mapped[int] = mapped_column(
+        ForeignKey("SensorDAO.database_id")
+    )
+
+    target: Mapped[SensorDAO] = relationship(
+        "SensorDAO", foreign_keys=[target_sensordao_id]
+    )
 
 
 class TracyDAO_arms_association(Base, AssociationDataAccessObject):
@@ -2408,6 +2428,15 @@ class HasExternalSensorsDAO(
         ForeignKey(HasRobotPartDAO.database_id),
         primary_key=True,
         use_existing_column=True,
+    )
+
+    external_sensors: Mapped[
+        builtins.list[HasExternalSensorsDAO_external_sensors_association]
+    ] = relationship(
+        "HasExternalSensorsDAO_external_sensors_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[HasExternalSensorsDAO_external_sensors_association.source_hasexternalsensorsdao_id]",
     )
 
     __mapper_args__ = {
@@ -5035,6 +5064,29 @@ class MismatchingWorldDAO(
     }
 
 
+class MissingDefaultCameraErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.MissingDefaultCameraError],
+):
+
+    __tablename__ = "MissingDefaultCameraErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    robot: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MissingDefaultCameraErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+    }
+
+
 class MissingPublishChangesKWARGDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.MissingPublishChangesKWARG],
@@ -6981,32 +7033,6 @@ class JustinDAO(
     }
 
 
-class MMPDresdenDAO(
-    AbstractRobotDAO,
-    DataAccessObject[semantic_digital_twin.robots.mmp_dresden.MMPDresden],
-):
-
-    __tablename__ = "MMPDresdenDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(AbstractRobotDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    arms: Mapped[builtins.list[MMPDresdenDAO_arms_association]] = relationship(
-        "MMPDresdenDAO_arms_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[MMPDresdenDAO_arms_association.source_mmpdresdendao_id]",
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "MMPDresdenDAO",
-        "inherit_condition": database_id == AbstractRobotDAO.database_id,
-    }
-
-
 class MinimalRobotDAO(
     AbstractRobotDAO,
     DataAccessObject[semantic_digital_twin.robots.minimal_robot.MinimalRobot],
@@ -7229,6 +7255,14 @@ class TracyDAO(
         use_existing_column=True,
     )
 
+    external_sensors: Mapped[builtins.list[TracyDAO_external_sensors_association]] = (
+        relationship(
+            "TracyDAO_external_sensors_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[TracyDAO_external_sensors_association.source_tracydao_id]",
+        )
+    )
     arms: Mapped[builtins.list[TracyDAO_arms_association]] = relationship(
         "TracyDAO_arms_association",
         collection_class=builtins.list,

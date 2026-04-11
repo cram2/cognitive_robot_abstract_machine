@@ -176,12 +176,10 @@ class URDFParser:
         urdf = process_file(xacro_path).toxml()
         return URDFParser(urdf=urdf, prefix=prefix)
 
-    def parse(self, mock_geometry: bool = False) -> World:
+    def parse(self) -> World:
         prefix = self.parsed.name
         links = [
-            self.parse_link(
-                link, PrefixedName(link.name, prefix), mock_geometry=mock_geometry
-            )
+            self.parse_link(link, PrefixedName(link.name, prefix))
             for link in self.parsed.links
         ]
         root = [link for link in links if link.name.name == self.parsed.get_root()][0]
@@ -273,9 +271,7 @@ class URDFParser:
         )
         return result
 
-    def parse_link(
-        self, link: urdfpy.Link, parent_frame: PrefixedName, mock_geometry: bool = False
-    ) -> Body:
+    def parse_link(self, link: urdfpy.Link, parent_frame: PrefixedName) -> Body:
         """
         Parses a URDF link to a link object.
         :param link: The URDF link to parse.
@@ -284,11 +280,10 @@ class URDFParser:
         """
         name = PrefixedName(prefix=self.prefix, name=link.name)
         body = Body(name=name)
-        if not mock_geometry:
-            visuals = self.parse_geometry(link.visuals, body)
-            collisions = self.parse_geometry(link.collisions, body)
-            body.visual = visuals
-            body.collision = collisions
+        visuals = self.parse_geometry(link.visuals, body)
+        collisions = self.parse_geometry(link.collisions, body)
+        body.visual = visuals
+        body.collision = collisions
         return body
 
     def parse_geometry(

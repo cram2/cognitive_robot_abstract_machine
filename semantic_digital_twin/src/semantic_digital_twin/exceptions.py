@@ -443,6 +443,14 @@ class WorldEntityNotFoundError(UsageError):
 
 
 @dataclass
+class MissingDefaultCameraError(UsageError):
+    robot: Type[AbstractRobot]
+
+    def __post_init__(self):
+        self.message = f"Robot {self.robot.name} does not have a default camera."
+
+
+@dataclass
 class WorldEntityWithIDNotFoundError(UsageError):
     id: UUID
 

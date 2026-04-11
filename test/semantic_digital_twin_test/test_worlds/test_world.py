@@ -641,13 +641,9 @@ def test_copy_world(world_setup):
         == 0.0
     )
     assert float(bf.global_transform.to_np()[0, 3]) == 1.5
-    assert all(
-        hash(d) in world_copy._world_entity_hash_table.keys()
-        for d in world.degrees_of_freedom
-    )
-    assert all(
-        hash(k) in world_copy._world_entity_hash_table.keys()
-        for k in world.kinematic_structure_entities
+
+    assert set(world_copy._world_entity_hash_table.keys()) == set(
+        world._world_entity_hash_table.keys()
     )
 
 
@@ -670,31 +666,8 @@ def test_copy_big_world():
     apartment_world.merge_world(pr2_world)
     apartment_world_copy = deepcopy(apartment_world)
 
-    assert all(
-        b_original.id == b_copy.id
-        for b_original, b_copy in zip(
-            apartment_world.bodies, apartment_world_copy.bodies
-        )
-    )
-    assert all(
-        s_original.id == s_copy.id
-        for s_original, s_copy in zip(
-            apartment_world.semantic_annotations,
-            apartment_world_copy.semantic_annotations,
-        )
-    )
-    assert all(
-        d_original.id == d_copy.id
-        for d_original, d_copy in zip(
-            apartment_world.degrees_of_freedom,
-            apartment_world_copy.degrees_of_freedom,
-        )
-    )
-    assert all(
-        hash(c_original) == hash(c_copy)
-        for c_original, c_copy in zip(
-            apartment_world.connections, apartment_world_copy.connections
-        )
+    assert set(apartment_world._world_entity_hash_table.keys()) == set(
+        apartment_world_copy._world_entity_hash_table.keys()
     )
 
 
@@ -806,12 +779,18 @@ def test_copy_connections(pr2_world_state_reset):
         pr2_copy.get_degree_of_freedom_by_name("torso_lift_joint").id
     ].position = 0.3
     pr2_copy.notify_state_change()
+    original_torso_state = pr2_world_state_reset.get_connection_by_name(
+        "torso_lift_joint"
+    ).origin
+    copied_and_updated_torso_state = pr2_copy.get_connection_by_name(
+        "torso_lift_joint"
+    ).origin
 
     assert_raises(
         AssertionError,
         np.testing.assert_array_almost_equal,
-        pr2_world_state_reset.get_connection_by_name("torso_lift_joint").origin.to_np(),
-        pr2_copy.get_connection_by_name("torso_lift_joint").origin.to_np(),
+        original_torso_state,
+        copied_and_updated_torso_state,
     )
 
 

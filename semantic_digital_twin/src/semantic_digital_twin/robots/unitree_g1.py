@@ -369,3 +369,6 @@ class UnitreeG1(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
             lambda: 1.0,
         )
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
+
+    def _setup_other_hardware_interfaces(self):
+        pass

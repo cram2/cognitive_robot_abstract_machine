@@ -17,6 +17,7 @@ from krrood.class_diagrams.attribute_introspector import (
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import MissingDefaultCameraError
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.connections import (
@@ -38,6 +39,7 @@ from semantic_digital_twin.robots.robot_parts import (
     Camera,
     Manipulator,
     Sensor,
+    AggregatesRobotParts,
 )
 
 if TYPE_CHECKING:
@@ -48,35 +50,10 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(eq=False)
-class HasRobotPart(ABC):
+class HasRobotPart(AggregatesRobotParts, ABC):
 
     @abstractmethod
     def _setup_robot_parts(self): ...
-
-    @property
-    def _robot_parts(self) -> list[RobotPart]:
-        """
-        Serves as a generic interface to access all robot parts assigned to a robot part.
-        Returns a list of all robot parts assigned directly to this robot part.
-        """
-        wrapped_class = WrappedClass(self.__class__)
-        introspector = DataclassOnlyIntrospector()
-        robot_parts = []
-        for field_ in introspector.discover(self.__class__):
-            value = getattr(self, field_.public_name)
-            wrapped_field = WrappedField(wrapped_class, field_.field)
-
-            if isinstance(value, (list, set)) and issubclass(
-                wrapped_field.contained_type, RobotPart
-            ):
-                robot_parts.extend(value)
-                for robot_part in value:
-                    robot_parts.extend(robot_part._robot_parts)
-            elif isinstance(value, RobotPart):
-                robot_parts.append(value)
-                robot_parts.extend(value._robot_parts)
-
-        return robot_parts
 
     @property
     def manipulators(self) -> list[RobotPart]:
@@ -192,14 +169,14 @@ class HasExternalSensors(HasRobotPart, ABC):
     Mixin class for robots that have an external camera.
     """
 
-    _external_sensors: List[Sensor] = field(default_factory=list)
+    external_sensors: List[Sensor] = field(default_factory=list)
     """
     A collection of external sensors in the robot.
     """
 
     @synchronized_attribute_modification
     def add_external_sensor(self, sensor: Sensor):
-        self._external_sensors.append(sensor)
+        self.external_sensors.append(sensor)
 
     def _setup_robot_parts(self):
         super()._setup_robot_parts()
@@ -211,7 +188,7 @@ class HasExternalSensors(HasRobotPart, ABC):
     @property
     def sensors(self) -> list[Sensor]:
         sensors = super().sensors
-        sensors.extend(self._external_sensors)
+        sensors.extend(self.external_sensors)
         return sensors
 
 
@@ -261,6 +238,10 @@ class HasMobileBase(HasRobotPart, ABC):
 
     @abstractmethod
     def _setup_mobile_base_semantic_annotations(self): ...
+
+    @property
+    def full_body_controlled(self):
+        return self.mobile_base.full_body_controlled
 
 
 @dataclass(eq=False)
@@ -317,51 +298,25 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
             robot._setup_velocity_limits()
         return robot
 
-    @classmethod
-    def mock_from_urdf_file_and_validate(cls, urdf_file: str):
-        from semantic_digital_twin.adapters.urdf import URDFParser
-
-        world = URDFParser.from_file(urdf_file).parse(mock_geometry=True)
-        self = cls.from_world(world)
-        self.validate()
-
     def validate(self) -> bool:
+        """
+        Validates the robot semantic annotation.
+            The validation process includes:
+            1. Printing out missing fields of any robot part, so that the user can check if they are intentionally left blank.
+            2. Deepcopy the resulting world to ensure that all parts of the robot are initialized in the correct order
+            3. Assert that the copied world is the same as the original world
+            4. Assert that the robot semantic annotation has a default camera.
 
-        wrapped_class = WrappedClass(self.__class__)
-        introspector = DataclassOnlyIntrospector()
-        for field_ in introspector.discover(self.__class__):
-            value = getattr(self, field_.public_name)
-            wrapped_field = WrappedField(wrapped_class, field_.field)
-            type_endpoint = wrapped_field.type_endpoint
+        :return: True if the robot semantic annotation is valid, False otherwise.
+        """
 
-            if isinstance(value, (list, set)) and issubclass(
-                wrapped_field.contained_type, RobotPart
-            ):
-                if not value:
-                    self._print_out_missing_field(field_)
-                else:
-                    for robot_part in value:
-                        robot_part._print_out_missing_fields()
-            elif issubclass(type_endpoint, RobotPart):
-                self._print_out_missing_field(field_)
+        for robot_part in self._robot_parts:
+            robot_part._log_missing_fields()
 
         self_world_copy = deepcopy(self._world)
 
-        assert all(
-            (original_b == copy_b)
-            for original_b, copy_b in zip(self_world_copy.bodies, self._world.bodies)
-        )
-        assert all(
-            (original_s == copy_s)
-            for original_s, copy_s in zip(
-                self_world_copy.semantic_annotations, self._world.semantic_annotations
-            )
-        )
-        assert all(
-            (original_c == copy_c)
-            for original_c, copy_c in zip(
-                self_world_copy.connections, self._world.connections
-            )
+        assert set(self_world_copy._world_entity_hash_table.keys()) == set(
+            self._world._world_entity_hash_table.keys()
         )
 
         assert (
@@ -372,11 +327,6 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
         )
 
         return True
-
-    def _print_out_missing_field(self, field: DiscoveredAttribute):
-        logger.info(
-            f"The field {field.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
-        )
 
     @classmethod
     @abstractmethod
@@ -436,4 +386,4 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
         for sensor in self.sensors:
             if isinstance(sensor, Camera) and sensor.default_camera:
                 return sensor
-        return [s for s in self.sensors if isinstance(s, Camera)][0]
+        raise MissingDefaultCameraError(type(self))

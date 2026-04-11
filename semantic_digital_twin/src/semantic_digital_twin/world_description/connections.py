@@ -194,6 +194,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         dof = DegreeOfFreedom(name=PrefixedName("dof", str(name)), limits=dof_limits)
         world.add_degree_of_freedom(dof)
         connection = cls(
+            name=name,
             parent=parent,
             child=child,
             axis=axis,

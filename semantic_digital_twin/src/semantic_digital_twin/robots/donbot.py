@@ -72,14 +72,15 @@ class Donbot(AbstractRobot, HasOneArm, HasMobileBase):
             world=world,
         )
 
-        camera = Camera(
+        camera = Camera.create_and_add_to_world(
             name=PrefixedName("camera_link", prefix=self.name.name),
-            root=world.get_body_by_name("camera_link"),
+            root_name="camera_link",
             forward_facing_axis=Vector3(0, 0, 1),
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=0.5,
             maximal_height=1.2,
-            _world=world,
+            world=world,
+            default_camera=True,
         )
 
         gripper = ParallelGripper.create_and_add_to_world(

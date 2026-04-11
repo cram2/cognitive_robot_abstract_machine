@@ -84,7 +84,11 @@ def setup_multi_robot_apartment(
     if request.param == "hsrb":
         hsr_copy = deepcopy(hsr_world_setup)
         apartment_copy.merge_world(hsr_copy)
-        view = HSRB.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(HSRB)
+        if not view:
+            view = HSRB.from_world(apartment_copy)
+        else:
+            view = view[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -94,7 +98,11 @@ def setup_multi_robot_apartment(
         apartment_copy.merge_world(
             stretch_copy,
         )
-        view = Stretch.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(Stretch)
+        if not view:
+            view = Stretch.from_world(stretch_copy)
+        else:
+            view = view[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -105,7 +113,11 @@ def setup_multi_robot_apartment(
         apartment_copy.merge_world(
             tiago_copy,
         )
-        view = Tiago.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(Tiago)
+        if not view:
+            view = Tiago.from_world(tiago_copy)
+        else:
+            view = view[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -116,7 +128,11 @@ def setup_multi_robot_apartment(
         apartment_copy.merge_world(
             pr2_copy,
         )
-        view = PR2.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(PR2)
+        if not view:
+            view = PR2.from_world(pr2_copy)
+        else:
+            view = view[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -137,8 +153,8 @@ def immutable_multiple_robot_apartment(
 @pytest.fixture
 def mutable_multiple_robot_apartment(setup_multi_robot_apartment):
     world, view = setup_multi_robot_apartment
-    copy_world = deepcopy(world)
-    copy_view = view.from_world(copy_world)
+    copy_world: World = deepcopy(world)
+    copy_view = copy_world.get_semantic_annotation_by_id(view.id)
     return copy_world, copy_view, Context(copy_world, copy_view)
 
 
@@ -274,7 +290,7 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
 
     if isinstance(robot, (Tiago)):
         # do not allow since
-        robot.full_body_controlled = False
+        robot.mobile_base.full_body_controlled = False
         robot.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(
                 1.7, 1.7, 0, reference_frame=world.root
@@ -284,7 +300,7 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
 
     if isinstance(robot, (Stretch)):
         # do not allow since
-        robot.full_body_controlled = False
+        robot.mobile_base.full_body_controlled = False
         robot.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(
                 2.12, 2.2, 0, reference_frame=world.root

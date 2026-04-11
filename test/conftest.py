@@ -290,6 +290,38 @@ def self_collision_bot_world():
 
 
 @pytest.fixture()
+def robot_urdf_path_to_abstract_robot_mappings():
+    return {
+        "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro": PR2,
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "pycram",
+            "resources",
+            "robots",
+            "hsrb.urdf",
+        ): HSRB,
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "semantic_digital_twin",
+            "resources",
+            "urdf",
+            "tracy.urdf",
+        ): Tracy,
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "pycram",
+            "resources",
+            "robots",
+            "stretch_description.urdf",
+        ): Stretch,
+        "package://iai_tiago_description/urdf/tiago_from_our_robot.urdf": Tiago,
+    }
+
+
+@pytest.fixture()
 def cylinder_bot_diff_world():
     robot_world = World()
     with robot_world.modify_world():
@@ -639,7 +671,7 @@ def simple_pr2_world_setup(pr2_world_setup, simple_apartment_setup):
 def hsr_apartment_world(hsr_world_setup, apartment_world_setup):
     apartment_copy = deepcopy(apartment_world_setup)
     hsr_copy = deepcopy(hsr_world_setup)
-    robot_view = HSRB.from_world(hsr_copy)
+    robot_view = hsr_copy.get_semantic_annotations_by_type(HSRB)[0]
 
     apartment_copy.merge_world_at_pose(
         hsr_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)

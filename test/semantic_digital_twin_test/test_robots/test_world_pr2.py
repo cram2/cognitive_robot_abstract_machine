@@ -1,5 +1,6 @@
 import os
 from collections import defaultdict
+from copy import deepcopy
 
 import numpy as np
 import pytest
@@ -7,8 +8,12 @@ from importlib.resources import files
 from pathlib import Path
 from typing_extensions import List
 
+from krrood.ormatic.utils import classes_of_package, classes_of_module
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import WorldEntityNotFoundError
 from semantic_digital_twin.reasoning.predicates import LeftOf
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.robot_parts import KinematicChain
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
@@ -20,6 +25,7 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
+    Vector3,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -27,8 +33,14 @@ from semantic_digital_twin.world_description.connections import (
     DifferentialDrive,
     PrismaticConnection,
     RevoluteConnection,
+    FixedConnection,
 )
 from semantic_digital_twin.orm.ormatic_interface import *  # noqa
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    KinematicStructureEntity,
+    Connection,
+)
 
 
 def test_compute_chain_of_bodies_pr2(pr2_world_state_reset):
@@ -538,7 +550,8 @@ def test_split_chain_of_connections(pr2_world_state_reset):
     assert result2_names == chain2
 
 
-def test_pr2_mock_and_validate():
-    PR2.mock_from_urdf_file_and_validate(
-        "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    )
+def test_pr2_mock_and_validate(robot_urdf_path_to_abstract_robot_mappings):
+    for urdf_path, abstract_robot in robot_urdf_path_to_abstract_robot_mappings.items():
+        world = URDFParser.from_file(urdf_path).parse()
+        robot = abstract_robot.from_world(world)
+        robot.validate()

@@ -81,6 +81,7 @@ class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
             minimal_height=0.75049,
             maximal_height=0.99483,
             world=self._world,
+            default_camera=False,
         )
 
         gripper = ParallelGripper.create_and_add_to_world(
@@ -173,6 +174,7 @@ class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
             minimal_height=0.75049,
             maximal_height=0.99483,
             world=self._world,
+            default_camera=False,
         )
 
         head_l_camera = Camera.create_and_add_to_world(
@@ -183,6 +185,7 @@ class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
             minimal_height=0.75049,
             maximal_height=0.99483,
             world=self._world,
+            default_camera=False,
         )
 
         head_rgbd_camera = Camera.create_and_add_to_world(
@@ -193,6 +196,7 @@ class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
             minimal_height=0.75049,
             maximal_height=0.99483,
             world=self._world,
+            default_camera=False,
         )
 
         # Create torso

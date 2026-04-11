@@ -12,7 +12,10 @@ from typing_extensions import (
     List,
 )
 
-from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
+from krrood.class_diagrams.attribute_introspector import (
+    DataclassOnlyIntrospector,
+    DiscoveredAttribute,
+)
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.factories import (
@@ -64,7 +67,35 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(eq=False)
-class RobotPart(HasRootBody, ABC):
+class AggregatesRobotParts(ABC):
+    @property
+    def _robot_parts(self) -> list[RobotPart]:
+        """
+        Serves as a generic interface to access all robot parts assigned to a robot part.
+        Returns a list of all robot parts assigned directly to this robot part.
+        """
+        wrapped_class = WrappedClass(self.__class__)
+        introspector = DataclassOnlyIntrospector()
+        robot_parts = []
+        for field_ in introspector.discover(self.__class__):
+            value = getattr(self, field_.public_name)
+            wrapped_field = WrappedField(wrapped_class, field_.field)
+
+            if isinstance(value, (list, set)) and issubclass(
+                wrapped_field.contained_type, RobotPart
+            ):
+                robot_parts.extend(value)
+                for robot_part in value:
+                    robot_parts.extend(robot_part._robot_parts)
+            elif isinstance(value, RobotPart):
+                robot_parts.append(value)
+                robot_parts.extend(value._robot_parts)
+
+        return robot_parts
+
+
+@dataclass(eq=False)
+class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
     """
     Represents a collection of connected robot bodies, starting from a root body, and ending in a unspecified collection
     of tip bodies.
@@ -87,9 +118,6 @@ class RobotPart(HasRootBody, ABC):
             if isinstance(value, (list, set)):
                 for v in value:
                     self._raise_if_not_in_world(v)
-            elif isinstance(value, dict):
-                for item in value.values():
-                    self._raise_if_not_in_world(item)
             else:
                 self._raise_if_not_in_world(value)
 
@@ -155,57 +183,52 @@ class RobotPart(HasRootBody, ABC):
         name: PrefixedName,
         world: World,
         **kwargs,
-    ) -> Self: ...
-
-    def _print_out_missing_fields(self):
-        wrapped_class = WrappedClass(self.__class__)
-        introspector = DataclassOnlyIntrospector()
-        for field_ in introspector.discover(self.__class__):
-            value = getattr(self, field_.public_name)
-            wrapped_field = WrappedField(wrapped_class, field_.field)
-            type_endpoint = wrapped_field.type_endpoint
-
-            if isinstance(value, (list, set)) and issubclass(
-                wrapped_field.contained_type, RobotPart
-            ):
-
-                if not value:
-                    logger.info(
-                        f"The field {field_.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
-                    )
-                else:
-                    for robot_part in value:
-                        robot_part._print_out_missing_fields()
-
-            elif issubclass(type_endpoint, RobotPart) and value is None:
-                logger.info(
-                    f"The field {field_.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
-                )
-
-    @property
-    def _robot_parts(self) -> list[RobotPart]:
+    ) -> Self:
         """
-        Serves as a generic interface to access all robot parts assigned to a robot part.
-        Returns a list of all robot parts assigned directly to this robot part.
+        Creates a new instance of the RobotPart and adds it to the world. The specific parameters needed to create the
+        RobotPart are added in the actual implementation of the method.
+        The primary purpose if this method is to allow the programmer to enforce some order in which the RobotParts are
+        created and added to the world when the user implements a new AbstractRobot.
+        """
+
+    def _log_missing_fields(self):
+        """
+        Logs any fields that are empty, which could indicate missing information in the robot annotation.
+        Primarily used for manual validation purposes.
         """
         wrapped_class = WrappedClass(self.__class__)
         introspector = DataclassOnlyIntrospector()
-        robot_parts = []
         for field_ in introspector.discover(self.__class__):
-            value = getattr(self, field_.public_name)
-            wrapped_field = WrappedField(wrapped_class, field_.field)
+            self._process_field(wrapped_class, field_)
 
-            if isinstance(value, (list, set)) and issubclass(
-                wrapped_field.contained_type, RobotPart
-            ):
-                robot_parts.extend(value)
-                for robot_part in value:
-                    robot_parts.extend(robot_part._robot_parts)
-            elif isinstance(value, RobotPart):
-                robot_parts.append(value)
-                robot_parts.extend(value._robot_parts)
+    def _process_field(self, wrapped_class: WrappedClass, field: DiscoveredAttribute):
+        """
+        Processes a single field of the dataclass, checking if it is empty, and logs a warning if it is.
 
-        return robot_parts
+        :param wrapped_class: The wrapped class of the dataclass.
+        :param field: The discovered attribute of the dataclass.
+        """
+        value = getattr(self, field.public_name)
+        wrapped_field = WrappedField(wrapped_class, field.field)
+        type_endpoint = wrapped_field.type_endpoint
+
+        if isinstance(value, (list, set)) and issubclass(
+            wrapped_field.contained_type, RobotPart
+        ):
+            if not value:
+                self._log_missing_field(field)
+                return
+
+            for robot_part in value:
+                robot_part._log_missing_fields()
+
+        elif issubclass(type_endpoint, RobotPart) and value is None:
+            self._log_missing_field(field)
+
+    def _log_missing_field(self, field: DiscoveredAttribute):
+        logger.info(
+            f"The field {field.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
+        )
 
     @property
     def _robot(self) -> Optional[AbstractRobot]:
@@ -552,7 +575,7 @@ class Camera(Sensor):
         field_of_view: FieldOfView,
         minimal_height: float,
         maximal_height: float,
-        default_camera: bool = False,
+        default_camera: bool,
     ) -> Self:
         self = cls(
             name=name,
