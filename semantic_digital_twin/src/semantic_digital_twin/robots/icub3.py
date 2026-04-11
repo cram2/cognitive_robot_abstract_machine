@@ -1,17 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Self
 
 import numpy as np
 
-from pycram.robot_descriptions.mmp_dresden_states import left_arm
-from semantic_digital_twin.robots.abstract_robot import (
-    SpecifiesLeftRightArm,
-    AbstractRobot,
-    HasTorso,
-    HasMobileBase,
-)
 from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     GripperState,
@@ -19,9 +11,14 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.abstract_robot import (
+    SpecifiesLeftRightArm,
+    AbstractRobot,
+    HasTorso,
+    HasMobileBase,
+)
 from semantic_digital_twin.robots.robot_parts import (
     Finger,
-    ParallelGripper,
     Arm,
     Camera,
     FieldOfView,
@@ -31,7 +28,6 @@ from semantic_digital_twin.robots.robot_parts import (
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
-    FixedConnection,
     ActiveConnection1DOF,
 )
 from semantic_digital_twin.world_description.world_entity import Body

@@ -1,4 +1,5 @@
 import os
+from copy import deepcopy
 
 import numpy as np
 from krrood.ormatic.utils import create_engine
@@ -147,6 +148,9 @@ def test_pr2_world(pr2_world_state_reset, session):
 
     queried_world = session.scalar(select(WorldMappingDAO))
     reconstructed: World = queried_world.from_dao()
+
+    # confirm the modification history
+    deepcopy(reconstructed)
 
     q = select(RevoluteConnectionDAO)
     r = session.scalars(q).all()

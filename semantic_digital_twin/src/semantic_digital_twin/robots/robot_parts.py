@@ -111,23 +111,6 @@ class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
     A collection of sensors in the kinematic chain, such as cameras or other sensors.
     """
 
-    def __post_init__(self):
-        introspector = DataclassOnlyIntrospector()
-        for field_ in introspector.discover(self.__class__):
-            value = getattr(self, field_.public_name)
-            if isinstance(value, (list, set)):
-                for v in value:
-                    self._raise_if_not_in_world(v)
-            else:
-                self._raise_if_not_in_world(value)
-
-    def _raise_if_not_in_world(self, object_of_interest: Any):
-        if (
-            isinstance(object_of_interest, WorldEntity)
-            and object_of_interest._world is None
-        ):
-            raise DoesNotBelongToAWorldError(object_of_interest)
-
     @synchronized_attribute_modification
     def add_joint_state(self, joint_state: JointState):
         """
