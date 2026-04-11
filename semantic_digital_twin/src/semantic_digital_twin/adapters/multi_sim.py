@@ -58,7 +58,6 @@ from semantic_digital_twin.world_description.world_modification import (
     AddActuatorModification,
     AddConnectionModification,
 )
-from world_description.world_entity import WorldEntity
 
 logger = logging.getLogger(__name__)
 
