@@ -185,12 +185,6 @@ class HasExternalSensors(HasRobotPart, ABC):
     @abstractmethod
     def _setup_external_sensors(self): ...
 
-    @property
-    def sensors(self) -> list[Sensor]:
-        sensors = super().sensors
-        sensors.extend(self.external_sensors)
-        return sensors
-
 
 @dataclass(eq=False)
 class HasTorso(HasRobotPart, ABC):
@@ -315,6 +309,7 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
 
         self_world_copy = deepcopy(self._world)
 
+        # currently fails because of the forwardkinematic manager changing id, which we need bc of lru cache until I got the memoize on instance level from jonas
         assert set(self_world_copy._world_entity_hash_table.keys()) == set(
             self._world._world_entity_hash_table.keys()
         )

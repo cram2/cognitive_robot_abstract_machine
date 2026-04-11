@@ -641,6 +641,7 @@ def test_copy_world(world_setup):
         == 0.0
     )
     assert float(bf.global_transform.to_np()[0, 3]) == 1.5
+    # currently fails because of the forwardkinematic manager changing id, which we need bc of lru cache until I got the memoize on instance level from jonas
 
     assert set(world_copy._world_entity_hash_table.keys()) == set(
         world._world_entity_hash_table.keys()
@@ -665,6 +666,7 @@ def test_copy_big_world():
 
     apartment_world.merge_world(pr2_world)
     apartment_world_copy = deepcopy(apartment_world)
+    # currently fails because of the forwardkinematic manager changing id, which we need bc of lru cache until I got the memoize on instance level from jonas
 
     assert set(apartment_world._world_entity_hash_table.keys()) == set(
         apartment_world_copy._world_entity_hash_table.keys()

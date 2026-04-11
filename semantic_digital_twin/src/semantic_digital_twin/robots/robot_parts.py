@@ -384,8 +384,7 @@ class Manipulator(RobotPart, ABC):
     def __post_init__(self):
         super().__post_init__()
         rotation_matrix = RotationMatrix.from_quaternion(self.front_facing_orientation)
-        # raise NotImplementedError("Luca Implement this correctly!")
-        self.front_facing_axis = rotation_matrix[:2, 0]
+        self.front_facing_axis = Vector3.from_iterable(rotation_matrix[:3, 0])
 
 
 @dataclass(eq=False)

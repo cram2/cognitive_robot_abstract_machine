@@ -1265,6 +1265,27 @@ class AccelerationVariableDAO(
     )
 
 
+class AggregatesRobotPartsDAO(
+    Base,
+    DataAccessObject[semantic_digital_twin.robots.robot_parts.AggregatesRobotParts],
+):
+
+    __tablename__ = "AggregatesRobotPartsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "AggregatesRobotPartsDAO",
+    }
+
+
 class AtomicWorldModificationNotAtomicDAO(
     Base,
     DataAccessObject[semantic_digital_twin.exceptions.AtomicWorldModificationNotAtomic],
@@ -2356,22 +2377,21 @@ class FrozenIndexBoxDAO(
 
 
 class HasRobotPartDAO(
-    Base, DataAccessObject[semantic_digital_twin.robots.abstract_robot.HasRobotPart]
+    AggregatesRobotPartsDAO,
+    DataAccessObject[semantic_digital_twin.robots.abstract_robot.HasRobotPart],
 ):
 
     __tablename__ = "HasRobotPartDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    polymorphic_type: Mapped[str] = mapped_column(
-        String(255), nullable=False, use_existing_column=True
+        ForeignKey(AggregatesRobotPartsDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
     )
 
     __mapper_args__ = {
-        "polymorphic_on": "polymorphic_type",
         "polymorphic_identity": "HasRobotPartDAO",
+        "inherit_condition": database_id == AggregatesRobotPartsDAO.database_id,
     }
 
 
