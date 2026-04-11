@@ -4014,7 +4014,7 @@ class TestCollisionAvoidance:
 
     def test_collision_for_robot_with_static_base(self, tracy_world):
         world = deepcopy(tracy_world)
-        robot = Tracy.from_world(world)
+        robot = world.get_semantic_annotations_by_type(Tracy)[0]
 
         tool_frame = world.get_body_by_name("r_gripper_tool_frame")
         with world.modify_world():
