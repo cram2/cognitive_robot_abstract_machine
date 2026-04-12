@@ -3,7 +3,8 @@ Tests for the pouring domain (D_pour) of the BMP framework.
 
 Verifies that Causes and SatisfiesRequest correctly model pouring out a fraction
 of a container's fill level. The cup has a revolute tilt joint (the actuated DOF)
-and a virtual prismatic fill-level joint (the derived state).
+and a virtual prismatic fill-level joint (the derived state) governed by a
+TorricelliEquation that is explicitly part of the world model.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from semantic_digital_twin.reasoning.body_motion_problem.pouring import (
     PouringEffect,
     PouringMSCModel,
     PouringSatisfiesRequest,
+    TorricelliEquation,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel, HasRootBody
 from semantic_digital_twin.spatial_types import Vector3
@@ -69,6 +71,10 @@ def world_with_cup():
             ),
         )
     cup.initialize_fill_level(world=world, parent_body=cup.root, initial_fill=1.0)
+    cup.fill_equation = TorricelliEquation(
+        tilt_connection=cup.root.parent_connection,
+        fill_connection=cup.fill_connection,
+    )
     return world, cup
 
 
@@ -99,20 +105,16 @@ def test_causes_pours_out_40_percent(world_with_cup, rclpy_node):
     world, cup = world_with_cup
     viz = VizMarkerPublisher(_world=world, node=rclpy_node)
     viz.with_tf_publisher()
-    tilt_connection = cup.root.parent_connection
     goal_fill = 0.6
     effect = PouringEffect(
         target_object=cup,
         property_getter=lambda c: c.fill_level,
         goal_value=goal_fill,
     )
-    physics = PouringMSCModel(
-        tilt_connection=tilt_connection,
-        fill_connection=cup.fill_connection,
-    )
+    physics = PouringMSCModel(fill_equation=cup.fill_equation)
     motion = Motion(
         trajectory=[],
-        actuator=tilt_connection,
+        actuator=cup.fill_equation.tilt_connection,
         motion_model=physics,
     )
     task = TaskRequest(task_type="pour", name="cup")
@@ -122,7 +124,6 @@ def test_causes_pours_out_40_percent(world_with_cup, rclpy_node):
         effect=effect,
         environment=world,
         motion=motion,
-        fill_connection=cup.fill_connection,
     )
     result = causes()
     assert (
@@ -143,23 +144,19 @@ def test_causes_pours_out_40_percent(world_with_cup, rclpy_node):
 def test_physics_model_resets_world_state(world_with_cup):
     """World state is restored to its pre-simulation value after physics model runs."""
     world, cup = world_with_cup
-    tilt_connection = cup.root.parent_connection
     fill_before = cup.fill_level
     effect = PouringEffect(
         target_object=cup,
         property_getter=lambda c: c.fill_level,
         goal_value=0.6,
     )
-    physics = PouringMSCModel(
-        tilt_connection=tilt_connection,
-        fill_connection=cup.fill_connection,
-    )
+    physics = PouringMSCModel(fill_equation=cup.fill_equation)
     physics.run(effect=effect, world=world)
 
     assert cup.fill_level == pytest.approx(
         fill_before
     ), "World state must be reset after physics model run"
-    assert tilt_connection.position == pytest.approx(
+    assert cup.fill_equation.tilt_connection.position == pytest.approx(
         0.0
     ), "Tilt joint must be reset after physics model run"
 
@@ -168,7 +165,6 @@ def test_causes_does_not_hold_when_effect_already_achieved(world_with_cup):
     """Causes returns False if the effect is already satisfied before pouring."""
     world, cup = world_with_cup
     world.set_positions_1DOF_connection({cup.fill_connection: 0.5})
-    tilt_connection = cup.root.parent_connection
     effect = PouringEffect(
         target_object=cup,
         property_getter=lambda c: c.fill_level,
@@ -176,15 +172,11 @@ def test_causes_does_not_hold_when_effect_already_achieved(world_with_cup):
     )
     motion = Motion(
         trajectory=[],
-        actuator=tilt_connection,
-        motion_model=PouringMSCModel(
-            tilt_connection=tilt_connection,
-            fill_connection=cup.fill_connection,
-        ),
+        actuator=cup.fill_equation.tilt_connection,
+        motion_model=PouringMSCModel(fill_equation=cup.fill_equation),
     )
     assert not PouringCauses(
         effect=effect,
         environment=world,
         motion=motion,
-        fill_connection=cup.fill_connection,
     )()

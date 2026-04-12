@@ -74,6 +74,7 @@ if TYPE_CHECKING:
         Slider,
         Aperture,
     )
+    from semantic_digital_twin.physics.differential_equation import DifferentialEquation
 
 
 @dataclass(eq=False)
@@ -1013,10 +1014,22 @@ class HasFillLevel:
     The fill level is represented as a virtual :class:`PrismaticConnection` whose
     position encodes fill in the range ``[0, 1]``. Call :meth:`initialize_fill_level`
     once after the annotation is placed in a world.
+
+    Optionally assign :attr:`fill_equation` after initialisation to record the
+    differential equation that governs the fill level's evolution.
     """
 
     fill_connection: Optional[PrismaticConnection] = field(default=None, kw_only=True)
     """The virtual connection whose position encodes fill level in [0, 1]."""
+
+    fill_equation: Optional[DifferentialEquation] = field(default=None, kw_only=True)
+    """
+    The differential equation governing how the fill level changes over time.
+
+    Assign a :class:`~semantic_digital_twin.reasoning.body_motion_problem.pouring.torricelli.TorricelliEquation`
+    (or any other :class:`~semantic_digital_twin.physics.differential_equation.DifferentialEquation`)
+    here to make the physics of the fill level explicit in the world model.
+    """
 
     def initialize_fill_level(
         self, world: World, parent_body: Body, initial_fill: float = 1.0
@@ -1037,8 +1050,8 @@ class HasFillLevel:
                 child=phantom,
                 axis=Vector3(0, 0, 1),
                 dof_limits=DegreeOfFreedomLimits(
-                    lower=DerivativeMap(position=0.0),
-                    upper=DerivativeMap(position=1.0),
+                    lower=DerivativeMap(position=0.0, velocity=-1.0),
+                    upper=DerivativeMap(position=1.0, velocity=1.0),
                 ),
             )
             world.add_connection(connection)

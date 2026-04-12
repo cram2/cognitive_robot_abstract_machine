@@ -7,7 +7,6 @@ the Torricelli ODE and controls the tilt joint via QP.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
@@ -17,15 +16,14 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.pouring import PouringTask
 
+from semantic_digital_twin.reasoning.body_motion_problem.pouring.torricelli import (
+    TorricelliEquation,
+)
 from semantic_digital_twin.reasoning.body_motion_problem.types import (
     Effect,
     PhysicsModel,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    PrismaticConnection,
-    RevoluteConnection,
-)
 
 
 @dataclass
@@ -38,31 +36,22 @@ class PouringMSCModel(PhysicsModel):
     ticks it until EndMotion, records both the tilt and fill trajectories, and
     resets the World state before returning.
 
-    ODE: ``d(fill)/dt = -k * max(0, sin(θ(t) − θ_threshold)) * sqrt(fill)``
+    ODE parameters and both connections are carried by :attr:`fill_equation`.
     """
 
-    tilt_connection: RevoluteConnection
-    """Revolute DOF representing the container's tilt angle (the actuated joint)."""
+    fill_equation: TorricelliEquation
+    """Torricelli ODE — owns the tilt connection, fill connection, k, and theta_threshold."""
 
-    fill_connection: PrismaticConnection
-    """Virtual DOF whose position encodes the current fill level."""
-
-    theta_max: float = math.pi / 3
+    theta_max: float = field(default=1.0471975511965976)  # math.pi / 3
     """Maximum tilt angle in radians."""
 
-    n_ramp: int = 20
-    """Steps used in the predictive lookahead to estimate the ramp-down trajectory."""
+    ramp_margin: float = field(default=0.15)
+    """
+    Fill-level units above goal_value at which tilt ramp-down begins.
+    Passed directly to :class:`PouringTask`.
+    """
 
-    k: float = 1.0
-    """Outflow rate constant."""
-
-    theta_threshold: float = 0.3
-    """Tilt onset angle in radians; pouring begins above this."""
-
-    dt: float = 0.1
-    """ODE integration timestep in seconds."""
-
-    timeout: int = 500
+    timeout: int = field(default=500)
     """Maximum number of ticks before aborting the rollout."""
 
     last_fill_trajectory: List[float] = field(default_factory=list, init=False)
@@ -84,14 +73,17 @@ class PouringMSCModel(PhysicsModel):
         )
         executor.compile(motion_statechart=msc)
 
+        tilt_connection = self.fill_equation.tilt_connection
+        fill_connection = self.fill_equation.fill_connection
+
         initial_state = world.state._data.copy()
         tilt_trajectory: List[float] = []
         fill_trajectory: List[float] = []
         try:
             for _ in range(self.timeout):
                 executor.tick()
-                tilt_trajectory.append(float(self.tilt_connection.position))
-                fill_trajectory.append(float(self.fill_connection.position))
+                tilt_trajectory.append(float(tilt_connection.position))
+                fill_trajectory.append(float(fill_connection.position))
                 if msc.is_end_motion():
                     break
 
@@ -112,15 +104,11 @@ class PouringMSCModel(PhysicsModel):
         """
         msc = MotionStatechart()
         task = PouringTask(
-            tilt_connection=self.tilt_connection,
-            fill_connection=self.fill_connection,
+            fill_equation=self.fill_equation,
             goal_value=effect.goal_value,
             tolerance=effect.tolerance,
             theta_max=self.theta_max,
-            n_ramp=self.n_ramp,
-            theta_threshold=self.theta_threshold,
-            k=self.k,
-            dt=self.dt,
+            ramp_margin=self.ramp_margin,
         )
         msc.add_node(task)
         msc.add_node(EndMotion.when_true(task))

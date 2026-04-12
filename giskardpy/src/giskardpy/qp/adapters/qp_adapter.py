@@ -476,8 +476,18 @@ class FreeVariableBounds(ProblemDataPart):
                 derivative
             ):
                 if t < self.control_horizon:
-                    lower_slack[f"t{t:03}/{c.name}"] = c.lower_slack_limit[t]
-                    upper_slack[f"t{t:03}/{c.name}"] = c.upper_slack_limit[t]
+                    lower = (
+                        c.lower_slack_limit[t]
+                        if isinstance(c.lower_slack_limit, (list, np.ndarray))
+                        else c.lower_slack_limit
+                    )
+                    upper = (
+                        c.upper_slack_limit[t]
+                        if isinstance(c.upper_slack_limit, (list, np.ndarray))
+                        else c.upper_slack_limit
+                    )
+                    lower_slack[f"t{t:03}/{c.name}"] = lower
+                    upper_slack[f"t{t:03}/{c.name}"] = upper
         return lower_slack, upper_slack
 
     def equality_constraint_slack_lower_bound(self):
@@ -614,7 +624,12 @@ class EqualityBounds(ProblemDataPart):
                 derivative
             ):
                 if t < self.control_horizon:
-                    bound[f"t{t:03}/{c.name}"] = c.bound[t] * self.config.mpc_dt
+                    bound_t = (
+                        c.bound[t]
+                        if isinstance(c.bound, (list, np.ndarray))
+                        else c.bound
+                    )
+                    bound[f"t{t:03}/{c.name}"] = bound_t * self.config.mpc_dt
         return bound
 
     def construct_expression(
@@ -913,6 +928,14 @@ class EqualityModel(ProblemDataPart):
 
             # constraint slack
             model = sm.hstack(parts)
+            # Pad with zero columns to match the full non-slack column count
+            # (velocity constraint coefficients are only non-zero in velocity columns;
+            # jerk columns receive zeros).
+            remaining_cols = self.number_of_non_slack_columns - model.shape[1]
+            if remaining_cols > 0:
+                model = sm.hstack(
+                    [model, sm.Matrix.zeros(model.shape[0], remaining_cols)]
+                )
             num_slack_variables = sum(
                 self.control_horizon
                 for c in self.constraint_collection.velocity_equality_constraints

@@ -39,15 +39,18 @@ class PouringCauses(Causes):
     Causal sufficiency predicate for D_pour.
 
     Extends :class:`Causes` to handle the two coupled DOFs of the pouring domain:
-    the tilt joint (``motion.actuator``) and the fill-level joint (``fill_connection``).
-    Both trajectories are replayed during :meth:`_map_motion_to_effect` so that the
-    fill-level effect can be verified against the world state.
+    the tilt joint (``motion.actuator``) and the fill-level joint read from the
+    effect's target object. Both trajectories are replayed during
+    :meth:`_map_motion_to_effect` so that the fill-level effect can be verified
+    against the world state.
     """
 
-    fill_connection: PrismaticConnection
-    """The virtual fill-level DOF coupled to the tilt actuator."""
-
     _fill_trajectory: List[float] = field(default_factory=list, init=False)
+
+    @property
+    def _fill_connection(self) -> PrismaticConnection:
+        """Fill-level connection read from the effect's target object."""
+        return self.effect.target_object.fill_connection
 
     def __call__(self, *args, **kwargs) -> bool:
         if self.effect.is_achieved():
@@ -75,7 +78,7 @@ class PouringCauses(Causes):
             self.environment.set_positions_1DOF_connection(
                 {
                     tilt_actuator: float(tilt_pos),
-                    self.fill_connection: float(fill_pos),
+                    self._fill_connection: float(fill_pos),
                 }
             )
 
@@ -100,7 +103,7 @@ class PouringCauses(Causes):
             self.environment.set_positions_1DOF_connection(
                 {
                     tilt_actuator: float(tilt_pos),
-                    self.fill_connection: float(fill_pos),
+                    self._fill_connection: float(fill_pos),
                 }
             )
             time.sleep(step_delay)
