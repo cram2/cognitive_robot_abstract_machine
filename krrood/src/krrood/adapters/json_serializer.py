@@ -211,8 +211,12 @@ def to_json(obj: Union[SubclassJSONSerializer, Any]) -> JSON_RETURN_TYPE:
     :param obj: The object to convert to json
     :return: The JSON string
     """
+    if isinstance(obj, dict):
+        json_type = obj.get(JSON_TYPE_NAME, None)
+        if json_type is not None:
+            return obj
 
-    if isinstance(obj, leaf_types):
+    if isinstance(obj, (leaf_types)):
         return obj
 
     if isinstance(obj, list_like_classes):
