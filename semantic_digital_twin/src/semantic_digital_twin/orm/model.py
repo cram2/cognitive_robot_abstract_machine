@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from io import BytesIO
-
 from uuid import UUID
 
 import numpy as np
@@ -9,9 +8,7 @@ import trimesh.exchange.stl
 from sqlalchemy import TypeDecorator, types
 from typing_extensions import List, Optional, Type
 
-
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
-
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_types import (
     RotationMatrix,
@@ -32,9 +29,6 @@ from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
     WorldEntity,
 )
-from semantic_digital_twin.world_description.world_modification import (
-    WorldModelModificationBlock,
-)
 from semantic_digital_twin.world_description.world_state import WorldState
 
 
@@ -46,9 +40,6 @@ class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
     degrees_of_freedom: List[DegreeOfFreedom]
     state: WorldState
     name: Optional[str] = field(default=None)
-    modification_history: List[WorldModelModificationBlock] = field(
-        default_factory=list
-    )
 
     @classmethod
     def from_domain_object(cls, obj: World):
@@ -60,18 +51,31 @@ class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
             state=obj.state,
             name=obj.name,
             simulator_additional_properties=obj.simulator_additional_properties,
-            modification_history=obj._model_manager.model_modification_blocks,
         )
 
     def to_domain_object(self) -> World:
         result = World(name=self.name)
 
         with result.modify_world():
-            for modification_block in self.modification_history:
-                modification_block.apply(result)
+            for entity in self.kinematic_structure_entities:
+                result.add_kinematic_structure_entity(entity)
 
-                result.state = self.state
-                result.state._world = result
+            for dof in self.degrees_of_freedom:
+                result.add_degree_of_freedom(dof)
+
+            for connection in self.connections:
+                result.add_connection(connection)
+
+            # Sort semantic annotations by dependencies to ensure annotations
+            # are added in the correct order (dependencies first)
+            sorted_annotations = result._topological_sort_semantic_annotations(
+                self.semantic_annotations
+            )
+            for semantic_annotation in sorted_annotations:
+                result.add_semantic_annotation(semantic_annotation)
+
+        result.state = self.state
+        result.state._world = result
         return result
 
     @classmethod
