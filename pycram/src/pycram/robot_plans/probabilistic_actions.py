@@ -1,14 +1,9 @@
-import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from dataclasses import dataclass
 from typing import Optional, Any
 
 import numpy as np
-from typing_extensions import List
 
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
-from giskardpy.motion_statechart.tasks.pointing import Pointing
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import underspecified, variable
 from pycram.datastructures.dataclasses import Context
@@ -21,21 +16,14 @@ from pycram.plans.failures import (
     PlanFailure,
 )
 from pycram.plans.plan import Plan
-
+from pycram.robot_plans import MoveManipulatorMotion
 from pycram.robot_plans.actions.base import ActionDescription
-from pycram.robot_plans.actions.core.misc import MoveToReachHub
 from pycram.robot_plans.actions.core.navigation import NavigateAction
-from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.robots.abstract_robot import (
-    Camera,
     Manipulator,
     AbstractRobot,
 )
-
-from pycram.robot_plans.motions.base import BaseMotion
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-
-from pycram.view_manager import ViewManager
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
 @dataclass
@@ -93,13 +81,15 @@ class MoveToReach(LearnableAction):
 
     def execute(self):
         self.add_subplan(
-            execute_single(
-                MoveToReachHub(
-                    standing_pose=self.target_pose,
-                    manipulator=self.manipulator,
-                    target_pose=self.target_pose,
-                    grasp_description=self.grasp_description,
-                )
+            sequential(
+                [
+                    NavigateAction(self.standing_pose),
+                    MoveManipulatorMotion(
+                        self.target_pose,
+                        self.manipulator,
+                        allow_gripper_collision=False,
+                    ),
+                ]
             )
         ).perform()
 
@@ -123,7 +113,9 @@ class MoveToReach(LearnableAction):
             raise ManipulatorDidNotReachTarget(self.manipulator, self.target_pose)
 
     @classmethod
-    def training_environment(cls, robot: AbstractRobot) -> TrainingEnvironment:
+    def training_environment(
+        cls, robot: AbstractRobot, limit: int = 10
+    ) -> TrainingEnvironment:
         world = robot._world
         target_pose = Pose.from_xyz_rpy(
             x=1,
@@ -157,7 +149,7 @@ class MoveToReach(LearnableAction):
             ),
         )
 
-        move_to_reach.expression.limit(50)
+        move_to_reach.expression.limit(limit)
 
         plan = execute_single(
             move_to_reach,
