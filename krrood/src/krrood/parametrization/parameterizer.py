@@ -12,10 +12,15 @@ import random_events.variable
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.factories import and_
 from krrood.entity_query_language.query.match import MatchVariable
+from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.random_events_translator import (
     WhereExpressionToRandomEventTranslator,
 )
-from random_events.product_algebra import Event
+from probabilistic_model.probabilistic_circuit.relational.learn_rspn import (
+    get_features_of_class,
+    FeatureExtractor,
+)
+from random_events.product_algebra import Event, SimpleEvent
 from random_events.set import Set
 
 
@@ -70,7 +75,24 @@ class UnderspecifiedParameters:
                     name=name,
                     domain=Set.from_iterable(attribute_match.assigned_value.tolist()),
                 )
-                result[random_events_variable.name] = random_events_variable
+                # result[random_events_variable.name] = random_events_variable
+                features = get_features_of_class(
+                    to_dao(attribute_match.assigned_value.tolist()[0]),
+                    attribute_match.variable,
+                    [],
+                    set(),
+                )
+                extractor = FeatureExtractor(features)
+
+                for feature in extractor.features:
+                    random_events_variable = random_events.variable.Symbolic(
+                        name=feature._name_,
+                        domain=Set.from_iterable(
+                            attribute_match.assigned_value.tolist()
+                        ),
+                    )
+                    print(random_events_variable)
+                    result[random_events_variable.name] = random_events_variable
                 continue
             if attribute_match.assigned_variable._type_ is None or not issubclass(
                 attribute_match.assigned_variable._type_,

@@ -116,11 +116,8 @@ def data_preparation(mutable_model_world):
         ),
     )
 
-    # move_and_pick_up_description: Match = move_and_pick_up_description
-
     parameters = UnderspecifiedParameters(move_and_pick_up_description)
 
-    # sampling
     move_and_pick_up_distribution = fully_factorized(parameters.variables.values())
 
     probabilistic_registry = DictRegistry(
