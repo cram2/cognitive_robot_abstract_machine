@@ -247,4 +247,4 @@ class ProbabilisticBackend(GenerativeBackend):
             )
             yield instance
 
-        raise StopIteration
+        raise StopIteration()

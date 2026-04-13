@@ -84,10 +84,9 @@ class MoveToReach(LearnableAction):
             sequential(
                 [
                     NavigateAction(self.standing_pose),
-                    MoveManipulatorMotion(
+                    MoveManipulatorAction(
                         self.target_pose,
                         self.manipulator,
-                        allow_gripper_collision=False,
                     ),
                 ]
             )
@@ -156,3 +155,21 @@ class MoveToReach(LearnableAction):
             context=context,
         ).plan
         return TrainingEnvironment(plan=plan)
+
+
+@dataclass
+class MoveManipulatorAction(ActionDescription):
+    target_pose: Pose
+    manipulator: Manipulator
+    allow_gripper_collision: bool
+
+    def execute(self):
+        self.add_subplan(
+            execute_single(
+                MoveManipulatorMotion(
+                    self.target_pose,
+                    self.manipulator,
+                    self.allow_gripper_collision,
+                )
+            )
+        ).perform()
