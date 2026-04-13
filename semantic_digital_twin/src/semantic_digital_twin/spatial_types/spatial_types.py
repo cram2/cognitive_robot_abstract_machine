@@ -487,6 +487,17 @@ class HomogeneousTransformationMatrix(
             child_frame=self.child_frame,
         )
 
+    def __hash__(self):
+        if self.is_constant():
+            return hash(
+                (
+                    *self.to_position().to_np().tolist(),
+                    *self.to_quaternion().to_np().tolist(),
+                    self.reference_frame,
+                )
+            )
+        return super().__hash__()
+
 
 @dataclass(eq=False, init=False, repr=False)
 class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
@@ -1958,6 +1969,17 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return HomogeneousTransformationMatrix(
             data=self, reference_frame=self.reference_frame
         )
+
+    def __hash__(self):
+        if self.is_constant():
+            return hash(
+                (
+                    *self.to_position().to_np().tolist(),
+                    *self.to_quaternion().to_np().tolist(),
+                    self.reference_frame,
+                )
+            )
+        return super().__hash__()
 
 
 @sm.substitution_cache
