@@ -1951,7 +1951,7 @@ def logic_any(args: VectorData | MatrixData) -> Scalar:
     :param args: A vector or matrix of logical scalars.
     :return: A scalar truth value.
     """
-    return Scalar.from_casadi_sx(ca.logic_any(args.casadi_sx))
+    return Scalar.from_casadi_sx(ca.logic_any(to_sx(args)))
 
 
 def logic_all(args: GenericVectorOrMatrixType) -> Scalar:

@@ -1,7 +1,24 @@
 from dataclasses import field, dataclass
 from itertools import combinations
+from typing import Optional
 
 import krrood.symbolic_math.symbolic_math as sm
+from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.data_types import (
+    DefaultWeights,
+    ObservationStateValues,
+)
+from giskardpy.motion_statechart.exceptions import (
+    NodeInitializationError,
+    CollisionViolatedError,
+)
+from giskardpy.motion_statechart.graph_node import (
+    Goal,
+    MotionStatechartNode,
+    NodeArtifacts,
+    CancelMotion,
+)
+from giskardpy.motion_statechart.graph_node import Task
 from krrood.symbolic_math.symbolic_math import Scalar, FloatVariable
 from semantic_digital_twin.collision_checking.collision_groups import CollisionGroup
 from semantic_digital_twin.collision_checking.collision_matrix import (
@@ -22,16 +39,6 @@ from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
     Body,
 )
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.exceptions import NodeInitializationError
-from giskardpy.motion_statechart.graph_node import (
-    Goal,
-    MotionStatechartNode,
-    NodeArtifacts,
-)
-from giskardpy.motion_statechart.graph_node import Task
-from giskardpy.qp.qp_controller_config import QPControllerConfig
 
 
 @dataclass(eq=False, repr=False)
@@ -39,66 +46,6 @@ class _CollisionAvoidanceTask(Task):
     """
     Superclass with helper methods for collision avoidance tasks.
     """
-
-    def create_upper_slack(
-        self,
-        context: MotionStatechartContext,
-        buffer_zone_expr: sm.Scalar,
-        violated_distance: sm.Scalar,
-        distance_expression: sm.Scalar,
-        max_velocity: float = 0.2,
-    ) -> sm.Scalar:
-        """
-        Creates upper slack limits for collision avoidance tasks that is just large enough to reach the violated distance.
-        :param context: The motion statechart context.
-        :param buffer_zone_expr: The buffer zone expression for the collision avoidance task.
-        :param violated_distance: The violated distance for the collision avoidance task.
-        :param distance_expression: The distance expression for the collision avoidance task.
-        :param max_velocity: The maximum velocity for the collision avoidance task.
-        :return: The upper slack limit for the collision avoidance task.
-        """
-        distance_to_buffer_zone = buffer_zone_expr - distance_expression
-        qp_limits_for_lower_error_bound = (
-            max_velocity
-            * context.qp_controller_config.mpc_dt
-            * self.compute_control_horizon(context.qp_controller_config)
-        )
-
-        hard_threshold = sm.min(violated_distance, buffer_zone_expr / 2)
-
-        lower_limit_limited = sm.limit(
-            distance_to_buffer_zone,
-            -qp_limits_for_lower_error_bound,
-            qp_limits_for_lower_error_bound,
-        )
-
-        upper_slack = sm.if_greater(
-            distance_expression,
-            hard_threshold,
-            lower_limit_limited + sm.max(0, distance_expression - hard_threshold),
-            lower_limit_limited - 1e-4,
-        )
-        # undo factor in A
-        upper_slack /= context.qp_controller_config.mpc_dt
-
-        upper_slack = sm.if_greater(
-            distance_expression,
-            50,  # assuming that distance of unchecked closest points is 100
-            sm.Scalar(1e4),
-            sm.max(0, upper_slack),
-        )
-        return upper_slack
-
-    def compute_control_horizon(
-        self, qp_controller_config: QPControllerConfig
-    ) -> float:
-        """
-        Computes the control horizon for the QP controller.
-        """
-        control_horizon = qp_controller_config.prediction_horizon - (
-            qp_controller_config.max_derivative - 1
-        )
-        return max(1, control_horizon)
 
 
 @dataclass(eq=False, repr=False)
@@ -216,6 +163,17 @@ class _ExternalCollisionAvoidanceTask(_ExternalCollisionAvoidanceNode):
         ).safe_division(sm.min(number_of_external_collisions, max_avoided_bodies))
         return weight
 
+    def is_no_collision_violated(self, context: MotionStatechartContext) -> Scalar:
+        max_avoided_bodies = self.collision_group.get_max_avoided_bodies(
+            context.collision_manager
+        )
+        return sm.logic_all(
+            [
+                self.contact_distance >= self.violated_distance
+                for _ in range(max_avoided_bodies)
+            ]
+        )
+
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
@@ -238,7 +196,57 @@ class _ExternalCollisionAvoidanceTask(_ExternalCollisionAvoidanceNode):
             task_expression=a_projected_on_normal,
         )
 
+        artifacts.observation = self.is_no_collision_violated(context)
+
         return artifacts
+
+
+@dataclass(eq=False, repr=False)
+class _CancelBecauseExternalCollisionViolated(CancelMotion):
+    """
+    Cancels the motion by raising an exception detailing which external collision tasks were violated.
+    """
+
+    tasks: list[_ExternalCollisionAvoidanceTask] = field(kw_only=True)
+    """
+    The list of external collision avoidance tasks to check for collisions.
+    """
+    exception: Exception = field(init=False, default=Exception)
+    """
+    Set to init=False, because this class creates its own exception.
+    """
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        if len(self.tasks) == 1:
+            self.start_condition = sm.trinary_logic_not(
+                self.tasks[0].observation_variable
+            )
+        else:
+            self.start_condition = sm.trinary_logic_or(
+                *[
+                    sm.trinary_logic_not(node.observation_variable)
+                    for node in self.tasks
+                ]
+            )
+        return NodeArtifacts()
+
+    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
+        violated_tasks = [
+            task
+            for task in self.tasks
+            if task.observation_state == ObservationStateValues.FALSE
+        ]
+        collisions = []
+        thresholds = []
+        for task in violated_tasks:
+            collision = context.external_collision_manager.last_closest_contacts[
+                task.collision_group
+            ][0]
+            collisions.append(collision)
+            thresholds.append(task.violated_distance.evaluate()[0])
+        raise CollisionViolatedError(
+            violated_collisions=collisions, thresholds=thresholds
+        )
 
 
 @dataclass(eq=False, repr=False)
@@ -329,6 +337,10 @@ class ExternalCollisionAvoidance(Goal):
     """
     Reference to the external collision variable manager shared by other external collision avoidance nodes.
     """
+    cancel_if_collision_violated: bool = field(default=True, kw_only=True)
+    """
+    If True, the motion will be canceled if a collision is violated.
+    """
 
     def expand(self, context: MotionStatechartContext) -> None:
         if self.robot is None:
@@ -345,6 +357,8 @@ class ExternalCollisionAvoidance(Goal):
                 self.external_collision_manager.register_group_of_body(body)
 
         robot_bodies = self.robot.bodies
+
+        tasks = []
 
         for group in self.external_collision_manager.registered_groups:
             if group.root not in robot_bodies:
@@ -368,6 +382,15 @@ class ExternalCollisionAvoidance(Goal):
                 )
                 self.add_node(task)
                 task.pause_condition = distance_monitor.observation_variable
+                tasks.append(task)
+
+        if self.cancel_if_collision_violated:
+            self.add_node(
+                _CancelBecauseExternalCollisionViolated(
+                    tasks=tasks,
+                    name="External Collision Violated",
+                )
+            )
 
 
 @dataclass(eq=False, repr=False)
@@ -499,6 +522,9 @@ class _SelfCollisionAvoidanceTask(_SelfCollisionAvoidanceNode):
     The maximum velocity for the collision avoidance task.
     """
 
+    def is_collision_not_violated(self) -> Scalar:
+        return self.contact_distance >= self.violated_distance
+
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
@@ -524,17 +550,58 @@ class _SelfCollisionAvoidanceTask(_SelfCollisionAvoidanceNode):
             upper_error=float("inf"),
             quadratic_weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
             task_expression=a_projected_on_normal,
-            lower_slack_limit=-float("inf"),
-            upper_slack_limit=self.create_upper_slack(
-                context=context,
-                max_velocity=self.max_velocity,
-                buffer_zone_expr=self.buffer_zone_distance,
-                violated_distance=self.violated_distance,
-                distance_expression=sm.Scalar(self.contact_distance),
-            ),
         )
 
+        artifacts.observation = self.is_collision_not_violated()
         return artifacts
+
+
+@dataclass(eq=False, repr=False)
+class _CancelBecauseSelfCollisionViolated(CancelMotion):
+    """
+    Cancels the motion by raising an exception detailing which self collision tasks were violated.
+    """
+
+    tasks: list[_SelfCollisionAvoidanceTask] = field(kw_only=True)
+    """
+    The list of self collision avoidance tasks to check for collisions.
+    """
+    exception: Exception = field(init=False, default=Exception)
+    """
+    Set to init=False, because this class creates its own exception.
+    """
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        if len(self.tasks) == 1:
+            self.start_condition = sm.trinary_logic_not(
+                self.tasks[0].observation_variable
+            )
+        else:
+            self.start_condition = sm.trinary_logic_or(
+                *[
+                    sm.trinary_logic_not(node.observation_variable)
+                    for node in self.tasks
+                ]
+            )
+        return NodeArtifacts()
+
+    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
+        violated_tasks = [
+            task
+            for task in self.tasks
+            if task.observation_state == ObservationStateValues.FALSE
+        ]
+        collisions = []
+        thresholds = []
+        for task in violated_tasks:
+            collision = context.self_collision_manager.last_closest_contacts[
+                task.collision_group_a, task.collision_group_b
+            ][0]
+            collisions.append(collision)
+            thresholds.append(task.violated_distance.evaluate()[0])
+        raise CollisionViolatedError(
+            violated_collisions=collisions, thresholds=thresholds
+        )
 
 
 @dataclass(eq=False, repr=False)
@@ -556,6 +623,10 @@ class SelfCollisionAvoidance(Goal):
     self_collision_manager: SelfCollisionVariableManager = field(init=False)
     """
     Reference to the self collision variable manager shared by other self collision avoidance nodes.
+    """
+    cancel_if_collision_violated: bool = field(default=True, kw_only=True)
+    """
+    If True, the motion will be canceled if a collision is violated.
     """
 
     def create_self_collision_matrix(
@@ -586,6 +657,8 @@ class SelfCollisionAvoidance(Goal):
         collision_matrix = self.create_self_collision_matrix(context)
 
         kinematic_structure_entities = self.robot.kinematic_structure_entities
+
+        tasks = []
 
         for group_a, group_b in combinations(
             self.self_collision_manager.collision_groups, 2
@@ -625,6 +698,14 @@ class SelfCollisionAvoidance(Goal):
             )
             self.add_node(task)
             task.pause_condition = distance_monitor.observation_variable
+            tasks.append(task)
+
+        if self.cancel_if_collision_violated:
+            self.add_node(
+                _CancelBecauseSelfCollisionViolated(
+                    name="self collision violated", tasks=tasks
+                )
+            )
 
 
 @dataclass(eq=False, repr=False)
