@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import is_dataclass
+import sqlalchemy.types
 
 import semantic_digital_twin.adapters.procthor.procthor_resolver
 import semantic_digital_twin.collision_checking.collision_detector
@@ -29,7 +30,7 @@ import semantic_digital_twin.world_description.degree_of_freedom
 import semantic_digital_twin.world_description.geometry
 import semantic_digital_twin.world_description.shape_collection
 import semantic_digital_twin.world_description.world_entity
-from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.adapters.json_serializer import SubclassJSONSerializer, JSONData
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
@@ -94,6 +95,7 @@ def generate_orm():
         type_mappings=TypeDict(
             {
                 trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
+                JSONData: sqlalchemy.types.JSON,
             }
         ),
         alternative_mappings=alternative_mappings,

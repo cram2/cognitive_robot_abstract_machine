@@ -8,7 +8,7 @@ from abc import ABC
 from dataclasses import dataclass, fields, is_dataclass
 from dataclasses import field
 from types import NoneType
-from typing import List, Optional
+from typing import List, Optional, TypeAlias
 
 import numpy as np
 from typing_extensions import Dict, Any, Self, Union, Type, TypeVar
@@ -51,6 +51,10 @@ JSON_IS_CLASS = "__is_class__"
 """
 We need to remember if something is a class, because the type of a class is often just type.
 """
+
+
+class JSONData:
+    pass
 
 
 @dataclass

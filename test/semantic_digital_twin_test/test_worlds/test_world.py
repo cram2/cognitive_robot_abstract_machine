@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 from numpy.testing import assert_raises
 
-from conftest import world_with_urdf_factory
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
@@ -649,8 +648,10 @@ def test_copy_world(world_setup):
 
 
 def test_copy_big_world():
-    urdf_dir = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    pr2_world = world_with_urdf_factory(urdf_dir, PR2, OmniDrive)
+    pr2_world = URDFParser.from_file(
+        file_path="package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+    ).parse()
+    PR2.from_world(pr2_world)
     apartment_world = URDFParser.from_file(
         os.path.join(
             os.path.dirname(__file__),

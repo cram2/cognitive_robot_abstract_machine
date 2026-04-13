@@ -97,6 +97,7 @@ from krrood.ormatic.custom_types import TypeType
 class Base(DeclarativeBase):
     type_mappings = {
         trimesh.base.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
+        krrood.adapters.json_serializer.JSONData: sqlalchemy.sql.sqltypes.JSON,
         typing.Type: krrood.ormatic.custom_types.TypeType,
         enum.Enum: krrood.ormatic.custom_types.PolymorphicEnumType,
         krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
@@ -642,6 +643,26 @@ class WorldMappingDAO_degrees_of_freedom_association(Base, AssociationDataAccess
 
     target: Mapped[DegreeOfFreedomDAO] = relationship(
         "DegreeOfFreedomDAO", foreign_keys=[target_degreeoffreedomdao_id]
+    )
+
+
+class WorldMappingDAO_modification_history_association(
+    Base, AssociationDataAccessObject
+):
+
+    __tablename__ = "_11294180735054649438971565721084910078136875372585588648441413"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_worldmappingdao_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id")
+    )
+    target_worldmodelmodificationblockdao_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldModelModificationBlockDAO.database_id")
+    )
+
+    target: Mapped[WorldModelModificationBlockDAO] = relationship(
+        "WorldModelModificationBlockDAO",
+        foreign_keys=[target_worldmodelmodificationblockdao_id],
     )
 
 
@@ -5689,6 +5710,14 @@ class WorldMappingDAO(
     state: Mapped[WorldStateMappingDAO] = relationship(
         "WorldStateMappingDAO", uselist=False, foreign_keys=[state_id], post_update=True
     )
+    modification_history: Mapped[
+        builtins.list[WorldMappingDAO_modification_history_association]
+    ] = relationship(
+        "WorldMappingDAO_modification_history_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[WorldMappingDAO_modification_history_association.source_worldmappingdao_id]",
+    )
 
     __mapper_args__ = {
         "polymorphic_identity": "WorldMappingDAO",
@@ -10077,6 +10106,12 @@ class AddSemanticAnnotationModificationDAO(
         use_existing_column=True,
     )
 
+    semantic_annotation_json: Mapped[krrood.adapters.json_serializer.JSONData] = (
+        mapped_column(
+            sqlalchemy.sql.sqltypes.JSON, nullable=False, use_existing_column=True
+        )
+    )
+
     __mapper_args__ = {
         "polymorphic_identity": "AddSemanticAnnotationModificationDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
@@ -10101,8 +10136,8 @@ class AttributeUpdateModificationDAO(
     entity_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-    updated_kwargs: Mapped[
-        typing.List[krrood.adapters.json_serializer.JSONAttributeDiff]
+    updated_kwargs_json_list: Mapped[
+        typing.List[krrood.adapters.json_serializer.JSONData]
     ] = mapped_column(JSON, nullable=False, use_existing_column=True)
 
     __mapper_args__ = {

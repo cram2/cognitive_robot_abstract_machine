@@ -21,13 +21,16 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
     SpatialType,
 )
-from semantic_digital_twin.world import World
+from semantic_digital_twin.world import World, WorldModelManager
 from semantic_digital_twin.world_description.connections import Connection
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     KinematicStructureEntity,
     WorldEntity,
+)
+from semantic_digital_twin.world_description.world_modification import (
+    WorldModelModificationBlock,
 )
 from semantic_digital_twin.world_description.world_state import WorldState
 
@@ -39,7 +42,8 @@ class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
     semantic_annotations: List[SemanticAnnotation]
     degrees_of_freedom: List[DegreeOfFreedom]
     state: WorldState
-    name: Optional[str] = field(default=None)
+    name: Optional[str]
+    modification_history: List[WorldModelModificationBlock]
 
     @classmethod
     def from_domain_object(cls, obj: World):
@@ -51,31 +55,18 @@ class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
             state=obj.state,
             name=obj.name,
             simulator_additional_properties=obj.simulator_additional_properties,
+            modification_history=obj._model_manager.model_modification_blocks,
         )
 
     def to_domain_object(self) -> World:
         result = World(name=self.name)
 
         with result.modify_world():
-            for entity in self.kinematic_structure_entities:
-                result.add_kinematic_structure_entity(entity)
+            for modification_block in self.modification_history:
+                modification_block.apply(result)
 
-            for dof in self.degrees_of_freedom:
-                result.add_degree_of_freedom(dof)
-
-            for connection in self.connections:
-                result.add_connection(connection)
-
-            # Sort semantic annotations by dependencies to ensure annotations
-            # are added in the correct order (dependencies first)
-            sorted_annotations = result._topological_sort_semantic_annotations(
-                self.semantic_annotations
-            )
-            for semantic_annotation in sorted_annotations:
-                result.add_semantic_annotation(semantic_annotation)
-
-        result.state = self.state
-        result.state._world = result
+            result.state = self.state
+            result.state._world = result
         return result
 
     @classmethod

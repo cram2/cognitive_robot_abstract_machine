@@ -1,4 +1,5 @@
 import os
+import time
 from copy import deepcopy
 
 import numpy as np
@@ -146,11 +147,21 @@ def test_pr2_world(pr2_world_state_reset, session):
     session.add(dao)
     session.commit()
 
+    start_time = time.time()
+
+    to_dao(pr2_world_state_reset).from_dao()
+
+    end_time = time.time()
+    print(f"Time taken to reconstruct: {end_time - start_time}")
+
     queried_world = session.scalar(select(WorldMappingDAO))
     reconstructed: World = queried_world.from_dao()
 
     # confirm the modification history
+    start_time = time.time()
     deepcopy(reconstructed)
+    end_time = time.time()
+    print(f"Time taken to reconstruct: {end_time - start_time}")
 
     q = select(RevoluteConnectionDAO)
     r = session.scalars(q).all()

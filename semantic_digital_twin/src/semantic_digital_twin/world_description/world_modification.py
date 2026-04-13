@@ -12,6 +12,7 @@ from krrood.adapters.json_serializer import (
     shallow_diff_json,
     JSONAttributeDiff,
     list_like_classes,
+    JSONData,
 )
 from semantic_digital_twin.exceptions import (
     MissingWorldModificationContextError,
@@ -266,7 +267,7 @@ class RemoveDegreeOfFreedomModification(WorldModification):
 
 @dataclass
 class AddSemanticAnnotationModification(WorldModification, SubclassJSONSerializer):
-    semantic_annotation_json: Dict[str, Any]
+    semantic_annotation_json: JSONData
 
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]):
@@ -440,7 +441,7 @@ class SetDofHasHardwareInterface(WorldModification):
 
 
 @dataclass
-class AttributeUpdateModification(WorldModification):
+class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
     """
     An update to one or more attributes of an entity in the world.
     This is used when decorating a method with  @synchronized_attribute_modification
@@ -451,7 +452,7 @@ class AttributeUpdateModification(WorldModification):
     The UUID of the entity that was updated.
     """
 
-    updated_kwargs: List[JSONAttributeDiff]
+    updated_kwargs_json_list: List[JSONData]
     """
     The list of attribute names and their new values.
     """
@@ -460,12 +461,15 @@ class AttributeUpdateModification(WorldModification):
     def from_kwargs(cls, kwargs: Dict[str, Any]):
         return cls(
             from_json(kwargs["entity_id"], **kwargs),
-            from_json(kwargs["updated_kwargs"], **kwargs),
+            kwargs["updated_kwargs"],
         )
 
     def apply(self, world: World):
+        tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+        kwargs = tracker.create_kwargs()
+        updated_kwargs = from_json(self.updated_kwargs_json_list, **kwargs)
         entity = world.get_world_entity_with_id_by_id(self.entity_id)
-        for diff in self.update_world_references_in_updated_kwargs(world):
+        for diff in updated_kwargs:
             current_value = getattr(entity, diff.attribute_name)
             if isinstance(current_value, list_like_classes):
                 self._apply_to_list(world, current_value, diff)
@@ -473,11 +477,6 @@ class AttributeUpdateModification(WorldModification):
                 obj = self._resolve_item(world, diff.added_values[0])
                 setattr(entity, diff.attribute_name, obj)
         world._model_manager.current_model_modification_block.append(self)
-
-    def update_world_references_in_updated_kwargs(self, world: World):
-        tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-        kwargs = tracker.create_kwargs()
-        return from_json(to_json(self.updated_kwargs), **kwargs)
 
     def _apply_to_list(
         self, world: World, current_value: List[Any], diff: JSONAttributeDiff
@@ -496,6 +495,20 @@ class AttributeUpdateModification(WorldModification):
         if isinstance(item, UUID):
             return world.get_world_entity_with_id_by_id(item)
         return item
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "entity_id": to_json(self.entity_id),
+            "updated_kwargs_json_list": self.updated_kwargs_json_list,
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(
+            entity_id=data["entity_id"],
+            updated_kwargs_json_list=data["updated_kwargs_json_list"],
+        )
 
 
 def synchronized_attribute_modification(func):
