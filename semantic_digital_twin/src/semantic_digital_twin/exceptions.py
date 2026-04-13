@@ -451,6 +451,13 @@ class MissingDefaultCameraError(UsageError):
 
 
 @dataclass
+class MissingWorldError(UsageError):
+
+    def __post_init__(self):
+        self.message = f"The world you are trying to access is None."
+
+
+@dataclass
 class WorldEntityWithIDNotFoundError(UsageError):
     id: UUID
 

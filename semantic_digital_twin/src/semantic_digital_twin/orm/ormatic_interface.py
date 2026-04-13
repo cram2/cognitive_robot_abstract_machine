@@ -5184,6 +5184,24 @@ class MissingSemanticAnnotationErrorDAO(
     }
 
 
+class MissingWorldErrorDAO(
+    UsageErrorDAO, DataAccessObject[semantic_digital_twin.exceptions.MissingWorldError]
+):
+
+    __tablename__ = "MissingWorldErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MissingWorldErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+    }
+
+
 class MissingWorldModificationContextErrorDAO(
     UsageErrorDAO,
     DataAccessObject[
