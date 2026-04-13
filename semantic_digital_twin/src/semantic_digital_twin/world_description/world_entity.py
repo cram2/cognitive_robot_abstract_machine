@@ -711,6 +711,28 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
             HomogeneousTransformationMatrix(reference_frame=reference_frame)
         )
 
+    def _referenced_semantic_annotations(
+        self,
+    ) -> Set[SemanticAnnotation]:
+        """
+        Extract all direct SemanticAnnotation dependencies from a given SemanticAnnotation.
+        :return: A set of SemanticAnnotations that are referenced by the given annotation.
+        """
+        dependencies = set()
+        introspector = DataclassOnlyIntrospector()
+
+        for field_info in introspector.discover(self.__class__):
+            value = getattr(self, field_info.public_name)
+
+            if isinstance(value, SemanticAnnotation):
+                dependencies.add(value)
+            elif isinstance(value, list_like_classes):
+                for item in value:
+                    if isinstance(item, SemanticAnnotation):
+                        dependencies.add(item)
+
+        return dependencies
+
 
 @dataclass(eq=False)
 class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):

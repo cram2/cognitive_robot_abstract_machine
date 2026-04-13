@@ -262,6 +262,21 @@ class MissingSemanticAnnotationError(UsageError):
 
 
 @dataclass
+class SemanticAnnotationCircularDependencyError(UsageError):
+    """
+    Raised when a circular dependency between semantic annotations is detected.
+    """
+
+    semantic_annotations: List[SemanticAnnotation]
+    """
+    The list of semantic annotations that in which a circular dependency is detected.
+    """
+
+    def __post_init__(self):
+        self.message = f"The following semantic annotations have circular dependencies: {self.semantic_annotations}"
+
+
+@dataclass
 class InvalidPlaneDimensions(UsageError):
     """
     Raised when the depth of a plane is not less than its width or height.

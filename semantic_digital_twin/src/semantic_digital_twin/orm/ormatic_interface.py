@@ -553,6 +553,25 @@ class DuplicateWorldEntityErrorDAO_world_entities_association(
     )
 
 
+class SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_association(
+    Base, AssociationDataAccessObject
+):
+
+    __tablename__ = "_55398879348376960425566483383494381522090766330439258780258698"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_semanticannotationcirculardependencyerrordao_id: Mapped[int] = mapped_column(
+        ForeignKey("SemanticAnnotationCircularDependencyErrorDAO.database_id")
+    )
+    target_semanticannotationdao_id: Mapped[int] = mapped_column(
+        ForeignKey("SemanticAnnotationDAO.database_id")
+    )
+
+    target: Mapped[SemanticAnnotationDAO] = relationship(
+        "SemanticAnnotationDAO", foreign_keys=[target_semanticannotationdao_id]
+    )
+
+
 class WorldMappingDAO_kinematic_structure_entities_association(
     Base, AssociationDataAccessObject
 ):
@@ -623,26 +642,6 @@ class WorldMappingDAO_degrees_of_freedom_association(Base, AssociationDataAccess
 
     target: Mapped[DegreeOfFreedomDAO] = relationship(
         "DegreeOfFreedomDAO", foreign_keys=[target_degreeoffreedomdao_id]
-    )
-
-
-class WorldMappingDAO_modification_history_association(
-    Base, AssociationDataAccessObject
-):
-
-    __tablename__ = "_11294180735054649438971565721084910078136875372585588648441413"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_worldmappingdao_id: Mapped[int] = mapped_column(
-        ForeignKey("WorldMappingDAO.database_id")
-    )
-    target_worldmodelmodificationblockdao_id: Mapped[int] = mapped_column(
-        ForeignKey("WorldModelModificationBlockDAO.database_id")
-    )
-
-    target: Mapped[WorldModelModificationBlockDAO] = relationship(
-        "WorldModelModificationBlockDAO",
-        foreign_keys=[target_worldmodelmodificationblockdao_id],
     )
 
 
@@ -5223,6 +5222,38 @@ class MissingWorldModificationContextErrorDAO(
     }
 
 
+class SemanticAnnotationCircularDependencyErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.exceptions.SemanticAnnotationCircularDependencyError
+    ],
+):
+
+    __tablename__ = "SemanticAnnotationCircularDependencyErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    semantic_annotations: Mapped[
+        builtins.list[
+            SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_association
+        ]
+    ] = relationship(
+        "SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_association.source_semanticannotationcirculardependencyerrordao_id]",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SemanticAnnotationCircularDependencyErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+    }
+
+
 class SemanticAnnotationNotInWorldErrorDAO(
     UsageErrorDAO,
     DataAccessObject[
@@ -5657,14 +5688,6 @@ class WorldMappingDAO(
     )
     state: Mapped[WorldStateMappingDAO] = relationship(
         "WorldStateMappingDAO", uselist=False, foreign_keys=[state_id], post_update=True
-    )
-    modification_history: Mapped[
-        builtins.list[WorldMappingDAO_modification_history_association]
-    ] = relationship(
-        "WorldMappingDAO_modification_history_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[WorldMappingDAO_modification_history_association.source_worldmappingdao_id]",
     )
 
     __mapper_args__ = {
