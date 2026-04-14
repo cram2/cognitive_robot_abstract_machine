@@ -1,5 +1,8 @@
 import logging
+from abc import ABC
 from copy import deepcopy
+from dataclasses import dataclass, field
+from operator import xor
 
 from typing_extensions import List, Union
 
@@ -10,7 +13,8 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from krrood.entity_query_language.predicate import symbolic_function
+from krrood.entity_query_language.predicate import symbolic_function, Predicate
+from pycram.locations.base import PoseValidator
 from pycram.plans.plan import Plan
 from pycram.plans.plan_node import PlanNode
 from pycram.robot_plans import MoveToolCenterPointMotion
@@ -37,6 +41,22 @@ from pycram.datastructures.enums import Arms
 from pycram.view_manager import ViewManager
 
 logger = logging.getLogger("pycram")
+
+
+@dataclass
+class VisibilityValidator(PoseValidator):
+
+    target_pose: Pose = field(default=None)
+
+    target_body: Body = field(default=None)
+
+    def __call__(self) -> bool:
+        assert self.target_pose or self.target_body
+        return self.validate_pose() if self.target_pose else self.validate_body()
+
+    def validate_pose(self) -> bool: ...
+
+    def validate_body(self) -> bool: ...
 
 
 def visibility_validator(
@@ -109,6 +129,78 @@ def reachability_validator(
     )
 
 
+@dataclass
+class ReachabilitySequenceValidator(PoseValidator):
+
+    pose_sequence: List[Pose]
+
+    tip_link: KinematicStructureEntity
+
+    def __call__(self) -> bool:
+        logger.debug(
+            f"Hash of input for pose_sequence_reachability_validator: {hash((*self.pose_sequence, self.tip_link, self.robot))}"
+        )
+
+        with self.world.reset_state_context():
+            root = (
+                self.robot.root
+                if not self.robot.full_body_controlled
+                else self.world.root
+            )
+
+            alternative_motion = AlternativeMotion.check_for_alternative(
+                self.robot, MoveToolCenterPointMotion
+            )
+            if alternative_motion:
+                correct_arm = None
+                for arm in Arms:
+                    if (
+                        self.tip_link
+                        == ViewManager.get_end_effector_view(arm, self.robot).tool_frame
+                    ):
+                        correct_arm = arm
+                sequence = []
+                for pose in self.pose_sequence:
+                    motion = alternative_motion(pose, correct_arm, True)
+                    node = PlanNode()
+                    # Imagine a plan for the motion node
+                    plan = Plan(Context(self.world, self.robot))
+                    plan.add_node(node)
+                    motion.plan_node = node
+                    sequence.append(motion._motion_chart)
+
+            else:
+                sequence = [
+                    CartesianPose(
+                        root_link=root, tip_link=self.tip_link, goal_pose=pose
+                    )
+                    for pose in self.pose_sequence
+                ]
+
+            msc = MotionStatechart()
+            msc.add_node(n := Sequence(sequence))
+            msc.add_node(EndMotion.when_true(n))
+
+            executor = Executor(
+                context=MotionStatechartContext(
+                    world=self.world,
+                    qp_controller_config=QPControllerConfig(
+                        target_frequency=50, prediction_horizon=4, verbose=False
+                    ),
+                ),
+            )
+            executor.compile(msc)
+
+            try:
+                executor.tick_until_end()
+            except TimeoutError:
+                logger.debug(
+                    f"Timeout while executing pose sequence: {self.pose_sequence}"
+                )
+                return False
+            return True
+
+
 @symbolic_function
 def pose_sequence_reachability_validator(
     target_sequence: List[Pose],
@@ -126,7 +218,6 @@ def pose_sequence_reachability_validator(
     :param world: The world in which the visibility should be validated.
     :param use_fullbody_ik: If true the base will be used in trying to reach the poses
     """
-    # TODO: does not work for the moment since casadi has problems with hashes
     logger.debug(
         f"Hash of input for pose_sequence_reachability_validator: {hash((*target_sequence, tip_link, robot_view, world, use_fullbody_ik))}"
     )
