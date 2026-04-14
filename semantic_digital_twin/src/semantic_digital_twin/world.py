@@ -926,7 +926,6 @@ class World(HasSimulatorProperties):
             dof.has_hardware_interface = value
 
     # %% Getter
-    @memoize
     def get_connection(
         self, parent: KinematicStructureEntity, child: KinematicStructureEntity
     ) -> Connection:
