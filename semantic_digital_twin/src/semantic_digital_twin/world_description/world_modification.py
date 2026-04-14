@@ -501,14 +501,16 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
         return {
             **super().to_json(),
             "entity_id": to_json(self.entity_id),
-            "updated_kwargs_json_list": self.updated_kwargs_json_list,
+            "updated_kwargs_json_list": to_json(self.updated_kwargs_json_list),
         }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(
-            entity_id=data["entity_id"],
-            updated_kwargs_json_list=data["updated_kwargs_json_list"],
+            entity_id=from_json(data["entity_id"], **kwargs),
+            updated_kwargs_json_list=from_json(
+                data["updated_kwargs_json_list"], **kwargs
+            ),
         )
 
 
