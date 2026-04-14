@@ -410,24 +410,6 @@ class ExecutionDataDAO_added_world_modifications_association(
         foreign_keys=[target_worldmodelmodificationblockdao_id],
     )
 
-
-class GiskardTesterDAO_robot_names_association(Base, AssociationDataAccessObject):
-
-    __tablename__ = "_18552742813313585395849894661168412239528432174761485585780336"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_giskardtesterdao_id: Mapped[int] = mapped_column(
-        ForeignKey("GiskardTesterDAO.database_id")
-    )
-    target_prefixednamedao_id: Mapped[int] = mapped_column(
-        ForeignKey("PrefixedNameDAO.database_id")
-    )
-
-    target: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", foreign_keys=[target_prefixednamedao_id]
-    )
-
-
 class HasArmsDAO_arms_association(Base, AssociationDataAccessObject):
 
     __tablename__ = "_29862750035374540800173834202665026606176872785492472172419984"
