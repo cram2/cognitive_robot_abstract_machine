@@ -22,6 +22,7 @@ from typing_extensions import (
     List,
 )
 
+from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.entity_query_language.core.base_expressions import (
     UnaryExpression,
     Bindings,
@@ -305,6 +306,9 @@ class Call(MappedVariable):
     @property
     def _name_(self):
         return f"{self._child_._var_._name_}()"
+
+    def _update_type_(self) -> None:
+        self._type_ = get_type_hints_of_object(self._child_._type_)["return"]
 
 
 @dataclass(eq=False, repr=False)

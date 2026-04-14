@@ -11,8 +11,10 @@ from typing_extensions import Any
 import random_events.variable
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.factories import and_
-from krrood.entity_query_language.query.match import MatchVariable
+from krrood.entity_query_language.predicate import symbolic_function
+from krrood.entity_query_language.query.match import MatchVariable, AttributeMatch
 from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.parametrization.random_events_translator import (
     WhereExpressionToRandomEventTranslator,
 )
@@ -23,6 +25,11 @@ from probabilistic_model.probabilistic_circuit.relational.learn_rspn import (
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.set import Set
 from semantic_digital_twin.world_description.world_entity import Body
+
+
+@symbolic_function
+def symbolic_hash(value: Any) -> int:
+    return hash(value)
 
 
 @dataclass
@@ -76,22 +83,8 @@ class UnderspecifiedParameters:
             #     isinstance(attribute_match.assigned_value, SymbolicExpression),
             # )
             if isinstance(attribute_match.assigned_value, SymbolicExpression):
-                features = get_features_of_class(
-                    to_dao(attribute_match.assigned_value.tolist()[0]),
-                    attribute_match.variable,
-                    [],
-                    set(),
-                )
-                extractor = FeatureExtractor(features)
-
-                for feature in extractor.features:
-                    random_events_variable = (
-                        random_events.variable.variable_from_name_and_type(
-                            name=feature._name_, type_=feature._type_
-                        )
-                    )
-                    result[random_events_variable.name] = random_events_variable
-                    continue
+                self._create_variables_from_symbolic_expression(attribute_match)
+                continue
             # print(attribute_match.assigned_variable._type_)
             # print(attribute_match.assigned_variable)
             if attribute_match.assigned_variable._type_ is None or not issubclass(
@@ -105,6 +98,60 @@ class UnderspecifiedParameters:
             )
 
             result[random_events_variable.name] = random_events_variable
+        return result
+
+    def _create_variables_from_symbolic_expression(
+        self, attribute_match: AttributeMatch
+    ):
+
+        result = {}
+
+        state = ToDataAccessObjectState()
+        domain_objects = attribute_match.assigned_value.tolist()
+        hashes = [hash(obj) for obj in domain_objects]
+        data_access_objects = [to_dao(obj, state=state) for obj in domain_objects]
+
+        features = get_features_of_class(
+            data_access_objects[0],
+            attribute_match.assigned_variable,
+            [],
+            set(),
+        )
+        extractor = FeatureExtractor(features)
+
+        # extract feature variables
+        for feature in extractor.features:
+            random_events_variable = random_events.variable.variable_from_name_and_type(
+                name=feature._access_path_[-1]._name_, type_=feature._type_
+            )
+            result[random_events_variable.name] = random_events_variable
+
+        identifier_name = f"{attribute_match.name_from_variable_access_path}.hash"
+        identifier_variable = random_events.variable.Symbolic(
+            name=identifier_name, domain=Set.from_iterable(hashes)
+        )
+
+        result[identifier_variable.name] = identifier_variable
+
+        simple_events = []
+        for index, (hash_, dao) in enumerate(zip(hashes, data_access_objects)):
+            current_features = extractor.apply_mapping(dao)
+
+            current_simple_event = SimpleEvent.from_data(
+                {
+                    identifier_variable: hash_,
+                    **{
+                        result[f._name_]: v
+                        for f, v in zip(extractor.features, current_features)
+                    },
+                }
+            )
+            simple_events.append(current_simple_event)
+
+        resulting_event = Event.from_simple_sets(
+            *simple_events
+        )  # TODO: save this to an instance variable
+
         return result
 
     # @cached_property
