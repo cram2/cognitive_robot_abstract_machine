@@ -32,7 +32,7 @@ from sortedcontainers import SortedSet
 from semantic_digital_twin.spatial_types import Point3, HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("semantic_digital_twin")
 
 
 class PoseOccupiedError(Exception):

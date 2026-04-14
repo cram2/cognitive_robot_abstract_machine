@@ -44,6 +44,9 @@ logger = logging.getLogger("semantic_digital_twin")
 
 @dataclass(eq=False)
 class HasRobotPart(AggregatesRobotParts, ABC):
+    """
+    Mixin class for robots that have robot parts.
+    """
 
     @abstractmethod
     def _setup_robot_parts(self): ...
@@ -283,6 +286,8 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
             robot._setup_robot_parts()
             robot._setup_collision_rules()
             robot._setup_velocity_limits()
+        for robot_part in robot._robot_parts:
+            robot_part._robot = robot
         return robot
 
     def validate(self) -> bool:

@@ -631,25 +631,40 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
     def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
         """
         Returns the kinematic structure entities that are part of this semantic annotation.
+
+        Do not override this property. If your semantic annotation subclass has a specific way of aggregating its
+        kinematic structure entities, override the `_kinematic_structure_entities` method instead.
+
+        :returns: A list of kinematic structure entities that are part of this semantic annotation.
+        """
+        visited: Set[int] = set()
+        return self._kinematic_structure_entities(visited)
+
+    def _kinematic_structure_entities(
+        self, visited: Set[int]
+    ) -> list[KinematicStructureEntity]:
+        """
+        Returns the kinematic structure entities that are part of this semantic annotation.
          This is done by iterating over all fields of the semantic annotation and checking if they are kinematic
          structure entities or lists of kinematic structure entities.
          If a field is a semantic annotation, its kinematic structure entities are also added to the result, via the
          potentially overridden `kinematic_structure_entities` property.
 
-         ..warning::
-            if this method causes an infinite recursion, that probably means that there are public backreferences forming
-             cycles in your semantic annotations.
-            I don't think this is something we should, or need to allow, as we can always get the backreference via EQL queries.
-            Please contact @LucaKro if you encounter this problem and disagree with this decision.
-
-         :returns: A list of kinematic structure entities that are part of this semantic annotation.
+        :param visited: A set of ids of semantic annotations that have already been visited in the current chain of calls.
+        :returns: A list of kinematic structure entities that are part of this semantic annotation.
         """
+
+        if id(self) in visited:
+            return []
+        visited.add(id(self))
 
         def _resolve_item(item: Any) -> list[KinematicStructureEntity]:
             if isinstance(item, KinematicStructureEntity):
                 return [item]
             elif isinstance(item, SemanticAnnotation):
-                return item.kinematic_structure_entities
+                if id(item) in visited:
+                    return []
+                return item._kinematic_structure_entities(visited)
             else:
                 return []
 

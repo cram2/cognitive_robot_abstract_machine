@@ -10,9 +10,9 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import is_dataclass
-import sqlalchemy.types
 
 import semantic_digital_twin.adapters.procthor.procthor_resolver
+import semantic_digital_twin.adapters.sage_10k_dataset
 import semantic_digital_twin.collision_checking.collision_detector
 import semantic_digital_twin.collision_checking.collision_groups
 import semantic_digital_twin.collision_checking.collision_manager
@@ -21,24 +21,21 @@ import semantic_digital_twin.collision_checking.collision_variable_managers
 import semantic_digital_twin.orm.model
 import semantic_digital_twin.orm.ormatic_interface
 import semantic_digital_twin.reasoning.predicates
-import semantic_digital_twin.robots.robot_parts
 import semantic_digital_twin.robots.hsrb
 import semantic_digital_twin.robots.pr2
+import semantic_digital_twin.robots.robot_parts
 import semantic_digital_twin.semantic_annotations.semantic_annotations
 import semantic_digital_twin.world  # ensure the module attribute exists on the package
 import semantic_digital_twin.world_description.degree_of_freedom
 import semantic_digital_twin.world_description.geometry
 import semantic_digital_twin.world_description.shape_collection
 import semantic_digital_twin.world_description.world_entity
-from krrood.adapters.json_serializer import SubclassJSONSerializer, JSONData
+from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_module, classes_of_package
 from krrood.utils import recursive_subclasses
-from semantic_digital_twin.adapters.procthor.procthor_parser import ProcTHORParser
-import semantic_digital_twin.adapters.sage_10k_dataset
-from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.orm.model import *  # type: ignore
 from semantic_digital_twin.reasoning.predicates import ContainsType
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
@@ -95,7 +92,6 @@ def generate_orm():
         type_mappings=TypeDict(
             {
                 trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
-                JSONData: semantic_digital_twin.orm.model.JSONDataType,
             }
         ),
         alternative_mappings=alternative_mappings,

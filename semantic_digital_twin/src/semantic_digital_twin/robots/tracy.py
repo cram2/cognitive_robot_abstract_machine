@@ -44,14 +44,6 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasExternalSensors):
      Example can be found at: https://vib.ai.uni-bremen.de/page/comingsoon/the-tracebot-laboratory/
     """
 
-    def __hash__(self):
-        return hash(
-            tuple(
-                [self.__class__]
-                + sorted([kse.name for kse in self.kinematic_structure_entities])
-            )
-        )
-
     @classmethod
     def _get_robot_root_body(cls, world: World) -> Self:
         return world.get_body_by_name("table")

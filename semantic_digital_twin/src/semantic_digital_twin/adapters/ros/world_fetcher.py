@@ -161,7 +161,7 @@ def fetch_world_from_service(
     response = client.call(Trigger.Request(), timeout_sec=remaining)
     if response is None:
         raise TimeoutError(
-            f"WorldFetcher service '{chosen_service}' did not respond after {timeout_seconds} seconds"
+            f"WorldFetcher service '{chosen_service}' did not respond after {remaining} seconds"
         )
 
     # New format is an object {"modifications": [...], "state": {...}}.

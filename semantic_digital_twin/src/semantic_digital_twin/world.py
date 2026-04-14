@@ -114,7 +114,7 @@ from krrood.utils import memoize, clear_memoization_cache
 if TYPE_CHECKING:
     from semantic_digital_twin.spatial_types import GenericSpatialType
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("semantic_digital_twin")
 
 id_generator = IDGenerator()
 

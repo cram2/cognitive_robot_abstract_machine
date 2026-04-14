@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
+from typing import Set
 
 from typing_extensions import (
     TYPE_CHECKING,
@@ -30,6 +31,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     NoJointStateWithType,
     DuplicateRobotAssignmentsError,
+    MismatchingWorld,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -66,6 +68,11 @@ logger = logging.getLogger("semantic_digital_twin")
 
 @dataclass(eq=False)
 class AggregatesRobotParts(ABC):
+    """
+    Mixin for classes which can iterate through its own fields to aggregate all robot parts
+    references (including recursively).
+    """
+
     @property
     def _robot_parts(self) -> list[RobotPart]:
         """
@@ -107,6 +114,11 @@ class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
     sensors: List[Sensor] = field(default_factory=list)
     """
     A collection of sensors in the kinematic chain, such as cameras or other sensors.
+    """
+
+    _robot: Optional[AbstractRobot] = field(default=None, init=False, repr=False)
+    """
+    The robot that this robot part is assigned to.
     """
 
     @synchronized_attribute_modification
@@ -211,22 +223,6 @@ class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
             f"The field {field.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
         )
 
-    @property
-    def _robot(self) -> Optional[AbstractRobot]:
-        from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-
-        robot_variable = variable(AbstractRobot, self._world.semantic_annotations)
-        robot = (
-            a(entity(robot_variable))
-            .where(contains(robot_variable._robot_parts, self))
-            .tolist()
-        )
-        if len(robot) == 0:
-            return None
-        elif len(robot) > 1:
-            raise DuplicateRobotAssignmentsError(robot_part=self, robots=robot)
-        return robot[0]
-
 
 @dataclass(eq=False)
 class KinematicChain(RobotPart, ABC):
@@ -241,11 +237,15 @@ class KinematicChain(RobotPart, ABC):
     The tip body of the kinematic chain, which is the last body in the chain.
     """
 
-    @property
-    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
+    def _kinematic_structure_entities(
+        self, visited: Set[int]
+    ) -> list[KinematicStructureEntity]:
         """
         Returns itself as a kinematic chain of bodies.
         """
+        if id(self) in visited:
+            return []
+        visited.add(id(self))
         kinematic_structure_entities = [
             entity
             for entity in self._world.compute_chain_of_kinematic_structure_entities(
@@ -254,7 +254,9 @@ class KinematicChain(RobotPart, ABC):
         ]
 
         for sensor in self.sensors:
-            kinematic_structure_entities.extend(sensor.kinematic_structure_entities)
+            kinematic_structure_entities.extend(
+                sensor._kinematic_structure_entities(visited=visited)
+            )
 
         return kinematic_structure_entities
 
@@ -292,11 +294,15 @@ class Arm(KinematicChain):
     def add_manipulator(self, manipulator: Manipulator):
         self.manipulator = manipulator
 
-    @property
-    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
+    def _kinematic_structure_entities(
+        self, visited: Set[int]
+    ) -> list[KinematicStructureEntity]:
         """
         Returns itself as a kinematic chain of bodies.
         """
+        if id(self) in visited:
+            return []
+        visited.add(id(self))
         kinematic_structure_entities = [
             entity
             for entity in self._world.compute_chain_of_kinematic_structure_entities(
@@ -305,11 +311,13 @@ class Arm(KinematicChain):
         ]
         if self.manipulator is not None:
             kinematic_structure_entities.extend(
-                self.manipulator.kinematic_structure_entities
+                self.manipulator._kinematic_structure_entities(visited=visited)
             )
 
         for sensor in self.sensors:
-            kinematic_structure_entities.extend(sensor.kinematic_structure_entities)
+            kinematic_structure_entities.extend(
+                sensor._kinematic_structure_entities(visited=visited)
+            )
 
         return kinematic_structure_entities
 
@@ -324,9 +332,7 @@ class Arm(KinematicChain):
         sensors: List[Sensor] = None,
     ) -> Self:
         if manipulator._world is not world:
-            raise ValueError(
-                "The manipulator must be part of the given world, but it is not."
-            )
+            raise MismatchingWorld(world, manipulator._world)
         self = cls(
             name=name,
             root=world.get_body_by_name(root_name),
@@ -441,10 +447,10 @@ class ParallelGripper(Manipulator):
         thumb: Finger,
         sensors: List[Sensor] = None,
     ) -> Self:
-        if finger._world is not world or thumb._world is not world:
-            raise ValueError(
-                "The finger and thumb must be part of the given world, but they are not."
-            )
+        for part in (finger, thumb):
+            if part._world is not world:
+                raise MismatchingWorld(world, part._world)
+
         self = cls(
             name=name,
             root=world.get_body_by_name(root_name),
@@ -496,10 +502,10 @@ class HumanoidGripper(Manipulator):
         thumb: Finger,
         sensors: List[Sensor] = None,
     ) -> Self:
-        if thumb._world is not world or any(f._world is not world for f in fingers):
-            raise ValueError(
-                "The fingers and thumb must be part of the given world, but they are not."
-            )
+        for part in (thumb, *fingers):
+            if part._world is not world:
+                raise MismatchingWorld(world, part._world)
+
         self = cls(
             name=name,
             root=world.get_body_by_name(root_name),

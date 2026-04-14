@@ -293,8 +293,12 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
     def connections(self) -> list[Connection]:
         return self._world.get_connections_of_branch(self.root)
 
-    @property
-    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
+    def _kinematic_structure_entities(
+        self, visited: Set[int]
+    ) -> list[KinematicStructureEntity]:
+        if id(self) in visited:
+            return []
+        visited.add(id(self))
         return self._world.get_kinematic_structure_entities_of_branch(self.root)
 
 
@@ -480,8 +484,12 @@ class HasHinge(HasRootBody, ABC):
         )
         self.hinge = hinge
 
-    @property
-    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
+    def _kinematic_structure_entities(
+        self, visited: Set[int]
+    ) -> list[KinematicStructureEntity]:
+        if id(self) in visited:
+            return []
+        visited.add(id(self))
         kinematic_structure_entities = (
             self._world.get_kinematic_structure_entities_of_branch(self.root)
         )
@@ -516,8 +524,12 @@ class HasSlider(HasRootKinematicStructureEntity, ABC):
         )
         self.slider = slider
 
-    @property
-    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
+    def _kinematic_structure_entities(
+        self, visited: Set[int]
+    ) -> list[KinematicStructureEntity]:
+        if id(self) in visited:
+            return []
+        visited.add(id(self))
         kinematic_structure_entities = (
             self._world.get_kinematic_structure_entities_of_branch(self.root)
         )

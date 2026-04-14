@@ -1,4 +1,3 @@
-import json
 from dataclasses import dataclass, field
 from io import BytesIO
 from uuid import UUID
@@ -22,7 +21,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
     SpatialType,
 )
-from semantic_digital_twin.world import World, WorldModelManager
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import (
@@ -287,24 +286,3 @@ class TrimeshType(TypeDecorator):
             return None
         mesh = trimesh.Trimesh(**trimesh.exchange.stl.load_stl_binary(BytesIO(value)))
         return mesh
-
-
-class JSONDataType(TypeDecorator):
-    """
-    Type decorator for JSONData that stores JSON without automatic deserialization.
-
-    Unlike regular JSON columns which use the engine's custom json_deserializer
-    (that calls from_json()), this type keeps the data as raw JSON dictionaries/lists.
-    This is necessary for fields that should be deserialized later in application code.
-    """
-
-    impl = types.String
-    cache_ok = True
-
-    def process_bind_param(self, value, dialect):
-        """Store the value as-is (already JSON-serializable)."""
-        return json.dumps(value)
-
-    def process_result_value(self, value, dialect):
-        """Return the value as-is (raw JSON, not deserialized)."""
-        return json.loads(value)
