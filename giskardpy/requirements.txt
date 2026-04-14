@@ -15,4 +15,3 @@ line_profiler>=4.1.3
 urdf-parser-py>=0.0.4
 giskardpy_bullet_bindings==1.0.1
 PyQT5>=5.15.11
-json-msgs
