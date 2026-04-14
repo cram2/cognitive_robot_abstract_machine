@@ -298,6 +298,7 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
         parent = parent or self
         self.update_fields(variable, parent)
+        print("kwargs in resolve", self.kwargs.items())
         for attr_name, attr_assigned_value in self.kwargs.items():
             if isinstance(attr_assigned_value, (list, tuple)) and any(
                 isinstance(element, AbstractMatchExpression)
@@ -412,20 +413,26 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         Update the kwargs dictionary with values from this statements leaves.
         """
         for attribute_match in self.matches_with_variables:
+            print(attribute_match.assigned_variable)
             attribute_match._update_kwargs_from(self)
 
-    def _get_mapped_variable_by_name(self, name: str) -> MappedVariable:
+    def _get_mapped_variable_by_name(self, name: str) -> Optional[MappedVariable]:
         """
         Get a mapped variable by its name in the path.
         :param name: The name
         :return: The mapped variable
         """
-        [result] = [
+        result = [
             attribute_match.assigned_variable
             for attribute_match in self.matches_with_variables
             if attribute_match.name_from_variable_access_path == name
         ]
-        return result
+        if len(result) == 0:
+            return None
+        elif len(result) == 1:
+            return result[0]
+        else:
+            raise KeyError(f"Multiple variables with name {name}")
 
 
 @dataclass(eq=False)
@@ -593,7 +600,6 @@ class AttributeMatch(AbstractMatchExpression[T]):
                 self.assigned_variable._value_
             )
         else:
-
             final_step._set_child_instance_value_(
                 current_value, self.assigned_variable._value_
             )

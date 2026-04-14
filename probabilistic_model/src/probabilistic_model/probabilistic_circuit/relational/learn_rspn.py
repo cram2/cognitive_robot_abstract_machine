@@ -53,8 +53,8 @@ def get_aggregate_statistics(instance: Any) -> List[Tuple[Any, str]]:
 def get_features_of_class(
     example_instance: DataAccessObject,
     symbolic_attribute_access: Variable,
-    result=[],
-    seen: Set = set(),
+    result: List,
+    seen: Set,
 ):
     """
     Get all the class attributes of the given instance that are compatible with the supported types and return them as a list of symbolic attribute accesses.
@@ -78,6 +78,7 @@ def get_features_of_class(
         current_symbolic_attribute_access = getattr(
             symbolic_attribute_access, attribute.name
         )
+        current_symbolic_attribute_access._type_ = attribute.type.python_type
         result.append(current_symbolic_attribute_access)
 
     for part in specification.unique_parts:
@@ -88,78 +89,6 @@ def get_features_of_class(
             value, getattr(symbolic_attribute_access, part), result, seen
         )
     return result
-
-
-def fill_dataframe_with_parts(
-    df_data: Dict[str, List[float]], instances: List[Any], cls: Type, path: str = ""
-) -> Dict[str, List[float]]:
-    # if cls has an alternative mapping, use that instead
-    alternative_mapping = get_alternative_mapping(cls)
-    if alternative_mapping:
-        cls = alternative_mapping
-        new_instances = []
-        for instance in instances:
-            if instance is None:
-                new_instances.append(None)
-                continue
-            if not isinstance(instance, alternative_mapping):
-                instance = alternative_mapping.from_domain_object(instance)
-            new_instances.append(instance)
-        instances = new_instances
-
-    specification = RSPNSpecification(cls)
-    # if issubclass(cls, enum.Enum):
-    #     for instance in instances:
-    #         df_data.setdefault(cls.__name__, []).append(instance.key)
-
-    if issubclass(cls, enum.Enum):
-        for instance in instances:
-            column_name = (
-                f"{path}.{specification.spec.clazz.__name__}" if path else instance.name
-            )
-            # value = create_enum_mapping(cls)[instance.name]
-            df_data.setdefault(column_name, []).append(hash(instance.name))
-
-    for attribute in specification.attributes:
-        # create Attribute
-        column_name = f"{path}.{attribute.name}" if path else attribute.name
-        resolved_type = attribute.type_endpoint
-        if not issubclass(resolved_type, (float, int, enum.Enum, bool)):
-            continue
-        for instance in instances:
-            value = getattr(instance, attribute.name)
-
-            if value is None:
-                value = np.nan
-
-            elif isinstance(value, bool):
-                value = int(value)
-
-            elif isinstance(value, enum.Enum):
-                value = value.value
-
-            elif isinstance(value, (int, float, np.number)):
-                value = float(value)
-
-            else:
-                raise TypeError(
-                    f"Unsupported value type {type(value)} in column {column_name}: {value}"
-                )
-
-            df_data.setdefault(column_name, []).append(value)
-
-    for part in specification.unique_parts:
-        new_instances = []
-        for instance in instances:
-            if instance is None:
-                return df_data
-            new_instances.append(getattr(instance, part.public_name))
-        new_path = f"{path}.{part.public_name}" if path else part.public_name
-        df_data = fill_dataframe_with_parts(
-            df_data, new_instances, part.type_endpoint, new_path
-        )
-
-    return df_data
 
 
 def LearnRSPN(cls: Any, instances: List[DataAccessObject]) -> RSPNTemplate:
@@ -192,7 +121,7 @@ def LearnRSPN(cls: Any, instances: List[DataAccessObject]) -> RSPNTemplate:
 class FeatureExtractor:
     features: List[MappedVariable]
 
-    def apply_mapping(self, instance: Any) -> List[Union[*compatible_types]]:
+    def apply_mapping(self, instance: Any) -> List:
         return [
             feature.apply_mapping_on_external_root(instance)
             for feature in self.features

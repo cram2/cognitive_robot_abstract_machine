@@ -29,6 +29,7 @@ from ..dataset.example_classes import (
     Atom,
     Element,
 )
+from ..dataset.ormatic_interface import *  # type: ignore
 
 
 def test_selective_query_multiple_backends(session, database):

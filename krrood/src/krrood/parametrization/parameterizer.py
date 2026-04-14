@@ -22,6 +22,7 @@ from probabilistic_model.probabilistic_circuit.relational.learn_rspn import (
 )
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.set import Set
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -70,12 +71,11 @@ class UnderspecifiedParameters:
         for attribute_match in self.statement.matches_with_variables:
             name = attribute_match.name_from_variable_access_path
 
+            # print(
+            #     attribute_match.assigned_value,
+            #     isinstance(attribute_match.assigned_value, SymbolicExpression),
+            # )
             if isinstance(attribute_match.assigned_value, SymbolicExpression):
-                random_events_variable = random_events.variable.Symbolic(
-                    name=name,
-                    domain=Set.from_iterable(attribute_match.assigned_value.tolist()),
-                )
-                # result[random_events_variable.name] = random_events_variable
                 features = get_features_of_class(
                     to_dao(attribute_match.assigned_value.tolist()[0]),
                     attribute_match.variable,
@@ -85,15 +85,15 @@ class UnderspecifiedParameters:
                 extractor = FeatureExtractor(features)
 
                 for feature in extractor.features:
-                    random_events_variable = random_events.variable.Symbolic(
-                        name=feature._name_,
-                        domain=Set.from_iterable(
-                            attribute_match.assigned_value.tolist()
-                        ),
+                    random_events_variable = (
+                        random_events.variable.variable_from_name_and_type(
+                            name=feature._name_, type_=feature._type_
+                        )
                     )
-                    print(random_events_variable)
                     result[random_events_variable.name] = random_events_variable
-                continue
+                    continue
+            # print(attribute_match.assigned_variable._type_)
+            # print(attribute_match.assigned_variable)
             if attribute_match.assigned_variable._type_ is None or not issubclass(
                 attribute_match.assigned_variable._type_,
                 random_events.variable.compatible_types,
@@ -106,6 +106,37 @@ class UnderspecifiedParameters:
 
             result[random_events_variable.name] = random_events_variable
         return result
+
+    # @cached_property
+    # def variables(self) -> Dict[str, random_events.variable.Variable]:
+    #     """
+    #     :return: A dictionary that maps variable names to random events variables that appear in
+    #     the `where` or `Match` statement.
+    #     """
+    #     result = {v.name: v for v in self._random_event_compiler.variables.values()}
+    #
+    #     for attribute_match in self.statement.matches_with_variables:
+    #         name = attribute_match.name_from_variable_access_path
+    #
+    #         if isinstance(attribute_match.assigned_value, SymbolicExpression):
+    #             random_events_variable = random_events.variable.Symbolic(
+    #                 name=name,
+    #                 domain=Set.from_iterable(attribute_match.assigned_value.tolist()),
+    #             )
+    #             result[random_events_variable.name] = random_events_variable
+    #             continue
+    #         if attribute_match.assigned_variable._type_ is None or not issubclass(
+    #             attribute_match.assigned_variable._type_,
+    #             random_events.variable.compatible_types,
+    #         ):
+    #             continue
+    #
+    #         random_events_variable = random_events.variable.variable_from_name_and_type(
+    #             name, attribute_match.assigned_variable._type_
+    #         )
+    #
+    #         result[random_events_variable.name] = random_events_variable
+    #     return result
 
     @property
     def assignments_for_conditioning(
@@ -138,11 +169,15 @@ class UnderspecifiedParameters:
         :param sample: A sample from the same model-
         :return: The instance
         """
-
-        for variable_, value in zip(variables, sample):
+        sample_mapping = dict(zip(variables, sample))
+        for variable_, value in sample_mapping.items():
+            #   print(variable_, value)
+            #    print("matches", list(self.statement.matches_with_variables))
             mapped_variable = self.statement._get_mapped_variable_by_name(
                 variable_.name
             )
+            if mapped_variable is None:
+                continue
 
             if not variable_.is_numeric:
                 [value] = [
@@ -153,6 +188,32 @@ class UnderspecifiedParameters:
             else:
                 value = value.item()
             mapped_variable._value_ = value
+
+        # print(self.statement.kwargs.items())
+        # for variable in self.statement.matches_with_variables:
+        #     if variable.name_from_variable_access_path not in [
+        #         variable.name for variable in variables
+        #     ]:
+        #         mapped_variable = self.statement._get_mapped_variable_by_name(
+        #             variable.name_from_variable_access_path
+        #         )
+        #         random_events_variable = (
+        #             random_events.variable.variable_from_name_and_type(
+        #                 name=variable.assigned_variable._name_, type_=Body
+        #             )
+        #         )
+        #         value = (
+        #             sample_mapping[random_events_variable]
+        #             if random_events_variable.is_numeric
+        #             else [
+        #                 domain_value.element
+        #                 for domain_value in random_events_variable.domain
+        #                 if hash(domain_value) == sample_mapping[random_events_variable]
+        #             ][0]
+        #         )
+        #         print(value)
+        #         print(variable)
+        #         mapped_variable._value_ = value
 
         self.statement._update_kwargs_from_literal_values()
         result = self.statement.construct_instance()
