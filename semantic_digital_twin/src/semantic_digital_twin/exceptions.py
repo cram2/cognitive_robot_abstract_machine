@@ -459,7 +459,14 @@ class WorldEntityNotFoundError(UsageError):
 
 @dataclass
 class MissingDefaultCameraError(UsageError):
+    """
+    Raised when trying to access the default camera of a robot that does not have a default camera.
+    """
+
     robot: Type[AbstractRobot]
+    """
+    The robot that does not have a default camera.
+    """
 
     def __post_init__(self):
         self.message = f"Robot {self.robot.name} does not have a default camera."
@@ -467,6 +474,9 @@ class MissingDefaultCameraError(UsageError):
 
 @dataclass
 class MissingWorldError(UsageError):
+    """
+    Raised when trying to access a world that is None, but a world is required for the operation.
+    """
 
     def __post_init__(self):
         self.message = f"The world you are trying to access is None."
