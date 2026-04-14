@@ -442,6 +442,7 @@ class HasApertures(HasRootBody, ABC):
 
         :param aperture: The aperture whose geometry should be removed.
         """
+
         world = self._world
         world.update_forward_kinematics()
         hole_event = aperture.root.area.as_bounding_box_collection_in_frame(
@@ -454,6 +455,7 @@ class HasApertures(HasRootBody, ABC):
         new_bounding_box_collection = BoundingBoxCollection.from_event(
             self.root, new_wall_event
         ).as_shapes()
+
         self.root.collision = new_bounding_box_collection
         self.root.visual = new_bounding_box_collection
 

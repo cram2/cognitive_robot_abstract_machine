@@ -160,9 +160,9 @@ class VerticalAlignment(Grasp, Enum):
      that axis.
     """
 
+    NoAlignment = (AxisIdentifier.Undefined, 0)
     TOP = (AxisIdentifier.Z, -1)
     BOTTOM = (AxisIdentifier.Z, 1)
-    NoAlignment = (AxisIdentifier.Undefined, 0)
 
 
 class GripperType(Enum):

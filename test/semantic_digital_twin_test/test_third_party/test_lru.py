@@ -1,5 +1,7 @@
 from functools import lru_cache
 
+from krrood.utils import memoize
+
 
 def test_automatic_lru_clearing():
 

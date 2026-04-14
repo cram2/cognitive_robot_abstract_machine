@@ -36,7 +36,7 @@ from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_module, classes_of_package
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.adapters.procthor.procthor_parser import ProcTHORParser
-
+import semantic_digital_twin.adapters.sage_10k_dataset
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.orm.model import *  # type: ignore
 from semantic_digital_twin.reasoning.predicates import ContainsType
@@ -54,6 +54,7 @@ from semantic_digital_twin.world import (
 all_classes = set(classes_of_package(semantic_digital_twin))
 all_classes -= set(classes_of_module(semantic_digital_twin.orm.ormatic_interface))
 all_classes -= set(classes_of_package(semantic_digital_twin.adapters))
+all_classes |= set(classes_of_package(semantic_digital_twin.adapters.sage_10k_dataset))
 # remove classes that should not be mapped
 all_classes -= {
     ResetStateContextManager,

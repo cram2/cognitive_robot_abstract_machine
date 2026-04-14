@@ -24,6 +24,7 @@ from krrood.entity_query_language.factories import (
     a,
     the,
 )
+
 from krrood.entity_query_language.exceptions import (
     MultipleSolutionFound,
     UnsupportedNegation,

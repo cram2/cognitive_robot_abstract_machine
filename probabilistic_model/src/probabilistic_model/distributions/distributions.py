@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 import plotly.graph_objects as go
@@ -21,9 +21,7 @@ from probabilistic_model.utils import MissingDict, interval_as_array
 
 
 @dataclass
-class UnivariateDistribution(
-    ProbabilisticModel
-):
+class UnivariateDistribution(ProbabilisticModel):
     """
     Abstract Base class for Univariate distributions.
     """
@@ -649,7 +647,9 @@ class DiracDeltaDistribution(ContinuousDistribution):
         return f"δ({self.variable.name})"
 
     def __copy__(self):
-        return self.__class__(variable=self.variable, location=self.location, density_cap=self.density_cap)
+        return self.__class__(
+            variable=self.variable, location=self.location, density_cap=self.density_cap
+        )
 
     def __deepcopy__(self, memo=None):
         if memo is None:

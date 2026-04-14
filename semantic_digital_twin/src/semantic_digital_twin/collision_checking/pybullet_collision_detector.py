@@ -3,7 +3,7 @@ import logging
 import os
 import tempfile
 from dataclasses import dataclass, field
-from functools import lru_cache
+from krrood.utils import memoize, clear_memoization_cache
 from pathlib import Path
 from typing import Dict
 from typing import List, Tuple, Optional
@@ -306,12 +306,12 @@ class BulletCollisionDetector(CollisionDetector):
         self.body_to_bullet_object[body] = o
 
     def reset_cache(self):
-        self.collision_matrix_to_bullet_query.cache_clear()
+        clear_memoization_cache(self)
 
     def __hash__(self):
         return hash(id(self))
 
-    @lru_cache(maxsize=100)
+    @memoize
     def collision_matrix_to_bullet_query(
         self, collision_matrix: CollisionMatrix
     ) -> Optional[Dict[Tuple[bullet.CollisionObject, bullet.CollisionObject], float]]:

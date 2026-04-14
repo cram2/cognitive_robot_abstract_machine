@@ -3,13 +3,14 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+import shutil
 import tempfile
-import weakref
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from functools import cached_property
 
+from plyfile import PlyData
 import numpy as np
 import trimesh
 import trimesh.exchange.stl
@@ -250,7 +251,7 @@ class Scale:
     def to_bounding_box(self) -> BoundingBox:
         min_point = Point3(-self.x / 2, -self.y / 2, -self.z / 2)
         max_point = Point3(self.x / 2, self.y / 2, self.z / 2)
-        return BoundingBox.from_min_max(min_point, max_point)
+        return BoundingBox.from_min_max(min_point, max_point, None)
 
     def to_np(self) -> np.ndarray:
         return np.array([self.x, self.y, self.z])
@@ -356,10 +357,12 @@ class Mesh(Shape):
     def to_json(self) -> Dict[str, Any]:
         # Serialize the raw (unscaled, unprocessed) mesh geometry and the scale separately
         base_mesh = trimesh.load_mesh(self.filename, process=False)
+        file_type = self.filename.split(".")[-1]
         return {
             **super().to_json(),
             "mesh": base_mesh.to_dict(),
             "scale": to_json(self.scale),
+            "file_type": file_type,
         }
 
     @classmethod
@@ -372,7 +375,10 @@ class Mesh(Shape):
         )
         origin = from_json(data["origin"], **kwargs)
         scale = from_json(data["scale"], **kwargs)
-        return cls.from_trimesh(mesh=mesh, origin=origin, scale=scale)
+        file_type = data["file_type"]
+        return cls.from_trimesh(
+            mesh=mesh, origin=origin, scale=scale, file_type=file_type
+        )
 
     @classmethod
     def add_uv(cls, mesh: trimesh.Trimesh, uv: np.ndarray) -> trimesh.Trimesh:
@@ -439,6 +445,51 @@ class Mesh(Shape):
         return file_mesh
 
     @classmethod
+    def from_ply_file(
+        cls,
+        ply_file_path: str,
+        texture_file_path: Optional[str] = None,
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        scale: Optional[Scale] = None,
+    ) -> Mesh:
+        """
+        Create a Mesh from a PLY file path and an optional texture file path.
+        Ply files are not supported by RViz2, so we need to convert them to OBJ files with the textures intact.
+        """
+        texture_image = Image.open(texture_file_path)
+        ply_file = PlyData.read(ply_file_path)
+        # Raw data
+        vertices = np.stack(
+            [ply_file["vertex"]["x"], ply_file["vertex"]["y"], ply_file["vertex"]["z"]],
+            axis=-1,
+        )
+
+        texture_coordinates = np.stack(
+            [ply_file["texcoord"]["s"], ply_file["texcoord"]["t"]], axis=-1
+        )
+
+        faces = np.stack([np.array(f["vertex_indices"]) for f in ply_file["face"]])
+        texture_coordinate_indices = np.stack(
+            [np.array(f["texcoord_indices"]) for f in ply_file["face"]]
+        )
+
+        # Build per-vertex UV by unpacking face-corner UVs
+        # texture_coordinate_indices[f, c] -> index into texture_coordinates for face f, corner c
+        uv_per_corner = texture_coordinates[texture_coordinate_indices]
+
+        vertices_unindexed = vertices[faces.reshape(-1)]
+        uv_unindexed = uv_per_corner.reshape(-1, 2)
+        faces_new = np.arange(len(vertices_unindexed)).reshape(-1, 3)
+
+        mesh = trimesh.Trimesh(
+            vertices=vertices_unindexed,
+            faces=faces_new,
+            visual=trimesh.visual.TextureVisuals(uv=uv_unindexed, image=texture_image),
+        )
+
+        return Mesh.from_trimesh(mesh=mesh, origin=origin, scale=scale, file_type="obj")
+
+    @classmethod
     def from_trimesh(
         cls,
         mesh: trimesh.Trimesh,
@@ -447,8 +498,9 @@ class Mesh(Shape):
         uv: Optional[np.ndarray] = None,
         texture_file_path: Optional[str] = None,
         dirname: str = "/tmp",
-        file_type: str = "stl",
+        file_type: str = "obj",
     ) -> "Mesh":
+        file_type = file_type.lower()
         if origin is None:
             origin = HomogeneousTransformationMatrix()
         if scale is None:
@@ -458,44 +510,14 @@ class Mesh(Shape):
         if texture_file_path is not None:
             mesh = cls.add_texture(mesh=mesh, texture_file_path=texture_file_path)
 
-        # Capture path immediately and close handle before trimesh opens the file
-        with tempfile.NamedTemporaryFile(
-            dir=dirname, suffix=f".{file_type}", delete=False
-        ) as tmp:
-            tmp_path = tmp.name
+        # Each export gets its own subdir so material.mtl files never collide
+        subdir = tempfile.mkdtemp(dir=dirname)
+        tmp_path = os.path.join(subdir, f"mesh.{file_type}")
 
         try:
-            if file_type == "obj":
-                mesh.export(tmp_path, file_type="obj")
-
-                old_mtl_file = "material.mtl"
-                new_mtl_file = f"{os.path.basename(tmp_path)}.mtl"
-                old_mtl = os.path.join(dirname, old_mtl_file)
-                new_mtl = os.path.join(dirname, new_mtl_file)
-
-                if os.path.exists(old_mtl):
-                    os.rename(old_mtl, new_mtl)
-
-                with open(tmp_path) as f:
-                    text = f.read()
-                text = text.replace(old_mtl_file, new_mtl_file)
-                with open(tmp_path, "w") as f:
-                    f.write(text)
-
-            elif file_type == "stl":
-                mesh.export(tmp_path, file_type="stl")
-
-            else:
-                raise ValueError(f"Unsupported file type: {file_type}")
-
+            mesh.export(tmp_path, file_type=file_type)
         except Exception:
-            # Clean up temp files on failure so nothing is orphaned
-            for path in [
-                tmp_path,
-                os.path.join(dirname, f"{os.path.basename(tmp_path)}.mtl"),
-            ]:
-                if os.path.exists(path):
-                    os.remove(path)
+            shutil.rmtree(subdir, ignore_errors=True)
             raise
 
         instance = cls(
@@ -504,26 +526,21 @@ class Mesh(Shape):
             filename=tmp_path,
         )
 
-        # Tie file lifetime to the Mesh instance
-        weakref.finalize(instance, cls._cleanup_temp_files, tmp_path, dirname)
+        # # Tie file lifetime to the Mesh instance TODO luca wants to find a way for this to work with rviz (atexit)
+        # weakref.finalize(instance, cls._cleanup_temp_dir, subdir)
 
         return instance
 
     @staticmethod
-    def _cleanup_temp_files(tmp_path: str, dirname: str) -> None:
+    def _cleanup_temp_dir(subdir: str) -> None:
         """
-        Clean up temporary files created for the mesh.
+        Clean up the temporary subdirectory created for the mesh.
         """
-        for path in [
-            tmp_path,
-            os.path.join(dirname, f"{os.path.basename(tmp_path)}.mtl"),
-        ]:
-            logger.debug(f"Cleaning up temporary file: {path}")
-            try:
-                if os.path.exists(path):
-                    os.remove(path)
-            except OSError:
-                pass
+        logger.debug(f"Cleaning up temporary directory: {subdir}")
+        try:
+            shutil.rmtree(subdir, ignore_errors=True)
+        except OSError:
+            pass
 
     @classmethod
     def from_vertices_and_faces(
@@ -627,6 +644,41 @@ class Mesh(Shape):
             mesh=hull,
             origin=HomogeneousTransformationMatrix(reference_frame=reference_frame),
         )
+
+    @classmethod
+    def project_texture_coordinates(
+        cls,
+        mesh: trimesh.Trimesh,
+        projection_axis: np.ndarray,
+        scale: np.ndarray,
+    ) -> trimesh.Trimesh:
+        """
+        Generate texture coordinates by projecting vertices along an axis and normalizing by scale.
+        This prepares the mesh for rendering with a texture map using
+        `UV mapping <https://en.wikipedia.org/wiki/UV_mapping>`_.
+
+        :param mesh: The mesh to apply UVs to.
+        :param projection_axis: A (3,) array representing the axis to project along (e.g., [0, 0, 1] for Z).
+        :param scale: A (3,) array for normalizing the UV coordinates (e.g., dimensions of the box).
+        :return: A new mesh with UV coordinates and expanded vertices.
+        """
+        # Expand vertices for each face corner
+        faces = mesh.faces.reshape(-1)
+        vertices = mesh.vertices[faces]
+
+        # Identify the two axes perpendicular to the projection axis
+        # This is a simplified version for axis-aligned projections (X, Y, or Z)
+        axes = np.where(projection_axis == 0)[0]
+        if len(axes) != 2:
+            # Fallback or more complex logic for non-axis-aligned projections could go here
+            axes = [0, 1] if projection_axis[2] != 0 else [0, 2]
+
+        # Calculate UVs by projecting and normalizing
+        uv = np.zeros((len(vertices), 2))
+        uv[:, 0] = (vertices[:, axes[0]] / scale[axes[0]]) + 0.5
+        uv[:, 1] = (vertices[:, axes[1]] / scale[axes[1]]) + 0.5
+
+        return cls.add_uv(mesh=mesh, uv=uv)
 
 
 @dataclass(eq=False)
@@ -780,32 +832,32 @@ class Box(Shape):
 class BoundingBox:
     min_x: float
     """
-    The minimum x-coordinate of the bounding box.
+    The minimum x-coordinate of the bounding box, relative to the origin.
     """
 
     min_y: float
     """
-    The minimum y-coordinate of the bounding box.
+    The minimum y-coordinate of the bounding box, relative to the origin.
     """
 
     min_z: float
     """
-    The minimum z-coordinate of the bounding box.
+    The minimum z-coordinate of the bounding box, relative to the origin.
     """
 
     max_x: float
     """
-    The maximum x-coordinate of the bounding box.
+    The maximum x-coordinate of the bounding box, relative to the origin.
     """
 
     max_y: float
     """
-    The maximum y-coordinate of the bounding box.
+    The maximum y-coordinate of the bounding box, relative to the origin.
     """
 
     max_z: float
     """
-    The maximum z-coordinate of the bounding box.
+    The maximum z-coordinate of the bounding box, relative to the origin.
     """
 
     origin: HomogeneousTransformationMatrix
@@ -825,7 +877,10 @@ class BoundingBox:
         :return: The x interval of the bounding box.
         """
         return SimpleInterval.from_data(
-            self.min_x, self.max_x, Bound.CLOSED, Bound.CLOSED
+            float(self.origin.x + self.min_x),
+            float(self.origin.x + self.max_x),
+            Bound.CLOSED,
+            Bound.CLOSED,
         )
 
     @property
@@ -834,7 +889,10 @@ class BoundingBox:
         :return: The y interval of the bounding box.
         """
         return SimpleInterval.from_data(
-            self.min_y, self.max_y, Bound.CLOSED, Bound.CLOSED
+            float(self.origin.y + self.min_y),
+            float(self.origin.y + self.max_y),
+            Bound.CLOSED,
+            Bound.CLOSED,
         )
 
     @property
@@ -843,7 +901,10 @@ class BoundingBox:
         :return: The z interval of the bounding box.
         """
         return SimpleInterval.from_data(
-            self.min_z, self.max_z, Bound.CLOSED, Bound.CLOSED
+            float(self.origin.z + self.min_z),
+            float(self.origin.z + self.max_z),
+            Bound.CLOSED,
+            Bound.CLOSED,
         )
 
     @property
@@ -917,11 +978,14 @@ class BoundingBox:
         return self.simple_event.contains((x, y, z))
 
     @classmethod
-    def from_simple_event(cls, simple_event: SimpleEvent):
+    def from_simple_event(
+        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+    ) -> List[Self]:
         """
         Create a list of bounding boxes from a simple random event.
 
         :param simple_event: The random event.
+        :param origin: The origin of the intersection.
         :return: The list of bounding boxes.
         """
         result = []
@@ -930,7 +994,9 @@ class BoundingBox:
             simple_event[SpatialVariables.y.value].simple_sets,
             simple_event[SpatialVariables.z.value].simple_sets,
         ):
-            result.append(cls(x.lower, y.lower, z.lower, x.upper, y.upper, z.upper))
+            result.append(
+                cls(x.lower, y.lower, z.lower, x.upper, y.upper, z.upper, origin)
+            )
         return result
 
     def intersection_with(self, other: BoundingBox) -> Optional[BoundingBox]:
@@ -940,10 +1006,11 @@ class BoundingBox:
         :param other: The other bounding box.
         :return: The intersection of the two bounding boxes or None if they do not intersect.
         """
-        result = self.simple_event.intersection_with(other.simple_event)
+        other_in_same_frame = other.transform_to_origin(self.origin)
+        result = self.simple_event.intersection_with(other_in_same_frame.simple_event)
         if result.is_empty():
             return None
-        return self.__class__.from_simple_event(result)[0]
+        return self.__class__.from_simple_event(result, self.origin)[0]
 
     def enlarge(
         self,
@@ -1016,7 +1083,12 @@ class BoundingBox:
         ]
 
     @classmethod
-    def from_min_max(cls, min_point: Point3, max_point: Point3) -> Self:
+    def from_min_max(
+        cls,
+        min_point: Point3,
+        max_point: Point3,
+        origin: HomogeneousTransformationMatrix,
+    ) -> Self:
         """
         Set the axis-aligned bounding box from a minimum and maximum point.
 
@@ -1026,13 +1098,7 @@ class BoundingBox:
         assert (
             min_point.reference_frame == max_point.reference_frame
         ), "The reference frames of the minimum and maximum points must be the same."
-        return cls(
-            *min_point.to_np()[:3],
-            *max_point.to_np()[:3],
-            origin=HomogeneousTransformationMatrix(
-                reference_frame=min_point.reference_frame
-            ),
-        )
+        return cls(*min_point.to_np()[:3], *max_point.to_np()[:3], origin=origin)
 
     def as_shape(self) -> Box:
         scale = Scale(
@@ -1040,9 +1106,9 @@ class BoundingBox:
             y=self.max_y - self.min_y,
             z=self.max_z - self.min_z,
         )
-        x = (self.max_x + self.min_x) / 2
-        y = (self.max_y + self.min_y) / 2
-        z = (self.max_z + self.min_z) / 2
+        x = (self.max_x + self.min_x) / 2 + float(self.origin.x)
+        y = (self.max_y + self.min_y) / 2 + float(self.origin.y)
+        z = (self.max_z + self.min_z) / 2 + float(self.origin.z)
         origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x, y, z, 0, 0, 0, self.origin.reference_frame
         )
@@ -1054,15 +1120,16 @@ class BoundingBox:
         """
         Transform the bounding box to a different reference frame.
         """
-        origin_T_self_np = self.origin.to_np()
-        origin_frame = self.origin.reference_frame
-        world = origin_frame._world
-
-        reference_T_origin_np = world.compute_forward_kinematics_np(
-            reference_T_new_origin.reference_frame, origin_frame
+        reference_T_new_origin = HomogeneousTransformationMatrix(
+            data=reference_T_new_origin.to_np(),
+            reference_frame=reference_T_new_origin.reference_frame,
         )
 
-        reference_T_self_np: np.ndarray = reference_T_origin_np @ origin_T_self_np
+        new_origin_reference_T_self = self.origin.reference_frame._world.transform(
+            self.origin, reference_T_new_origin.reference_frame
+        )
+
+        self_T_new_pose = reference_T_new_origin.inverse() @ new_origin_reference_T_self
 
         # Get all 8 corners of the BB in link-local space
         list_self_T_corner = [
@@ -1073,14 +1140,15 @@ class BoundingBox:
         ]  # shape (8, 3)
 
         list_reference_T_corner = [
-            reference_T_self_np @ self_T_corner for self_T_corner in list_self_T_corner
+            self_T_new_pose.to_np() @ self_T_corner
+            for self_T_corner in list_self_T_corner
         ]
 
         list_reference_P_corner = [
             reference_T_corner[:3, 3:] for reference_T_corner in list_reference_T_corner
         ]
 
-        # Compute world-space bounding box from transformed corners
+        # Compute new corner points
         min_corner = np.min(list_reference_P_corner, axis=0)
         max_corner = np.max(list_reference_P_corner, axis=0)
 
@@ -1091,6 +1159,7 @@ class BoundingBox:
             Point3.from_iterable(
                 max_corner, reference_frame=reference_T_new_origin.reference_frame
             ),
+            reference_T_new_origin,
         )
 
         return world_bb
