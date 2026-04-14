@@ -4,6 +4,9 @@ import time
 import pytest
 
 from krrood.entity_query_language.backends import ProbabilisticBackend
+from llmr.backend import LLMBackend
+from llmr.schemas.slots import ActionReasoningOutput, SlotValue
+from pycram.datastructures.enums import ApproachDirection, VerticalAlignment
 from krrood.entity_query_language.factories import (
     variable_from,
     underspecified,
@@ -430,6 +433,100 @@ def test_parameterization_of_pick_up(mutable_model_world):
     )
 
     plan = execute_single(pick_up_description, context)
+
+    with simulated_robot:
+        try:
+            plan.perform()
+        except MotionDidNotFinish:
+            pass
+
+
+def test_parameterization_of_pick_up_with_llm_backend(mutable_model_world):
+    """Mirror of test_parameterization_of_pick_up, but resolves the free slots
+    via LLMBackend (llmr) instead of ProbabilisticBackend.
+
+    A ScriptedLLM is used so the test runs fully offline — no API key needed.
+    The scripted response fills the four free slots of the PickUpAction:
+      - arm                             → LEFT
+      - grasp_description.approach_direction  → FRONT
+      - grasp_description.vertical_alignment  → TOP
+      - grasp_description.rotate_gripper      → False
+    """
+    from langchain_core.language_models import BaseChatModel
+    from pydantic import BaseModel, ConfigDict, PrivateAttr
+    from langchain_core.messages import AIMessage
+    from langchain_core.outputs import ChatGeneration, ChatResult
+    from langchain_core.runnables import RunnableLambda
+
+    class ScriptedLLM(BaseChatModel):
+        """Deterministic offline LLM — returns pre-built Pydantic instances."""
+        model_config = ConfigDict(arbitrary_types_allowed=True)
+        responses: list
+        _idx: int = PrivateAttr(default=0)
+
+        @property
+        def _llm_type(self) -> str:
+            return "scripted-llm"
+
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            obj = self.responses[self._idx % len(self.responses)]
+            self._idx += 1
+            return ChatResult(generations=[ChatGeneration(message=AIMessage(content=obj.model_dump_json()))])
+
+        def with_structured_output(self, schema, **kwargs):
+            responses = self.responses
+            idx = [self._idx]
+            def _invoke(messages, **kw):
+                obj = responses[idx[0] % len(responses)]
+                idx[0] += 1
+                return obj
+            return RunnableLambda(_invoke)
+
+    world, robot_view, context = mutable_model_world
+    context.evaluate_conditions = False
+
+    milk = world.get_body_by_name("milk.stl")
+    milk_variable = variable_from([milk])
+
+    pick_up_description = underspecified(PickUpAction)(
+        object_designator=milk_variable,
+        arm=...,
+        grasp_description=underspecified(GraspDescription)(
+            approach_direction=...,
+            vertical_alignment=...,
+            rotate_gripper=...,
+            manipulation_offset=0.05,
+            manipulator=variable(Manipulator, world.semantic_annotations),
+        ),
+    )
+    pick_up_description.resolve()
+
+    # Scripted response: fills all four free slots the LLMBackend will encounter
+    scripted_response = ActionReasoningOutput(
+        action_type="PickUpAction",
+        overall_reasoning="Picking up the milk from the table with the left arm.",
+        slots=[
+            SlotValue(field_name="arm", value="LEFT",
+                      reasoning="Left arm is free and closer to the object."),
+            SlotValue(field_name="approach_direction", value="FRONT",
+                      reasoning="Approaching from the front gives clear line of sight."),
+            SlotValue(field_name="vertical_alignment", value="TOP",
+                      reasoning="Grasping from the top is stable for cylindrical objects."),
+            SlotValue(field_name="rotate_gripper", value="False",
+                      reasoning="No rotation needed for upright cylindrical object."),
+        ],
+    )
+
+    llm = ScriptedLLM(responses=[scripted_response])
+
+    context.query_backend = LLMBackend(
+        llm=llm,
+        instruction="pick up the milk",
+    )
+
+    plan = execute_single(pick_up_description, context)
+
+    assert plan is not None
 
     with simulated_robot:
         try:

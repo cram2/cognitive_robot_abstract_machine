@@ -1,34 +1,27 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "llm-reasoner"
+name = "llmr"
 version = "0.1.0"
-description = "LLM-based generative backend for NL → PartialDesignator → FullAction resolution"
+description = """
+LLM-powered GenerativeBackend for KRROOD.
+Resolves underspecified PyCRAM action Match expressions via LLM reasoning
+rather than probabilistic sampling or deterministic EQL lookup.
+Dependency direction: llmr -> krrood (krrood has zero knowledge of us).
+"""
 requires-python = ">=3.10"
 dependencies = [
-    "pydantic>=2.0",
-    "langchain-openai>=0.1",
-    "langchain-ollama>=0.1",
-    "langgraph>=0.1",
-    "python-dotenv",
-    "typing_extensions",
+    "langchain-core>=0.2.0",
+    "pydantic>=2.0.0",
+    "typing_extensions>=4.0.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio"]
+openai  = ["langchain-openai>=0.1.0"]
+ollama  = ["langchain-ollama>=0.1.0"]
+dev     = ["pytest", "pytest-asyncio"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.black]
-line-length = 99
-target-version = ["py310", "py311", "py312"]
-
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["../test/llmr_test"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
