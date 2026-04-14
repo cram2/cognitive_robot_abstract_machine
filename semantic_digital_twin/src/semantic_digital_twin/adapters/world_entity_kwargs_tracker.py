@@ -98,7 +98,7 @@ class WorldEntityWithIDKwargsTracker:
         try:
             self.get_world_entity_with_id(id)
             return True
-        except WorldEntityWithIDNotInKwargs:
+        except (WorldEntityWithIDNotInKwargs, MissingWorldError):
             return False
 
     def get_world_entity_with_id(self, id: UUID) -> WorldEntityWithID:

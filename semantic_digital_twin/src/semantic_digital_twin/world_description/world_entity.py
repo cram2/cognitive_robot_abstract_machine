@@ -44,6 +44,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     ReferenceFrameMismatchError,
     WorldEntityWithIDNotInKwargs,
+    MissingWorldError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -232,10 +233,6 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
 
         if isinstance(obj, uuid.UUID):
             obj = from_json(data, **kwargs)
-            try:
-                state.get_world_entity_with_id(obj)
-            except WorldEntityWithIDNotInKwargs:
-                ...
             return state.get_world_entity_with_id(obj)
         else:
             return obj

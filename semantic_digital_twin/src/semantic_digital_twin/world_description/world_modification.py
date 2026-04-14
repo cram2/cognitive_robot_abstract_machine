@@ -362,10 +362,7 @@ class WorldModelModificationBlock:
 
     def apply(self, world: World):
         for modification in self.modifications:
-            try:
-                modification.apply(world)
-            except WorldEntityWithIDNotFoundError as e:
-                ...
+            modification.apply(world)
 
     def update_references_for_world_and_apply(self, world: World):
         """
@@ -452,7 +449,7 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
     The UUID of the entity that was updated.
     """
 
-    updated_kwargs_json_list: List[JSONData]
+    updated_kwargs_json_list: List[JSONAttributeDiff]
     """
     The list of attribute names and their new values.
     """
@@ -461,32 +458,36 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
     def from_kwargs(cls, kwargs: Dict[str, Any]):
         return cls(
             from_json(kwargs["entity_id"], **kwargs),
-            kwargs["updated_kwargs"],
+            from_json(kwargs["updated_kwargs"], **kwargs),
         )
 
     def apply(self, world: World):
         tracker = WorldEntityWithIDKwargsTracker.from_world(world)
         kwargs = tracker.create_kwargs()
-        updated_kwargs = from_json(self.updated_kwargs_json_list, **kwargs)
         entity = world.get_world_entity_with_id_by_id(self.entity_id)
-        for diff in updated_kwargs:
+        for diff in self.updated_kwargs_json_list:
             current_value = getattr(entity, diff.attribute_name)
             if isinstance(current_value, list_like_classes):
-                self._apply_to_list(world, current_value, diff)
+                self._apply_to_list(current_value, diff, **kwargs)
             else:
-                obj = self._resolve_item(world, diff.added_values[0])
+                obj = self._resolve_item(
+                    world, from_json(diff.added_values[0], **kwargs)
+                )
                 setattr(entity, diff.attribute_name, obj)
         world._model_manager.current_model_modification_block.append(self)
 
     def _apply_to_list(
-        self, world: World, current_value: List[Any], diff: JSONAttributeDiff
+        self, current_value: List[Any], diff: JSONAttributeDiff, **kwargs
     ):
-        for raw in diff.removed_values:
+        world = kwargs["__world_entity_tracker"]._world
+        for raw_json in diff.removed_values:
+            raw = from_json(raw_json, **kwargs)
             obj = self._resolve_item(world, raw)
             if obj in current_value:
                 current_value.remove(obj)
 
-        for raw in diff.added_values:
+        for raw_json in diff.added_values:
+            raw = from_json(raw_json, **kwargs)
             obj = self._resolve_item(world, raw)
             if obj not in current_value:
                 current_value.append(obj)

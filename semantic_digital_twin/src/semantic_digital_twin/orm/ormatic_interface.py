@@ -97,7 +97,7 @@ from krrood.ormatic.custom_types import TypeType
 class Base(DeclarativeBase):
     type_mappings = {
         trimesh.base.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
-        krrood.adapters.json_serializer.JSONData: sqlalchemy.sql.sqltypes.JSON,
+        krrood.adapters.json_serializer.JSONData: semantic_digital_twin.orm.model.JSONDataType,
         typing.Type: krrood.ormatic.custom_types.TypeType,
         enum.Enum: krrood.ormatic.custom_types.PolymorphicEnumType,
         krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
@@ -10108,7 +10108,9 @@ class AddSemanticAnnotationModificationDAO(
 
     semantic_annotation_json: Mapped[krrood.adapters.json_serializer.JSONData] = (
         mapped_column(
-            sqlalchemy.sql.sqltypes.JSON, nullable=False, use_existing_column=True
+            semantic_digital_twin.orm.model.JSONDataType,
+            nullable=False,
+            use_existing_column=True,
         )
     )
 
@@ -10137,7 +10139,7 @@ class AttributeUpdateModificationDAO(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
     updated_kwargs_json_list: Mapped[
-        typing.List[krrood.adapters.json_serializer.JSONData]
+        typing.List[krrood.adapters.json_serializer.JSONAttributeDiff]
     ] = mapped_column(JSON, nullable=False, use_existing_column=True)
 
     __mapper_args__ = {

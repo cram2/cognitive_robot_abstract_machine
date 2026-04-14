@@ -246,12 +246,12 @@ class JSONAttributeDiff(SubclassJSONSerializer):
     The name of the attribute that has changed.
     """
 
-    added_values: List[Any] = field(default_factory=list)
+    added_values: List[JSONData] = field(default_factory=list)
     """
     The items that have been added to the attribute.
     """
 
-    removed_values: List[Any] = field(default_factory=list)
+    removed_values: List[JSONData] = field(default_factory=list)
     """
     The items that have been removed from the attribute.
     """
@@ -261,16 +261,16 @@ class JSONAttributeDiff(SubclassJSONSerializer):
         return {
             JSON_TYPE_NAME: get_full_class_name(self.__class__),
             "attribute_name": self.attribute_name,
-            "removed_values": to_json(self.removed_values),
-            "added_values": to_json(self.added_values),
+            "removed_values": self.removed_values,
+            "added_values": self.added_values,
         }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(
             attribute_name=data["attribute_name"],
-            removed_values=from_json(data["removed_values"], **kwargs),
-            added_values=from_json(data["added_values"], **kwargs),
+            removed_values=data["removed_values"],
+            added_values=data["added_values"],
         )
 
 
@@ -313,12 +313,10 @@ def _compute_attribute_diff(
     if not isinstance(original_value, list_like_classes):
         if original_value == new_value:
             return None
-        return JSONAttributeDiff(
-            attribute_name=key, added_values=[from_json(new_value, **kwargs)]
-        )
+        return JSONAttributeDiff(attribute_name=key, added_values=[new_value])
 
-    add = [from_json(x, **kwargs) for x in new_value if x not in original_value]
-    remove = [from_json(x, **kwargs) for x in original_value if x not in new_value]
+    add = [x for x in new_value if x not in original_value]
+    remove = [x for x in original_value if x not in new_value]
     if not (add or remove):
         return None
     return JSONAttributeDiff(

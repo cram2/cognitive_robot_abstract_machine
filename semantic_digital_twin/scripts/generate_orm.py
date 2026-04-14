@@ -95,7 +95,7 @@ def generate_orm():
         type_mappings=TypeDict(
             {
                 trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
-                JSONData: sqlalchemy.types.JSON,
+                JSONData: semantic_digital_twin.orm.model.JSONDataType,
             }
         ),
         alternative_mappings=alternative_mappings,
