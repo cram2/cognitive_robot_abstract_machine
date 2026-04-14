@@ -501,7 +501,7 @@ def test_is_pose_free_for_robot(pr2_apartment_state_reset):
 def test_bodies_in_gripper(pr2_apartment_world):
     world = deepcopy(pr2_apartment_world)
     tcp = world.get_body_by_name("l_gripper_tool_frame")
-    pr2 = PR2.from_world(world)
+    pr2 = world.get_semantic_annotations_by_type(PR2)[0]
 
     with world.modify_world():
         body = Body(

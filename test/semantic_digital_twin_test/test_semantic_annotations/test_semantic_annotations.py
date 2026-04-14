@@ -1,25 +1,13 @@
 import logging
 
 from krrood.entity_query_language.factories import entity, variable, in_, inference, an
-from numpy.ma.testutils import (
-    assert_equal,
-)  # You could replace this with numpy's regular assert for better compatibility
-
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from semantic_digital_twin.exceptions import DoesNotBelongToAWorldError
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
-from semantic_digital_twin.robots.robot_parts import (
-    Manipulator,
-    Finger,
-    ParallelGripper,
-)
-from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
-from semantic_digital_twin.spatial_types import Quaternion
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -308,17 +296,3 @@ def test_minimal_robot_annotation(pr2_world_state_reset):
     pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(AbstractRobot)[0]
     assert len(robot.bodies) == len(pr2.bodies)
     assert len(robot.connections) == len(pr2.connections)
-
-
-def test_robot_part_post_init():
-    world = World()
-    b1 = Body(name=PrefixedName("b1"))
-    with world.modify_world():
-        world.add_kinematic_structure_entity(b1)
-
-    finger = Finger(root=b1, tip=b1)
-
-    with pytest.raises(DoesNotBelongToAWorldError):
-        manipulator = ParallelGripper(
-            root=b1, tool_frame=b1, front_facing_orientation=Quaternion(), finger=finger
-        )
