@@ -124,7 +124,7 @@ def test_repeat_construction():
 
 def test_perform_execute_single(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    act = NavigateAction(Pose.from_xyz_rpy(0.3, 0.3, 0, reference_frame=world.root))
+    act = NavigateAction(Pose.from_xyz_rpy(0.3, -1.3, 0, reference_frame=world.root))
     act2 = MoveTorsoAction(TorsoState.HIGH)
     act3 = ParkArmsAction(Arms.BOTH)
 
@@ -132,13 +132,28 @@ def test_perform_execute_single(immutable_model_world):
     with simulated_robot:
         plan.perform()
     np.testing.assert_almost_equal(
-        robot_view.root.global_transform.to_np()[:3, 3], [0.3, 0.3, 0], decimal=1
+        robot_view.root.global_transform.to_np()[:3, 3], [0.3, -1.3, 0], decimal=1
     )
     assert world.state[
         world.get_degree_of_freedom_by_name("torso_lift_joint").id
     ].position == pytest.approx(0.3, abs=0.1)
 
     plan.validate()
+
+
+def test_perform_parallel_desig(immutable_model_world):
+    world, robot_view, context = immutable_model_world
+
+    plan = parallel(
+        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
+        context,
+    ).plan
+
+    with simulated_robot:
+        plan.perform()
+
+    for node in plan.nodes:
+        assert node.status == TaskStatus.SUCCEEDED
 
 
 def test_perform_single_designator(immutable_model_world):
@@ -161,14 +176,18 @@ def test_perform_parallel(immutable_model_world):
     def check_thread_id(main_id):
         assert main_id != threading.get_ident()
 
-    act = code(lambda: check_thread_id(threading.get_ident()), context=context)
-    act2 = code(lambda: check_thread_id(threading.get_ident()), context=context)
-    act3 = code(lambda: check_thread_id(threading.get_ident()), context=context)
+    main_thread_id = threading.get_ident()
+    act = code(lambda: check_thread_id(main_thread_id), context=context)
+    act2 = code(lambda: check_thread_id(main_thread_id), context=context)
+    act3 = code(lambda: check_thread_id(main_thread_id), context=context)
 
     plan = parallel([act, act2, act3], context).plan
     with simulated_robot:
         plan.perform()
     plan.validate()
+
+    for node in plan.nodes:
+        assert node.status == TaskStatus.SUCCEEDED
 
 
 def test_perform_repeat(immutable_model_world):
@@ -191,7 +210,7 @@ def test_exception_sequential(immutable_model_world):
     def raise_except():
         raise PlanFailure()
 
-    act = NavigateAction(Pose(reference_frame=world.root))
+    act = NavigateAction(Pose.from_xyz_rpy(1, -1, reference_frame=world.root))
     act2 = code(raise_except)
 
     plan = sequential(
@@ -215,7 +234,7 @@ def test_exception_try_in_order(immutable_model_world):
     def raise_except():
         raise PlanFailure()
 
-    act = NavigateAction(Pose(reference_frame=world.root))
+    act = NavigateAction(Pose.from_xyz_rpy(1, -1, reference_frame=world.root))
     act2 = code(raise_except)
 
     plan = try_in_order([act, act2], context).plan

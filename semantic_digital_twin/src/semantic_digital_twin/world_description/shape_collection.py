@@ -291,18 +291,22 @@ class BoundingBoxCollection(ShapeCollection):
             simple_event[SpatialVariables.z.value].simple_sets,
         ):
 
+            origin_x = x.center()
+            origin_y = y.center()
+            origin_z = z.center()
+
             bb = BoundingBox(
-                x.lower,
-                y.lower,
-                z.lower,
-                x.upper,
-                y.upper,
-                z.upper,
+                x.lower - origin_x,
+                y.lower - origin_y,
+                z.lower - origin_z,
+                x.upper - origin_x,
+                y.upper - origin_y,
+                z.upper - origin_z,
                 HomogeneousTransformationMatrix.from_point_rotation_matrix(
                     point=Point3(
-                        x.upper - (x.upper - x.lower) / 2,
-                        y.upper - (y.upper - y.lower) / 2,
-                        z.upper - (z.upper - z.lower) / 2,
+                        origin_x,
+                        origin_y,
+                        origin_z,
                     ),
                     reference_frame=reference_frame,
                 ),

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field, fields, MISSING
-from functools import lru_cache
+from functools import lru_cache, wraps
 from inspect import isclass
-from typing import Union, Type
+from typing import Union, Type, Any
 
-from typing_extensions import TypeVar, Type, List, Optional
+from typing_extensions import TypeVar, Type, List, Optional, Callable
 
 T = TypeVar("T")
 
@@ -130,3 +131,58 @@ def get_default_values_for_dataclass(dataclass_type):
             defaults[f.name] = f.default_factory()
 
     return defaults
+
+
+T = TypeVar("T", bound=Callable[..., Any])
+
+
+def memoize(function: T) -> T:
+    """
+    Caches the return value of a function call at the instance level.
+    """
+
+    @wraps(function)
+    def wrapper(self, *args: Any, **kwargs: Any) -> T:
+        if not hasattr(self, "__memo__"):
+            self.__memo__ = {}
+        memo = self.__memo__
+
+        key = (function, self, args, frozenset(kwargs.items()))
+        try:
+            return memo[key]
+        except KeyError:
+            rv = function(self, *args, **kwargs)
+            memo[key] = rv
+            return rv
+
+    return wrapper  # type: ignore
+
+
+def copy_memoize(function: T) -> T:
+    """
+    Caches the return value of a function call at the instance level but returns a deepcopy of the value.
+    """
+
+    @wraps(function)
+    def wrapper(self, *args, **kwargs):
+        if not hasattr(self, "__memo__"):
+            self.__memo__ = {}
+        memo = self.__memo__
+
+        key = (function, self, args, frozenset(kwargs.items()))
+        try:
+            return deepcopy(memo[key])
+        except KeyError:
+            rv = function(self, *args, **kwargs)
+            memo[key] = rv
+            return deepcopy(rv)
+
+    return wrapper
+
+
+def clear_memoization_cache(instance):
+    """
+    Clears the memoization cache of an instance.
+    """
+    if hasattr(instance, "__memo__"):
+        instance.__memo__.clear()

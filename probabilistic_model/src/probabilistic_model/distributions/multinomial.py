@@ -3,15 +3,11 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
-
-from probabilistic_model.exceptions import ShapeMismatchError
-from random_events.product_algebra import SimpleEvent, Event
-from random_events.variable import Symbolic, Variable
 from typing_extensions import Self, Any, Iterable, List, Optional, Tuple, Dict
 
+from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SymbolicDistribution,
-    UnivariateDiscreteLeaf,
     ProductUnit,
     SumUnit,
     ProbabilisticCircuit,
@@ -19,6 +15,8 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 )
 from probabilistic_model.probabilistic_model import ProbabilisticModel
 from probabilistic_model.utils import MissingDict
+from random_events.product_algebra import SimpleEvent, Event
+from random_events.variable import Symbolic, Variable
 
 
 @dataclass

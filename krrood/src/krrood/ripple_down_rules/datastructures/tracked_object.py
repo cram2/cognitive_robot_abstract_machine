@@ -6,7 +6,7 @@ import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field, Field, fields
 from enum import Enum
-from functools import lru_cache
+from krrood.utils import memoize
 
 import pydot
 import rustworkx as rx
@@ -113,7 +113,7 @@ class TrackedObjectMixin:
             yield from TrackedObjectMixin.parse_fields(clazz)
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @memoize
     def parse_fields(clazz) -> Generator[Tuple[Type[TrackedObjectMixin], Type[TrackedObjectMixin]], None, None]:
         for f in TrackedObjectMixin.get_fields(clazz):
 
@@ -129,7 +129,7 @@ class TrackedObjectMixin:
             yield from TrackedObjectMixin.parse_field(field_info)
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @memoize
     def get_fields(clazz) -> List[Field]:
         skip_fields = []
         bases = [base for base in clazz.__bases__ if issubclass(base, TrackedObjectMixin)]
@@ -141,7 +141,7 @@ class TrackedObjectMixin:
         return result
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @memoize
     def parse_field(field_info: FieldInfo)\
             -> Generator[Tuple[Type[TrackedObjectMixin], Type[TrackedObjectMixin]], None, None]:
         parent = field_info.clazz

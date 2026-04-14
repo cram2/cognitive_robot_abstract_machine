@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Type, Self
 
+import numpy as np
 from typing_extensions import Dict, List, TYPE_CHECKING, Optional
 
 from krrood.adapters.json_serializer import (
@@ -76,6 +77,20 @@ class JointState(SubclassJSONSerializer):
 
     def items(self):
         return zip(self.connections, self.target_values)
+
+    def is_achieved(self) -> bool:
+        """
+        Checks if the defined joint state is achieved.
+        :return: True if all connections are in the specified target value, False otherwise
+        """
+        return all(
+            [
+                np.allclose(connection.position, target_value, atol=1e-2)
+                for connection, target_value in zip(
+                    self.connections, self.target_values
+                )
+            ]
+        )
 
     @classmethod
     def from_str_dict(cls, mapping: Dict[str, float], world: World):

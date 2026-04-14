@@ -37,7 +37,7 @@ from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospect
 from krrood.entity_query_language.predicate import Symbol
 from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math.symbolic_math import Matrix
-from krrood.utils import get_full_class_name
+from krrood.utils import get_full_class_name, memoize
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.inertial_properties import Inertial
@@ -574,7 +574,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
     """
 
     @classmethod
-    @lru_cache(maxsize=None)
+    @memoize
     def class_name_tokens(cls) -> Set[str]:
         """
         :return: Set of tokens from the class name.

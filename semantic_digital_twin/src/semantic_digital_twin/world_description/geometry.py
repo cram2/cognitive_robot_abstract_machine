@@ -5,13 +5,12 @@ import logging
 import os
 import shutil
 import tempfile
-import weakref
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from functools import cached_property
-from plyfile import PlyData
 
+from plyfile import PlyData
 import numpy as np
 import trimesh
 import trimesh.exchange.stl
@@ -252,7 +251,7 @@ class Scale:
     def to_bounding_box(self) -> BoundingBox:
         min_point = Point3(-self.x / 2, -self.y / 2, -self.z / 2)
         max_point = Point3(self.x / 2, self.y / 2, self.z / 2)
-        return BoundingBox.from_min_max(min_point, max_point)
+        return BoundingBox.from_min_max(min_point, max_point, None)
 
     def to_np(self) -> np.ndarray:
         return np.array([self.x, self.y, self.z])
@@ -833,32 +832,32 @@ class Box(Shape):
 class BoundingBox:
     min_x: float
     """
-    The minimum x-coordinate of the bounding box.
+    The minimum x-coordinate of the bounding box, relative to the origin.
     """
 
     min_y: float
     """
-    The minimum y-coordinate of the bounding box.
+    The minimum y-coordinate of the bounding box, relative to the origin.
     """
 
     min_z: float
     """
-    The minimum z-coordinate of the bounding box.
+    The minimum z-coordinate of the bounding box, relative to the origin.
     """
 
     max_x: float
     """
-    The maximum x-coordinate of the bounding box.
+    The maximum x-coordinate of the bounding box, relative to the origin.
     """
 
     max_y: float
     """
-    The maximum y-coordinate of the bounding box.
+    The maximum y-coordinate of the bounding box, relative to the origin.
     """
 
     max_z: float
     """
-    The maximum z-coordinate of the bounding box.
+    The maximum z-coordinate of the bounding box, relative to the origin.
     """
 
     origin: HomogeneousTransformationMatrix
@@ -878,7 +877,10 @@ class BoundingBox:
         :return: The x interval of the bounding box.
         """
         return SimpleInterval.from_data(
-            self.min_x, self.max_x, Bound.CLOSED, Bound.CLOSED
+            float(self.origin.x + self.min_x),
+            float(self.origin.x + self.max_x),
+            Bound.CLOSED,
+            Bound.CLOSED,
         )
 
     @property
@@ -887,7 +889,10 @@ class BoundingBox:
         :return: The y interval of the bounding box.
         """
         return SimpleInterval.from_data(
-            self.min_y, self.max_y, Bound.CLOSED, Bound.CLOSED
+            float(self.origin.y + self.min_y),
+            float(self.origin.y + self.max_y),
+            Bound.CLOSED,
+            Bound.CLOSED,
         )
 
     @property
@@ -896,7 +901,10 @@ class BoundingBox:
         :return: The z interval of the bounding box.
         """
         return SimpleInterval.from_data(
-            self.min_z, self.max_z, Bound.CLOSED, Bound.CLOSED
+            float(self.origin.z + self.min_z),
+            float(self.origin.z + self.max_z),
+            Bound.CLOSED,
+            Bound.CLOSED,
         )
 
     @property
@@ -970,11 +978,14 @@ class BoundingBox:
         return self.simple_event.contains((x, y, z))
 
     @classmethod
-    def from_simple_event(cls, simple_event: SimpleEvent):
+    def from_simple_event(
+        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+    ) -> List[Self]:
         """
         Create a list of bounding boxes from a simple random event.
 
         :param simple_event: The random event.
+        :param origin: The origin of the intersection.
         :return: The list of bounding boxes.
         """
         result = []
@@ -983,7 +994,9 @@ class BoundingBox:
             simple_event[SpatialVariables.y.value].simple_sets,
             simple_event[SpatialVariables.z.value].simple_sets,
         ):
-            result.append(cls(x.lower, y.lower, z.lower, x.upper, y.upper, z.upper))
+            result.append(
+                cls(x.lower, y.lower, z.lower, x.upper, y.upper, z.upper, origin)
+            )
         return result
 
     def intersection_with(self, other: BoundingBox) -> Optional[BoundingBox]:
@@ -993,10 +1006,11 @@ class BoundingBox:
         :param other: The other bounding box.
         :return: The intersection of the two bounding boxes or None if they do not intersect.
         """
-        result = self.simple_event.intersection_with(other.simple_event)
+        other_in_same_frame = other.transform_to_origin(self.origin)
+        result = self.simple_event.intersection_with(other_in_same_frame.simple_event)
         if result.is_empty():
             return None
-        return self.__class__.from_simple_event(result)[0]
+        return self.__class__.from_simple_event(result, self.origin)[0]
 
     def enlarge(
         self,
@@ -1069,7 +1083,12 @@ class BoundingBox:
         ]
 
     @classmethod
-    def from_min_max(cls, min_point: Point3, max_point: Point3) -> Self:
+    def from_min_max(
+        cls,
+        min_point: Point3,
+        max_point: Point3,
+        origin: HomogeneousTransformationMatrix,
+    ) -> Self:
         """
         Set the axis-aligned bounding box from a minimum and maximum point.
 
@@ -1079,13 +1098,7 @@ class BoundingBox:
         assert (
             min_point.reference_frame == max_point.reference_frame
         ), "The reference frames of the minimum and maximum points must be the same."
-        return cls(
-            *min_point.to_np()[:3],
-            *max_point.to_np()[:3],
-            origin=HomogeneousTransformationMatrix(
-                reference_frame=min_point.reference_frame
-            ),
-        )
+        return cls(*min_point.to_np()[:3], *max_point.to_np()[:3], origin=origin)
 
     def as_shape(self) -> Box:
         scale = Scale(
@@ -1093,9 +1106,9 @@ class BoundingBox:
             y=self.max_y - self.min_y,
             z=self.max_z - self.min_z,
         )
-        x = (self.max_x + self.min_x) / 2
-        y = (self.max_y + self.min_y) / 2
-        z = (self.max_z + self.min_z) / 2
+        x = (self.max_x + self.min_x) / 2 + float(self.origin.x)
+        y = (self.max_y + self.min_y) / 2 + float(self.origin.y)
+        z = (self.max_z + self.min_z) / 2 + float(self.origin.z)
         origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x, y, z, 0, 0, 0, self.origin.reference_frame
         )
@@ -1107,15 +1120,16 @@ class BoundingBox:
         """
         Transform the bounding box to a different reference frame.
         """
-        origin_T_self_np = self.origin.to_np()
-        origin_frame = self.origin.reference_frame
-        world = origin_frame._world
-
-        reference_T_origin_np = world.compute_forward_kinematics_np(
-            reference_T_new_origin.reference_frame, origin_frame
+        reference_T_new_origin = HomogeneousTransformationMatrix(
+            data=reference_T_new_origin.to_np(),
+            reference_frame=reference_T_new_origin.reference_frame,
         )
 
-        reference_T_self_np: np.ndarray = reference_T_origin_np @ origin_T_self_np
+        new_origin_reference_T_self = self.origin.reference_frame._world.transform(
+            self.origin, reference_T_new_origin.reference_frame
+        )
+
+        self_T_new_pose = reference_T_new_origin.inverse() @ new_origin_reference_T_self
 
         # Get all 8 corners of the BB in link-local space
         list_self_T_corner = [
@@ -1126,14 +1140,15 @@ class BoundingBox:
         ]  # shape (8, 3)
 
         list_reference_T_corner = [
-            reference_T_self_np @ self_T_corner for self_T_corner in list_self_T_corner
+            self_T_new_pose.to_np() @ self_T_corner
+            for self_T_corner in list_self_T_corner
         ]
 
         list_reference_P_corner = [
             reference_T_corner[:3, 3:] for reference_T_corner in list_reference_T_corner
         ]
 
-        # Compute world-space bounding box from transformed corners
+        # Compute new corner points
         min_corner = np.min(list_reference_P_corner, axis=0)
         max_corner = np.max(list_reference_P_corner, axis=0)
 
@@ -1144,6 +1159,7 @@ class BoundingBox:
             Point3.from_iterable(
                 max_corner, reference_frame=reference_T_new_origin.reference_frame
             ),
+            reference_T_new_origin,
         )
 
         return world_bb

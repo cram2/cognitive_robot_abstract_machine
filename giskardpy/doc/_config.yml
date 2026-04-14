@@ -1,0 +1,46 @@
+# Book settings
+# Learn more at https://jupyterbook.org/customize/config.html
+
+title: Giskard Python API
+author: AICOR Institute for Artificial Intelligence
+
+# Force re-execution of notebooks on each build.
+# See https://jupyterbook.org/content/execute.html
+execute:
+  execute_notebooks: force
+
+# Define the name of the latex output file for PDF builds
+latex:
+  latex_documents:
+    targetname: book.tex
+
+sphinx:
+  extra_extensions:
+    - myst_nb
+    - autoapi.extension  # Add the AutoAPI extension
+    - sphinx.ext.autodoc
+    - sphinxcontrib.plantuml
+  config:
+    # AutoAPI configuration
+    autoapi_dirs:
+      - ../src
+    autoapi_options:
+      - members
+      - undoc-members
+      - show-inheritance
+      - show-module-summary
+    autoapi_add_toctree_entry: True
+    html_static_path: ["_static"]
+
+# Information about where the book exists on the web
+repository:
+  url: https://github.com/cram2/giskardpy  # Online location of your book
+  path_to_book: doc  # Optional path to your book, relative to the repository root
+  branch: main  # Which branch of the repository should be used when creating links (optional)
+
+# Add GitHub buttons to your book
+# See https://jupyterbook.org/customize/config.html#add-a-link-to-your-repository
+html:
+  use_issues_button: true
+  use_repository_button: true
+  extra_css: ["_static/custom.css"]
