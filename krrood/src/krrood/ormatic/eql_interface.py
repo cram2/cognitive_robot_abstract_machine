@@ -18,6 +18,7 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 from krrood.entity_query_language.core.variable import Variable, Literal
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.operators.comparator import Comparator
+from krrood.entity_query_language.operators.aggregators import Aggregator, CountAll, Count
 
 from krrood.ormatic.data_access_objects.helper import get_dao_class
 
@@ -404,8 +405,27 @@ class EQLTranslator:
         if builder is None:
             return None
         if isinstance(builder.variable, Attribute):
-            return self.translate_attribute(builder.variable)
+            col = self.translate_attribute(builder.variable)
+            return col.desc() if builder.descending else col
         return builder.variable
+
+    @property
+    def _sql_group_by(self) -> Optional[List[Any]]:
+        builder = self.eql_query._grouped_by_builder_
+        if builder is None:
+            return None
+        columns = []
+        for var in builder.variables_to_group_by:
+            if isinstance(var, Attribute):
+                columns.append(self.translate_attribute(var))
+        return columns if columns else None
+
+    @property
+    def _sql_having(self) -> Optional[Any]:
+        builder = self.eql_query._having_builder_
+        if builder is None:
+            return None
+        return self.translate_query(builder.conditions_expression)
 
     @property
     def _sql_distinct(self) -> bool:
@@ -426,6 +446,14 @@ class EQLTranslator:
             conditions = self.translate_query(where_expr)
             if conditions is not None:
                 self.sql_query = self.sql_query.where(conditions)
+
+        group_by_cols = self._sql_group_by
+        if group_by_cols:
+            self.sql_query = self.sql_query.group_by(*group_by_cols)
+
+        having_condition = self._sql_having
+        if having_condition is not None:
+            self.sql_query = self.sql_query.having(having_condition)
 
         if self._sql_limit is not None:
             self.sql_query = self.sql_query.limit(self._sql_limit)
@@ -463,8 +491,6 @@ class EQLTranslator:
         :param query: The EQL query expression
         :return: SQLAlchemy expression or None
         """
-        if query is None:
-            return None
 
         if isinstance(query, AND):
             return self.translate_and(query)
@@ -640,6 +666,13 @@ class EQLTranslator:
         """
         if isinstance(operand, Attribute):
             return self.translate_attribute(operand)
+
+        if isinstance(operand, CountAll):
+            return func.count()
+
+        if isinstance(operand, Count):
+            col = self.translate_attribute(operand._child_)
+            return func.count(col)
 
         if isinstance(operand, Literal):
             extractor = DomainValueExtractor(self.session)

@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.exc import MultipleResultsFound
 from sqlalchemy.dialects import postgresql
 
@@ -30,6 +30,7 @@ from krrood.entity_query_language.factories import (
     in_,
     an,
     the,
+    count_all,
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
@@ -225,7 +226,7 @@ def test_equal(session, database):
     assert result[0].child.name == "Handle2"
 
 
-@pytest.mark.skip(reason="Not finished yet-")
+#@pytest.mark.skip(reason="Not finished yet-")
 def test_complicated_equal(session, database):
     # Create the world with its bodies and connections
     world = World(
@@ -333,6 +334,26 @@ def test_order_by(session, database):
     assert results[0].name == "SmallBody"
     assert results[1].name == "BigBody"
 
+
+def test_order_by_descending(session, database):
+    session.add(BodyDAO(name="BigBody", size=100))
+    session.add(BodyDAO(name="SmallBody", size=10))
+    session.commit()
+
+    b = variable(type_=Body, domain=[])
+    query = an(entity(b).ordered_by(b.size, descending=True))
+
+    translator = eql_to_sql(query, session)
+    expected = select(BodyDAO).order_by(BodyDAO.size.desc())
+
+    assert str(translator.sql_query) == str(expected)
+
+    results = translator.evaluate()
+    assert len(results) == 2
+    assert results[0].name == "BigBody"
+    assert results[1].name == "SmallBody"
+
+
 def test_translate_distinct(session, database):
     session.add(BodyDAO(name="UniqueBody", size=10))
     session.add(BodyDAO(name="UniqueBody", size=20))
@@ -348,3 +369,104 @@ def test_translate_distinct(session, database):
 
     results = translator.evaluate()
     assert len(results) == 2
+
+
+def test_group_by(session, database):
+    session.add(BodyDAO(name="Body1", size=10))
+    session.add(BodyDAO(name="Body2", size=10))
+    session.add(BodyDAO(name="Body3", size=20))
+    session.commit()
+
+    b = variable(type_=Body, domain=[])
+    query = an(entity(b).grouped_by(b.size))
+
+    translator = eql_to_sql(query, session)
+    expected = select(BodyDAO).group_by(BodyDAO.size)
+
+    assert str(translator.sql_query) == str(expected)
+
+    results = translator.evaluate()
+    assert len(results) == 2
+    sizes = sorted([r.size for r in results])
+    assert sizes == [10, 20]
+
+
+def test_having(session, database):
+    session.add(BodyDAO(name="Body1", size=10))
+    session.add(BodyDAO(name="Body2", size=10))
+    session.add(BodyDAO(name="Body3", size=20))
+    session.commit()
+
+    b = variable(type_=Body, domain=[])
+    query = an(entity(b).grouped_by(b.size).having(count_all() > 1))
+
+    translator = eql_to_sql(query, session)
+    expected = (
+        select(BodyDAO)
+        .group_by(BodyDAO.size)
+        .having(func.count() > 1)
+    )
+
+    assert str(translator.sql_query) == str(expected)
+
+    results = translator.evaluate()
+    assert len(results) == 1
+    assert results[0].size == 10
+
+
+def test_group_by_with_count(session, database):
+    session.add(BodyDAO(name="Body1", size=10))
+    session.add(BodyDAO(name="Body2", size=10))
+    session.add(BodyDAO(name="Body3", size=20))
+    session.commit()
+
+    b = variable(type_=Body, domain=[])
+    query = an(entity(b).grouped_by(b.size).having(count_all() > 0))
+
+    translator = eql_to_sql(query, session)
+    results = translator.evaluate()
+    assert len(results) == 2
+
+
+def test_having_no_results(session, database):
+    session.add(BodyDAO(name="Body1", size=10))
+    session.add(BodyDAO(name="Body2", size=20))
+    session.commit()
+
+    b = variable(type_=Body, domain=[])
+    query = an(entity(b).grouped_by(b.size).having(count_all() > 1))
+
+    translator = eql_to_sql(query, session)
+    results = translator.evaluate()
+    assert results == []
+
+
+def test_where_and_group_by_and_having(session, database):
+    session.add(BodyDAO(name="Body1", size=10))
+    session.add(BodyDAO(name="Body2", size=10))
+    session.add(BodyDAO(name="Body3", size=20))
+    session.add(BodyDAO(name="Body4", size=20))
+    session.add(BodyDAO(name="Body5", size=30))
+    session.commit()
+
+    b = variable(type_=Body, domain=[])
+    query = an(
+        entity(b)
+        .where(b.size < 25)
+        .grouped_by(b.size)
+        .having(count_all() > 1)
+    )
+
+    translator = eql_to_sql(query, session)
+    expected = (
+        select(BodyDAO)
+        .where(BodyDAO.size < 25)
+        .group_by(BodyDAO.size)
+        .having(func.count() > 1)
+    )
+    assert str(translator.sql_query) == str(expected)
+
+    results = translator.evaluate()
+    assert len(results) == 2
+    sizes = sorted([r.size for r in results])
+    assert sizes == [10, 20]
