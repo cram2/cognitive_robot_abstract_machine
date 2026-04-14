@@ -64,9 +64,6 @@ class ForwardKinematicsManager(ModelChangeCallback):
         self.compile()
         self.recompute()  # we need to recompute because other model updaters might need fk.
 
-    def __hash__(self):
-        return hash((id(self), self._world))
-
     def update_root_T_kse_expression_cache(self):
         self.root_T_kse_expression_cache = {
             self._world.root.id: HomogeneousTransformationMatrix()

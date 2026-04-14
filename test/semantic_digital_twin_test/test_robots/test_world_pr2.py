@@ -1,22 +1,16 @@
-import os
 from collections import defaultdict
-from copy import deepcopy
 
 import numpy as np
 import pytest
-from importlib.resources import files
-from pathlib import Path
 from typing_extensions import List
 
-from krrood.ormatic.utils import classes_of_package, classes_of_module
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import WorldEntityNotFoundError
+from semantic_digital_twin.orm.ormatic_interface import *  # noqa
 from semantic_digital_twin.reasoning.predicates import LeftOf
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.robots.robot_parts import KinematicChain
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.robot_parts import KinematicChain
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_computations.ik_solver import (
     MaxIterationsException,
@@ -25,7 +19,6 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
-    Vector3,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -33,13 +26,6 @@ from semantic_digital_twin.world_description.connections import (
     DifferentialDrive,
     PrismaticConnection,
     RevoluteConnection,
-    FixedConnection,
-)
-from semantic_digital_twin.orm.ormatic_interface import *  # noqa
-from semantic_digital_twin.world_description.world_entity import (
-    Body,
-    KinematicStructureEntity,
-    Connection,
 )
 
 

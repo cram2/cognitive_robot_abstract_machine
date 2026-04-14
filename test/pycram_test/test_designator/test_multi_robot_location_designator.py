@@ -45,10 +45,7 @@ def setup_multi_robot_simple_apartment(
         hsr_copy = deepcopy(hsr_world_setup)
         apartment_copy.merge_world(hsr_copy)
         view = apartment_copy.get_semantic_annotations_by_type(HSRB)
-        if not view:
-            view = HSRB.from_world(apartment_copy)
-        else:
-            view = view[0]
+        view = view[0] if view else HSRB.from_world(apartment_copy)
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -59,10 +56,7 @@ def setup_multi_robot_simple_apartment(
             stretch_copy,
         )
         view = apartment_copy.get_semantic_annotations_by_type(Stretch)
-        if not view:
-            view = Stretch.from_world(apartment_copy)
-        else:
-            view = view[0]
+        view = view[0] if view else Stretch.from_world(apartment_copy)
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -74,10 +68,7 @@ def setup_multi_robot_simple_apartment(
             tiago_copy,
         )
         view = apartment_copy.get_semantic_annotations_by_type(Tiago)
-        if not view:
-            view = Tiago.from_world(apartment_copy)
-        else:
-            view = view[0]
+        view = view[0] if view else Tiago.from_world(apartment_copy)
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -89,10 +80,7 @@ def setup_multi_robot_simple_apartment(
             pr2_copy,
         )
         view = apartment_copy.get_semantic_annotations_by_type(PR2)
-        if not view:
-            view = PR2.from_world(apartment_copy)
-        else:
-            view = view[0]
+        view = view[0] if view else PR2.from_world(apartment_copy)
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
