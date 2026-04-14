@@ -191,7 +191,9 @@ def is_gripper_holding_something(gripper: Manipulator) -> bool:
 def is_pose_free_for_robot(
     robot: AbstractRobot, pose: HomogeneousTransformationMatrix
 ) -> bool:
-    robot_bb = robot.base.bounding_box.transform_to_origin(robot.root.global_pose)
+    robot_bb = robot.mobile_base.bounding_box.transform_to_origin(
+        robot.root.global_pose
+    )
     target_bb = BoundingBox(
         robot_bb.min_x,
         robot_bb.min_y,

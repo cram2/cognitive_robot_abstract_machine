@@ -219,7 +219,7 @@ class CostmapLocation(Location):
                 _world=test_world, node=self.context.ros_node
             ).with_tf_publisher()
 
-        robot = self.robot
+        robot_id = self.robot.id
 
         test_robot = test_world.get_semantic_annotation_by_id(robot_id)
 

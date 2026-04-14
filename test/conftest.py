@@ -725,7 +725,6 @@ def pr2_world_state_reset(pr2_world_setup):
 def pr2_apartment_state_reset(pr2_apartment_world):
     world = deepcopy(pr2_apartment_world)
     state = deepcopy(world.state._data)
-    PR2.from_world(world)
     yield world
     world.state._data = state
 
