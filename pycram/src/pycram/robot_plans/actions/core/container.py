@@ -17,9 +17,9 @@ from pycram.datastructures.enums import (
 )
 from pycram.datastructures.grasp import GraspDescription
 from pycram.plans.factories import sequential
-from pycram.pose_validator import reachability_validator
+from pycram.locations.pose_validator import reachability_validator
 from pycram.querying.predicates import GripperIsFree
-from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
+from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.pick_up import GraspingAction
 from pycram.robot_plans.motions.container import OpeningMotion, ClosingMotion
 from pycram.robot_plans.motions.gripper import MoveGripperMotion

@@ -4,7 +4,6 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 
 import numpy as np
-import rclpy
 from typing_extensions import List, Optional, Iterator
 
 from giskardpy.executor import Executor
@@ -36,7 +35,7 @@ from pycram.locations.costmaps import (
     OrientationGenerator,
     RingCostmap,
 )
-from pycram.pose_validator import (
+from pycram.locations.pose_validator import (
     visibility_validator,
     collision_check,
     pose_sequence_reachability_validator,

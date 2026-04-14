@@ -1,4 +1,4 @@
-from pycram.pose_validator import (
+from pycram.locations.pose_validator import (
     reachability_validator,
     pose_sequence_reachability_validator,
 )

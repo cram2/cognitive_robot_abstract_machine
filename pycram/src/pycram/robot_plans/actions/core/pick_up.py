@@ -15,7 +15,7 @@ from pycram.datastructures.enums import (
 )
 from pycram.datastructures.grasp import GraspDescription
 from pycram.plans.factories import sequential, execute_single
-from pycram.pose_validator import (
+from pycram.locations.pose_validator import (
     pose_sequence_reachability_validator,
 )
 from pycram.querying.predicates import GripperIsFree
