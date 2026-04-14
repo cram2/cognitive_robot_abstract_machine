@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from typing import Any
 
 from typing_extensions import (
     TYPE_CHECKING,
@@ -12,6 +11,7 @@ from typing_extensions import (
     List,
 )
 
+from krrood.adapters.json_serializer import list_like_classes
 from krrood.class_diagrams.attribute_introspector import (
     DataclassOnlyIntrospector,
     DiscoveredAttribute,
@@ -29,7 +29,6 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     NoJointStateWithType,
-    DoesNotBelongToAWorldError,
     DuplicateRobotAssignmentsError,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
@@ -49,7 +48,6 @@ from semantic_digital_twin.world_description.geometry import BoundingBox, Scale
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     Connection,
-    WorldEntity,
 )
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -63,7 +61,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("semantic_digital_twin")
 
 
 @dataclass(eq=False)
@@ -81,7 +79,7 @@ class AggregatesRobotParts(ABC):
             value = getattr(self, field_.public_name)
             wrapped_field = WrappedField(wrapped_class, field_.field)
 
-            if isinstance(value, (list, set)) and issubclass(
+            if isinstance(value, list_like_classes) and issubclass(
                 wrapped_field.contained_type, RobotPart
             ):
                 robot_parts.extend(value)

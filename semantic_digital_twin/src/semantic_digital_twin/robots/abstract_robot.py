@@ -5,32 +5,13 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, field
-from functools import cached_property, wraps
+from functools import cached_property
 from typing import List, Type, Union, TYPE_CHECKING, Optional
 
 from typing_extensions import Self, DefaultDict
 
-from krrood.class_diagrams.attribute_introspector import (
-    DataclassOnlyIntrospector,
-    DiscoveredAttribute,
-)
-from krrood.class_diagrams.class_diagram import WrappedClass
-from krrood.class_diagrams.wrapped_field import WrappedField
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import MissingDefaultCameraError
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.world_description.connections import (
-    ActiveConnection,
-    OmniDrive,
-    ActiveConnection1DOF,
-    Drive,
-)
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.world_description.world_modification import (
-    synchronized_attribute_modification,
-)
 from semantic_digital_twin.robots.robot_parts import (
     Arm,
     Torso,
@@ -41,12 +22,24 @@ from semantic_digital_twin.robots.robot_parts import (
     Sensor,
     AggregatesRobotParts,
 )
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection,
+    ActiveConnection1DOF,
+    Drive,
+)
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_modification import (
+    synchronized_attribute_modification,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
     from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("semantic_digital_twin")
 
 
 @dataclass(eq=False)
