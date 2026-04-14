@@ -18,8 +18,7 @@ from giskardpy.motion_statechart.exceptions import (
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 
-if TYPE_CHECKING:
-    from semantic_digital_twin.world import World
+from semantic_digital_twin.world import World
 
 
 @dataclass
