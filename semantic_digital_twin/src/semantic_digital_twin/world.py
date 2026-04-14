@@ -1207,12 +1207,14 @@ class World(HasSimulatorProperties):
         new_parent: KinematicStructureEntity,
     ):
         """
-        Moves a branch of the kinematic structure starting at branch_root to a new parent.
-        Useful for example to "attach" an object (branch_root) to the gripper of the robot (new_parent), when picking up
-        an object.
-        ..warning:: the old connection is lost after calling this method
+        Destroys the connection between branch_root and its parent, and moves it to a new parent using a new connection
+        of the same type. The pose of body with respect to root stays the same.
 
-        :param branch_root: The root of the branch to move.
+        ..warning::
+
+            Move branch only works if the world structure is not currently fucked.
+
+        :param branch_root: The root of the branch to be moved.
         :param new_parent: The new parent of the branch.
         """
         new_parent_T_child = self.compute_forward_kinematics(new_parent, branch_root)
