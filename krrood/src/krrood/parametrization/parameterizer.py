@@ -11,6 +11,12 @@ from typing_extensions import Any
 import random_events.variable
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.factories import and_
+from krrood.entity_query_language.core.mapped_variable import (
+    Attribute,
+    Index,
+    Call,
+    MappedVariable,
+)
 from krrood.entity_query_language.predicate import symbolic_function
 from krrood.entity_query_language.query.match import MatchVariable, AttributeMatch
 from krrood.ormatic.data_access_objects.helper import to_dao
@@ -30,6 +36,24 @@ from semantic_digital_twin.world_description.world_entity import Body
 @symbolic_function
 def symbolic_hash(value: Any) -> int:
     return hash(value)
+
+
+def get_clean_name_from_mapped_variable(variable: MappedVariable) -> str:
+    """
+    Get a clean name from a mapped variable by joining its attribute names.
+
+    :param variable: The mapped variable.
+    :return: The clean name.
+    """
+    names = []
+    for step in variable._access_path_:
+        if isinstance(step, Attribute):
+            names.append(step._attribute_name_)
+        elif isinstance(step, Index):
+            names.append(f"[{step._key_}]")
+        elif isinstance(step, Call):
+            names.append(f"()")
+    return ".".join(names)
 
 
 @dataclass
@@ -59,6 +83,8 @@ class UnderspecifiedParameters:
     Only exists if the statement has a where condition.
     """
 
+    generated_events: typing.List = field(init=False, default_factory=list)
+
     def __post_init__(self):
         self.statement.expression.build()
         self._random_event_compiler = WhereExpressionToRandomEventTranslator(
@@ -78,15 +104,9 @@ class UnderspecifiedParameters:
         for attribute_match in self.statement.matches_with_variables:
             name = attribute_match.name_from_variable_access_path
 
-            # print(
-            #     attribute_match.assigned_value,
-            #     isinstance(attribute_match.assigned_value, SymbolicExpression),
-            # )
             if isinstance(attribute_match.assigned_value, SymbolicExpression):
                 self._create_variables_from_symbolic_expression(attribute_match)
                 continue
-            # print(attribute_match.assigned_variable._type_)
-            # print(attribute_match.assigned_variable)
             if attribute_match.assigned_variable._type_ is None or not issubclass(
                 attribute_match.assigned_variable._type_,
                 random_events.variable.compatible_types,
@@ -121,8 +141,10 @@ class UnderspecifiedParameters:
 
         # extract feature variables
         for feature in extractor.features:
+            relative_feature_name = get_clean_name_from_mapped_variable(feature)
+            name = f"{attribute_match.name_from_variable_access_path}.{relative_feature_name}"
             random_events_variable = random_events.variable.variable_from_name_and_type(
-                name=feature._access_path_[-1]._name_, type_=feature._type_
+                name=name, type_=feature._type_
             )
             result[random_events_variable.name] = random_events_variable
 
@@ -141,8 +163,10 @@ class UnderspecifiedParameters:
                 {
                     identifier_variable: hash_,
                     **{
-                        result[f._name_]: v
-                        for f, v in zip(extractor.features, current_features)
+                        result[
+                            f"{attribute_match.name_from_variable_access_path}.{get_clean_name_from_mapped_variable(f)}"
+                        ]: v
+                        for f, v in zip(features, current_features)
                     },
                 }
             )
@@ -150,40 +174,10 @@ class UnderspecifiedParameters:
 
         resulting_event = Event.from_simple_sets(
             *simple_events
-        )  # TODO: save this to an instance variable
+        )
+        self.generated_events.append(resulting_event)
 
-        return result
-
-    # @cached_property
-    # def variables(self) -> Dict[str, random_events.variable.Variable]:
-    #     """
-    #     :return: A dictionary that maps variable names to random events variables that appear in
-    #     the `where` or `Match` statement.
-    #     """
-    #     result = {v.name: v for v in self._random_event_compiler.variables.values()}
-    #
-    #     for attribute_match in self.statement.matches_with_variables:
-    #         name = attribute_match.name_from_variable_access_path
-    #
-    #         if isinstance(attribute_match.assigned_value, SymbolicExpression):
-    #             random_events_variable = random_events.variable.Symbolic(
-    #                 name=name,
-    #                 domain=Set.from_iterable(attribute_match.assigned_value.tolist()),
-    #             )
-    #             result[random_events_variable.name] = random_events_variable
-    #             continue
-    #         if attribute_match.assigned_variable._type_ is None or not issubclass(
-    #             attribute_match.assigned_variable._type_,
-    #             random_events.variable.compatible_types,
-    #         ):
-    #             continue
-    #
-    #         random_events_variable = random_events.variable.variable_from_name_and_type(
-    #             name, attribute_match.assigned_variable._type_
-    #         )
-    #
-    #         result[random_events_variable.name] = random_events_variable
-    #     return result
+        return resulting_event
 
     @property
     def assignments_for_conditioning(
@@ -218,8 +212,6 @@ class UnderspecifiedParameters:
         """
         sample_mapping = dict(zip(variables, sample))
         for variable_, value in sample_mapping.items():
-            #   print(variable_, value)
-            #    print("matches", list(self.statement.matches_with_variables))
             mapped_variable = self.statement._get_mapped_variable_by_name(
                 variable_.name
             )
@@ -235,32 +227,6 @@ class UnderspecifiedParameters:
             else:
                 value = value.item()
             mapped_variable._value_ = value
-
-        # print(self.statement.kwargs.items())
-        # for variable in self.statement.matches_with_variables:
-        #     if variable.name_from_variable_access_path not in [
-        #         variable.name for variable in variables
-        #     ]:
-        #         mapped_variable = self.statement._get_mapped_variable_by_name(
-        #             variable.name_from_variable_access_path
-        #         )
-        #         random_events_variable = (
-        #             random_events.variable.variable_from_name_and_type(
-        #                 name=variable.assigned_variable._name_, type_=Body
-        #             )
-        #         )
-        #         value = (
-        #             sample_mapping[random_events_variable]
-        #             if random_events_variable.is_numeric
-        #             else [
-        #                 domain_value.element
-        #                 for domain_value in random_events_variable.domain
-        #                 if hash(domain_value) == sample_mapping[random_events_variable]
-        #             ][0]
-        #         )
-        #         print(value)
-        #         print(variable)
-        #         mapped_variable._value_ = value
 
         self.statement._update_kwargs_from_literal_values()
         result = self.statement.construct_instance()

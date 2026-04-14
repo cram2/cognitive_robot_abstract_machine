@@ -111,7 +111,6 @@ def data_preparation(mutable_model_world):
     )
 
     parameters = UnderspecifiedParameters(move_and_pick_up_description)
-    print(len(parameters.variables.values()))
 
     move_and_pick_up_distribution = fully_factorized(parameters.variables.values())
 
@@ -150,7 +149,6 @@ def test_move_and_pick_up(database, mutable_model_world, data_preparation):
     values, move_and_pick_up_distribution = data_preparation
 
     # avg log likelihood auf den traingsdaten und dann auf dem gelernten circuit, der sollte hoehere log likelihood haben
-    print(print(value.object_designator for value in values))
     data_access_objects = [to_dao(value) for value in values]
     template = LearnRSPN(MoveAndPickUpAction, data_access_objects)
     feature_extractor = FeatureExtractor(
