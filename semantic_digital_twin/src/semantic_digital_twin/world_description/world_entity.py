@@ -35,6 +35,15 @@ from krrood.adapters.json_serializer import (
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.predicate import Symbol
 from krrood.symbolic_math.symbolic_math import Matrix
+from krrood.utils import get_full_class_name, memoize
+from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.world_description.geometry import Mesh
+from semantic_digital_twin.world_description.inertial_properties import Inertial
+from semantic_digital_twin.world_description.shape_collection import (
+    ShapeCollection,
+    BoundingBoxCollection,
+)
+from semantic_digital_twin.mixin import HasSimulatorProperties
 from krrood.utils import get_full_class_name
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -595,7 +604,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
             )
 
     @classmethod
-    @lru_cache(maxsize=None)
+    @memoize
     def class_name_tokens(cls) -> Set[str]:
         """
         :return: Set of tokens from the class name.

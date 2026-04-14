@@ -61,14 +61,14 @@ class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
         gripper_thumb = Finger.create_and_add_to_world(
             name=PrefixedName("thumb", prefix=self.name.name),
             root_name="hand_l_proximal_link",
-            tip_name="hand_l_finger_tip_frame",
+            tip_name="hand_l_distal_link",
             world=self._world,
         )
 
         gripper_finger = Finger.create_and_add_to_world(
             name=PrefixedName("finger", prefix=self.name.name),
             root_name="hand_r_proximal_link",
-            tip_name="hand_r_finger_tip_frame",
+            tip_name="hand_r_finger_tip_frame", #"hand_r_distal_link",
             world=self._world,
         )
 

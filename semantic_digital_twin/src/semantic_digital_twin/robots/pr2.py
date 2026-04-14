@@ -301,7 +301,7 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
 
         torso_low = JointState.from_mapping(
             name=PrefixedName("torso_low", prefix=self.name.name),
-            mapping=dict(zip(torso_joint, [0.0])),
+            mapping=dict(zip(torso_joint, [0.0115])),
             state_type=TorsoState.LOW,
         )
 

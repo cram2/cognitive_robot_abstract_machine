@@ -2,9 +2,13 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
+import rclpy
 from rustworkx.rustworkx import NoEdgeBetweenNodes
 from typing_extensions import Tuple, Generator
 
+# The alternative mapping needs to be imported for the stretch to work properly
+import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
+import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
@@ -41,9 +45,7 @@ from pycram.view_manager import ViewManager
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
+from pycram.view_manager import ViewManager
 
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
@@ -65,12 +67,8 @@ from semantic_digital_twin.spatial_types import (
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 
-# The alternative mapping needs to be imported for the stretch to work properly
-import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
-import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 
-
-@pytest.fixture(scope="session", params=["hsrb", "stretch", "tiago", "pr2"])
+@pytest.fixture(scope="module", params=["hsrb", "stretch", "tiago", "pr2"])
 def setup_multi_robot_apartment(
     request,
     hsr_world_setup,
@@ -588,16 +586,13 @@ def test_facing(immutable_multiple_robot_apartment):
         )
 
 
-def test_transport(mutable_multiple_robot_apartment):
+def test_transport(mutable_multiple_robot_apartment, rclpy_node):
     world, robot, context = mutable_multiple_robot_apartment
-
-    if isinstance(robot, Tiago):
-        return  # TODO jonas fix this test for Tiago
 
     description = TransportAction(
         object_designator=world.get_body_by_name("milk.stl"),
         target_location=Pose(
-            Point3.from_iterable([3.1, 2.2, 0.95]),
+            Point3.from_iterable([3.2, 2.2, 0.95]),
             Quaternion.from_iterable([0.0, 0.0, 1.0, 0.0]),
             reference_frame=world.root,
         ),
@@ -607,7 +602,7 @@ def test_transport(mutable_multiple_robot_apartment):
     with simulated_robot:
         plan.perform()
     milk_position = world.get_body_by_name("milk.stl").global_transform.to_np()[:3, 3]
-    dist = np.linalg.norm(milk_position - np.array([3.1, 2.2, 0.95]))
+    dist = np.linalg.norm(milk_position - np.array([3.2, 2.2, 0.95]))
     assert dist <= 0.02
 
     plan.plan.validate()

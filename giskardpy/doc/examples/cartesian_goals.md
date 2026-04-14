@@ -68,7 +68,7 @@ msc = MotionStatechart()
 # 3. Define a Cartesian Pose Goal
 # We want to move the left gripper to a specific pose relative to the world root
 root_link = world.root
-tip_link = world.get_body_by_name("l_wrist_roll_link")
+tip_link = world.get_body_by_name("l_gripper_tool_frame")
 
 goal_pose = Pose(
     position=Vector3(0.5, 0.5, 1.2), 

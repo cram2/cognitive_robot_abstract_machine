@@ -1,7 +1,6 @@
 from __future__ import absolute_import, annotations
 
 from dataclasses import dataclass, field
-from functools import lru_cache
 from typing import Dict, TYPE_CHECKING
 from uuid import UUID
 
@@ -15,11 +14,11 @@ from krrood.symbolic_math.symbolic_math import (
     VariableParameters,
     FloatVariable,
 )
+from krrood.utils import copy_memoize, memoize, clear_memoization_cache
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.math import inverse_frame
-from semantic_digital_twin.utils import copy_lru_cache
 from semantic_digital_twin.world_description.world_entity import (
     Connection,
     KinematicStructureEntity,
@@ -61,7 +60,7 @@ class ForwardKinematicsManager(ModelChangeCallback):
         if len(self._world.kinematic_structure_entities) == 0:
             return
         self.update_root_T_kse_expression_cache()
-        self.compose_expression.cache_clear()
+        clear_memoization_cache(self)
         self.compile()
         self.recompute()  # we need to recompute because other model updaters might need fk.
 
@@ -108,10 +107,10 @@ class ForwardKinematicsManager(ModelChangeCallback):
         """
         Clears cache and recomputes all forward kinematics. Should be called after a state update.
         """
-        self.compute_np.cache_clear()
+        clear_memoization_cache(self)
         self.forward_kinematics_for_all_bodies = self.compiled_all_fks.evaluate()
 
-    @copy_lru_cache()
+    @copy_memoize
     def compose_expression(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> HomogeneousTransformationMatrix:
@@ -155,7 +154,7 @@ class ForwardKinematicsManager(ModelChangeCallback):
             data=self.compute_np(root, tip), reference_frame=root
         )
 
-    @lru_cache(maxsize=None)
+    @memoize
     def compute_np(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> NpMatrix4x4:

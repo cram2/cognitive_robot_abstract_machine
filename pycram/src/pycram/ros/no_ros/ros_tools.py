@@ -1,8 +1,8 @@
 import os
-from functools import lru_cache
+from krrood.utils import memoize
 
 
-@lru_cache(maxsize=None)
+@memoize
 def get_ros_package_path(package_name: str) -> str:
     """
     Get the path of a ROS package. Using the os module to avoid importing rospkg.

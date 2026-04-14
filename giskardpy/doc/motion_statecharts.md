@@ -16,19 +16,37 @@ Motion Statecharts address these issues by using a state machine-based approach 
 
 ### Key Concepts
 
-- **Nodes**: The fundamental building blocks of a statechart. Every state or component in the statechart is a node. Nodes are specialized into:
-    - **Tasks**: Atomic units of motion that define what the robot should do at a low level by adding specific motion constraints (e.g., "maintain this Cartesian pose" or "stay within these joint limits").
-    - **Goals**: Composite nodes that encapsulate multiple other Nodes (Tasks, Goals, or Monitors). They allow for hierarchical organization and complex behavior patterns (e.g., a "Grasp Goal" that includes pre-grasp, reach, and close gripper steps).
-    - **Monitors**: Nodes that check for specific conditions in the environment or robot state (e.g., "is the goal reached?" or "is a collision imminent?").
-- **Transitions**: Transitions define the flow of execution. A transition is triggered by a condition (usually from a Monitor) and leads to another Node or ends the motion.
-- **Hierarchical Composition**: Statecharts are inherently hierarchical. Goals can contain other Goals, allowing complex behaviors to be built from simpler, reusable components.
-- **Parallel and Sequential Execution**: Using nodes like `Parallel` and `Sequence` (which are types of Goals), you can specify which tasks/goals should be pursued simultaneously and which must follow one another.
+A Motion Statechart comprises multiple **nodes**, which may be one of the following
+types:
+- **Task**: A specific, single-purpose segment of the overall motion. These nodes add constraints to the motion problem and monitor their progress. For example, a Cartesian position task will monitor if the distance to the target is below a threshold.
+- **Monitor**: Nodes that observe certain conditions or events without controlling motion. For example, monitoring the distance between the robot’s gripper and a goal point without actively controlling the motion.
+- **Termination Node**: Nodes that signal the end of motion execution upon reaching a specific observation state. For example, a node that terminates the motion when a specific condition is met, such as reaching the final destination. There are two termination nodes, **EndMotion** and **CancelMotion**.
+- **Goal**: Nodes that encapsulate reusable, parameterized designs for Motion Statechart patterns. For example, a combination of monitors and motion tasks to open a door can be encapsulated into a template for
+reuse in different contexts.
+
+
+Every node has two inner state machines:
+- An observation FSM is used to represent whether an observed condition is currently True, False, or "?". For tasks, this state represents the constraint satisfaction status. An explicit "?" state is required for situations in which the state is unknown, for example when the node has never been active.
+- A life cycle FSM is used to determine whether the node is active.
+  - Possible states are :
+    - Not Started: The initial state.
+    - Running: The only active state. The Nodes can updates their observation state and Tasks will cause motions.
+    - Paused: Indicates a temporary inactivity
+    - Stopped: Indicates that the node purpose is done
+  - Every node has life cycle transitions that based on observation state of itself or other nodes. Since "?" is a possible observation state, the transitions use three-values logic:
+    - start: When True, Transition from Not Started -> Running
+    - pause: When True, Transition from Running -> Pause, when not True, transition from Pause -> Running
+    - end: When True, transition from Running or Paused -> Stopped
+    - reset: When True, transition from any State to Not Started.
+    - When multiple transitions are possible, the following priority is used: reset > end > pause > start
 
 ### Benefits
+
 
 - **Modularity**: Individual motions and checks are self-contained nodes that can be reused across different tasks.
 - **Clarity**: The statechart structure provides a clear visual and logical representation of the robot's behavior.
 - **Robustness**: Error handling and environment reactivity are built directly into the motion's structure through monitors and transitions.
-- **Constraint-Based**: Because Giskard is constraint-based, multiple goals in a `Parallel` node are solved together, ensuring the robot satisfies all requirements simultaneously (e.g., "reach for the cup while keeping the arm away from the table").
+- **Constraint-Based**: The constraints of all currently active tasks influence the motion, ensuring the robot satisfies all requirements simultaneously (e.g., "reach for the cup while keeping the arm away from the table").
+
 
 For practical examples of how to use Motion Statecharts, see the [Basic Motion](examples/basic_motion.md) and [Cartesian Goals](examples/cartesian_goals.md) tutorials.

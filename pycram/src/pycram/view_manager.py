@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from typing_extensions import Optional, Tuple
 
+from krrood.entity_query_language.predicate import symbolic_function
 from pycram.datastructures.enums import Arms
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.robot_parts import (
@@ -14,6 +15,7 @@ from semantic_digital_twin.robots.robot_parts import (
 class ViewManager:
 
     @staticmethod
+    @symbolic_function
     def get_end_effector_view(
         arm: Arms, robot_view: AbstractRobot
     ) -> Optional[Manipulator]:

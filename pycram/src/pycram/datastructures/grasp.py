@@ -8,12 +8,13 @@ from typing import Tuple
 import numpy as np
 from typing_extensions import Optional, Union, List
 
+from semantic_digital_twin import utils
 from semantic_digital_twin.robots.robot_parts import Manipulator
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vector3, Quaternion
 from semantic_digital_twin.world_description.world_entity import Body, KinematicStructureEntity
 from pycram.datastructures.rotations import Rotations
-from pycram.datastructures.enums import Grasp, AxisIdentifier, ApproachDirection, VerticalAlignment, Arms
+from pycram.datastructures.enums import AxisIdentifier, ApproachDirection, VerticalAlignment, Arms
 from pycram.tf_transformations import quaternion_multiply
 from pycram.utils import translate_pose_along_local_axis
 
@@ -67,9 +68,12 @@ class GraspDescription:
 
         world = target._world
 
-        grasp_pose_R_gripper = self.grasp_orientation()
-        target_R_gripper = target_T_grasp_pose.to_rotation_matrix() @ grasp_pose_R_gripper.to_rotation_matrix()
-        target_T_gripper: Pose = Pose(position=target_T_grasp_pose.to_position(), orientation=target_R_gripper.to_quaternion(), reference_frame=target)
+        grasp_pose_R_gripper_goal = self.grasp_orientation()
+
+        # if we just did target_T_grasp_pose @ grasp_pose_R_gripper_goal we would also rotate the translation in the
+        # global frame, which we dont want here. Thus we just multiply the rotations, and take the translation as is
+        target_R_gripper_goal = target_T_grasp_pose.to_rotation_matrix() @ grasp_pose_R_gripper_goal.to_rotation_matrix()
+        target_T_gripper_goal: Pose = Pose(position=target_T_grasp_pose.to_position(), orientation=target_R_gripper_goal.to_quaternion(), reference_frame=target)
 
         if body:
             bb_in_frame = body.collision.as_bounding_box_collection_in_frame(
@@ -86,12 +90,12 @@ class GraspDescription:
         else:
             offset = 0
 
-        target_T_gripper_copy = deepcopy(target_T_gripper)
+        target_T_gripper_goal_copy = deepcopy(target_T_gripper_goal)
         pre_pose = translate_pose_along_local_axis(
-            target_T_gripper_copy, self.manipulation_axis(), -offset
+            target_T_gripper_goal_copy, self.manipulation_axis(), -offset
         )
 
-        target_T_gripper_copy = deepcopy(target_T_gripper)
+        target_T_gripper_goal_copy = deepcopy(target_T_gripper_goal)
 
         # Lift pose calculation. We want the lift pose to be moved along the global z-axis, but the final pose should be in the target frame.
         map_T_grasp = world.transform(target_T_grasp_pose.to_homogeneous_matrix(), world.root)
@@ -104,9 +108,9 @@ class GraspDescription:
         target_P_lift = world.transform(map_T_lift, target)
 
         # the lift pose is adjusted for the gripper orientation, but without rotating the point we want to grasp
-        lift_pose = Pose(target_P_lift, target_T_gripper.to_quaternion(), reference_frame=target)
+        lift_pose = Pose(target_P_lift, target_T_gripper_goal.to_quaternion(), reference_frame=target)
 
-        sequence = [pre_pose, target_T_gripper_copy, lift_pose]
+        sequence = [pre_pose, target_T_gripper_goal_copy, lift_pose]
 
         if reverse:
             sequence.reverse()
@@ -371,6 +375,8 @@ class GraspDescription:
 
         return primary_face, secondary_face
 
+    def __hash__(self):
+        return id(self)
 
 @dataclass
 class PreferredGraspAlignment:

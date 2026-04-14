@@ -9,12 +9,9 @@ from semantic_digital_twin.world_description.shape_collection import (
 )
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
-
-logger = logging.getLogger(__name__)
 
 import time
 from functools import reduce
@@ -33,6 +30,9 @@ from rtree import index
 from sortedcontainers import SortedSet
 
 from semantic_digital_twin.spatial_types import Point3, HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
+
+logger = logging.getLogger(__name__)
 
 
 class PoseOccupiedError(Exception):
@@ -141,8 +141,8 @@ class GraphOfConvexSets:
 
         # Record every node once, insert it into the index
         for n in node_list:
-            mn = (n.min_x, n.min_y, n.min_z)
-            mx = (n.max_x, n.max_y, n.max_z)
+            mn = (n.x_interval.lower, n.y_interval.lower, n.z_interval.lower)
+            mx = (n.x_interval.upper, n.y_interval.upper, n.z_interval.upper)
             ex = (
                 mn[0] - tolerance,
                 mn[1] - tolerance,
@@ -167,7 +167,11 @@ class GraphOfConvexSets:
                     continue  # no true overlap
                 box = _intersection_box(mn_i, mx_i, mn_j, mx_j)
 
-                self.graph.add_edge(i, j, box)
+                # Map from the local list positions back to the graph node indices
+                u = self.box_to_index_map[node_list[i]]
+                v = self.box_to_index_map[node_list[j]]
+
+                self.graph.add_edge(u, v, box)
 
     def draw(self):
         import rustworkx.visualization
@@ -185,6 +189,11 @@ class GraphOfConvexSets:
         )
         return free_space.plot(color="blue")
 
+    def plot_and_show_free_space(self) -> None:
+        import plotly.graph_objects as go
+
+        go.Figure(self.plot_free_space()).show()
+
     def plot_occupied_space(self) -> List[go.Mesh3d]:
         """
         Plot the occupied space of the environment in red.
@@ -195,6 +204,11 @@ class GraphOfConvexSets:
         )
         occupied_space = ~free_space & self.search_space.event
         return occupied_space.plot(color="red")
+
+    def plot_and_show_occupied_space(self) -> None:
+        import plotly.graph_objects as go
+
+        go.Figure(self.plot_occupied_space()).show()
 
     def node_of_point(self, point: Point3) -> Optional[BoundingBox]:
         """

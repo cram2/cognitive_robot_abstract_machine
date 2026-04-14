@@ -23,6 +23,7 @@ from giskardpy.middleware.ros2.robot_interface_config import RobotInterfaceConfi
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from krrood.ormatic.utils import create_engine
+from krrood.utils import clear_memoization_cache
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
@@ -78,7 +79,7 @@ class Giskard:
         """
         with self.world_config.world.modify_world():
             self.world_config.setup_world()
-            self.world_config.world.__class__.root.fget.cache_clear()
+            clear_memoization_cache(self.world_config.world)
             if isinstance(self.behavior_tree_config, StandAloneBTConfig):
                 real_time_factor = None
             else:

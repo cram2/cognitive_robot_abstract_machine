@@ -241,6 +241,7 @@ class Door(HasHandle, HasHinge):
         if not (scale.x < scale.y and scale.x < scale.z):
             raise InvalidPlaneDimensions(scale, clazz=Door)
 
+        # This creates an event around the scale, so if the scale is 1 the event will be from -0.5 to 0.5.
         door_event = scale.to_simple_event().as_composite_set()
         door_body = Body(name=name)
         bounding_box_collection = BoundingBoxCollection.from_event(
@@ -491,6 +492,7 @@ class Wall(HasApertures):
             raise InvalidPlaneDimensions(scale, clazz=Wall)
 
         wall_body = Body(name=name)
+        # This creates an event exactly as the scale, so if the scale is 1 the event will be from 0 to 1.
         wall_event = cls._create_wall_event(scale).as_composite_set()
         wall_collision = BoundingBoxCollection.from_event(
             wall_body, wall_event
