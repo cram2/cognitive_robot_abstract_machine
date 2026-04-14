@@ -23,9 +23,9 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 from semantic_digital_twin.reasoning.predicates import is_place_occupied
 from semantic_digital_twin.robots.abstract_robot import (
     AbstractRobot,
-    ParallelGripper,
     Manipulator,
 )
+from semantic_digital_twin.robots.robot_parts import ParallelGripper
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import Body
