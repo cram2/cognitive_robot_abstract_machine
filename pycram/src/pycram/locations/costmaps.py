@@ -465,8 +465,13 @@ class OccupancyCostmap(Costmap):
             ),
             axis=0,
         ) * self.resolution + np.array(origin_position[:2])
+
+        # base height of the robot plus a safty offset
+        base_height = self.robot_view.base.bounding_box.height + 0.1
         # Add the z-coordinate to the grid, which is either 0 or 10
-        indices_0 = np.pad(indices, (0, 1), mode="constant", constant_values=5)[:-1]
+        indices_0 = np.pad(
+            indices, (0, 1), mode="constant", constant_values=base_height
+        )[:-1]
         indices_10 = np.pad(indices, (0, 1), mode="constant", constant_values=0)[:-1]
         # Zips both arrays such that there are tuples for every coordinate that
         # only differ in the z-coordinate

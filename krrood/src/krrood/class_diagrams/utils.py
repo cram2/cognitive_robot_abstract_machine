@@ -1,13 +1,20 @@
+from __future__ import annotations
+
 import inspect
 import sys
+from copy import copy
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable
+from functools import lru_cache
+from typing import Callable, Any, Dict, get_args, get_origin, Union
 from uuid import UUID
 
 import typing_extensions
-from typing_extensions import List, Type, Generic, TYPE_CHECKING
+from typing_extensions import List, Type, Generic, TYPE_CHECKING, Optional, Tuple
 from typing_extensions import TypeVar, get_origin, get_args
+
+from krrood.class_diagrams.exceptions import CouldNotResolveType
+from krrood.utils import get_scope_from_imports
 
 
 def classes_of_module(module) -> List[Type]:
@@ -82,3 +89,39 @@ def get_type_hint_of_keyword_argument(callable_: Callable, name: str):
         include_extras=True,  # keeps Annotated[...] / other extras if you use them
     )
     return hints.get(name)
+
+@lru_cache
+def get_type_hints_of_object(object_: Any, namespace: Tuple[Tuple[str, Any], ...] = ()) -> Dict[str, Any]:
+    """
+    Get the type hints of an object. This is a workaround for the fact that get_type_hints() does not work with objects
+     that are not defined in the same module or are imported through TYPE_CHECKING.
+
+    :param object_: The object to get the type hints of.
+    :param namespace: A starting namespace to use for resolving type hints.
+    :return: The type hints of the object as a dictionary.
+    :raises CouldNotResolveType: If a type hint cannot be resolved.
+    """
+    type_hints = {}
+    if namespace:
+        local_namespace = dict(namespace)
+    else:
+        local_namespace = {}
+    while True:
+        try:
+            type_hints = typing_extensions.get_type_hints(
+                object_, include_extras=True, localns=local_namespace
+            )
+            break
+        except NameError as e:
+            module = inspect.getmodule(object_)
+            if module is not None and hasattr(module, e.name):
+                local_namespace[e.name] = getattr(module, e.name)
+                continue
+            source_path = inspect.getsourcefile(object_)
+            if source_path is None:
+                raise CouldNotResolveType(e.name)
+            scope = get_scope_from_imports(file_path=source_path)
+            if e.name in scope:
+                local_namespace[e.name] = scope[e.name]
+                continue
+    return type_hints

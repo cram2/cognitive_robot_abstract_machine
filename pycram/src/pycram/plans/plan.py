@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from copy import deepcopy
 from dataclasses import field, dataclass
-from enum import IntEnum
 
 import numpy as np
 import rustworkx as rx
@@ -20,24 +19,22 @@ from typing_extensions import (
     Type,
 )
 
-from krrood.entity_query_language.backends import QueryBackend
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     PlotAlignment,
 )
-from pycram.plans.designator import Designator
 from pycram.plans.plan_entity import PlanEntity
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.world import World
 from pycram.plans.plan_node import (
     PlanNode,
     ActionNode,
     DesignatorNode,
-    MotionNode,
 )
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.world import World
 
 if TYPE_CHECKING:
     from pycram.plans.plan_callbacks import PlanCallback
     from pycram.datastructures.dataclasses import Context
+    from pycram.plans.designator import Designator
 
 
 logger = logging.getLogger(__name__)

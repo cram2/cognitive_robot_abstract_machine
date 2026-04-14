@@ -1,9 +1,14 @@
+import gc
+import linecache
 import os
 import threading
 import time
+import tracemalloc
 from copy import deepcopy
+from functools import _lru_cache_wrapper
 
 import numpy as np
+import objgraph
 import pytest
 
 from semantic_digital_twin.adapters.package_resolver import PathResolver
@@ -18,7 +23,11 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.utils import recursive_subclasses
-from pycram.datastructures.dataclasses import Context  # type: ignore
+try:
+    from pycram.datastructures.dataclasses import Context  # type: ignore
+except ImportError:
+    # Adds ROS dependency
+    pass
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -103,22 +112,21 @@ def cleanup_after_test():
     yield
     # runs AFTER each test (even if the test fails or errors)
     SymbolGraph.clear()
+    class_diagram.clear()
 
 
-@pytest.fixture(autouse=True, scope="session")
-def cleanup_ros():
-    """
-    Fixture to ensure that ROS is properly cleaned up after all tests.
-    """
-    if os.environ.get("ROS_VERSION") == "2":
-        import rclpy
-
-        if not rclpy.ok():
-            rclpy.init()
+@pytest.fixture(autouse=True, scope="module")
+def count_worlds():
     yield
-    if os.environ.get("ROS_VERSION") == "2":
-        if rclpy.ok():
-            rclpy.shutdown()
+    unreachable = gc.collect()
+    world_in_mem = objgraph.count("World")
+    print(f"Number of worlds after test: {objgraph.count("World")}")
+    if world_in_mem > 30:
+        print("Unreachable objects found:", unreachable)
+        print(f"Number of worlds after test: {objgraph.count("World")}")
+        raise MemoryError(
+            "Something is leaking worlds, there are more than 20 worlds in memory after the test"
+        )
 
 
 #############################################
@@ -346,6 +354,7 @@ def world_with_urdf_factory(
         robot_semantic_annotation.from_world(world_with_urdf)
 
     with world_with_urdf.modify_world():
+        old_root = world_with_urdf.root
         map = Body(name=PrefixedName("map"))
         localization_body = Body(name=PrefixedName("odom_combined"))
 
@@ -356,7 +365,7 @@ def world_with_urdf_factory(
 
         c_root_bf = drive_connection_type.create_with_dofs(
             parent=localization_body,
-            child=world_with_urdf.root,
+            child=old_root,
             world=world_with_urdf,
         )
         world_with_urdf.add_connection(c_root_bf)
@@ -474,7 +483,7 @@ def apartment_world_setup():
     apartment_world.merge_world_at_pose(
         cereal_world,
         HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.37, 1.8, 1.05, reference_frame=apartment_world.root
+            2.37, 2.5, 1.05, reference_frame=apartment_world.root
         ),
     )
     milk_view = Milk(
@@ -683,6 +692,15 @@ def pr2_world_state_reset(pr2_world_setup):
     state = world.state._data.copy()
     yield world
     world.state._data[:] = state
+
+
+@pytest.fixture
+def pr2_apartment_state_reset(pr2_apartment_world):
+    world = deepcopy(pr2_apartment_world)
+    state = deepcopy(world.state._data)
+    PR2.from_world(world)
+    yield world
+    world.state._data = state
 
 
 ###############################

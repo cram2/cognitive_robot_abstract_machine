@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
 from inspect import isclass
 
+import sqlalchemy
 from typing_extensions import List, Dict, TYPE_CHECKING, Optional, Set, Type, get_origin
 
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
@@ -14,9 +15,9 @@ from krrood.class_diagrams.class_diagram import (
     WrappedClass,
     Inheritance,
 )
-from krrood.class_diagrams.failures import ClassIsUnMappedInClassDiagram
+from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
-from krrood.utils import module_and_class_name
+from krrood.utils import module_and_class_name, memoize
 
 if TYPE_CHECKING:
     from krrood.ormatic.ormatic import ORMatic
@@ -491,7 +492,7 @@ class WrappedTable:
 
         return result
 
-    @lru_cache(maxsize=None)
+    @memoize
     def parse_fields(self):
 
         for f in self.fields:
@@ -605,7 +606,7 @@ class WrappedTable:
         )
 
         if wrapped_field.type_endpoint is str:
-            constructor = f"mapped_column(String(255), use_existing_column=True)"
+            constructor = f"mapped_column({module_and_class_name(sqlalchemy.types.Text)}, use_existing_column=True)"
         else:
             constructor = f"mapped_column(use_existing_column=True)"
         self.builtin_columns.append(

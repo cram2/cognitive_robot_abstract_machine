@@ -74,27 +74,6 @@ def record_time(function: T) -> T:
     return wrapper
 
 
-def clear_memo(f):
-    if hasattr(f, "memo"):
-        f.memo.clear()
-
-
-def copy_memoize(function: T) -> T:
-    memo = function.memo = {}
-
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-        key = (args, frozenset(kwargs.items()))
-        try:
-            return deepcopy(memo[key])
-        except KeyError:
-            rv = function(*args, **kwargs)
-            memo[key] = rv
-            return deepcopy(rv)
-
-    return wrapper
-
-
 # %% these two decorators automatically add a state variable to an object that prevents multiple calls for off on pairs
 def toggle_on(state_var: str):
     def decorator(func: T) -> T:

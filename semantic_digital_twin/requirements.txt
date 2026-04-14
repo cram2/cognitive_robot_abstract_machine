@@ -29,3 +29,6 @@ pymysql
 pyglet == 1.5.31
 pycollada
 psycopg
+plyfile
+huggingface-hub
+vhacdx

@@ -16,7 +16,6 @@ You may also find links to the quizzes below.
 - [](semantic-annotations-quiz)
 - [](world-state-manipulation-quiz)
 - [](regions-quiz)
-- [](multiverse-quiz)
 - [](semantic-annotation-factories-quiz)
 - [](persistence-of-annotated-worlds-quiz)
 - [](graph-of-convex-sets-quiz)
