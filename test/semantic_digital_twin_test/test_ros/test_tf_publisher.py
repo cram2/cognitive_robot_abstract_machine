@@ -67,6 +67,12 @@ def test_clear(rclpy_node, pr2_world_copy):
     world_copy = deepcopy(pr2_world_copy)
     with pr2_world_copy.modify_world():
         pr2_world_copy.clear()
+    tf_wrapper = TFWrapper(node=rclpy_node)
+    tf_publisher = TFPublisher(
+        node=rclpy_node,
+        _world=pr2_world_copy,
+    )
+
     with pr2_world_copy.modify_world():
         pr2_world_copy.merge_world(world_copy)
 

@@ -1809,11 +1809,13 @@ class World(HasSimulatorProperties):
         """
         Clears all stored data and resets the state of the instance.
         """
-        kse = self.kinematic_structure_entities
         self._clear_world_entities()
         self.state.clear()
         self._world_entity_hash_table.clear()
         self._model_manager.model_modification_blocks.clear()
+        self._model_manager.model_change_callbacks.clear()
+        self.state.state_change_callbacks.clear()
+        self.__post_init__()
 
     def _clear_world_entities(self):
         """
