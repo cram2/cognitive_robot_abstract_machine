@@ -31,6 +31,7 @@ from semantic_digital_twin.exceptions import (
     InvalidHingeActiveAxis,
     MissingSemanticAnnotationError,
 )
+from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
@@ -507,8 +508,6 @@ class Wall(HasApertures):
 
     @property
     def doors(self) -> Iterable[Door]:
-        from semantic_digital_twin.reasoning.predicates import InsideOf
-
         return [
             door
             for door in self._world.get_semantic_annotations_by_type(Door)

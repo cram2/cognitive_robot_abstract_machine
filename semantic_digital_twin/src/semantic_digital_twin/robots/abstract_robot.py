@@ -115,7 +115,7 @@ class HasOneArm(HasArms, ABC):
 
 
 @dataclass(eq=False)
-class SpecifiesLeftRightArm(HasArms, ABC):
+class HasLetRightArm(HasArms, ABC):
     """
     Mixin class for robots that have two arms and can specify which is the left and which is the right arm.
     """
@@ -286,8 +286,6 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
             robot._setup_robot_parts()
             robot._setup_collision_rules()
             robot._setup_velocity_limits()
-        for robot_part in robot._robot_parts:
-            robot_part._robot = robot
         return robot
 
     def validate(self) -> bool:

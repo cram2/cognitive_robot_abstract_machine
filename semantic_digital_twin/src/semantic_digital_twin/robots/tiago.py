@@ -16,7 +16,7 @@ from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
 )
 from semantic_digital_twin.robots.abstract_robot import (
-    SpecifiesLeftRightArm,
+    HasLetRightArm,
     AbstractRobot,
     HasTorso,
     HasMobileBase,
@@ -46,7 +46,7 @@ from semantic_digital_twin.world_description.connections import (
 
 
 @dataclass(eq=False)
-class Tiago(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
+class Tiago(AbstractRobot, HasLetRightArm, HasTorso, HasMobileBase):
     """
     Class that describes the Take It And Go Robot (TIAGo).
     """
@@ -342,7 +342,7 @@ class Tiago(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
 
 
 @dataclass(eq=False)
-class TiagoMujoco(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
+class TiagoMujoco(AbstractRobot, HasLetRightArm, HasTorso, HasMobileBase):
     """
     Class that describes the Take It And Go Robot (TIAGo). This version is based on the MuJoCo model, which contains
     less bodies and connections than the URDF version, including missing some crucial links like the camera etc.

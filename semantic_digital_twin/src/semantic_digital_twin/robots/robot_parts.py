@@ -9,7 +9,6 @@ from typing_extensions import (
     TYPE_CHECKING,
     Optional,
     Self,
-    List,
 )
 
 from krrood.adapters.json_serializer import list_like_classes
@@ -19,19 +18,15 @@ from krrood.class_diagrams.attribute_introspector import (
 )
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
-from krrood.entity_query_language.factories import (
-    variable,
-    a,
-    entity,
-    contains,
-)
+from krrood.entity_query_language.factories import variable, contains, entity, a
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     NoJointStateWithType,
-    DuplicateRobotAssignmentsError,
     MismatchingWorld,
+    DuplicateRobotAssignmentsError,
+    UselessConceptError,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -111,14 +106,9 @@ class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
     Fixed joint states that are defined for this robot annotation. 
     """
 
-    sensors: List[Sensor] = field(default_factory=list)
+    sensors: list[Sensor] = field(default_factory=list)
     """
     A collection of sensors in the kinematic chain, such as cameras or other sensors.
-    """
-
-    _robot: Optional[AbstractRobot] = field(default=None, init=False, repr=False)
-    """
-    The robot that this robot part is assigned to.
     """
 
     @synchronized_attribute_modification
@@ -127,14 +117,14 @@ class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
         Adds a joint state to this semantic annotation.
         """
         if not self.is_controlled:
-            raise NotImplementedError(
-                "Adding joint states is only supported for robot parts that can be controlled."
+            raise UselessConceptError(
+                message="Adding joint states is only supported for robot parts that can be controlled."
             )
         self.joint_states.append(joint_state)
         joint_state.assign_to_robot(self._robot)
 
     @synchronized_attribute_modification
-    def add_sensors(self, sensors: List[Sensor]):
+    def add_sensors(self, sensors: list[Sensor]):
         self.sensors.extend(sensors)
 
     def get_joint_state_by_type(self, state_type: JointStateType) -> JointState:
@@ -165,8 +155,8 @@ class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
         scale: Scale = None,
         **kwargs,
     ) -> Self:
-        raise NotImplementedError(
-            "The bodies needed for RobotParts should already exist in the world, by parsing a URDF"
+        raise UselessConceptError(
+            message="The bodies needed for RobotParts should already exist in the world, by parsing a URDF"
         )
 
     @classmethod
@@ -222,6 +212,22 @@ class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
         logger.info(
             f"The field {field.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
         )
+
+    @property
+    def _robot(self) -> Optional[AbstractRobot]:
+        from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+
+        robot_variable = variable(AbstractRobot, self._world.semantic_annotations)
+        robot = (
+            a(entity(robot_variable))
+            .where(contains(robot_variable._robot_parts, self))
+            .tolist()
+        )
+        if len(robot) == 0:
+            return None
+        elif len(robot) > 1:
+            raise DuplicateRobotAssignmentsError(robot_part=self, robots=robot)
+        return robot[0]
 
 
 @dataclass(eq=False)
@@ -329,7 +335,7 @@ class Arm(KinematicChain):
         root_name: str,
         tip_name: str,
         manipulator: Manipulator,
-        sensors: List[Sensor] = None,
+        sensors: list[Sensor] = None,
     ) -> Self:
         if manipulator._world is not world:
             raise MismatchingWorld(world, manipulator._world)
@@ -393,7 +399,7 @@ class Finger(KinematicChain):
         root_name: str,
         tip_name: str,
         finger_tip_frame_name: Optional[str] = None,
-        sensors: List[Sensor] = None,
+        sensors: list[Sensor] = None,
     ) -> Self:
         finger_tip_frame = None
         if finger_tip_frame_name is not None:
@@ -445,7 +451,7 @@ class ParallelGripper(Manipulator):
         front_facing_orientation: Quaternion,
         finger: Finger,
         thumb: Finger,
-        sensors: List[Sensor] = None,
+        sensors: list[Sensor] = None,
     ) -> Self:
         for part in (finger, thumb):
             if part._world is not world:
@@ -477,13 +483,13 @@ class HumanoidGripper(Manipulator):
     The thumb of the humanoid gripper, which is the part that always needs to touch an object when grasping it.
     """
 
-    fingers: List[Finger] = field(default_factory=list)
+    fingers: list[Finger] = field(default_factory=list)
     """
     The fingers of the humanoid gripper, which are the parts that move in parallel to the thumb to grasp objects.
     """
 
     @synchronized_attribute_modification
-    def add_fingers(self, fingers: List[Finger]):
+    def add_fingers(self, fingers: list[Finger]):
         self.fingers.extend(fingers)
 
     @synchronized_attribute_modification
@@ -498,9 +504,9 @@ class HumanoidGripper(Manipulator):
         root_name: str,
         tool_frame_name: str,
         front_facing_orientation: Quaternion,
-        fingers: List[Finger],
+        fingers: list[Finger],
         thumb: Finger,
-        sensors: List[Sensor] = None,
+        sensors: list[Sensor] = None,
     ) -> Self:
         for part in (thumb, *fingers):
             if part._world is not world:
@@ -589,7 +595,7 @@ class Torso(KinematicChain):
         world: World,
         root_name: str,
         tip_name: str,
-        sensors: List[Sensor] = None,
+        sensors: list[Sensor] = None,
     ) -> Self:
         self = cls(
             name=name,
@@ -633,7 +639,7 @@ class MobileBase(RobotPart):
         root_name: str,
         main_axis: Vector3,
         full_body_controlled: bool,
-        sensors: List[Sensor] = None,
+        sensors: list[Sensor] = None,
     ) -> Self:
         self = cls(
             name=name,

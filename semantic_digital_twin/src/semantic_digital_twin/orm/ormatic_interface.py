@@ -554,25 +554,6 @@ class DuplicateWorldEntityErrorDAO_world_entities_association(
     )
 
 
-class SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_association(
-    Base, AssociationDataAccessObject
-):
-
-    __tablename__ = "_55398879348376960425566483383494381522090766330439258780258698"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_semanticannotationcirculardependencyerrordao_id: Mapped[int] = mapped_column(
-        ForeignKey("SemanticAnnotationCircularDependencyErrorDAO.database_id")
-    )
-    target_semanticannotationdao_id: Mapped[int] = mapped_column(
-        ForeignKey("SemanticAnnotationDAO.database_id")
-    )
-
-    target: Mapped[SemanticAnnotationDAO] = relationship(
-        "SemanticAnnotationDAO", foreign_keys=[target_semanticannotationdao_id]
-    )
-
-
 class WorldMappingDAO_kinematic_structure_entities_association(
     Base, AssociationDataAccessObject
 ):
@@ -2470,6 +2451,23 @@ class HasArmsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasArmsDAO",
         "inherit_condition": database_id == HasRobotPartDAO.database_id,
+    }
+
+
+class HasLetRightArmDAO(
+    HasArmsDAO,
+    DataAccessObject[semantic_digital_twin.robots.abstract_robot.HasLetRightArm],
+):
+
+    __tablename__ = "HasLetRightArmDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasArmsDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HasLetRightArmDAO",
+        "inherit_condition": database_id == HasArmsDAO.database_id,
     }
 
 
@@ -4505,23 +4503,6 @@ class SpatialTypeNotJsonSerializableDAO(
     }
 
 
-class SpecifiesLeftRightArmDAO(
-    HasArmsDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.SpecifiesLeftRightArm],
-):
-
-    __tablename__ = "SpecifiesLeftRightArmDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(HasArmsDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "SpecifiesLeftRightArmDAO",
-        "inherit_condition": database_id == HasArmsDAO.database_id,
-    }
-
-
 class SphereDAO(
     ShapeDAO, DataAccessObject[semantic_digital_twin.world_description.geometry.Sphere]
 ):
@@ -5243,38 +5224,6 @@ class MissingWorldModificationContextErrorDAO(
     }
 
 
-class SemanticAnnotationCircularDependencyErrorDAO(
-    UsageErrorDAO,
-    DataAccessObject[
-        semantic_digital_twin.exceptions.SemanticAnnotationCircularDependencyError
-    ],
-):
-
-    __tablename__ = "SemanticAnnotationCircularDependencyErrorDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(UsageErrorDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    semantic_annotations: Mapped[
-        builtins.list[
-            SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_association
-        ]
-    ] = relationship(
-        "SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_association.source_semanticannotationcirculardependencyerrordao_id]",
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "SemanticAnnotationCircularDependencyErrorDAO",
-        "inherit_condition": database_id == UsageErrorDAO.database_id,
-    }
-
-
 class SemanticAnnotationNotInWorldErrorDAO(
     UsageErrorDAO,
     DataAccessObject[
@@ -5399,6 +5348,25 @@ class ReferenceFrameMismatchErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ReferenceFrameMismatchErrorDAO",
         "inherit_condition": database_id == SpatialTypesErrorDAO.database_id,
+    }
+
+
+class UselessConceptErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.UselessConceptError],
+):
+
+    __tablename__ = "UselessConceptErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "UselessConceptErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
     }
 
 
@@ -10303,14 +10271,14 @@ class SetDofHasHardwareInterfaceDAO(
     }
 
 
-class WorldModificationWithLiveReferenceDAO(
+class WorldModificationWithWorldEntityReferenceDAO(
     WorldModificationDAO,
     DataAccessObject[
-        semantic_digital_twin.world_description.world_modification.WorldModificationWithLiveReference
+        semantic_digital_twin.world_description.world_modification.WorldModificationWithWorldEntityReference
     ],
 ):
 
-    __tablename__ = "WorldModificationWithLiveReferenceDAO"
+    __tablename__ = "WorldModificationWithWorldEntityReferenceDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(WorldModificationDAO.database_id),
@@ -10319,13 +10287,13 @@ class WorldModificationWithLiveReferenceDAO(
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "WorldModificationWithLiveReferenceDAO",
+        "polymorphic_identity": "WorldModificationWithWorldEntityReferenceDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
     }
 
 
 class AddActuatorModificationDAO(
-    WorldModificationWithLiveReferenceDAO,
+    WorldModificationWithWorldEntityReferenceDAO,
     DataAccessObject[
         semantic_digital_twin.world_description.world_modification.AddActuatorModification
     ],
@@ -10334,7 +10302,7 @@ class AddActuatorModificationDAO(
     __tablename__ = "AddActuatorModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldModificationWithLiveReferenceDAO.database_id),
+        ForeignKey(WorldModificationWithWorldEntityReferenceDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -10356,12 +10324,12 @@ class AddActuatorModificationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AddActuatorModificationDAO",
         "inherit_condition": database_id
-        == WorldModificationWithLiveReferenceDAO.database_id,
+        == WorldModificationWithWorldEntityReferenceDAO.database_id,
     }
 
 
 class AddConnectionModificationDAO(
-    WorldModificationWithLiveReferenceDAO,
+    WorldModificationWithWorldEntityReferenceDAO,
     DataAccessObject[
         semantic_digital_twin.world_description.world_modification.AddConnectionModification
     ],
@@ -10370,7 +10338,7 @@ class AddConnectionModificationDAO(
     __tablename__ = "AddConnectionModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldModificationWithLiveReferenceDAO.database_id),
+        ForeignKey(WorldModificationWithWorldEntityReferenceDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -10395,12 +10363,12 @@ class AddConnectionModificationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AddConnectionModificationDAO",
         "inherit_condition": database_id
-        == WorldModificationWithLiveReferenceDAO.database_id,
+        == WorldModificationWithWorldEntityReferenceDAO.database_id,
     }
 
 
 class AddDegreeOfFreedomModificationDAO(
-    WorldModificationWithLiveReferenceDAO,
+    WorldModificationWithWorldEntityReferenceDAO,
     DataAccessObject[
         semantic_digital_twin.world_description.world_modification.AddDegreeOfFreedomModification
     ],
@@ -10409,7 +10377,7 @@ class AddDegreeOfFreedomModificationDAO(
     __tablename__ = "AddDegreeOfFreedomModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldModificationWithLiveReferenceDAO.database_id),
+        ForeignKey(WorldModificationWithWorldEntityReferenceDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -10434,12 +10402,12 @@ class AddDegreeOfFreedomModificationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AddDegreeOfFreedomModificationDAO",
         "inherit_condition": database_id
-        == WorldModificationWithLiveReferenceDAO.database_id,
+        == WorldModificationWithWorldEntityReferenceDAO.database_id,
     }
 
 
 class AddKinematicStructureEntityModificationDAO(
-    WorldModificationWithLiveReferenceDAO,
+    WorldModificationWithWorldEntityReferenceDAO,
     DataAccessObject[
         semantic_digital_twin.world_description.world_modification.AddKinematicStructureEntityModification
     ],
@@ -10448,7 +10416,7 @@ class AddKinematicStructureEntityModificationDAO(
     __tablename__ = "AddKinematicStructureEntityModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldModificationWithLiveReferenceDAO.database_id),
+        ForeignKey(WorldModificationWithWorldEntityReferenceDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -10475,7 +10443,7 @@ class AddKinematicStructureEntityModificationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AddKinematicStructureEntityModificationDAO",
         "inherit_condition": database_id
-        == WorldModificationWithLiveReferenceDAO.database_id,
+        == WorldModificationWithWorldEntityReferenceDAO.database_id,
     }
 
 

@@ -29,10 +29,10 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
     CollisionMatrix,
     CollisionCheck,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
+    from semantic_digital_twin.robots.abstract_robot import AbstractRobotf
     from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -299,12 +299,7 @@ class AllowNonRobotCollisions(AllowCollisionRule):
         from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 
         # Bodies that are part of any robot and participate in collisions
-        robot_bodies: set[Body] = {
-            body
-            for robot in world.get_semantic_annotations_by_type(AbstractRobot)
-            for body in robot.bodies_with_collision
-        }
-
+        robot_bodies = set(world.robot_bodies_with_collision)
         # Bodies with collisions that are NOT part of a robot
         non_robot_bodies: set[Body] = set(world.bodies_with_collision) - robot_bodies
         if not non_robot_bodies:

@@ -423,7 +423,7 @@ def test_pr2_semantic_annotation(pr2_world_state_reset):
     assert pr2.sensors[0] == pr2.get_default_camera()
 
 
-def test_specifies_left_right_arm_mixin(pr2_world_state_reset):
+def test_has_left_right_arm_mixin(pr2_world_state_reset):
     pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
     left_arm_chain = list(pr2.left_arm.bodies)
     right_arm_chain = list(pr2.right_arm.bodies)

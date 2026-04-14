@@ -32,7 +32,7 @@ from semantic_digital_twin.robots.robot_parts import (
     HumanoidGripper,
 )
 from semantic_digital_twin.robots.abstract_robot import (
-    SpecifiesLeftRightArm,
+    HasLetRightArm,
     AbstractRobot,
     HasTorso,
     HasMobileBase,
@@ -46,7 +46,7 @@ from semantic_digital_twin.world_description.connections import (
 
 
 @dataclass(eq=False)
-class UnitreeG1(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
+class UnitreeG1(AbstractRobot, HasLetRightArm, HasTorso, HasMobileBase):
     """
     A class representing the Unitree G1 robot by the Unitree Robotics team.
     """

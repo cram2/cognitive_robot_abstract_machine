@@ -12,7 +12,7 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import (
-    SpecifiesLeftRightArm,
+    HasLetRightArm,
     AbstractRobot,
     HasTorso,
     HasMobileBase,
@@ -34,7 +34,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False)
-class ICub3(AbstractRobot, SpecifiesLeftRightArm, HasTorso, HasMobileBase):
+class ICub3(AbstractRobot, HasLetRightArm, HasTorso, HasMobileBase):
     """
     Class that describes the iCub3 Robot.
     """

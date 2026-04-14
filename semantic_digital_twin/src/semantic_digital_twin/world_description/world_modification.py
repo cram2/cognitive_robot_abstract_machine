@@ -76,9 +76,9 @@ class WorldModification(ABC):
 
 
 @dataclass
-class WorldModificationWithLiveReference(WorldModification, ABC):
+class WorldModificationWithWorldEntityReference(WorldModification, ABC):
     """
-    An abstract base class representing a modification to the world which may be synchronized, and which contains a live
+    An abstract base class representing a modification to the world which may be synchronized, and which contains a
      reference to an entity in the world, as those cases may sometimes be treated differently (see World.__deepcopy__).
     """
 
@@ -94,7 +94,9 @@ class WorldModificationWithLiveReference(WorldModification, ABC):
 
 
 @dataclass
-class AddKinematicStructureEntityModification(WorldModificationWithLiveReference):
+class AddKinematicStructureEntityModification(
+    WorldModificationWithWorldEntityReference
+):
     """
     Addition of a body to the world.
     """
@@ -156,7 +158,7 @@ class RemoveKinematicStructureEntityModification(WorldModification):
 
 
 @dataclass
-class AddConnectionModification(WorldModificationWithLiveReference):
+class AddConnectionModification(WorldModificationWithWorldEntityReference):
     """
     Addition of a connection to the world.
     """
@@ -220,7 +222,7 @@ class RemoveConnectionModification(WorldModification):
 
 
 @dataclass
-class AddDegreeOfFreedomModification(WorldModificationWithLiveReference):
+class AddDegreeOfFreedomModification(WorldModificationWithWorldEntityReference):
     """
     Addition of a degree of freedom to the world.
     """
@@ -311,7 +313,7 @@ class RemoveSemanticAnnotationModification(WorldModification):
 
 
 @dataclass
-class AddActuatorModification(WorldModificationWithLiveReference):
+class AddActuatorModification(WorldModificationWithWorldEntityReference):
     actuator: Actuator
 
     original_actuator_id: Optional[UUID] = field(default=None)
@@ -373,7 +375,7 @@ class WorldModelModificationBlock:
         :param world: The world to update the references for.
         """
         for modification in self.modifications:
-            if isinstance(modification, WorldModificationWithLiveReference):
+            if isinstance(modification, WorldModificationWithWorldEntityReference):
                 modification = modification.update_reference_for_world(world)
 
             modification.apply(world)

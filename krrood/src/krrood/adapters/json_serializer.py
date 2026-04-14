@@ -53,6 +53,7 @@ We need to remember if something is a class, because the type of a class is ofte
 """
 
 
+# TODO: Manage to have JSONData as a proper type alias for the JSON typehints, while keeping everything ormaticable @tomsch420
 class JSONData:
     pass
 

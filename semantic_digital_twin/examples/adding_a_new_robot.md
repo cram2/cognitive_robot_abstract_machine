@@ -59,12 +59,12 @@ from dataclasses import dataclass
 from typing import Self
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import HasNeck, SpecifiesLeftRightArm, AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import HasNeck, HasLetRightArm, AbstractRobot
 from semantic_digital_twin.world import World
 
 
 @dataclass(eq=False)
-class MyNewRobot(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
+class MyNewRobot(AbstractRobot, HasLetRightArm, HasNeck):
     """  
 	A nice docstring for your new robot. In this case it has a neck and exactly 2 arms, which can be identified as "Left arm" and "Right arm"
     """
