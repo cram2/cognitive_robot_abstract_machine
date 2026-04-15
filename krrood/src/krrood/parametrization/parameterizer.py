@@ -3,7 +3,7 @@ from __future__ import annotations
 import typing
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 from typing_extensions import Any
@@ -85,6 +85,10 @@ class UnderspecifiedParameters:
 
     generated_events: typing.List = field(init=False, default_factory=list)
 
+    _symbolic_expression_event_cache: Dict[
+        SymbolicExpression, Tuple[Event, Dict[str, random_events.variable.Variable]]
+    ] = field(init=False, default_factory=dict)
+
     def __post_init__(self):
         self.statement.expression.build()
         self._random_event_compiler = WhereExpressionToRandomEventTranslator(
@@ -105,7 +109,10 @@ class UnderspecifiedParameters:
             name = attribute_match.name_from_variable_access_path
 
             if isinstance(attribute_match.assigned_value, SymbolicExpression):
-                self._create_variables_from_symbolic_expression(attribute_match)
+                variables = self._create_variables_from_symbolic_expression(
+                    attribute_match
+                )
+                result.update(variables)
                 continue
             if attribute_match.assigned_variable._type_ is None or not issubclass(
                 attribute_match.assigned_variable._type_,
@@ -122,7 +129,10 @@ class UnderspecifiedParameters:
 
     def _create_variables_from_symbolic_expression(
         self, attribute_match: AttributeMatch
-    ):
+    ) -> Dict[str, random_events.variable.Variable]:
+
+        if attribute_match.assigned_value in self._symbolic_expression_event_cache:
+            return self._symbolic_expression_event_cache[attribute_match.assigned_value]
 
         result = {}
 
@@ -172,12 +182,14 @@ class UnderspecifiedParameters:
             )
             simple_events.append(current_simple_event)
 
-        resulting_event = Event.from_simple_sets(
-            *simple_events
-        )
+        resulting_event = Event.from_simple_sets(*simple_events)
         self.generated_events.append(resulting_event)
+        self._symbolic_expression_event_cache[attribute_match.assigned_value] = (
+            resulting_event,
+            result,
+        )
 
-        return resulting_event
+        return result
 
     @property
     def assignments_for_conditioning(
