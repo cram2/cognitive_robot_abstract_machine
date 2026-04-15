@@ -8,7 +8,7 @@ from importlib.resources import files
 from pathlib import Path
 
 from semantic_digital_twin.robots.abstract_robot import (
-    HasLetRightArm,
+    HasLeftRightArm,
     HasTorso,
     HasMobileBase,
     AbstractRobot,
@@ -47,7 +47,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False)
-class PR2(AbstractRobot, HasLetRightArm, HasTorso, HasMobileBase):
+class PR2(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
     """
     Represents the Personal Robot 2 (PR2), which was originally created by Willow Garage.
     The PR2 robot consists of two arms, each with a parallel gripper, a head with a camera, and a prismatic torso

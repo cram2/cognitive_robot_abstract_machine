@@ -2456,7 +2456,7 @@ class HasArmsDAO(
 
 class HasLetRightArmDAO(
     HasArmsDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.HasLetRightArm],
+    DataAccessObject[semantic_digital_twin.robots.abstract_robot.HasLeftRightArm],
 ):
 
     __tablename__ = "HasLetRightArmDAO"

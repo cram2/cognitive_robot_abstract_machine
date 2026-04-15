@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from semantic_digital_twin.robots.abstract_robot import (
-    HasLetRightArm,
+    HasLeftRightArm,
     AbstractRobot,
     HasMobileBase,
     HasTorso,
@@ -35,7 +35,7 @@ from semantic_digital_twin.world_description.connections import (
 
 
 @dataclass(eq=False)
-class Armar7(AbstractRobot, HasLetRightArm, HasMobileBase, HasTorso):
+class Armar7(AbstractRobot, HasLeftRightArm, HasMobileBase, HasTorso):
     """
     Class that describes the Armar7 Robot.
     """

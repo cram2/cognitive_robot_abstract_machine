@@ -115,7 +115,7 @@ class HasOneArm(HasArms, ABC):
 
 
 @dataclass(eq=False)
-class HasLetRightArm(HasArms, ABC):
+class HasLeftRightArm(HasArms, ABC):
     """
     Mixin class for robots that have two arms and can specify which is the left and which is the right arm.
     """

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from semantic_digital_twin.robots.abstract_robot import (
-    HasLetRightArm,
+    HasLeftRightArm,
     AbstractRobot,
     HasTorso,
     HasMobileBase,
@@ -34,7 +34,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False)
-class Justin(AbstractRobot, HasLetRightArm, HasTorso, HasMobileBase):
+class Justin(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
     """
     Class that describes the Justin Robot.
     """
