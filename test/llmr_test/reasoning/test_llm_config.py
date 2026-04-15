@@ -1,6 +1,4 @@
 """Tests for LLM factory — make_llm and LLMProvider.
-
-Coverage target: 80% (5 tests covering provider selection and error handling).
 """
 from __future__ import annotations
 

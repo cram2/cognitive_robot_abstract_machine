@@ -1,20 +1,31 @@
 """Root conftest for llmr tests — krrood-aligned test fixtures.
 
-Autouse cleanup: SymbolGraph is real, singleton, and cleared between tests.
-Pattern: SymbolGraph() to ensure singleton exists, yield, clear() after test.
+
 """
 from __future__ import annotations
 
 import pytest
-from krrood.symbol_graph.symbol_graph import SymbolGraph
+from krrood.class_diagrams import ClassDiagram
+from krrood.ontomatic.property_descriptor.attribute_introspector import (
+    DescriptorAwareIntrospector,
+)
+from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
+from krrood.utils import recursive_subclasses
 
 
 @pytest.fixture(autouse=True)
 def cleanup_after_test() -> None:
-    """Ensure SymbolGraph exists, yield for test, clear after.
+    """Rebuild SymbolGraph from scratch before each test, tear down after.
 
+    Ensures no stale wrapped-class metadata leaks between tests.
     Krrood pattern: real singleton, no mocking.
     """
-    SymbolGraph()  # ensure singleton exists before test
+    SymbolGraph.clear()
+    class_diagram = ClassDiagram(
+        recursive_subclasses(Symbol),
+        introspector=DescriptorAwareIntrospector(),
+    )
+    SymbolGraph(_class_diagram=class_diagram)
     yield
-    SymbolGraph().clear()  # wipe state after every test
+    SymbolGraph.clear()
+    class_diagram.clear()

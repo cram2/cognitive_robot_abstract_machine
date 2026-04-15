@@ -1,13 +1,11 @@
 """Tests for PycramIntrospector — action introspection and field classification.
 
 Tests use MockPickUpAction, MockNavigateAction, MockGraspDescription from test_actions.py.
-No PyCRAM installation needed.
-
-Coverage target: 80% (16 tests covering introspection and type classification).
 """
 from __future__ import annotations
 
-from typing_extensions import Optional
+from dataclasses import dataclass, field
+from typing_extensions import List, Optional, Type
 from krrood.symbol_graph.symbol_graph import Symbol
 
 from llmr.pycram_bridge.introspector import (
@@ -20,6 +18,20 @@ from ..test_actions import (
     MockPickUpAction,
     MockNavigateAction,
 )
+
+
+@dataclass
+class MockTypeRefAction:
+    """Action with a type reference slot."""
+
+    annotation_type: Type[Symbol]
+
+
+@dataclass
+class MockContainerAction:
+    """Action with a collection field."""
+
+    object_designators: List[Symbol] = field(default_factory=list)
 
 
 class TestIntrospect:
@@ -111,50 +123,69 @@ class TestIntrospect:
         obj_field = next(f for f in schema.fields if f.name == "object_designator")
         assert obj_field.docstring == "The object to pick up."
 
+    def test_type_ref_field_keeps_inner_type(
+        self, introspector: PycramIntrospector
+    ) -> None:
+        """Type[X] fields are classified as TYPE_REF with raw_type set to X."""
+        schema = introspector.introspect(MockTypeRefAction)
+        type_field = next(f for f in schema.fields if f.name == "annotation_type")
+        assert type_field.kind == FieldKind.TYPE_REF
+        assert type_field.raw_type is Symbol
+
+    def test_container_field_not_reclassified_as_single_entity(
+        self, introspector: PycramIntrospector
+    ) -> None:
+        """Container endpoints stay compatible with the previous primitive fallback."""
+        schema = introspector.introspect(MockContainerAction)
+        container_field = next(
+            f for f in schema.fields if f.name == "object_designators"
+        )
+        assert container_field.kind == FieldKind.PRIMITIVE
+
 
 class TestClassifyType:
-    """_classify_type() for each FieldKind."""
+    """classify_type() for each FieldKind."""
 
     def test_symbol_subclass_is_entity(
         self, introspector: PycramIntrospector
     ) -> None:
         """Symbol and its subclasses classified as ENTITY."""
-        kind = introspector._classify_type(Symbol)
+        kind = introspector.classify_type(Symbol)
         assert kind == FieldKind.ENTITY
 
     def test_enum_subclass_is_enum(
         self, introspector: PycramIntrospector
     ) -> None:
         """Enum subclasses classified as ENUM."""
-        kind = introspector._classify_type(GraspType)
+        kind = introspector.classify_type(GraspType)
         assert kind == FieldKind.ENUM
 
     def test_bool_is_primitive(self, introspector: PycramIntrospector) -> None:
         """bool classified as PRIMITIVE."""
-        assert introspector._classify_type(bool) == FieldKind.PRIMITIVE
+        assert introspector.classify_type(bool) == FieldKind.PRIMITIVE
 
     def test_int_is_primitive(self, introspector: PycramIntrospector) -> None:
         """int classified as PRIMITIVE."""
-        assert introspector._classify_type(int) == FieldKind.PRIMITIVE
+        assert introspector.classify_type(int) == FieldKind.PRIMITIVE
 
     def test_str_is_primitive(self, introspector: PycramIntrospector) -> None:
         """str classified as PRIMITIVE."""
-        assert introspector._classify_type(str) == FieldKind.PRIMITIVE
+        assert introspector.classify_type(str) == FieldKind.PRIMITIVE
 
     def test_float_is_primitive(self, introspector: PycramIntrospector) -> None:
         """float classified as PRIMITIVE."""
-        assert introspector._classify_type(float) == FieldKind.PRIMITIVE
+        assert introspector.classify_type(float) == FieldKind.PRIMITIVE
 
     def test_dataclass_is_complex(
         self, introspector: PycramIntrospector
     ) -> None:
         """Non-primitive dataclass classified as COMPLEX."""
-        kind = introspector._classify_type(MockGraspDescription)
+        kind = introspector.classify_type(MockGraspDescription)
         assert kind == FieldKind.COMPLEX
 
     def test_none_type_is_primitive(
         self, introspector: PycramIntrospector
     ) -> None:
         """None / type(None) classified as PRIMITIVE."""
-        assert introspector._classify_type(None) == FieldKind.PRIMITIVE
-        assert introspector._classify_type(type(None)) == FieldKind.PRIMITIVE
+        assert introspector.classify_type(None) == FieldKind.PRIMITIVE
+        assert introspector.classify_type(type(None)) == FieldKind.PRIMITIVE

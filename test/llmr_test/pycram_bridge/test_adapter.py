@@ -1,10 +1,7 @@
 """Tests for pycram_bridge.adapter — action discovery and protocols.
-
-Coverage target: 70% (6 tests covering discover_action_classes and protocol protocols).
 """
 from __future__ import annotations
 
-import pytest
 from types import SimpleNamespace
 from llmr.pycram_bridge.adapter import (
     PycramContext,
@@ -100,7 +97,7 @@ class TestPycramPlanNodeProtocol:
 
         class FakePlanNode:
             def perform(self) -> None:
-                pass
+                return None
 
         node = FakePlanNode()
         assert isinstance(node, PycramPlanNode)

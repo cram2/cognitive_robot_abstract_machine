@@ -1,6 +1,4 @@
 """Test action dataclasses — minimal PyCRAM-free stand-ins for introspection and slot-filling tests.
-
-No PyCRAM installation needed. These follow krrood-style per-field docstrings.
 """
 from __future__ import annotations
 

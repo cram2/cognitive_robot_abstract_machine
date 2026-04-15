@@ -1,8 +1,6 @@
 """Tests for SlotValue, ActionReasoningOutput, ActionClassification.
 
 Pure Pydantic validation — no fixtures needed.
-
-Coverage target: 85% (10 tests covering all slots schemas and validation).
 """
 from __future__ import annotations
 

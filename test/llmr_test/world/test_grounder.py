@@ -1,11 +1,8 @@
 """Tests for EntityGrounder — entity description to Symbol resolution.
-
-Coverage target: 85% (15 tests covering helper functions and basic logic).
 """
 from __future__ import annotations
 
 from typing_extensions import Dict, Any
-import pytest
 from types import SimpleNamespace
 
 from krrood.symbol_graph.symbol_graph import Symbol
@@ -18,6 +15,7 @@ from llmr.world.grounder import (
     _camel_to_tokens,
 )
 from llmr.world.serializer import body_display_name, body_xyz, body_bounding_box
+from .conftest import WorldBody
 
 
 class TestEntityGrounder:
@@ -44,8 +42,8 @@ class TestEntityGrounder:
         grounder = EntityGrounder()
         description = EntityDescriptionSchema(name="nonexistent_xyz_12345")
         result = grounder.ground(description)
-        # Nonexistent entity should have warning
-        assert result.warning is not None or len(result.bodies) == 0
+        assert result.bodies == []
+        assert result.warning is not None
 
     def test_ground_accepts_semantic_type(self) -> None:
         """ground() accepts semantic_type in description."""
@@ -55,6 +53,61 @@ class TestEntityGrounder:
         )
         result = grounder.ground(description)
         assert isinstance(result, GroundingResult)
+
+    def test_name_grounding_returns_exact_matching_symbol(
+        self, symbol_world: Dict[str, Any]
+    ) -> None:
+        """Name grounding returns matching SymbolGraph instances."""
+        grounder = EntityGrounder(groundable_type=symbol_world["body_type"])
+        result = grounder.ground(EntityDescriptionSchema(name="red_cup"))
+
+        assert result.bodies == [symbol_world["red_cup"]]
+        assert result.warning is None
+
+    def test_semantic_type_grounding_returns_annotated_body(
+        self, symbol_world: Dict[str, Any]
+    ) -> None:
+        """Semantic type grounding follows annotation .bodies links."""
+        result = EntityGrounder(groundable_type=symbol_world["body_type"]).ground(
+            EntityDescriptionSchema(
+                name="milk",
+                semantic_type=symbol_world["annotation_type"].__name__,
+            )
+        )
+
+        assert result.bodies == [symbol_world["milk_on_table"]]
+
+    def test_multiple_name_matches_return_warning(
+        self, symbol_world: Dict[str, Any]
+    ) -> None:
+        """Ambiguous grounding keeps candidates and reports the ambiguity."""
+        result = EntityGrounder(groundable_type=symbol_world["body_type"]).ground(
+            EntityDescriptionSchema(name="cup")
+        )
+
+        assert result.bodies == [symbol_world["red_cup"], symbol_world["blue_cup"]]
+        assert result.warning is not None
+        assert "2 candidates" in result.warning
+
+    def test_attribute_filter_narrows_candidates(
+        self, symbol_world: Dict[str, Any]
+    ) -> None:
+        """Attribute values narrow ambiguous name matches."""
+        result = EntityGrounder(groundable_type=symbol_world["body_type"]).ground(
+            EntityDescriptionSchema(name="cup", attributes={"color": "blue"})
+        )
+
+        assert result.bodies == [symbol_world["blue_cup"]]
+
+    def test_spatial_context_filters_by_parent_subtree(
+        self, symbol_world: Dict[str, Any]
+    ) -> None:
+        """Spatial context can narrow candidates by parent subtree."""
+        result = EntityGrounder(groundable_type=symbol_world["body_type"]).ground(
+            EntityDescriptionSchema(name="milk", spatial_context="on the table")
+        )
+
+        assert result.bodies == [symbol_world["milk_on_table"]]
 
     def test_ground_accepts_spatial_context(self) -> None:
         """ground() accepts spatial_context in description."""
@@ -84,23 +137,22 @@ class TestEntityGrounder:
         grounder = EntityGrounder()
         description = EntityDescriptionSchema(name="test")
         result = grounder.ground(description)
-        assert result.warning is None or isinstance(result.warning, str)
+        assert result.warning is not None
+        assert isinstance(result.warning, str)
 
 
 class TestResolveSymbolClass:
     """resolve_symbol_class() — semantic type to Symbol subclass resolution."""
 
     def test_exact_class_name_match(self) -> None:
-        """Exact class name match resolves correctly."""
-        # Symbol itself should always resolve
-        cls = resolve_symbol_class("Symbol")
-        assert cls is Symbol or cls is None  # Depends on SymbolGraph state
+        """Exact class name match resolves a concrete Symbol subclass."""
+        cls = resolve_symbol_class("WorldBody")
+        assert cls is WorldBody
 
     def test_case_insensitive_match(self) -> None:
         """Class name matching is case-insensitive."""
-        cls = resolve_symbol_class("symbol")
-        # May return Symbol or None depending on SymbolGraph, just verify type
-        assert cls is None or isinstance(cls, type)
+        cls = resolve_symbol_class("worldbody")
+        assert cls is WorldBody
 
     def test_returns_none_for_unknown_type(self) -> None:
         """Returns None for unknown semantic type."""
@@ -126,7 +178,7 @@ class TestCamelToTokens:
     def test_handles_underscores(self) -> None:
         """Underscores are preserved during conversion."""
         tokens = _camel_to_tokens("My_CamelCase")
-        assert "my" in tokens.lower() or "camel" in tokens.lower()
+        assert tokens == "my_camel case"
 
 
 class TestBodyHelpers:

@@ -1,12 +1,9 @@
 """Tests for TaskDecomposer — NL instruction decomposition.
 
 Uses ScriptedLLM with pre-built responses. No network, no API keys.
-
-Coverage target: 75% (9 tests covering decomposition and helper logic).
 """
 from __future__ import annotations
 
-import pytest
 from ..scripted_llm import ScriptedLLM
 from llmr.reasoning.decomposer import (
     TaskDecomposer,
@@ -73,8 +70,7 @@ class TestDecompose:
         llm = ScriptedLLM(responses=[response])
         decomposer = TaskDecomposer(llm=llm)
         result = decomposer.decompose("pick up the ball and throw it")
-        # Step 1 should depend on step 0
-        assert 1 in result.dependencies or len(result.dependencies) > 0
+        assert result.dependencies == {1: [0]}
 
     def test_no_dependency_for_independent_steps(self) -> None:
         """Independent steps have no dependencies."""
@@ -87,8 +83,7 @@ class TestDecompose:
         llm = ScriptedLLM(responses=[response])
         decomposer = TaskDecomposer(llm=llm)
         result = decomposer.decompose("go to the kitchen and go to the bedroom")
-        # These are independent, so no dependencies
-        assert result.dependencies == {} or len(result.dependencies) == 0
+        assert result.dependencies == {}
 
     def test_dedup_removes_repeated_steps(self) -> None:
         """Duplicate steps are removed."""
@@ -102,8 +97,7 @@ class TestDecompose:
         llm = ScriptedLLM(responses=[response])
         decomposer = TaskDecomposer(llm=llm)
         result = decomposer.decompose("go to table, pick up milk, go back to table")
-        # Deduplication should have occurred
-        assert len(result.steps) <= 3
+        assert result.steps == ["go to the table", "pick up milk"]
 
     def test_dedup_preserves_order(self) -> None:
         """Deduplication preserves step order."""
@@ -117,13 +111,7 @@ class TestDecompose:
         llm = ScriptedLLM(responses=[response])
         decomposer = TaskDecomposer(llm=llm)
         result = decomposer.decompose("A then B then A again")
-        # The first occurrence of A should come before B
-        if "step A" in result.steps:
-            a_idx = result.steps.index("step A")
-            if "step B" in result.steps:
-                b_idx = result.steps.index("step B")
-                # Either only one A (deduped) or A comes before B
-                assert a_idx < b_idx or result.steps.count("step A") == 1
+        assert result.steps == ["step A", "step B"]
 
     def test_graceful_fallback_when_llm_fails(self) -> None:
         """When LLM fails, returns single-step fallback plan."""
@@ -154,6 +142,18 @@ class TestDecompose:
         llm = ScriptedLLM(responses=[response])
         decomposer = TaskDecomposer(llm=llm)
         result = decomposer.decompose("some instruction")
-        # Out-of-range dependency should be clamped/removed
-        if 1 in result.dependencies:
-            assert 999 not in result.dependencies.get(1, [])
+        assert result.dependencies == {}
+
+    def test_self_dependencies_are_removed(self) -> None:
+        """Self-dependency indices are removed from the dependency graph."""
+        response = _DecomposedInstructions(
+            steps=[
+                _AtomicStep(instruction="step 0", dependencies=[0]),
+                _AtomicStep(instruction="step 1", dependencies=[0, 1]),
+            ]
+        )
+        llm = ScriptedLLM(responses=[response])
+
+        result = TaskDecomposer(llm=llm).decompose("some instruction")
+
+        assert result.dependencies == {1: [0]}

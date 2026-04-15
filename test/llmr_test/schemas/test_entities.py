@@ -1,8 +1,6 @@
 """Tests for EntityDescriptionSchema.
 
 Pure Pydantic validation — no fixtures needed.
-
-Coverage target: 85% (6 tests covering all fields and validation edge cases).
 """
 from __future__ import annotations
 

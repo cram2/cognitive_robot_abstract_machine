@@ -2,8 +2,6 @@
 
 All exceptions inherit from krrood.utils.DataclassException and provide
 structured error messages via __post_init__.
-
-Coverage target: 100% (5 tests for 5 exception classes).
 """
 from __future__ import annotations
 
@@ -73,4 +71,5 @@ class TestLLMActionRegistryEmpty:
         """Message should be descriptive."""
         exc = LLMActionRegistryEmpty()
         assert len(exc.message) > 0
-        assert "registry" in exc.message.lower() or "action" in exc.message.lower()
+        assert "registry" in exc.message.lower()
+        assert "actions" in exc.message.lower()
