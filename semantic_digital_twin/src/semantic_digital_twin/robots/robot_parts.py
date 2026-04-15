@@ -93,6 +93,20 @@ class AggregatesRobotParts(ABC):
 
         return robot_parts
 
+    @property
+    def manipulators(self) -> list[RobotPart]:
+        """
+        A collection of all manipulators in the robot.
+        """
+        return [part for part in self._robot_parts if isinstance(part, Manipulator)]
+
+    @property
+    def sensors(self) -> list[Sensor]:
+        """
+        A collection of all sensors in the robot.
+        """
+        return [part for part in self._robot_parts if isinstance(part, Sensor)]
+
 
 @dataclass(eq=False)
 class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
@@ -195,7 +209,7 @@ class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
         wrapped_field = WrappedField(wrapped_class, field.field)
         type_endpoint = wrapped_field.type_endpoint
 
-        if isinstance(value, (list, set)) and issubclass(
+        if isinstance(value, list_like_classes) and issubclass(
             wrapped_field.contained_type, RobotPart
         ):
             if not value:
@@ -210,7 +224,7 @@ class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
 
     def _log_missing_field(self, field: DiscoveredAttribute):
         logger.info(
-            f"The field {field.public_name} of {self.__class__.__name__} is empty. Please confirm that this is intentional."
+            f"The field {field.public_name} of {self.__class__.__name__} is empty."
         )
 
     @property
@@ -229,6 +243,23 @@ class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
             raise DuplicateRobotAssignmentsError(robot_part=self, robots=robot)
         return robot[0]
 
+    def _default_hardware_interface_setup(self):
+        """
+        Sets up a default hardware interface for the robot part by setting the has_hardware_interface flag to True for
+         all active connections of all robot parts in this robot part
+        """
+        for robot_part in self._robot_parts:
+            for connection in robot_part.active_connections:
+                connection.has_hardware_interface = True
+
+    @property
+    def active_connections(self) -> list[ActiveConnection]:
+        return [
+            connection
+            for connection in self.connections
+            if isinstance(connection, ActiveConnection)
+        ]
+
 
 @dataclass(eq=False)
 class KinematicChain(RobotPart, ABC):
@@ -246,9 +277,6 @@ class KinematicChain(RobotPart, ABC):
     def _kinematic_structure_entities(
         self, visited: Set[int]
     ) -> list[KinematicStructureEntity]:
-        """
-        Returns itself as a kinematic chain of bodies.
-        """
         if id(self) in visited:
             return []
         visited.add(id(self))
@@ -276,14 +304,6 @@ class KinematicChain(RobotPart, ABC):
             return [self.root.parent_connection]
         return self._world.compute_chain_of_connections(self.root, self.tip)
 
-    @property
-    def active_connections(self) -> list[ActiveConnection]:
-        return [
-            connection
-            for connection in self.connections
-            if isinstance(connection, ActiveConnection)
-        ]
-
 
 @dataclass(eq=False)
 class Arm(KinematicChain):
@@ -303,9 +323,6 @@ class Arm(KinematicChain):
     def _kinematic_structure_entities(
         self, visited: Set[int]
     ) -> list[KinematicStructureEntity]:
-        """
-        Returns itself as a kinematic chain of bodies.
-        """
         if id(self) in visited:
             return []
         visited.add(id(self))
@@ -371,8 +388,6 @@ class Manipulator(RobotPart, ABC):
     """
     The axis of the manipulator's tool frame that is facing forward.
     """
-
-    is_controlled = True
 
     def __post_init__(self):
         super().__post_init__()
@@ -472,7 +487,7 @@ class ParallelGripper(Manipulator):
 
 
 @dataclass(eq=False)
-class HumanoidGripper(Manipulator):
+class HumanoidHand(Manipulator):
     """
     Represents a human-like gripper of a robot. Contains a collection of fingers and a thumb. The thumb is a specific finger
     that always needs to touch an object when grasping it, ensuring a stable grasp.
@@ -614,7 +629,7 @@ class MobileBase(RobotPart):
     The base of a robot
     """
 
-    main_axis: Vector3 = field(default_factory=Vector3.X)
+    forward_axis: Vector3 = field(default_factory=Vector3.X)
     """
     Axis along which the robot manipulates
     """
@@ -637,14 +652,14 @@ class MobileBase(RobotPart):
         name: PrefixedName,
         world: World,
         root_name: str,
-        main_axis: Vector3,
+        forward_axis: Vector3,
         full_body_controlled: bool,
         sensors: list[Sensor] = None,
     ) -> Self:
         self = cls(
             name=name,
             root=world.get_body_by_name(root_name),
-            main_axis=main_axis,
+            forward_axis=forward_axis,
             full_body_controlled=full_body_controlled,
         )
         if sensors is not None:

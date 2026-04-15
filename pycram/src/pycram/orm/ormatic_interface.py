@@ -3850,7 +3850,7 @@ class GraspingActionDAO(
 
 class HasRobotPartDAO(
     AggregatesRobotPartsDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.HasRobotPart],
+    DataAccessObject[semantic_digital_twin.robots.abstract_robot.RobotPartSetupMixin],
 ):
 
     __tablename__ = "HasRobotPartDAO"
@@ -17595,7 +17595,7 @@ class ManipulatorDAO(
 
 class HumanoidGripperDAO(
     ManipulatorDAO,
-    DataAccessObject[semantic_digital_twin.robots.robot_parts.HumanoidGripper],
+    DataAccessObject[semantic_digital_twin.robots.robot_parts.HumanoidHand],
 ):
 
     __tablename__ = "HumanoidGripperDAO"

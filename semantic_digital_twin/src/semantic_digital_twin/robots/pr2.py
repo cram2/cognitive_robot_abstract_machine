@@ -185,8 +185,7 @@ class PR2(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
 
     def _setup_arm_hardware_interfaces(self):
         for arm in self.arms:
-            for connection in arm.active_connections:
-                connection.has_hardware_interface = True
+            arm._default_hardware_interface_setup()
 
     def _setup_arm_joint_state(self):
         right_arm_park = JointState.from_mapping(
@@ -293,8 +292,7 @@ class PR2(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         self.add_torso(torso)
 
     def _setup_torso_hardware_interfaces(self):
-        for connection in self.torso.active_connections:
-            connection.has_hardware_interface = True
+        self.torso._default_hardware_interface_setup()
 
     def _setup_torso_joint_state(self):
         torso_joint = [self._world.get_connection_by_name("torso_lift_joint")]
@@ -327,7 +325,7 @@ class PR2(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
             name=PrefixedName("base", prefix=self.name.name),
             root_name="base_link",
             world=self._world,
-            main_axis=Vector3.X(),
+            forward_axis=Vector3.X(),
             full_body_controlled=False,
         )
         self.add_mobile_base(base)
@@ -347,14 +345,3 @@ class PR2(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
             },
         )
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
-
-    def _setup_other_hardware_interfaces(self):
-        controlled_joints = [
-            "head_pan_joint",
-            "head_tilt_joint",
-        ]
-        for joint_name in controlled_joints:
-            connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
-            )
-            connection.has_hardware_interface = True

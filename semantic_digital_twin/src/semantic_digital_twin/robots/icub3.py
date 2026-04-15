@@ -23,7 +23,7 @@ from semantic_digital_twin.robots.robot_parts import (
     Camera,
     FieldOfView,
     Torso,
-    HumanoidGripper,
+    HumanoidHand,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
@@ -50,9 +50,6 @@ class ICub3(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         return world.get_body_by_name("base_footprint")
 
     def _setup_collision_rules(self):
-        pass
-
-    def _setup_other_hardware_interfaces(self):
         pass
 
     def _setup_arm_semantic_annotations(self):
@@ -94,7 +91,7 @@ class ICub3(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
             world=world,
         )
 
-        left_gripper = HumanoidGripper.create_and_add_to_world(
+        left_gripper = HumanoidHand.create_and_add_to_world(
             name=PrefixedName("left_gripper", prefix=self.name.name),
             root_name="l_hand",
             tool_frame_name="l_gripper_tool_frame",
@@ -150,7 +147,7 @@ class ICub3(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
             world=world,
         )
 
-        right_gripper = HumanoidGripper.create_and_add_to_world(
+        right_gripper = HumanoidHand.create_and_add_to_world(
             name=PrefixedName("right_gripper", prefix=self.name.name),
             root_name="r_hand",
             tool_frame_name="r_gripper_tool_frame",
@@ -175,7 +172,8 @@ class ICub3(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         self.add_arm(right_arm)
 
     def _setup_arm_hardware_interfaces(self):
-        pass
+        for arm in self.arms:
+            arm._default_hardware_interface_setup()
 
     def _setup_arm_joint_state(self):
         left_arm = self.left_arm

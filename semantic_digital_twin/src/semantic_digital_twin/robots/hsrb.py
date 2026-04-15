@@ -68,7 +68,7 @@ class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
         gripper_finger = Finger.create_and_add_to_world(
             name=PrefixedName("finger", prefix=self.name.name),
             root_name="hand_r_proximal_link",
-            tip_name="hand_r_finger_tip_frame", #"hand_r_distal_link",
+            tip_name="hand_r_finger_tip_frame",  # "hand_r_distal_link",
             world=self._world,
         )
 
@@ -110,8 +110,7 @@ class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
         self.add_arm(arm)
 
     def _setup_arm_hardware_interfaces(self):
-        for connection in self.arm.active_connections:
-            connection.has_hardware_interface = True
+        self.arm._default_hardware_interface_setup()
 
     def _setup_arm_joint_state(self):
         # Create states
@@ -203,7 +202,7 @@ class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
         torso = Torso.create_and_add_to_world(
             name=PrefixedName("torso", prefix=self.name.name),
             root_name="base_link",
-            tip_name="torso_lift_link",
+            tip_name="head_tilt_link",
             sensors=[
                 head_center_camera,
                 head_r_camera,
@@ -215,8 +214,7 @@ class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
         self.add_torso(torso)
 
     def _setup_torso_hardware_interfaces(self):
-        for connection in self.torso.active_connections:
-            connection.has_hardware_interface = True
+        self.torso._default_hardware_interface_setup()
 
     def _setup_torso_joint_state(self):
         torso_joint = [self._world.get_connection_by_name("torso_lift_joint")]
@@ -248,7 +246,7 @@ class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
             name=PrefixedName("base", prefix=self.name.name),
             root_name="base_link",
             world=self._world,
-            main_axis=Vector3.X(),
+            forward_axis=Vector3.X(),
             full_body_controlled=True,
         )
 
@@ -305,14 +303,3 @@ class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(lambda: 1)
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
-
-    def _setup_other_hardware_interfaces(self):
-        controlled_joints = [
-            "head_pan_joint",
-            "head_tilt_joint",
-        ]
-        for joint_name in controlled_joints:
-            connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
-            )
-            connection.has_hardware_interface = True

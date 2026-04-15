@@ -124,8 +124,7 @@ class Tiago(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
 
     def _setup_arm_hardware_interfaces(self):
         for arm in self.arms:
-            for connection in arm.active_connections:
-                connection.has_hardware_interface = True
+            arm._default_hardware_interface_setup()
 
     def _setup_arm_joint_state(self):
         # Create states
@@ -217,15 +216,14 @@ class Tiago(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         torso = Torso.create_and_add_to_world(
             name=PrefixedName("torso", prefix=self.name.name),
             root_name="torso_fixed_link",
-            tip_name="torso_lift_link",
+            tip_name="head_2_link",
             world=self._world,
             sensors=[camera],
         )
         self.add_torso(torso)
 
     def _setup_torso_hardware_interfaces(self):
-        for connection in self.torso.active_connections:
-            connection.has_hardware_interface = True
+        self.torso._default_hardware_interface_setup()
 
     def _setup_torso_joint_state(self):
         torso_joint = [self._world.get_connection_by_name("torso_lift_joint")]
@@ -257,7 +255,7 @@ class Tiago(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
             name=PrefixedName("base", prefix=self.name.name),
             root_name="base_link",
             world=self._world,
-            main_axis=Vector3.X(),
+            forward_axis=Vector3.X(),
             full_body_controlled=False,
         )
 
@@ -326,19 +324,6 @@ class Tiago(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(lambda: 1)
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
-
-    def _setup_other_hardware_interfaces(self):
-        controlled_joints = [
-            "head_1_joint",
-            "head_2_joint",
-            "gripper_right_finger_joint",
-            "gripper_left_finger_joint",
-        ]
-        for joint_name in controlled_joints:
-            connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
-            )
-            connection.has_hardware_interface = True
 
 
 @dataclass(eq=False)
@@ -420,7 +405,8 @@ class TiagoMujoco(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         self.add_arm(right_arm)
 
     def _setup_arm_hardware_interfaces(self):
-        pass
+        for arm in self.arms:
+            arm._default_hardware_interface_setup()
 
     def _setup_arm_joint_state(self):
         # Create states
@@ -504,13 +490,13 @@ class TiagoMujoco(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         torso = Torso.create_and_add_to_world(
             name=PrefixedName("torso", prefix=self.name.name),
             root_name="base_link",
-            tip_name="torso_lift_link",
+            tip_name="head_2_link",
             world=self._world,
         )
         self.add_torso(torso)
 
     def _setup_torso_hardware_interfaces(self):
-        pass
+        self.torso._default_hardware_interface_setup()
 
     def _setup_torso_joint_state(self):
         torso_joint = [self._world.get_connection_by_name("torso_lift_joint")]
@@ -542,7 +528,7 @@ class TiagoMujoco(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
             name=PrefixedName("base", prefix=self.name.name),
             root_name="base_link",
             world=self._world,
-            main_axis=Vector3.X(),
+            forward_axis=Vector3.X(),
             full_body_controlled=False,
         )
 
@@ -552,7 +538,4 @@ class TiagoMujoco(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         pass
 
     def _setup_velocity_limits(self):
-        pass
-
-    def _setup_other_hardware_interfaces(self):
         pass

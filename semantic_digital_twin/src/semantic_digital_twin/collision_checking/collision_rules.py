@@ -296,8 +296,6 @@ class AllowNonRobotCollisions(AllowCollisionRule):
         """
         Disable collision checks between bodies that do not belong to any robot.
         """
-        from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-
         # Bodies that are part of any robot and participate in collisions
         robot_bodies = set(world.robot_bodies_with_collision)
         # Bodies with collisions that are NOT part of a robot

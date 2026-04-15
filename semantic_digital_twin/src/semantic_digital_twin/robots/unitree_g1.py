@@ -29,7 +29,7 @@ from semantic_digital_twin.robots.robot_parts import (
     FieldOfView,
     Torso,
     MobileBase,
-    HumanoidGripper,
+    HumanoidHand,
 )
 from semantic_digital_twin.robots.abstract_robot import (
     HasLeftRightArm,
@@ -78,7 +78,7 @@ class UnitreeG1(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
             world=self._world,
         )
 
-        left_gripper = HumanoidGripper.create_and_add_to_world(
+        left_gripper = HumanoidHand.create_and_add_to_world(
             name=PrefixedName("left_gripper", prefix=self.name.name),
             root_name="left_hand_palm_link",
             tool_frame_name="left_hand_tool_frame",
@@ -118,7 +118,7 @@ class UnitreeG1(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
             tip_name="right_hand_index_1_link",
         )
 
-        right_gripper = HumanoidGripper.create_and_add_to_world(
+        right_gripper = HumanoidHand.create_and_add_to_world(
             name=PrefixedName("right_gripper", prefix=self.name.name),
             root_name="right_hand_palm_link",
             tool_frame_name="right_hand_tool_frame",
@@ -140,8 +140,7 @@ class UnitreeG1(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
 
     def _setup_arm_hardware_interfaces(self):
         for arm in self.arms:
-            for connection in arm.active_connections:
-                connection.has_hardware_interface = True
+            arm._default_hardware_interface_setup()
 
     def _setup_arm_joint_state(self):
         right_arm_park = JointState.from_mapping(
@@ -270,8 +269,7 @@ class UnitreeG1(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         self.add_torso(torso)
 
     def _setup_torso_hardware_interfaces(self):
-        for connection in self.torso.active_connections:
-            connection.has_hardware_interface = True
+        self.torso._default_hardware_interface_setup()
 
     def _setup_torso_joint_state(self):
         torso_low = JointState.from_mapping(
@@ -302,7 +300,7 @@ class UnitreeG1(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
             name=PrefixedName("base", prefix=self.name.name),
             root_name="pelvis",
             world=self._world,
-            main_axis=Vector3.X(),
+            forward_axis=Vector3.X(),
             full_body_controlled=False,
         )
 
@@ -369,6 +367,3 @@ class UnitreeG1(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
             lambda: 1.0,
         )
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
-
-    def _setup_other_hardware_interfaces(self):
-        pass

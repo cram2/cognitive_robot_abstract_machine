@@ -536,7 +536,7 @@ def test_split_chain_of_connections(pr2_world_state_reset):
     assert result2_names == chain2
 
 
-def test_pr2_mock_and_validate(robot_urdf_path_to_abstract_robot_mappings):
+def test_robots_and_validate(robot_urdf_path_to_abstract_robot_mappings):
     for urdf_path, abstract_robot in robot_urdf_path_to_abstract_robot_mappings.items():
         world = URDFParser.from_file(urdf_path).parse()
         robot = abstract_robot.from_world(world)

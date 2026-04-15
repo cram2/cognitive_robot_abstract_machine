@@ -1,33 +1,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Self
 
+from semantic_digital_twin.datastructures.definitions import (
+    StaticJointState,
+    GripperState,
+)
+from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import (
-    HasArms,
     AbstractRobot,
     HasMobileBase,
     HasOneArm,
 )
-from semantic_digital_twin.datastructures.definitions import (
-    StaticJointState,
-    GripperState,
-    TorsoState,
-)
-from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import (
     Finger,
     ParallelGripper,
     Arm,
     Camera,
     FieldOfView,
-    Torso,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
-    FixedConnection,
     ActiveConnection1DOF,
 )
 from semantic_digital_twin.world_description.world_entity import Body
@@ -50,9 +45,6 @@ class Donbot(AbstractRobot, HasOneArm, HasMobileBase):
         return world.get_body_by_name("base_footprint")
 
     def _setup_collision_rules(self):
-        pass
-
-    def _setup_other_hardware_interfaces(self):
         pass
 
     def _setup_arm_semantic_annotations(self):
@@ -104,8 +96,7 @@ class Donbot(AbstractRobot, HasOneArm, HasMobileBase):
         self.add_arm(arm)
 
     def _setup_arm_hardware_interfaces(self):
-        for connection in self.arm.active_connections:
-            connection.has_hardware_interface = True
+        self.arm._default_hardware_interface_setup()
 
     def _setup_arm_joint_state(self):
         arm_park = JointState.from_mapping(

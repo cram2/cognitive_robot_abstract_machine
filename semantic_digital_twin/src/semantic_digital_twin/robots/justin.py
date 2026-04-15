@@ -52,9 +52,6 @@ class Justin(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
     def _setup_collision_rules(self):
         pass
 
-    def _setup_other_hardware_interfaces(self):
-        pass
-
     def _setup_arm_semantic_annotations(self):
         # TODO a lot of stuff here is wrong bc MoAswad modelled it wrongly
         world = self._world
@@ -162,7 +159,8 @@ class Justin(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         self.add_arm(right_arm)
 
     def _setup_arm_hardware_interfaces(self):
-        pass
+        for arm in self.arms:
+            arm._default_hardware_interface_setup()
 
     def _setup_arm_joint_state(self):
         left_arm = self.left_arm
@@ -353,7 +351,7 @@ class Justin(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         self.add_torso(torso)
 
     def _setup_torso_hardware_interfaces(self):
-        pass
+        self.torso._default_hardware_interface_setup()
 
     def _setup_torso_joint_state(self):
         torso_joints = [self.torso.active_connections]

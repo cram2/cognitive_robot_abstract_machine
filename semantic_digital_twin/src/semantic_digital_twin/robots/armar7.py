@@ -22,7 +22,7 @@ from semantic_digital_twin.robots.robot_parts import (
     Camera,
     FieldOfView,
     Torso,
-    HumanoidGripper,
+    HumanoidHand,
     MobileBase,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
@@ -78,7 +78,7 @@ class Armar7(AbstractRobot, HasLeftRightArm, HasMobileBase, HasTorso):
             world=self._world,
         )
 
-        left_gripper = HumanoidGripper.create_and_add_to_world(
+        left_gripper = HumanoidHand.create_and_add_to_world(
             name=PrefixedName("left_gripper", prefix=self.name.name),
             root_name="ArmL8_Wrist_Hemisphere_B_link",
             tool_frame_name="Hand L TCP_link",
@@ -144,7 +144,7 @@ class Armar7(AbstractRobot, HasLeftRightArm, HasMobileBase, HasTorso):
             world=self._world,
         )
 
-        right_gripper = HumanoidGripper.create_and_add_to_world(
+        right_gripper = HumanoidHand.create_and_add_to_world(
             name=PrefixedName("right_gripper", prefix=self.name.name),
             root_name="ArmR8_Wrist_Hemisphere_B_link",
             tool_frame_name="Hand R TCP_link",
@@ -176,8 +176,7 @@ class Armar7(AbstractRobot, HasLeftRightArm, HasMobileBase, HasTorso):
 
     def _setup_arm_hardware_interfaces(self):
         for arm in self.arms:
-            for connection in arm.active_connections:
-                connection.has_hardware_interface = True
+            arm._default_hardware_interface_setup()
 
     def _setup_arm_joint_state(self):
         left_arm_park = JointState.from_mapping(
@@ -280,7 +279,7 @@ class Armar7(AbstractRobot, HasLeftRightArm, HasMobileBase, HasTorso):
         base = MobileBase.create_and_add_to_world(
             name=PrefixedName("base", prefix=self.name.name),
             root_name="Platform_body_link",
-            main_axis=Vector3.Y(),
+            forward_axis=Vector3.Y(),
             world=self._world,
             full_body_controlled=False,
         )
@@ -314,8 +313,7 @@ class Armar7(AbstractRobot, HasLeftRightArm, HasMobileBase, HasTorso):
         self._world.add_semantic_annotation(self)
 
     def _setup_torso_hardware_interfaces(self):
-        for connection in self.torso.active_connections:
-            connection.has_hardware_interface = True
+        self.torso._default_hardware_interface_setup()
 
     def _setup_torso_joint_state(self):
         torso_joints = [
@@ -343,9 +341,6 @@ class Armar7(AbstractRobot, HasLeftRightArm, HasMobileBase, HasTorso):
         self.torso.add_joint_state(torso_low)
         self.torso.add_joint_state(torso_mid)
         self.torso.add_joint_state(torso_high)
-
-    def _setup_other_hardware_interfaces(self):
-        pass
 
     def _setup_collision_rules(self):
         pass

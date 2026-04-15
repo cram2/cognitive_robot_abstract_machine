@@ -43,31 +43,18 @@ logger = logging.getLogger("semantic_digital_twin")
 
 
 @dataclass(eq=False)
-class HasRobotPart(AggregatesRobotParts, ABC):
+class RobotPartSetupMixin(AggregatesRobotParts, ABC):
     """
-    Mixin class for robots that have robot parts.
+    Parent class for robot part mixins as well as abstract robot, to allow AbstractRobot to call all
+    HasRobotPart._setup_robot_parts() methods of its parent classes.
     """
 
     @abstractmethod
     def _setup_robot_parts(self): ...
 
-    @property
-    def manipulators(self) -> list[RobotPart]:
-        """
-        A collection of all manipulators in the robot.
-        """
-        return [part for part in self._robot_parts if isinstance(part, Manipulator)]
-
-    @property
-    def sensors(self) -> list[Sensor]:
-        """
-        A collection of all sensors in the robot.
-        """
-        return [part for part in self._robot_parts if isinstance(part, Sensor)]
-
 
 @dataclass(eq=False)
-class HasArms(HasRobotPart, ABC):
+class HasArms(RobotPartSetupMixin, ABC):
     """
     Mixin class for robots that have arms.
     """
@@ -101,6 +88,13 @@ class HasArms(HasRobotPart, ABC):
 
     @abstractmethod
     def _setup_arm_joint_state(self): ...
+
+    @property
+    def manipulators(self) -> list[RobotPart]:
+        """
+        A collection of all manipulators of the robot.
+        """
+        return [part for part in self._robot_parts if isinstance(part, Manipulator)]
 
 
 @dataclass(eq=False)
@@ -160,7 +154,7 @@ class HasLeftRightArm(HasArms, ABC):
 
 
 @dataclass(eq=False)
-class HasExternalSensors(HasRobotPart, ABC):
+class HasExternalSensors(RobotPartSetupMixin, ABC):
     """
     Mixin class for robots that have an external camera.
     """
@@ -183,7 +177,7 @@ class HasExternalSensors(HasRobotPart, ABC):
 
 
 @dataclass(eq=False)
-class HasTorso(HasRobotPart, ABC):
+class HasTorso(RobotPartSetupMixin, ABC):
     """
     Mixin class for robots that have a torso.
     """
@@ -214,7 +208,7 @@ class HasTorso(HasRobotPart, ABC):
 
 
 @dataclass(eq=False)
-class HasMobileBase(HasRobotPart, ABC):
+class HasMobileBase(RobotPartSetupMixin, ABC):
 
     mobile_base: Optional[MobileBase] = field(default=None)
 
@@ -235,7 +229,7 @@ class HasMobileBase(HasRobotPart, ABC):
 
 
 @dataclass(eq=False)
-class AbstractRobot(Agent, HasRobotPart, ABC):
+class AbstractRobot(Agent, RobotPartSetupMixin, ABC):
     """
     Specification of an abstract robot
     """
@@ -282,7 +276,6 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
                 root=robot_root_body,
             )
             world.add_semantic_annotation(robot)
-            robot._setup_other_hardware_interfaces()
             robot._setup_robot_parts()
             robot._setup_collision_rules()
             robot._setup_velocity_limits()
@@ -331,9 +324,6 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
         )
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
-    @abstractmethod
-    def _setup_other_hardware_interfaces(self): ...
-
     @property
     def drive(self) -> Optional[Drive]:
         """
@@ -377,3 +367,10 @@ class AbstractRobot(Agent, HasRobotPart, ABC):
             if isinstance(sensor, Camera) and sensor.default_camera:
                 return sensor
         raise MissingDefaultCameraError(type(self))
+
+    @property
+    def sensors(self) -> list[Sensor]:
+        """
+        A collection of all sensors of the robot.
+        """
+        return [part for part in self._robot_parts if isinstance(part, Sensor)]

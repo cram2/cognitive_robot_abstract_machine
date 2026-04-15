@@ -230,7 +230,7 @@ class CostmapLocation(Location):
         final_map.number_of_samples = 600
         final_map.orientation_generator = (
             OrientationGenerator.orientation_generator_for_axis(
-                list(self.robot.mobile_base.main_axis.to_np())
+                list(self.robot.mobile_base.forward_axis.to_np())
             )
         )
 

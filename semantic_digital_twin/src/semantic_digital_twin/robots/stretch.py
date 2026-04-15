@@ -210,7 +210,7 @@ class Stretch(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
             name=PrefixedName("base", prefix=self.name.name),
             root_name="base_link",
             world=self._world,
-            main_axis=Vector3(0, -1, 0, self._world.get_body_by_name("base_link")),
+            forward_axis=Vector3(0, -1, 0, self._world.get_body_by_name("base_link")),
             full_body_controlled=True,
         )
 

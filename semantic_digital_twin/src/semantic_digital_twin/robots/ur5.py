@@ -43,9 +43,6 @@ class UR5(AbstractRobot, HasOneArm):
     def _setup_collision_rules(self):
         pass
 
-    def _setup_other_hardware_interfaces(self):
-        pass
-
     def _setup_arm_semantic_annotations(self):
         world = self._world
         # Create arm
@@ -84,7 +81,7 @@ class UR5(AbstractRobot, HasOneArm):
         self.add_arm(arm)
 
     def _setup_arm_hardware_interfaces(self):
-        pass
+        self.arm._default_hardware_interface_setup()
 
     def _setup_arm_joint_state(self):
         gripper = self.arm.manipulator

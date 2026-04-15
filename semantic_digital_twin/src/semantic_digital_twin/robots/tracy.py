@@ -115,8 +115,7 @@ class Tracy(AbstractRobot, HasLeftRightArm, HasExternalSensors):
 
     def _setup_arm_hardware_interfaces(self):
         for arm in self.arms:
-            for connection in arm.active_connections:
-                connection.has_hardware_interface = True
+            arm._default_hardware_interface_setup()
 
     def _setup_arm_joint_state(self):
         # Create states
@@ -243,6 +242,3 @@ class Tracy(AbstractRobot, HasLeftRightArm, HasExternalSensors):
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(lambda: 0.2)
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
-
-    def _setup_other_hardware_interfaces(self):
-        pass

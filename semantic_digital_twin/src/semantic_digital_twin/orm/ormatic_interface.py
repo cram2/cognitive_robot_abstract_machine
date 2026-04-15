@@ -2411,7 +2411,7 @@ class FrozenIndexBoxDAO(
 
 class HasRobotPartDAO(
     AggregatesRobotPartsDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.HasRobotPart],
+    DataAccessObject[semantic_digital_twin.robots.abstract_robot.RobotPartSetupMixin],
 ):
 
     __tablename__ = "HasRobotPartDAO"
@@ -2454,19 +2454,19 @@ class HasArmsDAO(
     }
 
 
-class HasLetRightArmDAO(
+class HasLeftRightArmDAO(
     HasArmsDAO,
     DataAccessObject[semantic_digital_twin.robots.abstract_robot.HasLeftRightArm],
 ):
 
-    __tablename__ = "HasLetRightArmDAO"
+    __tablename__ = "HasLeftRightArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(HasArmsDAO.database_id), primary_key=True, use_existing_column=True
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "HasLetRightArmDAO",
+        "polymorphic_identity": "HasLeftRightArmDAO",
         "inherit_condition": database_id == HasArmsDAO.database_id,
     }
 
@@ -9374,7 +9374,7 @@ class ManipulatorDAO(
 
 class HumanoidGripperDAO(
     ManipulatorDAO,
-    DataAccessObject[semantic_digital_twin.robots.robot_parts.HumanoidGripper],
+    DataAccessObject[semantic_digital_twin.robots.robot_parts.HumanoidHand],
 ):
 
     __tablename__ = "HumanoidGripperDAO"
