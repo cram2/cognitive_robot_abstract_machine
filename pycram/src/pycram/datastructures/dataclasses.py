@@ -56,6 +56,9 @@ class Context(PlanEntity):
     Should debug information be printed or visualized
     """
 
+    def __post_init__(self):
+        self.debug = self._debug
+
     @property
     def debug(self):
         return self._debug

@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from pycram.robot_plans import ActionDescription, BaseMotion
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pycram")
 
 
 def sort_by_layer_index(nodes: Iterable[PlanNode]) -> Iterable[PlanNode]:
@@ -258,7 +258,7 @@ class PlanNode(PlanEntity):
         """
         Perform the node and update the fields of this node.
         """
-
+        logger.debug(f"Performing node: {str(self)}")
         for parent in self.path:
             if parent.status == TaskStatus.INTERRUPTED:
                 self.status = TaskStatus.INTERRUPTED
@@ -443,6 +443,7 @@ class ActionNode(DesignatorNode):
         )
 
     def _perform(self):
+        logger.debug(f"Performing node: {str(self)} with params: {[f for f in self.action.fields]}")
         self.create_execution_data_pre_perform()
 
         result = self.action.perform()

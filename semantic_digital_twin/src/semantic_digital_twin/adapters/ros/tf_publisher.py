@@ -108,9 +108,7 @@ class TfPublisherModelCallback(ModelChangeCallback):
         if self.compiled_tf.is_result_empty():
             return
         tf_data = self.compiled_tf.evaluate()
-        current_time = self.node.get_clock().now().to_msg()
         for i, (p_T_c, pose) in enumerate(zip(self.tf_message.transforms, tf_data)):
-            p_T_c.header.stamp = current_time
             p_T_c.transform.translation.x = pose[0]
             p_T_c.transform.translation.y = pose[1]
             p_T_c.transform.translation.z = pose[2]
@@ -149,6 +147,11 @@ class TFPublisher(StateChangeCallback):
     Only published every n-th state update.
     """
 
+    tf_prefix: str = field(default="")
+    """
+    Tf prefix for the tf topic
+    """
+
     def __post_init__(self):
         super().__post_init__()
         self.tf_pub = self.node.create_publisher(TFMessage, self.tf_topic, 10)
@@ -184,13 +187,9 @@ class TFPublisher(StateChangeCallback):
         :param node: The ROS2 node used to create the publisher.
         """
         tf_wrapper = TFWrapper(node=node)
-        for i in range(20):
-            all_frames = set(tf_wrapper.get_tf_frames())
-            if len(all_frames) > 0:
-                break
-            sleep(0.1)
-        else:
-            all_frames = set()
+        sleep(2)
+        all_frames = set(tf_wrapper.get_tf_frames())
+        if len(all_frames) == 0:
             logging.info("Could not find any tf frames, publishing all tf")
         ignored_bodies = set(
             kse
@@ -203,8 +202,16 @@ class TFPublisher(StateChangeCallback):
             ignored_kinematic_structure_entities=ignored_bodies,
         )
 
+    def update_time_stamp(self):
+        current_time = self.node.get_clock().now().to_msg()
+        for tf_message in self.tf_model_cb.tf_message.transforms:
+            tf_message.header.stamp = current_time
+
     def _notify(self, **kwargs):
+        if len(self.tf_model_cb.tf_message.transforms) == 0:
+            return
         if self._world.state.version % self.throttle_state_updates != 0:
             return
         self.tf_model_cb.update_tf_message()
+        self.update_time_stamp()
         self.tf_pub.publish(self.tf_model_cb.tf_message)

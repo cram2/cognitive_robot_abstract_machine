@@ -3,9 +3,11 @@ import threading
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 
+from krrood.entity_query_language.factories import underspecified, variable
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment, MovementType
 from pycram.datastructures.grasp import GraspDescription
+from pycram.locations.locations import CostmapLocation
 from pycram.motion_executor import real_robot
 from pycram.plans.factories import execute_single, sequential
 from pycram.robot_plans import MoveToolCenterPointMotion
@@ -54,16 +56,29 @@ StateSynchronizer(_world=world, node=node)
 VizMarkerPublisher(_world=world, node=node)
 
 robot_annotation = world.get_semantic_annotations_by_type(Stretch)[0]
-context = Context(world, robot_annotation, node)
+context = Context(world, robot_annotation, node, _debug=False, evaluate_conditions=False)
 
 plan = sequential([
     # ParkArmsAction(Arms.BOTH),
-    MoveTorsoAction(TorsoState.HIGH),
+    # MoveTorsoAction(TorsoState.HIGH),
     #                    ReachAction(Pose.from_xyz_rpy(0.6, -1, 0.7, reference_frame=world.root), arm=Arms.LEFT,
     #                                grasp_description=GraspDescription(ApproachDirection.FRONT, VerticalAlignment.NoAlignment, robot_annotation.arm.manipulator))
-    # NavigateAction(Pose.from_xyz_rpy(2.35, 1.3, 0, yaw=-1.57, reference_frame=world.root)),
+    NavigateAction(Pose.from_xyz_rpy(2.35, 1.3, 0, yaw=-1.57, reference_frame=world.root)),
+    # underspecified(NavigateAction)(
+    #     target_location=variable(
+    #         Pose,
+    #         domain=CostmapLocation(
+    #             target=world.get_body_by_name("breakfast_cereal.stl").global_pose,
+    #             reachable_arm=Arms.LEFT,
+    #             reachable=True,
+    #             context=context,
+    #             grasp_description=(grasp_desc := GraspDescription(ApproachDirection.FRONT, VerticalAlignment.NoAlignment, robot_annotation.arm.manipulator)),
+    #         ),
+    #     ),
+    #     keep_joint_states=True,
+    # ),
     # MoveToolCenterPointMotion(Pose.from_xyz_rpy(2.3, 0.38, 0.5, reference_frame=world.root), arm=Arms.LEFT, movement_type=MovementType.TRANSLATION)
-    PickUpAction(world.get_body_by_name("breakfast_cereal.stl"), Arms.LEFT, GraspDescription(ApproachDirection.FRONT, VerticalAlignment.NoAlignment, robot_annotation.arm.manipulator))
+    # PickUpAction(world.get_body_by_name("breakfast_cereal.stl"), Arms.LEFT, grasp_desc)
     ],
     context).plan
 

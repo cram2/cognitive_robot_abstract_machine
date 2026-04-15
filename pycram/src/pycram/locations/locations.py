@@ -235,7 +235,7 @@ class CostmapLocation(Location):
         )
 
         for pose_candidate in final_map:
-            logger.debug(f"Testing candidate pose at {pose_candidate}")
+            logger.debug(f"Testing candidate pose at {pose_candidate.to_position(), pose_candidate.to_quaternion()}")
             odom_height = test_world.compute_forward_kinematics(
                 test_world.root,
                 test_robot.root.parent_kinematic_structure_entity,
