@@ -17,8 +17,14 @@ import textwrap
 import typing
 from dataclasses import dataclass, field
 from enum import Enum
-from typing_extensions import Any, ClassVar, Dict, List, Optional, Tuple, Type
+from typing_extensions import Any, ClassVar, Dict, List, Type
 
+from krrood.class_diagrams.attribute_introspector import (
+    AttributeIntrospector,
+    DiscoveredAttribute,
+)
+from krrood.class_diagrams.class_diagram import ClassDiagram
+from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.symbol_graph.symbol_graph import Symbol
 
 import logging
@@ -73,6 +79,21 @@ class ActionSchema:
 
 
 @dataclass
+class OwnDataclassIntrospector(AttributeIntrospector):
+    """Discover only fields declared directly on the inspected dataclass."""
+
+    def discover(self, owner_cls: Type) -> List[DiscoveredAttribute]:
+        own_names = set(getattr(owner_cls, "__annotations__", {}))
+        if not dataclasses.is_dataclass(owner_cls):
+            return []
+        return [
+            DiscoveredAttribute(public_name=f.name, field=f)
+            for f in dataclasses.fields(owner_cls)
+            if f.name in own_names and not f.name.startswith("_") and f.init
+        ]
+
+
+@dataclass
 class PycramIntrospector:
     """Reads an action dataclass and classifies each field into a FieldKind.
 
@@ -89,80 +110,32 @@ class PycramIntrospector:
     # Matched against every class in the type's MRO — no world-package import needed.
     POSE_TYPE_NAMES: ClassVar[frozenset] = frozenset({"Pose", "HomogeneousTransformationMatrix"})
 
+    introspector: AttributeIntrospector = field(
+        default_factory=OwnDataclassIntrospector
+    )
+
     def introspect(self, action_cls: type, _depth: int = 0) -> ActionSchema:
         """Return an :class:`ActionSchema` for *action_cls*.
 
         :param action_cls: An action dataclass.
         """
-        import sys
+        if not dataclasses.is_dataclass(action_cls):
+            raise TypeError(f"{action_cls!r} is not a dataclass")
+
         cls_doc = (inspect.getdoc(action_cls) or "").strip()
         field_docs = self._extract_field_docstrings(action_cls)
-
-        # Resolve string annotations (from __future__ import annotations).
-        # Try progressively: with module globals, without, then fall back to raw strings.
-        module = sys.modules.get(action_cls.__module__)
-        module_globals = vars(module) if module is not None else {}
-        try:
-            hints = typing.get_type_hints(action_cls, globalns=module_globals)
-        except Exception:
-            try:
-                hints = typing.get_type_hints(action_cls)
-            except Exception:
-                hints = getattr(action_cls, "__annotations__", {})
-
-        # Only introspect fields defined directly on this class (not inherited base fields)
-        own_names = set(getattr(action_cls, "__annotations__", {}).keys())
+        class_diagram = ClassDiagram([action_cls], introspector=self.introspector)
+        wrapped_class = class_diagram.get_wrapped_class(action_cls)
 
         field_specs: List[FieldSpec] = []
-        for dc_field in dataclasses.fields(action_cls):
-            if dc_field.name not in own_names:
-                continue
-
-            raw_type = hints.get(dc_field.name, dc_field.type)
-            # If annotation resolution still yielded a string, resolve it via module search
-            if isinstance(raw_type, str):
-                resolved = _resolve_type_string(raw_type, module_globals)
-                if resolved is not None:
-                    raw_type = resolved
-            unwrapped, is_opt = _unwrap_optional(raw_type)
-            kind = self._classify_type(unwrapped, _depth)
-
-            has_default = dc_field.default is not dataclasses.MISSING
-            has_factory = dc_field.default_factory is not dataclasses.MISSING  # type: ignore[misc]
-            if has_default:
-                field_default = dc_field.default
-            elif has_factory:
-                field_default = dc_field.default_factory  # type: ignore[misc]
-            else:
-                field_default = NO_DEFAULT
-
-            spec = FieldSpec(
-                name=dc_field.name,
-                raw_type=unwrapped,
-                kind=kind,
-                docstring=field_docs.get(dc_field.name, ""),
-                is_optional=is_opt or has_default or has_factory,
-                default=field_default,
+        for wrapped_field in wrapped_class.fields:
+            field_specs.append(
+                self._field_spec_from_wrapped_field(
+                    wrapped_field=wrapped_field,
+                    field_docs=field_docs,
+                    depth=_depth,
+                )
             )
-
-            if kind == FieldKind.ENUM:
-                spec.enum_members = list(unwrapped.__members__.keys())
-
-            elif kind == FieldKind.COMPLEX and _depth < 2:
-                # Recursively introspect sub-fields of complex types
-                try:
-                    sub_schema = self.introspect(unwrapped, _depth=_depth + 1)
-                    spec.sub_fields = sub_schema.fields
-                except Exception as exc:
-                    logger.debug("Cannot introspect sub-fields of %s: %s", unwrapped, exc)
-
-            elif kind == FieldKind.TYPE_REF:
-                # e.g. Type[SemanticAnnotation] → extract the inner type
-                args = typing.get_args(raw_type)
-                if args:
-                    spec.raw_type = args[0]
-
-            field_specs.append(spec)
 
         return ActionSchema(
             action_type=action_cls.__name__,
@@ -171,9 +144,62 @@ class PycramIntrospector:
             fields=field_specs,
         )
 
+    def _field_spec_from_wrapped_field(
+        self,
+        wrapped_field: WrappedField,
+        field_docs: Dict[str, str],
+        depth: int,
+    ) -> FieldSpec:
+        """Convert KRROOD field metadata into llmr's prompt-facing schema."""
+        if wrapped_field.is_type_type:
+            raw_type = wrapped_field.type_endpoint
+            kind = FieldKind.TYPE_REF
+        elif wrapped_field.is_container and not wrapped_field.is_optional:
+            raw_type = wrapped_field.resolved_type
+            kind = self.classify_type(raw_type, depth)
+        else:
+            raw_type = wrapped_field.type_endpoint
+            kind = self.classify_type(raw_type, depth)
+        dc_field = wrapped_field.field
+
+        has_default = dc_field.default is not dataclasses.MISSING
+        has_factory = dc_field.default_factory is not dataclasses.MISSING  # type: ignore[misc]
+        if has_default:
+            field_default = dc_field.default
+        elif has_factory:
+            field_default = dc_field.default_factory  # type: ignore[misc]
+        else:
+            field_default = NO_DEFAULT
+
+        spec = FieldSpec(
+            name=wrapped_field.name,
+            raw_type=raw_type,
+            kind=kind,
+            docstring=field_docs.get(wrapped_field.name, ""),
+            is_optional=wrapped_field.is_optional or has_default or has_factory,
+            default=field_default,
+        )
+
+        if kind == FieldKind.ENUM:
+            spec.enum_members = list(raw_type.__members__.keys())
+
+        elif kind == FieldKind.COMPLEX and depth < 2:
+            try:
+                sub_schema = self.introspect(raw_type, _depth=depth + 1)
+                spec.sub_fields = sub_schema.fields
+            except Exception as exc:
+                logger.debug("Cannot introspect sub-fields of %s: %s", raw_type, exc)
+
+        elif kind == FieldKind.TYPE_REF:
+            args = typing.get_args(raw_type) or typing.get_args(wrapped_field.resolved_type)
+            if args:
+                spec.raw_type = args[0]
+
+        return spec
+
     # ── Type classification ────────────────────────────────────────────────────
 
-    def _classify_type(self, t: Any, depth: int = 0) -> FieldKind:
+    def classify_type(self, t: Any, depth: int = 0) -> FieldKind:
         """Return the :class:`FieldKind` for a resolved Python type *t*.
 
         Symbol subclasses, including robot components such as manipulators and
@@ -277,36 +303,6 @@ class PycramIntrospector:
                     docs[fname] = nxt.value.value.strip()
 
         return docs
-
-
-# ── Helpers ────────────────────────────────────────────────────────────────────
-
-
-def _resolve_type_string(name: str, module_globals: dict) -> Optional[type]:
-    """Try to resolve a bare string annotation (e.g. ``'Body'``) to an actual type.
-
-    Resolution is deliberately limited to the action class module globals.  This
-    avoids coupling llmr to PyCRAM or world package module names.
-    Returns ``None`` if the name cannot be resolved.
-    """
-    bare = name.strip()
-
-    found = module_globals.get(bare)
-    if isinstance(found, type):
-        return found
-
-    return None
-
-
-def _unwrap_optional(t: Any) -> Tuple[Any, bool]:
-    """Strip ``Optional[X]`` / ``Union[X, None]`` and return ``(inner_type, is_optional)``."""
-    if typing.get_origin(t) is typing.Union:
-        args = [a for a in typing.get_args(t) if a is not type(None)]
-        if len(args) == 1:
-            return args[0], True
-        # Multi-type Union — return as-is
-        return t, False
-    return t, False
 
 
 def introspect(action_cls: type) -> ActionSchema:

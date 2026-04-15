@@ -4,11 +4,9 @@ World context is derived from SymbolGraph.
 """
 from __future__ import annotations
 
-import dataclasses
 import logging
 import typing
 from dataclasses import dataclass, field
-from enum import Enum
 from typing_extensions import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -19,8 +17,8 @@ from krrood.symbol_graph.symbol_graph import Symbol
 
 from krrood.entity_query_language.utils import T
 
-from llmr._utils import field_short_name as _field_short_name
 from llmr.exceptions import LLMSlotFillingFailed, LLMUnresolvedRequiredFields
+from llmr._utils import field_short_name as _leaf_field_name, slot_prompt_name as _slot_prompt_name
 
 if typing.TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
@@ -105,8 +103,8 @@ class LLMBackend(GenerativeBackend):
 
         for attr_match in expression.matches_with_variables:
             fname_raw = attr_match.name_from_variable_access_path
-            fname = _field_short_name(fname_raw)   # strip 'ClassName.' prefix
-            value = attr_match.assigned_variable._value_
+            fname = attr_match.attribute_name
+            value = _assigned_variable_value(attr_match.assigned_variable)
             ftype = attr_match.assigned_variable._type_
             field_types[fname] = ftype
             _full_name_map[fname] = fname_raw
@@ -128,7 +126,10 @@ class LLMBackend(GenerativeBackend):
         # krrood already resolved each field's type via get_field_type_endpoint()
         # and stored it in attr_match.assigned_variable._type_ — we use those
         # types directly below instead of re-running full action-class introspection.
-        llm_free_slot_names = [name for name, _ in free_slots]
+        llm_free_slot_names = [
+            _slot_prompt_name(_full_name_map.get(name, name), expression.type)
+            for name, _ in free_slots
+        ]
         output = None
         if llm_free_slot_names:
             from llmr.reasoning.slot_filler import run_slot_filler
@@ -150,16 +151,18 @@ class LLMBackend(GenerativeBackend):
         _intro = PycramIntrospector()
         grounder = EntityGrounder(self.groundable_type)
 
-        slot_by_name = (
-            {sv.field_name: sv for sv in output.slots} if output else {}
-        )
+        slot_by_name: Dict[str, "SlotValue"] = {}
+        if output:
+            for sv in output.slots:
+                slot_by_name[sv.field_name] = sv
+                slot_by_name.setdefault(_leaf_field_name(sv.field_name), sv)  # _leaf_field_name from _utils
         # Tracks successfully resolved top-level values so COMPLEX reconstruction
         # can use them (e.g. arm → pick matching Manipulator from SymbolGraph).
         resolved_params: Dict[str, Any] = {}
 
         for field_name, field_type in free_slots:
             # Classify using krrood's already-resolved type — no re-introspection needed.
-            kind = _intro._classify_type(field_type)
+            kind = _intro.classify_type(field_type)
 
             resolved = _UNRESOLVED
 
@@ -203,7 +206,7 @@ class LLMBackend(GenerativeBackend):
             elif kind == FieldKind.PRIMITIVE or kind is None:
                 sv = slot_by_name.get(field_name)
                 if sv is not None and sv.value is not None:
-                    resolved = _coerce_primitive(sv.value, field_type)
+                    resolved = coerce_primitive(sv.value, field_type)
 
             if resolved is _UNRESOLVED:
                 logger.debug(
@@ -309,7 +312,10 @@ def _resolve_entity_slot(
         # TYPE_REF fields expect the *class* (e.g. Type[SemanticAnnotation]),
         # resolved from SymbolGraph class diagram.
         if ed is not None and ed.semantic_type:
-            cls = resolve_symbol_class(ed.semantic_type)
+            cls = resolve_symbol_class(
+                ed.semantic_type,
+                symbol_graph=getattr(grounder, "symbol_graph", None),
+            )
             if cls is not None:
                 return cls
         return body  # fallback: return the instance
@@ -356,7 +362,10 @@ def _reconstruct_complex(
             if (
                 sub.kind == FieldKind.ENTITY
                 and not sub.is_optional
-                and _type_mro_contains(sub.raw_type, "Manipulator")
+                and any(
+                    cls.__name__ == "Manipulator"
+                    for cls in getattr(sub.raw_type, "__mro__", ())
+                )
             ):
                 val = _auto_ground_sub_entity(sub.raw_type, resolved_params or {})
             if val is _UNRESOLVED:
@@ -376,7 +385,7 @@ def _reconstruct_complex(
                 kwargs[sub.name] = _coerce_enum(sv.value, sub.raw_type)
         elif sub.kind == FieldKind.PRIMITIVE:
             if sv.value is not None:
-                kwargs[sub.name] = _coerce_primitive(sv.value, sub.raw_type)
+                kwargs[sub.name] = coerce_primitive(sv.value, sub.raw_type)
         elif sv.value is not None:
             kwargs[sub.name] = sv.value
 
@@ -423,14 +432,6 @@ def _auto_ground_sub_entity(raw_type: Any, resolved_params: Dict[str, Any]) -> A
     return instances[0]
 
 
-def _type_mro_contains(raw_type: Any, class_name: str) -> bool:
-    """Return True when *raw_type* or one of its base classes has *class_name*."""
-    try:
-        return any(cls.__name__ == class_name for cls in raw_type.__mro__)
-    except AttributeError:
-        return False
-
-
 def _name_to_string(name: Any) -> Optional[str]:
     """Normalize PrefixedName-like values and plain strings to a comparable string."""
     if name is None:
@@ -439,6 +440,58 @@ def _name_to_string(name: Any) -> Optional[str]:
         name = name.name
     return str(name)
 
+
+def _assigned_variable_value(assigned_variable: Any) -> Any:
+    """Return the concrete value of a KRROOD variable, evaluating it when needed."""
+    try:
+        value = vars(assigned_variable).get("_value_", _UNRESOLVED)
+    except TypeError:
+        value = getattr(assigned_variable, "_value_", _UNRESOLVED)
+    if value is not _UNRESOLVED:
+        return value
+
+    # Try evaluating as a KRROOD selectable via the public .evaluate() API.
+    evaluate = getattr(assigned_variable, "evaluate", None)
+    if not callable(evaluate):
+        return _UNRESOLVED
+    try:
+        value = next(iter(evaluate()))
+    except Exception:
+        return _UNRESOLVED
+    assigned_variable._value_ = value
+    return value
+
+
+def _top_level_field_name(attr_match: Any) -> Optional[str]:
+    """Return the first field name in a KRROOD variable access path, if present."""
+    try:
+        access_path = attr_match.assigned_variable._access_path_
+    except AttributeError:
+        return None
+
+    try:
+        steps = iter(access_path)
+    except TypeError:
+        steps = iter((access_path,))
+
+    for step in steps:
+        attribute_name = getattr(step, "_attribute_name_", None)
+        if attribute_name:
+            return attribute_name
+    return None
+
+
+def _match_kwarg_is_resolved(value: Any) -> bool:
+    """Return whether a Match kwarg value can be constructed without ellipses."""
+    if isinstance(value, type(Ellipsis)):
+        return False
+    if isinstance(value, Match):
+        return all(_match_kwarg_is_resolved(item) for item in value.kwargs.values())
+    if isinstance(value, dict):
+        return all(_match_kwarg_is_resolved(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return all(_match_kwarg_is_resolved(item) for item in value)
+    return True
 
 
 def _coerce_enum(value: str, enum_type: type) -> Any:
@@ -459,9 +512,15 @@ def _coerce_enum(value: str, enum_type: type) -> Any:
     return first
 
 
-def _coerce_primitive(value: str, field_type: Any) -> Any:
+def coerce_primitive(value: str, field_type: Any) -> Any:
     """Cast LLM string output to bool / int / float as required by *field_type*; str passthrough."""
-    unwrapped = _unwrap_field_type(field_type)
+    origin = typing.get_origin(field_type)
+    if origin is typing.Union:
+        args = [arg for arg in typing.get_args(field_type) if arg is not type(None)]
+        unwrapped = args[0] if len(args) == 1 else field_type
+    else:
+        unwrapped = field_type
+
     if unwrapped is bool:
         return value.lower() in ("true", "1", "yes")
     if unwrapped is int:
@@ -478,7 +537,13 @@ def _coerce_primitive(value: str, field_type: Any) -> Any:
 
 
 def _unresolved_required_fields(expression: Match[Any], introspector: "PycramIntrospector") -> List[str]:
-    """Return required action fields that are still unset in a Match expression."""
+    """Return required action fields that are still unset in a Match expression.
+
+    KRROOD may represent a required top-level field as a nested ``Match`` whose
+    unresolved leaves live below it, for example ``action.slot.member``.  In
+    that case the top-level slot is present even though no direct variable named
+    ``slot`` appears in ``matches_with_variables``.
+    """
     try:
         required = {
             field.name
@@ -491,26 +556,19 @@ def _unresolved_required_fields(expression: Match[Any], introspector: "PycramInt
     unresolved: List[str] = []
     seen: set[str] = set()
     for attr_match in expression.matches_with_variables:
-        field_name = _field_short_name(attr_match.name_from_variable_access_path)
+        field_name = attr_match.attribute_name
+        top_level_name = _top_level_field_name(attr_match)
         seen.add(field_name)
+        if top_level_name:
+            seen.add(top_level_name)
         value = attr_match.assigned_variable._value_
         if field_name in required and isinstance(value, type(Ellipsis)):
             unresolved.append(field_name)
 
+    expression._update_kwargs_from_literal_values()
     for field_name in sorted(required - seen):
+        if _match_kwarg_is_resolved(expression.kwargs.get(field_name)):
+            continue
         unresolved.append(field_name)
 
     return unresolved
-
-
-def _unwrap_field_type(t: Any) -> Any:
-    """Strip Optional[X] / Union[X, None] → X."""
-    import typing as _typing
-    if _typing.get_origin(t) is _typing.Union:
-        args = [a for a in _typing.get_args(t) if a is not type(None)]
-        if len(args) == 1:
-            return args[0]
-    return t
-
-
-

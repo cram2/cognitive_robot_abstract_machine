@@ -68,7 +68,7 @@ def make_llm(
         except ImportError as e:
             raise ImportError(
                 "langchain-openai is not installed. "
-                "Run: pip install 'llm-reasoner[openai]'"
+                "Run: pip install 'llmr[openai]'"
             ) from e
         return ChatOpenAI(model=model, temperature=temperature, **kwargs)
 
@@ -78,7 +78,7 @@ def make_llm(
         except ImportError as e:
             raise ImportError(
                 "langchain-ollama is not installed. "
-                "Run: pip install 'llm-reasoner[ollama]'"
+                "Run: pip install 'llmr[ollama]'"
             ) from e
         return ChatOllama(model=model, temperature=temperature, **kwargs)
 

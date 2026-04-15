@@ -4,7 +4,6 @@ All pycram access goes through llmr.pycram_bridge.
 """
 from __future__ import annotations
 
-import dataclasses
 import inspect
 import typing
 from typing_extensions import Any, Callable, Dict, List, Optional
@@ -153,7 +152,7 @@ def resolve_params(
 ) -> Any:
     """Resolve an underspecified Match and return the concrete action instance.
 
-    Role 2 standalone API: no action classification, no Match construction, and no
+    Role 2 non-executing API: no action classification, no Match construction, and no
     PyCRAM PlanNode creation.  The supplied Match is still updated by the backend as
     part of normal KRROOD evaluation.
     """
@@ -189,12 +188,10 @@ def _get_settable_fields(action_cls: type) -> List[str]:
 
     Skips internal krrood/pycram bookkeeping fields that the LLM must not fill.
     """
-    if dataclasses.is_dataclass(action_cls):
-        return [
-            f.name
-            for f in dataclasses.fields(action_cls)
-            if not f.name.startswith("_") and f.name not in _SKIP_FIELDS
-        ]
+    schema_fields = _get_schema_fields(action_cls, required_only=False)
+    if schema_fields is not None:
+        return schema_fields
+
     try:
         sig = inspect.signature(action_cls.__init__)
         return [
@@ -208,6 +205,11 @@ def _get_settable_fields(action_cls: type) -> List[str]:
 
 def _get_required_schema_fields(action_cls: type) -> Optional[List[str]]:
     """Return required action fields from PycramIntrospector, or None on failure."""
+    return _get_schema_fields(action_cls, required_only=True)
+
+
+def _get_schema_fields(action_cls: type, required_only: bool) -> Optional[List[str]]:
+    """Return prompt-settable field names from the KRROOD-backed action schema."""
     try:
         from llmr.pycram_bridge import PycramIntrospector
 
@@ -219,7 +221,7 @@ def _get_required_schema_fields(action_cls: type) -> Optional[List[str]]:
         field.name
         for field in schema.fields
         if (
-            not field.is_optional
+            (not required_only or not field.is_optional)
             and not field.name.startswith("_")
             and field.name not in _SKIP_FIELDS
         )

@@ -46,20 +46,25 @@ def _camel_to_tokens(name: str) -> str:
     return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", name).lower()
 
 
-def resolve_symbol_class(semantic_type: str) -> Optional[Type[Symbol]]:
+def resolve_symbol_class(
+    semantic_type: str,
+    symbol_graph: Optional[SymbolGraph] = None,
+) -> Optional[Type[Symbol]]:
     """Resolve a semantic type string to a Symbol subclass via the SymbolGraph class diagram.
 
-    Walks ``SymbolGraph().class_diagram`` — all Symbol subclasses are registered
-    there at instantiation time, so no world-package import is needed.
+    Walks the provided graph's class diagram, or the singleton graph by default.
+    All Symbol subclasses are registered there at instantiation time, so no
+    world-package import is needed.
 
     :param semantic_type: String from the LLM slot schema.
+    :param symbol_graph: Existing SymbolGraph to query; defaults to the singleton.
     :return: Matching Symbol subclass, or ``None`` if nothing found.
     """
     query = semantic_type.strip().lower()
     query_tokens = query.replace("_", " ").replace("-", " ")
 
     try:
-        class_diagram = SymbolGraph().class_diagram
+        class_diagram = (symbol_graph or SymbolGraph()).class_diagram
     except Exception:
         logger.debug("SymbolGraph not yet initialised — cannot resolve '%s'.", semantic_type)
         return None
@@ -95,6 +100,9 @@ class EntityGrounder:
     """The Symbol subclass representing groundable world entities (e.g. Body).
     Defaults to Symbol (all instances in SymbolGraph). Pass a more specific
     subclass to narrow the search pool."""
+
+    symbol_graph: SymbolGraph = field(default_factory=SymbolGraph)
+    """KRROOD SymbolGraph used as the grounding data source."""
 
     # ── Main entry point ───────────────────────────────────────────────────────
 
@@ -139,7 +147,10 @@ class EntityGrounder:
 
     def _annotation_ground(self, description: EntityDescriptionSchema) -> GroundingResult:
         """Tier 1: resolve semantic_type to a Symbol subclass, collect its annotated bodies."""
-        cls = resolve_symbol_class(description.semantic_type)
+        cls = resolve_symbol_class(
+            description.semantic_type,
+            symbol_graph=self.symbol_graph,
+        )
         if cls is None:
             logger.debug(
                 "Cannot resolve '%s' to a Symbol subclass.", description.semantic_type
@@ -147,7 +158,7 @@ class EntityGrounder:
             return GroundingResult()
 
         try:
-            annotations = list(SymbolGraph().get_instances_of_type(cls))
+            annotations = list(self.symbol_graph.get_instances_of_type(cls))
         except Exception as exc:
             logger.warning("SymbolGraph.get_instances_of_type raised: %s", exc)
             return GroundingResult()
@@ -190,7 +201,9 @@ class EntityGrounder:
 
         name_lower = description.name.lower()
         try:
-            all_instances = list(SymbolGraph().get_instances_of_type(self.groundable_type))
+            all_instances = list(
+                self.symbol_graph.get_instances_of_type(self.groundable_type)
+            )
         except Exception as exc:
             logger.warning("SymbolGraph.get_instances_of_type raised: %s", exc)
             return GroundingResult()
@@ -233,10 +246,15 @@ class EntityGrounder:
         context_lower = spatial_context.lower()
 
         # Try to find a surface annotation type by name from SymbolGraph class diagram
-        surface_cls = resolve_symbol_class("HasSupportingSurface")
+        surface_cls = resolve_symbol_class(
+            "HasSupportingSurface",
+            symbol_graph=self.symbol_graph,
+        )
         if surface_cls is not None:
             try:
-                surface_annotations = list(SymbolGraph().get_instances_of_type(surface_cls))
+                surface_annotations = list(
+                    self.symbol_graph.get_instances_of_type(surface_cls)
+                )
                 matched_surfaces = [
                     ann for ann in surface_annotations
                     if _camel_to_tokens(type(ann).__name__) in context_lower
@@ -253,7 +271,9 @@ class EntityGrounder:
 
         # Fallback: anchor body name substring match via SymbolGraph
         try:
-            all_instances = list(SymbolGraph().get_instances_of_type(self.groundable_type))
+            all_instances = list(
+                self.symbol_graph.get_instances_of_type(self.groundable_type)
+            )
         except Exception:
             return candidates
 

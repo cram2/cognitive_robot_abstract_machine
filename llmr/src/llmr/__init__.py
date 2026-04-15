@@ -1,7 +1,7 @@
 """
 llmr — LLM-powered GenerativeBackend for KRROOD.
 
-A standalone package that implements LLMBackend(GenerativeBackend), allowing
+KRROOD-integrated package that implements LLMBackend(GenerativeBackend), allowing
 PyCRAM underspecified action Match expressions to be resolved via LLM reasoning.
 
 Package-independence guarantees

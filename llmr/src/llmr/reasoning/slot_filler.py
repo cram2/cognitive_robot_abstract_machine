@@ -11,7 +11,8 @@ from __future__ import annotations
 import inspect
 import logging
 import typing
-from typing_extensions import Any, Dict, List, Optional, Tuple, Type
+from dataclasses import replace
+from typing_extensions import Any, Dict, List, Optional
 
 if typing.TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
@@ -19,14 +20,12 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-from llmr._utils import field_short_name as _field_short_name
 from llmr.exceptions import LLMActionRegistryEmpty
+from llmr._utils import slot_prompt_name as _slot_prompt_name
 from llmr.schemas.slots import (
     ActionClassification,
     ActionReasoningOutput,
-    SlotValue,
 )
-from llmr.schemas.entities import EntityDescriptionSchema
 
 
 # ── System prompts ─────────────────────────────────────────────────────────────
@@ -65,7 +64,8 @@ Return a SlotValue with:
   - value      = chosen value as a string (exact enum member name or primitive)
   - reasoning  = 1-2 sentences justifying the choice
 
-For ENUM slots use EXACTLY one of the listed allowed values.
+For ENUM slots use EXACTLY one of the listed allowed values. Never paraphrase,
+translate, or describe enum values in natural language.
 For COMPLEX fields use dotted names (e.g. 'grasp_description.grasp_type').
 For ENTITY slots inside complex fields (e.g. 'grasp_description.manipulator'),
 return a SlotValue with entity_description populated — treat them like any other
@@ -150,20 +150,24 @@ def run_slot_filler(
     :param llm:             LangChain-compatible chat model.
     :returns: ActionReasoningOutput on success; None on LLM failure.
     """
-    # Normalise names: strip 'ClassName.' prefix so introspection and prompt
-    # both use bare field names (the LLM also returns bare names).
-    short_slot_names = [_field_short_name(n) for n in free_slot_names]
-    short_fixed_slots = {_field_short_name(k): v for k, v in fixed_slots.items()}
+    # Normalise names: strip the root 'ClassName.' prefix while preserving
+    # nested paths such as 'grasp_description.approach_direction'.
+    slot_names = [_slot_prompt_name(n, action_cls) for n in free_slot_names]
+    prompt_fixed_slots = {
+        _slot_prompt_name(k, action_cls): v for k, v in fixed_slots.items()
+    }
 
     # ── Introspect action class → field specs ──────────────────────────────────
-    field_specs = _introspect_free_slots(action_cls, short_slot_names)
+    action_schema = _introspect_action_schema(action_cls)
+    field_specs = _select_free_slot_specs(action_schema, slot_names)
 
     # ── Build dynamic user message ─────────────────────────────────────────────
     user_message = _build_dynamic_message(
         instruction=instruction,
         action_cls=action_cls,
-        free_slot_names=short_slot_names,
-        fixed_slots=short_fixed_slots,
+        action_schema=action_schema,
+        free_slot_names=slot_names,
+        fixed_slots=prompt_fixed_slots,
         world_context=world_context,
         field_specs=field_specs,
     )
@@ -182,32 +186,44 @@ def run_slot_filler(
 
 # ── Prompt construction ────────────────────────────────────────────────────────
 
-def _introspect_free_slots(
-    action_cls: type,
-    free_slot_names: List[str],
-) -> Dict[str, "FieldSpec"]:
-    """Return a {field_name: FieldSpec} map for the given free slot names.
-
-    Falls back to an empty dict if action introspection fails.
-    Normalises ``free_slot_names`` by stripping any 'ClassName.' prefix before
-    matching — ``name_from_variable_access_path`` may return prefixed names.
-    """
+def _introspect_action_schema(action_cls: type) -> Optional["ActionSchema"]:
+    """Return the KRROOD-backed action schema, or None when introspection fails."""
     try:
         from llmr.pycram_bridge.introspector import PycramIntrospector
-        schema: "ActionSchema" = PycramIntrospector().introspect(action_cls)
-        short_names = {_field_short_name(n) for n in free_slot_names}
-        return {f.name: f for f in schema.fields if f.name in short_names}
+
+        return PycramIntrospector().introspect(action_cls)
     except Exception as exc:
         logger.debug(
-            "_introspect_free_slots: introspection failed for %s: %s",
+            "_introspect_action_schema: introspection failed for %s: %s",
             action_cls.__name__, exc,
         )
+        return None
+
+
+def _select_free_slot_specs(
+    action_schema: Optional["ActionSchema"],
+    free_slot_names: List[str],
+) -> Dict[str, "FieldSpec"]:
+    """Return a {field_name: FieldSpec} map for the given free slot names."""
+    if action_schema is None:
         return {}
+
+    slot_names = set(free_slot_names)
+    selected: Dict[str, "FieldSpec"] = {}
+    for field in action_schema.fields:
+        if field.name in slot_names:
+            selected[field.name] = field
+        for sub_field in field.sub_fields:
+            dotted_name = f"{field.name}.{sub_field.name}"
+            if dotted_name in slot_names:
+                selected[dotted_name] = replace(sub_field, name=dotted_name)
+    return selected
 
 
 def _build_dynamic_message(
     instruction: Optional[str],
     action_cls: type,
+    action_schema: Optional["ActionSchema"],
     free_slot_names: List[str],
     fixed_slots: Dict[str, Any],
     world_context: str,
@@ -229,8 +245,12 @@ def _build_dynamic_message(
     if instruction:
         lines.insert(0, f"Instruction: {instruction!r}")
 
-    # Action class docstring
-    action_doc = (inspect.getdoc(action_cls) or "").strip()
+    # Action class docstring from the same schema that provides field metadata.
+    action_doc = (
+        action_schema.docstring
+        if action_schema is not None
+        else (inspect.getdoc(action_cls) or "").strip()
+    )
     if action_doc:
         lines += ["", f"Action description: {action_doc}"]
 
@@ -355,7 +375,20 @@ def _format_action_catalog(action_registry: Dict[str, type]) -> str:
     lines: List[str] = []
     for name in sorted(action_registry):
         action_cls = action_registry[name]
-        doc = " ".join((inspect.getdoc(action_cls) or "").split())
+        schema = None
+        if introspector is not None:
+            try:
+                schema = introspector.introspect(action_cls)
+            except Exception:
+                schema = None
+
+        doc = " ".join(
+            (
+                schema.docstring
+                if schema is not None
+                else (inspect.getdoc(action_cls) or "")
+            ).split()
+        )
         if len(doc) > 180:
             doc = f"{doc[:177]}..."
 
@@ -364,11 +397,7 @@ def _format_action_catalog(action_registry: Dict[str, type]) -> str:
             header += f": {doc}"
         lines.append(header)
 
-        if introspector is None:
-            continue
-        try:
-            schema = introspector.introspect(action_cls)
-        except Exception:
+        if schema is None:
             continue
         if schema.fields:
             fields = ", ".join(_format_catalog_field(field) for field in schema.fields)

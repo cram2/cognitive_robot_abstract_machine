@@ -8,30 +8,72 @@ package) so this module never imports a world directly.
 """
 from __future__ import annotations
 
-import logging
-from typing_extensions import Any, Dict, List, Optional, Tuple, Type
+from dataclasses import dataclass, field
+from typing_extensions import Any, Callable, Dict, List, Optional, Set, Tuple, Type
 
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 
-logger = logging.getLogger(__name__)
+_ROBOT_ANNOTATION_TYPE_NAMES = frozenset(
+    {
+        "AbstractRobot",
+        "SemanticRobotAnnotation",
+        "KinematicChain",
+        "Manipulator",
+        "Sensor",
+        "Camera",
+        "Base",
+        "Torso",
+        "Neck",
+        "Arm",
+        "Finger",
+    }
+)
 
-# Kinematic-link name suffixes — these are robot structural parts, not scene objects.
-# Suffix-based filter is representation-agnostic (unlike the old "/" heuristic which
-# relied on a particular prefixed-name string format).
+# Fallback only: semantic robot annotations are preferred when present.
 _STRUCTURAL_SUFFIXES = (
     "_link", "_frame", "_joint", "_screw", "_plate",
     "_optical_frame", "_motor", "_pad", "_finger",
 )
 
 
-def _is_structural_link(name: str) -> bool:
-    """True if *name* ends with a robot kinematic-link suffix — these are filtered from scene listings."""
+def _is_structural_name(name: str) -> bool:
+    """Fallback name heuristic for robot kinematic links when semantic metadata is unavailable."""
     return any(name.endswith(s) for s in _STRUCTURAL_SUFFIXES)
+
+
+@dataclass(frozen=True)
+class WorldSerializationOptions:
+    """Controls how much SymbolGraph detail is rendered for the LLM prompt."""
+
+    max_objects: int = 40
+    max_relations: int = 60
+    include_geometry: bool = True
+    include_parent_context: bool = True
+    include_relations: bool = True
+    include_structural: bool = False
+    exclude_robot_structures: bool = True
+    fallback_name_filter: bool = True
+    structural_body_filter: Optional[Callable[[Any], bool]] = None
+    precision: int = 3
+
+
+@dataclass
+class _BodyRecord:
+    instance: Any
+    body_name: str
+    class_name: str
+    semantic_types: List[str] = field(default_factory=list)
+    parent_name: Optional[str] = None
+    xyz: Optional[Tuple[float, float, float]] = None
+    size: Optional[Tuple[float, float, float]] = None
+    notes: List[str] = field(default_factory=list)
 
 
 def serialize_world_from_symbol_graph(
     groundable_type: Type[Symbol] = Symbol,
     extra_context: str = "",
+    symbol_graph: Optional[SymbolGraph] = None,
+    options: Optional[WorldSerializationOptions] = None,
 ) -> str:
     """Build an LLM world-context string from SymbolGraph contents.
 
@@ -39,63 +81,403 @@ def serialize_world_from_symbol_graph(
         Defaults to ``Symbol`` (all instances).  Pass a more specific caller
         type for a tighter scope covering only the intended world entities.
     :param extra_context: Optional extra text appended at the end.
+    :param symbol_graph: Existing KRROOD SymbolGraph to query; defaults to the singleton.
+    :param options: Optional rendering controls for prompt size and detail.
     :returns: Multi-line string describing the current world state.
     """
-    lines = ["## World State Summary\n"]
+    opts = options or WorldSerializationOptions()
 
-    # ── Scene objects ──────────────────────────────────────────────────────────
     try:
-        all_instances = list(SymbolGraph().get_instances_of_type(groundable_type))
-        all_names = [body_display_name(b) for b in all_instances]
-        scene_names = [n for n in all_names if not _is_structural_link(n)]
-        if scene_names:
-            lines.append(f"Scene objects and surfaces: {', '.join(scene_names)}")
-        elif all_names:
-            lines.append(f"Bodies present: {', '.join(all_names[:30])}")
-            if len(all_names) > 30:
-                lines.append(f"  … and {len(all_names) - 30} more.")
-        else:
-            lines.append("No scene objects found in SymbolGraph.")
+        graph = symbol_graph or SymbolGraph()
     except Exception:
-        lines.append("Bodies: unavailable")
+        graph = None
 
-    # ── Semantic annotations ───────────────────────────────────────────────────
-    lines.append("\n## Semantic annotations")
+    records: List[_BodyRecord] = []
+    annotation_summary: Dict[str, List[str]] = {}
+    relation_lines: List[str] = []
+
     try:
-        ann_summary: Dict[str, List[str]] = {}
-        graph = SymbolGraph()
-        for wrapped in graph.wrapped_instances:
-            inst = wrapped.instance
-            if inst is None:
-                continue
-            bodies_attr = getattr(inst, "bodies", None)
-            if bodies_attr is None:
-                continue
-            ann_type = type(inst).__name__
-            try:
-                for body in bodies_attr:
-                    b_name = body_display_name(body)
-                    if _is_structural_link(b_name):
-                        continue
-                    ann_summary.setdefault(b_name, []).append(ann_type)
-            except Exception:
-                pass
-
-        if ann_summary:
-            unique_types = sorted({t for types in ann_summary.values() for t in types})
-            lines.append(f"Available types: {', '.join(unique_types)}")
-            lines.append("Per body:")
-            for body_name, types in ann_summary.items():
-                lines.append(f"  {body_name}: {', '.join(types)}")
-        else:
-            lines.append("  None found in this world.")
+        if graph is None:
+            raise RuntimeError("SymbolGraph unavailable")
+        structural_body_ids = _collect_structural_body_ids(graph, opts)
+        annotations_by_id, annotation_summary = _collect_annotations(
+            graph,
+            opts,
+            structural_body_ids,
+        )
+        records = _collect_body_records(
+            graph=graph,
+            groundable_type=groundable_type,
+            annotations_by_id=annotations_by_id,
+            structural_body_ids=structural_body_ids,
+            options=opts,
+        )
+        if opts.include_relations:
+            visible_ids = {id(record.instance) for record in records}
+            relation_lines = _collect_relation_lines(
+                graph,
+                visible_ids,
+                structural_body_ids,
+                opts,
+            )
     except Exception:
-        lines.append("  (unavailable)")
+        records = []
+        annotation_summary = {}
+        relation_lines = []
+
+    return _render_world_context(
+        records=records,
+        annotation_summary=annotation_summary,
+        relation_lines=relation_lines,
+        extra_context=extra_context,
+        options=opts,
+    )
+
+
+def _collect_body_records(
+    graph: SymbolGraph,
+    groundable_type: Type[Symbol],
+    annotations_by_id: Dict[int, List[str]],
+    structural_body_ids: Set[int],
+    options: WorldSerializationOptions,
+) -> List[_BodyRecord]:
+    records: List[_BodyRecord] = []
+    seen: Set[int] = set()
+
+    for body in graph.get_instances_of_type(groundable_type):
+        body_id = id(body)
+        if body_id in seen:
+            continue
+        seen.add(body_id)
+
+        body_name = body_display_name(body)
+        if not body_name:
+            body_name = f"{type(body).__name__}@{body_id:x}"
+        if not options.include_structural and _is_structural_body(
+            body,
+            body_name,
+            structural_body_ids,
+            options,
+        ):
+            continue
+
+        parent_name = _nearest_parent_name(body) if options.include_parent_context else None
+        xyz = body_xyz(body) if options.include_geometry else None
+        size = body_bounding_box(body) if options.include_geometry else None
+        records.append(
+            _BodyRecord(
+                instance=body,
+                body_name=body_name,
+                class_name=type(body).__name__,
+                semantic_types=sorted(set(annotations_by_id.get(body_id, []))),
+                parent_name=parent_name,
+                xyz=xyz,
+                size=size,
+            )
+        )
+
+    records.sort(key=lambda record: (record.body_name.lower(), record.class_name))
+    return records
+
+
+def _collect_annotations(
+    graph: SymbolGraph,
+    options: WorldSerializationOptions,
+    structural_body_ids: Set[int],
+) -> Tuple[Dict[int, List[str]], Dict[str, List[str]]]:
+    annotations_by_id: Dict[int, List[str]] = {}
+    annotation_summary: Dict[str, List[str]] = {}
+
+    for wrapped in graph.wrapped_instances:
+        inst = wrapped.instance
+        if inst is None:
+            continue
+        bodies_attr = getattr(inst, "bodies", None)
+        if bodies_attr is None:
+            continue
+
+        ann_type = type(inst).__name__
+        try:
+            bodies = list(bodies_attr)
+        except Exception:
+            continue
+
+        for body in bodies:
+            b_name = body_display_name(body)
+            if not b_name:
+                b_name = f"{type(body).__name__}@{id(body):x}"
+            if not options.include_structural and _is_structural_body(
+                body,
+                b_name,
+                structural_body_ids,
+                options,
+            ):
+                continue
+            annotations_by_id.setdefault(id(body), []).append(ann_type)
+            annotation_summary.setdefault(ann_type, []).append(b_name)
+
+    for body_names in annotation_summary.values():
+        body_names[:] = sorted(set(body_names), key=str.lower)
+    return annotations_by_id, dict(sorted(annotation_summary.items()))
+
+
+def _collect_relation_lines(
+    graph: SymbolGraph,
+    visible_ids: Set[int],
+    structural_body_ids: Set[int],
+    options: WorldSerializationOptions,
+) -> List[str]:
+    lines: List[str] = []
+    seen: Set[str] = set()
+
+    try:
+        relations = list(graph.relations())
+    except Exception:
+        return []
+
+    for relation in relations:
+        source = getattr(getattr(relation, "source", None), "instance", None)
+        target = getattr(getattr(relation, "target", None), "instance", None)
+        if source is None or target is None:
+            continue
+        if id(source) not in visible_ids and id(target) not in visible_ids:
+            continue
+
+        source_name = body_display_name(source) or f"{type(source).__name__}@{id(source):x}"
+        target_name = body_display_name(target) or f"{type(target).__name__}@{id(target):x}"
+        if not options.include_structural and (
+            _is_structural_body(source, source_name, structural_body_ids, options)
+            or _is_structural_body(target, target_name, structural_body_ids, options)
+        ):
+            continue
+
+        relation_name = str(relation)
+        line = f"- {source_name} --{relation_name}--> {target_name}"
+        if line not in seen:
+            seen.add(line)
+            lines.append(line)
+        if len(lines) >= options.max_relations:
+            break
+
+    return sorted(lines, key=str.lower)
+
+
+def _collect_structural_body_ids(
+    graph: SymbolGraph,
+    options: WorldSerializationOptions,
+) -> Set[int]:
+    if not options.exclude_robot_structures:
+        return set()
+
+    structural_body_ids: Set[int] = set()
+    try:
+        wrapped_instances = list(graph.wrapped_instances)
+    except Exception:
+        return structural_body_ids
+
+    for wrapped in wrapped_instances:
+        inst = wrapped.instance
+        if inst is None or not _is_robot_annotation(inst):
+            continue
+        for body in _iter_robot_annotation_bodies(inst):
+            structural_body_ids.add(id(body))
+
+    return structural_body_ids
+
+
+def _is_robot_annotation(instance: Any) -> bool:
+    try:
+        mro_names = {cls.__name__ for cls in type(instance).__mro__}
+    except AttributeError:
+        return False
+    if mro_names & _ROBOT_ANNOTATION_TYPE_NAMES:
+        return True
+    return hasattr(instance, "_robot") and (
+        hasattr(instance, "root")
+        or hasattr(instance, "tool_frame")
+        or hasattr(instance, "tip")
+    )
+
+
+def _iter_robot_annotation_bodies(instance: Any) -> List[Any]:
+    bodies: List[Any] = []
+
+    for attr_name in ("bodies", "kinematic_structure_entities"):
+        try:
+            values = getattr(instance, attr_name)
+            if callable(values):
+                values = values()
+            bodies.extend(list(values))
+        except Exception:
+            pass
+
+    for attr_name in (
+        "root",
+        "tip",
+        "tool_frame",
+        "torso",
+        "base",
+        "neck",
+    ):
+        value = getattr(instance, attr_name, None)
+        if value is not None:
+            bodies.append(value)
+
+    for attr_name in (
+        "manipulators",
+        "sensors",
+        "manipulator_chains",
+        "sensor_chains",
+        "arms",
+    ):
+        for child in _safe_iter(getattr(instance, attr_name, None)):
+            bodies.extend(_iter_robot_annotation_bodies(child))
+
+    result: List[Any] = []
+    seen: Set[int] = set()
+    for body in bodies:
+        if body is None or id(body) in seen:
+            continue
+        seen.add(id(body))
+        result.append(body)
+    return result
+
+
+def _safe_iter(value: Any) -> List[Any]:
+    if value is None:
+        return []
+    if isinstance(value, (str, bytes)):
+        return []
+    try:
+        return list(value)
+    except TypeError:
+        return [value]
+    except Exception:
+        return []
+
+
+def _is_structural_body(
+    body: Any,
+    body_name: str,
+    semantic_structural_ids: Set[int],
+    options: WorldSerializationOptions,
+) -> bool:
+    if options.structural_body_filter is not None:
+        return options.structural_body_filter(body)
+    if options.exclude_robot_structures and id(body) in semantic_structural_ids:
+        return True
+    return options.fallback_name_filter and _is_structural_name(body_name)
+
+
+def _render_world_context(
+    records: List[_BodyRecord],
+    annotation_summary: Dict[str, List[str]],
+    relation_lines: List[str],
+    extra_context: str,
+    options: WorldSerializationOptions,
+) -> str:
+    shown_records = records[:max(options.max_objects, 0)]
+    unique_types = sorted(
+        {ann_type for record in records for ann_type in record.semantic_types}
+        | set(annotation_summary)
+    )
+
+    lines = [
+        "## World State Summary",
+        (
+            f"Objects: {len(records)} visible"
+            + (
+                f" (showing {len(shown_records)})"
+                if len(shown_records) != len(records)
+                else ""
+            )
+            + f", Semantic types: {len(unique_types)}, Relations: {len(relation_lines)} shown"
+        ),
+        "",
+        "## Grounding Instructions",
+        "- Use exact body_name values for entity_description.name when possible.",
+        "- Use semantic_type only from Available Semantic Types.",
+        "- Use spatial_context for parent, surface, container, or proximity clues.",
+        "- Use attributes only for visible distinguishing words such as color, size, or material.",
+        "",
+        "## Scene Objects",
+    ]
+    lines.extend(_render_scene_table(shown_records, options))
+
+    if len(shown_records) < len(records):
+        lines.append(f"- Truncated {len(records) - len(shown_records)} additional object(s).")
+
+    lines += ["", "## Available Semantic Types"]
+    if annotation_summary:
+        for ann_type, body_names in annotation_summary.items():
+            lines.append(f"- {ann_type}: {', '.join(body_names)}")
+    else:
+        lines.append("- None found in this world.")
+
+    lines += ["", "## Spatial Context"]
+    spatial_lines = [
+        f"- {record.body_name} is under/within parent {record.parent_name}"
+        for record in shown_records
+        if record.parent_name
+    ]
+    lines.extend(spatial_lines or ["- No parent or surface context found."])
+
+    lines += ["", "## Symbol Relations"]
+    lines.extend(relation_lines or ["- None found in this world."])
 
     if extra_context:
-        lines.append(extra_context)
+        lines += ["", "## Extra Context", extra_context]
 
     return "\n".join(lines)
+
+
+def _render_scene_table(
+    records: List[_BodyRecord],
+    options: WorldSerializationOptions,
+) -> List[str]:
+    rows = [
+        "| body_name | class | semantic_types | parent_or_surface | xyz | size | notes |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    if not records:
+        rows.append("| - | - | - | - | - | - | No scene objects found in SymbolGraph. |")
+        return rows
+
+    for record in records:
+        rows.append(
+            "| "
+            + " | ".join(
+                [
+                    record.body_name,
+                    record.class_name,
+                    ", ".join(record.semantic_types) if record.semantic_types else "-",
+                    record.parent_name or "-",
+                    _format_tuple(record.xyz, options.precision),
+                    _format_tuple(record.size, options.precision),
+                    ", ".join(record.notes) if record.notes else "-",
+                ]
+            )
+            + " |"
+        )
+    return rows
+
+
+def _nearest_parent_name(body: Any) -> Optional[str]:
+    parent_conn = getattr(body, "parent_connection", None)
+    parent = getattr(parent_conn, "parent", None) if parent_conn else None
+    if parent is None:
+        return None
+    return body_display_name(parent) or f"{type(parent).__name__}@{id(parent):x}"
+
+
+def _format_tuple(
+    values: Optional[Tuple[float, float, float]],
+    precision: int,
+) -> str:
+    if values is None:
+        return "-"
+    rounded = [round(value, precision) for value in values]
+    return "(" + ", ".join(f"{value:g}" for value in rounded) + ")"
 
 
 # ── Duck-type body helpers (public, reusable) ──────────────────────────────────
