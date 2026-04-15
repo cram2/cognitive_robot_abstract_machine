@@ -93,20 +93,6 @@ class AggregatesRobotParts(ABC):
 
         return robot_parts
 
-    @property
-    def manipulators(self) -> list[RobotPart]:
-        """
-        A collection of all manipulators in the robot.
-        """
-        return [part for part in self._robot_parts if isinstance(part, Manipulator)]
-
-    @property
-    def sensors(self) -> list[Sensor]:
-        """
-        A collection of all sensors in the robot.
-        """
-        return [part for part in self._robot_parts if isinstance(part, Sensor)]
-
 
 @dataclass(eq=False)
 class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
