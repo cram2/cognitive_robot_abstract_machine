@@ -14,6 +14,7 @@ import numpy.typing as npt
 from probabilistic_model.distributions.distributions import (
     ContinuousDistribution,
     ContinuousDistributionWithFiniteSupport,
+    DiracDeltaDistribution,
 )
 from probabilistic_model.probabilistic_model import OrderType, CenterType, MomentType
 from probabilistic_model.utils import simple_interval_as_array
@@ -117,10 +118,20 @@ class GaussianDistribution(ContinuousDistribution):
     def log_conditional_from_simple_interval(
         self, interval: SimpleInterval
     ) -> Tuple[Optional[TruncatedGaussianDistribution], float]:
+        if interval.is_singleton():
+            return (
+                DiracDeltaDistribution(
+                    variable=self.variable,
+                    location=interval.lower,
+                    density_cap=1.0,
+                ),
+                self.log_likelihood(np.array([[interval.lower]]))[0],
+            )
+
         cdf_values = self.cumulative_distribution_function(
             simple_interval_as_array(interval).reshape(-1, 1)
         )
-        probability = cdf_values[1] - cdf_values[0]
+        probability: float = cdf_values[1] - cdf_values[0]
         if probability <= 0.0:
             return None, -np.inf
         return TruncatedGaussianDistribution(

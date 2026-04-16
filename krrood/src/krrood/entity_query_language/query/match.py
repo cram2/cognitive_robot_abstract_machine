@@ -298,7 +298,6 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
         parent = parent or self
         self.update_fields(variable, parent)
-        print("kwargs in resolve", self.kwargs.items())
         for attr_name, attr_assigned_value in self.kwargs.items():
             if isinstance(attr_assigned_value, (list, tuple)) and any(
                 isinstance(element, AbstractMatchExpression)
@@ -413,7 +412,6 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         Update the kwargs dictionary with values from this statements leaves.
         """
         for attribute_match in self.matches_with_variables:
-            print(attribute_match.assigned_variable)
             attribute_match._update_kwargs_from(self)
 
     def _get_mapped_variable_by_name(self, name: str) -> Optional[MappedVariable]:

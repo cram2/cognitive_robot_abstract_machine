@@ -35,6 +35,7 @@ from probabilistic_model.probabilistic_circuit.relational.learn_rspn import (
 )
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
 from pycram.robot_plans.actions.composite.transporting import MoveAndPickUpAction
+from random_events.product_algebra import Event
 from semantic_digital_twin.orm.model import (
     QuaternionMapping,
     Point3Mapping,
@@ -114,6 +115,24 @@ def data_preparation(mutable_model_world):
 
     move_and_pick_up_distribution = fully_factorized(parameters.variables.values())
 
+    # assert len(parameters.generated_events) == 3
+    complete_event = parameters.generated_events[0]
+    complete_event.fill_missing_variables(parameters.variables.values())
+
+    [
+        event.fill_missing_variables(parameters.variables.values())
+        for event in parameters.generated_events
+    ]
+
+    complete_event = parameters.generated_events[0]
+    for other_event in parameters.generated_events[1:]:
+        complete_event = complete_event.intersection_with(other_event)
+
+    m2, prob = move_and_pick_up_distribution.truncated(complete_event)
+    print(m2)
+    print(prob)
+
+    exit()
     probabilistic_registry = DictRegistry(
         {MoveAndPickUpAction: move_and_pick_up_distribution}
     )
