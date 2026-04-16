@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Optional, Any, List, Type, TYPE_CHECKING, Iterable, Iterator
 
 import rustworkx as rx
+import tqdm
 from typing_extensions import Union
 
 from giskardpy.motion_statechart.graph_node import Task
@@ -331,7 +332,7 @@ class UnderspecifiedNode(PlanNode):
                 self.underspecified_action
             )
 
-        for grounded_action in self._action_iterator:
+        for grounded_action in tqdm.tqdm(self._action_iterator):
             new_child = ActionNode(designator=grounded_action)
             self.add_child(new_child)
             try:
