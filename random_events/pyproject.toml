@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42", "wheel", "pybind11>=2.6.0"]
+requires = ["setuptools>=42", "wheel", "pybind11>=2.10.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -34,7 +34,7 @@ where = ["src"]
 include = ["random_events*"]
 
 [tool.pybind11]
-include-dirs = ["src/random-events-lib/random_events_lib/include"]
+include-dirs = ["src/random_events_lib/random_events_lib/include"]
 
 [tool.setuptools.dynamic]
 version = {attr = "random_events.__version__"}
