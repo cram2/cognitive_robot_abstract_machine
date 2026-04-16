@@ -20,6 +20,12 @@ class MinimalRobot(AbstractRobot):
     Used when you only care that there is a robot.
     """
 
+    def _setup_robot_parts(self):
+        for connection in self.connections:
+            if isinstance(connection, ActiveConnection):
+                connection.has_hardware_interface = True
+        super()._setup_robot_parts()
+
     @classmethod
     def _get_robot_root_body(cls, world: World) -> Self:
         return world.root
@@ -30,11 +36,6 @@ class MinimalRobot(AbstractRobot):
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(lambda: 1.0)
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
-
-    def _setup_other_hardware_interfaces(self):
-        for connection in self.connections:
-            if isinstance(connection, ActiveConnection):
-                connection.has_hardware_interface = True
 
     def _setup_joint_states(self):
         pass

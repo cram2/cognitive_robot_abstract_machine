@@ -80,8 +80,8 @@ class PR2(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
                     buffer_zone_distance=0.05,
                     violated_distance=0.0,
                     robot=self,
-                    body_subset=self.left_arm.bodies_with_collision
-                    + self.right_arm.bodies_with_collision,
+                    body_subset=set(self.left_arm.bodies_with_collision)
+                    | set(self.right_arm.bodies_with_collision),
                 ),
                 AvoidExternalCollisions(
                     buffer_zone_distance=0.2,
@@ -184,8 +184,27 @@ class PR2(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         self.add_arm(right_arm)
 
     def _setup_arm_hardware_interfaces(self):
-        for arm in self.arms:
-            arm._default_hardware_interface_setup()
+        controlled_joints = [
+            "r_shoulder_pan_joint",
+            "r_shoulder_lift_joint",
+            "r_upper_arm_roll_joint",
+            "r_forearm_roll_joint",
+            "r_elbow_flex_joint",
+            "r_wrist_flex_joint",
+            "r_wrist_roll_joint",
+            "l_shoulder_pan_joint",
+            "l_shoulder_lift_joint",
+            "l_upper_arm_roll_joint",
+            "l_forearm_roll_joint",
+            "l_elbow_flex_joint",
+            "l_wrist_flex_joint",
+            "l_wrist_roll_joint",
+        ]
+        for joint_name in controlled_joints:
+            connection: ActiveConnection = self._world.get_connection_by_name(
+                joint_name
+            )
+            connection.has_hardware_interface = True
 
     def _setup_arm_joint_state(self):
         right_arm_park = JointState.from_mapping(

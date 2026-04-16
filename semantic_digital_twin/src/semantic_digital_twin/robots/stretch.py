@@ -86,7 +86,7 @@ class Stretch(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
         self.add_arm(arm)
 
     def _setup_arm_hardware_interfaces(self):
-        pass
+        self.arm._default_hardware_interface_setup()
 
     def _setup_arm_joint_state(self):
         arm_park = JointState.from_mapping(
@@ -178,7 +178,7 @@ class Stretch(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
         self.add_torso(torso)
 
     def _setup_torso_hardware_interfaces(self):
-        pass
+        self.torso._default_hardware_interface_setup()
 
     def _setup_torso_joint_state(self):
         torso_joint = [self._world.get_connection_by_name("joint_lift")]

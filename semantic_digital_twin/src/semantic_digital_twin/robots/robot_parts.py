@@ -116,10 +116,6 @@ class RobotPart(HasRootBody, AggregatesRobotParts, ABC):
         """
         Adds a joint state to this semantic annotation.
         """
-        if not self.is_controlled:
-            raise UselessConceptError(
-                message="Adding joint states is only supported for robot parts that can be controlled."
-            )
         self.joint_states.append(joint_state)
         joint_state.assign_to_robot(self._robot)
 
