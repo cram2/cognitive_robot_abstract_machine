@@ -4,6 +4,7 @@ import logging
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from typing import Set
+from uuid import UUID
 
 from typing_extensions import (
     TYPE_CHECKING,
@@ -74,9 +75,23 @@ class AggregatesRobotParts(ABC):
         Serves as a generic interface to access all robot parts assigned to a robot part.
         Returns a list of all robot parts assigned directly to this robot part.
         """
+        return self._aggregate_robot_parts(set())
+
+    def _aggregate_robot_parts(self, seen: set[UUID]) -> list[RobotPart]:
+        """
+        Recursively aggregates all robot parts assigned to this robot part, including itself if it is a robot part.
+         Uses a set of seen UUIDs to avoid infinite recursion in case of cyclic references and duplicates.
+        """
         wrapped_class = WrappedClass(self.__class__)
         introspector = DataclassOnlyIntrospector()
-        robot_parts = [self] if isinstance(self, RobotPart) else []
+        robot_parts = []
+
+        if isinstance(self, RobotPart):
+            if self.id in seen:
+                return []
+            seen.add(self.id)
+            robot_parts.append(self)
+
         for field_ in introspector.discover(self.__class__):
             value = getattr(self, field_.public_name)
             wrapped_field = WrappedField(wrapped_class, field_.field)
@@ -84,12 +99,10 @@ class AggregatesRobotParts(ABC):
             if isinstance(value, list_like_classes) and issubclass(
                 wrapped_field.contained_type, RobotPart
             ):
-                robot_parts.extend(value)
                 for robot_part in value:
-                    robot_parts.extend(robot_part._robot_parts)
+                    robot_parts.extend(robot_part._aggregate_robot_parts(seen))
             elif isinstance(value, RobotPart):
-                robot_parts.append(value)
-                robot_parts.extend(value._robot_parts)
+                robot_parts.extend(value._aggregate_robot_parts(seen))
 
         return robot_parts
 
