@@ -208,12 +208,6 @@ class KitchenEnvironment:
                 scale=cupboard_scale,
                 wall_thickness=0.02,
             )
-            ## ToDo: Deleate from Rody
-            # Connect the cupboard to 'root', to ensure that the coordinates are relative to the room
-            # cupboard_connection = cupboard.root.parent_connection
-            # world.remove_connection(cupboard_connection)
-            # cupboard_connection.parent = root
-            # world.add_connection(cupboard_connection)
 
             # create shelflayers manually
             shelf_1 = ShelfLayer.create_with_new_body_in_world(
