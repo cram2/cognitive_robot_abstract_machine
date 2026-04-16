@@ -142,7 +142,7 @@ class MotionExecutor:
     def _execute_for_real(self):
         from giskardpy.middleware.ros2.python_interface import GiskardWrapper
 
-        giskard = GiskardWrapper(self.ros_node)
+        giskard = GiskardWrapper(self.ros_node, world=self.world)
 
         kill_event = threading.Event()
         interrupt_thread = threading.Thread(

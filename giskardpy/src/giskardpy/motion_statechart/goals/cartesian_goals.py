@@ -45,6 +45,8 @@ class DifferentialDriveBaseGoal(Sequence):
 
     nodes: list[MotionStatechartNode] = field(default_factory=list, init=False)
 
+    threshold: float = 0.01
+
     def expand(self, context: MotionStatechartContext) -> None:
         if self.diff_drive_connection is None:
             diff_drives = context.world.get_connections_by_type(DifferentialDrive)
@@ -82,6 +84,7 @@ class DifferentialDriveBaseGoal(Sequence):
                 tip_link=tip,
                 goal_orientation=root_R_first_orientation,
                 weight=self.weight,
+                threshold=self.threshold
             ),
             CartesianPose(
                 name=f"{self.name}/step2",
@@ -89,6 +92,7 @@ class DifferentialDriveBaseGoal(Sequence):
                 tip_link=tip,
                 goal_pose=root_T_goal2,
                 weight=self.weight,
+                threshold=self.threshold
             ),
             CartesianPose(
                 name=f"{self.name}/step3",
@@ -96,6 +100,7 @@ class DifferentialDriveBaseGoal(Sequence):
                 tip_link=tip,
                 goal_pose=root_T_goal,
                 weight=self.weight,
+                threshold=self.threshold
             ),
         ]
         super().expand(context)

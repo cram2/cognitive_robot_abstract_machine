@@ -16,6 +16,8 @@ from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 
 from typing import TYPE_CHECKING
 
+from ....world_description.world_entity import KinematicStructureEntity
+
 if TYPE_CHECKING:
     from ....world import World
 
@@ -99,6 +101,13 @@ class VizMarkerPublisher(ModelChangeCallback):
         """
         Launches a tf publisher in conjunction with the VizMarkerPublisher.
         """
+        # ignored_kinematic_structure_entities: set[KinematicStructureEntity] = field(
+        #     default_factory=set
+        # )
+        # """
+        # Kinematic structure entities that should not be published in the tf tree.
+        # Useful, if the robot is already publishing some tf.
+        # """
         TFPublisher(_world=self._world, node=self.node)
 
     def _select_shapes(self, body):

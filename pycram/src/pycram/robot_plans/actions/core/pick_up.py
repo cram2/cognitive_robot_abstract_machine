@@ -167,10 +167,10 @@ class PickUpAction(ActionDescription):
         end_effector = ViewManager.get_end_effector_view(self.arm, self.robot)
 
         # Attach the object to the end effector
-        with self.world.modify_world():
-            self.world.move_branch_with_fixed_connection(
-                self.object_designator, end_effector.tool_frame
-            )
+        # with self.world.modify_world():
+        #     self.world.move_branch_with_fixed_connection(
+        #         self.object_designator, end_effector.tool_frame
+        #     )
 
         _, _, lift_to_pose = self.grasp_description.grasp_pose_sequence(
             self.object_designator

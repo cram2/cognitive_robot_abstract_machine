@@ -1940,3 +1940,11 @@ class World(HasSimulatorProperties):
         for connection, value in new_state.items():
             connection.position = value
         self.notify_state_change()
+
+    def is_entity_in_world_by_name(self, name: str) -> bool:
+        """
+        Checks if there is a kinematic structure entity with the given name in the world
+        :param name: Name to be checked
+        :return: True if the entity is in the world, False otherwise
+        """
+        return name in [b.name.name for b in self.kinematic_structure_entities]

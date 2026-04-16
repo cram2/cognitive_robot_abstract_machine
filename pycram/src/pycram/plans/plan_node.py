@@ -372,9 +372,9 @@ class DesignatorNode(PlanNode, ABC):
         """
         return [
             motion_node.motion.motion_chart
-            for motion_node in self.descendants + [self]
+            for motion_node in self.children + [self]
             if isinstance(motion_node, MotionNode)
-            and self is motion_node.parent_action_node
+            # and self is motion_node.parent_action_node
         ]
 
     def construct_motion_state_chart(self):

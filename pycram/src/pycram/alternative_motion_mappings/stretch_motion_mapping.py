@@ -86,6 +86,7 @@ class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
 
     @property
     def _motion_chart(self) -> NavigateActionServerTask:
+        return DifferentialDriveBaseGoal(goal_pose=self.target, threshold=0.05)
         return NavigateActionServerTask(
             target_pose=self.target,
             base_link=self.robot.root,
