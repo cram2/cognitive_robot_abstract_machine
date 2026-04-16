@@ -182,6 +182,7 @@ class HomogeneousTransformationMatrix(
         else:
             casadi_sx = sm.to_sx(data)
         self.casadi_sx = casadi_sx
+        super().__post_init__()
 
     def _verify_type(self):
         if self.shape != (4, 4):
@@ -218,16 +219,19 @@ class HomogeneousTransformationMatrix(
         :param resolver: Callable that returns the actual transformation matrix when called.
         :return: TransformationMatrix object with float variables.
         """
-        transformation_matrix = HomogeneousTransformationMatrix()
+        transformation_matrix = []
         for row in range(3):
+            column_variables = []
             for column in range(4):
                 variable = sm.FloatVariable(
                     name=f"{cls.__name__}_{name}[{row},{column}]",
                 )
-                transformation_matrix[row, column] = variable
+                column_variables.append(variable)
                 if resolver is not None:
                     variable.resolve = lambda: resolver()[row, column]
-        return transformation_matrix
+            transformation_matrix.append(column_variables)
+        transformation_matrix.append([0, 0, 0, 1])
+        return cls(transformation_matrix)
 
     def to_json(self) -> Dict[str, Any]:
         if not self.is_constant():
@@ -483,6 +487,17 @@ class HomogeneousTransformationMatrix(
             child_frame=self.child_frame,
         )
 
+    def __hash__(self):
+        if self.is_constant():
+            return hash(
+                (
+                    *self.to_position().to_np().tolist(),
+                    *self.to_quaternion().to_np().tolist(),
+                    self.reference_frame,
+                )
+            )
+        return super().__hash__()
+
 
 @dataclass(eq=False, init=False, repr=False)
 class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
@@ -512,6 +527,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         empty_data = to_sx(Matrix.eye(4))
         empty_data[:3, :3] = sm.to_sx(data)[:3, :3]
         self._casadi_sx = empty_data
+        super().__post_init__()
 
     def _verify_type(self):
         if self.shape != (4, 4):
@@ -842,6 +858,7 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         self.casadi_sx = sm.to_sx([x, y, z, 1])
         self.reference_frame = reference_frame
+        super().__post_init__()
 
     def _verify_type(self):
         if self.shape == (3, 1):
@@ -1094,6 +1111,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         self.casadi_sx = sm.to_sx([x, y, z, 0])
         self.reference_frame = reference_frame
         self.visualisation_frame = visualisation_frame
+        super().__post_init__()
 
     def _verify_type(self):
         if self.shape == (3, 1):
@@ -1452,6 +1470,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         self.casadi_sx = sm.to_sx([x, y, z, w])
         self.reference_frame = reference_frame
+        super().__post_init__()
 
     def _verify_type(self):
         if self.shape != (4, 1):
@@ -1778,6 +1797,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         )
         self._casadi_sx = transformation_matrix._casadi_sx
         self.reference_frame = reference_frame
+        super().__post_init__()
 
     def _verify_type(self):
         if self.shape != (4, 4):
@@ -1870,6 +1890,8 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         p = Point3(x=pos_x, y=pos_y, z=pos_z)
         r = Quaternion(w=quat_w, x=quat_x, y=quat_y, z=quat_z)
+        if r.is_constant():
+            r.normalize()
         return cls(p, r, reference_frame=reference_frame)
 
     @classmethod
@@ -1959,6 +1981,17 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return HomogeneousTransformationMatrix(
             data=self, reference_frame=self.reference_frame
         )
+
+    def __hash__(self):
+        if self.is_constant():
+            return hash(
+                (
+                    *self.to_position().to_np().tolist(),
+                    *self.to_quaternion().to_np().tolist(),
+                    self.reference_frame,
+                )
+            )
+        return super().__hash__()
 
 
 @sm.substitution_cache

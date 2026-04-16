@@ -27,8 +27,8 @@ def test_underspecified_action(mutable_model_world):
     action = underspecified(NavigateAction)(
         target_location=variable_from(
             [
-                Pose.from_xyz_quaternion(1, 0, 0, reference_frame=world.root),
-                Pose.from_xyz_quaternion(2, 0, 0, reference_frame=world.root),
+                Pose.from_xyz_quaternion(1, -1, 0, reference_frame=world.root),
+                Pose.from_xyz_quaternion(2, -1, 0, reference_frame=world.root),
             ]
         ),
         keep_joint_states=True,

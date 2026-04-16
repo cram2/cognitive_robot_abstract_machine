@@ -1,7 +1,7 @@
 name: Examples and Demos  (matrix over libs)
 defaults:
   run:
-    shell: bash -ieo pipefail {0}
+    shell: bash -euo pipefail {0}
 
 on:
   push:

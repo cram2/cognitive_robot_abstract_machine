@@ -1,50 +1,22 @@
 from __future__ import annotations
 
 import logging
-from abc import abstractmethod, ABC
+from abc import abstractmethod
 from dataclasses import dataclass
 from inspect import signature
 from typing import Optional
 
+from typing_extensions import TypeVar, Type
+
 from giskardpy.motion_statechart.graph_node import Task
-from krrood.ormatic.data_access_objects.base import HasGeneric
 from pycram.plans.designator import Designator
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from pycram.datastructures.enums import ExecutionType
-from typing_extensions import TypeVar, ClassVar, Type
-
-from pycram.motion_executor import MotionExecutor
+from ...alternative_motion_mapping import AlternativeMotion
 
 logger = logging.getLogger(__name__)
 
 
 T = TypeVar("T", bound=AbstractRobot)
-
-
-@dataclass
-class AlternativeMotion(HasGeneric[T], ABC):
-    execution_type: ClassVar[ExecutionType]
-
-    def perform(self):
-        pass
-
-    @staticmethod
-    def check_for_alternative(
-        robot_view: AbstractRobot, motion: BaseMotion
-    ) -> Optional[Type[BaseMotion]]:
-        """
-        Checks if there is an alternative motion for the given robot view, motion and execution type.
-
-        :return: The alternative motion class if found, None otherwise
-        """
-        for alternative in AlternativeMotion.__subclasses__():
-            if (
-                issubclass(alternative, motion.__class__)
-                and alternative.original_class() == robot_view.__class__
-                and MotionExecutor.execution_type == alternative.execution_type
-            ):
-                return alternative
-        return None
 
 
 @dataclass
@@ -86,7 +58,7 @@ class BaseMotion(Designator):
         pass
 
     def get_alternative_motion(self) -> Optional[Type[AlternativeMotion]]:
-        return AlternativeMotion.check_for_alternative(self.robot, self)
+        return AlternativeMotion.check_for_alternative(self.robot, self.__class__)
 
 
 MotionType = TypeVar("MotionType", bound=BaseMotion)

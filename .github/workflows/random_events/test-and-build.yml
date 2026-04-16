@@ -52,13 +52,33 @@ jobs:
         with:
             python-version: "3.12"
             cache: pip
-            
+
+      # ----------------------------------------------------------------------------------------------------------------
+
+      - name: Install Bazel 7.0.0
+        run: |
+          BAZEL_VERSION=7.0.0
+          curl -L -o bazel.sh \
+            https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
+          chmod +x bazel.sh
+          ./bazel.sh --user
+          echo "$HOME/bin" >> $GITHUB_PATH
+
       # ----------------------------------------------------------------------------------------------------------------
 
       - name: Install dependencies
         run: |
           pip install pytest
           pip install -r requirements-dev.txt
+
+      # ----------------------------------------------------------------------------------------------------------------
+
+      - name: Build and test C++ lib
+        working-directory: random_events/src/random_events_lib
+        run: |
+          bazel build //test:test_all
+          bazel test //test:test_all
+
 
       # ----------------------------------------------------------------------------------------------------------------
 

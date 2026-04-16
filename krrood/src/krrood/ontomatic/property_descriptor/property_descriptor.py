@@ -22,7 +22,9 @@ from krrood.ontomatic.property_descriptor.monitored_container import (
     MonitoredContainer,
     monitored_type_map,
 )
-from krrood.ontomatic.property_descriptor.property_descriptor_relation import PropertyDescriptorRelation
+from krrood.ontomatic.property_descriptor.property_descriptor_relation import (
+    PropertyDescriptorRelation,
+)
 from krrood.ontomatic.failures import UnMonitoredContainerTypeForDescriptor
 from krrood.class_diagrams.class_diagram import WrappedClass, Association
 from krrood.class_diagrams.wrapped_field import WrappedField
@@ -31,6 +33,7 @@ from krrood.symbol_graph.symbol_graph import (
     SymbolGraph,
 )
 from krrood.entity_query_language.utils import make_set
+from krrood.utils import memoize
 
 SymbolType = Type[Symbol]
 """
@@ -286,7 +289,7 @@ class PropertyDescriptor(Symbol):
         return updated
 
     @classmethod
-    @lru_cache(maxsize=None)
+    @memoize
     def get_associated_field_of_domain_type(
         cls,
         domain_type: Union[Type[Symbol], WrappedClass],
@@ -311,7 +314,7 @@ class PropertyDescriptor(Symbol):
         return result.field if result else None
 
     @classmethod
-    @lru_cache(maxsize=None)
+    @memoize
     def get_fields_of_superproperties_in_role_taker_of_class(
         cls,
         domain_type: Union[SymbolType, WrappedClass],
@@ -332,7 +335,7 @@ class PropertyDescriptor(Symbol):
         return None, []
 
     @classmethod
-    @lru_cache(maxsize=None)
+    @memoize
     def get_fields_of_superproperties(
         cls,
         domain_type: Union[SymbolType, WrappedClass],

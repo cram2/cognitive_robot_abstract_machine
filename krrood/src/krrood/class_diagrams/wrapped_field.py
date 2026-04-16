@@ -27,7 +27,7 @@ from typing_extensions import (
 
 from krrood.class_diagrams.exceptions import MissingContainedTypeOfContainer
 from krrood.class_diagrams.utils import behaves_like_a_built_in_class
-from krrood.utils import module_and_class_name
+from krrood.utils import module_and_class_name, memoize
 
 if TYPE_CHECKING:
     from krrood.class_diagrams.class_diagram import WrappedClass

@@ -26,13 +26,6 @@ jobs:
           path: cognitive_robot_abstract_machine
           submodules: recursive
 
-      - name: Initialize submodules explicitly
-        run: |
-          cd cognitive_robot_abstract_machine
-          git config --global --add safe.directory "*"
-          git submodule sync --recursive
-          git submodule update --init --recursive
-
       - name: Install dependencies
         run: |
           cd cognitive_robot_abstract_machine
@@ -55,14 +48,39 @@ jobs:
         if: ${{inputs.lib == 'pycram' || inputs.lib == 'semantic_digital_twin'}}
         run: |
           cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
-          source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
+          source /opt/ros/overlay_ws/install/setup.bash
           python generate_orm.py
+
+      - name: Build ROS2 packages
+        run: |
+          source /opt/ros/cram-env/bin/activate
+          source /opt/ros/overlay_ws/install/setup.bash
+          cd /opt/ros/overlay_ws/src
+          ln -s "${GITHUB_WORKSPACE}/cognitive_robot_abstract_machine/cram_ros2_packages" cram_ros2_packages
+          cd ..
+          colcon build --merge-install
+
+      - name: Run CPP tests
+        if: ${{inputs.lib == 'random_events'}}
+        run: |
+          cd cognitive_robot_abstract_machine/${{ inputs.lib }}/src/random_events_lib
+          sudo apt-get install -y g++ unzip zip
+          BAZEL_VERSION=7.0.0
+          curl -L -o bazel.sh \
+            https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
+          chmod +x bazel.sh
+          ./bazel.sh --user
+          export PATH="$HOME/bin:$PATH"
+          
+          bazel build //test:test_all
+          bazel test //test:test_all
 
       - name: Run tests
         run: |
-          source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
+          source /opt/ros/overlay_ws/install/setup.bash
+          echo "PYTHONPATH: $PYTHONPATH"
           if [[ "${{ inputs.lib }}" == "probabilistic_model" ]]; then
             export QT_QPA_PLATFORM=offscreen
           fi

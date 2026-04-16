@@ -150,6 +150,8 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
     Offset of the violated_distance variable in the block.
     """
 
+    last_closest_contacts: dict[CollisionGroup, list[ClosestPoints]] = field(init=False)
+
     def get_contact_distance_offset(self) -> int:
         return self._contact_distance_offset
 
@@ -159,7 +161,7 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
         into the buffer at the right place.
         """
         self.reset_collision_data()
-        closest_contacts: dict[CollisionGroup, list[ClosestPoints]] = defaultdict(list)
+        self.last_closest_contacts = defaultdict(list)
         for collision in collision.contacts:
             group_a = self.get_collision_group(collision.body_a)
             group_b = self.get_collision_group(collision.body_b)
@@ -171,9 +173,9 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
                 # swap group_a and group_b, such that group_a is the registered group
                 collision = collision.reverse()
                 group_a, group_b = group_b, group_a
-            closest_contacts[group_a].append(collision)
+            self.last_closest_contacts[group_a].append(collision)
 
-        for group_a, collisions in closest_contacts.items():
+        for group_a, collisions in self.last_closest_contacts.items():
             collisions = sorted(collisions, key=lambda c: c.distance)
             for i in range(
                 min(
@@ -325,6 +327,10 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
     Maps body combinations to the index of point_on_body_a in the collision buffer.
     """
 
+    last_closest_contacts: dict[
+        tuple[CollisionGroup, CollisionGroup], list[ClosestPoints]
+    ] = field(init=False)
+
     @property
     def block_size(self) -> int:
         return 12
@@ -363,9 +369,7 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
         into the buffer at the right place.
         """
         self.reset_collision_data()
-        closest_contacts: dict[
-            tuple[CollisionGroup, CollisionGroup], list[ClosestPoints]
-        ] = defaultdict(list)
+        self.last_closest_contacts = defaultdict(list)
         for collision in collision_result.contacts:
             key = (
                 self.get_collision_group(collision.body_b),
@@ -378,10 +382,15 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
                 key = tuple(reversed(key))
             if key not in self.registered_group_combinations:
                 continue
-            closest_contacts[key].append(collision)
+            self.last_closest_contacts[key].append(collision)
 
-        for (group_a, group_b), collisions in closest_contacts.items():
-            closest_contact = sorted(collisions, key=lambda c: c.distance)[0]
+        for key, collisions in self.last_closest_contacts.items():
+            self.last_closest_contacts[key] = sorted(
+                collisions, key=lambda c: c.distance
+            )
+
+        for (group_a, group_b), collisions in self.last_closest_contacts.items():
+            closest_contact = collisions[0]
             group_a_T_root = group_a.root._world.compute_forward_kinematics_np(
                 group_a.root, group_a.root._world.root
             )

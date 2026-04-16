@@ -20,7 +20,6 @@ parts:
         - file: examples/persistence_of_annotated_worlds
         - file: examples/graph_of_convex_sets
         - file: examples/physics_simulators
-        - file: examples/multiverse
         - file: examples/adding_robots
         - file: datasets
 

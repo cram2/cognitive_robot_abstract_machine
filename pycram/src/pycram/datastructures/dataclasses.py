@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 from typing_extensions import (
     Optional,
-    Any,
+    Any, TYPE_CHECKING,
 )
 
 from krrood.entity_query_language.backends import QueryBackend, EntityQueryLanguageBackend
@@ -14,6 +15,10 @@ from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3
 from semantic_digital_twin.world import World
 
+try:
+    import rclpy
+except ImportError:
+    rclpy = None
 
 @dataclass
 class Context(PlanEntity):
@@ -31,15 +36,37 @@ class Context(PlanEntity):
     The semantic robot annotation which should execute the plan
     """
 
-    ros_node: Optional[Any] = field(default=None)
+    ros_node: Optional[rclpy.node.Node] = field(default=None)
     """
     A ROS node that should be used for communication in this plan
+    """
+
+    evaluate_conditions: bool = field(default=True)
+    """
+    Should pre -and postconditions of actions be evaluated in this plan
     """
 
     query_backend: QueryBackend = field(default_factory=EntityQueryLanguageBackend)
     """
     The backend used to answer queries about underspecified statements.
     """
+
+    _debug: bool = field(default=False)
+    """
+    Should debug information be printed or visualized
+    """
+
+    @property
+    def debug(self):
+        return self._debug
+
+    @debug.setter
+    def debug(self, value):
+        self._debug = value
+        if self.debug and not self.ros_node:
+            raise ValueError("Debug mode requires a ROS node")
+        logging.getLogger("pycram").setLevel(logging.DEBUG if self.debug else logging.INFO)
+
 
     @classmethod
     def from_world(cls, world: World, plan: Plan = None, query_backend: Optional[QueryBackend] = None):
