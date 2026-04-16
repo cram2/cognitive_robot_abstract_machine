@@ -17681,16 +17681,16 @@ class MobileBaseDAO(
         use_existing_column=True
     )
 
-    main_axis_id: Mapped[int] = mapped_column(
+    forward_axis_id: Mapped[int] = mapped_column(
         ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    main_axis: Mapped[Vector3MappingDAO] = relationship(
+    forward_axis: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
-        foreign_keys=[main_axis_id],
+        foreign_keys=[forward_axis_id],
         post_update=True,
     )
 
