@@ -114,6 +114,22 @@ def data_preparation(mutable_model_world):
     parameters = UnderspecifiedParameters(move_and_pick_up_description)
 
     move_and_pick_up_distribution = fully_factorized(parameters.variables.values())
+    assert len(parameters.generated_events) == 3
+    complete_event = parameters.generated_events[0]
+    complete_event.fill_missing_variables(parameters.variables.values())
+
+    [
+        event.fill_missing_variables(parameters.variables.values())
+        for event in parameters.generated_events
+    ]
+
+    complete_event = parameters.generated_events[0]
+    for other_event in parameters.generated_events[1:]:
+        complete_event = complete_event.intersection_with(other_event)
+
+    m2, _ = move_and_pick_up_distribution.log_truncated_with_singletons(complete_event)
+    print(m2)
+    exit()
 
     # assert len(parameters.generated_events) == 3
     complete_event = parameters.generated_events[0]

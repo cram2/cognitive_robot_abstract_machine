@@ -83,7 +83,7 @@ class UnderspecifiedParameters:
     Only exists if the statement has a where condition.
     """
 
-    generated_events: typing.List = field(init=False, default_factory=list)
+    generated_events: typing.List[Event] = field(init=False, default_factory=list)
 
     _symbolic_expression_event_cache: Dict[
         SymbolicExpression, Tuple[Event, Dict[str, random_events.variable.Variable]]
@@ -158,7 +158,7 @@ class UnderspecifiedParameters:
             )
             result[random_events_variable.name] = random_events_variable
 
-        identifier_name = f"{attribute_match.name_from_variable_access_path}.hash"
+        identifier_name = f"{attribute_match.name_from_variable_access_path}"
         identifier_variable = random_events.variable.Symbolic(
             name=identifier_name, domain=Set.from_iterable(hashes)
         )

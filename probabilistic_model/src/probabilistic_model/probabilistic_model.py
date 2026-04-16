@@ -225,6 +225,24 @@ class ProbabilisticModel(ABC):
         :return: The truncated distribution and the log-probability of the event.
         """
 
+    def log_truncated_with_singletons(
+        self, event: Event
+    ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
+        """
+        Truncate the distribution by handling singletons differently than `truncated`.
+        This allows for events where entire dimensions contain only unions over singleton intervals to produce
+        non-zero probabilities.
+
+        Be aware that the returned log-probability might not be the actual probability as densities may have influenced
+        it.
+
+        It is the responsibility of the caller to check if the event is compatible with the model.
+
+        :param event: The event to truncate the distribution to.
+        :return: The truncated distribution and the log-probability of the event.
+        """
+        raise NotImplementedError
+
     def conditional(self, point: Dict[Variable, Any]) -> Tuple[Optional[Self], float]:
         """
         Calculate the conditioned distribution P(*| point) and the probability of the event.
