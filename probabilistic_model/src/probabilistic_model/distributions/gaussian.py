@@ -1,26 +1,26 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Optional
 
-from numpy import nextafter
-
-from scipy.stats import gamma, norm
-
-from dataclasses import dataclass, field
-from typing_extensions import Union, Iterable, Any, Self, Dict, List, Tuple
 import numpy as np
 import numpy.typing as npt
+from numpy import nextafter
+from scipy.stats import gamma, norm
+from typing_extensions import Self, Tuple
+
 from probabilistic_model.distributions.distributions import (
     ContinuousDistribution,
     ContinuousDistributionWithFiniteSupport,
+    DiracDeltaDistribution,
 )
 from probabilistic_model.probabilistic_model import OrderType, CenterType, MomentType
 from probabilistic_model.utils import simple_interval_as_array
 from random_events.interval import Interval, reals, singleton, SimpleInterval, Bound
 from random_events.product_algebra import VariableMap
 from random_events.sigma_algebra import AbstractCompositeSet
-from random_events.variable import Continuous, Variable
+from random_events.variable import Variable
 
 
 @dataclass
@@ -168,6 +168,27 @@ class GaussianDistribution(ContinuousDistribution):
     def apply_scaling(self, scaling: VariableMap[Variable, float]):
         self.location *= scaling[self.variable]
         self.scale *= scaling[self.variable]
+
+    def log_conditional_from_simple_interval_allow_singletons(
+        self, interval: SimpleInterval
+    ) -> Tuple[Self, float]:
+
+        if interval.is_singleton():
+            log_likelihood = self.log_likelihood(np.array([[interval.lower]]))[0]
+            if log_likelihood == -np.inf:
+                return None, -np.inf
+
+            return (
+                DiracDeltaDistribution(
+                    variable=self.variable,
+                    location=interval.lower,
+                    density_cap=1.0,
+                ),
+                log_likelihood,
+            )
+
+        else:
+            return self.log_conditional_from_simple_interval(interval)
 
 
 @dataclass

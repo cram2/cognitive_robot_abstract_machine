@@ -124,6 +124,21 @@ class ContinuousDistribution(UnivariateDistribution):
         else:
             raise UndefinedOperationError(self)
 
+    def log_truncated_with_singletons(
+        self, event: Event
+    ) -> Tuple[Optional[Self], float]:
+        if event.is_empty():
+            return None, -np.inf
+
+        interval = self.composite_set_from_event(event)
+
+        if len(interval.simple_sets) == 1:
+            return self.log_conditional_from_simple_interval_allow_singletons(
+                interval.simple_sets[0]
+            )
+        else:
+            raise UndefinedOperationError(self)
+
     def log_conditional(
         self, point: Dict[Variable, Any]
     ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
@@ -151,6 +166,12 @@ class ContinuousDistribution(UnivariateDistribution):
         :param interval: The simple interval
         :return: The truncated distribution and the log-probability of the interval.
         """
+        raise NotImplementedError
+
+    @abstractmethod
+    def log_conditional_from_simple_interval_allow_singletons(
+        self, interval: SimpleInterval
+    ) -> Tuple[Self, float]:
         raise NotImplementedError
 
 
@@ -325,6 +346,11 @@ class DiscreteDistribution(UnivariateDistribution):
         # construct event
         condition = self.composite_set_from_event(event)
         return self.log_conditional_of_composite_set(condition)
+
+    def log_truncated_with_singletons(
+        self, event: Event
+    ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
+        return self.log_truncated(event)
 
     def log_conditional(
         self, point: Dict[Variable, Any]
@@ -567,10 +593,12 @@ class BernoulliDistribution(IntegerDistribution):
 
     variable: Integer
 
-    def __init__(self,
-                 variable: Integer,
-                 p: Optional[float] = None,
-                 probabilities: Optional[MissingDict[Union[int, SetElement], float]] = None):
+    def __init__(
+        self,
+        variable: Integer,
+        p: Optional[float] = None,
+        probabilities: Optional[MissingDict[Union[int, SetElement], float]] = None,
+    ):
         if probabilities is None:
             if p is None:
                 p = 0.5
@@ -748,3 +776,11 @@ class DiracDeltaDistribution(ContinuousDistribution):
 
     def apply_scaling(self, scaling: VariableMap[Variable, float]):
         self.location += scaling[self.variable]
+
+    def log_conditional_from_simple_interval_allow_singletons(
+        self, interval: SimpleInterval
+    ) -> Tuple[Self, float]:
+        if interval.contains(self.location):
+            return self, 0.0
+        else:
+            return None, -np.inf

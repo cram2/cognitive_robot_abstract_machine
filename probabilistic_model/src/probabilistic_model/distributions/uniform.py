@@ -193,3 +193,20 @@ class UniformDistribution(ContinuousDistributionWithFiniteSupport):
 
     def __hash__(self):
         return hash((self.variable.name, hash(self.interval)))
+
+    def log_conditional_from_simple_interval_allow_singletons(
+        self, interval: SimpleInterval
+    ) -> Tuple[Self, float]:
+        if not interval.is_singleton():
+            return self.log_conditional_from_simple_interval(interval)
+
+        log_likelihood = self.log_likelihood(np.array([[interval.lower]]))[0]
+        if log_likelihood == -np.inf:
+            return None, -np.inf
+
+        return (
+            DiracDeltaDistribution(
+                variable=self.variable, location=interval.lower, density_cap=1.0
+            ),
+            log_likelihood,
+        )

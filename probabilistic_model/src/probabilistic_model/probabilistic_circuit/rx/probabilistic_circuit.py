@@ -285,6 +285,13 @@ class LeafUnit(Unit):
             self.distribution.log_truncated(event.as_composite_set())
         )
 
+    def log_truncated_of_simple_event_with_singletons_in_place(
+        self, event: SimpleEvent
+    ):
+        self.distribution, self.result_of_current_query = (
+            self.distribution.log_truncated_with_singletons(event.as_composite_set())
+        )
+
     def moment(self, order, center, variable_to_index_map):
         result = np.zeros(len(variable_to_index_map))
 
@@ -1150,6 +1157,94 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
     def log_truncated(self, event: Event) -> Tuple[Optional[Self], float]:
         result = copy.deepcopy(self)
         return result.log_truncated_in_place(event)
+
+    def log_truncated_with_singletons(
+        self, event: Event
+    ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
+        result = copy.deepcopy(self)
+        return result.log_truncated_with_singletons_in_place(event)
+
+    def log_truncated_with_singletons_in_place(
+        self, event: Event
+    ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
+        # skip trivial case
+        if event.is_empty():
+            self.graph.remove_nodes_from(list(self.graph.nodes()))
+            return None, -np.inf
+
+        # if the event is easy, don't create a proxy node
+        elif len(event.simple_sets) == 1:
+            result = self.log_truncated_of_simple_event_with_singletons_in_place(
+                event.simple_sets[0]
+            )
+            return result
+
+        truncated_circuits = [
+            self.__deepcopy__().log_truncated_of_simple_event_with_singletons_in_place(
+                simple_event
+            )
+            for simple_event in event.simple_sets
+        ]
+
+        # clear this circuit
+        self.remove_nodes_from(list(self.graph.nodes()))
+
+        # filtered out impossible conditionals
+        conditional_circuits = [
+            (conditional, log_probability)
+            for conditional, log_probability in truncated_circuits
+            if log_probability > -np.inf
+        ]
+
+        # if all conditionals are impossible
+        if len(conditional_circuits) == 0:
+            return None, -np.inf
+
+        # create a new sum unit
+        result = SumUnit(probabilistic_circuit=self)
+
+        # add the conditionals to the sum unit
+        for conditional, log_probability in conditional_circuits:
+            root = conditional.root
+            new_nodes = result.probabilistic_circuit.add_from_subgraph(
+                conditional.graph
+            )
+            result.add_subcircuit(new_nodes[root.index], log_probability)
+
+        result.log_forward()
+        result.normalize()
+        return self, result.result_of_current_query
+
+    def log_truncated_of_simple_event_with_singletons_in_place(
+        self, simple_event: SimpleEvent
+    ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
+        for layer in reversed(self.layers):
+            for unit in layer:
+                if unit.is_leaf:
+                    unit: LeafUnit
+                    unit.log_truncated_of_simple_event_with_singletons_in_place(
+                        simple_event
+                    )
+                else:
+                    unit: InnerUnit
+                    unit.log_forward()
+
+        root = self.root
+        [
+            self.remove_node(node)
+            for node in self.nodes()
+            if node.result_of_current_query == -np.inf
+        ]
+
+        if root not in set(self.graph.nodes()):
+            return None, -np.inf
+
+        # clean the circuit up
+        self.remove_unreachable_nodes(root)
+        self.simplify()
+        self.normalize()
+
+        return self, root.result_of_current_query
 
     def marginal_in_place(self, variables: Iterable[Variable]) -> Optional[Self]:
         result = [
