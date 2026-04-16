@@ -76,7 +76,7 @@ class AggregatesRobotParts(ABC):
         """
         wrapped_class = WrappedClass(self.__class__)
         introspector = DataclassOnlyIntrospector()
-        robot_parts = []
+        robot_parts = [self] if isinstance(self, RobotPart) else []
         for field_ in introspector.discover(self.__class__):
             value = getattr(self, field_.public_name)
             wrapped_field = WrappedField(wrapped_class, field_.field)
