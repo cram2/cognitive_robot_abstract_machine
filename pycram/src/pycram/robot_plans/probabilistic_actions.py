@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Optional, Any
+from dataclasses import dataclass, field
+from typing import Optional, Any, Callable
 
 import numpy as np
 
@@ -16,6 +16,7 @@ from pycram.plans.failures import (
     PlanFailure,
 )
 from pycram.plans.plan import Plan
+from pycram.plans.plan_node import UnderspecifiedNode
 from pycram.robot_plans import MoveManipulatorMotion
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.navigation import NavigateAction
@@ -32,16 +33,17 @@ class TrainingEnvironment:
     Represents a training environment for learning the parametrization of actions.
     """
 
-    plan: Plan
-    """
-    The plan that should be used for training.
-    """
+    root_node_generator: Callable[[], UnderspecifiedNode] = None
+
+    executed_plans: list[Plan] = field(default_factory=list)
 
     def generate_episode(self) -> Any:
+        limit = self.plan.root.underspecified_action.expression._limit_
+
         with simulated_robot:
             try:
                 self.plan.perform()
-            except (PlanFailure, StopIteration):
+            except PlanFailure:
                 pass
 
 
@@ -109,16 +111,19 @@ class MoveToReach(LearnableAction):
     def training_environment(
         cls, robot: AbstractRobot, limit: int = 10
     ) -> TrainingEnvironment:
+
+        return TrainingEnvironment(cls.generate_root_for_training)
+
+    @classmethod
+    def generate_root_for_training(
+        cls, robot: AbstractRobot, limit: int = 10
+    ) -> UnderspecifiedNode:
         world = robot._world
         target_pose = Pose.from_xyz_rpy(
             x=1,
             y=1,
             z=1,
             reference_frame=world.root,
-        )
-
-        context = Context(
-            robot=robot, world=world, query_backend=ProbabilisticBackend()
         )
 
         move_to_reach = underspecified(MoveToReach)(
@@ -144,11 +149,7 @@ class MoveToReach(LearnableAction):
 
         move_to_reach.expression.limit(limit)
 
-        plan = execute_single(
-            move_to_reach,
-            context=context,
-        ).plan
-        return TrainingEnvironment(plan=plan)
+        return execute_single(move_to_reach)
 
 
 @dataclass
@@ -169,7 +170,7 @@ class MoveManipulatorAction(ActionDescription):
         ).perform()
 
     def validate_postcondition(self, result: Optional[Any] = None):
-        return  # TODO fix when this is called
+
         if not np.allclose(
             self.manipulator.tool_frame.global_pose.to_np(),
             self.target_pose.to_np(),

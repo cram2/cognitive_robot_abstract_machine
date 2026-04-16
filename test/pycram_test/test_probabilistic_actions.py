@@ -22,6 +22,7 @@ def test_move_to_reach(pr2_world_copy, rclpy_node):
 
     training_environment.generate_episode()
 
+    print(training_environment.plan)
     successful = 0
     for index, child in enumerate(training_environment.plan.root.children):
         if child.status == TaskStatus.SUCCEEDED:
