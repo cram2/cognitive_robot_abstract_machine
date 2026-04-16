@@ -54,9 +54,43 @@ class VisibilityValidator(PoseValidator):
         assert self.target_pose or self.target_body
         return self.validate_pose() if self.target_pose else self.validate_body()
 
-    def validate_pose(self) -> bool: ...
+    def validate_pose(self) -> bool:
+        gen_body = Body(
+            name=PrefixedName("vist_test_obj", "pycram"),
+            collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
+        )
+        with self.world.modify_world():
+            self.world.add_connection(
+                Connection6DoF.create_with_dofs(
+                    parent=self.world.root, child=gen_body, world=self.world
+                )
+            )
+        gen_body.parent_connection.origin = self.target_pose.to_homogeneous_matrix()
 
-    def validate_body(self) -> bool: ...
+        result = self._ray_test(gen_body)
+
+        if isinstance(self.target_pose, Pose):
+            with self.world.modify_world():
+                self.world.remove_connection(gen_body.parent_connection)
+                self.world.remove_kinematic_structure_entity(gen_body)
+
+        return result
+
+    def validate_body(self) -> bool:
+        return self._ray_test(self.target_body)
+
+    def _ray_test(self, target_body: Body) -> bool:
+        r_t = self.world.ray_tracer
+        camera = self.robot.get_default_camera()
+        ray = r_t.ray_test(
+            camera.bodies[0].global_transform.to_position().to_np()[:3],
+            target_body.global_transform.to_position().to_np()[:3],
+            multiple_hits=True,
+        )
+
+        hit_bodies = [b for b in ray[2] if not b in self.robot.bodies]
+
+        return hit_bodies[0] == target_body if len(hit_bodies) > 0 else False
 
 
 def visibility_validator(
@@ -130,11 +164,66 @@ def reachability_validator(
 
 
 @dataclass
+class ReachabilityValidator(PoseValidator):
+
+    pose: Pose
+
+    tip_link: KinematicStructureEntity
+
+    def __call__(self) -> bool:
+        return ReachabilitySequenceValidator(
+            pose_sequence=[self.pose],
+            tip_link=self.tip_link,
+            robot=self.robot,
+            world=self.world,
+        ).__call__()
+
+
+@dataclass
 class ReachabilitySequenceValidator(PoseValidator):
 
     pose_sequence: List[Pose]
 
     tip_link: KinematicStructureEntity
+
+    def create_msc(self):
+        alternative_motion = AlternativeMotion.check_for_alternative(
+            self.robot, MoveToolCenterPointMotion
+        )
+        if alternative_motion:
+            correct_arm = None
+            for arm in Arms:
+                if (
+                    self.tip_link
+                    == ViewManager.get_end_effector_view(arm, self.robot).tool_frame
+                ):
+                    correct_arm = arm
+            sequence = []
+            for pose in self.pose_sequence:
+                motion = alternative_motion(pose, correct_arm, True)
+                node = PlanNode()
+                # Imagine a plan for the motion node
+                plan = Plan(Context(self.world, self.robot))
+                plan.add_node(node)
+                motion.plan_node = node
+                sequence.append(motion._motion_chart)
+
+        else:
+            root = (
+                self.robot.root
+                if not self.robot.full_body_controlled
+                else self.world.root
+            )
+            sequence = [
+                CartesianPose(root_link=root, tip_link=self.tip_link, goal_pose=pose)
+                for pose in self.pose_sequence
+            ]
+
+        msc = MotionStatechart()
+        msc.add_node(n := Sequence(sequence))
+        msc.add_node(EndMotion.when_true(n))
+
+        return msc
 
     def __call__(self) -> bool:
         logger.debug(
@@ -142,44 +231,8 @@ class ReachabilitySequenceValidator(PoseValidator):
         )
 
         with self.world.reset_state_context():
-            root = (
-                self.robot.root
-                if not self.robot.full_body_controlled
-                else self.world.root
-            )
 
-            alternative_motion = AlternativeMotion.check_for_alternative(
-                self.robot, MoveToolCenterPointMotion
-            )
-            if alternative_motion:
-                correct_arm = None
-                for arm in Arms:
-                    if (
-                        self.tip_link
-                        == ViewManager.get_end_effector_view(arm, self.robot).tool_frame
-                    ):
-                        correct_arm = arm
-                sequence = []
-                for pose in self.pose_sequence:
-                    motion = alternative_motion(pose, correct_arm, True)
-                    node = PlanNode()
-                    # Imagine a plan for the motion node
-                    plan = Plan(Context(self.world, self.robot))
-                    plan.add_node(node)
-                    motion.plan_node = node
-                    sequence.append(motion._motion_chart)
-
-            else:
-                sequence = [
-                    CartesianPose(
-                        root_link=root, tip_link=self.tip_link, goal_pose=pose
-                    )
-                    for pose in self.pose_sequence
-                ]
-
-            msc = MotionStatechart()
-            msc.add_node(n := Sequence(sequence))
-            msc.add_node(EndMotion.when_true(n))
+            msc = self.create_msc()
 
             executor = Executor(
                 context=MotionStatechartContext(

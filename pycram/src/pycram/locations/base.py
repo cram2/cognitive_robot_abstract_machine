@@ -19,18 +19,23 @@ class Location:
     Base for all locations that can be used to plan movements.
     """
 
-    generator: PoseGeneratorBackend
+    context: Optional[Context]
+    """
+    The context where the location can extract information about the robot and world from.
+    """
+
+    target_pose: Pose
+    """
+    The target pose for the location.
+    """
+
+    generator: PoseGeneratorBackend = field(default=None)
     """
     Backend that generates pose candidates.
     """
-    validators: List[PoseValidator]
+    validators: List[PoseValidator] = field(default=None)
     """
     Validators that are used to check if a generated pose is valid.
-    """
-
-    context: Optional[Context] = field(default=None, kw_only=True)
-    """
-    The context where the location can extract information about the robot and world from.
     """
 
     @property
@@ -47,7 +52,6 @@ class Location:
         """
         return next(iter(self))
 
-    @abstractmethod
     def __iter__(self) -> Iterator[Pose]:
         for pose_candidate in self.generator:
             if all(validator(pose_candidate) for validator in self.validators):
@@ -74,6 +78,7 @@ class PoseGeneratorBackend:
     Generator backend base class for poses, generates pose candidates which are checked against a set of validators.
     """
 
+    @abstractmethod
     def __iter__(self) -> Iterator[Pose]:
         pass
 
