@@ -3,30 +3,25 @@ from __future__ import annotations
 import os
 import queue
 import threading
-from collections import UserDict
+from collections import UserDict, defaultdict
 from threading import RLock
 import time
 from datetime import timedelta
 from os.path import dirname, abspath
 import re
 
-from owlready2_optimized import defaultdict
+from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Optional, Dict, Type, TYPE_CHECKING, Callable, Tuple
-
-from pycram.datastructures.dataclasses import TextAnnotation
-from pycram.datastructures.enums import WorldMode
-from pycram.datastructures.world import World
-from pycram.ros import loginfo, logdebug, logerr
-from pycram.world_concepts.world_object import Object, Link
 from .datastructures.events import Event, EventUnion, EventWithTrackedObjects, EventWithTwoTrackedObjects, PickUpEvent, \
     InsertionEvent
 from .datastructures.mixins import HasPrimaryTrackedObject
 from .datastructures.object_tracker import ObjectTrackerFactory
 from .utils import text_to_speech
 
-if TYPE_CHECKING:
-    from .detectors.coarse_event_detectors import DetectorWithStarterEvent
+from segmind import set_logger_level, LogLevel, logger
 
+
+set_logger_level(LogLevel.DEBUG)
 
 ConditionFunction = Callable[[EventUnion], bool]
 CallbackFunction = Callable[[EventUnion], None]
@@ -126,9 +121,9 @@ class EventLogger:
 
         :param event: The event to annotate the scene with.
         """
-        # logdebug(f"Logging event: {event}")
+
         if self.events_to_annotate is not None and (type(event) in self.events_to_annotate):
-            loginfo(f"Logging event: {event}")
+            logger.debug(f"Logging event: {event}")
             if self.annotation_thread is not None:
                 self.annotation_queue.put(event)
                 
@@ -176,7 +171,7 @@ class EventLogger:
         save_path to the save path you prefer).
         :param save_path: the html plot will be save the given path, if not provided, it will not be saved.
         """
-        loginfo("Plotting events:")
+        logger.debug("Plotting events:")
         # construct a dataframe with the events
         import pandas as pd
         import plotly.express as px
@@ -193,22 +188,22 @@ class EventLogger:
                 data_dict['event'].append(event.__class__.__name__)
                 obj = event.tracked_object if isinstance(event, HasPrimaryTrackedObject) else tracker.obj
                 data_dict['object'].append(obj.name)
-                if isinstance(obj, Object):
+                if isinstance(obj, Body):
                     data_dict['obj_type'].append(obj.obj_type.name)
-                elif isinstance(obj, Link):
+                elif isinstance(obj, Body):
                     data_dict['obj_type'].append(f'Link of {obj.parent_entity.obj_type}')
                 if isinstance(event, EventWithTwoTrackedObjects) and event.with_object is not None:
                     with_object = event.with_object
                     data_dict['with_object'].append(with_object.name)
-                    if isinstance(with_object, Object):
+                    if isinstance(with_object, Body):
                         data_dict['with_obj_type'].append(with_object.obj_type.name)
-                    elif isinstance(with_object, Link):
+                    elif isinstance(with_object, Body):
                         data_dict['with_obj_type'].append(f'Link of {with_object.parent_entity.obj_type}')
                 else:
                     data_dict['with_object'].append(None)
                     data_dict['with_obj_type'].append(None)
         if len(data_dict['start']) == 0:
-            loginfo("No events to plot.")
+            logger.debug("No events to plot.")
             return
         # subtract the start time from all timestamps
         min_start = min(data_dict['start'])
@@ -262,14 +257,14 @@ class EventLogger:
                 save_path += '.html'
             file_path = abspath(save_path)
             fig.write_html(file_path)
-            loginfo(f"Plot saved to {file_path}")
+            logger.debug(f"Plot saved to {file_path}")
 
     def print_events(self):
         """
         Print all events that have been logged.
         """
-        loginfo("Events:")
-        loginfo(self.__str__())
+        logger.debug("Events:")
+        logger.debug(self.__str__())
 
     def get_events_per_thread(self) -> Dict[str, List[Event]]:
         """
@@ -287,7 +282,7 @@ class EventLogger:
             events = self.timeline.copy()
         return events
 
-    def get_latest_event_of_detector_for_object(self, detector_prefix: str, obj: Object) -> Optional[Event]:
+    def get_latest_event_of_detector_for_object(self, detector_prefix: str, obj: Body) -> Optional[Event]:
         """
         Get the latest of event of the thread that has the given prefix and object name in its id.
 
@@ -297,7 +292,7 @@ class EventLogger:
         thread_id = self.find_thread_with_prefix_and_object(detector_prefix, obj.name)
         return self.get_latest_event_of_thread(thread_id)
 
-    def get_nearest_event_of_detector_for_object(self, detector_prefix: str, obj: Object,
+    def get_nearest_event_of_detector_for_object(self, detector_prefix: str, obj: Body,
                                                  timestamp: float) -> Optional[EventUnion]:
         """
         Get the nearest event of the thread that has the given prefix and object name in its id.
@@ -368,7 +363,7 @@ class EventLogger:
             self.annotation_thread.join()
             while self.annotation_queue.unfinished_tasks > 0:
                 event = self.annotation_queue.get_nowait()
-                logdebug(f"Left out annotation for event: {event}")
+                logger.debug(f"Left out annotation for event: {event}")
                 self.annotation_queue.task_done()
             self.annotation_queue.join()
         self.event_queue.join()
@@ -381,7 +376,7 @@ class EventAnnotationThread(threading.Thread):
     def __init__(self, logger: EventLogger):
         super().__init__()
         self.logger = logger
-        self.current_annotations: List[TextAnnotation] = []
+        #self.current_annotations: List[TextAnnotation] = []
         self.kill_event = threading.Event()
 
     def run(self):
@@ -405,7 +400,7 @@ class EventAnnotationThread(threading.Thread):
                     text_to_speech(f"The {obj_name_map[event.tracked_object.name]} was inserted into the {hole_name}")
                 event.annotate()
             except Exception as e:
-                logerr(f"Error annotating event {event}: {e}")
+                logger.debug(f"Error annotating event {event}: {e}")
                 continue
 
     def stop(self):

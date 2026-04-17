@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import datetime
-import threading
 from threading import RLock
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+
+from semantic_digital_twin.world import World
 from typing_extensions import Callable, Any, Optional, Dict, Generator
-from pycram.ros import logdebug
-from pycram.datastructures.world import World
+
+from segmind import set_logger_level, LogLevel, logger
+
+
+set_logger_level(LogLevel.DEBUG)
 
 try:
     from pycram.worlds.multiverse import Multiverse
@@ -29,28 +32,38 @@ class EpisodePlayer(PropagatingThread, ABC):
     A class that represents the thread that steps the world.
     """
 
-    _instance: Optional[EpisodePlayer] = None
+    _instances: dict[type, 'EpisodePlayer'] = {}
     pause_resume_lock: RLock = RLock()
-    
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            EpisodePlayer._instance = cls._instance
-            # Initialize only once when instance is first created
-            cls._instance._initialized = False
-        return cls._instance
 
-    def __init__(self, time_between_frames: Optional[datetime.timedelta] = None, use_realtime: bool = False,
-                 stop_after_ready: bool = False, world: Optional[World] = None,
-                 rdr_viewer: Optional[RDRCaseViewer] = None):
+    def __new__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            # Create the instance and store it under its specific class key
+            instance = super().__new__(cls)
+            cls._instances[cls] = instance
+            instance._initialized = False
+
+        return cls._instances[cls]
+
+    def __init__(
+        self,
+        time_between_frames: Optional[datetime.timedelta] = None,
+        use_realtime: bool = False,
+        stop_after_ready: bool = False,
+        world: Optional[World] = None,
+        rdr_viewer: Optional[RDRCaseViewer] = None,
+    ):
         if not self._initialized:
             super().__init__()
             self.rdr_viewer: Optional[RDRCaseViewer] = rdr_viewer
             self.stop_after_ready: bool = stop_after_ready
-            self.world: World = world if world is not None else World.current_world
+            self.world: World
             self._ready: bool = False
             self._status = PlayerStatus.CREATED
-            self.time_between_frames: datetime.timedelta = time_between_frames if time_between_frames is not None else datetime.timedelta(seconds=0.01)
+            self.time_between_frames: datetime.timedelta = (
+                time_between_frames
+                if time_between_frames is not None
+                else datetime.timedelta(seconds=0.01)
+            )
             self.use_realtime: bool = use_realtime
             self._initialized = True
 
@@ -75,7 +88,7 @@ class EpisodePlayer(PropagatingThread, ABC):
     def run(self):
         self._status = PlayerStatus.PLAYING
         super().run()
-    
+
     def pause(self):
         """
         Pause the episode player frame processing.
@@ -96,7 +109,7 @@ class EpisodePlayer(PropagatingThread, ABC):
         """
         self._status = PlayerStatus.PLAYING
         self._resume()
-    
+
     @abstractmethod
     def _resume(self):
         """
@@ -111,7 +124,11 @@ class EpisodePlayer(PropagatingThread, ABC):
         while self.status == PlayerStatus.PAUSED and not self.kill_event.is_set():
             time.sleep(0.1)
 
-    def _wait_to_maintain_frame_rate(self, last_processing_time: float, delta_time: Optional[datetime.timedelta] = None):
+    def _wait_to_maintain_frame_rate(
+        self,
+        last_processing_time: float,
+        delta_time: Optional[datetime.timedelta] = None,
+    ):
         """
         Wait to maintain the frame rate of the episode player.
 
@@ -124,6 +141,40 @@ class EpisodePlayer(PropagatingThread, ABC):
             time.sleep((time_to_wait - delta_time).total_seconds())
 
     @classmethod
+    def pause_resume_with_condition(cls, condition: Callable[[Any], bool]) -> Callable:
+        """
+        A decorator for pausing the player before a function call given a condition and then resuming it after the call
+         ends.
+
+        :param condition: The condition to check before pausing the player.
+        :return: The wrapped callable
+        """
+
+        def condition_wrapper(func: Callable) -> Callable:
+            """
+            A decorator for pausing the player before a function call and then resuming it after the call ends.
+
+            :param func: The callable to wrap with the decorator.
+            :return: The wrapped callable
+            """
+
+            def wrapper(*args, **kwargs) -> Any:
+                if not condition(*args, **kwargs):
+                    return func(*args, **kwargs)
+                with cls.pause_resume_lock:
+                    if cls._instance.status == PlayerStatus.PLAYING:
+                        print("Pausing player")
+                        cls._instance.pause()
+                        result = func(*args, **kwargs)
+                        cls._instance.resume()
+                        print("Resuming player")
+                        return result
+                    else:
+                        return func(*args, **kwargs)
+
+        return condition_wrapper
+
+    @classmethod
     def pause_resume(cls, func: Callable) -> Callable:
         """
         A decorator for pausing the player before a function call and then resuming it after the call ends.
@@ -131,18 +182,20 @@ class EpisodePlayer(PropagatingThread, ABC):
         :param func: The callable to wrap with the decorator.
         :return: The wrapped callable
         """
+
         def wrapper(*args, **kwargs) -> Any:
             with cls.pause_resume_lock:
                 if cls._instance.status == PlayerStatus.PLAYING:
-                    logdebug("Pausing player")
+                    logger.debug("Pausing player")
                     cls._instance.pause()
                     result = func(*args, **kwargs)
                     cls._instance.resume()
-                    logdebug("Resuming player")
+                    logger.debug("Resuming player")
                     return result
                 else:
                     return func(*args, **kwargs)
+
         return wrapper
-    
+
     def _join(self, timeout=None):
         self._instance = None

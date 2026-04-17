@@ -7,13 +7,17 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from threading import RLock
-
+from segmind import set_logger_level, LogLevel, logger
 from typing_extensions import Callable, Optional, Dict, Generator, List
+from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Pose,
+    HomogeneousTransformationMatrix,
+)
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
-from pycram.datastructures.pose import Pose, Vector3
-from pycram.datastructures.world import World
-from pycram.world_concepts.world_object import Object
-
+set_logger_level(LogLevel.DEBUG)
 try:
     from pycram.worlds.multiverse import Multiverse
 except ImportError:
@@ -28,6 +32,7 @@ class FrameData:
     """
     A dataclass to store the frame data.
     """
+
     time: float
     """
     The time of the frame.
@@ -52,10 +57,20 @@ class DataPlayer(EpisodePlayer, ABC):
 
     frame_callback_lock: RLock = RLock()
 
-    def __init__(self, time_between_frames: Optional[timedelta] = None, use_realtime: bool = False,
-                 stop_after_ready: bool = False, world: Optional[World] = None):
-        super().__init__(time_between_frames=time_between_frames, use_realtime=use_realtime,
-                         stop_after_ready=stop_after_ready, world=world)
+    def __init__(
+        self,
+        world: World,
+        time_between_frames: Optional[timedelta] = None,
+        use_realtime: bool = False,
+        stop_after_ready: bool = False,
+    ):
+        super().__init__(
+            time_between_frames=time_between_frames,
+            use_realtime=use_realtime,
+            stop_after_ready=stop_after_ready,
+            world=world,
+        )
+        self.world = world
         self.frame_callbacks: List[Callable[[float], None]] = []
         self.frame_data_generator: FrameDataGenerator = self.get_frame_data_generator()
         self.sync_robot_only: bool = False
@@ -64,6 +79,7 @@ class DataPlayer(EpisodePlayer, ABC):
         """
         Reset the player to its initial state.
         """
+        logger.debug("Resetting DataPlayer !!!!!!!!!!!!!!!!")
         self.ready = False
         self.frame_callbacks = []
         self.frame_data_generator = self.get_frame_data_generator()
@@ -82,6 +98,7 @@ class DataPlayer(EpisodePlayer, ABC):
         :param callback: The callback.
         """
         with self.frame_callback_lock:
+            logger.debug(f"Adding frame callback: {callback}")
             self.frame_callbacks.append(callback)
 
     def remove_frame_callback(self, callback: Callable):
@@ -90,6 +107,7 @@ class DataPlayer(EpisodePlayer, ABC):
 
         :param callback: The callback.
         """
+        logger.debug(f"Removing frame callback: {callback}")
         with self.frame_callback_lock:
             if callback in self.frame_callbacks:
                 self.frame_callbacks.remove(callback)
@@ -128,6 +146,7 @@ class DataPlayer(EpisodePlayer, ABC):
                 self._wait_to_maintain_frame_rate(last_processing_time, wait_time)
 
             is_first_frame = False
+        self._status = PlayerStatus.STOPPED
 
     def process_objects_data(self, frame_data: FrameData):
         """
@@ -136,16 +155,24 @@ class DataPlayer(EpisodePlayer, ABC):
         :param frame_data: The frame data.
         """
         objects_poses = self.get_objects_poses(frame_data)
-        joint_states = self.get_joint_states(frame_data)
         if len(objects_poses):
-            if self.sync_robot_only:
-                objects_poses = {self.world.robot: objects_poses[self.world.robot]}
-            self.world.reset_multiple_objects_base_poses(objects_poses)
-        if len(joint_states):
-            self.world.robot.set_multiple_joint_positions(joint_states)
+            for obj in self.world.bodies_with_collision:
+                if obj in objects_poses:
+                    obj.parent_connection.origin = (
+                        HomogeneousTransformationMatrix.from_xyz_quaternion(
+                            pos_x=objects_poses[obj].x,
+                            pos_y=objects_poses[obj].y,
+                            pos_z=objects_poses[obj].z,
+                            quat_x=objects_poses[obj].to_quaternion()[0],
+                            quat_y=objects_poses[obj].to_quaternion()[1],
+                            quat_z=objects_poses[obj].to_quaternion()[2],
+                            quat_w=objects_poses[obj].to_quaternion()[3],
+                        )
+                    )
+
 
     @abstractmethod
-    def get_objects_poses(self, frame_data: FrameData) -> Dict[Object, Pose]:
+    def get_objects_poses(self, frame_data: FrameData) -> Dict[Body, Pose]:
         """
         Get the poses of the objects.
 
@@ -162,9 +189,16 @@ class FilePlayer(DataPlayer, ABC):
     file_path: str
     models_dir: Optional[str]
 
-    def __init__(self, file_path: str, models_dir: Optional[str] = None, world: Optional[World] = None,
-                 time_between_frames: Optional[timedelta] = None, use_realtime: bool = False,
-                 stop_after_ready: bool = False, position_shift: Optional[Vector3] = None):
+    def __init__(
+        self,
+        file_path: str,
+        world: World,
+        models_dir: Optional[str] = None,
+        time_between_frames: Optional[timedelta] = None,
+        use_realtime: bool = False,
+        stop_after_ready: bool = False,
+        position_shift: Optional[Vector3] = None,
+    ):
         """
         Initializes the FAMEEpisodePlayer with the specified file.
 
@@ -177,17 +211,17 @@ class FilePlayer(DataPlayer, ABC):
         :param position_shift: The position shift to apply to the objects.
         """
         self.file_path = file_path
-        super().__init__(time_between_frames=time_between_frames, use_realtime=use_realtime, world=world,
-                         stop_after_ready=stop_after_ready)
+        super().__init__(
+            time_between_frames=time_between_frames,
+            use_realtime=use_realtime,
+            world=world,
+            stop_after_ready=stop_after_ready,
+        )
 
-        self.models_dir = models_dir or os.path.join(os.path.dirname(self.file_path), "models")
+        self.models_dir = models_dir or os.path.join(
+            os.path.dirname(self.file_path), "models"
+        )
 
-        self.copy_model_files_to_world_data_dir()
         self.position_shift: Optional[Vector3] = position_shift
 
-    def copy_model_files_to_world_data_dir(self):
-        """
-        Copy the model files to the world data directory.
-        """
-        # Copy the entire folder and its contents
-        shutil.copytree(self.models_dir, self.world.conf.cache_dir + "/objects", dirs_exist_ok=True)
+

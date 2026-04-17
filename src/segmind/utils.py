@@ -1,31 +1,23 @@
 from __future__ import annotations
 
-import math
 import threading
 import time
 from abc import ABC, abstractmethod
 
 import numpy as np
-from typing_extensions import List, Optional, Tuple
-
-from pycram.datastructures.dataclasses import Color
-from pycram.datastructures.dataclasses import (ContactPointsList, AxisAlignedBoundingBox as AABB, BoxVisualShape)
-from pycram.datastructures.enums import Arms, Grasp, AxisIdentifier
-from pycram.datastructures.grasp import GraspDescription
-from pycram.datastructures.pose import Transform, Vector3
-from pycram.datastructures.world import World, UseProspectionWorld
-from pycram.datastructures.world_entity import PhysicalBody
-from pycram.object_descriptors.generic import ObjectDescription as GenericObjectDescription
-from pycram.ros import logdebug, logwarn
+from segmind import set_logger_level, LogLevel, logger
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from typing_extensions import List, Optional
 from pycram.tf_transformations import quaternion_inverse, quaternion_multiply
-from pycram.world_concepts.world_object import Object
-from pycrap.ontologies import Supporter, Floor
 
+set_logger_level(LogLevel.DEBUG)
 try:
     from semantic_world.views import Container
 except ImportError:
     Container = None
-    logwarn("Container view is not available. Some functionalities may not work as expected.")
+    logger.debug(
+        "Container view is not available. Some functionalities may not work as expected."
+    )
 
 from gtts import gTTS
 import pygame
@@ -35,10 +27,10 @@ speech_lock = threading.RLock()
 
 def text_to_speech(text: str):
     # The text that you want to convert to audio
-    text = 'Hello' if text is None else text
+    text = "Hello" if text is None else text
 
     # Language in which you want to convert
-    language = 'en'
+    language = "en"
 
     # Passing the text and language to the engine,
     # here we have marked slow=False. Which tells
@@ -57,52 +49,12 @@ def text_to_speech(text: str):
             except pygame.error:
                 pass
 
-            # time.sleep(1)
-
-            # Play the loaded mp3 file
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():
                 time.sleep(0.1)
                 continue
         except pygame.error:
-            logwarn("Audio not available, running in silent mode.")
-
-
-def is_object_supported_by_container_body(obj: PhysicalBody, distance: float = 0.07,
-                                          bodies_to_check: Optional[List[PhysicalBody]] = None) -> bool:
-    if bodies_to_check is None:
-        bodies_to_check = obj.contact_points.get_all_bodies()
-    if hasattr(obj.world, "views") and obj.world.views is not None:
-        containers = [v for v in obj.world.views['views'] if isinstance(v, Container)]
-        container_bodies = [c.body for c in containers]
-        container_body_names = [c.name.name for c in container_bodies]
-        return any(body.name in container_body_names for body in bodies_to_check)
-    else:
-        if any("drawer" in body.name and "handle" not in body.name for body in bodies_to_check):
-            return True
-        else:
-            possible_containers = obj.update_containment(axis_to_use=[AxisIdentifier.X, AxisIdentifier.Y])
-            possible_containers = [b for b in possible_containers if "drawer" in b.name and "handle" not in b.name]
-            for b in bodies_to_check:
-                b_contact_bodies = b.contact_points.get_all_bodies()
-                if any(contact_body in possible_containers for contact_body in b_contact_bodies):
-                    return True
-            return False
-
-
-def get_arm_and_grasp_description_for_object(obj: Object) -> Tuple[Arms, GraspDescription]:
-    obj_pose = obj.pose
-    left_arm_pose = World.current_world.robot.get_link_pose("l_gripper_tool_frame")
-    right_arm_pose = World.current_world.robot.get_link_pose("r_gripper_tool_frame")
-    obj_distance_from_left_arm = left_arm_pose.position.euclidean_distance(obj_pose.position)
-    obj_distance_from_right_arm = right_arm_pose.position.euclidean_distance(obj_pose.position)
-    if obj_distance_from_left_arm < obj_distance_from_right_arm:
-        arm = Arms.LEFT
-        grasp = GraspDescription(Grasp.LEFT, Grasp.TOP)
-    else:
-        arm = Arms.RIGHT
-        grasp = GraspDescription(Grasp.RIGHT, Grasp.TOP)
-    return arm, grasp
+            print("Audio not available, running in silent mode.")
 
 
 class PropagatingThread(threading.Thread, ABC):
@@ -127,181 +79,11 @@ class PropagatingThread(threading.Thread, ABC):
         self.kill_event.set()
         self._join()
 
-    # def join(self, timeout=None):
-    #     self._join(timeout)
-    #     super().join(timeout)
-    #     if self.exc is not None:
-    #         pytest.fail(f"Exception in event detector {self}: {self.exc}")
-    #         raise self.exc  # Propagate the exception to the main thread
-
     @abstractmethod
     def _join(self, timeout=None):
         pass
 
 
-def check_if_object_is_supported(obj: Object, distance: Optional[float] = 0.03) -> bool:
-    """
-    Check if the object is supported by any other object.
-
-    :param obj: The object to check if it is supported.
-    :param distance: The distance to check if the object is supported.
-    :return: True if the object is supported, False otherwise.
-    """
-    supported = True
-    with UseProspectionWorld():
-        prospection_obj = World.current_world.get_prospection_object_for_object(obj)
-        dt = math.sqrt(2 * distance / 9.81) + 0.01  # time to fall distance
-        World.current_world.simulate(dt)
-        cp = prospection_obj.contact_points
-        if get_support(prospection_obj, cp.get_all_bodies()) is None:
-            return False
-    return supported
-
-
-def check_if_object_is_supported_using_contact_points(obj: Object, contact_points: ContactPointsList) -> bool:
-    """
-    Check if the object is supported by any other object using the contact points.
-
-    :param obj: The object to check if it is supported.
-    :param contact_points: The contact points of the object.
-    :return: True if the object is supported, False otherwise.
-    """
-    for body in contact_points.get_bodies_in_contact():
-        if check_if_object_is_supported_by_another_object(obj, body, contact_points.get_points_of_body(body)):
-            return True
-
-
-def get_support(obj: Object, contact_bodies: Optional[List[PhysicalBody]] = None) -> Optional[PhysicalBody]:
-    """
-    Check if the object is in contact with a supporting surface and returns it.
-
-    :param obj: The object to check if it is in contact with a supporting surface.
-    :param contact_bodies: The bodies in contact with the object.
-    :return: The supporting surface if it exists, None otherwise.
-    """
-    if not contact_bodies:
-        contact_bodies = obj.contact_points.get_all_bodies()
-    excluded_bodies = [obj]
-    if isinstance(obj, Object):
-        excluded_bodies.extend(list(obj.links.values()))
-    for body in contact_bodies:
-        if body in excluded_bodies:
-            continue
-        # if isinstance(body, Link):
-        #     parent_obj = body.parent_entity
-        # else:
-        #     parent_obj = body
-        # if issubclass(obj.obj_type, (Supporter, Location)):
-        if is_object_supported_by_container_body(obj, bodies_to_check=[body]):
-            return body
-        body_aabb = body.get_axis_aligned_bounding_box()
-        surface_z = body_aabb.max_z - 0.001
-        obj_bbox = obj.get_axis_aligned_bounding_box()
-        intersection = obj_bbox.intersection_with(body_aabb, axis_to_use=[AxisIdentifier.X, AxisIdentifier.Y])
-        tracked_object_base = obj.position
-        if tracked_object_base.z + 0.001 >= surface_z and intersection.width >= 0.5 * obj_bbox.width and \
-                intersection.depth >= 0.5 * obj_bbox.depth:
-            logdebug(f"Object {obj.name} IS supported by {body.name}")
-            return body
-    logdebug(f"Object {obj.name} IS NOT supported")
-
-
-def check_if_object_is_supported_by_another_object(obj: Object, support_obj: Object,
-                                                   contact_points: Optional[ContactPointsList] = None) -> bool:
-    """
-    Check if the object is supported by another object.
-
-    :param obj: The object to check if it is supported.
-    :param support_obj: The object that supports the object.
-    :param contact_points: The contact points between the object and the support object.
-    :return: True if the object is supported by the support object, False otherwise.
-    """
-    if contact_points is None:
-        contact_points = obj.get_contact_points_with_body(support_obj)
-    normals = [cp.normal.to_list() for cp in contact_points if any(cp.normal.to_list())]
-    if len(normals) > 0:
-        average_normal = np.mean(normals, axis=0)
-        return is_vector_opposite_to_gravity(average_normal)
-    return False
-
-
-def is_vector_opposite_to_gravity(vector: List[float], gravity_vector: Optional[List[float]] = None) -> bool:
-    """
-    Check if the vector is opposite to the gravity vector.
-
-    :param vector: A list of float values that represent the vector.
-    :param gravity_vector: A list of float values that represent the gravity vector.
-    :return: True if the vector is opposite to the gravity vector, False otherwise.
-    """
-    gravity_vector = [0, 0, -1] if gravity_vector is None else gravity_vector
-    return np.dot(vector, gravity_vector) < 0
-
-
-class Imaginator:
-    """
-    A class that provides methods for imagining objects.
-    """
-    surfaces_created: List[Object] = []
-    latest_surface_idx: int = 0
-
-    @classmethod
-    def imagine_support_from_aabb(cls, aabb: AABB) -> Object:
-        """
-        Imagine a support with the size of the axis-aligned bounding box.
-
-        :param aabb: The axis-aligned bounding box for which the support of same size should be imagined.
-        :return: The support object.
-        """
-        return cls._imagine_support(aabb=aabb)
-
-    @classmethod
-    def imagine_support_for_object(cls, obj: Object, support_thickness: Optional[float] = 0.005) -> Object:
-        """
-        Imagine a support that supports the object and has a specified thickness.
-
-        :param obj: The object for which the support should be imagined.
-        :param support_thickness: The thickness of the support.
-        :return: The support object
-        """
-        return cls._imagine_support(obj=obj, support_thickness=support_thickness)
-
-    @classmethod
-    def _imagine_support(cls, obj: Optional[Object] = None,
-                         aabb: Optional[AABB] = None,
-                         support_thickness: Optional[float] = None) -> Object:
-        """
-        Imagine a support for the object or with the size of the axis-aligned bounding box.
-
-        :param obj: The object for which the support should be imagined.
-        :param aabb: The axis-aligned bounding box for which the support of same size should be imagined.
-        :param support_thickness: The thickness of the support.
-        :return: The support object.
-        """
-        if aabb is not None:
-            obj_aabb = aabb
-        elif obj is not None:
-            obj_aabb = obj.get_axis_aligned_bounding_box()
-        else:
-            raise ValueError("Either object or axis-aligned bounding box should be provided.")
-        print(f"support index: {cls.latest_surface_idx}")
-        support_name = f"imagined_support_{cls.latest_surface_idx}"
-        support_thickness = obj_aabb.depth if support_thickness is None else support_thickness
-        box_vis_shape = BoxVisualShape(Color(1, 1, 0, 1), Vector3(0, 0, 0),
-                                       Vector3(obj_aabb.width, obj_aabb.depth, support_thickness * 0.5))
-        support = GenericObjectDescription(support_name, box_vis_shape)
-        support_obj = Object(support_name, Supporter, None, support, color=support.color)
-        support_position = obj_aabb.base_origin
-        support_obj.set_position(support_position)
-        cp = support_obj.closest_points(0.05)
-        contacted_objects = cp.get_objects_that_have_points()
-        contacted_surfaces = [obj for obj in contacted_objects if obj in cls.surfaces_created and obj != support_obj]
-        for obj in contacted_surfaces:
-            support_obj = support_obj.merge(obj)
-            cls.surfaces_created.remove(obj)
-        World.current_world.get_object_by_type(Floor)[0].attach(support_obj)
-        cls.surfaces_created.append(support_obj)
-        cls.latest_surface_idx += 1
-        return support_obj
 
 
 def get_angle_between_vectors(vector_1: List[float], vector_2: List[float]) -> float:
@@ -312,14 +94,21 @@ def get_angle_between_vectors(vector_1: List[float], vector_2: List[float]) -> f
     :param vector_2: A list of float values that represent the second vector.
     :return: A float value that represents the angle between the two vectors.
     """
-    angle = np.arccos(np.dot(vector_1, vector_2) / (np.linalg.norm(vector_1) * np.linalg.norm(vector_2)))
+    angle = np.arccos(
+        np.dot(vector_1, vector_2)
+        / (np.linalg.norm(vector_1) * np.linalg.norm(vector_2))
+    )
     if isinstance(angle, np.ndarray):
         angle = float(angle.squeeze())
     return angle
 
 
-def calculate_transform_difference_and_check_if_small(transform_1: Transform, transform_2: Transform,
-                                                      translation_threshold: float, angle_threshold: float) -> bool:
+def calculate_transform_difference_and_check_if_small(
+    transform_1: HomogeneousTransformationMatrix,
+    transform_2: HomogeneousTransformationMatrix,
+    translation_threshold: float,
+    angle_threshold: float,
+) -> bool:
     """
     Calculate the translation and rotation of the object with respect to the hand to check if it was picked up,
      uses the translation and rotation thresholds to determine if the object was picked up.
@@ -331,15 +120,20 @@ def calculate_transform_difference_and_check_if_small(transform_1: Transform, tr
     :return: A tuple of two boolean values that represent the conditions for the translation and rotation of the
     object to be considered as picked up.
     """
-    trans_1, quat_1 = transform_1.translation_as_list(), transform_1.rotation_as_list()
-    trans_2, quat_2 = transform_2.translation_as_list(), transform_2.rotation_as_list()
-    trans_diff_cond = calculate_translation_difference_and_check(trans_1, trans_2, translation_threshold)
-    rot_diff_cond = calculate_angle_between_quaternions_and_check(quat_1, quat_2, angle_threshold)
+    trans_1, quat_1 = transform_1.to_position(), transform_1.to_quaternion()
+    trans_2, quat_2 = transform_2.to_position(), transform_2.to_quaternion()
+    trans_diff_cond = calculate_translation_difference_and_check(
+        trans_1.to_list(), trans_2.to_list(), translation_threshold
+    )
+    rot_diff_cond = calculate_angle_between_quaternions_and_check(
+        quat_1.to_list(), quat_2.to_list(), angle_threshold
+    )
     return trans_diff_cond and rot_diff_cond
 
 
-def calculate_translation_difference_and_check(trans_1: List[float], trans_2: List[float],
-                                               threshold: float) -> bool:
+def calculate_translation_difference_and_check(
+    trans_1: List[float], trans_2: List[float], threshold: float
+) -> bool:
     """
     Calculate the translation difference and checks if it is small.
 
@@ -362,7 +156,7 @@ def is_translation_difference_small(trans_diff: List[float], threshold: float) -
     :return: A boolean value that represents the condition for the translation difference to be considered as small.
     """
     return np.linalg.norm(trans_diff) <= threshold
-    # return all([diff <= threshold for diff in trans_diff])
+
 
 
 def calculate_translation(position_1: List[float], position_2: List[float]) -> List:
@@ -376,7 +170,9 @@ def calculate_translation(position_1: List[float], position_2: List[float]) -> L
     return [p2 - p1 for p1, p2 in zip(position_1, position_2)]
 
 
-def calculate_abs_translation_difference(trans_1: List[float], trans_2: List[float]) -> List[float]:
+def calculate_abs_translation_difference(
+    trans_1: List[float], trans_2: List[float]
+) -> List[float]:
     """
     Calculate the translation difference.
 
@@ -409,7 +205,9 @@ def calculate_translation_vector(point_1: List[float], point_2: List[float]):
     return [p2 - p1 for p1, p2 in zip(point_1, point_2)]
 
 
-def calculate_angle_between_quaternions_and_check(quat_1: List[float], quat_2: List[float], threshold: float) -> bool:
+def calculate_angle_between_quaternions_and_check(
+    quat_1: List[float], quat_2: List[float], threshold: float
+) -> bool:
     """
     Calculate the angle between two quaternions and checks if it is small.
 
@@ -423,7 +221,9 @@ def calculate_angle_between_quaternions_and_check(quat_1: List[float], quat_2: L
     return quat_diff_angle <= threshold
 
 
-def calculate_angle_between_quaternions(quat_1: List[float], quat_2: List[float]) -> float:
+def calculate_angle_between_quaternions(
+    quat_1: List[float], quat_2: List[float]
+) -> float:
     """
     Calculate the angle between two quaternions.
 
@@ -436,7 +236,9 @@ def calculate_angle_between_quaternions(quat_1: List[float], quat_2: List[float]
     return quat_diff_angle
 
 
-def calculate_quaternion_difference(quat_1: List[float], quat_2: List[float]) -> List[float]:
+def calculate_quaternion_difference(
+    quat_1: List[float], quat_2: List[float]
+) -> List[float]:
     """
     Calculate the quaternion difference.
 

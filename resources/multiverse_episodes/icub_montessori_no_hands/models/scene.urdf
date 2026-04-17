@@ -330,7 +330,7 @@
     <collision name="MontessoriObject2">
       <origin xyz="-0.005819993559271097 1.2720914664890083e-19 3.725290298461914e-09" rpy="0.0 0.0 0.0"/>
       <geometry>
-        <mesh filename="file://montessori_object_1/meshes/stl/montessori_object_2_MontessoriObject_002.stl" scale="0.8 0.8 0.02"/>
+        <mesh filename="file://scene/meshes/stl/montessori_object_2_MontessoriObject_002.stl" scale="0.8 0.8 0.02"/>
       </geometry>
     </collision>
   </link>
