@@ -1,0 +1,795 @@
+<mujoco model="iCub_with_montessori_toys_2">
+  <compiler angle="radian" />
+  <option timestep="0.004" integrator="implicitfast" cone="elliptic" >
+    <flag nativeccd="enable" multiccd="enable"/>
+  </option>
+  <size nkey="2" />
+  <visual>
+    <map stiffness="700" fogstart="1" fogend="15" zfar="40" haze="1" shadowscale="0.5" />
+    <rgba haze="0.15 0.25 0.35 1" />
+  </visual>
+  <default>
+    <default class="table_main" />
+    <default class="small_table_main" />
+    <default class="montessori_box_main">
+      <default class="montessori_box_montessori_box_visual">
+        <geom contype="0" conaffinity="0" rgba="0.89 0.67 0.57 1" />
+      </default>
+      <default class="montessori_box_montessori_box_collision">
+        <geom group="3" rgba="0.9 0.9 0.9 1" />
+      </default>
+    </default>
+    <default class="montessori_object_1_main">
+      <default class="montessori_object_1_montessori_object_1_collision">
+        <geom rgba="1 0.83 0.67 1" />
+      </default>
+    </default>
+    <default class="montessori_object_2_main">
+      <default class="montessori_object_2_montessori_object_2_collision">
+        <geom rgba="0.99 0.73 0.55 1" />
+      </default>
+    </default>
+    <default class="montessori_object_3_main">
+      <default class="montessori_object_3_montessori_object_3_collision">
+        <geom rgba="0.87 0.94 0.98 1" />
+      </default>
+    </default>
+    <default class="montessori_object_4_main">
+      <default class="montessori_object_4_montessori_object_4_collision">
+        <geom rgba="1 0.83 0.67 1" />
+      </default>
+    </default>
+    <default class="montessori_object_5_main">
+      <default class="montessori_object_5_montessori_object_5_collision">
+        <geom rgba="0.99 0.73 0.55 1" />
+      </default>
+    </default>
+    <default class="montessori_object_6_main">
+      <default class="montessori_object_6_montessori_object_6_collision">
+        <geom rgba="0.87 0.94 0.98 1" />
+      </default>
+    </default>
+    <default class="iCub_main">
+      <default class="iCub_iCub_visual">
+        <geom contype="0" conaffinity="0" />
+      </default>
+      <default class="iCub_iCub_collision">
+        <geom rgba="0.9 0.9 0.9 1" />
+      </default>
+    </default>
+  </default>
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072" />
+    <texture type="2d" name="texplane" builtin="checker" mark="cross" rgb1="0.2 0.3 0.4" rgb2="0.1 0.15 0.2" markrgb="0.8 0.8 0.8" width="512" height="512" />
+    <material name="matplane" texture="texplane" texuniform="true" texrepeat="10 10" reflectance="0.3" />
+    <mesh name="montessori_box_MontessoriBox" file="./MontessoriBox.stl" />
+    <mesh name="montessori_box_MontessoriDrawer" file="./MontessoriDrawer.stl" />
+    <mesh name="montessori_box_MontessoriDrawerHandle" file="./MontessoriDrawerHandle.stl" />
+    <mesh name="montessori_object_2_MontessoriObject_002" file="./MontessoriObject_002.stl" />
+  </asset>
+  <worldbody>
+    <geom name="ground" size="0 0 1" type="plane" condim="1" material="matplane" />
+    <light pos="0 0 2" dir="0 0 -1" castshadow="false" diffuse="0.4 0.4 0.4" specular="0.1 0.1 0.1" />
+    <light pos="0 0 4" dir="0 0 -1" directional="true" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2" />
+    <body name="table" pos="0 0 1">
+      <geom size="1 0.5 0.05" type="box" condim="4" mass="6" rgba="0.9 0.9 0.9 1" />
+      <geom size="0.05 0.05 0.5" pos="0.95 0.45 -0.5" type="box" mass="1" rgba="0.9 0.9 0.9 1" />
+      <geom size="0.05 0.05 0.5" pos="-0.95 0.45 -0.5" type="box" mass="1" rgba="0.9 0.9 0.9 1" />
+      <geom size="0.05 0.05 0.5" pos="0.95 -0.45 -0.5" type="box" mass="1" rgba="0.9 0.9 0.9 1" />
+      <geom size="0.05 0.05 0.5" pos="-0.95 -0.45 -0.5" type="box" mass="1" rgba="0.9 0.9 0.9 1" />
+    </body>
+    <body name="small_table" pos="-0.35 0 1">
+      <geom name="small_table_geom_1" size="0.25 0.5 0.05" pos="0 0 0.3" type="box" condim="4" friction="10" mass="6" rgba="0.9 0.9 0.9 1" />
+      <geom name="small_table_geom_2" size="0.025 0.025 0.125" pos="0.225 0.475 0.125" type="box" mass="1" rgba="0.9 0.9 0.9 1" />
+      <geom name="small_table_geom_3" size="0.025 0.025 0.125" pos="0.225 -0.475 0.125" type="box" mass="1" rgba="0.9 0.9 0.9 1" />
+      <geom name="small_table_geom_4" size="0.025 0.025 0.125" pos="-0.225 0.475 0.125" type="box" mass="1" rgba="0.9 0.9 0.9 1" />
+      <geom name="small_table_geom_5" size="0.025 0.025 0.125" pos="-0.225 -0.475 0.125" type="box" mass="1" rgba="0.9 0.9 0.9 1" />
+    </body>
+    <body name="montessori_box" pos="-0.4 0 1.39">
+      <inertial pos="0.026772 0.00018125 -0.00393274" quat="0.708185 -0.00375276 -0.00476699 0.706001" mass="1.02204" diaginertia="0.00192842 0.00624674 0.00657549" />
+      <geom name="MontessoriBox" class="montessori_box_montessori_box_visual" type="mesh" mesh="montessori_box_MontessoriBox" />
+      <geom name="UCX_MontessoriBox_001" class="montessori_box_montessori_box_collision" size="0.008 0.021 0.004" pos="-0.0075 0 0.036" type="box" />
+      <geom name="UCX_MontessoriBox_002" class="montessori_box_montessori_box_collision" size="0.00875 0.141 0.004" pos="-0.04625 0 0.036" type="box" />
+      <geom name="UCX_MontessoriBox_003" class="montessori_box_montessori_box_collision" size="0.049 0.004 0.032" pos="0 0.133 0" type="box" />
+      <geom name="UCX_MontessoriBox_004" class="montessori_box_montessori_box_collision" size="0.049 0.004 0.032" pos="0 -0.133 0" type="box" />
+      <geom name="UCX_MontessoriBox_005" class="montessori_box_montessori_box_collision" size="0.001 0.129 0.032" pos="0.045 0 0" type="box" />
+      <geom name="UCX_MontessoriBox_006" class="montessori_box_montessori_box_collision" size="0.0465 0.0015 0.032" pos="-0.0025 0.0435 0" type="box" />
+      <geom name="UCX_MontessoriBox_007" class="montessori_box_montessori_box_collision" size="0.0465 0.0015 0.032" pos="-0.0025 -0.0435 0" type="box" />
+      <geom name="UCX_MontessoriBox_008" class="montessori_box_montessori_box_collision" size="0.055 0.141 0.004" pos="0 0 -0.036" type="box" />
+      <geom name="UCX_MontessoriBox_009" class="montessori_box_montessori_box_collision" size="0.00925 0.141 0.004" pos="0.04575 0 0.036" type="box" />
+      <geom name="UCX_MontessoriBox_010" class="montessori_box_montessori_box_collision" size="0.037 0.019 0.004" pos="-0.0005 -0.122 0.036" type="box" />
+      <geom name="UCX_MontessoriBox_011" class="montessori_box_montessori_box_collision" size="0.037 0.025 0.004" pos="-0.0005 -0.046 0.036" type="box" />
+      <geom name="UCX_MontessoriBox_012" class="montessori_box_montessori_box_collision" size="0.02 0.025 0.004" pos="-0.0175 0.046 0.036" type="box" />
+      <geom name="UCX_MontessoriBox_013" class="montessori_box_montessori_box_collision" size="0.02 0.015 0.004" pos="-0.0175 0.126 0.036" type="box" />
+      <geom name="UCX_MontessoriBox_014" class="montessori_box_montessori_box_collision" size="0.021 0.0105 0.004" pos="0.023937 0.019593 0.036" quat="0.965926 0 0 -0.258819" type="box" />
+      <geom name="UCX_MontessoriBox_015" class="montessori_box_montessori_box_collision" size="0.005 0.016 0.004" pos="-0.0005 -0.087 0.036" type="box" />
+      <geom name="UCX_MontessoriBox_016" class="montessori_box_montessori_box_collision" size="0.0045 0.06 0.004" pos="0.032 0.081 0.036" type="box" />
+      <geom name="UCX_MontessoriBox_017" class="montessori_box_montessori_box_collision" size="0.0025 0.023 0.004" pos="0.025 0.044 0.036" type="box" />
+      <geom name="UCX_MontessoriBox_018" class="montessori_box_montessori_box_collision" size="0.0025 0.013 0.004" pos="0.025 0.128 0.036" type="box" />
+      <geom name="UCX_MontessoriBox_019" class="montessori_box_montessori_box_collision" size="0.0082845 0.0082845 0.004" pos="0.0025 0.071 0.036" quat="0.92388 0 0 0.382683" type="box" />
+      <geom name="UCX_MontessoriBox_020" class="montessori_box_montessori_box_collision" size="0.01 0.06 0.004" pos="0.0125 0.081 0.036" type="box" />
+      <geom name="UCX_MontessoriBox_021" class="montessori_box_montessori_box_collision" size="0.0082845 0.0082845 0.004" pos="-0.0375 0.071 0.036" quat="0.92388 0 0 0.382683" type="box" />
+      <geom name="UCX_MontessoriBox_022" class="montessori_box_montessori_box_collision" size="0.0082845 0.0082845 0.004" pos="-0.0375 0.111 0.036" quat="0.92388 0 0 0.382683" type="box" />
+      <geom name="UCX_MontessoriBox_023" class="montessori_box_montessori_box_collision" size="0.0082845 0.0082845 0.004" pos="0.0025 0.111 0.036" quat="0.92388 0 0 0.382683" type="box" />
+      <geom name="UCX_MontessoriBox_024" class="montessori_box_montessori_box_collision" size="0.021 0.0105 0.004" pos="0.023937 -0.019593 0.036" quat="0.965926 0 0 0.258819" type="box" />
+      <geom name="UCX_MontessoriBox_025" class="montessori_box_montessori_box_collision" size="0.0066275 0.0066275 0.004" pos="-0.0375 -0.071 0.036" quat="0.92388 0 0 0.382683" type="box" />
+      <geom name="UCX_MontessoriBox_026" class="montessori_box_montessori_box_collision" size="0.0066275 0.0066275 0.004" pos="-0.0055 -0.071 0.036" quat="0.92388 0 0 0.382683" type="box" />
+      <geom name="UCX_MontessoriBox_027" class="montessori_box_montessori_box_collision" size="0.0066275 0.0066275 0.004" pos="-0.0055 -0.103 0.036" quat="0.92388 0 0 0.382683" type="box" />
+      <geom name="UCX_MontessoriBox_028" class="montessori_box_montessori_box_collision" size="0.0066275 0.0066275 0.004" pos="-0.0375 -0.103 0.036" quat="0.92388 0 0 0.382683" type="box" />
+      <body name="montessori_drawer_1" pos="-0.003 0.087 0">
+        <inertial pos="0.0257486 5.70399e-08 -0.00258182" quat="0.999873 -8.21031e-09 0.0159586 -1.63374e-08" mass="0.132188" diaginertia="0.000164339 0.000202005 0.000267194" />
+        <joint name="montessori_drawer_1_joint" pos="0 0 0" axis="-1 0 0" type="slide" range="0 0.1" damping="1" />
+        <geom name="MontessoriDrawer1" class="montessori_box_montessori_box_visual" type="mesh" rgba="1 0.83 0.67 1" mesh="montessori_box_MontessoriDrawer" />
+        <geom name="UCX_MontessoriDrawer1_001" class="montessori_box_montessori_box_collision" size="0.046 0.041 0.001" pos="0 0 -0.03" type="box" />
+        <geom name="UCX_MontessoriDrawer1_002" class="montessori_box_montessori_box_collision" size="0.004 0.041 0.03" pos="-0.042 0 0.001" type="box" />
+        <geom name="UCX_MontessoriDrawer1_003" class="montessori_box_montessori_box_collision" size="0.042 0.0025 0.03" pos="0.004 0.0385 0.001" type="box" />
+        <geom name="UCX_MontessoriDrawer1_004" class="montessori_box_montessori_box_collision" size="0.042 0.0025 0.03" pos="0.004 -0.0385 0.001" type="box" />
+        <geom name="UCX_MontessoriDrawer1_005" class="montessori_box_montessori_box_collision" size="0.0025 0.036 0.03" pos="0.0435 0 0.001" type="box" />
+        <body name="montessori_drawer_1_handle" pos="-0.061 0 0.001">
+          <inertial pos="0.00391558 7.50302e-09 -7.7999e-11" quat="0.707107 -0.707107 -4.64617e-07 4.87344e-07" mass="0.00573975" diaginertia="2.26772e-07 3.54304e-07 3.54724e-07" />
+          <geom name="MontessoriDrawer1Handle" class="montessori_box_montessori_box_visual" type="mesh" mesh="montessori_box_MontessoriDrawerHandle" />
+          <geom name="UCX_MontessoriDrawer1Handle_001" class="montessori_box_montessori_box_collision" size="0.008 0.0075" pos="0.0075 0 0" quat="0.707107 0 0.707107 0" type="cylinder" />
+          <geom name="UCX_MontessoriDrawer1Handle_002" class="montessori_box_montessori_box_collision" size="0.005 0.011 0.011" type="ellipsoid" />
+        </body>
+      </body>
+      <body name="montessori_drawer_2" pos="-0.003 0 0">
+        <inertial pos="0.0257486 5.70399e-08 -0.00258182" quat="0.999873 -8.21031e-09 0.0159586 -1.63374e-08" mass="0.132188" diaginertia="0.000164339 0.000202005 0.000267194" />
+        <joint name="montessori_drawer_2_joint" pos="0 0 0" axis="-1 0 0" type="slide" range="0 0.1" damping="1" />
+        <geom name="MontessoriDrawer2" class="montessori_box_montessori_box_visual" type="mesh" rgba="0.99 0.73 0.55 1" mesh="montessori_box_MontessoriDrawer" />
+        <geom name="UCX_MontessoriDrawer2_001" class="montessori_box_montessori_box_collision" size="0.046 0.041 0.001" pos="0 0 -0.03" type="box" />
+        <geom name="UCX_MontessoriDrawer2_002" class="montessori_box_montessori_box_collision" size="0.004 0.041 0.03" pos="-0.042 0 0.001" type="box" />
+        <geom name="UCX_MontessoriDrawer2_003" class="montessori_box_montessori_box_collision" size="0.042 0.0025 0.03" pos="0.004 0.0385 0.001" type="box" />
+        <geom name="UCX_MontessoriDrawer2_004" class="montessori_box_montessori_box_collision" size="0.042 0.0025 0.03" pos="0.004 -0.0385 0.001" type="box" />
+        <geom name="UCX_MontessoriDrawer2_005" class="montessori_box_montessori_box_collision" size="0.0025 0.036 0.03" pos="0.0435 0 0.001" type="box" />
+        <body name="montessori_drawer_2_handle" pos="-0.061 0 0.001">
+          <inertial pos="0.00391558 7.50302e-09 -7.7999e-11" quat="0.707107 -0.707107 -4.64617e-07 4.87344e-07" mass="0.00573975" diaginertia="2.26772e-07 3.54304e-07 3.54724e-07" />
+          <geom name="MontessoriDrawer2Handle" class="montessori_box_montessori_box_visual" type="mesh" mesh="montessori_box_MontessoriDrawerHandle" />
+          <geom name="UCX_MontessoriDrawer2Handle_001" class="montessori_box_montessori_box_collision" size="0.008 0.0075" pos="0.0075 0 0" quat="0.707107 0 0.707107 0" type="cylinder" />
+          <geom name="UCX_MontessoriDrawer2Handle_002" class="montessori_box_montessori_box_collision" size="0.005 0.011 0.011" type="ellipsoid" />
+        </body>
+      </body>
+      <body name="montessori_drawer_3" pos="-0.003 -0.087 0">
+        <inertial pos="0.0257486 5.70399e-08 -0.00258182" quat="0.999873 -8.21031e-09 0.0159586 -1.63374e-08" mass="0.132188" diaginertia="0.000164339 0.000202005 0.000267194" />
+        <joint name="montessori_drawer_3_joint" pos="0 0 0" axis="-1 0 0" type="slide" range="0 0.1" damping="1" />
+        <geom name="MontessoriDrawer3" class="montessori_box_montessori_box_visual" type="mesh" rgba="0.87 0.94 0.98 1" mesh="montessori_box_MontessoriDrawer" />
+        <geom name="UCX_MontessoriDrawer3_001" class="montessori_box_montessori_box_collision" size="0.046 0.041 0.001" pos="0 0 -0.03" type="box" />
+        <geom name="UCX_MontessoriDrawer3_002" class="montessori_box_montessori_box_collision" size="0.004 0.041 0.03" pos="-0.042 0 0.001" type="box" />
+        <geom name="UCX_MontessoriDrawer3_003" class="montessori_box_montessori_box_collision" size="0.042 0.0025 0.03" pos="0.004 0.0385 0.001" type="box" />
+        <geom name="UCX_MontessoriDrawer3_004" class="montessori_box_montessori_box_collision" size="0.042 0.0025 0.03" pos="0.004 -0.0385 0.001" type="box" />
+        <geom name="UCX_MontessoriDrawer3_005" class="montessori_box_montessori_box_collision" size="0.0025 0.036 0.03" pos="0.0435 0 0.001" type="box" />
+        <body name="montessori_drawer_3_handle" pos="-0.061 0 0.001">
+          <inertial pos="0.00391558 7.50302e-09 -7.7999e-11" quat="0.707107 -0.707107 -4.64617e-07 4.87344e-07" mass="0.00573975" diaginertia="2.26772e-07 3.54304e-07 3.54724e-07" />
+          <geom name="MontessoriDrawer3Handle" class="montessori_box_montessori_box_visual" type="mesh" mesh="montessori_box_MontessoriDrawerHandle" />
+          <geom name="UCX_MontessoriDrawer3Handle_001" class="montessori_box_montessori_box_collision" size="0.008 0.0075" pos="0.0075 0 0" quat="0.707107 0 0.707107 0" type="cylinder" />
+          <geom name="UCX_MontessoriDrawer3Handle_002" class="montessori_box_montessori_box_collision" size="0.005 0.011 0.011" type="ellipsoid" />
+        </body>
+      </body>
+    </body>
+    <body name="montessori_object_1" pos="-0.375 0.091 1.5" quat="0.707107 0 0.707107 0">
+      <inertial pos="0 0 0" mass="0.00411518" diaginertia="2.38973e-07 2.38973e-07 4.53745e-07" />
+      <joint type="free" limited="false" actuatorfrclimited="false" />
+      <geom name="MontessoriObject1" class="montessori_object_1_montessori_object_1_collision" size="0.022 0.002" type="cylinder" />
+    </body>
+    <body name="montessori_object_2" pos="-0.4015 0.25 1.4">
+      <inertial pos="0 0 0" mass="0.0113441" diaginertia="1.25081e-06 1.25081e-06 8.33876e-07" />
+      <joint type="free" limited="false" actuatorfrclimited="false" />
+      <geom name="MontessoriObject2" class="montessori_object_2_montessori_object_2_collision" type="mesh" mesh="montessori_object_2_MontessoriObject_002" />
+    </body>
+    <body name="montessori_object_3" pos="-0.4015 -0.237 1.4">
+      <inertial pos="0 0 0" mass="0.00776239" diaginertia="5.07195e-07 5.07195e-07 5.07195e-07" />
+      <joint type="free" limited="false" actuatorfrclimited="false" />
+      <geom name="MontessoriObject3" class="montessori_object_3_montessori_object_3_collision" size="0.015 0.015 0.015" type="box" />
+    </body>
+    <body name="montessori_object_4" pos="-0.4175 0.091 1.5" quat="0.707107 0 0.707107 0">
+      <inertial pos="0 0 0" mass="0.0137173" diaginertia="1.20999e-06 1.20999e-06 1.20999e-06" />
+      <joint type="free" limited="false" actuatorfrclimited="false" />
+      <geom name="MontessoriObject4" class="montessori_object_4_montessori_object_4_collision" size="0.02" />
+    </body>
+    <body name="montessori_object_5" pos="-0.3095 0.25 1.4">
+      <inertial pos="0 0 0" mass="0.00873269" diaginertia="1.28384e-06 7.13243e-07 7.13243e-07" />
+      <joint type="free" limited="false" actuatorfrclimited="false" />
+      <geom name="MontessoriObject5" class="montessori_object_5_montessori_object_5_collision" size="0.01 0.02 0.015" type="box" />
+    </body>
+    <body name="montessori_object_6" pos="-0.3095 -0.237 1.4">
+      <inertial pos="0 0 0" mass="0.00609657" diaginertia="3.48556e-07 3.48556e-07 2.98762e-07" />
+      <joint type="free" limited="false" actuatorfrclimited="false" />
+      <geom name="MontessoriObject6" class="montessori_object_6_montessori_object_6_collision" size="0.015 0.015" type="cylinder" />
+    </body>
+    <body name="iCub" pos="-0.8 0 0.55">
+      <joint type="free" limited="false" actuatorfrclimited="false" />
+      <body name="base_footprint">
+        <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+        <body name="root_link" pos="0 0 0.635">
+          <inertial pos="0.0112627 0 0.0291245" quat="0.720977 0 -0.692959 0" mass="0.586692" diaginertia="0.000661842 0.00150937 0.00152514" />
+          <geom name="SM_root_link_collision_0" class="iCub_iCub_collision" size="0.035 0.037" pos="0.002 0 0.06" quat="0.707107 0 0.707107 0" type="cylinder" />
+          <geom name="SM_root_link_collision_1" class="iCub_iCub_collision" size="0.031 0.05" pos="0.02 0 0" quat="0.707107 0.707107 0 0" type="cylinder" />
+          <body name="r_hip_1" pos="0.0216 -0.04055 0">
+            <inertial pos="0 -0.04 0" quat="-0.707107 0 0 0.707107" mass="0.398857" diaginertia="0.00042199 0.000968823 0.000968823" />
+            <joint name="r_hip_pitch" pos="0 0 0" axis="0 -1 0" range="-0.785398 2.00713" />
+            <geom name="SM_r_hip_1_collision_0" class="iCub_iCub_collision" size="0.046 0.03" pos="0 -0.04 0" quat="0.707107 0.707107 0 0" type="cylinder" />
+            <body name="r_hip_2" pos="-0.0473 -0.0331 -0.009">
+              <inertial pos="-0.00124471 0.00309852 -0.0342123" quat="-0.508064 0.451113 0.489988 0.54615" mass="2.58188" diaginertia="0.00809107 0.0165375 0.0185028" />
+              <joint name="r_hip_roll" pos="0 0 0" axis="-1 0 0" range="-0.174533 1.95477" />
+              <geom name="SM_r_hip_2_collision_0" class="iCub_iCub_collision" size="0.035 0.03" pos="-0.028 0 0" quat="0.707107 0 -0.707107 0" type="cylinder" />
+              <geom name="SM_r_hip_2_collision_1" class="iCub_iCub_collision" size="0.031 0.03" pos="-0.028 0 -0.065" quat="0.707107 0 -0.707107 0" type="cylinder" />
+              <geom name="SM_r_hip_2_collision_2" class="iCub_iCub_collision" size="0.029 0.017" pos="0.037 0 -0.073" type="cylinder" />
+              <body name="r_hip_3" pos="0.0367 0 -0.0897">
+                <inertial pos="0.005 0.008 -0.07" quat="-0.503536 0.445897 0.486635 0.557506" mass="2.08" diaginertia="0.00733115 0.0150578 0.0165653" />
+                <geom name="SM_r_hip_3_collision_0" class="iCub_iCub_collision" size="0.08 0.065 0.05" pos="0.005 0.008 -0.07" type="box" />
+                <body name="r_upper_leg" pos="0 0.015 -0.0709">
+                  <inertial pos="0.018 0 -0.11" quat="0 0.6475 0 0.762066" mass="0.0923628" diaginertia="0.000142539 0.00120409 0.00129005" />
+                  <joint name="r_hip_yaw" pos="0 0 0" axis="0 0 -1" range="-1.39626 1.39626" />
+                  <geom name="SM_r_upper_leg_collision_0" class="iCub_iCub_collision" size="0.035 0.006" pos="0.018 -0.035 -0.11" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                  <geom name="SM_r_upper_leg_collision_1" class="iCub_iCub_collision" size="0.035 0.006" pos="0.018 0.035 -0.11" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                  <body name="r_lower_leg" pos="0.015 -0.0249 -0.1062">
+                    <inertial pos="-0.0191507 0.0211699 -0.127235" quat="-0.383712 -0.539956 -0.510366 0.548397" mass="2.1712" diaginertia="0.00457105 0.0495482 0.0501324" />
+                    <joint name="r_knee" pos="0 0 0" axis="0 -1 0" range="-1.22173 0.0872665" />
+                    <geom name="SM_r_lower_leg_collision_0" class="iCub_iCub_collision" size="0.042 0.025" pos="0 0.025 0" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                    <geom name="SM_r_lower_leg_collision_1" class="iCub_iCub_collision" size="0.06 0.055 0.063" pos="-0.025 0.02 -0.13" type="box" />
+                    <geom name="SM_r_lower_leg_collision_2" class="iCub_iCub_collision" size="0.035 0.03" pos="0 0.025 -0.26" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                    <body name="r_ankle_1" pos="0 0.0005 -0.255989">
+                      <inertial pos="0 0.015 0" quat="-0.707107 0 0 0.707107" mass="0.0282743" diaginertia="1.27234e-05 1.29591e-05 1.29591e-05" />
+                      <joint name="r_ankle_pitch" pos="0 0 0" axis="0 1 0" range="-0.785398 0.785398" />
+                      <geom name="SM_r_ankle_1_collision_0" class="iCub_iCub_collision" size="0.03 0.005" pos="0 0.015 0" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                      <body name="r_ankle_2" pos="-0.05275 0.0182 -0.035">
+                        <inertial pos="0.0670801 0 -0.0267179" quat="0.992135 0 0.125169 0" mass="1.6124" diaginertia="0.00286201 0.0175144 0.0181845" />
+                        <joint name="r_ankle_roll" pos="0 0 0" axis="-1 0 0" range="-0.436332 0.436332" />
+                        <geom name="SM_r_ankle_2_collision_0" class="iCub_iCub_collision" size="0.02 0.05 0.02" pos="0.12 0 0" type="box" />
+                        <geom name="SM_r_ankle_2_collision_1" class="iCub_iCub_collision" size="0.02 0.05 0.02" pos="-0.02 0 0" type="box" />
+                        <geom name="SM_r_ankle_2_collision_2" class="iCub_iCub_collision" size="0.12 0.06 0.02" pos="0.08 0 -0.04" type="box" />
+                        <body name="r_foot_rear" pos="0.016 0 -0.0658">
+                          <inertial pos="0 0 0.003" mass="0.0702" diaginertia="5.93424e-05 8.0923e-05 0.000138581" />
+                          <geom name="SM_r_foot_rear_collision_0" class="iCub_iCub_collision" size="0.0585 0.05 0.003" pos="0 0 0.003" type="box" />
+                          <body name="r_sole" pos="0.05963 0 0">
+                            <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                          </body>
+                        </body>
+                        <body name="r_foot_front" pos="0.13525 0 -0.0658">
+                          <inertial pos="0 0 0.003" mass="0.0702" diaginertia="5.93424e-05 8.0923e-05 0.000138581" />
+                          <geom name="SM_r_foot_front_collision_0" class="iCub_iCub_collision" size="0.0585 0.05 0.003" pos="0 0 0.003" type="box" />
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+          <body name="torso_1" pos="0 0 0.0605">
+            <inertial pos="-0.0174388 0 0.05014" quat="0.556262 0.556262 0.436546 -0.436546" mass="0.553937" diaginertia="0.0009214 0.00235659 0.00280552" />
+            <joint name="torso_roll" pos="0 0 0" axis="-1 0 0" range="-0.401426 0.401426" />
+            <geom name="SM_torso_1_collision_0" class="iCub_iCub_collision" size="0.035 0.0365" pos="0 0 0.073" quat="0.707107 -0.707107 0 0" type="cylinder" />
+            <geom name="SM_torso_1_collision_1" class="iCub_iCub_collision" size="0.015 0.035 0.055" pos="-0.05 0 0.03" type="box" />
+            <geom name="SM_torso_1_collision_2" class="iCub_iCub_collision" size="0.005 0.035 0.03" pos="0.045 0 0.008" type="box" />
+            <body name="torso_2" pos="0 0 0.0725">
+              <inertial pos="0.038 0 0.015" quat="0.97907 0 -0.203525 0" mass="0.00785398" diaginertia="2.27623e-06 1.4346e-05 1.45241e-05" />
+              <joint name="torso_pitch" pos="0 0 0" axis="0 1 0" range="-0.314159 0.785398" />
+              <geom name="SM_torso_2_collision_0" class="iCub_iCub_collision" size="0.025 0.002" pos="0.038 0 0.015" quat="0.707107 0 -0.707107 0" type="cylinder" />
+              <body name="chest" pos="0 0 0.06447">
+                <inertial pos="-0.0146367 0.000591164 0.0701518" quat="0.568401 0.568358 0.420225 -0.42107" mass="3.00836" diaginertia="0.0141261 0.0187219 0.0223391" />
+                <joint name="torso_yaw" pos="0 0 0" axis="0 0 -1" range="-0.750492 0.750492" />
+                <geom name="SM_chest_collision_0" class="iCub_iCub_collision" size="0.08 0.015" pos="-0.025 0.015 0.068" type="capsule" />
+                <geom name="SM_chest_collision_1" class="iCub_iCub_collision" size="0.08 0.015" pos="-0.025 -0.015 0.068" type="capsule" />
+                <geom name="SM_chest_collision_2" class="iCub_iCub_collision" size="0.08 0.015" pos="0.025 0.015 0.068" type="capsule" />
+                <geom name="SM_chest_collision_3" class="iCub_iCub_collision" size="0.08 0.015" pos="0.025 -0.015 0.068" type="capsule" />
+                <geom name="SM_chest_collision_4" class="iCub_iCub_collision" size="0.01 0.07 0.085" pos="-0.09 0 0.03" type="box" />
+                <body name="chest_depth_frame" pos="0.0894115 0.0175 0.0992995" quat="0.5 -0.5 0.5 -0.5">
+                  <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                </body>
+                <body name="r_shoulder_1" pos="-0.0208351 -0.0397423 0.105203" quat="0.983506 -0.125212 -0.0164844 0.129481">
+                  <inertial pos="0 -0.1 0" quat="-0.707107 0 0 0.707107" mass="0.137445" diaginertia="4.29515e-05 0.00145205 0.00145205" />
+                  <joint name="r_shoulder_pitch" pos="0 0 0" axis="1.49904e-07 -1 -1.45662e-07" range="-0.349066 3.05433" />
+                  <geom name="SM_r_shoulder_1_collision_0" class="iCub_iCub_collision" size="0.025 0.035" pos="0 -0.1 0" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                  <body name="r_shoulder_2" pos="0.00748901 -0.1115 0.000402786" quat="0.995835 0.0871243 -0.0267684 0.00234163">
+                    <inertial pos="0.00434426 0 -0.0177049" quat="0.334102 -0.334102 0.623198 0.623198" mass="0.0479093" diaginertia="2.5417e-05 4.38174e-05 5.03751e-05" />
+                    <joint name="r_shoulder_roll" pos="0 0 0" axis="-1 4.2105e-08 1.98389e-07" range="0.20944 2.84489" />
+                    <geom name="SM_r_shoulder_2_collision_0" class="iCub_iCub_collision" size="0.03 0.005" pos="-0.01 0 -0.03" type="cylinder" />
+                    <geom name="SM_r_shoulder_2_collision_1" class="iCub_iCub_collision" size="0.025 0.005" pos="0.025 0 0" quat="0.707107 0 -0.707107 0" type="cylinder" />
+                    <body name="r_shoulder_3" pos="-0.00684995 2.1905e-07 -0.0543">
+                      <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                      <body name="r_upper_arm" pos="0 4.21833e-07 -0.0224999">
+                        <inertial pos="0 0 -0.05" quat="0.707107 0 0.707107 0" mass="1.01788" diaginertia="0.0010306 0.00523146 0.00523146" />
+                        <joint name="r_shoulder_yaw" pos="0 0 0" axis="-3.78762e-08 2.8052e-08 1" range="-0.872665 1.39626" />
+                        <geom name="SM_r_upper_arm_collision_0" class="iCub_iCub_collision" size="0.045 0.08" pos="0 0 -0.05" type="cylinder" />
+                        <body name="r_elbow_1" pos="0.00999993 0.00149964 -0.1237">
+                          <inertial pos="-0.01 0 -0.02" quat="0.601501 -0.601501 -0.371748 -0.371748" mass="0.0251327" diaginertia="3.35103e-06 1.59174e-05 1.75929e-05" />
+                          <joint name="r_elbow" pos="0 0 0" axis="2.49496e-07 -1 -2.45409e-07" range="-0.0523599 1.309" />
+                          <geom name="SM_r_elbow_1_collision_0" class="iCub_iCub_collision" size="0.02 0.01" pos="-0.01 0 -0.02" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                          <body name="r_forearm" pos="-0.0149999 -0.00199965 -0.0553001">
+                            <inertial pos="0 0 -0.036" quat="0.707107 0 0.707107 0" mass="0.687066" diaginertia="0.000695655 0.00190609 0.00190609" />
+                            <joint name="r_wrist_prosup" pos="0 0 0" axis="-3.78762e-08 2.8052e-08 1" range="-1.53589 1.53589" />
+                            <geom name="SM_r_forearm_collision_0" class="iCub_iCub_collision" size="0.045 0.054" pos="0 0 -0.036" type="cylinder" />
+                            <body name="r_wrist_1" pos="0.0163 -0.00200744 -0.1075">
+                              <inertial pos="-0.02 0 0" quat="0 1 0 0" mass="0.0125664" diaginertia="6.28318e-07 7.01622e-06 7.01622e-06" />
+                              <joint name="r_wrist_pitch" pos="0 0 0" axis="1 4.2105e-08 -1.98389e-07" range="-1.22173 0.436332" />
+                              <geom name="SM_r_wrist_1_collision_0" class="iCub_iCub_collision" size="0.01 0.02" pos="-0.02 0 0" quat="0.707107 0 -0.707107 0" type="cylinder" />
+                              <body name="r_hand" pos="-0.0163001 0.00699939 0" quat="0 0.707107 0 0.707107">
+                                <inertial pos="-0.04 0.005 0.01" quat="0.990781 0.0427494 0.110082 -0.0663885" mass="0.065" diaginertia="1.76431e-05 0.000129328 0.000138769" />
+                                <joint name="r_wrist_yaw" pos="0 0 0" axis="-2.49496e-07 1 2.45409e-07" range="-0.261799 0.610865" />
+                                <geom name="SM_r_hand_collision_0" class="iCub_iCub_collision" size="0.025 0.025 0.013" pos="-0.04 0.005 0.01" quat="-0.701057 0.701057 -0.092296 -0.092296" type="box" />
+                                <body name="r_hand_little_0" pos="-0.063629 0.0044432 -0.0101109" quat="0.0851337 0.0244894 -0.698657 0.709951">
+                                  <inertial pos="0.007 -0.002 -0.001" quat="0.964142 0.227603 0.0313562 -0.132827" mass="0.00158336" diaginertia="2.94565e-08 1.24657e-07 1.25613e-07" />
+                                  <joint name="r_hand_little_0_joint" pos="0 0 0" axis="0 0 1" range="0 0.349066" />
+                                  <geom name="SM_r_hand_little_0_collision_0" class="iCub_iCub_collision" size="0.006 0.007" pos="0.007 -0.002 -0.001" quat="0 0.707107 0 0.707107" type="capsule" />
+                                  <body name="r_hand_little_1" pos="0.0148 -0.00175 0" quat="0.707107 0.707107 0 0">
+                                    <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                    <joint name="r_hand_little_1_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                    <geom name="SM_r_hand_little_1_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                    <body name="r_hand_little_2" pos="0.0219 0 0">
+                                      <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                      <joint name="r_hand_little_2_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                      <geom name="SM_r_hand_little_2_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                      <body name="r_hand_little_3" pos="0.019 0 0">
+                                        <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.000904779" diaginertia="1.6286e-08 2.16544e-07 2.16544e-07" />
+                                        <joint name="r_hand_little_3_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                        <geom name="SM_r_hand_little_3_collision_0" class="iCub_iCub_collision" size="0.006 0.004" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                        <body name="r_hand_little_tip" pos="0.0168 0 0" quat="0.707107 -0.707107 0 0">
+                                          <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                                        </body>
+                                      </body>
+                                    </body>
+                                  </body>
+                                </body>
+                                <body name="r_gripper_tool_frame" pos="0 0 0.13">
+                                  <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                                </body>
+                                <body name="r_hand_middle_0" pos="-0.0575405 0.0060432 0.023778" quat="0.092296 0.092296 -0.701057 0.701057">
+                                  <inertial pos="0.007 0.002 -0.001" quat="0.964142 -0.227603 0.0313562 0.132827" mass="0.00158336" diaginertia="2.94565e-08 1.24657e-07 1.25613e-07" />
+                                  <joint name="r_hand_middle_0_joint" pos="0 0 0" axis="0 0 1" range="0 0.349066" />
+                                  <geom name="SM_r_hand_middle_0_collision_0" class="iCub_iCub_collision" size="0.006 0.007" pos="0.007 0.002 -0.001" quat="0 0.707107 0 0.707107" type="capsule" />
+                                  <body name="r_hand_middle_1" pos="0.0153 0.0022 0" quat="0.707107 0.707107 0 0">
+                                    <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                    <joint name="r_hand_middle_1_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                    <geom name="SM_r_hand_middle_1_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                    <body name="r_hand_middle_2" pos="0.0258 0 0">
+                                      <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                      <joint name="r_hand_middle_2_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                      <geom name="SM_r_hand_middle_2_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                      <body name="r_hand_middle_3" pos="0.024 0 0">
+                                        <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.000904779" diaginertia="1.6286e-08 2.16544e-07 2.16544e-07" />
+                                        <joint name="r_hand_middle_3_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                        <geom name="SM_r_hand_middle_3_collision_0" class="iCub_iCub_collision" size="0.006 0.004" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                        <body name="r_hand_middle_tip" pos="0.0168 0 0" quat="0.707107 -0.707107 0 0">
+                                          <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                                        </body>
+                                      </body>
+                                    </body>
+                                  </body>
+                                </body>
+                                <body name="r_hand_index_0" pos="-0.0525584 0.0051432 0.0394733" quat="-0.120133 -0.114274 0.727348 -0.665939">
+                                  <inertial pos="0.007 0.002 -0.001" quat="0.964142 -0.227603 0.0313562 0.132827" mass="0.00158336" diaginertia="2.94565e-08 1.24657e-07 1.25613e-07" />
+                                  <joint name="r_hand_index_0_joint" pos="0 0 0" axis="0 0 1" range="-0.349066 0" />
+                                  <geom name="SM_r_hand_index_0_collision_0" class="iCub_iCub_collision" size="0.006 0.007" pos="0.007 0.002 -0.001" quat="0 0.707107 0 0.707107" type="capsule" />
+                                  <body name="r_hand_index_1" pos="0.0148 0.00175 0" quat="0.707107 0.707107 0 0">
+                                    <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                    <joint name="r_hand_index_1_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                    <geom name="SM_r_hand_index_1_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                    <body name="r_hand_index_2" pos="0.0259 0 0">
+                                      <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                      <joint name="r_hand_index_2_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                      <geom name="SM_r_hand_index_2_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                      <body name="r_hand_index_3" pos="0.022 0 0">
+                                        <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.000904779" diaginertia="1.6286e-08 2.16544e-07 2.16544e-07" />
+                                        <joint name="r_hand_index_3_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                        <geom name="SM_r_hand_index_3_collision_0" class="iCub_iCub_collision" size="0.006 0.004" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                        <body name="r_hand_index_tip" pos="0.0168 0 0" quat="0.707107 -0.707107 0 0">
+                                          <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                                        </body>
+                                      </body>
+                                    </body>
+                                  </body>
+                                </body>
+                                <body name="r_hand_ring_0" pos="-0.0606911 0.0054432 0.00865823" quat="0.0851337 0.0244894 -0.698657 0.709951">
+                                  <inertial pos="0.007 0.002 -0.001" quat="0.964142 -0.227603 0.0313562 0.132827" mass="0.00158336" diaginertia="2.94565e-08 1.24657e-07 1.25613e-07" />
+                                  <joint name="r_hand_ring_0_joint" pos="0 0 0" axis="0 0 1" range="0 0.349066" />
+                                  <geom name="SM_r_hand_ring_0_collision_0" class="iCub_iCub_collision" size="0.006 0.007" pos="0.007 0.002 -0.001" quat="0 0.707107 0 0.707107" type="capsule" />
+                                  <body name="r_hand_ring_1" pos="0.0148 0.00175 0" quat="0.707107 0.707107 0 0">
+                                    <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                    <joint name="r_hand_ring_1_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                    <geom name="SM_r_hand_ring_1_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                    <body name="r_hand_ring_2" pos="0.0259 0 0">
+                                      <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                      <joint name="r_hand_ring_2_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                      <geom name="SM_r_hand_ring_2_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                      <body name="r_hand_ring_3" pos="0.022 0 0">
+                                        <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.000904779" diaginertia="1.6286e-08 2.16544e-07 2.16544e-07" />
+                                        <joint name="r_hand_ring_3_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                        <geom name="SM_r_hand_ring_3_collision_0" class="iCub_iCub_collision" size="0.006 0.004" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                        <body name="r_hand_ring_tip" pos="0.0168 0 0" quat="0.707107 -0.707107 0 0">
+                                          <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                                        </body>
+                                      </body>
+                                    </body>
+                                  </body>
+                                </body>
+                                <body name="r_hand_thumb_0" pos="-0.0318492 -0.0040568 0.0192027" quat="0.0382606 0.614855 -0.0162249 0.787545">
+                                  <inertial pos="0.007 0.003 -0.001" quat="-0.20683 0.0335639 0.156626 0.965175" mass="0.00281487" diaginertia="9.02341e-08 2.56933e-07 2.57091e-07" />
+                                  <joint name="r_hand_thumb_0_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                  <geom name="SM_r_hand_thumb_0_collision_0" class="iCub_iCub_collision" size="0.008 0.007" pos="0.007 0.003 -0.001" quat="-0.707107 0 0.707107 0" type="capsule" />
+                                  <body name="r_hand_thumb_1" pos="0.0211 0.0049 0" quat="-0.707107 0.707107 0 0">
+                                    <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                    <joint name="r_hand_thumb_1_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                    <geom name="SM_r_hand_thumb_1_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                    <body name="r_hand_thumb_2" pos="0.026 0 0">
+                                      <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                      <joint name="r_hand_thumb_2_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                      <geom name="SM_r_hand_thumb_2_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                      <body name="r_hand_thumb_3" pos="0.022 0 0">
+                                        <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.000904779" diaginertia="1.6286e-08 2.16544e-07 2.16544e-07" />
+                                        <joint name="r_hand_thumb_3_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                        <geom name="SM_r_hand_thumb_3_collision_0" class="iCub_iCub_collision" size="0.006 0.004" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                        <body name="r_hand_thumb_tip" pos="0.0168 0 0" quat="0.707107 -0.707107 0 0">
+                                          <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                                        </body>
+                                      </body>
+                                    </body>
+                                  </body>
+                                </body>
+                              </body>
+                            </body>
+                          </body>
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+                <body name="chest_rgb_frame" pos="0.0894115 -0.0115 0.0992995" quat="0.5 -0.5 0.5 -0.5">
+                  <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                </body>
+                <body name="l_shoulder_1" pos="-0.0208351 0.0397423 0.105203" quat="0.983506 0.125212 -0.0164846 -0.129481">
+                  <inertial pos="0 0.1 0" quat="-0.707107 0 0 0.707107" mass="0.137445" diaginertia="4.29515e-05 0.00145205 0.00145205" />
+                  <joint name="l_shoulder_pitch" pos="0 0 0" axis="3.32308e-07 1 1.66169e-07" range="-3.05433 0.349066" />
+                  <geom name="SM_l_shoulder_1_collision_0" class="iCub_iCub_collision" size="0.025 0.035" pos="0 0.1 0" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                  <body name="l_shoulder_2" pos="0.00499285 0.1115 0.00026865" quat="0.995835 -0.0871243 -0.0267683 -0.00234192">
+                    <inertial pos="0.00434426 0 -0.0177049" quat="0.334102 -0.334102 0.623198 0.623198" mass="0.0479093" diaginertia="2.5417e-05 4.38174e-05 5.03751e-05" />
+                    <joint name="l_shoulder_roll" pos="0 0 0" axis="1 -2.03483e-07 -2.13988e-07" range="0.20944 2.84489" />
+                    <geom name="SM_l_shoulder_2_collision_0" class="iCub_iCub_collision" size="0.03 0.005" pos="-0.01 0 -0.03" type="cylinder" />
+                    <geom name="SM_l_shoulder_2_collision_1" class="iCub_iCub_collision" size="0.025 0.005" pos="0.025 0 0" quat="0.707107 0 -0.707107 0" type="cylinder" />
+                    <body name="l_shoulder_3" pos="-0.00435013 3.63257e-07 -0.0543">
+                      <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                      <body name="l_upper_arm" pos="0 -4.23452e-07 -0.0224999">
+                        <inertial pos="0 0 -0.05" quat="0.707107 0 0.707107 0" mass="1.01788" diaginertia="0.0010306 0.00523146 0.00523146" />
+                        <joint name="l_shoulder_yaw" pos="0 0 0" axis="2.22765e-08 4.39379e-08 -1" range="-0.872665 1.39626" />
+                        <geom name="SM_l_upper_arm_collision_0" class="iCub_iCub_collision" size="0.045 0.08" pos="0 0 -0.05" type="cylinder" />
+                        <body name="l_elbow_1" pos="0.00999993 -0.00149965 -0.1237">
+                          <inertial pos="-0.01 0 -0.02" quat="0.601501 -0.601501 -0.371748 -0.371748" mass="0.0251327" diaginertia="3.35103e-06 1.59174e-05 1.75929e-05" />
+                          <joint name="l_elbow" pos="0 0 0" axis="-8.81182e-08 -1 -2.29304e-07" range="-0.0523599 1.309" />
+                          <geom name="SM_l_elbow_1_collision_0" class="iCub_iCub_collision" size="0.02 0.01" pos="-0.01 0 -0.02" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                          <body name="l_forearm" pos="-0.0149999 0.00199964 -0.0553001">
+                            <inertial pos="0 0 -0.036" quat="0.707107 0 0.707107 0" mass="0.687066" diaginertia="0.000695655 0.00190609 0.00190609" />
+                            <joint name="l_wrist_prosup" pos="0 0 0" axis="2.22765e-08 4.39379e-08 -1" range="-1.53589 1.53589" />
+                            <geom name="SM_l_forearm_collision_0" class="iCub_iCub_collision" size="0.045 0.054" pos="0 0 -0.036" type="cylinder" />
+                            <body name="l_wrist_1" pos="0.0166 0.0020069 -0.1075">
+                              <inertial pos="-0.02 0 0" quat="0 1 0 0" mass="0.0125664" diaginertia="6.28318e-07 7.01622e-06 7.01622e-06" />
+                              <joint name="l_wrist_pitch" pos="0 0 0" axis="-1 -2.03483e-07 2.13988e-07" range="-1.22173 0.436332" />
+                              <geom name="SM_l_wrist_1_collision_0" class="iCub_iCub_collision" size="0.01 0.02" pos="-0.02 0 0" quat="0.707107 0 -0.707107 0" type="cylinder" />
+                              <body name="l_hand" pos="-0.000634107 -0.0194999 0.00236652" quat="0.707107 0 0.707107 0">
+                                <inertial pos="0.04 0.005 0.01" quat="0.991392 -0.0304943 -0.113971 0.0567696" mass="0.065" diaginertia="1.77161e-05 0.000129328 0.000138696" />
+                                <joint name="l_wrist_yaw" pos="0 0 0" axis="0 1 0" range="-0.349066 0.436332" />
+                                <geom name="SM_l_hand_collision_0" class="iCub_iCub_collision" size="0.025 0.025 0.013" pos="0.04 0.005 0.01" quat="0.701057 0.701057 -0.092296 0.092296" type="box" />
+                                <body name="l_hand_ring_0" pos="0.0606911 0.0054432 0.00865823" quat="0.698657 0.709951 -0.0851337 0.0244894">
+                                  <inertial pos="0.007 -0.002 -0.001" quat="0.964142 0.227603 0.0313562 -0.132827" mass="0.00158336" diaginertia="2.94565e-08 1.24657e-07 1.25613e-07" />
+                                  <joint name="l_hand_ring_0_joint" pos="0 0 0" axis="0 0 -1" range="0 0.349066" />
+                                  <geom name="SM_l_hand_ring_0_collision_0" class="iCub_iCub_collision" size="0.006 0.007" pos="0.007 -0.002 -0.001" quat="0 0.707107 0 0.707107" type="capsule" />
+                                  <body name="l_hand_ring_1" pos="0.0148 -0.00175 0" quat="0.707107 0.707107 0 0">
+                                    <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                    <joint name="l_hand_ring_1_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                    <geom name="SM_l_hand_ring_1_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                    <body name="l_hand_ring_2" pos="0.0259 0 0">
+                                      <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                      <joint name="l_hand_ring_2_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                      <geom name="SM_l_hand_ring_2_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                      <body name="l_hand_ring_3" pos="0.022 0 0">
+                                        <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.000904779" diaginertia="1.6286e-08 2.16544e-07 2.16544e-07" />
+                                        <joint name="l_hand_ring_3_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                        <geom name="SM_l_hand_ring_3_collision_0" class="iCub_iCub_collision" size="0.006 0.004" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                        <body name="l_hand_ring_tip" pos="0.0168 0 0" quat="0.707107 -0.707107 0 0">
+                                          <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                                        </body>
+                                      </body>
+                                    </body>
+                                  </body>
+                                </body>
+                                <body name="l_hand_little_0" pos="0.063629 0.0044432 -0.0101109" quat="0.698657 0.709951 -0.0851337 0.0244894">
+                                  <inertial pos="0.007 0.002 -0.001" quat="0.964142 -0.227603 0.0313562 0.132827" mass="0.00158336" diaginertia="2.94565e-08 1.24657e-07 1.25613e-07" />
+                                  <joint name="l_hand_little_0_joint" pos="0 0 0" axis="0 0 -1" range="0 0.349066" />
+                                  <geom name="SM_l_hand_little_0_collision_0" class="iCub_iCub_collision" size="0.006 0.007" pos="0.007 0.002 -0.001" quat="0 0.707107 0 0.707107" type="capsule" />
+                                  <body name="l_hand_little_1" pos="0.0148 0.00175 0" quat="0.707107 0.707107 0 0">
+                                    <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                    <joint name="l_hand_little_1_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                    <geom name="SM_l_hand_little_1_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                    <body name="l_hand_little_2" pos="0.0219 0 0">
+                                      <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                      <joint name="l_hand_little_2_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                      <geom name="SM_l_hand_little_2_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                      <body name="l_hand_little_3" pos="0.019 0 0">
+                                        <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.000904779" diaginertia="1.6286e-08 2.16544e-07 2.16544e-07" />
+                                        <joint name="l_hand_little_3_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                        <geom name="SM_l_hand_little_3_collision_0" class="iCub_iCub_collision" size="0.006 0.004" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                        <body name="l_hand_little_tip" pos="0.0168 0 0" quat="0.707107 -0.707107 0 0">
+                                          <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                                        </body>
+                                      </body>
+                                    </body>
+                                  </body>
+                                </body>
+                                <body name="l_gripper_tool_frame" pos="0 0 0.13">
+                                  <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                                </body>
+                                <body name="l_hand_thumb_0" pos="0.0318492 -0.0040568 0.0192027" quat="-0.0162249 0.787545 0.0382606 0.614855">
+                                  <inertial pos="0.007 0.003 -0.001" quat="-0.20683 0.0335639 0.156626 0.965175" mass="0.00281487" diaginertia="9.02341e-08 2.56933e-07 2.57091e-07" />
+                                  <joint name="l_hand_thumb_0_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                  <geom name="SM_l_hand_thumb_0_collision_0" class="iCub_iCub_collision" size="0.008 0.007" pos="0.007 0.003 -0.001" quat="-0.707107 0 0.707107 0" type="capsule" />
+                                  <body name="l_hand_thumb_1" pos="0.0211 0.0049 0" quat="0.707107 0.707107 0 0">
+                                    <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                    <joint name="l_hand_thumb_1_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                    <geom name="SM_l_hand_thumb_1_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                    <body name="l_hand_thumb_2" pos="0.026 0 0">
+                                      <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                      <joint name="l_hand_thumb_2_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                      <geom name="SM_l_hand_thumb_2_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                      <body name="l_hand_thumb_3" pos="0.022 0 0">
+                                        <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.000904779" diaginertia="1.6286e-08 2.16544e-07 2.16544e-07" />
+                                        <joint name="l_hand_thumb_3_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                        <geom name="SM_l_hand_thumb_3_collision_0" class="iCub_iCub_collision" size="0.006 0.004" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                        <body name="l_hand_thumb_tip" pos="0.0168 0 0" quat="0.707107 -0.707107 0 0">
+                                          <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                                        </body>
+                                      </body>
+                                    </body>
+                                  </body>
+                                </body>
+                                <body name="l_hand_middle_0" pos="0.0575405 0.0060432 0.023778" quat="0.701057 0.701057 -0.092296 0.092296">
+                                  <inertial pos="0.007 -0.002 -0.001" quat="0.964142 0.227603 0.0313562 -0.132827" mass="0.00158336" diaginertia="2.94565e-08 1.24657e-07 1.25613e-07" />
+                                  <joint name="l_hand_middle_0_joint" pos="0 0 0" axis="0 0 1" range="0 0.349066" />
+                                  <geom name="SM_l_hand_middle_0_collision_0" class="iCub_iCub_collision" size="0.006 0.007" pos="0.007 -0.002 -0.001" quat="0 0.707107 0 0.707107" type="capsule" />
+                                  <body name="l_hand_middle_1" pos="0.0153 -0.0022 0" quat="0.707107 0.707107 0 0">
+                                    <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                    <joint name="l_hand_middle_1_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                    <geom name="SM_l_hand_middle_1_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                    <body name="l_hand_middle_2" pos="0.0258 0 0">
+                                      <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                      <joint name="l_hand_middle_2_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                      <geom name="SM_l_hand_middle_2_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                      <body name="l_hand_middle_3" pos="0.024 0 0">
+                                        <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.000904779" diaginertia="1.6286e-08 2.16544e-07 2.16544e-07" />
+                                        <joint name="l_hand_middle_3_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                        <geom name="SM_l_hand_middle_3_collision_0" class="iCub_iCub_collision" size="0.006 0.004" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                        <body name="l_hand_middle_tip" pos="0.0168 0 0" quat="0.707107 -0.707107 0 0">
+                                          <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                                        </body>
+                                      </body>
+                                    </body>
+                                  </body>
+                                </body>
+                                <body name="l_hand_index_0" pos="0.0525584 0.0051432 0.0394733" quat="0.665939 0.727348 -0.114274 0.120133">
+                                  <inertial pos="0.007 -0.002 -0.001" quat="0.964142 0.227603 0.0313562 -0.132827" mass="0.00158336" diaginertia="2.94565e-08 1.24657e-07 1.25613e-07" />
+                                  <joint name="l_hand_index_0_joint" pos="0 0 0" axis="0 0 -1" range="-0.349066 0" />
+                                  <geom name="SM_l_hand_index_0_collision_0" class="iCub_iCub_collision" size="0.006 0.007" pos="0.007 -0.002 -0.001" quat="0 0.707107 0 0.707107" type="capsule" />
+                                  <body name="l_hand_index_1" pos="0.0148 -0.00175 0" quat="0.707107 0.707107 0 0">
+                                    <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                    <joint name="l_hand_index_1_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                    <geom name="SM_l_hand_index_1_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                    <body name="l_hand_index_2" pos="0.0259 0 0">
+                                      <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.00185825" diaginertia="3.92556e-08 4.68086e-07 4.68086e-07" />
+                                      <joint name="l_hand_index_2_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                      <geom name="SM_l_hand_index_2_collision_0" class="iCub_iCub_collision" size="0.0065 0.007" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                      <body name="l_hand_index_3" pos="0.022 0 0">
+                                        <inertial pos="0.015 0 0" quat="0 0 0 1" mass="0.000904779" diaginertia="1.6286e-08 2.16544e-07 2.16544e-07" />
+                                        <joint name="l_hand_index_3_joint" pos="0 0 0" axis="0 0 1" range="0 1.5708" />
+                                        <geom name="SM_l_hand_index_3_collision_0" class="iCub_iCub_collision" size="0.006 0.004" pos="0.015 0 0" quat="0 0.707107 0 0.707107" type="capsule" />
+                                        <body name="l_hand_index_tip" pos="0.0168 0 0" quat="0.707107 -0.707107 0 0">
+                                          <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                                        </body>
+                                      </body>
+                                    </body>
+                                  </body>
+                                </body>
+                              </body>
+                            </body>
+                          </body>
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+                <body name="neck_1" pos="-0.00378849 0 0.1653">
+                  <inertial pos="-0.00119249 0.00177843 0.0326951" quat="0.708289 0.00582867 -0.7032 0.0616601" mass="0.119613" diaginertia="9.7481e-05 0.000187145 0.000236903" />
+                  <geom name="SM_neck_1_collision_0" class="iCub_iCub_collision" size="0.0195 0.01" pos="0.0085 0.031 0.049" quat="0.707107 0.707107 0 0" type="cylinder" />
+                  <geom name="SM_neck_1_collision_1" class="iCub_iCub_collision" size="0.0195 0.01" pos="0.0085 -0.031 0.049" quat="0.707107 0.707107 0 0" type="cylinder" />
+                  <geom name="SM_neck_1_collision_2" class="iCub_iCub_collision" size="0.0115 0.032" pos="-0.022 0.008 0.0335" quat="0.707107 0.707107 0 0" type="cylinder" />
+                  <geom name="SM_neck_1_collision_4" class="iCub_iCub_collision" size="0.015 0.032" pos="0.0008 0 0.015" quat="0.707107 0.707107 0 0" type="cylinder" />
+                  <body name="neck_2" pos="0.00865 0 0.049">
+                    <inertial pos="0 0 0" quat="-0.707107 0 0 0.707107" mass="0.0282743" diaginertia="3.18086e-06 5.36034e-06 5.36034e-06" />
+                    <joint name="neck_pitch" pos="0 0 0" axis="0 -1 0" range="-0.523599 0.383972" />
+                    <geom name="SM_neck_2_collision_0" class="iCub_iCub_collision" size="0.015 0.02" quat="0.707107 0.707107 0 0" type="cylinder" />
+                    <body name="neck_3" pos="0 0 0.0095005">
+                      <inertial pos="0 0 0.0410714" quat="-0.5 -0.5 -0.5 0.5" mass="0.0540454" diaginertia="8.86971e-06 0.000120413 0.000122365" />
+                      <joint name="neck_roll" pos="0 0 0" axis="1 0 0" range="-0.349066 0.349066" />
+                      <geom name="SM_neck_3_collision_0" class="iCub_iCub_collision" size="0.016 0.0018" pos="0.02 0 0" quat="0.707107 0 0.707107 0" type="cylinder" />
+                      <geom name="SM_neck_3_collision_1" class="iCub_iCub_collision" size="0.016 0.0018" pos="-0.02 0 0" quat="0.707107 0 0.707107 0" type="cylinder" />
+                      <geom name="SM_neck_3_collision_3" class="iCub_iCub_collision" size="0.016 0.03" pos="0 0 0.046" type="cylinder" />
+                      <body name="head" pos="0 0 0.06915">
+                        <inertial pos="-0.018 0 0.04" quat="0 0.787207 0 -0.616689" mass="0.804248" diaginertia="0.00151183 0.0029414 0.00400316" />
+                        <joint name="neck_yaw" pos="0 0 0" axis="0 0 1" range="-0.785398 0.785398" />
+                        <geom name="SM_head_collision_0" class="iCub_iCub_collision" size="0.08 0.02" pos="-0.018 0 0.04" quat="0.707107 0 0.707107 0" type="capsule" />
+                        <body name="imu_frame" pos="0.0035 0.0055 0.101334" quat="0 0.707107 -0.707107 0">
+                          <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                        </body>
+                        <body name="eyes_tilt_frame" pos="0.05 0 0.015" quat="0.000563312 0.000562864 0.706825 0.707388">
+                          <inertial pos="0 0 0" mass="0.001" diaginertia="0.0001 0.0001 0.0001" />
+                          <joint name="eyes_tilt" pos="0 0 0" axis="0 0 1" range="-0.523599 0.523599" />
+                          <body name="l_eye" pos="0 0 0.034" quat="0.707388 0 -0.706825 0">
+                            <inertial pos="0 0 0" mass="0.001" diaginertia="0.0001 0.0001 0.0001" />
+                            <joint name="l_eye_pan_joint" pos="0 0 0" axis="0 -1 0" range="-0.523599 0.959931" />
+                          </body>
+                          <body name="r_eye" pos="0 0 -0.034" quat="0.707388 0 -0.706825 0">
+                            <inertial pos="0 0 0" mass="0.001" diaginertia="0.0001 0.0001 0.0001" />
+                            <joint name="r_eye_pan_joint" pos="0 0 0" axis="0 -1 0" range="-0.959931 0.523599" />
+                          </body>
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+          <body name="l_hip_1" pos="0.0216 0.04045 0">
+            <inertial pos="0 0.04 0" quat="-0.707107 0 0 0.707107" mass="0.398857" diaginertia="0.00042199 0.000968823 0.000968823" />
+            <joint name="l_hip_pitch" pos="0 0 0" axis="0 -1 0" range="-0.785398 2.00713" />
+            <geom name="SM_l_hip_1_collision_0" class="iCub_iCub_collision" size="0.046 0.03" pos="0 0.04 0" quat="0.707107 0.707107 0 0" type="cylinder" />
+            <body name="l_hip_2" pos="-0.04725 0.0331 -0.009">
+              <inertial pos="-0.00124471 -0.00309852 -0.0342123" quat="0.54615 0.489988 0.451113 -0.508064" mass="2.58188" diaginertia="0.00809107 0.0165375 0.0185028" />
+              <joint name="l_hip_roll" pos="0 0 0" axis="1 0 0" range="-0.174533 2.00713" />
+              <geom name="SM_l_hip_2_collision_0" class="iCub_iCub_collision" size="0.035 0.03" pos="-0.028 0 0" quat="0.707107 0 -0.707107 0" type="cylinder" />
+              <geom name="SM_l_hip_2_collision_1" class="iCub_iCub_collision" size="0.031 0.03" pos="-0.028 0 -0.065" quat="0.707107 0 -0.707107 0" type="cylinder" />
+              <geom name="SM_l_hip_2_collision_2" class="iCub_iCub_collision" size="0.029 0.017" pos="0.037 0 -0.073" type="cylinder" />
+              <body name="l_hip_3" pos="0.0367 0 -0.0897">
+                <inertial pos="0.005 -0.008 -0.07" quat="0.557506 0.486635 0.445897 -0.503536" mass="2.08" diaginertia="0.00733115 0.0150578 0.0165653" />
+                <geom name="SM_l_hip_3_collision_0" class="iCub_iCub_collision" size="0.08 0.065 0.05" pos="0.005 -0.008 -0.07" type="box" />
+                <body name="l_upper_leg" pos="0 -0.015 -0.0709">
+                  <inertial pos="0.018 0 -0.11" quat="0 0.6475 0 0.762066" mass="0.0923628" diaginertia="0.000142539 0.00120409 0.00129005" />
+                  <joint name="l_hip_yaw" pos="0 0 0" axis="0 0 1" range="-1.39626 1.39626" />
+                  <geom name="SM_l_upper_leg_collision_0" class="iCub_iCub_collision" size="0.035 0.006" pos="0.018 -0.035 -0.11" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                  <geom name="SM_l_upper_leg_collision_1" class="iCub_iCub_collision" size="0.035 0.006" pos="0.018 0.035 -0.11" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                  <body name="l_lower_leg" pos="0.015 0.0249 -0.1062">
+                    <inertial pos="-0.0191507 -0.0211699 -0.127235" quat="0.539956 0.383712 0.548397 -0.510366" mass="2.1712" diaginertia="0.00457105 0.0495482 0.0501324" />
+                    <joint name="l_knee" pos="0 0 0" axis="0 -1 0" range="-1.22173 0.0872665" />
+                    <geom name="SM_l_lower_leg_collision_0" class="iCub_iCub_collision" size="0.042 0.025" pos="0 -0.025 0" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                    <geom name="SM_l_lower_leg_collision_1" class="iCub_iCub_collision" size="0.06 0.055 0.063" pos="-0.025 -0.02 -0.13" type="box" />
+                    <geom name="SM_l_lower_leg_collision_2" class="iCub_iCub_collision" size="0.035 0.03" pos="0 -0.025 -0.26" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                    <body name="l_ankle_1" pos="0 -0.0005 -0.255989">
+                      <inertial pos="0 0.015 0" quat="-0.707107 0 0 0.707107" mass="0.0282743" diaginertia="1.27234e-05 1.29591e-05 1.29591e-05" />
+                      <joint name="l_ankle_pitch" pos="0 0 0" axis="0 1 0" range="-0.785398 0.785398" />
+                      <geom name="SM_l_ankle_1_collision_0" class="iCub_iCub_collision" size="0.03 0.005" pos="0 0.015 0" quat="0.707107 -0.707107 0 0" type="cylinder" />
+                      <body name="l_ankle_2" pos="-0.05275 -0.0182 -0.035">
+                        <inertial pos="0.0670801 0 -0.0267179" quat="0.992135 0 0.125169 0" mass="1.6124" diaginertia="0.00286201 0.0175144 0.0181845" />
+                        <joint name="l_ankle_roll" pos="0 0 0" axis="1 0 0" range="-0.436332 0.436332" />
+                        <geom name="SM_l_ankle_2_collision_0" class="iCub_iCub_collision" size="0.02 0.05 0.02" pos="0.12 0 0" type="box" />
+                        <geom name="SM_l_ankle_2_collision_1" class="iCub_iCub_collision" size="0.02 0.05 0.02" pos="-0.02 0 0" type="box" />
+                        <geom name="SM_l_ankle_2_collision_2" class="iCub_iCub_collision" size="0.12 0.06 0.02" pos="0.08 0 -0.04" type="box" />
+                        <body name="l_foot_front" pos="0.13525 0 -0.0658">
+                          <inertial pos="0 0 0.003" mass="0.0702" diaginertia="5.93424e-05 8.0923e-05 0.000138581" />
+                          <geom name="SM_l_foot_front_collision_0" class="iCub_iCub_collision" size="0.0585 0.05 0.003" pos="0 0 0.003" type="box" />
+                        </body>
+                        <body name="l_foot_rear" pos="0.016 0 -0.0658">
+                          <inertial pos="0 0 0.003" mass="0.0702" diaginertia="5.93424e-05 8.0923e-05 0.000138581" />
+                          <geom name="SM_l_foot_rear_collision_0" class="iCub_iCub_collision" size="0.0585 0.05 0.003" pos="0 0 0.003" type="box" />
+                          <body name="l_sole" pos="0.05963 0 0">
+                            <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+                          </body>
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+          <body name="base_link">
+            <inertial pos="0 0 0" mass="0" diaginertia="0 0 0" />
+          </body>
+        </body>
+      </body>
+    </body>
+    <body name="montessori_object_2_ref" pos="-0.4015 0.25 1.4" mocap="true">
+      <geom name="montessori_object_2_ref_MontessoriObject2" type="mesh" contype="0" conaffinity="0" rgba="0 1 0 1" mesh="montessori_object_2_MontessoriObject_002" />
+    </body>
+    <body name="montessori_object_3_ref" pos="-0.4015 -0.237 1.4" mocap="true">
+      <geom name="montessori_object_3_ref_MontessoriObject3" size="0.015 0.015 0.015" type="box" contype="0" conaffinity="0" rgba="0 1 0 1" />
+    </body>
+    <body name="montessori_object_5_ref" pos="-0.3095 0.25 1.4" mocap="true">
+      <geom name="montessori_object_5_ref_MontessoriObject5" size="0.01 0.02 0.015" type="box" contype="0" conaffinity="0" rgba="0 1 0 1" />
+    </body>
+    <body name="montessori_object_6_ref" pos="-0.3095 -0.237 1.4" mocap="true">
+      <geom name="montessori_object_6_ref_MontessoriObject6" size="0.015 0.015" type="cylinder" contype="0" conaffinity="0" rgba="0 1 0 1" />
+    </body>
+  </worldbody>
+  <equality>
+    <weld name="montessori_object_2_controller" body1="montessori_object_2_ref" body2="montessori_object_2" anchor="0 0 0" relpose="0 0 0 1 0 0 0" torquescale="1" />
+    <weld name="montessori_object_3_controller" body1="montessori_object_3_ref" body2="montessori_object_3" anchor="0 0 0" relpose="0 0 0 1 0 0 0" torquescale="1" />
+    <weld name="montessori_object_5_controller" body1="montessori_object_5_ref" body2="montessori_object_5" anchor="0 0 0" relpose="0 0 0 1 0 0 0" torquescale="1" />
+    <weld name="montessori_object_6_controller" body1="montessori_object_6_ref" body2="montessori_object_6" anchor="0 0 0" relpose="0 0 0 1 0 0 0" torquescale="1" />
+  </equality>
+  <actuator>
+    <general name="r_hip_pitch_actuator" joint="r_hip_pitch" ctrlrange="-0.785398 2.00713" biastype="affine" gainprm="150" biasprm="0 -150 -10" />
+    <general name="l_hip_pitch_actuator" joint="l_hip_pitch" ctrlrange="-0.785398 2.00713" biastype="affine" gainprm="150" biasprm="0 -150 -10" />
+    <general name="neck_roll_actuator" joint="neck_roll" ctrlrange="-0.349066 0.349066" biastype="affine" gainprm="15" biasprm="0 -15 -1" />
+    <general name="neck_pitch_actuator" joint="neck_pitch" ctrlrange="-0.523599 0.383972" biastype="affine" gainprm="15" biasprm="0 -15 -1" />
+    <general name="neck_yaw_actuator" joint="neck_yaw" ctrlrange="-0.785398 0.785398" biastype="affine" gainprm="15" biasprm="0 -15 -1" />
+    <general name="torso_roll_actuator" joint="torso_roll" ctrlrange="-0.401426 0.401426" biastype="affine" gainprm="500" biasprm="0 -500 -40" />
+    <general name="torso_pitch_actuator" joint="torso_pitch" ctrlrange="-0.314159 0.785398" biastype="affine" gainprm="500" biasprm="0 -500 -40" />
+    <general name="torso_yaw_actuator" joint="torso_yaw" ctrlrange="-0.750492 0.750492" biastype="affine" gainprm="500" biasprm="0 -500 -40" />
+    <general name="r_shoulder_pitch_actuator" joint="r_shoulder_pitch" ctrlrange="-0.349066 3.05433" biastype="affine" gainprm="600" biasprm="0 -600 -100" />
+    <general name="r_shoulder_roll_actuator" joint="r_shoulder_roll" ctrlrange="0.20944 2.84489" biastype="affine" gainprm="600" biasprm="0 -600 -100" />
+    <general name="r_shoulder_yaw_actuator" joint="r_shoulder_yaw" ctrlrange="-0.872665 1.39626" biastype="affine" gainprm="500" biasprm="0 -500 -90" />
+    <general name="r_elbow_actuator" joint="r_elbow" ctrlrange="-53.826 55.0826" biastype="affine" gainprm="100" biasprm="0 -100 -400" />
+    <general name="r_wrist_prosup_actuator" joint="r_wrist_prosup" ctrlrange="-1.53589 1.53589" biastype="affine" gainprm="200" biasprm="0 -200 -50" />
+    <general name="r_wrist_pitch_actuator" joint="r_wrist_pitch" ctrlrange="-1.22173 0.436332" biastype="affine" gainprm="200" biasprm="0 -200 -50" />
+    <general name="r_wrist_yaw_actuator" joint="r_wrist_yaw" ctrlrange="-0.261799 0.610865" biastype="affine" gainprm="200" biasprm="0 -200 -50" />
+    <general name="l_shoulder_pitch_actuator" joint="l_shoulder_pitch" ctrlrange="-3.05433 0.349066" biastype="affine" gainprm="600" biasprm="0 -600 -100" />
+    <general name="l_shoulder_roll_actuator" joint="l_shoulder_roll" ctrlrange="0.20944 2.84489" biastype="affine" gainprm="600" biasprm="0 -600 -100" />
+    <general name="l_shoulder_yaw_actuator" joint="l_shoulder_yaw" ctrlrange="-0.872665 1.39626" biastype="affine" gainprm="500" biasprm="0 -500 -90" />
+    <general name="l_elbow_actuator" joint="l_elbow" ctrlrange="-53.826 55.0826" biastype="affine" gainprm="100" biasprm="0 -100 -400" />
+    <general name="l_wrist_prosup_actuator" joint="l_wrist_prosup" ctrlrange="-1.53589 1.53589" biastype="affine" gainprm="200" biasprm="0 -200 -50" />
+    <general name="l_wrist_pitch_actuator" joint="l_wrist_pitch" ctrlrange="-1.22173 0.436332" biastype="affine" gainprm="200" biasprm="0 -200 -50" />
+    <general name="l_wrist_yaw_actuator" joint="l_wrist_yaw" ctrlrange="-0.349066 0.436332" biastype="affine" gainprm="200" biasprm="0 -200 -50" />
+    <general name="r_hand_thumb_0_actuator" joint="r_hand_thumb_0_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="100" biasprm="0 -100 -10" />
+    <general name="r_hand_thumb_1_actuator" joint="r_hand_thumb_1_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="80" biasprm="0 -80 -8" />
+    <general name="r_hand_thumb_2_actuator" joint="r_hand_thumb_2_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="60" biasprm="0 -60 -6" />
+    <general name="r_hand_thumb_3_actuator" joint="r_hand_thumb_3_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="40" biasprm="0 -40 -4" />
+    <general name="r_hand_index_0_actuator" joint="r_hand_index_0_joint" ctrlrange="-0.349066 0" biastype="affine" gainprm="100" biasprm="0 -100 -10" />
+    <general name="r_hand_index_1_actuator" joint="r_hand_index_1_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="80" biasprm="0 -80 -8" />
+    <general name="r_hand_index_2_actuator" joint="r_hand_index_2_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="60" biasprm="0 -60 -6" />
+    <general name="r_hand_index_3_actuator" joint="r_hand_index_3_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="40" biasprm="0 -40 -4" />
+    <general name="r_hand_middle_0_actuator" joint="r_hand_middle_0_joint" ctrlrange="0 0.349066" biastype="affine" gainprm="100" biasprm="0 -100 -10" />
+    <general name="r_hand_middle_1_actuator" joint="r_hand_middle_1_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="80" biasprm="0 -80 -8" />
+    <general name="r_hand_middle_2_actuator" joint="r_hand_middle_2_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="60" biasprm="0 -60 -6" />
+    <general name="r_hand_middle_3_actuator" joint="r_hand_middle_3_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="40" biasprm="0 -40 -4" />
+    <general name="r_hand_ring_0_actuator" joint="r_hand_ring_0_joint" ctrlrange="0 0.349066" biastype="affine" gainprm="100" biasprm="0 -100 -10" />
+    <general name="r_hand_ring_1_actuator" joint="r_hand_ring_1_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="80" biasprm="0 -80 -8" />
+    <general name="r_hand_ring_2_actuator" joint="r_hand_ring_2_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="60" biasprm="0 -60 -6" />
+    <general name="r_hand_ring_3_actuator" joint="r_hand_ring_3_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="40" biasprm="0 -40 -4" />
+    <general name="r_hand_little_0_actuator" joint="r_hand_little_0_joint" ctrlrange="0 0.349066" biastype="affine" gainprm="100" biasprm="0 -100 -10" />
+    <general name="r_hand_little_1_actuator" joint="r_hand_little_1_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="80" biasprm="0 -80 -8" />
+    <general name="r_hand_little_2_actuator" joint="r_hand_little_2_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="60" biasprm="0 -60 -6" />
+    <general name="r_hand_little_3_actuator" joint="r_hand_little_3_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="40" biasprm="0 -40 -4" />
+    <general name="l_hand_thumb_0_actuator" joint="l_hand_thumb_0_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="100" biasprm="0 -100 -10" />
+    <general name="l_hand_thumb_1_actuator" joint="l_hand_thumb_1_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="80" biasprm="0 -80 -8" />
+    <general name="l_hand_thumb_2_actuator" joint="l_hand_thumb_2_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="60" biasprm="0 -60 -6" />
+    <general name="l_hand_thumb_3_actuator" joint="l_hand_thumb_3_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="40" biasprm="0 -40 -4" />
+    <general name="l_hand_index_0_actuator" joint="l_hand_index_0_joint" ctrlrange="-0.349066 0" biastype="affine" gainprm="100" biasprm="0 -100 -10" />
+    <general name="l_hand_index_1_actuator" joint="l_hand_index_1_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="80" biasprm="0 -80 -8" />
+    <general name="l_hand_index_2_actuator" joint="l_hand_index_2_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="60" biasprm="0 -60 -6" />
+    <general name="l_hand_index_3_actuator" joint="l_hand_index_3_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="40" biasprm="0 -40 -4" />
+    <general name="l_hand_middle_0_actuator" joint="l_hand_middle_0_joint" ctrlrange="0 0.349066" biastype="affine" gainprm="100" biasprm="0 -100 -10" />
+    <general name="l_hand_middle_1_actuator" joint="l_hand_middle_1_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="80" biasprm="0 -80 -8" />
+    <general name="l_hand_middle_2_actuator" joint="l_hand_middle_2_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="60" biasprm="0 -60 -6" />
+    <general name="l_hand_middle_3_actuator" joint="l_hand_middle_3_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="40" biasprm="0 -40 -4" />
+    <general name="l_hand_ring_0_actuator" joint="l_hand_ring_0_joint" ctrlrange="0 0.349066" biastype="affine" gainprm="100" biasprm="0 -100 -10" />
+    <general name="l_hand_ring_1_actuator" joint="l_hand_ring_1_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="80" biasprm="0 -80 -8" />
+    <general name="l_hand_ring_2_actuator" joint="l_hand_ring_2_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="60" biasprm="0 -60 -6" />
+    <general name="l_hand_ring_3_actuator" joint="l_hand_ring_3_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="40" biasprm="0 -40 -4" />
+    <general name="l_hand_little_0_actuator" joint="l_hand_little_0_joint" ctrlrange="0 0.349066" biastype="affine" gainprm="100" biasprm="0 -100 -10" />
+    <general name="l_hand_little_1_actuator" joint="l_hand_little_1_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="80" biasprm="0 -80 -8" />
+    <general name="l_hand_little_2_actuator" joint="l_hand_little_2_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="60" biasprm="0 -60 -6" />
+    <general name="l_hand_little_3_actuator" joint="l_hand_little_3_joint" ctrlrange="0 1.5708" biastype="affine" gainprm="40" biasprm="0 -40 -4" />
+  </actuator>
+  <keyframe>
+    <key name="iCub_home" qpos="0 0 0 -0.375 0.091 1.5 0.707107 0 0.707107 0 -0.4015 0.25 1.4 1 0 0 0 -0.4015 -0.237 1.4 1 0 0 0 -0.4175 0.091 1.5 0.707107 0 0.707107 0 -0.3095 0.25 1.4 1 0 0 0 -0.3095 -0.237 1.4 1 0 0 0 -0.8 0 0.55 1 0 0 0 1.5 0 0 0 0 0 0 0.5 0 2 0.42 -0.21 1.309 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2 0.42 -0.21 1.309 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.5 0 0 0 0 0" ctrl="1.5 1.5 0 0 0 0 0.5 0 2.0 0.42 -0.21 1.309 0 0 0 -2.0 0.42 -0.21 1.309 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0" />
+  </keyframe>
+  <extension>
+    <plugin plugin="mujoco.multiverse_connector">
+      <instance name="mujoco_client">
+        <config key="host" value="tcp://127.0.0.1" />
+        <config key="server_port" value="7000" />
+        <config key="client_port" value="7500" />
+        <config key="world_name" value="world" />
+        <config key="simulation_name" value="iCub_with_montessori_toys_2" />
+        <config key="send" value="{'body': ['position', 'quaternion'], 'joint': ['joint_rvalue', 'joint_tvalue', 'joint_linear_velocity', 'joint_angular_velocity', 'joint_force', 'joint_torque']}" />
+        <config key="receive" value="{'montessori_object_2_ref': ['position', 'quaternion'], 'montessori_object_3_ref': ['position', 'quaternion'], 'montessori_object_5_ref': ['position', 'quaternion'], 'montessori_object_6_ref': ['position', 'quaternion']}" />
+      </instance>
+    </plugin>
+  </extension>
+</mujoco>

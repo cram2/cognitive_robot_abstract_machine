@@ -1,0 +1,81 @@
+{
+    "_type": "ripple_down_rules.rdr.GeneralRDR",
+    "start_rules": {
+        "output_": {
+            "_type": "ripple_down_rules.rdr.SingleClassRDR",
+            "start_rule": {
+                "_type": "ripple_down_rules.rules.SingleClassRule",
+                "conditions": {
+                    "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                    "user_input": "def _get_value(case):\n    def conditions_for_placing_detector_get_object_to_track_from_starter_event(cls_: Type[PlacingDetector], starter_event: ContactEvent, output_: Union[NoneType, Object]) -> bool:\n        \"\"\"Get conditions on whether it's possible to conclude a value for PlacingDetector_get_object_to_track_from_starter_event.output_  of type Object.\"\"\"\n        return isinstance(starter_event, HasPrimaryTrackedObject)\n    return conditions_for_placing_detector_get_object_to_track_from_starter_event(**case)\n    ",
+                    "conclusion_type": [
+                        "builtins.bool"
+                    ],
+                    "scope": {
+                        "Case": "ripple_down_rules.datastructures.case.Case",
+                        "Dict": "typing.Dict",
+                        "Optional": "typing.Optional",
+                        "Type": "typing.Type",
+                        "Union": "typing.Union",
+                        "PlacingDetector": "segmind.detectors.coarse_event_detectors.PlacingDetector",
+                        "Object": "pycram.world_concepts.world_object.Object",
+                        "HasSecondaryTrackedObject": "segmind.datastructures.mixins.HasSecondaryTrackedObject",
+                        "HasPrimaryTrackedObject": "segmind.datastructures.mixins.HasPrimaryTrackedObject",
+                        "ContactEvent": "segmind.datastructures.events.ContactEvent",
+                        "EventWithOneTrackedObject": "segmind.datastructures.events.EventWithOneTrackedObject",
+                        "StopTranslationEvent": "segmind.datastructures.events.StopTranslationEvent",
+                        "NoneType": "builtins.NoneType"
+                    },
+                    "conclusion": {
+                        "_type": "builtins.NoneType",
+                        "value": null
+                    },
+                    "mutually_exclusive": true
+                },
+                "conclusion": {
+                    "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                    "user_input": "def _get_value(case):\n    def placing_detector_get_object_to_track_from_starter_event(cls_: Type[PlacingDetector], starter_event: ContactEvent, output_: Union[NoneType, Object]) -> Union[NoneType, Object]:\n        \"\"\"Get possible value(s) for PlacingDetector_get_object_to_track_from_starter_event.output_  of type Object.\"\"\"\n        return starter_event.tracked_object\n    return placing_detector_get_object_to_track_from_starter_event(**case)\n    ",
+                    "conclusion_type": [
+                        "builtins.NoneType",
+                        "pycram.world_concepts.world_object.Object"
+                    ],
+                    "scope": {
+                        "Case": "ripple_down_rules.datastructures.case.Case",
+                        "Dict": "typing.Dict",
+                        "Optional": "typing.Optional",
+                        "Type": "typing.Type",
+                        "Union": "typing.Union",
+                        "PlacingDetector": "segmind.detectors.coarse_event_detectors.PlacingDetector",
+                        "Object": "pycram.world_concepts.world_object.Object",
+                        "HasSecondaryTrackedObject": "segmind.datastructures.mixins.HasSecondaryTrackedObject",
+                        "HasPrimaryTrackedObject": "segmind.datastructures.mixins.HasPrimaryTrackedObject",
+                        "ContactEvent": "segmind.datastructures.events.ContactEvent",
+                        "EventWithOneTrackedObject": "segmind.datastructures.events.EventWithOneTrackedObject",
+                        "StopTranslationEvent": "segmind.datastructures.events.StopTranslationEvent",
+                        "NoneType": "builtins.NoneType"
+                    },
+                    "conclusion": {
+                        "_type": "builtins.NoneType",
+                        "value": null
+                    },
+                    "mutually_exclusive": true
+                },
+                "parent": null,
+                "corner_case": null,
+                "conclusion_name": "output_",
+                "weight": null,
+                "uid": "157980724165316319734190707637955950660",
+                "refinement": null,
+                "alternative": null
+            },
+            "generated_python_file_name": "placing_detector_get_object_to_track_from_starter_event_output__scrdr",
+            "name": "output_",
+            "case_type": "typing.Dict",
+            "case_name": "PlacingDetector_get_object_to_track_from_starter_event"
+        }
+    },
+    "generated_python_file_name": "placing_detector_get_object_to_track_from_starter_event_rdr",
+    "name": "output_",
+    "case_type": "typing.Dict",
+    "case_name": "PlacingDetector_get_object_to_track_from_starter_event"
+}
