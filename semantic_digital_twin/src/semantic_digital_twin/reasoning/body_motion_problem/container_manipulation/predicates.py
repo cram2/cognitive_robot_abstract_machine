@@ -129,7 +129,7 @@ class ContainerCanPerform(CanPerform):
 
             executor = Executor(
                 context=MotionStatechartContext(world=self.robot._world),
-                pacer=SimulationPacer(real_time_factor=1.0),
+                # pacer=SimulationPacer(real_time_factor=3.0),
             )
             executor.compile(motion_statechart=msc)
 

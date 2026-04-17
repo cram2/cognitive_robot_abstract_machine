@@ -457,84 +457,8 @@ class Base(KinematicChain):
         )
         return bb_collection.bounding_box()
 
-    def assign_to_robot(self, robot: AbstractRobot):
-        self._robot = robot
-        self.main_axis.reference_frame = self._robot.root
-
     def __hash__(self):
         return hash((self.name, self.root, self.tip))
-
-
-@dataclass
-class JointState:
-    """
-    Represents a named joint state of a robot. For example, the park position of the arms.
-    """
-
-    name: PrefixedName
-    """
-    The identifier for this joint state.
-    """
-
-    joint_names: List[Connection]
-    """
-    Names of the joints in this state
-    """
-
-    joint_positions: List[float]
-    """
-    Position of the joints in this state, must correspond to the joint_names
-    """
-
-    state_type: str
-    """
-    Type of the joint state (e.g., "Park", "Open")
-    """
-
-    kinematic_chains: List[KinematicChain]
-    """
-    Kinematic chains that are involved in the state of the joints
-    """
-
-    _world: World = field(default=None)
-    """
-    The backreference to the world this joint state belongs to.
-    """
-
-    _robot: AbstractRobot = field(init=False, default=None)
-    """
-    The robot this joint state belongs to
-    """
-
-    def apply_to_world(self, world: World):
-        """
-        Applies the joint state to the robot in the given world.
-        :param world: The world in which the robot is located.
-        """
-        for joint_name, joint_position in zip(self.joint_names, self.joint_positions):
-            joint_name.position = joint_position
-        world.notify_state_change()
-
-    def assign_to_robot(self, robot: AbstractRobot):
-        """
-        Assigns the joint state to the given robot. This method ensures that the joint state is only assigned
-        to one robot at a time, and raises an error if it is already assigned to another robot.
-        """
-        if self._robot is not None and self._robot != robot:
-            raise ValueError(
-                f"Joint State {self.name} is already assigned to another robot: {self._robot.name}."
-            )
-        if self._robot is not None:
-            return
-        self._robot = robot
-
-    def __hash__(self):
-        """
-        Returns the hash of the joint state, which is based on the joint names and positions.
-        This allows for proper comparison and storage in sets or dictionaries.
-        """
-        return id(self)
-        return hash((self.name, self.joint_names, self.joint_positions))
 
 
 @dataclass(eq=False)
