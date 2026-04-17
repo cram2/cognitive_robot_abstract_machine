@@ -372,7 +372,7 @@ class DesignatorNode(PlanNode, ABC):
         """
         return [
             motion_node.motion.motion_chart
-            for motion_node in self.children + [self]
+            for motion_node in self.descendants + [self]
             if isinstance(motion_node, MotionNode)
             # and self is motion_node.parent_action_node
         ]
@@ -443,7 +443,9 @@ class ActionNode(DesignatorNode):
         )
 
     def _perform(self):
-        logger.debug(f"Performing node: {str(self)} with params: {[f for f in self.action.fields]}")
+        logger.debug(
+            f"Performing node: {str(self)} with params: {[f for f in self.action.fields]}"
+        )
         self.create_execution_data_pre_perform()
 
         result = self.action.perform()

@@ -10,11 +10,13 @@ from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.ros2_nodes.ros_tasks import NavigateActionServerTask
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from pycram.datastructures.enums import ExecutionType
 from pycram.robot_plans import MoveToolCenterPointMotion, MoveMotion, ClosingMotion
 from pycram.robot_plans.motions.base import AlternativeMotion
 from pycram.view_manager import ViewManager
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -32,7 +34,7 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
         return
 
     @property
-    def _motion_chart(self) -> Sequence:
+    def _motion_chart(self):
         tip = ViewManager().get_end_effector_view(self.arm, self.robot).tool_frame
         goal_copy = deepcopy(self.target)
         goal_copy = self.world.transform(goal_copy, self.world.root)
@@ -40,17 +42,42 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
         goal_point.z = 0
         return Sequence(
             [
-                Pointing(
-                    root_link=self.world.root,
-                    tip_link=self.robot.root,
-                    goal_point=goal_point,
-                    pointing_axis=Vector3(0, -1, 0, reference_frame=self.robot.root),
-                    binding_policy=GoalBindingPolicy.Bind_at_build,
+                Parallel(
+                    [
+                        Pointing(
+                            root_link=self.world.root,
+                            tip_link=self.robot.root,
+                            goal_point=goal_point,
+                            pointing_axis=Vector3(
+                                0, -1, 0, reference_frame=self.robot.root
+                            ),
+                            binding_policy=GoalBindingPolicy.Bind_at_build,
+                        ),
+                        JointPositionList(
+                            goal_state=JointState.from_str_dict(
+                                {"joint_wrist_yaw": 0.0}, world=self.world
+                            )
+                        ),
+                    ]
                 ),
-                CartesianPose(
-                    root_link=self.world.root,
-                    tip_link=tip,
-                    goal_pose=self.target,
+                Parallel(
+                    [
+                        AlignPlanes(
+                            root_link=self.world.root,
+                            tip_link=self.robot.root,
+                            tip_normal=Vector3(
+                                1, 0, 0, reference_frame=self.robot.root
+                            ),
+                            goal_normal=Vector3(
+                                -1, 0, 0, reference_frame=self.world.root
+                            ),
+                        ),
+                        CartesianPose(
+                            root_link=self.world.root,
+                            tip_link=tip,
+                            goal_pose=self.target,
+                        ),
+                    ],
                 ),
             ]
         )
@@ -86,14 +113,13 @@ class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
 
     @property
     def _motion_chart(self) -> NavigateActionServerTask:
-        return DifferentialDriveBaseGoal(goal_pose=self.target, threshold=0.05)
+        return DifferentialDriveBaseGoal(goal_pose=self.target, threshold=0.1)
         return NavigateActionServerTask(
             target_pose=self.target,
             base_link=self.robot.root,
             action_topic="/navigate_to_pose",
             message_type=NavigateToPose,
         )
-
 
 
 class StretchClose(ClosingMotion, AlternativeMotion[Stretch]):

@@ -176,9 +176,13 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
 
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(lambda: 0.1)
-        vel_limits[self._world.get_connection_by_name("joint_gripper_finger_left")] = 0.01
-        vel_limits[self._world.get_connection_by_name("joint_gripper_finger_right")] = 0.01
-        vel_limits[ self._world.get_connection_by_name("joint_wrist_yaw")] = 0.4
+        vel_limits[self._world.get_connection_by_name("joint_gripper_finger_left")] = (
+            0.01
+        )
+        vel_limits[self._world.get_connection_by_name("joint_gripper_finger_right")] = (
+            0.01
+        )
+        vel_limits[self._world.get_connection_by_name("joint_wrist_yaw")] = 0.4
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
     def _setup_hardware_interfaces(self):
@@ -205,12 +209,14 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
     def _setup_joint_states(self):
         arm_park = JointState.from_mapping(
             name=PrefixedName("arm_park", prefix=self.name.name),
-            mapping={self._world.get_connection_by_name("joint_lift"): 0.95,
-                     self._world.get_connection_by_name("joint_arm_l0"): 0.0,
-                     self._world.get_connection_by_name("joint_arm_l1"): 0.0,
-                     self._world.get_connection_by_name("joint_arm_l2"): 0.0,
-                     self._world.get_connection_by_name("joint_arm_l3"): 0.0,
-                     self._world.get_connection_by_name("joint_wrist_yaw"): 2.0,},
+            mapping={
+                self._world.get_connection_by_name("joint_lift"): 0.95,
+                self._world.get_connection_by_name("joint_arm_l0"): 0.0,
+                self._world.get_connection_by_name("joint_arm_l1"): 0.0,
+                self._world.get_connection_by_name("joint_arm_l2"): 0.0,
+                self._world.get_connection_by_name("joint_arm_l3"): 0.0,
+                self._world.get_connection_by_name("joint_wrist_yaw"): 2.0,
+            },
             state_type=StaticJointState.PARK,
         )
 
@@ -229,7 +235,7 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
 
         gripper_close = JointState.from_mapping(
             name=PrefixedName("gripper_close", prefix=self.name.name),
-            mapping=dict(zip(gripper_joints, [-0.2, -0.2])),
+            mapping=dict(zip(gripper_joints, [-0.0, -0.0])),
             state_type=GripperState.CLOSE,
         )
 
