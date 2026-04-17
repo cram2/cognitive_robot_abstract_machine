@@ -106,7 +106,7 @@ class GaussianLayer(ContinuousLayer):
 
         parameters = jnp.vstack(
             [
-                (node.distribution.location, node.distribution.scale, 0.01)
+                jnp.array([node.distribution.location, node.distribution.scale, 0.01])
                 for node in (
                     tqdm.tqdm(
                         nodes,
