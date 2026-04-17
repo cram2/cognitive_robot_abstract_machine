@@ -12,17 +12,13 @@ from pathlib import Path
 
 def pytest_configure(config):
     # Ensure ORM classes are generated before tests run.
-    # The generator may fail when ormatic_interface is already loaded in the
-    # same process (SQLAlchemy rejects duplicate table registrations). In that
-    # case the existing ormatic_interface.py is already valid and we continue.
     repo_root = Path(__file__).resolve().parents[2]
     generate_orm_path = (
         repo_root / "semantic_digital_twin" / "scripts" / "generate_orm.py"
     )
-    try:
-        runpy.run_path(str(generate_orm_path), run_name="__main__")
-    except Exception:
-        pass
+    # Execute the ORM generation script as a standalone module
+    runpy.run_path(str(generate_orm_path), run_name="__main__")
+
     class_diagram = ClassDiagram(
         recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),
