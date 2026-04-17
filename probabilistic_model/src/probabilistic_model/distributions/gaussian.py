@@ -1,26 +1,26 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Optional
 
-from numpy import nextafter
-
-from scipy.stats import gamma, norm
-
-from dataclasses import dataclass, field
-from typing_extensions import Union, Iterable, Any, Self, Dict, List, Tuple
 import numpy as np
 import numpy.typing as npt
+from numpy import nextafter
+from scipy.stats import gamma, norm
+from typing_extensions import Self, Tuple
+
 from probabilistic_model.distributions.distributions import (
     ContinuousDistribution,
     ContinuousDistributionWithFiniteSupport,
+    DiracDeltaDistribution,
 )
 from probabilistic_model.probabilistic_model import OrderType, CenterType, MomentType
 from probabilistic_model.utils import simple_interval_as_array
 from random_events.interval import Interval, reals, singleton, SimpleInterval, Bound
 from random_events.product_algebra import VariableMap
 from random_events.sigma_algebra import AbstractCompositeSet
-from random_events.variable import Continuous, Variable
+from random_events.variable import Variable
 
 
 @dataclass
@@ -114,15 +114,16 @@ class GaussianDistribution(ContinuousDistribution):
 
         return VariableMap({self.variable: moment})
 
-    def log_conditional_from_simple_interval(
+    def log_conditional_from_simple_interval_if_not_singleton(
         self, interval: SimpleInterval
-    ) -> Tuple[Optional[TruncatedGaussianDistribution], float]:
+    ) -> Tuple[Optional[ContinuousDistribution], float]:
         cdf_values = self.cumulative_distribution_function(
             simple_interval_as_array(interval).reshape(-1, 1)
         )
-        probability = cdf_values[1] - cdf_values[0]
+        probability: float = cdf_values[1] - cdf_values[0]
         if probability <= 0.0:
             return None, -np.inf
+
         return TruncatedGaussianDistribution(
             variable=self.variable,
             interval=interval,

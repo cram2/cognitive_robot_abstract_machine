@@ -178,7 +178,9 @@ class MultinomialDistribution(ProbabilisticModel):
     def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
         return np.log(self.probabilities[tuple(events.T)])
 
-    def log_truncated(self, event: Event) -> Tuple[Optional[Self], float]:
+    def log_truncated(
+        self, event: Event, singleton_allowed: bool = False
+    ) -> Tuple[Optional[Self], float]:
         probabilities = np.zeros_like(self.probabilities)
 
         for simple_event in event.simple_sets:
