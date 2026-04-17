@@ -673,13 +673,3 @@ class AbstractRobot(Agent, ABC):
             if isinstance(sensor, Camera) and sensor.default_camera:
                 return sensor
         return [s for s in self.sensors if isinstance(s, Camera)][0]
-
-    def add_joint_states(self, joint_states: List[JointState]):
-        """
-        Adds joint states for a specific robot.
-
-        :param joint_states: A list of joint states to be added.
-        """
-        for joint_state in joint_states:
-            self.joint_states.add(joint_state)
-            joint_state.assign_to_robot(self)
