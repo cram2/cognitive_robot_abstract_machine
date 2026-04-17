@@ -21,7 +21,10 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.robots.robot_parts import AbstractRobot, RobotPart
+    from semantic_digital_twin.robots.robot_parts import (
+        AbstractRobot,
+        AbstractRobotPart,
+    )
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.geometry import Scale
     from semantic_digital_twin.world_description.world_entity import (
@@ -372,7 +375,7 @@ class DuplicateRobotAssignmentsError(UsageError):
     Raised when a robot part is assigned to multiple robots, which should not happen.
     """
 
-    robot_part: RobotPart
+    robot_part: AbstractRobotPart
     """
     The robot part that is assigned to multiple robots.
     """

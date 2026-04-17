@@ -21,7 +21,6 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import (
     HasLeftRightArm,
     AbstractRobot,
-    HasExternalSensors,
 )
 from semantic_digital_twin.robots.robot_parts import (
     Finger,
@@ -38,7 +37,7 @@ from semantic_digital_twin.world_description.connections import (
 
 
 @dataclass(eq=False)
-class Tracy(AbstractRobot, HasLeftRightArm, HasExternalSensors):
+class Tracy(AbstractRobot, HasLeftRightArm):
     """
     Represents two UR10e Arms on a table, with a pole between them holding a small camera.
      Example can be found at: https://vib.ai.uni-bremen.de/page/comingsoon/the-tracebot-laboratory/

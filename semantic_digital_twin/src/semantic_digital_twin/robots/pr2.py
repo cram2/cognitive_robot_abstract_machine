@@ -1,18 +1,28 @@
-from __future__ import annotations
-
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-
 from importlib.resources import files
 from pathlib import Path
 
+from semantic_digital_twin.robots.robot_parts import (
+    MobileBase,
+    Torso,
+    Arm,
+    Neck,
+    ParallelGripper,
+    Finger,
+    Camera,
+)
 from semantic_digital_twin.robots.abstract_robot import (
-    HasLeftRightArm,
-    HasTorso,
     HasMobileBase,
     AbstractRobot,
+    HasTorso,
+    HasLeftRightArm,
+    HasNeck,
+    HasParallelGripper,
+    HasCameras,
 )
+
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -21,41 +31,186 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AvoidSelfCollisions,
 )
-from semantic_digital_twin.datastructures.definitions import (
-    StaticJointState,
-    GripperState,
-    TorsoState,
-)
-from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.robot_parts import (
-    Finger,
-    ParallelGripper,
-    Arm,
-    Camera,
-    FieldOfView,
-    Torso,
-    MobileBase,
-)
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    ActiveConnection,
-    FixedConnection,
-)
 from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False)
-class PR2(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
-    """
-    Represents the Personal Robot 2 (PR2), which was originally created by Willow Garage.
-    The PR2 robot consists of two arms, each with a parallel gripper, a head with a camera, and a prismatic torso
-    """
+class PR2KinectV1(Camera):
 
     @classmethod
-    def _get_robot_root_body(cls, world: World) -> Body:
-        return world.get_body_by_name("base_footprint")
+    def setup_default_configuration(cls, world: World):
+        return cls(root=world.get_body_by_name("wide_stereo_optical_frame"))
+
+
+@dataclass(eq=False)
+class PR2Finger(Finger):
+
+    @classmethod
+    def setup_default_configuration(cls, world: World):
+        raise NotImplementedError
+
+    @classmethod
+    def setup_right_gripper_left_finger_configuration(cls, world: World):
+        return cls(
+            root=world.get_body_by_name("r_gripper_l_finger_link"),
+            tip=world.get_body_by_name("r_gripper_l_finger_tip_link"),
+        )
+
+    @classmethod
+    def setup_right_gripper_right_finger_configuration(cls, world: World):
+        return cls(
+            root=world.get_body_by_name("r_gripper_r_finger_link"),
+            tip=world.get_body_by_name("r_gripper_r_finger_tip_link"),
+        )
+
+    @classmethod
+    def setup_left_gripper_left_finger_configuration(cls, world: World):
+        return cls(
+            root=world.get_body_by_name("l_gripper_l_finger_link"),
+            tip=world.get_body_by_name("l_gripper_l_finger_tip_link"),
+        )
+
+    @classmethod
+    def setup_left_gripper_right_finger_configuration(cls, world: World):
+        return cls(
+            root=world.get_body_by_name("l_gripper_r_finger_link"),
+            tip=world.get_body_by_name("l_gripper_r_finger_tip_link"),
+        )
+
+
+@dataclass(eq=False)
+class PR2Gripper(ParallelGripper):
+
+    @classmethod
+    def setup_default_configuration(cls, world: World):
+        raise NotImplementedError
+
+    @classmethod
+    def setup_right_gripper_configuration(cls, world: World):
+        return cls(
+            root=world.get_body_by_name("l_gripper_palm_link"),
+            tool_frame=world.get_body_by_name("l_gripper_tool_frame"),
+            front_facing_orientation=Quaternion(0, 0, 0, 1),
+            thumb=PR2Finger.setup_right_gripper_right_finger_configuration(world),
+            fingers=[PR2Finger.setup_right_gripper_left_finger_configuration(world)],
+        )
+
+    @classmethod
+    def setup_left_gripper_configuration(cls, world: World):
+        return cls(
+            root=world.get_body_by_name("r_gripper_palm_link"),
+            tool_frame=world.get_body_by_name("r_gripper_tool_frame"),
+            front_facing_orientation=Quaternion(0, 0, 0, 1),
+            thumb=PR2Finger.setup_left_gripper_right_finger_configuration(world),
+            fingers=[PR2Finger.setup_left_gripper_left_finger_configuration(world)],
+        )
+
+    def _setup_finger_semantic_annotations(self, world: World):
+        pass
+
+
+@dataclass(eq=False)
+class PR2Neck(Neck, HasCameras):
+
+    @classmethod
+    def setup_default_configuration(cls, world: World):
+        return cls(
+            root=world.get_body_by_name("torso_lift_link"),
+            tip=world.get_body_by_name("head_tilt_link"),
+            sensors=[PR2KinectV1.setup_default_configuration(world)],
+        )
+
+    def _setup_sensors_semantic_annotations(self, world: World):
+        pass
+
+
+@dataclass(eq=False)
+class PR2Arm(Arm, HasParallelGripper):
+
+    @classmethod
+    def setup_default_configuration(cls, world: World):
+        raise NotImplementedError
+
+    @classmethod
+    def setup_left_arm_configuration(cls, world: World):
+        return cls(
+            root=world.get_body_by_name("torso_lift_link"),
+            tip=world.get_body_by_name("l_wrist_roll_link"),
+            end_effector=PR2Gripper.setup_left_gripper_configuration(world),
+        )
+
+    @classmethod
+    def setup_right_arm_configuration(cls, world: World):
+        self = cls(
+            root=world.get_body_by_name("torso_lift_link"),
+            tip=world.get_body_by_name("r_wrist_roll_link"),
+        )
+        self._setup_specifications(world)
+
+    def _setup_end_effector_semantic_annotations(self, world: World):
+        PR2Gripper.setup_right_gripper_configuration(world)
+
+
+@dataclass(eq=False)
+class PR2Torso(Torso, HasLeftRightArm, HasNeck):
+
+    @classmethod
+    def setup_default_configuration(cls, world: World):
+        return cls(
+            root=world.get_body_by_name("base_link"),
+            tip=world.get_body_by_name("torso_lift_link"),
+        )
+
+    def _setup_arm_semantic_annotations(self, world: World):
+        return [
+            PR2Arm.setup_left_arm_configuration(self._world),
+            PR2Arm.setup_right_arm_configuration(self._world),
+        ]
+
+    def _setup_neck_semantic_annotations(self, world: World):
+        return PR2Neck.setup_default_configuration(self._world)
+
+
+@dataclass(eq=False)
+class PR2MobileBase(MobileBase, HasTorso):
+
+    @classmethod
+    def _setup_default_torso_semantic_annotation(cls, world: World) -> Torso:
+        return PR2Torso.setup_default_configuration(world)
+
+    @classmethod
+    def setup_default_configuration(cls, world: World):
+
+        return cls(
+            root=world.get_body_by_name("base_link"),
+            torso=cls._setup_default_torso_semantic_annotation(world),
+        )
+
+
+@dataclass(eq=False)
+class PR2(AbstractRobot, HasMobileBase):
+
+    @classmethod
+    def _get_root_body_name(cls) -> str:
+        return "base_footprint"
+
+    def _setup_mobile_base_semantic_annotation(self, world: World) -> MobileBase:
+        return PR2MobileBase.setup_default_configuration(world)
+
+    def _setup_velocity_limits(self):
+        vel_limits = defaultdict(
+            lambda: 1.0,
+            {
+                self._world.get_connection_by_name("head_tilt_joint"): 3.5,
+                self._world.get_connection_by_name("r_shoulder_pan_joint"): 0.15,
+                self._world.get_connection_by_name("l_shoulder_pan_joint"): 0.15,
+                self._world.get_connection_by_name("r_shoulder_lift_joint"): 0.2,
+                self._world.get_connection_by_name("l_shoulder_lift_joint"): 0.2,
+            },
+        )
+        self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
     def _setup_collision_rules(self):
         """
@@ -115,252 +270,3 @@ class PR2(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
                 ),
             ]
         )
-
-    def _setup_arm_semantic_annotations(self):
-        world = self._world
-        # Create left arm
-        left_gripper_thumb = Finger.create_and_add_to_world(
-            name=PrefixedName("left_gripper_thumb", prefix=self.name.name),
-            root_name="l_gripper_l_finger_link",
-            tip_name="l_gripper_l_finger_tip_link",
-            world=world,
-        )
-
-        left_gripper_finger = Finger.create_and_add_to_world(
-            name=PrefixedName("left_gripper_finger", prefix=self.name.name),
-            root_name="l_gripper_r_finger_link",
-            tip_name="l_gripper_r_finger_tip_link",
-            world=world,
-        )
-
-        left_gripper = ParallelGripper.create_and_add_to_world(
-            name=PrefixedName("left_gripper", prefix=self.name.name),
-            root_name="l_gripper_palm_link",
-            tool_frame_name="l_gripper_tool_frame",
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
-            thumb=left_gripper_thumb,
-            finger=left_gripper_finger,
-            world=world,
-        )
-        left_arm = Arm.create_and_add_to_world(
-            name=PrefixedName("left_arm", prefix=self.name.name),
-            root_name="torso_lift_link",
-            tip_name="l_wrist_roll_link",
-            manipulator=left_gripper,
-            world=world,
-        )
-        self.add_arm(left_arm)
-
-        # Create right arm
-        right_gripper_thumb = Finger.create_and_add_to_world(
-            name=PrefixedName("right_gripper_thumb", prefix=self.name.name),
-            root_name="r_gripper_l_finger_link",
-            tip_name="r_gripper_l_finger_tip_link",
-            world=world,
-        )
-        right_gripper_finger = Finger.create_and_add_to_world(
-            name=PrefixedName("right_gripper_finger", prefix=self.name.name),
-            root_name="r_gripper_r_finger_link",
-            tip_name="r_gripper_r_finger_tip_link",
-            world=world,
-        )
-
-        right_gripper = ParallelGripper.create_and_add_to_world(
-            name=PrefixedName("right_gripper", prefix=self.name.name),
-            root_name="r_gripper_palm_link",
-            tool_frame_name="r_gripper_tool_frame",
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
-            thumb=right_gripper_thumb,
-            finger=right_gripper_finger,
-            world=world,
-        )
-        right_arm = Arm.create_and_add_to_world(
-            name=PrefixedName("right_arm", prefix=self.name.name),
-            root_name="torso_lift_link",
-            tip_name="r_wrist_roll_link",
-            manipulator=right_gripper,
-            world=world,
-        )
-        self.add_arm(right_arm)
-
-    def _setup_arm_hardware_interfaces(self):
-        controlled_joints = [
-            "r_shoulder_pan_joint",
-            "r_shoulder_lift_joint",
-            "r_upper_arm_roll_joint",
-            "r_forearm_roll_joint",
-            "r_elbow_flex_joint",
-            "r_wrist_flex_joint",
-            "r_wrist_roll_joint",
-            "l_shoulder_pan_joint",
-            "l_shoulder_lift_joint",
-            "l_upper_arm_roll_joint",
-            "l_forearm_roll_joint",
-            "l_elbow_flex_joint",
-            "l_wrist_flex_joint",
-            "l_wrist_roll_joint",
-        ]
-        for joint_name in controlled_joints:
-            connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
-            )
-            connection.has_hardware_interface = True
-
-    def _setup_arm_joint_state(self):
-        right_arm_park = JointState.from_mapping(
-            name=PrefixedName("right_park", prefix=self.name.name),
-            mapping=dict(
-                zip(
-                    [
-                        c
-                        for c in self.right_arm.connections
-                        if type(c) != FixedConnection
-                    ],
-                    [-1.712, -0.256, -1.463, -2.12, 1.766, -0.07, 0.051],
-                )
-            ),
-            state_type=StaticJointState.PARK,
-        )
-
-        self.right_arm.add_joint_state(right_arm_park)
-
-        left_arm_park = JointState.from_mapping(
-            name=PrefixedName("left_park", prefix=self.name.name),
-            mapping=dict(
-                zip(
-                    [c for c in self.left_arm.active_connections],
-                    [
-                        1.712,
-                        -0.264,
-                        1.38,
-                        -2.12,
-                        16.996 + 3.14159,
-                        -0.073,
-                        0.0,
-                    ],
-                )
-            ),
-            state_type=StaticJointState.PARK,
-        )
-
-        self.left_arm.add_joint_state(left_arm_park)
-
-        left_gripper_joints = [
-            c
-            for c in self.left_arm.manipulator.connections
-            if type(c) != FixedConnection
-        ]
-
-        left_gripper_open = JointState.from_mapping(
-            name=PrefixedName("left_gripper_open", prefix=self.name.name),
-            mapping=dict(zip(left_gripper_joints, [0.548, 0.548])),
-            state_type=GripperState.OPEN,
-        )
-
-        left_gripper_close = JointState.from_mapping(
-            name=PrefixedName("left_gripper_close", prefix=self.name.name),
-            mapping=dict(zip(left_gripper_joints, [0.0, 0.0])),
-            state_type=GripperState.CLOSE,
-        )
-
-        self.left_arm.manipulator.add_joint_state(left_gripper_close)
-        self.left_arm.manipulator.add_joint_state(left_gripper_open)
-
-        right_gripper_joints = [
-            c
-            for c in self.right_arm.manipulator.connections
-            if type(c) != FixedConnection
-        ]
-
-        right_gripper_open = JointState.from_mapping(
-            name=PrefixedName("right_gripper_open", prefix=self.name.name),
-            mapping=dict(zip(right_gripper_joints, [0.548, 0.548])),
-            state_type=GripperState.OPEN,
-        )
-
-        right_gripper_close = JointState.from_mapping(
-            name=PrefixedName("right_gripper_close", prefix=self.name.name),
-            mapping=dict(zip(right_gripper_joints, [0.0, 0.0])),
-            state_type=GripperState.CLOSE,
-        )
-
-        self.right_arm.manipulator.add_joint_state(right_gripper_close)
-        self.right_arm.manipulator.add_joint_state(right_gripper_open)
-
-    def _setup_torso_semantic_annotations(self):
-
-        # Create camera and neck
-        camera = Camera.create_and_add_to_world(
-            name=PrefixedName("wide_stereo_optical_frame", prefix=self.name.name),
-            root_name="wide_stereo_optical_frame",
-            forward_facing_axis=Vector3(0, 0, 1),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
-            minimal_height=1.27,
-            maximal_height=1.60,
-            world=self._world,
-            default_camera=True,
-        )
-
-        torso = Torso.create_and_add_to_world(
-            name=PrefixedName("torso", prefix=self.name.name),
-            root_name="base_link",
-            tip_name="head_tilt_link",
-            world=self._world,
-            sensors=[camera],
-        )
-        self.add_torso(torso)
-
-    def _setup_torso_hardware_interfaces(self):
-        self.torso._default_hardware_interface_setup()
-
-    def _setup_torso_joint_state(self):
-        torso_joint = [self._world.get_connection_by_name("torso_lift_joint")]
-
-        torso_low = JointState.from_mapping(
-            name=PrefixedName("torso_low", prefix=self.name.name),
-            mapping=dict(zip(torso_joint, [0.0115])),
-            state_type=TorsoState.LOW,
-        )
-
-        torso_mid = JointState.from_mapping(
-            name=PrefixedName("torso_mid", prefix=self.name.name),
-            mapping=dict(zip(torso_joint, [0.15])),
-            state_type=TorsoState.MID,
-        )
-
-        torso_high = JointState.from_mapping(
-            name=PrefixedName("torso_high", prefix=self.name.name),
-            mapping=dict(zip(torso_joint, [0.3])),
-            state_type=TorsoState.HIGH,
-        )
-
-        self.torso.add_joint_state(torso_low)
-        self.torso.add_joint_state(torso_mid)
-        self.torso.add_joint_state(torso_high)
-
-    def _setup_mobile_base_semantic_annotations(self):
-        # Create the robot base
-        base = MobileBase.create_and_add_to_world(
-            name=PrefixedName("base", prefix=self.name.name),
-            root_name="base_link",
-            world=self._world,
-            forward_axis=Vector3.X(),
-            full_body_controlled=False,
-        )
-        self.add_mobile_base(base)
-
-    def _setup_base_joint_state(self):
-        return
-
-    def _setup_velocity_limits(self):
-        vel_limits = defaultdict(
-            lambda: 1.0,
-            {
-                self._world.get_connection_by_name("head_tilt_joint"): 3.5,
-                self._world.get_connection_by_name("r_shoulder_pan_joint"): 0.15,
-                self._world.get_connection_by_name("l_shoulder_pan_joint"): 0.15,
-                self._world.get_connection_by_name("r_shoulder_lift_joint"): 0.2,
-                self._world.get_connection_by_name("l_shoulder_lift_joint"): 0.2,
-            },
-        )
-        self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)

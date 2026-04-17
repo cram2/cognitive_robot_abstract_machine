@@ -1,27 +1,16 @@
 from __future__ import annotations
-
-import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import List, Type, Union, TYPE_CHECKING, Optional
+from typing import Union, Tuple, Optional, List
 
-from typing_extensions import Self, DefaultDict
+from typing_extensions import TYPE_CHECKING, Type, Self, DefaultDict
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import MissingDefaultCameraError
-from semantic_digital_twin.robots.robot_parts import (
-    Arm,
-    Torso,
-    MobileBase,
-    RobotPart,
-    Camera,
-    Manipulator,
-    Sensor,
-    AggregatesRobotParts,
-)
+from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.connections import (
@@ -30,71 +19,163 @@ from semantic_digital_twin.world_description.connections import (
     Drive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    KinematicStructureEntity,
+)
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
-    from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
-
-logger = logging.getLogger("semantic_digital_twin")
+    from semantic_digital_twin.robots.robot_parts import (
+        Finger,
+        Sensor,
+        Camera,
+        EndEffector,
+        MechanicalGripper,
+        ParallelGripper,
+        Arm,
+        MobileBase,
+        Torso,
+        Neck,
+    )
 
 
 @dataclass(eq=False)
-class RobotPartSetupMixin(AggregatesRobotParts, ABC):
-    """
-    Parent class for robot part mixins as well as abstract robot, to allow AbstractRobot to call all
-    HasRobotPart._setup_robot_parts() methods of its parent classes.
-    """
+class RobotSpecification:
 
     @abstractmethod
-    def _setup_robot_parts(self): ...
+    def _setup_specifications(self, world: World): ...
 
 
 @dataclass(eq=False)
-class HasArms(RobotPartSetupMixin, ABC):
-    """
-    Mixin class for robots that have arms.
-    """
+class HasFingers(RobotSpecification):
 
-    arms: List[Arm] = field(default_factory=list)
-    """
-    A collection of arms in the robot.
-    """
+    fingers: list[Finger] = field(default_factory=list)
+
+    thumb: Finger = field(default=None)
+
+    @synchronized_attribute_modification
+    def add_finger(self, finger: Finger):
+        if finger == self.thumb:
+            raise Exception(f"This finger is already part of the robot {self}.")
+        self.fingers.append(finger)
+
+    @synchronized_attribute_modification
+    def add_thumb(self, thumb: Finger):
+        if thumb in self.fingers:
+            raise Exception(f"This finger is already part of the robot {self}.")
+        self.thumb = thumb
+
+    def _setup_specifications(self, world: World):
+        super()._setup_specifications(world)
+        fingers, thumb = self._setup_finger_semantic_annotations(world)
+        world.add_semantic_annotations(fingers)
+        world.add_semantic_annotation(thumb)
+        for finger in fingers:
+            self.add_finger(finger)
+        self.add_thumb(thumb)
+
+    @abstractmethod
+    def _setup_finger_semantic_annotations(
+        self, world: World
+    ) -> Tuple[list[Finger], Finger]: ...
+
+
+@dataclass(eq=False)
+class HasTwoFingers(HasFingers, ABC):
+
+    @property
+    def finger(self):
+        if len(self.fingers) != 1 or self.thumb is not None:
+            raise Exception(
+                f"This robot has {len(self.fingers)} fingers and {bool(self.thumb)} thumbs. Should have exactly one finger and one thumb"
+            )
+        return self.fingers[0]
+
+
+@dataclass(eq=False)
+class HasSensors(RobotSpecification):
+
+    sensors: list[Sensor] = field(default_factory=list)
+
+    @synchronized_attribute_modification
+    def add_sensor(self, sensor: Sensor):
+        self.sensors.append(sensor)
+
+    def _setup_specifications(self, world: World):
+        super()._setup_specifications(world)
+        sensors = self._setup_sensor_semantic_annotations(world)
+        world.add_semantic_annotations(sensors)
+        for sensor in sensors:
+            self.add_sensor(sensor)
+
+    @abstractmethod
+    def _setup_sensor_semantic_annotations(self, world: World) -> list[Sensor]: ...
+
+
+@dataclass(eq=False)
+class HasCameras(HasSensors, ABC):
+
+    @synchronized_attribute_modification
+    def add_camera(self, camera: Camera):
+        self.sensors.append(camera)
+
+    @property
+    def cameras(self):
+        from semantic_digital_twin.robots.robot_parts import Camera
+
+        return [sensor for sensor in self.sensors if isinstance(sensor, Camera)]
+
+
+@dataclass(eq=False)
+class HasEndEffector(RobotSpecification, ABC):
+
+    end_effector: EndEffector = field(default=None)
+
+    @synchronized_attribute_modification
+    def add_end_effector(self, end_effector: EndEffector):
+        self.end_effector = end_effector
+
+    def _setup_specifications(self, world: World):
+        super()._setup_specifications(world)
+        end_effector = self._setup_end_effector_semantic_annotation(world)
+        world.add_semantic_annotation(end_effector)
+        self.add_end_effector(end_effector)
+
+    @abstractmethod
+    def _setup_end_effector_semantic_annotation(self, world: World) -> EndEffector: ...
+
+
+@dataclass(eq=False)
+class HasMechanicalGripper(HasEndEffector, ABC):
+    end_effector: MechanicalGripper = field(default=None)
+
+
+@dataclass(eq=False)
+class HasParallelGripper(HasMechanicalGripper, ABC):
+    end_effector: ParallelGripper = field(default=None)
+
+
+@dataclass(eq=False)
+class HasArms(RobotSpecification):
+    arms: list[Arm] = field(default_factory=list)
 
     @synchronized_attribute_modification
     def add_arm(self, arm: Arm):
-        """
-        Adds a kinematic chain to the PR2 robot's collection of kinematic chains.
-        If the kinematic chain is an arm, it will be added to the left or right arm accordingly.
-
-        :param arm: The kinematic chain to add to the PR2 robot.
-        """
         self.arms.append(arm)
 
-    def _setup_robot_parts(self):
-        super()._setup_robot_parts()
-        self._setup_arm_semantic_annotations()
-        self._setup_arm_hardware_interfaces()
-        self._setup_arm_joint_state()
+    def _setup_specifications(self, world: World):
+        super()._setup_specifications(world)
+        arms = self._setup_arm_semantic_annotations(world)
+        world.add_semantic_annotations(arms)
+        for arm in arms:
+            self.add_arm(arm)
 
     @abstractmethod
-    def _setup_arm_semantic_annotations(self): ...
-
-    @abstractmethod
-    def _setup_arm_hardware_interfaces(self): ...
-
-    @abstractmethod
-    def _setup_arm_joint_state(self): ...
-
-    @property
-    def manipulators(self) -> list[RobotPart]:
-        """
-        A collection of all manipulators of the robot.
-        """
-        return [part for part in self._robot_parts if isinstance(part, Manipulator)]
+    def _setup_arm_semantic_annotations(self, world: World) -> list[Arm]: ...
 
 
 @dataclass(eq=False)
@@ -102,6 +183,12 @@ class HasOneArm(HasArms, ABC):
     """
     Mixin class for robots that have exactly one arm.
     """
+
+    @synchronized_attribute_modification
+    def add_arm(self, arm: Arm):
+        if len(self.arms) != 0:
+            raise Exception(f"This robot already has an arm {self.arms}")
+        self.arms.append(arm)
 
     @property
     def arm(self) -> Arm:
@@ -154,88 +241,85 @@ class HasLeftRightArm(HasArms, ABC):
 
 
 @dataclass(eq=False)
-class HasExternalSensors(RobotPartSetupMixin, ABC):
-    """
-    Mixin class for robots that have an external camera.
-    """
-
-    external_sensors: List[Sensor] = field(default_factory=list)
-    """
-    A collection of external sensors in the robot.
-    """
-
-    @synchronized_attribute_modification
-    def add_external_sensor(self, sensor: Sensor):
-        self.external_sensors.append(sensor)
-
-    def _setup_robot_parts(self):
-        super()._setup_robot_parts()
-        self._setup_external_sensors()
-
-    @abstractmethod
-    def _setup_external_sensors(self): ...
-
-
-@dataclass(eq=False)
-class HasTorso(RobotPartSetupMixin, ABC):
-    """
-    Mixin class for robots that have a torso.
-    """
-
-    torso: Optional[Torso] = field(default=None)
-    """
-    The torso of the robot, represented as an arm.
-    """
-
-    @synchronized_attribute_modification
-    def add_torso(self, torso: Torso):
-        self.torso = torso
-
-    def _setup_robot_parts(self):
-        super()._setup_robot_parts()
-        self._setup_torso_semantic_annotations()
-        self._setup_torso_hardware_interfaces()
-        self._setup_torso_joint_state()
-
-    @abstractmethod
-    def _setup_torso_semantic_annotations(self): ...
-
-    @abstractmethod
-    def _setup_torso_hardware_interfaces(self): ...
-
-    @abstractmethod
-    def _setup_torso_joint_state(self): ...
-
-
-@dataclass(eq=False)
-class HasMobileBase(RobotPartSetupMixin, ABC):
-
-    mobile_base: Optional[MobileBase] = field(default=None)
+class HasMobileBase(RobotSpecification):
+    mobile_base: MobileBase = field(default=None)
 
     @synchronized_attribute_modification
     def add_mobile_base(self, mobile_base: MobileBase):
         self.mobile_base = mobile_base
 
-    def _setup_robot_parts(self):
-        super()._setup_robot_parts()
-        self._setup_mobile_base_semantic_annotations()
+    def _setup_specifications(self, world: World):
+        mobile_base = self._setup_mobile_base_semantic_annotation(world)
+        world.add_semantic_annotation(mobile_base)
+        self.add_mobile_base(mobile_base)
 
     @abstractmethod
-    def _setup_mobile_base_semantic_annotations(self): ...
-
-    @property
-    def full_body_controlled(self):
-        return self.mobile_base.full_body_controlled
+    def _setup_mobile_base_semantic_annotation(self, world: World) -> MobileBase: ...
 
 
 @dataclass(eq=False)
-class AbstractRobot(Agent, RobotPartSetupMixin, ABC):
+class HasTorso(RobotSpecification):
+    torso: Torso = field(default=None)
+
+    @synchronized_attribute_modification
+    def add_torso(self, torso: Torso):
+        self.torso = torso
+
+    def _setup_specifications(self, world: World):
+        torso = self._setup_default_torso_semantic_annotation(world)
+        world.add_semantic_annotation(torso)
+        self.add_torso(torso)
+
+    @abstractmethod
+    def _setup_default_torso_semantic_annotation(self, world: World) -> Torso: ...
+
+
+@dataclass(eq=False)
+class HasNeck(RobotSpecification):
+    neck: Neck = field(default=None)
+
+    @synchronized_attribute_modification
+    def add_neck(self, neck: Neck):
+        self.neck = neck
+
+    def _setup_specifications(self, world: World):
+        neck = self._setup_neck_semantic_annotations(world)
+        world.add_semantic_annotation(neck)
+        self.add_neck(neck)
+
+    @abstractmethod
+    def _setup_neck_semantic_annotations(self, world: World) -> Neck: ...
+
+
+@dataclass(eq=False)
+class AbstractRobot(Agent, RobotSpecification, ABC):
     """
     Specification of an abstract robot
     """
 
-    def _setup_robot_parts(self):
-        super()._setup_robot_parts()
+    def _setup_specifications(self, world: World):
+        super()._setup_specifications(world)
+
+    @classmethod
+    @abstractmethod
+    def _get_root_body_name(cls) -> str: ...
+
+    @classmethod
+    def from_world(cls, world: World) -> Self:
+        return cls.from_branch_in_world(world.root)
+
+    @classmethod
+    def from_branch_in_world(cls, branch_root: KinematicStructureEntity) -> Self:
+        world = branch_root._world
+        with world.modify_world():
+            self = cls(
+                name=PrefixedName(name=cls.__name__),
+                root=world.get_body_in_branch_by_name(
+                    branch_root=branch_root, name=cls._get_root_body_name()
+                ),
+            )
+            world.add_semantic_annotation(self)
+            self._setup_specifications(world)
 
     @property
     def controlled_connections(self) -> list[ActiveConnection]:
@@ -257,29 +341,6 @@ class AbstractRobot(Agent, RobotPartSetupMixin, ABC):
         for connection in self.connections:
             dofs.extend(connection.controlled_dofs)
         return dofs
-
-    @classmethod
-    def from_world(cls, world: World) -> Self:
-        """
-        Creates a robot semantic annotation from the given world.
-        This method constructs the robot semantic annotation by identifying and organizing the various semantic components of the robot,
-        such as manipulators, sensors, and kinematic chains. It is expected to be implemented in subclasses.
-
-        :param world: The world from which to create the robot semantic annotation.
-
-        :return: A robot semantic annotation.
-        """
-        with world.modify_world():
-            robot_root_body = cls._get_robot_root_body(world)
-            robot = cls(
-                name=PrefixedName(cls.__name__, world.name),
-                root=robot_root_body,
-            )
-            world.add_semantic_annotation(robot)
-            robot._setup_robot_parts()
-            robot._setup_collision_rules()
-            robot._setup_velocity_limits()
-        return robot
 
     def validate(self) -> bool:
         """
@@ -310,13 +371,6 @@ class AbstractRobot(Agent, RobotPartSetupMixin, ABC):
         )
 
         return True
-
-    @classmethod
-    @abstractmethod
-    def _get_robot_root_body(cls, world: World) -> Body: ...
-
-    @abstractmethod
-    def _setup_collision_rules(self): ...
 
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(
@@ -367,10 +421,3 @@ class AbstractRobot(Agent, RobotPartSetupMixin, ABC):
             if isinstance(sensor, Camera) and sensor.default_camera:
                 return sensor
         raise MissingDefaultCameraError(type(self))
-
-    @property
-    def sensors(self) -> list[Sensor]:
-        """
-        A collection of all sensors of the robot.
-        """
-        return [part for part in self._robot_parts if isinstance(part, Sensor)]

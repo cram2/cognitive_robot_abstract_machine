@@ -964,8 +964,30 @@ class World(HasSimulatorProperties):
         )
 
     @memoize
+    def get_kinematic_structure_entity_in_branch_by_name(
+        self, branch_root: KinematicStructureEntity, name: Union[str, PrefixedName]
+    ) -> KinematicStructureEntity:
+        kinematic_structure_entities = self.get_kinematic_structure_entities_of_branch(
+            branch_root
+        )
+        return self._get_world_entity_by_name_from_iterable(
+            name, kinematic_structure_entities
+        )
+
+    @memoize
     def get_body_by_name(self, name: Union[str, PrefixedName]) -> Body:
         return self._get_world_entity_by_name_from_iterable(name, self.bodies)
+
+    @memoize
+    def get_body_in_branch_by_name(
+        self, branch_root: KinematicStructureEntity, name: Union[str, PrefixedName]
+    ) -> Body:
+        bodies = [
+            kse
+            for kse in self.get_kinematic_structure_entities_of_branch(branch_root)
+            if isinstance(kse, Body)
+        ]
+        return self._get_world_entity_by_name_from_iterable(name, bodies)
 
     @memoize
     def get_degree_of_freedom_by_name(
