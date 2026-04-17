@@ -29,7 +29,6 @@ set_logger_level(LogLevel.DEBUG)
 
 @dataclass
 class EpisodeSegmenterExecutor:
-
     """
     Handles the segmentation of episodes by controlling the execution of a
     detector statechart and maintaining interactive control cycles.
