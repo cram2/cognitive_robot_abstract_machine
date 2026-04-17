@@ -11,6 +11,7 @@ from semantic_digital_twin.reasoning.body_motion_problem.pouring.physics import 
 from semantic_digital_twin.reasoning.body_motion_problem.pouring.predicates import (
     PouringSatisfiesRequest,
     PouringCauses,
+    PouringCanPerform,
 )
 from semantic_digital_twin.reasoning.body_motion_problem.pouring.tee_class import (
     PouringTEEClass,
@@ -24,6 +25,7 @@ __all__ = [
     "PouringMSCModel",
     "PouringSatisfiesRequest",
     "PouringCauses",
+    "PouringCanPerform",
     "PouringTEEClass",
     "TorricelliEquation",
 ]

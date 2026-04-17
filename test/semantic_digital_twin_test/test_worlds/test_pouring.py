@@ -10,6 +10,7 @@ TorricelliEquation that is explicitly part of the world model.
 from __future__ import annotations
 
 import math
+from copy import deepcopy
 from dataclasses import dataclass
 
 import pytest
@@ -24,14 +25,16 @@ from semantic_digital_twin.reasoning.body_motion_problem import (
     TaskRequest,
 )
 from semantic_digital_twin.reasoning.body_motion_problem.pouring import (
+    PouringCanPerform,
     PouringCauses,
     PouringEffect,
     PouringMSCModel,
     PouringSatisfiesRequest,
     TorricelliEquation,
 )
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel, HasRootBody
-from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -180,3 +183,58 @@ def test_causes_does_not_hold_when_effect_already_achieved(world_with_cup):
         environment=world,
         motion=motion,
     )()
+
+
+@pytest.fixture(scope="function")
+def pr2_world_with_cup(pr2_world_setup):
+    """PR2 world with a pourable cup placed within arm reach at (0.7, 0.0, 0.85)."""
+    world = deepcopy(pr2_world_setup)
+    robot = PR2.from_world(world)
+    with world.modify_world():
+        cup = PourableContainer.create_with_new_body_in_world(
+            name=PrefixedName("cup"),
+            world=world,
+            active_axis=Vector3(0, 1, 0),
+            connection_limits=DegreeOfFreedomLimits(
+                lower=DerivativeMap(position=0.0, velocity=-2.0),
+                upper=DerivativeMap(position=math.pi / 2, velocity=2.0),
+            ),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=0.7,
+                y=0.0,
+                z=0.85,
+                reference_frame=world.root,
+            ),
+        )
+    cup.initialize_fill_level(world=world, parent_body=cup.root, initial_fill=1.0)
+    cup.fill_equation = TorricelliEquation(
+        tilt_connection=cup.root.parent_connection,
+        fill_connection=cup.fill_connection,
+    )
+    return world, cup, robot
+
+
+def test_pouring_can_perform(pr2_world_with_cup, rclpy_node):
+    """PouringCanPerform confirms the PR2 can execute the tilt trajectory from Causes."""
+    world, cup, robot = pr2_world_with_cup
+    viz = VizMarkerPublisher(_world=world, node=rclpy_node)
+    viz.with_tf_publisher()
+    goal_fill = 0.6
+    effect = PouringEffect(
+        target_object=cup,
+        property_getter=lambda c: c.fill_level,
+        goal_value=goal_fill,
+    )
+    physics = PouringMSCModel(fill_equation=cup.fill_equation)
+    motion = Motion(
+        trajectory=[],
+        actuator=cup.fill_equation.tilt_connection,
+        motion_model=physics,
+    )
+
+    causes = PouringCauses(effect=effect, environment=world, motion=motion)
+    assert causes(), "Causes must hold before testing CanPerform"
+    causes.replay(step_delay=0.1)
+    assert PouringCanPerform(
+        motion=motion, robot=robot
+    )(), "PR2 must be able to physically execute the pouring trajectory"
