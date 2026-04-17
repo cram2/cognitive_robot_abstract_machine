@@ -20,6 +20,7 @@ import datetime
 import enum
 import krrood.adapters.json_serializer
 import krrood.entity_query_language.orm.model
+import krrood.entity_query_language.predicate
 import krrood.ormatic.custom_types
 import krrood.ormatic.data_access_objects.alternative_mappings
 import krrood.ormatic.type_dict
@@ -437,7 +438,9 @@ class BuildFirstMappingDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    value: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    value: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
 
     backreference_to_entrypoint_id: Mapped[typing.Optional[builtins.int]] = (
         mapped_column(
@@ -784,7 +787,7 @@ class MixinDAO(Base, DataAccessObject[test.krrood_test.dataset.example_classes.M
     )
 
     mixin_attribute: Mapped[builtins.str] = mapped_column(
-        String(255), use_existing_column=True
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     polymorphic_type: Mapped[str] = mapped_column(
@@ -807,7 +810,9 @@ class NamedNumbersDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
 
     numbers: Mapped[typing.List[builtins.int]] = mapped_column(
         JSON, nullable=False, use_existing_column=True
@@ -828,7 +833,7 @@ class ParentAlternativelyMappedMappingDAO(
     )
 
     derived_attribute: Mapped[builtins.str] = mapped_column(
-        String(255), use_existing_column=True
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     polymorphic_type: Mapped[str] = mapped_column(
@@ -912,7 +917,9 @@ class PersonDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
 
     knows: Mapped[builtins.list[PersonDAO_knows_association]] = relationship(
         "PersonDAO_knows_association",
@@ -992,7 +999,7 @@ class PrimaryBaseDAO(
     )
 
     primary_attribute: Mapped[builtins.str] = mapped_column(
-        String(255), use_existing_column=True
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     polymorphic_type: Mapped[str] = mapped_column(
@@ -1019,10 +1026,10 @@ class MultipleInheritanceDAO(
     )
 
     mixin_attribute: Mapped[builtins.str] = mapped_column(
-        String(255), use_existing_column=True
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
     extra_attribute: Mapped[builtins.str] = mapped_column(
-        String(255), use_existing_column=True
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     __mapper_args__ = {
@@ -1215,7 +1222,7 @@ class EntityMappingDAO(
     )
 
     overwritten_name: Mapped[builtins.str] = mapped_column(
-        String(255), use_existing_column=True
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     __mapper_args__ = {
@@ -1238,7 +1245,7 @@ class DerivedEntityDAO(
     )
 
     description: Mapped[builtins.str] = mapped_column(
-        String(255), use_existing_column=True
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     __mapper_args__ = {
@@ -1289,7 +1296,9 @@ class ForwardRefTypeADAO(
         ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
     )
 
-    value: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    value: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
 
     __mapper_args__ = {
         "polymorphic_identity": "ForwardRefTypeADAO",
@@ -1327,7 +1336,9 @@ class FruitBoxDAO(
         ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
     )
 
-    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
 
     fruits: Mapped[builtins.list[FruitBoxDAO_fruits_association]] = relationship(
         "FruitBoxDAO_fruits_association",
@@ -1385,7 +1396,9 @@ class KRROODKinematicChainDAO(
         ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
     )
 
-    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
 
     __mapper_args__ = {
         "polymorphic_identity": "KRROODKinematicChainDAO",
@@ -1889,7 +1902,9 @@ class ParentDAO(
         ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
     )
 
-    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
 
     __mapper_args__ = {
         "polymorphic_identity": "ParentDAO",
@@ -1926,7 +1941,9 @@ class ParentBaseMappingDAO(
         ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
     )
 
-    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
 
     __mapper_args__ = {
         "polymorphic_identity": "ParentBaseMappingDAO",
@@ -1950,6 +1967,22 @@ class ChildBaseMappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ChildBaseMappingDAO",
         "inherit_condition": database_id == ParentBaseMappingDAO.database_id,
+    }
+
+
+class PredicateDAO(
+    SymbolDAO, DataAccessObject[krrood.entity_query_language.predicate.Predicate]
+):
+
+    __tablename__ = "PredicateDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PredicateDAO",
+        "inherit_condition": database_id == SymbolDAO.database_id,
     }
 
 
@@ -2080,7 +2113,9 @@ class ShapeDAO(
         ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
     )
 
-    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
 
     origin_id: Mapped[int] = mapped_column(
         ForeignKey("KRROODTransformationMappedDAO.database_id", use_alter=True),
@@ -2283,7 +2318,9 @@ class BodyDAO(
         use_existing_column=True,
     )
 
-    name: Mapped[builtins.str] = mapped_column(String(255), use_existing_column=True)
+    name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
     size: Mapped[builtins.int] = mapped_column(use_existing_column=True)
 
     __mapper_args__ = {
@@ -2647,11 +2684,11 @@ class FunctionMappingDAO(
     )
 
     module_name: Mapped[builtins.str] = mapped_column(
-        String(255), use_existing_column=True
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
     function_name: Mapped[builtins.str] = mapped_column(
-        String(255), use_existing_column=True
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
     class_name: Mapped[typing.Optional[builtins.str]] = mapped_column(
-        String(255), use_existing_column=True
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )

@@ -1,3 +1,6 @@
+import time
+
+import numpy as np
 import pytest
 from sqlalchemy import select
 
@@ -87,12 +90,13 @@ def test_replay_simple_plan(pycram_testing_session, simple_plan):
 @pytest.fixture
 def complex_plan(mutable_model_world):
     world, robot_view, context = mutable_model_world
+    context.evaluate_conditions = False
 
     plan = execute_single(
         TransportAction(
             object_designator=world.get_body_by_name("milk.stl"),
             target_location=Pose.from_xyz_quaternion(
-                2.3, 2.5, 1, 0, 0, 0, 1, reference_frame=world.root
+                2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
             ),
             arm=Arms.LEFT,
         ),

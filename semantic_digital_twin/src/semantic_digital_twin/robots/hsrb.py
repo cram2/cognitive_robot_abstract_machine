@@ -64,14 +64,14 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
         gripper_thumb = Finger(
             name=PrefixedName("thumb", prefix=self.name.name),
             root=self._world.get_body_by_name("hand_l_proximal_link"),
-            tip=self._world.get_body_by_name("hand_l_finger_tip_frame"),
+            tip=self._world.get_body_by_name("hand_l_distal_link"),
             _world=self._world,
         )
 
         gripper_finger = Finger(
             name=PrefixedName("finger", prefix=self.name.name),
             root=self._world.get_body_by_name("hand_r_proximal_link"),
-            tip=self._world.get_body_by_name("hand_r_finger_tip_frame"),
+            tip=self._world.get_body_by_name("hand_r_distal_link"),
             _world=self._world,
         )
 
@@ -195,7 +195,7 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
             "collision_configs",
             "hsrb.srdf",
         )
-        self._world.collision_manager.ignore_collision_rules.append(
+        self._world.collision_manager.add_ignore_collision_rule(
             SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
         )
         self._world.collision_manager.add_default_rule(

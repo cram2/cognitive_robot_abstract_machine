@@ -37,18 +37,18 @@ CRAM consists of the following sub-packages:
    annotations to provide a comprehensive understanding of
    the robot's environment and tasks.
 
--  `Giskardpy <https://github.com/SemRoCo/giskardpy>`__ is a
-   Python library for motion control for robots. It uses constraint-
+-  `Giskardpy <https://cram2.github.io/cognitive_robot_abstract_machine/giskardpy>`__
+   is a Python library for motion control for robots. It uses constraint-
    and optimization-based task-space control to control the whole
    body of a robot.
 
--  `KRROOD <(https://cram2.github.io/cognitive_robot_abstract_machine/krrood)>`__
+-  `KRROOD <https://cram2.github.io/cognitive_robot_abstract_machine/krrood>`__
    is a Python framework that integrates symbolic knowledge
    representation, powerful querying, and rule-based reasoning through
    intuitive, object-oriented abstractions.
 
 -  `Probabilistic
-   Model <(https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model)>`__
+   Model <https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model>`__
    is a Python library that offers a clean and
    unified API for probabilistic models, similar to scikit-learn for
    classical machine learning.
@@ -83,14 +83,8 @@ Activate / deactivate
 ..code:: bash
 
   workon cram-env
+
   deactivate
-
-Pull the submodules:
-
-.. code:: bash
-
-  cd cognitive_robot_abstract_machine
-  git submodule update --init --recursive
 
 Install using UV
 ~~~~~~~~~~~~~~~~

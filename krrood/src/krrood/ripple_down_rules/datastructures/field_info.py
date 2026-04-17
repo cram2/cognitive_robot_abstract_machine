@@ -8,7 +8,7 @@ import sys
 import typing
 from dataclasses import dataclass, Field
 from datetime import datetime
-from functools import lru_cache
+from krrood.utils import memoize
 from types import NoneType
 
 from typing_extensions import Type, get_origin, Optional, get_type_hints, Tuple
@@ -172,6 +172,6 @@ def manually_search_for_class_name(target_class_name: str) -> Type:
     return resolved_class
 
 
-@lru_cache(maxsize=None)
+@memoize
 def warn_multiple_classes(target_class_name, found_classes):
     logging.warning(f"Found multiple classes with name {target_class_name}. Found classes: {found_classes} ")

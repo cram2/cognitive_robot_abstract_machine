@@ -91,3 +91,51 @@ test/krrood_test/test_ripple_down_rules/test_results/
 test/**/*.pdf
 test/krrood_test/test_ripple_down_rules/test_generated_rdrs
 
+!semantic_digital_twin/resources/ply/chair_texture.png
+
+
+### CPP IGNORES
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+doc/doc_out
+
+# Bazel
+/bazel-*
+
+# Directories for the Bazel IntelliJ plugin containing the generated
+# IntelliJ project files and plugin configuration. Seperate directories are
+# for the IntelliJ, Android Studio and CLion versions of the plugin.
+/.ijwb/
+/.aswb/
+/.clwb/

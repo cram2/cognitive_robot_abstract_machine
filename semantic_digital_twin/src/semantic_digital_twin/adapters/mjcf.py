@@ -88,6 +88,13 @@ class MJCFParser:
         self.tree = ET.fromstring(self.spec.to_xml())
         self.world = World()
 
+    @classmethod
+    def from_xml_string(cls, xml_string: str) -> "MJCFParser":
+        file_path = "/tmp/scene.xml"
+        with open(file_path, "w") as f:
+            f.write(xml_string)
+        return cls(file_path)
+
     def parse(self) -> World:
         """
         Parse the MJCF file and convert it into a World object.
@@ -128,6 +135,7 @@ class MJCFParser:
         collisions = []
         for mujoco_geom in mujoco_body.geoms:
             shape = self.parse_geom(mujoco_geom=mujoco_geom)
+            shape.origin.reference_frame = body
             shape.simulator_additional_properties.append(
                 MujocoGeom(
                     solver_impedance=mujoco_geom.solimp.tolist(),
@@ -566,6 +574,7 @@ class MJCFParser:
         body = self.world.get_body_by_name(body_name)
         body.simulator_additional_properties.append(
             MujocoCamera(
+                body=body,
                 name=camera_name,
                 mode=mujoco_camera.mode,
                 orthographic=(

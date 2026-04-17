@@ -17,6 +17,7 @@ parts:
     - file: abstract_robot.rst
     - file: process_modules.rst
     - file: locations.rst
+    - file: conditions.rst
     - file: notebooks.rst
   - caption: Adding a new Robot
     chapters:

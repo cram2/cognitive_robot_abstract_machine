@@ -25,6 +25,7 @@ import inspect
 import math
 import operator
 import sys
+import weakref
 from abc import ABC, abstractmethod
 from collections import Counter
 from dataclasses import field, dataclass
@@ -439,6 +440,10 @@ class SymbolicMathType(ABC):
     Reference to the casadi data structure of type casadi.SX
     """
 
+    def __post_init__(self):
+        self.__FREE_VARIABLES__ = self.free_variables()
+        # save free variables at the instance to prevent them from getting cleaned up.
+
     @classmethod
     def from_casadi_sx(cls, casadi_sx: ca.SX) -> Self:
         result = cls()
@@ -794,6 +799,7 @@ class Scalar(SymbolicMathType):
 
     def __init__(self, data: ScalarData = 0):
         self.casadi_sx = to_sx(data)
+        super().__post_init__()
 
     def _verify_type(self):
         if self.casadi_sx.shape != (1, 1):
@@ -987,7 +993,9 @@ class FloatVariable(Scalar):
 
     name: str = field(kw_only=True)
 
-    _registry: ClassVar[Dict[ca.SX, FloatVariable]] = {}
+    _registry: ClassVar[weakref.WeakValueDictionary[ca.SX, FloatVariable]] = (
+        weakref.WeakValueDictionary()
+    )
     """
     Keeps track of which FloatVariable instances are associated with which which casadi.SX instances.
     Needed to recreate the FloatVariables from a casadi expression.
@@ -1042,6 +1050,7 @@ class Vector(SymbolicMathType):
         if data is None:
             data = []
         self.casadi_sx = to_sx(data)
+        super().__post_init__()
 
     def _verify_type(self):
         """
@@ -1169,6 +1178,7 @@ class Matrix(SymbolicMathType):
         if data is None:
             data = []
         self.casadi_sx = to_sx(data)
+        super().__post_init__()
 
     @classmethod
     def create_filled_with_variables(cls, shape: Tuple[int, int], name: str) -> Self:
@@ -1951,7 +1961,7 @@ def logic_any(args: VectorData | MatrixData) -> Scalar:
     :param args: A vector or matrix of logical scalars.
     :return: A scalar truth value.
     """
-    return Scalar.from_casadi_sx(ca.logic_any(args.casadi_sx))
+    return Scalar.from_casadi_sx(ca.logic_any(to_sx(args)))
 
 
 def logic_all(args: GenericVectorOrMatrixType) -> Scalar:

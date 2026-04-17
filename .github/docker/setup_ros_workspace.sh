@@ -9,6 +9,7 @@ apt install -y \
     python3.12-venv \
     ros-jazzy-xacro \
     ros-jazzy-navigation2 \
+    ros-jazzy-py-trees-ros \
     python3-vcstool \
     git \
     ros-dev-tools \

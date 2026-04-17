@@ -59,6 +59,18 @@ class FixedConnection(Connection):
     Has 0 degrees of freedom.
     """
 
+    @classmethod
+    def create_with_dofs(
+        cls,
+        world: World,
+        parent: KinematicStructureEntity,
+        child: KinematicStructureEntity,
+        name: Optional[PrefixedName] = None,
+        *args,
+        **kwargs,
+    ) -> Self:
+        return FixedConnection(parent=parent, child=child, name=name, **kwargs)
+
 
 @dataclass(eq=False)
 class ActiveConnection(Connection):
