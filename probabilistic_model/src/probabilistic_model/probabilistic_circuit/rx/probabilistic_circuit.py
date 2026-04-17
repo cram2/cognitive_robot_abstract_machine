@@ -280,16 +280,11 @@ class LeafUnit(Unit):
         if self.distribution is None:
             self.probabilistic_circuit.remove_node(self)
 
-    def log_truncated_of_simple_event_in_place(self, event: SimpleEvent):
-        self.distribution, self.result_of_current_query = (
-            self.distribution.log_truncated(event.as_composite_set())
-        )
-
-    def log_truncated_of_simple_event_with_singletons_in_place(
-        self, event: SimpleEvent
+    def log_truncated_of_simple_event_in_place(
+        self, event: SimpleEvent, singleton_allowed: bool = False
     ):
         self.distribution, self.result_of_current_query = (
-            self.distribution.log_truncated_with_singletons(event.as_composite_set())
+            self.distribution.log_truncated(event.as_composite_set(), singleton_allowed)
         )
 
     def moment(self, order, center, variable_to_index_map):
@@ -1064,19 +1059,22 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         self.remove_nodes_from(unreachable_nodes)
 
     def log_truncated_of_simple_event_in_place(
-        self, simple_event: SimpleEvent
+        self, simple_event: SimpleEvent, singleton_allowed: bool = False
     ) -> Tuple[Optional[Self], float]:
         """
         Construct the truncated circuit from a simple event.
 
         :param simple_event: The simple event to condition on.
+        :param singleton_allowed: Whether to allow singletons in the simple sets of the event.
         :return: The truncated circuit and the log-probability of the event
         """
         for layer in reversed(self.layers):
             for unit in layer:
                 if unit.is_leaf:
                     unit: LeafUnit
-                    unit.log_truncated_of_simple_event_in_place(simple_event)
+                    unit.log_truncated_of_simple_event_in_place(
+                        simple_event, singleton_allowed
+                    )
                 else:
                     unit: InnerUnit
                     unit.log_forward()
@@ -1098,9 +1096,14 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
 
         return self, root.result_of_current_query
 
-    def log_truncated_in_place(self, event: Event) -> Tuple[Optional[Self], float]:
+    def log_truncated_in_place(
+        self, event: Event, singleton_allowed: bool = False
+    ) -> Tuple[Optional[Self], float]:
         """
         Efficiently compute the truncated for an Event, batching as much as possible.
+        :param event: The event to condition on.
+        :param singleton_allowed: Whether to allow singletons in the simple sets of the event.
+        :return: The truncated circuit and the log-probability of the event
         """
         # skip trivial case
         if event.is_empty():
@@ -1109,21 +1112,17 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
 
         # if the event is easy, don't create a proxy node
         elif len(event.simple_sets) == 1:
-            result = self.log_truncated_of_simple_event_in_place(event.simple_sets[0])
+            result = self.log_truncated_of_simple_event_in_place(
+                event.simple_sets[0], singleton_allowed
+            )
             return result
 
-        # Helper so every thread does its own deepcopy and truncation
-        def _copy_and_truncate(simple_event):
-            return self.__deepcopy__().log_truncated_of_simple_event_in_place(
-                simple_event
+        conditional_circuits = list(
+            self.__deepcopy__().log_truncated_of_simple_event_in_place(
+                simple_event, singleton_allowed
             )
-
-        with ThreadPoolExecutor(
-            max_workers=min(32, len(event.simple_sets))
-        ) as executor:
-            conditional_circuits = list(
-                executor.map(_copy_and_truncate, event.simple_sets)
-            )
+            for simple_event in event.simple_sets
+        )
 
         # clear this circuit
         self.remove_nodes_from(list(self.graph.nodes()))
@@ -1154,97 +1153,11 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         result.normalize()
         return self, result.result_of_current_query
 
-    def log_truncated(self, event: Event) -> Tuple[Optional[Self], float]:
+    def log_truncated(
+        self, event: Event, singleton_allowed: bool = False
+    ) -> Tuple[Optional[Self], float]:
         result = copy.deepcopy(self)
-        return result.log_truncated_in_place(event)
-
-    def log_truncated_with_singletons(
-        self, event: Event
-    ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
-        result = copy.deepcopy(self)
-        return result.log_truncated_with_singletons_in_place(event)
-
-    def log_truncated_with_singletons_in_place(
-        self, event: Event
-    ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
-        # skip trivial case
-        if event.is_empty():
-            self.graph.remove_nodes_from(list(self.graph.nodes()))
-            return None, -np.inf
-
-        # if the event is easy, don't create a proxy node
-        elif len(event.simple_sets) == 1:
-            result = self.log_truncated_of_simple_event_with_singletons_in_place(
-                event.simple_sets[0]
-            )
-            return result
-
-        truncated_circuits = [
-            self.__deepcopy__().log_truncated_of_simple_event_with_singletons_in_place(
-                simple_event
-            )
-            for simple_event in event.simple_sets
-        ]
-
-        # clear this circuit
-        self.remove_nodes_from(list(self.graph.nodes()))
-
-        # filtered out impossible conditionals
-        conditional_circuits = [
-            (conditional, log_probability)
-            for conditional, log_probability in truncated_circuits
-            if log_probability > -np.inf
-        ]
-
-        # if all conditionals are impossible
-        if len(conditional_circuits) == 0:
-            return None, -np.inf
-
-        # create a new sum unit
-        result = SumUnit(probabilistic_circuit=self)
-
-        # add the conditionals to the sum unit
-        for conditional, log_probability in conditional_circuits:
-            root = conditional.root
-            new_nodes = result.probabilistic_circuit.add_from_subgraph(
-                conditional.graph
-            )
-            result.add_subcircuit(new_nodes[root.index], log_probability)
-
-        result.log_forward()
-        result.normalize()
-        return self, result.result_of_current_query
-
-    def log_truncated_of_simple_event_with_singletons_in_place(
-        self, simple_event: SimpleEvent
-    ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
-        for layer in reversed(self.layers):
-            for unit in layer:
-                if unit.is_leaf:
-                    unit: LeafUnit
-                    unit.log_truncated_of_simple_event_with_singletons_in_place(
-                        simple_event
-                    )
-                else:
-                    unit: InnerUnit
-                    unit.log_forward()
-
-        root = self.root
-        [
-            self.remove_node(node)
-            for node in self.nodes()
-            if node.result_of_current_query == -np.inf
-        ]
-
-        if root not in set(self.graph.nodes()):
-            return None, -np.inf
-
-        # clean the circuit up
-        self.remove_unreachable_nodes(root)
-        self.simplify()
-        self.normalize()
-
-        return self, root.result_of_current_query
+        return result.log_truncated_in_place(event, singleton_allowed)
 
     def marginal_in_place(self, variables: Iterable[Variable]) -> Optional[Self]:
         result = [
@@ -1547,7 +1460,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
 
     def breadth_first_search_layout(
         self, scale: float = 1.0, align: PlotAlignment = PlotAlignment.VERTICAL
-    ) -> Dict[int, np.array]:
+    ) -> Dict[int, npt.NDArray]:
         """
         Generate a bfs layout for this circuit.
 

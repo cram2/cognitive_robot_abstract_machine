@@ -113,19 +113,8 @@ class ContinuousDistribution(UnivariateDistribution):
         lower_bound_cdf = self.cumulative_distribution_function(points[:, (0,)])
         return (upper_bound_cdf - lower_bound_cdf).sum()
 
-    def log_truncated(self, event: Event) -> Tuple[Optional[Self], float]:
-        if event.is_empty():
-            return None, -np.inf
-
-        interval = self.composite_set_from_event(event)
-
-        if len(interval.simple_sets) == 1:
-            return self.log_conditional_from_simple_interval(interval.simple_sets[0])
-        else:
-            raise UndefinedOperationError(self)
-
-    def log_truncated_with_singletons(
-        self, event: Event
+    def log_truncated(
+        self, event: Event, singleton_allowed: bool = False
     ) -> Tuple[Optional[Self], float]:
         if event.is_empty():
             return None, -np.inf
@@ -133,8 +122,8 @@ class ContinuousDistribution(UnivariateDistribution):
         interval = self.composite_set_from_event(event)
 
         if len(interval.simple_sets) == 1:
-            return self.log_conditional_from_simple_interval_allow_singletons(
-                interval.simple_sets[0]
+            return self.log_conditional_from_simple_interval(
+                interval.simple_sets[0], singleton_allowed
             )
         else:
             raise UndefinedOperationError(self)
@@ -158,20 +147,15 @@ class ContinuousDistribution(UnivariateDistribution):
         )
 
     def log_conditional_from_simple_interval(
-        self, interval: SimpleInterval
+        self, interval: SimpleInterval, singleton_allowed: bool = False
     ) -> Tuple[Self, float]:
         """
         Calculate the truncated distribution given a simple interval.
 
         :param interval: The simple interval
+        :param singleton_allowed: Whether the simple interval is allowed to be a singleton.
         :return: The truncated distribution and the log-probability of the interval.
         """
-        raise NotImplementedError
-
-    @abstractmethod
-    def log_conditional_from_simple_interval_allow_singletons(
-        self, interval: SimpleInterval
-    ) -> Tuple[Self, float]:
         raise NotImplementedError
 
 
@@ -342,15 +326,12 @@ class DiscreteDistribution(UnivariateDistribution):
         for key in self.probabilities:
             self.probabilities[key] /= total
 
-    def log_truncated(self, event: Event) -> Tuple[Optional[Self], float]:
+    def log_truncated(
+        self, event: Event, singleton_allowed: bool = False
+    ) -> Tuple[Optional[Self], float]:
         # construct event
         condition = self.composite_set_from_event(event)
         return self.log_conditional_of_composite_set(condition)
-
-    def log_truncated_with_singletons(
-        self, event: Event
-    ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
-        return self.log_truncated(event)
 
     def log_conditional(
         self, point: Dict[Variable, Any]
@@ -509,8 +490,10 @@ class IntegerDistribution(ContinuousDistribution, DiscreteDistribution):
 
     variable: Integer = field(kw_only=True)
 
-    def log_truncated(self, event: Event) -> Tuple[Optional[Self], float]:
-        return DiscreteDistribution.log_truncated(self, event)
+    def log_truncated(
+        self, event: Event, singleton_allowed: bool = False
+    ) -> Tuple[Optional[DiscreteDistribution], float]:
+        return DiscreteDistribution.log_truncated(self, event, singleton_allowed)
 
     def univariate_log_mode(self) -> Tuple[AbstractCompositeSet, float]:
         max_likelihood = max(self.probabilities.values())
@@ -678,8 +661,8 @@ class DiracDeltaDistribution(ContinuousDistribution):
         return singleton(self.location)
 
     def log_conditional_from_simple_interval(
-        self, interval: SimpleInterval
-    ) -> Tuple[Self, float]:
+        self, interval: SimpleInterval, singleton_allowed: bool = False
+    ) -> Tuple[Optional[ContinuousDistribution], float]:
         if interval.contains(self.location):
             return self, 0.0
         else:
@@ -776,11 +759,3 @@ class DiracDeltaDistribution(ContinuousDistribution):
 
     def apply_scaling(self, scaling: VariableMap[Variable, float]):
         self.location += scaling[self.variable]
-
-    def log_conditional_from_simple_interval_allow_singletons(
-        self, interval: SimpleInterval
-    ) -> Tuple[Self, float]:
-        if interval.contains(self.location):
-            return self, 0.0
-        else:
-            return None, -np.inf
