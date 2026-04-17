@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, Set
+from typing import Optional, Set as PythonSet
 
 import numpy as np
 import numpy.typing as npt
@@ -21,7 +21,7 @@ from probabilistic_model.probabilistic_model import (
     CenterType,
 )
 from probabilistic_model.utils import MissingDict, interval_as_array
-from random_events.set import SetElement
+from random_events.set import SetElement, Set
 from random_events.sigma_algebra import AbstractCompositeSet
 from random_events.variable import Variable, Continuous, Symbolic, Integer
 
@@ -592,7 +592,7 @@ class BernoulliDistribution(IntegerDistribution):
             probs[1] = p
             probabilities = probs
 
-        super().__init__(variable, probabilities)
+        super().__init__(variable=variable, probabilities=probabilities)
 
     @property
     def p(self) -> float:
@@ -664,6 +664,8 @@ class DiracDeltaDistribution(ContinuousDistribution):
         self, interval: SimpleInterval, singleton_allowed: bool = False
     ) -> Tuple[Optional[ContinuousDistribution], float]:
         if interval.contains(self.location):
+            if singleton_allowed and interval.is_singleton():
+                return self, np.log(self.density_cap)
             return self, 0.0
         else:
             return None, -np.inf

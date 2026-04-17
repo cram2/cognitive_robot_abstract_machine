@@ -1075,9 +1075,12 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                     unit.log_truncated_of_simple_event_in_place(
                         simple_event, singleton_allowed
                     )
-                else:
-                    unit: InnerUnit
+                elif isinstance(unit, ProductUnit):
                     unit.log_forward()
+                elif isinstance(unit, SumUnit):
+                    unit.log_forward_conditioning()
+                else:
+                    raise IntractableError(f"Unit of type {type(unit)} not supported.")
 
         root = self.root
         [
@@ -1835,12 +1838,16 @@ class UnivariateContinuousLeaf(UnivariateLeaf):
 
     __hash__ = Unit.__hash__
 
-    def log_truncated_of_simple_event_in_place(self, event: SimpleEvent):
+    def log_truncated_of_simple_event_in_place(
+        self, event: SimpleEvent, singleton_allowed: bool = False
+    ):
         return self.univariate_log_truncated_of_simple_event_in_place(
-            event[self.variable]
+            event[self.variable], singleton_allowed
         )
 
-    def univariate_log_truncated_of_simple_event_in_place(self, event: Interval):
+    def univariate_log_truncated_of_simple_event_in_place(
+        self, event: Interval, singleton_allowed: bool = False
+    ):
         """
         Condition this distribution on a simple event in-place but use sum units to create conditions on composite
         intervals.
@@ -1851,7 +1858,7 @@ class UnivariateContinuousLeaf(UnivariateLeaf):
         if len(event.simple_sets) == 1:
             self.distribution, self.result_of_current_query = (
                 self.distribution.log_conditional_from_simple_interval(
-                    event.simple_sets[0]
+                    event.simple_sets[0], singleton_allowed
                 )
             )
             return self
@@ -1863,7 +1870,9 @@ class UnivariateContinuousLeaf(UnivariateLeaf):
 
         for simple_interval in event.simple_sets:
             current_conditional, current_log_probability = (
-                self.distribution.log_conditional_from_simple_interval(simple_interval)
+                self.distribution.log_conditional_from_simple_interval(
+                    simple_interval, singleton_allowed
+                )
             )
             current_probability = np.exp(current_log_probability)
 
