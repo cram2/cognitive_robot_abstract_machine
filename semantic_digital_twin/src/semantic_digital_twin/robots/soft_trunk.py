@@ -7,6 +7,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.soft_connections import SoftPCCConnection
+from semantic_digital_twin.world_description.soft_connections import CosseratRodConnection
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.geometry import Cylinder, Color
 from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
@@ -79,3 +80,27 @@ class SoftTrunk(AbstractRobot):
             world.add_semantic_annotation(robot)
             
         return robot, kappas, phis
+    
+    @classmethod
+    def build_cosserat_trunk(cls, world: World) -> tuple:
+        with world.modify_world():
+            root_body = Body(name=PrefixedName(name="base", prefix="cosserat"))
+            tip_body = Body(name=PrefixedName(name="tip", prefix="cosserat"), 
+                            visual=ShapeCollection([Cylinder(height=0.5, width=0.04)]))
+            
+            world.add_body(root_body)
+            world.add_body(tip_body)
+            
+            # 3 DOFs for bending and twisting
+            ux = DegreeOfFreedom(name=PrefixedName(name="ux", prefix="cosserat"))
+            uy = DegreeOfFreedom(name=PrefixedName(name="uy", prefix="cosserat"))
+            uz = DegreeOfFreedom(name=PrefixedName(name="uz", prefix="cosserat"))
+            world.add_degree_of_freedom(ux)
+            world.add_degree_of_freedom(uy)
+            world.add_degree_of_freedom(uz)
+            
+            conn = CosseratRodConnection(root_body, tip_body, ux, uy, uz, length=0.5)
+            world.add_connection(conn)
+            
+            robot = cls(name=PrefixedName(name="cosserat_bot", prefix="robot"), root=root_body, _world=world)
+            return robot, ux, uy, uz
