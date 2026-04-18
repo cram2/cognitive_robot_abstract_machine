@@ -347,40 +347,6 @@ class JointStateDAO_connections_association(Base, AssociationDataAccessObject):
     )
 
 
-class JointStateDAO_joint_names_association(Base, AssociationDataAccessObject):
-
-    __tablename__ = "_45083347919329008091636463915192410260878840213657200731565101"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_jointstatedao_id: Mapped[int] = mapped_column(
-        ForeignKey("JointStateDAO.database_id")
-    )
-    target_connectiondao_id: Mapped[int] = mapped_column(
-        ForeignKey("ConnectionDAO.database_id")
-    )
-
-    target: Mapped[ConnectionDAO] = relationship(
-        "ConnectionDAO", foreign_keys=[target_connectiondao_id]
-    )
-
-
-class JointStateDAO_kinematic_chains_association(Base, AssociationDataAccessObject):
-
-    __tablename__ = "_90531419516336285247311033348050004136728735039483081862594264"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_jointstatedao_id: Mapped[int] = mapped_column(
-        ForeignKey("JointStateDAO.database_id")
-    )
-    target_kinematicchaindao_id: Mapped[int] = mapped_column(
-        ForeignKey("KinematicChainDAO.database_id")
-    )
-
-    target: Mapped[KinematicChainDAO] = relationship(
-        "KinematicChainDAO", foreign_keys=[target_kinematicchaindao_id]
-    )
-
-
 class MaxAvoidedCollisionsOverrideDAO_bodies_association(
     Base, AssociationDataAccessObject
 ):
@@ -3053,51 +3019,6 @@ class JointStateDAO(
     )
 
 
-class JointStateDAO(
-    Base, DataAccessObject[semantic_digital_twin.robots.abstract_robot.JointState]
-):
-
-    __tablename__ = "JointStateDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    state_type: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-    joint_positions: Mapped[typing.List[builtins.float]] = mapped_column(
-        JSON, nullable=False, use_existing_column=True
-    )
-
-    name_id: Mapped[int] = mapped_column(
-        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
-    )
-    joint_names: Mapped[builtins.list[JointStateDAO_joint_names_association]] = (
-        relationship(
-            "JointStateDAO_joint_names_association",
-            collection_class=builtins.list,
-            cascade="all, delete-orphan",
-            foreign_keys="[JointStateDAO_joint_names_association.source_jointstatedao_id]",
-        )
-    )
-    kinematic_chains: Mapped[
-        builtins.list[JointStateDAO_kinematic_chains_association]
-    ] = relationship(
-        "JointStateDAO_kinematic_chains_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[JointStateDAO_kinematic_chains_association.source_jointstatedao_id]",
-    )
-
-
 class KinematicStructureEntitySpatialRelationDAO(
     Base,
     DataAccessObject[
@@ -3968,38 +3889,6 @@ class RootNodeNotFoundErrorDAO(
 
     candidates: Mapped[typing.List[builtins.str]] = mapped_column(
         JSON, nullable=False, use_existing_column=True
-    )
-
-
-class RunMSCModelDAO(
-    Base,
-    DataAccessObject[
-        semantic_digital_twin.reasoning.body_motion_problem.container_manipulation.physics.RunMSCModel
-    ],
-):
-
-    __tablename__ = "RunMSCModelDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    timeout: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-
-    msc: Mapped[giskardpy.motion_statechart.motion_statechart.MotionStatechart] = (
-        mapped_column(
-            sqlalchemy.sql.sqltypes.JSON, nullable=False, use_existing_column=True
-        )
-    )
-
-    actuator_id: Mapped[int] = mapped_column(
-        ForeignKey("ConnectionDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    actuator: Mapped[ConnectionDAO] = relationship(
-        "ConnectionDAO", uselist=False, foreign_keys=[actuator_id], post_update=True
     )
 
 

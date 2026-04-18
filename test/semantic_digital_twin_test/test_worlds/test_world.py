@@ -47,6 +47,7 @@ from semantic_digital_twin.world_description.world_state import WorldStateTrajec
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
     WorldStateTrajectoryPlotter,
 )
+from semantic_digital_twin.orm.ormatic_interface import *
 
 
 def test_set_state(world_setup):
