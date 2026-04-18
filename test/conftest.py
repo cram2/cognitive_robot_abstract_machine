@@ -120,12 +120,8 @@ def cleanup_after_test():
 @pytest.fixture(autouse=True, scope="module")
 def count_worlds():
     yield
-    unreachable = gc.collect()
     world_in_mem = objgraph.count("World")
-    print(f"Number of worlds after test: {objgraph.count("World")}")
     if world_in_mem > 30:
-        print("Unreachable objects found:", unreachable)
-        print(f"Number of worlds after test: {objgraph.count("World")}")
         raise MemoryError(
             "Something is leaking worlds, there are more than 20 worlds in memory after the test"
         )

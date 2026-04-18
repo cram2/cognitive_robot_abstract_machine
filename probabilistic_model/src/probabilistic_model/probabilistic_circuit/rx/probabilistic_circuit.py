@@ -264,7 +264,9 @@ class LeafUnit(Unit):
         self.result_of_current_query = self.distribution.log_likelihood(events)
 
     def cumulative_distribution(self, events: npt.NDArray):
-        self.result_of_current_query = self.distribution.cumulative_distribution_function(events)
+        self.result_of_current_query = (
+            self.distribution.cumulative_distribution_function(events)
+        )
 
     def probability_of_simple_event(self, event: SimpleEvent):
         self.result_of_current_query = self.distribution.probability_of_simple_event(
@@ -278,9 +280,11 @@ class LeafUnit(Unit):
         if self.distribution is None:
             self.probabilistic_circuit.remove_node(self)
 
-    def log_truncated_of_simple_event_in_place(self, event: SimpleEvent):
+    def log_truncated_of_simple_event_in_place(
+        self, event: SimpleEvent, singleton_allowed: bool = False
+    ):
         self.distribution, self.result_of_current_query = (
-            self.distribution.log_truncated(event.as_composite_set())
+            self.distribution.log_truncated(event.as_composite_set(), singleton_allowed)
         )
 
     def moment(self, order, center, variable_to_index_map):
@@ -679,7 +683,6 @@ class SumUnit(InnerUnit):
             return True
         return abs(float(logsumexp(log_weights))) < tolerance
 
-
     def is_deterministic(self) -> bool:
         """
         :return: If this unit is deterministic or not.
@@ -815,9 +818,9 @@ class ProductUnit(InnerUnit):
                 subcircuit.result_of_current_query.append([start_index, amount])
 
     def attach_marginal_circuit(
-            self,
-            marginal_circuit: "ProbabilisticCircuit",
-            target_circuit: "ProbabilisticCircuit",
+        self,
+        marginal_circuit: "ProbabilisticCircuit",
+        target_circuit: "ProbabilisticCircuit",
     ) -> None:
         """
         Attach the root of marginal_circuit as a child of this ProductUnit,
@@ -841,9 +844,7 @@ class ProductUnit(InnerUnit):
                 )
             self.add_subcircuit(new_sum_unit)
         else:
-            self.add_subcircuit(
-                leaf(copy.deepcopy(root.distribution), target_circuit)
-            )
+            self.add_subcircuit(leaf(copy.deepcopy(root.distribution), target_circuit))
 
 
 @dataclass
@@ -1102,22 +1103,28 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         self.remove_nodes_from(unreachable_nodes)
 
     def log_truncated_of_simple_event_in_place(
-        self, simple_event: SimpleEvent
+        self, simple_event: SimpleEvent, singleton_allowed: bool = False
     ) -> Tuple[Optional[Self], float]:
         """
         Construct the truncated circuit from a simple event.
 
         :param simple_event: The simple event to condition on.
+        :param singleton_allowed: Whether to allow singletons in the simple sets of the event.
         :return: The truncated circuit and the log-probability of the event
         """
         for layer in reversed(self.layers):
             for unit in layer:
                 if unit.is_leaf:
                     unit: LeafUnit
-                    unit.log_truncated_of_simple_event_in_place(simple_event)
-                else:
-                    unit: InnerUnit
+                    unit.log_truncated_of_simple_event_in_place(
+                        simple_event, singleton_allowed
+                    )
+                elif isinstance(unit, ProductUnit):
                     unit.log_forward()
+                elif isinstance(unit, SumUnit):
+                    unit.log_forward_conditioning()
+                else:
+                    raise IntractableError(f"Unit of type {type(unit)} not supported.")
 
         root = self.root
         [
@@ -1136,9 +1143,14 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
 
         return self, root.result_of_current_query
 
-    def log_truncated_in_place(self, event: Event) -> Tuple[Optional[Self], float]:
+    def log_truncated_in_place(
+        self, event: Event, singleton_allowed: bool = False
+    ) -> Tuple[Optional[Self], float]:
         """
         Efficiently compute the truncated for an Event, batching as much as possible.
+        :param event: The event to condition on.
+        :param singleton_allowed: Whether to allow singletons in the simple sets of the event.
+        :return: The truncated circuit and the log-probability of the event
         """
         # skip trivial case
         if event.is_empty():
@@ -1147,21 +1159,17 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
 
         # if the event is easy, don't create a proxy node
         elif len(event.simple_sets) == 1:
-            result = self.log_truncated_of_simple_event_in_place(event.simple_sets[0])
+            result = self.log_truncated_of_simple_event_in_place(
+                event.simple_sets[0], singleton_allowed
+            )
             return result
 
-        # Helper so every thread does its own deepcopy and truncation
-        def _copy_and_truncate(simple_event):
-            return self.__deepcopy__().log_truncated_of_simple_event_in_place(
-                simple_event
+        conditional_circuits = list(
+            self.__deepcopy__().log_truncated_of_simple_event_in_place(
+                simple_event, singleton_allowed
             )
-
-        with ThreadPoolExecutor(
-            max_workers=min(32, len(event.simple_sets))
-        ) as executor:
-            conditional_circuits = list(
-                executor.map(_copy_and_truncate, event.simple_sets)
-            )
+            for simple_event in event.simple_sets
+        )
 
         # clear this circuit
         self.remove_nodes_from(list(self.graph.nodes()))
@@ -1192,9 +1200,11 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         result.normalize()
         return self, result.result_of_current_query
 
-    def log_truncated(self, event: Event) -> Tuple[Optional[Self], float]:
+    def log_truncated(
+        self, event: Event, singleton_allowed: bool = False
+    ) -> Tuple[Optional[Self], float]:
         result = copy.deepcopy(self)
-        return result.log_truncated_in_place(event)
+        return result.log_truncated_in_place(event, singleton_allowed)
 
     def marginal_in_place(self, variables: Iterable[Variable]) -> Optional[Self]:
         result = [
@@ -1497,7 +1507,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
 
     def breadth_first_search_layout(
         self, scale: float = 1.0, align: PlotAlignment = PlotAlignment.VERTICAL
-    ) -> Dict[int, np.array]:
+    ) -> Dict[int, npt.NDArray]:
         """
         Generate a bfs layout for this circuit.
 
@@ -1561,7 +1571,9 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         layers = self.layers
 
         # get the positions of the nodes
-        positions = self.breadth_first_search_layout(scale=scale, align=PlotAlignment.VERTICAL)
+        positions = self.breadth_first_search_layout(
+            scale=scale, align=PlotAlignment.VERTICAL
+        )
         position_for_variable_name = {
             node: (x + variable_name_offset, y) for node, (x, y) in positions.items()
         }
@@ -1870,12 +1882,16 @@ class UnivariateContinuousLeaf(UnivariateLeaf):
 
     __hash__ = Unit.__hash__
 
-    def log_truncated_of_simple_event_in_place(self, event: SimpleEvent):
+    def log_truncated_of_simple_event_in_place(
+        self, event: SimpleEvent, singleton_allowed: bool = False
+    ):
         return self.univariate_log_truncated_of_simple_event_in_place(
-            event[self.variable]
+            event[self.variable], singleton_allowed
         )
 
-    def univariate_log_truncated_of_simple_event_in_place(self, event: Interval):
+    def univariate_log_truncated_of_simple_event_in_place(
+        self, event: Interval, singleton_allowed: bool = False
+    ):
         """
         Condition this distribution on a simple event in-place but use sum units to create conditions on composite
         intervals.
@@ -1886,7 +1902,7 @@ class UnivariateContinuousLeaf(UnivariateLeaf):
         if len(event.simple_sets) == 1:
             self.distribution, self.result_of_current_query = (
                 self.distribution.log_conditional_from_simple_interval(
-                    event.simple_sets[0]
+                    event.simple_sets[0], singleton_allowed
                 )
             )
             return self
@@ -1898,7 +1914,9 @@ class UnivariateContinuousLeaf(UnivariateLeaf):
 
         for simple_interval in event.simple_sets:
             current_conditional, current_log_probability = (
-                self.distribution.log_conditional_from_simple_interval(simple_interval)
+                self.distribution.log_conditional_from_simple_interval(
+                    simple_interval, singleton_allowed
+                )
             )
             current_probability = np.exp(current_log_probability)
 
