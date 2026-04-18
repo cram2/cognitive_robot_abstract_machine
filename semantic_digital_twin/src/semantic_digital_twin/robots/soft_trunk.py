@@ -29,55 +29,53 @@ class SoftTrunk(AbstractRobot):
     def _setup_joint_states(self): pass
     
     @classmethod
-    def build_pcc(cls, world: World, num_segments: int = 10) -> tuple[SoftTrunk, DegreeOfFreedom, DegreeOfFreedom]:
-        total_length = 0.5
-        seg_length = total_length / num_segments
+    def build_pcc(cls, world: World, num_sections: int = 3, segs_per_section: int = 6, total_robot_length: float = 0.9) -> SoftTrunk:
+        section_length = total_robot_length / num_sections
+        seg_length = section_length / segs_per_section
         
         with world.modify_world():
-            # Create the global DOFs (shared by all segments)
-            kappa = DegreeOfFreedom(name=PrefixedName(name="kappa", prefix="soft_trunk"))
-            phi = DegreeOfFreedom(name=PrefixedName(name="phi", prefix="soft_trunk"))
-            world.add_degree_of_freedom(kappa)
-            world.add_degree_of_freedom(phi)
-
-            # Create the Root
-            root_body = Body(name=PrefixedName(name="base", prefix="soft_trunk"))
+            root_body = Body(name=PrefixedName(name="base", prefix="snake"))
             world.add_body(root_body)
-            
-            robot = cls(name=PrefixedName(name="soft_trunk", prefix="robot"), root=root_body, _world=world)
+            robot = cls(name=PrefixedName(name="soft_snake", prefix="robot"), root=root_body, _world=world)
             
             prev_body = root_body
-            for i in range(num_segments):
-                # Create a small cylinder for each segment
-                # center the cylinder so it looks like a continuous rod
-                seg_visual = Cylinder(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(z=-seg_length/2), 
-                    width=0.05, 
-                    height=seg_length, 
-                    color=Color(0.0, 0.5, 1.0, 1.0)
-                )
-                
-                curr_body = Body(
-                    name=PrefixedName(name=f"seg_{i}", prefix="soft_trunk"), 
-                    visual=ShapeCollection([seg_visual])
-                )
-                world.add_body(curr_body)
-                
-                # Every segment uses the same kappa and phi
-                conn = SoftPCCConnection(
-                    parent=prev_body, 
-                    child=curr_body, 
-                    kappa_dof=kappa, 
-                    phi_dof=phi, 
-                    length=seg_length
-                )
-                world.add_connection(conn)
-                prev_body = curr_body
 
-            # Tip is the last body created
-            arm_chain = Arm(name=PrefixedName(name="soft_arm", prefix="soft_trunk"), 
+            kappas = []
+            phis = []
+
+            for s in range(num_sections):
+                # unique dofs for section
+                kappa = DegreeOfFreedom(name=PrefixedName(name=f"kappa_{s}", prefix="snake"))
+                phi = DegreeOfFreedom(name=PrefixedName(name=f"phi_{s}", prefix="snake"))
+                world.add_degree_of_freedom(kappa)
+                world.add_degree_of_freedom(phi)
+                kappas.append(kappa)
+                phis.append(phi)
+
+                # Build the noodle for this section
+                for i in range(segs_per_section):
+                    # Color-code sections
+                    color_val = (s + 1) / num_sections
+                    seg_visual = Cylinder(
+                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(z=-seg_length/2), 
+                        width=0.04, height=seg_length, 
+                        color=Color(0.0, color_val, 1.0 - color_val, 1.0)
+                    )
+                    
+                    curr_body = Body(name=PrefixedName(name=f"sec{s}_seg{i}", prefix="snake"), 
+                                    visual=ShapeCollection([seg_visual]))
+                    world.add_body(curr_body)
+                    
+                    # Connect using the DOFs for this specific section
+                    conn = SoftPCCConnection(parent=prev_body, child=curr_body, 
+                                            kappa_dof=kappa, phi_dof=phi, length=seg_length)
+                    world.add_connection(conn)
+                    prev_body = curr_body
+
+            # Register the whole thing as one arm
+            arm_chain = Arm(name=PrefixedName(name="snake_arm", prefix="snake"), 
                             root=root_body, tip=prev_body, _world=world)
             robot.add_kinematic_chain(arm_chain)
             world.add_semantic_annotation(robot)
             
-        return robot, kappa, phi
+        return robot, kappas, phis
