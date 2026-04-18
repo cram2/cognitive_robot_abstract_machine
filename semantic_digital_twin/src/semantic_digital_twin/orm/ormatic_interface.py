@@ -45,14 +45,13 @@ import semantic_digital_twin.pipeline.mesh_decomposition.coacd
 import semantic_digital_twin.pipeline.mesh_decomposition.vhacd
 import semantic_digital_twin.pipeline.pipeline
 import semantic_digital_twin.reasoning.body_motion_problem.container_manipulation.effects
-import semantic_digital_twin.reasoning.body_motion_problem.container_manipulation.physics
 import semantic_digital_twin.reasoning.body_motion_problem.container_manipulation.predicates
 import semantic_digital_twin.reasoning.body_motion_problem.container_manipulation.tee_class
+import semantic_digital_twin.reasoning.body_motion_problem.pouring.articulated
 import semantic_digital_twin.reasoning.body_motion_problem.pouring.effects
 import semantic_digital_twin.reasoning.body_motion_problem.pouring.physics
 import semantic_digital_twin.reasoning.body_motion_problem.pouring.predicates
 import semantic_digital_twin.reasoning.body_motion_problem.pouring.tee_class
-import semantic_digital_twin.reasoning.body_motion_problem.pouring.torricelli
 import semantic_digital_twin.reasoning.body_motion_problem.predicates
 import semantic_digital_twin.reasoning.body_motion_problem.types
 import semantic_digital_twin.reasoning.predicates
@@ -2354,6 +2353,23 @@ class ContainerCanPerformDAO(
     }
 
 
+class ContainerGeometryDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.mixins.ContainerGeometry
+    ],
+):
+
+    __tablename__ = "ContainerGeometryDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    half_width: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+
 class DatabaseNotAvailableErrorDAO(
     Base,
     DataAccessObject[semantic_digital_twin.orm.exceptions.DatabaseNotAvailableError],
@@ -2654,42 +2670,6 @@ class HasArmsDAO(
         "polymorphic_on": "polymorphic_type",
         "polymorphic_identity": "HasArmsDAO",
     }
-
-
-class HasFillLevelDAO(
-    Base,
-    DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasFillLevel],
-):
-
-    __tablename__ = "HasFillLevelDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    fill_connection_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("PrismaticConnectionDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    fill_equation_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("DifferentialEquationDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    fill_connection: Mapped[PrismaticConnectionDAO] = relationship(
-        "PrismaticConnectionDAO",
-        uselist=False,
-        foreign_keys=[fill_connection_id],
-        post_update=True,
-    )
-    fill_equation: Mapped[DifferentialEquationDAO] = relationship(
-        "DifferentialEquationDAO",
-        uselist=False,
-        foreign_keys=[fill_equation_id],
-        post_update=True,
-    )
 
 
 class HasNeckDAO(
@@ -3706,6 +3686,87 @@ class PouringEffectDAO(
     }
 
 
+class PouringEquationDAO(
+    DifferentialEquationDAO,
+    DataAccessObject[
+        semantic_digital_twin.reasoning.body_motion_problem.pouring.articulated.PouringEquation
+    ],
+):
+
+    __tablename__ = "PouringEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(DifferentialEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    k: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    tilt_connection_id: Mapped[int] = mapped_column(
+        ForeignKey("RevoluteConnectionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    fill_connection_id: Mapped[int] = mapped_column(
+        ForeignKey("PrismaticConnectionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    tilt_connection: Mapped[RevoluteConnectionDAO] = relationship(
+        "RevoluteConnectionDAO",
+        uselist=False,
+        foreign_keys=[tilt_connection_id],
+        post_update=True,
+    )
+    fill_connection: Mapped[PrismaticConnectionDAO] = relationship(
+        "PrismaticConnectionDAO",
+        uselist=False,
+        foreign_keys=[fill_connection_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PouringEquationDAO",
+        "inherit_condition": database_id == DifferentialEquationDAO.database_id,
+    }
+
+
+class ArticulatedPouringEquationDAO(
+    PouringEquationDAO,
+    DataAccessObject[
+        semantic_digital_twin.reasoning.body_motion_problem.pouring.articulated.ArticulatedPouringEquation
+    ],
+):
+
+    __tablename__ = "ArticulatedPouringEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(PouringEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    container_geometry_id: Mapped[int] = mapped_column(
+        ForeignKey("ContainerGeometryDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    container_geometry: Mapped[ContainerGeometryDAO] = relationship(
+        "ContainerGeometryDAO",
+        uselist=False,
+        foreign_keys=[container_geometry_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ArticulatedPouringEquationDAO",
+        "inherit_condition": database_id == PouringEquationDAO.database_id,
+    }
+
+
 class PouringMSCModelDAO(
     Base,
     DataAccessObject[
@@ -3724,13 +3785,13 @@ class PouringMSCModelDAO(
     timeout: Mapped[builtins.int] = mapped_column(use_existing_column=True)
 
     fill_equation_id: Mapped[int] = mapped_column(
-        ForeignKey("TorricelliEquationDAO.database_id", use_alter=True),
+        ForeignKey("PouringEquationDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    fill_equation: Mapped[TorricelliEquationDAO] = relationship(
-        "TorricelliEquationDAO",
+    fill_equation: Mapped[PouringEquationDAO] = relationship(
+        "PouringEquationDAO",
         uselist=False,
         foreign_keys=[fill_equation_id],
         post_update=True,
@@ -5245,54 +5306,6 @@ class TaskRequestDAO(
     name: Mapped[builtins.str] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
-
-
-class TorricelliEquationDAO(
-    DifferentialEquationDAO,
-    DataAccessObject[
-        semantic_digital_twin.reasoning.body_motion_problem.pouring.torricelli.TorricelliEquation
-    ],
-):
-
-    __tablename__ = "TorricelliEquationDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(DifferentialEquationDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    k: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    theta_threshold: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    tilt_connection_id: Mapped[int] = mapped_column(
-        ForeignKey("RevoluteConnectionDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    fill_connection_id: Mapped[int] = mapped_column(
-        ForeignKey("PrismaticConnectionDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    tilt_connection: Mapped[RevoluteConnectionDAO] = relationship(
-        "RevoluteConnectionDAO",
-        uselist=False,
-        foreign_keys=[tilt_connection_id],
-        post_update=True,
-    )
-    fill_connection: Mapped[PrismaticConnectionDAO] = relationship(
-        "PrismaticConnectionDAO",
-        uselist=False,
-        foreign_keys=[fill_connection_id],
-        post_update=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "TorricelliEquationDAO",
-        "inherit_condition": database_id == DifferentialEquationDAO.database_id,
-    }
 
 
 class UnknownWorldModificationDAO(

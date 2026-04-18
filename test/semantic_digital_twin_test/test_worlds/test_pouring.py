@@ -3,8 +3,8 @@ Tests for the pouring domain (D_pour) of the BMP framework.
 
 Verifies that Causes and SatisfiesRequest correctly model pouring out a fraction
 of a container's fill level. The cup has a revolute tilt joint (the actuated DOF)
-and a virtual prismatic fill-level joint (the derived state) governed by a
-TorricelliEquation that is explicitly part of the world model.
+and a virtual prismatic fill-level joint (the derived state) governed by an
+ArticulatedPouringEquation that is explicitly part of the world model.
 """
 
 from __future__ import annotations
@@ -18,19 +18,22 @@ import pytest
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
+from krrood.entity_query_language.factories import an, set_of, variable
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.reasoning.body_motion_problem import (
+    Effect,
     Motion,
     TaskRequest,
 )
 from semantic_digital_twin.reasoning.body_motion_problem.pouring import (
+    ArticulatedPouringEquation,
+    ContainerGeometry,
     PouringCanPerform,
     PouringCauses,
     PouringEffect,
     PouringMSCModel,
     PouringSatisfiesRequest,
-    TorricelliEquation,
 )
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel, HasRootBody
@@ -73,10 +76,12 @@ def world_with_cup():
                 upper=DerivativeMap(position=math.pi / 2, velocity=2.0),
             ),
         )
+    cup.container_geometry = ContainerGeometry(height=0.12, half_width=0.04)
     cup.initialize_fill_level(world=world, parent_body=cup.root, initial_fill=1.0)
-    cup.fill_equation = TorricelliEquation(
+    cup.fill_equation = ArticulatedPouringEquation(
         tilt_connection=cup.root.parent_connection,
         fill_connection=cup.fill_connection,
+        container_geometry=cup.container_geometry,
     )
     return world, cup
 
@@ -206,10 +211,12 @@ def pr2_world_with_cup(pr2_world_setup):
                 reference_frame=world.root,
             ),
         )
+    cup.container_geometry = ContainerGeometry(height=0.12, half_width=0.04)
     cup.initialize_fill_level(world=world, parent_body=cup.root, initial_fill=1.0)
-    cup.fill_equation = TorricelliEquation(
+    cup.fill_equation = ArticulatedPouringEquation(
         tilt_connection=cup.root.parent_connection,
         fill_connection=cup.fill_connection,
+        container_geometry=cup.container_geometry,
     )
     return world, cup, robot
 
@@ -238,3 +245,42 @@ def test_pouring_can_perform(pr2_world_with_cup, rclpy_node):
     assert PouringCanPerform(
         motion=motion, robot=robot
     )(), "PR2 must be able to physically execute the pouring trajectory"
+
+
+def test_eql_query_all_three_predicates(pr2_world_with_cup, rclpy_node):
+    """EQL query resolves task, effect, and motion simultaneously across all three BMP predicates."""
+    world, cup, robot = pr2_world_with_cup
+    viz = VizMarkerPublisher(_world=world, node=rclpy_node)
+    viz.with_tf_publisher()
+
+    goal_fill = 0.6
+    task = TaskRequest(task_type="pour", name="cup")
+    effect = PouringEffect(
+        target_object=cup,
+        property_getter=lambda c: c.fill_level,
+        goal_value=goal_fill,
+    )
+    motion = Motion(
+        trajectory=[],
+        actuator=cup.fill_equation.tilt_connection,
+        motion_model=PouringMSCModel(fill_equation=cup.fill_equation),
+    )
+
+    task_sym = variable(TaskRequest, domain=[task])
+    effect_sym = variable(Effect, domain=[effect])
+    motion_sym = variable(Motion, domain=[motion])
+
+    query = an(
+        set_of(task_sym, effect_sym, motion_sym).where(
+            PouringSatisfiesRequest(task=task_sym, effect=effect_sym),
+            PouringCauses(effect=effect_sym, environment=world, motion=motion_sym),
+            PouringCanPerform(motion=motion_sym, robot=robot),
+        )
+    )
+
+    results = list(query.evaluate())
+    assert len(results) == 1, "Exactly one solution must satisfy all three predicates"
+    result = results[0]
+    assert result.data[task_sym].task_type == "pour"
+    assert result.data[effect_sym].goal_value == goal_fill
+    assert len(result.data[motion_sym].trajectory) > 0

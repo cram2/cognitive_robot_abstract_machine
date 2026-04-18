@@ -39,6 +39,9 @@ from semantic_digital_twin.adapters.procthor.procthor_parser import ProcTHORPars
 import semantic_digital_twin.adapters.sage_10k_dataset
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.orm.model import *  # type: ignore
+from semantic_digital_twin.reasoning.body_motion_problem.container_manipulation.physics import (
+    RunMSCModel,
+)
 from semantic_digital_twin.reasoning.predicates import ContainsType
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
     SemanticDirection,
@@ -60,6 +63,7 @@ all_classes -= {
     ResetStateContextManager,
     WorldModelUpdateContextManager,
     ForwardKinematicsManager,
+    RunMSCModel,
     semantic_digital_twin.adapters.procthor.procthor_resolver.ProcthorResolver,
     ContainsType,
     SemanticDirection,

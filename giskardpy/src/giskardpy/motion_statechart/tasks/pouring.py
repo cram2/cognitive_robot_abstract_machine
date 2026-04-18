@@ -19,8 +19,8 @@ from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
 )
 from giskardpy.motion_statechart.graph_node import NodeArtifacts, Task
-from semantic_digital_twin.reasoning.body_motion_problem.pouring.torricelli import (
-    TorricelliEquation,
+from semantic_digital_twin.reasoning.body_motion_problem.pouring.articulated import (
+    PouringEquation,
 )
 
 
@@ -31,8 +31,7 @@ class PouringTask(Task):
 
     ``build()`` registers:
 
-    1. A velocity equality constraint on the fill joint encoding the Torricelli ODE:
-       ``d(fill)/dt = -k * max(0, sin(θ − θ_threshold)) * √fill``.
+    1. A velocity equality constraint on the fill joint encoding the fill-level ODE.
     2. A position equality constraint on the tilt joint whose target is a
        continuous function of the fill level: tilt ramps linearly from ``theta_max``
        (high fill) to ``0`` (fill ≤ goal).  ``ramp_margin`` controls how many
@@ -42,8 +41,8 @@ class PouringTask(Task):
     integrate the ODE or manipulate QP float variables.
     """
 
-    fill_equation: TorricelliEquation
-    """Torricelli ODE coupling the tilt joint to the fill-level DOF."""
+    fill_equation: PouringEquation
+    """Pouring ODE coupling the tilt joint to the fill-level DOF."""
 
     goal_value: float
     """Target fill level to achieve."""
@@ -94,12 +93,19 @@ class PouringTask(Task):
         # Constraint 2: tilt goal is a continuous function of fill level.
         # tilt_fraction ∈ [0, 1]: reaches 1 when fill is ramp_margin above goal,
         # drops to 0 when fill ≤ goal.
+        # The ramp interpolates between theta_max (high fill) and the equation's
+        # symbolic_tilt_floor (low fill) so that flow is never cut off prematurely
+        # by reducing tilt below the minimum angle required for discharge.
         tilt_fraction = sm.limit(
             (fill_sym - self.goal_value) / self.ramp_margin,
             sm.Scalar(0.0),
             sm.Scalar(1.0),
         )
-        tilt_goal = tilt_fraction * self.theta_max
+        theta_floor = self.fill_equation.symbolic_tilt_floor(fill_sym)
+        tilt_goal = (
+            tilt_fraction * self.theta_max
+            + (sm.Scalar(1.0) - tilt_fraction) * theta_floor
+        )
 
         velocity_upper = tilt_connection.dof.limits.upper.velocity
         velocity_lower = tilt_connection.dof.limits.lower.velocity

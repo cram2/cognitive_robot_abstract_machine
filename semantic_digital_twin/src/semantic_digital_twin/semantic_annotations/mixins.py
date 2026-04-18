@@ -1009,6 +1009,19 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
 
 
 @dataclass(eq=False)
+@dataclass
+class ContainerGeometry:
+    """
+    Physical interior dimensions of a pourable container (rectangular cross-section).
+
+    :param height: Total interior height of the container in metres.
+    :param half_width: Half of the opening width in metres.
+    """
+
+    height: float
+    half_width: float
+
+
 class HasFillLevel:
     """
     Mixin that adds a virtual fill-level DOF to any semantic annotation.
@@ -1019,6 +1032,8 @@ class HasFillLevel:
 
     Optionally assign :attr:`fill_equation` after initialisation to record the
     differential equation that governs the fill level's evolution.
+    Assign :attr:`container_geometry` to provide physical dimensions for
+    geometry-aware fill equations.
     """
 
     fill_connection: Optional[PrismaticConnection] = field(default=None, kw_only=True)
@@ -1028,10 +1043,12 @@ class HasFillLevel:
     """
     The differential equation governing how the fill level changes over time.
 
-    Assign a :class:`~semantic_digital_twin.reasoning.body_motion_problem.pouring.torricelli.TorricelliEquation`
-    (or any other :class:`~semantic_digital_twin.physics.differential_equation.DifferentialEquation`)
+    Assign any :class:`~semantic_digital_twin.physics.differential_equation.DifferentialEquation`
     here to make the physics of the fill level explicit in the world model.
     """
+
+    container_geometry: Optional[ContainerGeometry] = field(default=None, kw_only=True)
+    """Physical dimensions used by geometry-aware fill equations."""
 
     def initialize_fill_level(
         self, world: World, parent_body: Body, initial_fill: float = 1.0

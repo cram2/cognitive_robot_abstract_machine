@@ -2,7 +2,7 @@
 Physics model for the pouring domain (D_pour).
 
 Implements Φ_pour using a MotionStatechart with a PouringTask that integrates
-the Torricelli ODE and controls the tilt joint via QP.
+the fill-level ODE and controls the tilt joint via QP.
 """
 
 from __future__ import annotations
@@ -16,8 +16,8 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.pouring import PouringTask
 
-from semantic_digital_twin.reasoning.body_motion_problem.pouring.torricelli import (
-    TorricelliEquation,
+from semantic_digital_twin.reasoning.body_motion_problem.pouring.articulated import (
+    PouringEquation,
 )
 from semantic_digital_twin.reasoning.body_motion_problem.types import (
     Effect,
@@ -32,15 +32,15 @@ class PouringMSCModel(PhysicsModel):
     Concrete physics model Φ_pour: execute a PouringTask MotionStatechart against a World.
 
     The MotionStatechart contains a single :class:`PouringTask` that integrates the
-    Torricelli ODE and drives the tilt joint via QP. This model compiles the MSC,
+    fill-level ODE and drives the tilt joint via QP. This model compiles the MSC,
     ticks it until EndMotion, records both the tilt and fill trajectories, and
     resets the World state before returning.
 
     ODE parameters and both connections are carried by :attr:`fill_equation`.
     """
 
-    fill_equation: TorricelliEquation
-    """Torricelli ODE — owns the tilt connection, fill connection, k, and theta_threshold."""
+    fill_equation: PouringEquation
+    """Pouring ODE — owns the tilt connection, fill connection, and k."""
 
     theta_max: float = field(default=1.0471975511965976)  # math.pi / 3
     """Maximum tilt angle in radians."""
