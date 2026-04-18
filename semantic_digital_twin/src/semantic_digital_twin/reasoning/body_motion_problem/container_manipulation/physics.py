@@ -70,9 +70,8 @@ class RunMSCModel(PhysicsModel):
         )
         executor.compile(motion_statechart=self.msc)
 
-        initial_state_data = world.state._data.copy()
-        try:
-            trajectory: List[float] = []
+        trajectory: List[float] = []
+        with world.reset_state_context():
             for _ in range(self.timeout):
                 executor.tick()
                 trajectory.append(float(self.actuator.position))
@@ -80,9 +79,5 @@ class RunMSCModel(PhysicsModel):
                     break
 
             achieved = effect.is_achieved()
-
-        finally:
-            world.state._data[:] = initial_state_data
-            world.notify_state_change()
 
         return trajectory, achieved

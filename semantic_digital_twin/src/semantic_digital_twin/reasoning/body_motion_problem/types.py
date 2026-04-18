@@ -124,6 +124,10 @@ class PhysicsModel(ABC):
         """
 
 
+class OutOfScopeError(Exception):
+    """Raised by Causes when world parameters fall outside I_Φ."""
+
+
 @dataclass(eq=True)
 class Motion:
     """
@@ -142,6 +146,17 @@ class Motion:
     motion_model: Optional[PhysicsModel] = field(default=None)
     """
     Optional physics model Φ used to generate the trajectory if it is empty.
+    """
+
+    secondary_trajectories: List[Tuple[Connection, List[float]]] = field(
+        default_factory=list
+    )
+    """
+    Additional coupled actuator trajectories replayed alongside the primary.
+
+    Each entry is ``(connection, positions)`` where ``positions`` is parallel
+    to ``trajectory``. Use this for domains where the effect depends on more
+    than one DOF (e.g., tilt joint + fill-level joint in pouring).
     """
 
 

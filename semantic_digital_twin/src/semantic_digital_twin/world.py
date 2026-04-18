@@ -143,9 +143,6 @@ class ResetStateContextManager:
         exc_val: Optional[Exception],
         exc_tb: Optional[type],
     ) -> None:
-        if exc_val:
-            raise exc_val
-
         self.world.state._data[:] = self.state
         self.world.notify_state_change()
 

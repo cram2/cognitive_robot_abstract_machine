@@ -9,13 +9,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from giskardpy.executor import Executor, SimulationPacer
+from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.goals.collision_avoidance import (
-    ExternalCollisionAvoidance,
-)
 from giskardpy.motion_statechart.goals.templates import Sequence
-from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.pointing import Pointing
@@ -94,23 +90,20 @@ class ContainerCanPerform(CanPerform):
         if not self.motion.trajectory:
             return False
 
-        initial_state_data = self.robot._world.state._data.copy()
+        with self.robot._world.reset_state_context():
+            target_body = self._resolve_target_body()
+            handle_bodies = (
+                [target_body]
+                if isinstance(target_body, Body)
+                else list(target_body.bodies)
+            )
+            handle_trajectory = self._compute_handle_trajectory(target_body)
 
-        target_body = self._resolve_target_body()
-        handle_bodies = (
-            [target_body] if isinstance(target_body, Body) else list(target_body.bodies)
-        )
-
-        handle_trajectory = self._compute_handle_trajectory(target_body)
         approach_trajectory = handle_trajectory[: len(handle_trajectory) // 4][::-1]
-
-        self.robot._world.state._data[:] = initial_state_data
-        self.robot._world.notify_state_change()
 
         result = False
         root = self.robot._world.root
         for gripper in self.robot.manipulators:
-            initial_state_data = self.robot._world.state._data.copy()
             msc = self._build_msc(
                 root, gripper, target_body, approach_trajectory, handle_trajectory
             )
@@ -129,18 +122,16 @@ class ContainerCanPerform(CanPerform):
 
             executor = Executor(
                 context=MotionStatechartContext(world=self.robot._world),
-                # pacer=SimulationPacer(real_time_factor=3.0),
             )
             executor.compile(motion_statechart=msc)
 
-            try:
-                executor.tick_until_end(timeout=900)
-            except TimeoutError:
-                pass
+            with self.robot._world.reset_state_context():
+                try:
+                    executor.tick_until_end(timeout=900)
+                except TimeoutError:
+                    pass
+                result = msc.is_end_motion()
 
-            result = msc.is_end_motion()
-            self.robot._world.state._data[:] = initial_state_data
-            self.robot._world.notify_state_change()
             self.robot._world.collision_manager.clear_temporary_rules()
             if result:
                 break
@@ -170,7 +161,7 @@ class ContainerCanPerform(CanPerform):
             ).evaluate()
         )[0].handle
 
-    def _compute_handle_trajectory(self, target_body):
+    def _compute_handle_trajectory(self, target_body) -> list:
         """
         Convert the actuator-space trajectory to a sequence of handle poses in world space.
         """
@@ -178,20 +169,12 @@ class ContainerCanPerform(CanPerform):
         for position in self.motion.trajectory[:]:
             joint_config = {self.motion.actuator.name.name: position}
             pose = link_pose_for_joint_config(target_body, joint_config)
-            if "sink_area_sink" in [b.name.name for b in self.robot._world.bodies]:
-                rotation1 = HomogeneousTransformationMatrix.from_xyz_quaternion(
-                    quat_x=0, quat_y=0, quat_z=1, quat_w=0
-                )
-                rotation2 = HomogeneousTransformationMatrix.from_xyz_quaternion(
-                    quat_x=0.6816388, quat_y=0, quat_z=0, quat_w=0.7316889
-                )
-                pose = (pose.to_homogeneous_matrix() @ rotation1 @ rotation2).to_pose()
             handle_trajectory.append(pose)
         return handle_trajectory
 
     def _build_msc(
         self, root, gripper, target_body, approach_trajectory, handle_trajectory
-    ):
+    ) -> MotionStatechart:
         """
         Build the MotionStatechart for approaching and following the handle trajectory.
         """
@@ -208,34 +191,20 @@ class ContainerCanPerform(CanPerform):
         )
         msc.add_node(point)
 
-        approach_waypoints = [
-            CartesianPose(
-                root_link=root,
-                tip_link=gripper.tool_frame,
-                goal_pose=pose,
-                name=f"approach_waypoint_{i}",
-                threshold=0.05,
-            )
-            for i, pose in enumerate(approach_trajectory)
-        ]
-
-        waypoints = [
-            CartesianPose(
-                root_link=root,
-                tip_link=gripper.tool_frame,
-                goal_pose=pose,
-                name=f"waypoint_{i}",
-                threshold=0.05,
-            )
-            for i, pose in enumerate(handle_trajectory)
-        ]
-
-        approach_sequence = Sequence(
-            nodes=approach_waypoints, name="approach_trajectory_sequence"
+        approach_sequence = self._build_cartesian_waypoint_sequence(
+            approach_trajectory,
+            root,
+            gripper.tool_frame,
+            name_prefix="approach_waypoint",
+            sequence_name="approach_trajectory_sequence",
         )
         msc.add_node(approach_sequence)
 
-        full_sequence = Sequence(nodes=waypoints, name="full_trajectory_sequence")
+        full_sequence = self._build_cartesian_waypoint_sequence(
+            handle_trajectory,
+            root,
+            gripper.tool_frame,
+        )
         msc.add_node(full_sequence)
 
         keep_relation = CartesianPose(
@@ -254,12 +223,6 @@ class ContainerCanPerform(CanPerform):
         approach_sequence.end_condition = approach_sequence.observation_variable
         point.end_condition = point.observation_variable
 
-        msc.add_node(EndMotion.when_true(full_sequence))
-        msc.add_node(
-            ExternalCollisionAvoidance(
-                name="external_collision_avoidance",
-                robot=self.robot,
-            )
-        )
+        self._add_trajectory_following_nodes(msc, full_sequence, self.robot)
 
         return msc

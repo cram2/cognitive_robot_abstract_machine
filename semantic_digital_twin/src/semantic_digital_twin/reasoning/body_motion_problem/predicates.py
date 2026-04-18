@@ -17,15 +17,24 @@ Together they form the axiom:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import List, Optional
 
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+)
+from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.graph_node import EndMotion
+from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from krrood.entity_query_language.predicate import Predicate
 
 from semantic_digital_twin.reasoning.body_motion_problem.types import (
     Effect,
     Motion,
+    OutOfScopeError,
     TaskRequest,
+    TEEClass,
 )
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
@@ -44,6 +53,9 @@ class Causes(Predicate):
       Case 1 — motion unknown: generate τ from motion_model, verify against effect.
       Case 2 — effect unknown: execute τ and check which effects become true.
       Case 3 — both unknown: union of Case 1 and Case 2.
+
+    Raises OutOfScopeError if tee_class is set and the current world parameters
+    fall outside the validity intervals I_Φ.
     """
 
     effect: Effect
@@ -52,7 +64,11 @@ class Causes(Predicate):
 
     motion: Optional[Motion]
 
+    tee_class: Optional[TEEClass] = field(default=None)
+
     def __call__(self, *args, **kwargs):
+        self._check_validity_intervals()
+
         if self.effect.is_achieved():
             return False
 
@@ -66,23 +82,38 @@ class Causes(Predicate):
             if trajectory and len(trajectory) > 0:
                 self.motion.trajectory = trajectory
 
-        # Verify the trajectory causes the effect by replaying it on the world state
         return self._map_motion_to_effect()
 
-    def _map_motion_to_effect(self):
-        initial_state_data = self.environment.state._data.copy()
+    def _check_validity_intervals(self) -> None:
+        """
+        Raise OutOfScopeError if any physics parameter is outside its I_Φ interval.
+
+        :raises OutOfScopeError: when the current value of the effect property
+            falls outside the bounds declared in tee_class.validity_intervals.
+        """
+        if not self.tee_class or not self.tee_class.validity_intervals:
+            return
+        current = self.effect.current_value
+        for param_name, (lower, upper) in self.tee_class.validity_intervals.items():
+            if not (lower <= current <= upper):
+                raise OutOfScopeError(
+                    f"Parameter '{param_name}' value {current} is outside [{lower}, {upper}]"
+                )
+
+    def _map_motion_to_effect(self) -> bool:
         trajectory = self.motion.trajectory
         actuator = self.motion.actuator
 
         is_achieved_pre = self.effect.is_achieved()
 
-        for position in trajectory:
-            self.environment.set_positions_1DOF_connection({actuator: float(position)})
+        with self.environment.reset_state_context():
+            for i, position in enumerate(trajectory):
+                updates = {actuator: float(position)}
+                for conn, traj in self.motion.secondary_trajectories:
+                    updates[conn] = float(traj[i])
+                self.environment.set_positions_1DOF_connection(updates)
 
-        is_achieved_post = self.effect.is_achieved()
-
-        self.environment.state._data[:] = initial_state_data
-        self.environment.notify_state_change()
+            is_achieved_post = self.effect.is_achieved()
 
         return (not is_achieved_pre) and is_achieved_post
 
@@ -124,3 +155,56 @@ class CanPerform(Predicate):
 
     def __call__(self, *args, **kwargs) -> bool:
         raise NotImplementedError(f"{self.__class__.__name__} must implement __call__.")
+
+    @staticmethod
+    def _build_cartesian_waypoint_sequence(
+        poses: list,
+        root_link,
+        tip_link,
+        name_prefix: str = "waypoint",
+        sequence_name: str = "full_trajectory_sequence",
+        threshold: float = 0.05,
+    ) -> Sequence:
+        """
+        Build a Sequence of CartesianPose waypoints from a list of target poses.
+
+        :param poses: Ordered list of goal poses for the tip link.
+        :param root_link: Root link for the Cartesian goal.
+        :param tip_link: Tip link (e.g. gripper tool frame) to move.
+        :param name_prefix: Prefix for individual waypoint node names.
+        :param sequence_name: Name of the resulting Sequence node.
+        :param threshold: Position tolerance for each waypoint.
+        :return: A Sequence node ready to be added to a MotionStatechart.
+        """
+        waypoints = [
+            CartesianPose(
+                root_link=root_link,
+                tip_link=tip_link,
+                goal_pose=pose,
+                name=f"{name_prefix}_{i}",
+                threshold=threshold,
+            )
+            for i, pose in enumerate(poses)
+        ]
+        return Sequence(nodes=waypoints, name=sequence_name)
+
+    @staticmethod
+    def _add_trajectory_following_nodes(
+        msc: MotionStatechart,
+        sequence: Sequence,
+        robot: AbstractRobot,
+    ) -> None:
+        """
+        Add EndMotion and ExternalCollisionAvoidance nodes to msc for a trajectory sequence.
+
+        :param msc: MotionStatechart to modify in place.
+        :param sequence: The Sequence node that triggers EndMotion on completion.
+        :param robot: Robot used for collision avoidance.
+        """
+        msc.add_node(EndMotion.when_true(sequence))
+        msc.add_node(
+            ExternalCollisionAvoidance(
+                name="external_collision_avoidance",
+                robot=robot,
+            )
+        )

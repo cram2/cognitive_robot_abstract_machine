@@ -1,5 +1,5 @@
 """
-Giskardpy Task for the pouring domain (D_pour) of the BMP framework.
+Giskardpy Tasks for the pouring domain (D_pour) of the BMP framework.
 
 Both the fill-level ODE (Torricelli) and the tilt goal are expressed as
 symbolic QP constraints in ``build()``. ``on_tick()`` is a pure observation
@@ -22,6 +22,8 @@ from giskardpy.motion_statechart.graph_node import NodeArtifacts, Task
 from semantic_digital_twin.reasoning.body_motion_problem.pouring.articulated import (
     PouringEquation,
 )
+from semantic_digital_twin.semantic_annotations.mixins import ContainerGeometry
+from semantic_digital_twin.world_description.connections import Connection
 
 
 @dataclass(eq=False, repr=False)
@@ -91,21 +93,7 @@ class PouringTask(Task):
         )
 
         # Constraint 2: tilt goal is a continuous function of fill level.
-        # tilt_fraction ∈ [0, 1]: reaches 1 when fill is ramp_margin above goal,
-        # drops to 0 when fill ≤ goal.
-        # The ramp interpolates between theta_max (high fill) and the equation's
-        # symbolic_tilt_floor (low fill) so that flow is never cut off prematurely
-        # by reducing tilt below the minimum angle required for discharge.
-        tilt_fraction = sm.limit(
-            (fill_sym - self.goal_value) / self.ramp_margin,
-            sm.Scalar(0.0),
-            sm.Scalar(1.0),
-        )
-        theta_floor = self.fill_equation.symbolic_tilt_floor(fill_sym)
-        tilt_goal = (
-            tilt_fraction * self.theta_max
-            + (sm.Scalar(1.0) - tilt_fraction) * theta_floor
-        )
+        tilt_goal = self._tilt_goal_expression(fill_sym)
 
         velocity_upper = tilt_connection.dof.limits.upper.velocity
         velocity_lower = tilt_connection.dof.limits.lower.velocity
@@ -128,6 +116,28 @@ class PouringTask(Task):
         )
         return artifacts
 
+    def _tilt_goal_expression(self, fill_sym) -> sm.Expression:
+        """
+        Symbolic tilt target as a function of fill level, capped at theta_max.
+
+        :param fill_sym: Symbolic fill-level variable.
+        :return: Symbolic expression for the desired tilt angle.
+        """
+        tilt_fraction = sm.limit(
+            (fill_sym - self.goal_value - self.tolerance) / self.ramp_margin,
+            sm.Scalar(0.0),
+            sm.Scalar(1.0),
+        )
+        theta_floor = sm.limit(
+            self.fill_equation.symbolic_tilt_floor(fill_sym),
+            sm.Scalar(0.0),
+            sm.Scalar(self.theta_max),
+        )
+        return (
+            tilt_fraction * self.theta_max
+            + (sm.Scalar(1.0) - tilt_fraction) * theta_floor
+        )
+
     def on_tick(
         self, context: MotionStatechartContext
     ) -> Optional[ObservationStateValues]:
@@ -142,5 +152,136 @@ class PouringTask(Task):
         """
         fill = float(self.fill_equation.fill_connection.position)
         if fill <= self.goal_value + self.tolerance:
+            return ObservationStateValues.TRUE
+        return None
+
+
+@dataclass(eq=False, repr=False)
+class CoupledPouringTask(PouringTask):
+    """
+    Extends :class:`PouringTask` with receiver fill and kinematic rim-positioning constraints.
+
+    Adds three QP constraints on top of the source fill ODE and tilt ramp:
+
+    1. Receiver fill velocity: ``ḣ_r = max(0, −ḣ_s) · (h_s·r_s) / (h_r·r_r)``
+    2. Cup x-axis position: drives x-translation DOF to keep the spilling rim above the receiver
+    3. Cup z-axis position: drives z-translation DOF to maintain ``height_above_receiver`` clearance
+
+    The rim constraints are nonlinear in the tilt angle but expressed fully symbolically,
+    so the QP progresses all DOFs simultaneously.
+
+    :param receiver_fill_connection: Fill-level DOF of the receiving container.
+    :param x_translation_connection: Prismatic x-DOF of the source cup body.
+    :param z_translation_connection: Prismatic z-DOF of the source cup body.
+    :param source_geometry: Physical dimensions of the source container.
+    :param receiver_geometry: Physical dimensions of the receiver container.
+    :param receiver_x: World-frame x of the receiver opening centre.
+    :param receiver_z_rim: World-frame z target for the spilling rim
+        (= receiver opening z + height_above_receiver).
+    :param goal_receiver_fill: Target normalised fill level for the receiver.
+    """
+
+    receiver_fill_connection: Connection = field(kw_only=True)
+    x_translation_connection: Connection = field(kw_only=True)
+    z_translation_connection: Connection = field(kw_only=True)
+    source_geometry: ContainerGeometry = field(kw_only=True)
+    receiver_geometry: ContainerGeometry = field(kw_only=True)
+    receiver_x: float = field(kw_only=True)
+    receiver_z_rim: float = field(kw_only=True)
+    goal_receiver_fill: float = field(kw_only=True)
+
+    def _tilt_goal_expression(self, fill_sym) -> sm.Expression:
+        """
+        Tilt target driven by receiver fill proximity to goal, capped at theta_max.
+
+        When receiver fill is far below goal, tilt stays at theta_max.
+        As receiver fill approaches goal within ramp_margin, tilt ramps back toward
+        theta_floor, so outflow decelerates before the goal is reached.
+
+        :param fill_sym: Symbolic source fill-level variable (used for theta_floor).
+        :return: Symbolic expression for the desired tilt angle.
+        """
+        receiver_fill_sym = self.receiver_fill_connection.dof.variables.position
+        tilt_fraction = sm.limit(
+            (self.goal_receiver_fill - self.tolerance - receiver_fill_sym)
+            / self.ramp_margin,
+            sm.Scalar(0.0),
+            sm.Scalar(1.0),
+        )
+        theta_floor = sm.limit(
+            self.fill_equation.symbolic_tilt_floor(fill_sym),
+            sm.Scalar(0.0),
+            sm.Scalar(self.theta_max),
+        )
+        return (
+            tilt_fraction * self.theta_max
+            + (sm.Scalar(1.0) - tilt_fraction) * theta_floor
+        )
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        Build source constraints via super(), then add receiver fill and rim positioning constraints.
+
+        :param context: MSC build context.
+        :return: NodeArtifacts with source fill ODE, tilt ramp, receiver fill ODE, and rim constraints.
+        """
+        artifacts = super().build(context)
+
+        source_fill_sym = self.fill_equation.fill_connection.dof.variables.position
+        tilt_sym = self.fill_equation.tilt_connection.dof.variables.position
+        receiver_fill_sym = self.receiver_fill_connection.dof.variables.position
+        x_sym = self.x_translation_connection.dof.variables.position
+        z_sym = self.z_translation_connection.dof.variables.position
+
+        r = self.source_geometry.half_width
+        A = self.source_geometry.height
+
+        source_vel = self.fill_equation.symbolic_velocity(source_fill_sym, tilt_sym)
+        outflow = sm.max(sm.Scalar(0.0), -source_vel)
+        volume_ratio = (r * A) / (
+            self.receiver_geometry.half_width * self.receiver_geometry.height
+        )
+
+        artifacts.constraints.add_velocity_eq_constraint(
+            velocity_goal=outflow * volume_ratio,
+            quadratic_weight=DefaultWeights.WEIGHT_ABOVE_CA,
+            task_expression=receiver_fill_sym,
+            velocity_limit=self.fill_equation.k * volume_ratio,
+            name=str(self.receiver_fill_connection.name),
+        )
+
+        x_target = self.receiver_x - r * sm.cos(tilt_sym) - A * sm.sin(tilt_sym)
+        z_target = self.receiver_z_rim - A * sm.cos(tilt_sym) + r * sm.sin(tilt_sym)
+
+        x_vel = self.x_translation_connection.dof.limits.upper.velocity
+        z_vel = self.z_translation_connection.dof.limits.upper.velocity
+
+        artifacts.constraints.add_equality_constraint(
+            name=str(self.x_translation_connection.name),
+            reference_velocity=x_vel,
+            equality_bound=x_target - x_sym,
+            quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
+            task_expression=x_sym,
+        )
+        artifacts.constraints.add_equality_constraint(
+            name=str(self.z_translation_connection.name),
+            reference_velocity=z_vel,
+            equality_bound=z_target - z_sym,
+            quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
+            task_expression=z_sym,
+        )
+        return artifacts
+
+    def on_tick(
+        self, context: MotionStatechartContext
+    ) -> Optional[ObservationStateValues]:
+        """
+        Return TRUE when the receiver fill reaches the goal, else None.
+
+        :param context: MSC runtime context (unused).
+        :return: ``TRUE`` when receiver fill ≥ goal_receiver_fill − tolerance, else ``None``.
+        """
+        fill = float(self.receiver_fill_connection.position)
+        if fill >= self.goal_receiver_fill - self.tolerance:
             return ObservationStateValues.TRUE
         return None

@@ -6,18 +6,12 @@ from __future__ import annotations
 
 import time
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List
 
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.goals.collision_avoidance import (
-    ExternalCollisionAvoidance,
-)
-from giskardpy.motion_statechart.goals.templates import Sequence
-from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionBetweenGroups,
     AvoidExternalCollisions,
@@ -29,9 +23,11 @@ from semantic_digital_twin.reasoning.body_motion_problem.predicates import (
 )
 from semantic_digital_twin.reasoning.body_motion_problem.pouring.effects import (
     PouringEffect,
+    ReceiverFillEffect,
 )
-from semantic_digital_twin.world_description.connections import PrismaticConnection
+from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from semantic_digital_twin.world_description.world_entity import Body
+from dataclasses import field as dataclass_field
 
 
 @dataclass
@@ -54,19 +50,10 @@ class PouringCauses(Causes):
     """
     Causal sufficiency predicate for D_pour.
 
-    Extends :class:`Causes` to handle the two coupled DOFs of the pouring domain:
-    the tilt joint (``motion.actuator``) and the fill-level joint read from the
-    effect's target object. Both trajectories are replayed during
-    :meth:`_map_motion_to_effect` so that the fill-level effect can be verified
-    against the world state.
+    Populates ``motion.secondary_trajectories`` with the fill-level joint
+    trajectory after simulation so that the base :meth:`_map_motion_to_effect`
+    can replay both DOFs (tilt + fill-level) when verifying the effect.
     """
-
-    _fill_trajectory: List[float] = field(default_factory=list, init=False)
-
-    @property
-    def _fill_connection(self) -> PrismaticConnection:
-        """Fill-level connection read from the effect's target object."""
-        return self.effect.target_object.fill_connection
 
     def __call__(self, *args, **kwargs) -> bool:
         if self.effect.is_achieved():
@@ -80,30 +67,12 @@ class PouringCauses(Causes):
             trajectory, _ = self.motion.motion_model.run(self.effect, self.environment)
             if trajectory:
                 self.motion.trajectory = trajectory
-                self._fill_trajectory = self.motion.motion_model.last_fill_trajectory
+                fill_connection = self.effect.target_object.fill_connection
+                self.motion.secondary_trajectories = [
+                    (fill_connection, self.motion.motion_model.last_fill_trajectory)
+                ]
 
         return self._map_motion_to_effect()
-
-    def _map_motion_to_effect(self) -> bool:
-        initial_state = self.environment.state._data.copy()
-        tilt_actuator = self.motion.actuator
-
-        is_achieved_pre = self.effect.is_achieved()
-
-        for tilt_pos, fill_pos in zip(self.motion.trajectory, self._fill_trajectory):
-            self.environment.set_positions_1DOF_connection(
-                {
-                    tilt_actuator: float(tilt_pos),
-                    self._fill_connection: float(fill_pos),
-                }
-            )
-
-        is_achieved_post = self.effect.is_achieved()
-
-        self.environment.state._data[:] = initial_state
-        self.environment.notify_state_change()
-
-        return (not is_achieved_pre) and is_achieved_post
 
     def replay(self, step_delay: float = 0.05) -> None:
         """
@@ -115,13 +84,12 @@ class PouringCauses(Causes):
         :param step_delay: Seconds to sleep between steps (default 50 ms ≈ 20 fps).
         """
         tilt_actuator = self.motion.actuator
-        for tilt_pos, fill_pos in zip(self.motion.trajectory, self._fill_trajectory):
-            self.environment.set_positions_1DOF_connection(
-                {
-                    tilt_actuator: float(tilt_pos),
-                    self._fill_connection: float(fill_pos),
-                }
-            )
+        secondary = self.motion.secondary_trajectories
+        for i, tilt_pos in enumerate(self.motion.trajectory):
+            updates = {tilt_actuator: float(tilt_pos)}
+            for conn, traj in secondary:
+                updates[conn] = float(traj[i])
+            self.environment.set_positions_1DOF_connection(updates)
             time.sleep(step_delay)
 
 
@@ -145,7 +113,6 @@ class PouringCanPerform(CanPerform):
         result = False
         root = self.robot._world.root
         for gripper in self.robot.manipulators:
-            initial_state_data = self.robot._world.state._data.copy()
             msc = self._build_msc(root, gripper, cup_trajectory)
 
             self.robot._world.collision_manager.clear_temporary_rules()
@@ -166,14 +133,14 @@ class PouringCanPerform(CanPerform):
                 pacer=SimulationPacer(real_time_factor=1.0),
             )
             executor.compile(motion_statechart=msc)
-            try:
-                executor.tick_until_end(timeout=900)
-            except TimeoutError:
-                pass
 
-            result = msc.is_end_motion()
-            self.robot._world.state._data[:] = initial_state_data
-            self.robot._world.notify_state_change()
+            with self.robot._world.reset_state_context():
+                try:
+                    executor.tick_until_end(timeout=900)
+                except TimeoutError:
+                    pass
+                result = msc.is_end_motion()
+
             self.robot._world.collision_manager.clear_temporary_rules()
             if result:
                 break
@@ -200,26 +167,105 @@ class PouringCanPerform(CanPerform):
         Build the MotionStatechart for following the cup tilt trajectory.
         """
         msc = MotionStatechart()
-
-        waypoints = [
-            CartesianPose(
-                root_link=root,
-                tip_link=gripper.tool_frame,
-                goal_pose=pose,
-                name=f"waypoint_{i}",
-                threshold=0.05,
-            )
-            for i, pose in enumerate(cup_trajectory)
-        ]
-
-        full_sequence = Sequence(nodes=waypoints, name="full_trajectory_sequence")
-        msc.add_node(full_sequence)
-
-        msc.add_node(EndMotion.when_true(full_sequence))
-        msc.add_node(
-            ExternalCollisionAvoidance(
-                name="external_collision_avoidance",
-                robot=self.robot,
-            )
+        full_sequence = self._build_cartesian_waypoint_sequence(
+            cup_trajectory, root, gripper.tool_frame
         )
+        msc.add_node(full_sequence)
+        self._add_trajectory_following_nodes(msc, full_sequence, self.robot)
         return msc
+
+
+@dataclass
+class CoupledPouringCauses(Causes):
+    """
+    Causal sufficiency predicate for the coupled pouring chain (source → receiver).
+
+    After running the :class:`CoupledPouringMSCModel`, populates
+    ``motion.secondary_trajectories`` with three entries:
+
+    1. Source tilt connection (primary trajectory, already in ``motion.trajectory``)
+    2. Source fill connection (fill level decreasing)
+    3. Receiver fill connection (fill level increasing)
+
+    The base :meth:`_map_motion_to_effect` then replays all three DOFs
+    and checks that the *receiver* fill effect is achieved.
+
+    :param source: Source container, used to access its fill connection.
+    """
+
+    source: HasFillLevel = dataclass_field(kw_only=True)
+
+    def __call__(self, *args, **kwargs) -> bool:
+        if self.effect.is_achieved():
+            return False
+
+        if (
+            self.motion
+            and self.motion.motion_model
+            and len(self.motion.trajectory) == 0
+        ):
+            trajectory, _ = self.motion.motion_model.run(self.effect, self.environment)
+            if trajectory:
+                self.motion.trajectory = trajectory
+                model = self.motion.motion_model
+                self.motion.secondary_trajectories = [
+                    (
+                        self.source.fill_connection,
+                        model.source_model.last_fill_trajectory,
+                    ),
+                    (
+                        self.effect.target_object.fill_connection,
+                        model.last_receiver_fill_trajectory,
+                    ),
+                    (model.x_translation_connection, model.last_x_trajectory),
+                    (model.z_translation_connection, model.last_z_trajectory),
+                ]
+
+        return self._map_motion_to_effect()
+
+    def replay(self, step_delay: float = 0.05) -> None:
+        """
+        Re-apply the computed trajectory to the world with a per-step delay,
+        animating tilt, source fill decrease, and receiver fill increase.
+
+        :param step_delay: Seconds to sleep between steps.
+        """
+        tilt_actuator = self.motion.actuator
+        secondary = self.motion.secondary_trajectories
+        for i, tilt_pos in enumerate(self.motion.trajectory):
+            updates = {tilt_actuator: float(tilt_pos)}
+            for conn, traj in secondary:
+                updates[conn] = float(traj[i])
+            self.environment.set_positions_1DOF_connection(updates)
+            time.sleep(step_delay)
+
+
+@dataclass
+class CoupledPouringCanPerform(PouringCanPerform):
+    """
+    Embodiment feasibility check for the coupled pouring domain.
+
+    Extends :class:`PouringCanPerform` by replaying x/z translation DOFs from
+    ``motion.secondary_trajectories`` alongside each tilt step, so the robot
+    follows the cup as it both tilts and moves to keep the rim above the receiver.
+    """
+
+    def _compute_cup_trajectory(self, cup_body: Body) -> list:
+        """
+        Compute the cup body trajectory with x/z DOFs set from the recorded QP trajectory.
+        """
+        reasoning_world = deepcopy(cup_body._world)
+        tilt_dof_id = self.motion.actuator.raw_dof.id
+        secondary_by_dof = {
+            conn.raw_dof.id: traj for conn, traj in self.motion.secondary_trajectories
+        }
+        trajectory = []
+        for i, tilt_angle in enumerate(self.motion.trajectory):
+            reasoning_world.state[tilt_dof_id].position = tilt_angle
+            for dof_id, traj in secondary_by_dof.items():
+                reasoning_world.state[dof_id].position = traj[i]
+            reasoning_world.notify_state_change()
+            trajectory.append(
+                reasoning_world.get_body_by_name(cup_body.name).global_pose
+            )
+        return trajectory

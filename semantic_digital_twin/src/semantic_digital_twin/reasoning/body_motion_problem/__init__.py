@@ -19,6 +19,7 @@ from semantic_digital_twin.reasoning.body_motion_problem.types import (
     Effect,
     MonotoneIncreasingEffect,
     MonotoneDecreasingEffect,
+    OutOfScopeError,
     PhysicsModel,
 )
 from semantic_digital_twin.reasoning.body_motion_problem.predicates import (
@@ -34,6 +35,7 @@ __all__ = [
     "Effect",
     "MonotoneIncreasingEffect",
     "MonotoneDecreasingEffect",
+    "OutOfScopeError",
     "PhysicsModel",
     "Causes",
     "SatisfiesRequest",
