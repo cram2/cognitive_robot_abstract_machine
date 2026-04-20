@@ -12,14 +12,14 @@ It handles:
 
 from __future__ import annotations
 
+import atexit
 import logging
-import queue
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from multiprocessing import Pipe, Process, Queue, shared_memory
 from multiprocessing.connection import Connection
-from threading import Event, Lock, Thread
+from threading import Lock, Thread
 
 import numpy as np
 import open3d as o3d  # this import creates a SIGINT during unit test execution....
@@ -37,7 +37,7 @@ from typing_extensions import (
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.defs import PACKAGE_NAME
-from robokudo.utils.decorators import record_time, timer_decorator
+from robokudo.utils.decorators import timer_decorator
 from robokudo.vis.o3d_visualizer import Viewer3D
 from robokudo.vis.visualizer import Visualizer
 
@@ -82,7 +82,6 @@ class O3DVisualizer(Visualizer, Visualizer.Observer):
         """
         self.update_output = True
 
-    @timer_decorator
     def tick(self) -> None:
         """Update the visualization display.
 
@@ -133,15 +132,21 @@ class O3DVisualizer(Visualizer, Visualizer.Observer):
         return self.identifier()
 
 
-@dataclass(slots=True)
+@dataclass(
+    slots=True,
+    frozen=True,
+)
 class MemoryMap(object):
     """A base memory map for shared memory."""
 
-    size: int
+    byte_size: int
     """Size of the underlying data in bytes."""
 
 
-@dataclass(slots=True)
+@dataclass(
+    slots=True,
+    frozen=True,
+)
 class ArrayMemoryMap(MemoryMap):
     """A memory map for a numpy array in shared memory."""
 
@@ -157,11 +162,11 @@ class ArrayMemoryMap(MemoryMap):
         return cls(
             shape=array.shape,
             dtype=str(array.dtype),
-            size=array.size * array.dtype.itemsize,
+            byte_size=array.size * array.dtype.itemsize,
         )
 
 
-@dataclass(slots=True, kw_only=True)
+@dataclass(slots=True, frozen=True, kw_only=True)
 class GeometryMemoryMap(MemoryMap):
     """A memory map for a geometry in shared memory."""
 
@@ -200,7 +205,7 @@ class GeometryMemoryMap(MemoryMap):
             attribute_dict[attribute] = ArrayMemoryMap.from_numpy_array(
                 np.asarray(getattr(geometry, attribute))
             )
-            size += attribute_dict[attribute].size
+            size += attribute_dict[attribute].byte_size
 
         return cls(
             name=name,
@@ -209,7 +214,7 @@ class GeometryMemoryMap(MemoryMap):
             group=group,
             time=time,
             is_visible=is_visible,
-            size=size,
+            byte_size=size,
             **attribute_dict,
         )
 
@@ -252,15 +257,15 @@ class GeometryMemoryMap(MemoryMap):
 
         for attribute, _ in self.mapped_attributes:
             attribute_map = getattr(self, attribute)
-            if attribute_map.size == 0:
+            if attribute_map.byte_size == 0:
                 continue
             buf = np.ndarray(
                 attribute_map.shape,
                 dtype=attribute_map.dtype,
-                buffer=write_buf[write_idx : write_idx + attribute_map.size],
+                buffer=write_buf[write_idx : write_idx + attribute_map.byte_size],
             )
             buf[:] = np.asarray(getattr(geometry, attribute))[:]
-            write_idx += attribute_map.size
+            write_idx += attribute_map.byte_size
         return write_idx
 
     def to_geometry(
@@ -272,22 +277,25 @@ class GeometryMemoryMap(MemoryMap):
         geometry = self.type()
         for attribute, attribute_type in self.mapped_attributes:
             attribute_map = getattr(self, attribute)
-            if attribute_map.size == 0:
+            if attribute_map.byte_size == 0:
                 continue
             buf = np.ndarray(
                 attribute_map.shape,
                 dtype=attribute_map.dtype,
-                buffer=read_buf[read_idx : read_idx + attribute_map.size],
+                buffer=read_buf[read_idx : read_idx + attribute_map.byte_size],
             )
             if attribute_type == np.ndarray:
                 setattr(geometry, attribute, buf)
             else:
                 setattr(geometry, attribute, attribute_type(buf))
-            read_idx += attribute_map.size
+            read_idx += attribute_map.byte_size
         return geometry, read_idx
 
 
-@dataclass(slots=True)
+@dataclass(
+    slots=True,
+    frozen=True,
+)
 class PointCloudMemoryMap(GeometryMemoryMap):
     points: ArrayMemoryMap
     """Memory map of the point clouds points."""
@@ -309,7 +317,49 @@ class PointCloudMemoryMap(GeometryMemoryMap):
     ]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
+class LineSetMemoryMap(GeometryMemoryMap):
+    colors: ArrayMemoryMap
+    """Memory map of the line set colors."""
+
+    lines: ArrayMemoryMap
+    """Memory map of the line set lines."""
+
+    points: ArrayMemoryMap
+    """Memory map of the line set points."""
+
+    mapped_attributes = [
+        ("colors", np.ndarray),
+        ("lines", np.ndarray),
+        ("points", np.ndarray),
+    ]
+
+
+@dataclass(
+    slots=True,
+    frozen=True,
+)
+class MeshBaseMemoryMap(GeometryMemoryMap):
+    vertices: ArrayMemoryMap
+    """Memory map of the mesh vertices."""
+
+    vertex_normals: ArrayMemoryMap
+    """Memory map of the vertex normals."""
+
+    vertex_colors: ArrayMemoryMap
+    """Memory map of the vertex colors."""
+
+    mapped_attributes = [
+        ("vertices", o3d.utility.Vector3dVector),
+        ("vertex_normals", o3d.utility.Vector3dVector),
+        ("vertex_colors", o3d.utility.Vector3dVector),
+    ]
+
+
+@dataclass(
+    slots=True,
+    frozen=True,
+)
 class TriangleMeshMemoryMap(GeometryMemoryMap):
     vertices: ArrayMemoryMap
     """Memory map of the mesh vertices."""
@@ -329,8 +379,8 @@ class TriangleMeshMemoryMap(GeometryMemoryMap):
     triangle_uvs: ArrayMemoryMap
     """Memory map of the mesh triangle uvs."""
 
-    adjacency_list: ArrayMemoryMap
-    """Memory map of the mesh adjacency list."""
+    # adjacency_list: ArrayMemoryMap
+    # """Memory map of the mesh adjacency list."""
 
     mapped_attributes = [
         ("vertices", o3d.utility.Vector3dVector),
@@ -338,15 +388,18 @@ class TriangleMeshMemoryMap(GeometryMemoryMap):
         ("vertex_colors", o3d.utility.Vector3dVector),
         ("triangles", o3d.utility.Vector3iVector),
         ("triangle_normals", o3d.utility.Vector3dVector),
-        ("triangle_uvs", o3d.utility.Vector3dVector),
-        ("adjacency_list", o3d.utility.Vector3dVector),
+        ("triangle_uvs", o3d.utility.Vector2dVector),
+        # ("adjacency_list", o3d.utility.Vector3dVector), # Not useful or visualization
         # TODO:
         # ("textures", o3d.utility.Vector3dVector)
         # ("triangle_material_ids", o3d.utility.Vector3dVector),
     ]
 
 
-@dataclass(slots=True)
+@dataclass(
+    slots=True,
+    frozen=True,
+)
 class OrientedBoundingBoxMap(GeometryMemoryMap):
     center: ArrayMemoryMap
     """Memory map of the oriented bounding box center."""
@@ -364,13 +417,71 @@ class OrientedBoundingBoxMap(GeometryMemoryMap):
     ]
 
 
+@dataclass(
+    slots=True,
+    frozen=True,
+)
+class AxisAlignedBoundingBoxMap(GeometryMemoryMap):
+    color: ArrayMemoryMap
+    """Memory map of the axis aligned bounding box color."""
+
+    max_bound: ArrayMemoryMap
+    """Memory map of the axis aligned bounding box maximum bound."""
+
+    min_bound: ArrayMemoryMap
+    """Memory map of the axis aligned bounding box maximum bound."""
+
+    mapped_attributes = [
+        ("color", np.ndarray),
+        ("max_bound", np.ndarray),
+        ("min_bound", np.ndarray),
+    ]
+
+
+@dataclass(
+    slots=True,
+    frozen=True,
+)
+class VoxelGridMemoryMap(GeometryMemoryMap):
+    # TODO: No actual data accessible in the VoxelGrid how to transfer?
+    origin: ArrayMemoryMap
+    """Memory map of the voxel grid origin."""
+
+    voxel_size: ArrayMemoryMap
+    """Memory map of the voxel grid voxel size."""
+
+    mapped_attributes = [
+        ("origin", o3d.utility.Vector3dVector),
+        ("voxel_size", o3d.utility.Vector3dVector),
+    ]
+
+
+@dataclass(slots=True, frozen=True)
+class OctreeMemoryMap(GeometryMemoryMap):
+    # TODO: No actual data accessible in the Octree how to transfer?
+    max_depth: int
+    """Maximum depth of the octree."""
+
+    origin: ArrayMemoryMap
+    """Memory map of the octree origin."""
+
+    root_node: o3d.geometry.OctreeNode
+    """Memory map of the octree root node."""
+
+    size: float
+    """Memory map of the octree size."""
+
+
 class GeometryMemoryMapFactory:
     """A factory class for creating geometry memory maps from open3d geometry objects."""
 
     geometry_proxies: Dict[Type, Type[GeometryMemoryMap]] = {
         o3d.geometry.PointCloud: PointCloudMemoryMap,
+        o3d.geometry.MeshBase: MeshBaseMemoryMap,
         o3d.geometry.TriangleMesh: TriangleMeshMemoryMap,
         o3d.geometry.OrientedBoundingBox: OrientedBoundingBoxMap,
+        o3d.geometry.AxisAlignedBoundingBox: AxisAlignedBoundingBoxMap,
+        o3d.geometry.LineSet: LineSetMemoryMap,
     }
     """Map of open3d geometry types to their corresponding memory map types."""
 
@@ -422,7 +533,7 @@ class SharedMemoryManager(object):
         self.memory_maps.append(memory_map)
 
         write_cursor = self.write_cursor
-        self.write_cursor += memory_map.size
+        self.write_cursor += memory_map.byte_size
         return write_cursor
 
     def extend(self, memory_maps: List[GeometryMemoryMap]) -> List[int]:
@@ -435,14 +546,14 @@ class SharedMemoryManager(object):
         write_cursors = []
         for memory_map in memory_maps:
             write_cursors.append(self.write_cursor)
-            self.write_cursor += memory_map.size
+            self.write_cursor += memory_map.byte_size
         return write_cursors
 
     def read(self) -> Iterator[Tuple[int, GeometryMemoryMap]]:
         """Read all memory maps from the shared memory manager."""
         for memory_map in self.memory_maps:
             yield self.read_cursor, memory_map
-            self.read_cursor += memory_map.size
+            self.read_cursor += memory_map.byte_size
 
     def reset(self) -> None:
         """Reset the shared memory manager to its initial state."""
@@ -478,89 +589,84 @@ class MultiprocessedViewer3DClient(object):
         """A thread for listening to commands from the main process."""
 
     def get_shm(self, shm_name: str) -> shared_memory.SharedMemory:
-        """Get the shared memory instance for the given shared memory name."""
+        """Get the shared memory instance for the given shared memory name.
+
+        :param shm_name: The name of the shared memory to get.
+        """
         if shm_name not in self.name_to_shm:
             self.name_to_shm[shm_name] = shared_memory.SharedMemory(name=shm_name)
         return self.name_to_shm[shm_name]
 
     def get_shm_manager(self, shm_name: str) -> SharedMemoryManager:
+        """Get the current shared memory manager.
+
+        :param shm_name: The name of the shared memory to get the manager for.
+        :return: The shared memory manager for the given shared memory name.
+        """
         return self.name_to_shm_manager[shm_name]
 
     def run(self) -> None:
+        """Run the visualization client."""
         self.receiver_thread.start()
+        try:
+            o3d.visualization.gui.Application.instance.run()
+        except KeyboardInterrupt:
+            self.rk_logger.info("Keyboard interrupt received, shutting down...")
+            self.close()
 
-        def tick():
-            self.viewer3d.main_vis.post_redraw()
-            return True  # keep running
-
-        o3d.visualization.gui.Application.instance.run()
+    def close(self) -> None:
+        """Close the visualization client and clean up resources."""
+        if self.receiver_thread.is_alive():
+            self.receiver_thread.join(timeout=1.0 / 10.0)
+        for shm in self.name_to_shm.values():
+            self.rk_logger.info(f"Closing shared memory {shm.name}")
+            shm.close()
 
     def update_geometry(self) -> None:
+        """Update the geometry in the viewer."""
+        start_t = time.perf_counter()
         with self.geometries_lock:
             self.viewer3d.update_cloud(self.geometries)
+        self.rk_logger.debug(
+            f"Updated geometry in {time.perf_counter() - start_t:.4f}s"
+        )
 
     def listen(self):
         """Listen for commands from the main process and handle them accordingly."""
-        interval = 1.0 / 60.0
-        frame_count = 0
-        start_time = time.monotonic()
-
-        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.1)
-        self.viewer3d.main_vis.add_geometry("dummy", coordinate_frame)
-
-        last_tick = time.monotonic() - interval
         while True:
-            now = time.monotonic()
-            delta = now - last_tick
-            sleep_time = max(0.0, interval - delta)
-            last_tick = now
-            if self.cmd_conn.poll(timeout=sleep_time):
-                cmd = self.cmd_conn.recv()
-                if isinstance(cmd, MemoryMapTransport):
-                    self.rk_logger.debug(f"Received memory map: {cmd}")
-                    start_t = time.perf_counter()
+            cmd = self.cmd_conn.recv()
+            if isinstance(cmd, MemoryMapTransport):
+                self.rk_logger.debug(f"Received memory map: {cmd}")
+                start_t = time.perf_counter()
 
-                    shm = self.get_shm(cmd.shm_name)
-                    shm_manager = self.get_shm_manager(cmd.shm_name)
-                    shm_manager.reset()
+                shm = self.get_shm(cmd.shm_name)
+                shm_manager = self.get_shm_manager(cmd.shm_name)
+                shm_manager.reset()
 
-                    # Load into memory manager
-                    _ = shm_manager.extend(cmd.memory_maps)
+                # Load into memory manager
+                _ = shm_manager.extend(cmd.memory_maps)
 
-                    # Reconstruct geometries
-                    with self.geometries_lock:
-                        self.geometries = []
-                        for read_idx, memory_map in shm_manager.read():
-                            geometry, read_idx = memory_map.as_geometry_dict(
-                                shm, read_idx
-                            )
-                            self.geometries.append(geometry)
+                # Reconstruct geometries
+                with self.geometries_lock:
+                    self.geometries = []
+                    for read_idx, memory_map in shm_manager.read():
+                        geometry, read_idx = memory_map.as_geometry_dict(shm, read_idx)
+                        self.geometries.append(geometry)
 
-                    # self.viewer3d.update_cloud(geometries)
-                    o3d.visualization.gui.Application.instance.post_to_main_thread(
-                        self.viewer3d.main_vis, self.update_geometry
-                    )
+                o3d.visualization.gui.Application.instance.post_to_main_thread(
+                    self.viewer3d.main_vis, self.update_geometry
+                )
 
-                    self.cmd_conn.send(True)
-                    self.rk_logger.debug(
-                        f"Processed memory map in {time.perf_counter() - start_t:.4f}s"
-                    )
-
-            # self.viewer3d.main_vis.remove_geometry("dummy")
-            # self.viewer3d.main_vis.add_geometry("dummy", coordinate_frame)
-            # self.viewer3d.tick()
-            # frame_count += 1
-
-            # elapsed = now - start_time
-            # if elapsed > 0:
-            #     avg_fps = frame_count / elapsed
-            #     self.rk_logger.info(f"Average FPS: {avg_fps:.2f}")
+                self.rk_logger.debug(
+                    f"Processed memory map in {time.perf_counter() - start_t:.4f}s"
+                )
+                self.cmd_conn.send(True)
 
 
 class MultiprocessedViewer3D(object):
     """A wrapper class for the Viewer3D class to run it in a separate process."""
 
-    def __init__(self, title: str) -> None:
+    def __init__(self, title: str, shm_size: int = 5_000_000_000) -> None:
         """Initialize the 3D viewer.
 
         :param title: Window title for the viewer
@@ -582,7 +688,7 @@ class MultiprocessedViewer3D(object):
         """Index of the shm to read to."""
 
         self.shms = [
-            shared_memory.SharedMemory(create=True, size=5_000_000_000)
+            shared_memory.SharedMemory(create=True, size=shm_size)
             for _ in range(self.buffer_count)
         ]
         """Shared memory instances for communicating with the viewer process."""
@@ -602,11 +708,20 @@ class MultiprocessedViewer3D(object):
         """Pipe connection for sending and receiving commands on the visualizer process."""
 
         self.visualizer_process: Process = Process(
-            target=self.run_visualizer, args=(title, self.child_cmd_conn)
+            target=self.run_visualizer,
+            args=(title, self.child_cmd_conn),
+            name="robokudo_visualizer",
+            daemon=True,
         )
         """A process running a viewer3d instance."""
 
         self.visualizer_process.start()
+
+        atexit.register(self.close)
+
+        self.rk_logger.debug(
+            f"Started viewer process with PID {self.visualizer_process.pid}"
+        )
 
     @staticmethod
     def run_visualizer(title: str, cmd_conn: Connection) -> None:
@@ -617,35 +732,41 @@ class MultiprocessedViewer3D(object):
         """
         client = MultiprocessedViewer3DClient(title, cmd_conn)
         client.run()
-        # client.listen()
 
     @property
     def _read_shm(self) -> shared_memory.SharedMemory:
+        """The shared memory that is currently readable."""
         return self.shms[self.buffer_read_cursor]
 
     @property
     def _write_shm(self) -> shared_memory.SharedMemory:
+        """The shared memory that is currently writeable."""
         return self.shms[self.buffer_write_cursor]
 
     @property
     def _read_manager(self) -> SharedMemoryManager:
+        """The manager for the shared memory that is currently readable."""
         return self.memory_manager[self.buffer_read_cursor]
 
     @property
     def _write_manager(self) -> SharedMemoryManager:
+        """The manager for the shared memory that is currently writeable."""
         return self.memory_manager[self.buffer_write_cursor]
 
-    def _swap(self) -> int:
+    def _swap(self) -> Tuple[int, int]:
+        """Rotate the read and write buffers.
+
+        :return: The indices of the new buffers in format (read_buffer, write_buffer)
+        """
         self.buffer_read_cursor = (self.buffer_read_cursor + 1) % self.buffer_count
         self.buffer_write_cursor = (self.buffer_write_cursor + 1) % self.buffer_count
-        return self.buffer_read_cursor
+        return self.buffer_read_cursor, self.buffer_write_cursor
 
     def tick(self) -> Any:
         """Update the viewer display.
 
         :returns: False if visualization should terminate, True otherwise
         """
-
         # self.parent_cmd_conn.send("tick")
         # tick_return = self.parent_cmd_conn.recv()
         # return tick_return
@@ -674,24 +795,24 @@ class MultiprocessedViewer3D(object):
 
         # local method to add a single geometry. either based on the geometry being fully
         # defined with a dict or being a plain geometry object
-        def add(g: Union[o3d.geometry.PointCloud, Dict], n: int) -> None:
+        def add(
+            g: Union[o3d.geometry.PointCloud, Dict, o3d.geometry.Geometry], n: int
+        ) -> None:
             # Skip empty point clouds as they generate errors during the update
             if isinstance(g, o3d.geometry.PointCloud) and len(g.points) == 0:
                 return
 
-            if isinstance(g, dict):
-                geometry = g["geometry"]
-                memory_map = GeometryMemoryMapFactory.from_geometry_dict(g)
-            else:
-                try:
+            try:
+                if isinstance(g, dict):
+                    geometry = g["geometry"]
+                    memory_map = GeometryMemoryMapFactory.from_geometry_dict(g)
+                else:
                     geometry = g
                     name = "Object " + str(n)
                     memory_map = GeometryMemoryMapFactory.from_geometry(name, g)
-                except KeyError as e:
-                    self.rk_logger.warning(
-                        f"Could not create a memory map for {g}: {e}"
-                    )
-                    return
+            except KeyError as e:
+                self.rk_logger.warning(f"Could not create a memory map for {g}: {e}")
+                return
 
             write_idx = self._write_manager.append(memory_map)
             memory_map.write_geometry(self._write_shm, write_idx, geometry)
@@ -715,3 +836,24 @@ class MultiprocessedViewer3D(object):
 
         self.parent_cmd_conn.send(transport)
         _ = self.parent_cmd_conn.recv()
+
+    def close(self) -> None:
+        """Clean up shared memory and process resources."""
+        if self.visualizer_process.is_alive():
+            self.visualizer_process.join(timeout=1)
+            if self.visualizer_process.is_alive():
+                self.visualizer_process.terminate()
+
+        for shm in self.shms:
+            shm.unlink()
+            shm.close()
+
+        try:
+            self.parent_cmd_conn.close()
+        except Exception:
+            pass
+
+        try:
+            self.child_cmd_conn.close()
+        except Exception:
+            pass
