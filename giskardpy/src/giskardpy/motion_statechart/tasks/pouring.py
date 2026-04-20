@@ -127,7 +127,7 @@ class PouringTask(Task):
         :return: Symbolic expression for the desired tilt angle.
         """
         tilt_fraction = sm.limit(
-            (fill_sym - self.goal_value - self.tolerance) / self.ramp_margin,
+            (fill_sym - self.goal_value) / self.ramp_margin,
             sm.Scalar(0.0),
             sm.Scalar(1.0),
         )

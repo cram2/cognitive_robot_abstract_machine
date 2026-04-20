@@ -39,7 +39,7 @@ from semantic_digital_twin.reasoning.body_motion_problem.types import (
 )
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door, Drawer
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     SemanticAnnotation,
@@ -182,10 +182,17 @@ class ContainerCanPerform(CanPerform):
 
         goal_point = handle_trajectory[0].to_position()
         goal_point.z = self.robot.base.bodies[0].global_pose.z
+        main_axis = self.robot.base.main_axis
+        pointing_axis = Vector3(
+            main_axis.x,
+            main_axis.y,
+            main_axis.z,
+            reference_frame=self.robot.root,
+        )
         point = Pointing(
             root_link=root,
             tip_link=self.robot.root,
-            pointing_axis=self.robot.base.main_axis,
+            pointing_axis=pointing_axis,
             goal_point=goal_point,
             threshold=0.2,
         )
