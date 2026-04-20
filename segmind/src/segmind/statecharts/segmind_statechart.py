@@ -46,17 +46,17 @@ class SegmindStatechart:
         self.context = context
 
         detectors = [
-            ContactDetector(context=self.context),
-            LossOfContactDetector(context=self.context),
-            SupportDetector(context=self.context),
-            LossOfSupportDetector(context=self.context),
-            ContainmentDetector(context=self.context),
-            TranslationDetector(context=self.context),
-            StopTranslationDetector(context=self.context),
-            PlacingDetector(context=self.context),
-            InsertionDetector(context=self.context),
-            PickUpDetector(context=self.context),
-            LossOfContainmentDetector(context=self.context),
+            ContactDetector(),
+            LossOfContactDetector(),
+            SupportDetector(),
+            LossOfSupportDetector(),
+            ContainmentDetector(),
+            TranslationDetector(),
+            StopTranslationDetector(),
+            PlacingDetector(),
+            InsertionDetector(),
+            PickUpDetector(),
+            LossOfContainmentDetector(),
         ]
 
         sc.add_nodes(detectors)

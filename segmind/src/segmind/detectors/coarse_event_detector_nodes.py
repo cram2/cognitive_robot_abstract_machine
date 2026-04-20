@@ -3,14 +3,13 @@ from dataclasses import dataclass
 from typing import List
 
 from segmind.datastructures.events import (
-    StopMotionEvent,
     SupportEvent,
-    Event,
-    PlacingEvent, TranslationEvent, LossOfSupportEvent, PickUpEvent,
+    DetectionEvent,
+    PlacingEvent, TranslationEvent, LossOfSupportEvent, PickUpEvent, StopTranslationEvent,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
-from segmind.detectors.base import AbstractDetector
+from segmind.detectors.base import AbstractDetector, SegmindContext
 
 
 @dataclass
@@ -27,7 +26,7 @@ class AbstractInteractionDetector(AbstractDetector):
     The threshold for the time difference between two events to be considered an interaction.
     """
 
-    def update_context_and_events(self, tracked_objects: List[Body]) -> List[Event]:
+    def update_context_and_events(self, context:SegmindContext, tracked_objects: List[Body]) -> List[DetectionEvent]:
         pass
 
 @dataclass
@@ -42,7 +41,7 @@ class PlacingDetector(AbstractInteractionDetector):
     the class helps maintain consistency and prevent duplication of events.
     """
 
-    def update_context_and_events(self, obj: List[Body]) -> List[Event]:
+    def update_context_and_events(self, context:SegmindContext, obj: List[Body]) -> List[DetectionEvent]:
         """
         Updates the system context with new placing event instances based on past
         actions logged in the system. It analyzes and filters specific event types
@@ -55,11 +54,11 @@ class PlacingDetector(AbstractInteractionDetector):
         """
         stop_translation_event = [
             i
-            for i in self.context.logger.get_events()
-            if isinstance(i, StopMotionEvent)
+            for i in context.logger.get_events()
+            if isinstance(i, StopTranslationEvent)
         ]
         support_event = [
-            i for i in self.context.logger.get_events() if isinstance(i, SupportEvent)
+            i for i in context.logger.get_events() if isinstance(i, SupportEvent)
         ]
 
         events = []
@@ -74,10 +73,10 @@ class PlacingDetector(AbstractInteractionDetector):
                     continue
 
                 key = (i.tracked_object.id, i.with_object.id)
-                if key in self.context.placing_pairs:
+                if key in context.placing_pairs:
                     continue
 
-                self.context.placing_pairs.add(key)
+                context.placing_pairs.add(key)
 
                 events.append(
                     PlacingEvent(
@@ -104,7 +103,7 @@ class PickUpDetector(AbstractInteractionDetector):
     data and uses a context to manage event pairs and thresholds.
     """
 
-    def update_context_and_events(self, obj: List[Body]) -> List[Event]:
+    def update_context_and_events(self, context:SegmindContext, obj: List[Body]) -> List[DetectionEvent]:
         """
         Updates the context and generates a list of events based on translation events and loss
         of support events. The method identifies pairs of related events that are close in
@@ -116,11 +115,11 @@ class PickUpDetector(AbstractInteractionDetector):
         """
         translation_event = [
             i
-            for i in self.context.logger.get_events()
+            for i in context.logger.get_events()
             if isinstance(i, TranslationEvent)
         ]
         loss_of_support_event = [
-            i for i in self.context.logger.get_events() if isinstance(i, LossOfSupportEvent)
+            i for i in context.logger.get_events() if isinstance(i, LossOfSupportEvent)
         ]
         events = []
         by_object = defaultdict(list)
@@ -133,10 +132,10 @@ class PickUpDetector(AbstractInteractionDetector):
                     continue
 
                 key = (i.tracked_object.id, i.with_object.id)
-                if key in self.context.placing_pairs:
+                if key in context.placing_pairs:
                     continue
 
-                self.context.placing_pairs.add(key)
+                context.placing_pairs.add(key)
 
                 events.append(
                     PickUpEvent(

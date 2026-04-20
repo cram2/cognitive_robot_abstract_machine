@@ -1,11 +1,10 @@
-import math
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Set, Any
 import numpy as np
 
 from segmind.datastructures.events import (
-    Event,
+    DetectionEvent,
     ContactEvent,
     LossOfContactEvent,
     TranslationEvent,
@@ -13,9 +12,7 @@ from segmind.datastructures.events import (
     StopTranslationEvent,
     StopRotationEvent,
 )
-from segmind.detectors.base import (
-    AbstractDetector,
-)
+from segmind.detectors.base import SegmindContext, AbstractDetector
 from semantic_digital_twin.reasoning.predicates import contact
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
@@ -30,8 +27,9 @@ class ContactDetector(AbstractDetector):
 
     def update_context_and_events(
         self,
+        context: SegmindContext,
         tracked_objects: List[Body],
-    ) -> List[Event]:
+    ) -> List[DetectionEvent]:
         """
         Detects newly formed contacts and updates the stored contact state.
 
@@ -42,8 +40,8 @@ class ContactDetector(AbstractDetector):
         :return: List of ContactEvent instances generated during this update.
         """
 
-        new_contact_pairs = self.get_relation(tracked_objects, contact)
-        latest_contact_bodies = self.context.latest_contact_bodies
+        new_contact_pairs = self.get_relation(context,tracked_objects, contact)
+        latest_contact_bodies = context.latest_contact_bodies
         events = []
         for obj, contact_list in new_contact_pairs.items():
             new_contacts = (
@@ -69,8 +67,9 @@ class LossOfContactDetector(AbstractDetector):
 
     def update_context_and_events(
         self,
+        context: SegmindContext,
         tracked_objects: List[Body],
-    ) -> List[Event]:
+    ) -> List[DetectionEvent]:
         """
         Detects when existing contacts are no longer present and updates
         the stored contact state accordingly.
@@ -82,8 +81,8 @@ class LossOfContactDetector(AbstractDetector):
         :return: List of LossOfContactEvent instances generated during this update.
         """
 
-        new_contact_pairs = self.get_relation(tracked_objects, contact)
-        latest_contact_bodies = self.context.latest_contact_bodies
+        new_contact_pairs = self.get_relation(context, tracked_objects, contact)
+        latest_contact_bodies = context.latest_contact_bodies
         events = []
         for obj, contact_list in list(latest_contact_bodies.items()):
             loss_contacts = (
@@ -122,7 +121,7 @@ class MotionDetector(AbstractDetector):
     Threshold for the distance between two poses to be considered movement.
     """
 
-    def update_context_and_events(self, tracked_objs: List[Body]) -> List[Event]:
+    def update_context_and_events(self, context: SegmindContext, tracked_objs: List[Body]) -> List[DetectionEvent]:
         """
         Updates the pose history for each tracked object and checks for motion events.
 
@@ -131,28 +130,28 @@ class MotionDetector(AbstractDetector):
         """
         events = []
         for obj in tracked_objs:
-            latest_poses = self.context.latest_poses.setdefault(obj, [])
+            latest_poses = context.latest_poses.setdefault(obj, [])
             latest_poses.append(obj.global_pose)
             if len(latest_poses) >= self.window_size:
-                event = self.check_obj_movement(obj)
+                event = self.check_obj_movement(context, obj)
                 if event:
                     events.append(event)
                 latest_poses.pop(0)
         return events
 
-    def check_obj_movement(self, obj: Body) -> Optional[Event]:
+    def check_obj_movement(self, context:SegmindContext, obj: Body) -> Optional[DetectionEvent]:
         """
         Determines if an object is moving based on its pose history and delegates event creation.
 
         :param obj: The body to check.
-        :return: An Event if movement/stop is detected, otherwise None.
+        :return: An DetectionEvent if movement/stop is detected, otherwise None.
         """
-        is_moving = self._calculate_is_moving(obj)
-        self.context.object_moving_status[obj] = is_moving
-        return self._check_movement_and_trigger_event(obj)
+        is_moving = self._calculate_is_moving(context, obj)
+        context.object_moving_status[obj] = is_moving
+        return self._check_movement_and_trigger_event(context, obj)
 
     @abstractmethod
-    def _check_movement_and_trigger_event(self, obj: Body) -> Optional[Event]:
+    def _check_movement_and_trigger_event(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
         """
         Subclass-specific logic to trigger Motion or StopMotion events.
 
@@ -161,7 +160,7 @@ class MotionDetector(AbstractDetector):
         """
         pass
 
-    def _calculate_is_moving(self, obj: Body) -> bool:
+    def _calculate_is_moving(self, context:SegmindContext, obj: Body) -> bool:
         """
         Determines whether an object is moving by evaluating the distance between its
         recorded positions within the window.
@@ -170,7 +169,7 @@ class MotionDetector(AbstractDetector):
         :return: True if the object is moving, False otherwise.
         """
 
-        latest_poses = self.context.latest_poses[obj]
+        latest_poses = context.latest_poses[obj]
         p_last = np.array(latest_poses[-1].to_position().to_list())
         for p in latest_poses[:-1]:
             p_prev = np.array(p.to_position().to_list())
@@ -207,7 +206,7 @@ class TranslationDetector(MotionDetector):
     Triggers a TranslationEvent when an object starts moving.
     """
 
-    def _check_movement_and_trigger_event(self, obj: Body) -> Optional[Event]:
+    def _check_movement_and_trigger_event(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
         """
         Checks the movement of an object and triggers a motion event if applicable.
 
@@ -219,9 +218,9 @@ class TranslationDetector(MotionDetector):
         :param obj: The object being monitored for movement.
         :return: A TranslationEvent if the object is moving, otherwise None.
         """
-        latest_motion_event = self.context.latest_motion_events.get(obj)
-        latest_poses = self.context.latest_poses[obj]
-        is_moving = self.context.object_moving_status.get(obj)
+        latest_motion_event = context.latest_motion_events.get(obj)
+        latest_poses = context.latest_poses[obj]
+        is_moving = context.object_moving_status.get(obj)
 
         if not is_moving or latest_motion_event is not None:
             return None
@@ -232,7 +231,7 @@ class TranslationDetector(MotionDetector):
             current_pose=latest_poses[-1],
         )
 
-        self.context.latest_motion_events[obj] = new_event
+        context.latest_motion_events[obj] = new_event
         return new_event
 
 
@@ -243,7 +242,7 @@ class StopTranslationDetector(MotionDetector):
     Triggers a StopTranslationEvent when an object that was moving stops.
     """
 
-    def _check_movement_and_trigger_event(self, obj: Body) -> Optional[Event]:
+    def _check_movement_and_trigger_event(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
         """
         Checks the movement of an object and triggers an event if necessary.
 
@@ -255,9 +254,9 @@ class StopTranslationDetector(MotionDetector):
         :param obj: The object to check for movement.
         :return: A StopTranslationEvent if the object stops moving, otherwise None.
         """
-        latest_motion_event = self.context.latest_motion_events.get(obj)
-        latest_poses = self.context.latest_poses[obj]
-        is_moving = self.context.object_moving_status.get(obj)
+        latest_motion_event = context.latest_motion_events.get(obj)
+        latest_poses = context.latest_poses[obj]
+        is_moving = context.object_moving_status.get(obj)
 
         if is_moving:
             return None
@@ -274,7 +273,7 @@ class StopTranslationDetector(MotionDetector):
             current_pose=latest_poses[-1],
         )
 
-        self.context.latest_motion_events.pop(obj, None)
+        context.latest_motion_events.pop(obj, None)
 
         return stop_event
 
@@ -288,33 +287,33 @@ class RotationDetector(MotionDetector):
     Triggers a RotationEvent when an object starts rotating.
     """
 
-    def check_obj_movement(self, obj: Body) -> Optional[Event]:
+    def check_obj_movement(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
         """
         Checks if an object is rotating based on its pose history.
 
         :param obj: The object to check.
         :return: A RotationEvent if the object is rotating, otherwise None.
         """
-        latest_poses = self.context.latest_poses[obj]
+        latest_poses = context.latest_poses[obj]
         is_moving = False
         q_last = latest_poses[-1].to_quaternion().to_list()
         for p in latest_poses[:-1]:
             if not np.allclose(q_last, p.to_quaternion().to_list()):
                 is_moving = True
                 break
-        self.context.object_moving_status[obj] = is_moving
-        return self._check_movement_and_trigger_event(obj)
+        context.object_moving_status[obj] = is_moving
+        return self._check_movement_and_trigger_event(context, obj)
 
-    def _check_movement_and_trigger_event(self, obj: Body) -> Optional[Event]:
+    def _check_movement_and_trigger_event(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
         """
         Checks if an object is rotating and triggers a RotationEvent if necessary.
 
         :param obj: The object to check.
         :return: The RotationEvent if the object is rotating, otherwise None.
         """
-        latest_motion_event = self.context.latest_motion_events.get(obj)
-        latest_poses = self.context.latest_poses[obj]
-        is_moving = self.context.object_moving_status.get(obj)
+        latest_motion_event = context.latest_motion_events.get(obj)
+        latest_poses = context.latest_poses[obj]
+        is_moving = context.object_moving_status.get(obj)
 
         if is_moving:
             if latest_motion_event is None:
@@ -323,7 +322,7 @@ class RotationDetector(MotionDetector):
                     start_pose=latest_poses[0],
                     current_pose=latest_poses[-1],
                 )
-                self.context.latest_motion_events[obj] = new_event
+                context.latest_motion_events[obj] = new_event
                 return new_event
             else:
                 return None
@@ -338,14 +337,14 @@ class StopRotationDetector(MotionDetector):
     Triggers a StopRotationEvent when an object that was rotating stops.
     """
 
-    def check_obj_movement(self, obj: Body) -> Optional[Event]:
+    def check_obj_movement(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
         """
         Check if an object is rotating based on its pose history.
 
         :param obj: The object to check.
         :return: A StopRotationEvent if the object is rotating, otherwise None.
         """
-        latest_poses = self.context.latest_poses[obj]
+        latest_poses = context.latest_poses[obj]
         # Check orientation closeness using quaternions.
         is_moving = False
         q_last = latest_poses[-1].to_quaternion().to_list()
@@ -353,19 +352,19 @@ class StopRotationDetector(MotionDetector):
             if not np.allclose(q_last, p.to_quaternion().to_list()):
                 is_moving = True
                 break
-        self.context.object_moving_status[obj] = is_moving
-        return self._check_movement_and_trigger_event(obj)
+        context.object_moving_status[obj] = is_moving
+        return self._check_movement_and_trigger_event(context, obj)
 
-    def _check_movement_and_trigger_event(self, obj: Body) -> Optional[Event]:
+    def _check_movement_and_trigger_event(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
         """
         Checks if an object is rotating and triggers a StopRotationEvent if necessary.
 
         :param obj: The object to check for movement.
         :return: The StopRotationEvent if the object stops rotating, otherwise None.
         """
-        latest_motion_event = self.context.latest_motion_events.get(obj)
-        latest_poses = self.context.latest_poses[obj]
-        is_moving = self.context.object_moving_status.get(obj)
+        latest_motion_event = context.latest_motion_events.get(obj)
+        latest_poses = context.latest_poses[obj]
+        is_moving = context.object_moving_status.get(obj)
 
         if is_moving:
             return None
@@ -386,6 +385,6 @@ class StopRotationDetector(MotionDetector):
                 start_pose=latest_motion_event.start_pose,
                 current_pose=latest_poses[-1],
             )
-            del self.context.latest_motion_events[obj]
+            del context.latest_motion_events[obj]
             return stop_event
 

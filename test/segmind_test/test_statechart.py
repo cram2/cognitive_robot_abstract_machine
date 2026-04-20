@@ -381,7 +381,7 @@ def test_rotation():
     from segmind.detectors.atomic_event_detectors_nodes import RotationDetector
     statechart = SegmindStatechart()
     sc = statechart.build_statechart(context)
-    rotation_detector = RotationDetector(name="rotation_detector", context=context)
+    rotation_detector = RotationDetector(name="rotation_detector")
     sc.add_node(rotation_detector)
 
     cylinder = world.get_body_by_name("cylinder_body")
@@ -412,8 +412,8 @@ def test_stop_rotation():
     from segmind.detectors.atomic_event_detectors_nodes import RotationDetector, StopRotationDetector
     statechart = SegmindStatechart()
     sc = statechart.build_statechart(context)
-    sc.add_node(RotationDetector(name="rotation_detector", context=context))
-    sc.add_node(StopRotationDetector(name="stop_rotation_detector", context=context))
+    sc.add_node(RotationDetector(name="rotation_detector"))
+    sc.add_node(StopRotationDetector(name="stop_rotation_detector"))
 
     cylinder = world.get_body_by_name("cylinder_body")
 

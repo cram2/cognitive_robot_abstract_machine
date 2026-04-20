@@ -458,7 +458,6 @@ class ObjectTracker:
             return [event.timestamp for event in self._event_history]
 
 
-@dataclass
 class ObjectTrackerFactory:
     """
     Factory class to manage creation and access of ObjectTracker instances.

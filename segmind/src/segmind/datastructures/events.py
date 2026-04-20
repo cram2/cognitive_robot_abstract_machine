@@ -17,7 +17,7 @@ from semantic_digital_twin.world_description.world_entity import Body, Agent
 
 @dataclass
 class DetectionEvent(ABC):
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: float = field(default_factory=time.time)
     """
     The time at which the event occurred, defaults to current time.
     """
@@ -182,7 +182,7 @@ class RotationEvent(MotionEvent):
 
 
 @dataclass(init=False, unsafe_hash=True)
-class StopMotionEvent(MotionEvent):
+class StopTranslationEvent(MotionEvent):
     """
     Represents an event where an object stops moving.
     """
@@ -190,7 +190,7 @@ class StopMotionEvent(MotionEvent):
 
 
 @dataclass(init=False, unsafe_hash=True)
-class StopRotationEvent(StopMotionEvent):
+class StopRotationEvent(MotionEvent):
     """
     Represents an event where an object stops rotating.
     """
@@ -319,7 +319,7 @@ class LossOfContainmentEvent(DefaultEventWithTwoTrackedObjects):
 # Create a type that is the union of all event types
 EventUnion = Union[
 MotionEvent,
-StopMotionEvent,
+StopTranslationEvent,
 PickUpEvent,
 PlacingEvent,
 ContainmentEvent,

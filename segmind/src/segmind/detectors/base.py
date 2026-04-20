@@ -6,18 +6,13 @@ from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from segmind.datastructures.events import MotionEvent, Event
+from segmind.datastructures.events import MotionEvent, DetectionEvent
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 
 
 # ToDo: See if we can create our own MotionStatechartNode or change its name (talk to simon)
-@dataclass(repr=False, eq=False)
-class DetectorStateChartNode(MotionStatechartNode):
-    pass
-
-
 @dataclass
 class DetectorStateChart(MotionStatechart):
     """
@@ -96,8 +91,8 @@ class SegmindContext(MotionStatechartContext):
     """
 
 
-@dataclass
-class AbstractDetector(ABC, DetectorStateChartNode):
+@dataclass(repr=False, eq=False)
+class AbstractDetector(MotionStatechartNode, ABC):
     """
     Abstract base class for all detectors.
     """
@@ -107,13 +102,6 @@ class AbstractDetector(ABC, DetectorStateChartNode):
     :param tracked_object: Optional body that should be monitored.
     If None, all trackable objects in the world are checked.
     """
-
-    context: SegmindContext = field(kw_only=True)
-    """
-    :param context: Segmind context containing world information,
-    contact history and logging utilities.
-    """
-
 
 
     def on_tick(self, context: SegmindContext) -> Optional[ObservationStateValues]:
@@ -133,27 +121,28 @@ class AbstractDetector(ABC, DetectorStateChartNode):
             if self.tracked_object
             else [
                 body
-                for body in self.context.world.bodies
+                for body in context.world.bodies
                 if type(body.parent_connection) is Connection6DoF
             ]
         )
-        events = self.update_context_and_events(objects_to_check)
+        events = self.update_context_and_events(context, objects_to_check)
         for e in events:
-            self.context.logger.log_event(e)
+            context.logger.log_event(e)
         return ObservationStateValues.TRUE if events else ObservationStateValues.FALSE
 
 
-    def get_relation(self, tracked_objects: List[Body], predicate) -> Dict[Body, Set[Body]]:
+    def get_relation(self, context: SegmindContext, tracked_objects: List[Body], predicate) -> Dict[Body, Set[Body]]:
         """
         Get the relation between tracked objects.
 
+        :param context: The context containing world information.
         :param tracked_objects: List of bodies to check for contact changes.
         :param predicate: Function that returns true if the objects are related.
         :return: Dictionary mapping bodies to sets of related bodies.
         """
 
         related_bodies: Dict[Body, Set[Body]] = {}
-        bodies_with_collision = self.context.world.bodies_with_collision
+        bodies_with_collision = context.world.bodies_with_collision
         for obj in tracked_objects:
             for body in bodies_with_collision:
                 if body is obj:
@@ -165,7 +154,7 @@ class AbstractDetector(ABC, DetectorStateChartNode):
 
 
     @abstractmethod
-    def update_context_and_events(self, tracked_objects: List[Body]) -> List[Event]:
+    def update_context_and_events(self, context:SegmindContext, tracked_objects: List[Body]) -> List[DetectionEvent]:
         """
         Updates the stored contact relationships and generates events
         when changes are detected.
@@ -173,6 +162,7 @@ class AbstractDetector(ABC, DetectorStateChartNode):
         Implementations define how contact changes are interpreted
         (e.g. new contact or loss of contact).
 
+        :param context: The context containing world information.
         :param tracked_objects: List of bodies to check for contact changes.
         :return: List of events generated during the update.
         """

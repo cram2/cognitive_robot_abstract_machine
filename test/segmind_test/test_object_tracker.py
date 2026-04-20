@@ -1,13 +1,13 @@
 from unittest.mock import MagicMock
 from semantic_digital_twin.world_description.world_entity import Body
 from segmind.datastructures.object_tracker import ObjectTracker, ObjectTrackerFactory
-from segmind.datastructures.events import Event, ContactEvent, PickUpEvent, PlacingEvent
+from segmind.datastructures.events import DetectionEvent, ContactEvent, PickUpEvent, PlacingEvent
 import pytest
 from datetime import timedelta
 import time
 
 
-class MockEvent(Event):
+class MockEvent(DetectionEvent):
     def __init__(self, timestamp=None):
         if timestamp is not None:
             self.timestamp = timestamp
