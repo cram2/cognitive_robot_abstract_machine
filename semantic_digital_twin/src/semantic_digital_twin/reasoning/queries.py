@@ -70,7 +70,7 @@ def get_next_object_using_planar_distance(
     )
 
 
-def query_goal_surface_of_object(
+def goal_surface_of_object(
     object_of_interest: SemanticAnnotation,
     supporting_surfaces: List[HasSupportingSurface],
     threshold: int = 1,
@@ -126,7 +126,7 @@ def query_goal_surface_of_object(
         if is_supported_by(most_similar.bodies[0], supporting_surface.bodies[0]):
             return supporting_surface
 
-def query_annotations_by_color(color: Color, objects: list[SemanticAnnotation]) -> Entity[SemanticAnnotation]:
+def filter_annotations_by_color(color: Color, objects: list[SemanticAnnotation]) -> Entity[SemanticAnnotation]:
     """
     Queries and retrieves a list of annotations from another one that match
     the specified color based on their visual properties.
@@ -159,7 +159,7 @@ def query_annotations_by_color(color: Color, objects: list[SemanticAnnotation]) 
     return entity(semantic_annotation).where(semantic_annotation.root == matching_body)
 
 
-def query_class_by_label(label: str) -> Optional[type]:
+def annotation_class_by_label(label: str) -> Optional[type]:
     """
     Finds the class whose name is contained within the given label.
     It searches through all subclasses of IsPerceivable.
@@ -172,7 +172,7 @@ def query_class_by_label(label: str) -> Optional[type]:
     return next(matching_class.evaluate(), None)
 
 
-def query_sort_by_volume(annotations: List[HasRootBody], order: Optional[bool]=True) -> List[HasRootBody]:
+def sort_annotations_by_volume(annotations: List[HasRootBody], order: Optional[bool]=True) -> List[HasRootBody]:
     """
     Sorts a list of SemanticAnnotations by volume in descending order (largest to smallest).
     Volume is calculated by multiplying the scale dimensions (x * y * z) of the object's shape.
@@ -195,3 +195,6 @@ def query_sort_by_volume(annotations: List[HasRootBody], order: Optional[bool]=T
             return 0.0
 
     return entity(annotaion_var).ordered_by(get_volume(annotaion_var), descending=not order)
+
+
+print(Vector3(x=4.55, y=4.72, z=1.01) + Vector3(x=-0.225, y=-0.40, z=-0.48250000000000004))

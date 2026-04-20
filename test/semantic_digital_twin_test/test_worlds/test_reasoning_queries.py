@@ -1,7 +1,7 @@
 from semantic_digital_twin.predetermined_maps.kitchen_environment import KitchenEnvironment
 from semantic_digital_twin.reasoning.queries import query_semantic_annotations_on_surfaces, \
-    get_next_object_using_planar_distance, query_goal_surface_of_object, query_annotations_by_color, \
-    query_class_by_label, query_sort_by_volume
+    get_next_object_using_planar_distance, goal_surface_of_object, filter_annotations_by_color, \
+    annotation_class_by_label, sort_annotations_by_volume
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color
@@ -69,9 +69,9 @@ def test_get_next_object_using_planar_distance(kitchen_environment_fixture):
     assert get_next_object_using_planar_distance(toya, table3, Vector3.Z()).tolist() == []
 
 
-def test_query_goal_surface_of_object(kitchen_environment_fixture):
+def test_goal_surface_of_object(kitchen_environment_fixture):
     """
-    Tests the `query_goal_surface_of_object` function for determining the surface of the most suitable
+    Tests the `goal_surface_of_object` function for determining the surface of the most suitable
     semantic annotation object from a set of candidates based on similarity and
     other constraints. The function is evaluated under multiple scenarios to verify
     its logic in choosing the correct table, handling empty tables, and cases with
@@ -89,26 +89,26 @@ def test_query_goal_surface_of_object(kitchen_environment_fixture):
     lettuce = kitchen_environment_fixture.get_semantic_annotation_by_name("lettuce")
 
     # choosing the correct table
-    assert query_goal_surface_of_object(banana, [table1, table2, table3]) == table1
-    assert query_goal_surface_of_object(carrot, [table1, table2, table3]) == table2
+    assert goal_surface_of_object(banana, [table1, table2, table3]) == table1
+    assert goal_surface_of_object(carrot, [table1, table2, table3]) == table2
     # choosing the empty table
-    assert query_goal_surface_of_object(lettuce, [table1, table3]) == table3
-    assert query_goal_surface_of_object(table1, [table1, table2, table3]) == table3
+    assert goal_surface_of_object(lettuce, [table1, table3]) == table3
+    assert goal_surface_of_object(table1, [table1, table2, table3]) == table3
     # trying with a new threshold
-    assert query_goal_surface_of_object(orange, [table2, table3], 2) == table2
+    assert goal_surface_of_object(orange, [table2, table3], 2) == table2
     # returning None if there is no empty table or no tables
-    assert query_goal_surface_of_object(apple, [table2]) == None
-    assert query_goal_surface_of_object(orange, []) == None
+    assert goal_surface_of_object(apple, [table2]) == None
+    assert goal_surface_of_object(orange, []) == None
     # trying with 2 empty tables
-    assert query_goal_surface_of_object(apple, [table2, table3, table4]) == table3
-    assert query_goal_surface_of_object(apple, [table2, table4, table3]) == table4
+    assert goal_surface_of_object(apple, [table2, table3, table4]) == table3
+    assert goal_surface_of_object(apple, [table2, table4, table3]) == table4
 
-def test_query_body_by_color(kitchen_environment_fixture):
+def test_filter_annotations_by_color(kitchen_environment_fixture):
     """
-    Tests the query_annotations_by_color function by verifying the retrieval of semantic
+    Tests the filter_annotations_by_color function by verifying the retrieval of semantic
     annotations by their associated colors.
 
-    The function validates that calling query_annotations_by_color with different color
+    The function validates that calling filter_annotations_by_color with different color
     parameters returns the expected list of annotations corresponding to that color
     within the given list of objects.
     """
@@ -118,26 +118,26 @@ def test_query_body_by_color(kitchen_environment_fixture):
     orange = kitchen_environment_fixture.get_semantic_annotation_by_name("orange")
     carrot = kitchen_environment_fixture.get_semantic_annotation_by_name("carrot")
 
-    assert query_annotations_by_color(Color.RED(), [apple, orange]).tolist() == [apple]
-    assert query_annotations_by_color(Color.ORANGE(), [apple, orange]).tolist() == [orange]
-    assert query_annotations_by_color(Color.BLUE(), [apple, orange,carrot]).tolist() == []
-    assert query_annotations_by_color(Color.ORANGE(), (query_semantic_annotations_on_surfaces([table1, table2], kitchen_environment_fixture))).tolist() == [orange, carrot]
-    assert query_annotations_by_color(Color.YELLOW(), []).tolist() == []
+    assert filter_annotations_by_color(Color.RED(), [apple, orange]).tolist() == [apple]
+    assert filter_annotations_by_color(Color.ORANGE(), [apple, orange]).tolist() == [orange]
+    assert filter_annotations_by_color(Color.BLUE(), [apple, orange,carrot]).tolist() == []
+    assert filter_annotations_by_color(Color.ORANGE(), (query_semantic_annotations_on_surfaces([table1, table2], kitchen_environment_fixture))).tolist() == [orange, carrot]
+    assert filter_annotations_by_color(Color.YELLOW(), []).tolist() == []
 
-def test_query_class_by_label():
+def test_annotation_class_by_label():
     """
-    Tests the query_class_by_label function by verifying the retrieval of the semantic class
+    Tests the annotation_class_by_label function by verifying the retrieval of the semantic class
     """
-    assert query_class_by_label("salt_aquasale_mill_transparent") == Salt
-    assert query_class_by_label("milk_jumbo_pack_voll") == Milk
-    assert query_class_by_label("bowl_collapsable_yellowgrey") == Bowl
+    assert annotation_class_by_label("salt_aquasale_mill_transparent") == Salt
+    assert annotation_class_by_label("milk_jumbo_pack_voll") == Milk
+    assert annotation_class_by_label("bowl_collapsable_yellowgrey") == Bowl
 
-    assert query_class_by_label("unknown_object") is None
+    assert annotation_class_by_label("unknown_object") is None
 
 
-def test_query_sort_by_volume(kitchen_environment_fixture):
+def test_sort_annotations_by_volume(kitchen_environment_fixture):
     """
-    Tests the query_sort_by_volume function by verifying the order of the returned annotations.
+    Tests the sort_annotations_by_volume function by verifying the order of the returned annotations.
     """
     table1 = kitchen_environment_fixture.get_semantic_annotation_by_name("fruit_table")
     table2 = kitchen_environment_fixture.get_semantic_annotation_by_name("vegetable_table")
@@ -146,8 +146,8 @@ def test_query_sort_by_volume(kitchen_environment_fixture):
     carrot = kitchen_environment_fixture.get_semantic_annotation_by_name("carrot")
     lettuce = kitchen_environment_fixture.get_semantic_annotation_by_name("lettuce")
 
-    assert query_sort_by_volume([]) ==[]
-    assert query_sort_by_volume([apple, carrot]) == [apple, carrot]
-    assert query_sort_by_volume([table1, lettuce, apple]) == [table1, lettuce, apple]
-    assert query_sort_by_volume([table1, lettuce, apple], False) == [apple, lettuce, table1]
-    assert query_sort_by_volume(query_semantic_annotations_on_surfaces([table2], kitchen_environment_fixture)) == [lettuce, carrot]
+    assert sort_annotations_by_volume([]) ==[]
+    assert sort_annotations_by_volume([apple, carrot]) == [apple, carrot]
+    assert sort_annotations_by_volume([table1, lettuce, apple]) == [table1, lettuce, apple]
+    assert sort_annotations_by_volume([table1, lettuce, apple], False) == [apple, lettuce, table1]
+    assert sort_annotations_by_volume(query_semantic_annotations_on_surfaces([table2], kitchen_environment_fixture)) == [lettuce, carrot]
