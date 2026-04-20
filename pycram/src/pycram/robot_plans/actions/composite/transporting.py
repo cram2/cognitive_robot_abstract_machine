@@ -12,7 +12,6 @@ from krrood.entity_query_language.factories import (
     variable,
     underspecified,
 )
-from pycram.locations.locations import CostmapLocation
 from pycram.plans.factories import sequential, execute_single
 from pycram.robot_plans.actions.composite.facing import FaceAtAction
 from pycram.robot_plans.actions.core.container import OpenAction

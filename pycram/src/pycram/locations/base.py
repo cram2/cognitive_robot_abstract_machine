@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -7,10 +8,14 @@ from typing_extensions import List, Iterator, Optional
 
 from krrood.entity_query_language.predicate import Predicate
 from pycram.datastructures.dataclasses import Context
+from pycram.utils import collision_check
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
+
+
+logger = logging.getLogger("pycram")
 
 
 @dataclass
@@ -54,7 +59,18 @@ class Location:
 
     def __iter__(self) -> Iterator[Pose]:
         for pose_candidate in self.generator:
-            if all(validator(pose_candidate) for validator in self.validators):
+            self.robot.root.parent_connection.origin = pose_candidate
+
+            collisions = collision_check(
+                robot=self.robot,
+                world=self.world,
+            )
+
+            if collisions:
+                logger.debug(f"Candidate pose in collision, skipping")
+                continue
+
+            if all(validator() for validator in self.validators):
                 yield pose_candidate
 
     def merge(self, other: Location) -> Location:
@@ -65,7 +81,10 @@ class Location:
         :return: A new location that is the merge of this location and the other location.
         """
         return Location(
-            self.generator.merge(other.generator), self.validators + other.validators
+            self.context,
+            self.target_pose,
+            self.generator.merge(other.generator),
+            self.validators + other.validators,
         )
 
     def __and__(self, other: Location) -> Location:

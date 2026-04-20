@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-from typing_extensions import List
+from typing_extensions import List, Union, Optional
 
 from krrood.adapters.json_serializer import list_like_classes
 from pycram.datastructures.dataclasses import Context
@@ -14,12 +14,16 @@ from pycram.locations.pose_validator import (
 )
 from pycram.view_manager import ViewManager
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Cabinet,
+    Drawer,
+)
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-def make_default_occupancy_costmap(context: Context, target: Pose) -> OccupancyCostmap:
+def _make_default_occupancy_costmap(context: Context, target: Pose) -> OccupancyCostmap:
     ground_pose = deepcopy(target)
     ground_pose.z = 0
 
@@ -36,9 +40,9 @@ def make_default_occupancy_costmap(context: Context, target: Pose) -> OccupancyC
     )
 
 
-def get_object_in_hand(
+def _get_object_in_hand(
     test_robot: AbstractRobot, test_world: World, arm: Arms = Arms.BOTH
-) -> List[Body]:
+) -> Optional[Body]:
 
     manipulator = ViewManager.get_end_effector_view(
         arm,
@@ -53,29 +57,47 @@ def get_object_in_hand(
             test_world.get_kinematic_structure_entities_of_branch(man.tool_frame)
         )
         objs.remove(man.tool_frame)
-    return list(objs)
+    return objs.pop() if objs else None
 
 
 def occupancy_location(target_pose: Pose, context: Context) -> Location:
+    """
+    :param target_pose:
+    :praam context:
+    :returns:
+    """
     return Location(
         context,
         target_pose,
-        make_default_occupancy_costmap(context, target_pose),
+        _make_default_occupancy_costmap(context, target_pose),
     )
 
 
 def reachability_location(
-    target_pose: Pose,
+    target: Union[Pose, Body],
     context: Context,
     arm: Arms,
     grasp_description: GraspDescription = None,
 ) -> Location:
+    """
+
+    :param target:
+    :param context:
+    :param arm:
+    :param grasp_description:
+    :returns: A location that is reachable from the target pose.
+    """
+    target_pose, target_body = (
+        (target.global_pose, target) if isinstance(target, Body) else (target, None)
+    )
+    man = ViewManager.get_end_effector_view(arm, context.robot)
+
     grasp_description = grasp_description or GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
-        man := ViewManager.get_end_effector_view(arm, context.robot),
+        man,
     )
-    costmap = make_default_occupancy_costmap(context, target_pose) & RingCostmap(
+    costmap = _make_default_occupancy_costmap(context, target_pose) & RingCostmap(
         resolution=0.02,
         width=200,
         height=200,
@@ -92,7 +114,8 @@ def reachability_location(
             ReachabilitySequenceValidator(
                 pose_sequence=grasp_description._pose_sequence(
                     target_pose,
-                    get_object_in_hand(context.robot, context.world, arm)[0],
+                    _get_object_in_hand(context.robot, context.world, arm)
+                    or target_body,
                 ),
                 tip_link=man.tool_frame,
                 world=context.world,
@@ -102,9 +125,39 @@ def reachability_location(
     )
 
 
-def visibility_location(target_pose: Pose, context: Context) -> Location:
+def accessing_location(
+    container: Union[Drawer, Cabinet], context: Context, arm: Arms
+) -> Location:
+    """
+    :param container:
+    :param context:
+    :param arm:
+    :returns: A location that is accessible from the container.
+    """
+    return reachability_location(
+        container.handle.root.global_pose,
+        context,
+        arm,
+        GraspDescription(
+            ApproachDirection.FRONT,
+            VerticalAlignment.NoAlignment,
+            ViewManager.get_end_effector_view(Arms.BOTH, context.robot),
+        ),
+    )
+
+
+def visibility_location(target: Union[Pose, Body], context: Context) -> Location:
+    """
+    :param target:
+    :param context:
+    :returns: A location that is visible from the target pose.
+    """
+    target_pose, target_body = (
+        (target.global_pose, target) if isinstance(target, Body) else (target, None)
+    )
+
     camera = context.robot.get_default_camera()
-    costmap = make_default_occupancy_costmap(context, target_pose) & VisibilityCostmap(
+    costmap = _make_default_occupancy_costmap(context, target_pose) & VisibilityCostmap(
         min_height=camera.minimal_height,
         max_height=camera.maximal_height,
         world=context.world,
@@ -119,7 +172,10 @@ def visibility_location(target_pose: Pose, context: Context) -> Location:
         costmap,
         [
             VisibilityValidator(
-                world=context.world, robot=context.robot, target_pose=target_pose
+                world=context.world,
+                robot=context.robot,
+                target_pose=target_pose,
+                target_body=target_body,
             )
         ],
     )
