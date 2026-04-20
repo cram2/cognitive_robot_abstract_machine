@@ -668,6 +668,21 @@ class SumUnit(InnerUnit):
                 self.index, subcircuit.index, log_weight - total_weight
             )
 
+    def is_normalized(self, tolerance: float = 1e-6) -> bool:
+        """
+        Return True iff this SumUnit's log-weights sum to log(1) == 0.
+
+        Uses logsumexp for numerical stability, matching normalize().
+        An empty SumUnit (no subcircuits) is considered normalized.
+
+        :param tolerance: Maximum absolute deviation from 0.0 permitted.
+        :returns: True if the weights are normalised within tolerance.
+        """
+        log_weights = self.log_weights
+        if len(log_weights) == 0:
+            return True
+        return abs(float(logsumexp(log_weights))) < tolerance
+
     def is_deterministic(self) -> bool:
         """
         :return: If this unit is deterministic or not.
@@ -801,6 +816,35 @@ class ProductUnit(InnerUnit):
         for start_index, amount in self.result_of_current_query:
             for subcircuit in self.subcircuits:
                 subcircuit.result_of_current_query.append([start_index, amount])
+
+    def attach_marginal_circuit(
+        self,
+        marginal_circuit: "ProbabilisticCircuit",
+        target_circuit: "ProbabilisticCircuit",
+    ) -> None:
+        """
+        Attach the root of marginal_circuit as a child of this ProductUnit,
+        constructing fresh nodes owned by target_circuit.
+
+        marginal() and log_truncated_in_place() return flat circuits
+        (SumUnit -> leaves, or a single leaf), so one level of recursion
+        suffices to copy all nodes into target_circuit.
+
+        :param marginal_circuit: The marginal or truncated circuit whose root
+            to attach as a child of this ProductUnit.
+        :param target_circuit: The owning circuit for all newly created nodes.
+        """
+        root = marginal_circuit.root
+        if isinstance(root, SumUnit):
+            new_sum_unit = SumUnit(probabilistic_circuit=target_circuit)
+            for child_log_weight, child_subcircuit in root.log_weighted_subcircuits:
+                new_sum_unit.add_subcircuit(
+                    leaf(copy.deepcopy(child_subcircuit.distribution), target_circuit),
+                    child_log_weight,
+                )
+            self.add_subcircuit(new_sum_unit)
+        else:
+            self.add_subcircuit(leaf(copy.deepcopy(root.distribution), target_circuit))
 
 
 @dataclass
@@ -1075,9 +1119,12 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                     unit.log_truncated_of_simple_event_in_place(
                         simple_event, singleton_allowed
                     )
-                else:
-                    unit: InnerUnit
+                elif isinstance(unit, ProductUnit):
                     unit.log_forward()
+                elif isinstance(unit, SumUnit):
+                    unit.log_forward_conditioning()
+                else:
+                    raise IntractableError(f"Unit of type {type(unit)} not supported.")
 
         root = self.root
         [
@@ -1835,12 +1882,16 @@ class UnivariateContinuousLeaf(UnivariateLeaf):
 
     __hash__ = Unit.__hash__
 
-    def log_truncated_of_simple_event_in_place(self, event: SimpleEvent):
+    def log_truncated_of_simple_event_in_place(
+        self, event: SimpleEvent, singleton_allowed: bool = False
+    ):
         return self.univariate_log_truncated_of_simple_event_in_place(
-            event[self.variable]
+            event[self.variable], singleton_allowed
         )
 
-    def univariate_log_truncated_of_simple_event_in_place(self, event: Interval):
+    def univariate_log_truncated_of_simple_event_in_place(
+        self, event: Interval, singleton_allowed: bool = False
+    ):
         """
         Condition this distribution on a simple event in-place but use sum units to create conditions on composite
         intervals.
@@ -1851,7 +1902,7 @@ class UnivariateContinuousLeaf(UnivariateLeaf):
         if len(event.simple_sets) == 1:
             self.distribution, self.result_of_current_query = (
                 self.distribution.log_conditional_from_simple_interval(
-                    event.simple_sets[0]
+                    event.simple_sets[0], singleton_allowed
                 )
             )
             return self
@@ -1863,7 +1914,9 @@ class UnivariateContinuousLeaf(UnivariateLeaf):
 
         for simple_interval in event.simple_sets:
             current_conditional, current_log_probability = (
-                self.distribution.log_conditional_from_simple_interval(simple_interval)
+                self.distribution.log_conditional_from_simple_interval(
+                    simple_interval, singleton_allowed
+                )
             )
             current_probability = np.exp(current_log_probability)
 

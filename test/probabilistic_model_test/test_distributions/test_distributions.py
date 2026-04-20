@@ -4,7 +4,11 @@ from enum import IntEnum
 from krrood.adapters.json_serializer import to_json, from_json
 
 from probabilistic_model.distributions.distributions import *
-from probabilistic_model.utils import MissingDict
+from probabilistic_model.utils import (
+    MissingDict,
+    event_compatible_for_truncation_with_singletons,
+)
+from random_events.interval import open_closed, open
 
 
 class TestEnum(IntEnum):
@@ -38,10 +42,14 @@ class IntegerDistributionTestCase(unittest.TestCase):
     def test_mode(self):
         mode, likelihood = self.model.mode()
         self.assertAlmostEqual(likelihood, 11 / 20)
-        self.assertEqual(mode, SimpleEvent.from_data({self.x: singleton(4)}).as_composite_set())
+        self.assertEqual(
+            mode, SimpleEvent.from_data({self.x: singleton(4)}).as_composite_set()
+        )
 
     def test_conditional(self):
-        event = SimpleEvent.from_data({self.x: closed(0, 1) | closed(3, 4)}).as_composite_set()
+        event = SimpleEvent.from_data(
+            {self.x: closed(0, 1) | closed(3, 4)}
+        ).as_composite_set()
         conditional, probability = self.model.truncated(event)
         self.assertEqual(probability, 15 / 20)
         self.assertAlmostEqual(conditional.probabilities[1], 4 / 15)
@@ -76,7 +84,9 @@ class IntegerDistributionTestCase(unittest.TestCase):
         self.assertEqual(support, singleton(1) | singleton(2) | singleton(4))
 
     def test_domain_if_weights_are_zero(self):
-        distribution = IntegerDistribution(variable=self.x, probabilities=MissingDict(float))
+        distribution = IntegerDistribution(
+            variable=self.x, probabilities=MissingDict(float)
+        )
         self.assertTrue(distribution.univariate_support.is_empty())
 
     def test_plot(self):
@@ -90,7 +100,9 @@ class IntegerDistributionTestCase(unittest.TestCase):
         self.assertEqual(deserialized, self.model)
 
     def test_cdf(self):
-        cdf = self.model.cumulative_distribution_function(np.array([0, 1, 2, 3, 4]).reshape(-1, 1))
+        cdf = self.model.cumulative_distribution_function(
+            np.array([0, 1, 2, 3, 4]).reshape(-1, 1)
+        )
         self.assertAlmostEqual(cdf[0], 0)
         self.assertAlmostEqual(cdf[1], 4 / 20)
         self.assertAlmostEqual(cdf[2], 9 / 20)
@@ -153,14 +165,18 @@ class SymbolicDistributionTestCase(unittest.TestCase):
     def test_mode(self):
         mode, likelihood = self.model.mode()
         self.assertEqual(likelihood, 13 / 20)
-        self.assertEqual(mode, SimpleEvent.from_data({self.x: TestEnum.B}).as_composite_set())
+        self.assertEqual(
+            mode, SimpleEvent.from_data({self.x: TestEnum.B}).as_composite_set()
+        )
 
     def test_plot(self):
         fig = go.Figure(self.model.plot(), self.model.plotly_layout())
         # fig.show()
 
     def test_probability(self):
-        event = SimpleEvent.from_data({self.x: (TestEnum.A, TestEnum.C)}).as_composite_set()
+        event = SimpleEvent.from_data(
+            {self.x: (TestEnum.A, TestEnum.C)}
+        ).as_composite_set()
         self.assertEqual(self.model.probability(event), 7 / 20)
 
     def test_support(self):
@@ -168,8 +184,14 @@ class SymbolicDistributionTestCase(unittest.TestCase):
         self.assertEqual(
             support,
             Set.from_simple_sets(
-                *[SetElement.from_data(TestEnum.A, self.x.domain.simple_sets[0].all_elements),
-                SetElement.from_data(TestEnum.B, self.x.domain.simple_sets[0].all_elements)]
+                *[
+                    SetElement.from_data(
+                        TestEnum.A, self.x.domain.simple_sets[0].all_elements
+                    ),
+                    SetElement.from_data(
+                        TestEnum.B, self.x.domain.simple_sets[0].all_elements
+                    ),
+                ]
             ),
         )
 
@@ -202,13 +224,17 @@ class DiracDeltaDistributionTestCase(unittest.TestCase):
         self.assertEqual(pdf[1], 0)
 
     def test_cdf(self):
-        cdf = self.model.cumulative_distribution_function(np.array([-1, 0, 1]).reshape(-1, 1))
+        cdf = self.model.cumulative_distribution_function(
+            np.array([-1, 0, 1]).reshape(-1, 1)
+        )
         self.assertEqual(cdf[0], 0)
         self.assertEqual(cdf[1], 1)
         self.assertEqual(cdf[2], 1)
 
     def test_probability(self):
-        event = SimpleEvent.from_data({self.x: closed(0, 1) | closed(1.5, 2)}).as_composite_set()
+        event = SimpleEvent.from_data(
+            {self.x: closed(0, 1) | closed(1.5, 2)}
+        ).as_composite_set()
         self.assertEqual(self.model.probability(event), 1)
 
     def test_probability_0(self):
@@ -218,13 +244,17 @@ class DiracDeltaDistributionTestCase(unittest.TestCase):
         self.assertEqual(self.model.probability(event), 0.0)
 
     def test_conditional(self):
-        event = SimpleEvent.from_data({self.model.variable: closed(-1, 2)}).as_composite_set()
+        event = SimpleEvent.from_data(
+            {self.model.variable: closed(-1, 2)}
+        ).as_composite_set()
         conditional, probability = self.model.truncated(event)
         self.assertEqual(conditional, self.model)
         self.assertEqual(probability, 1)
 
     def test_conditional_impossible(self):
-        event = SimpleEvent.from_data({self.model.variable: closed(1, 2)}).as_composite_set()
+        event = SimpleEvent.from_data(
+            {self.model.variable: closed(1, 2)}
+        ).as_composite_set()
         conditional, probability = self.model.truncated(event)
         self.assertIsNone(conditional)
         self.assertEqual(0, probability)
@@ -259,6 +289,76 @@ class DiracDeltaDistributionTestCase(unittest.TestCase):
     def test_plot(self):
         fig = go.Figure(self.model.plot(), self.model.plotly_layout())  # fig.show()
 
+    def test_dirac_delta_distribution_singleton(self):
+        x = Continuous("x")
+        dist = DiracDeltaDistribution(variable=x, location=1.0, density_cap=2.0)
+
+        # singleton at the location
+        event = SimpleEvent.from_data({x: singleton(1.0)}).as_composite_set()
+        conditional, probability = dist.truncated(event)
+        self.assertEqual(conditional, dist)
+        self.assertAlmostEqual(probability, 1.0)
+
+        # singleton elsewhere
+        event_away = SimpleEvent.from_data({x: singleton(0.0)}).as_composite_set()
+        conditional_away, probability_away = dist.truncated(
+            event_away, singleton_allowed=True
+        )
+        self.assertIsNone(conditional_away)
+        self.assertEqual(probability_away, 0.0)
+
+    def test_integer_distribution_singleton(self):
+        x = Integer("x")
+        probs = MissingDict(float, {1: 0.3, 2: 0.7})
+        dist = IntegerDistribution(variable=x, probabilities=probs)
+
+        event = SimpleEvent.from_data({x: singleton(1)}).as_composite_set()
+
+        # For discrete distributions, singleton is just a normal event
+        conditional, probability = dist.truncated(event, singleton_allowed=True)
+        self.assertIsInstance(conditional, IntegerDistribution)
+        self.assertEqual(conditional.probabilities[1], 1.0)
+        self.assertAlmostEqual(probability, 0.3)
+
+    def test_symbolic_distribution_singleton(self):
+        x = Symbolic("x", domain=Set.from_iterable(["a", "b"]))
+        probs = MissingDict(float, {hash("a"): 0.4, hash("b"): 0.6})
+        dist = SymbolicDistribution(variable=x, probabilities=probs)
+
+        event = SimpleEvent.from_data({x: "a"}).as_composite_set()
+
+        conditional, probability = dist.truncated(event, singleton_allowed=True)
+        self.assertIsInstance(conditional, SymbolicDistribution)
+        self.assertAlmostEqual(probability, 0.4)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EventCompatibleForTruncationTestCase(unittest.TestCase):
+    def test_all_singletons(self):
+        x = Continuous("x")
+        event = SimpleEvent.from_data(
+            {x: singleton(1.0) | singleton(2.0)}
+        ).as_composite_set()
+        self.assertTrue(event_compatible_for_truncation_with_singletons(event))
+
+    def test_mixed_singleton_and_interval(self):
+        x = Continuous("x")
+        # choose a singleton that lies outside the interval so the union doesn't merge
+        event = SimpleEvent.from_data(
+            {x: singleton(3.0) | closed(0.0, 2.0)}
+        ).as_composite_set()
+        self.assertFalse(event_compatible_for_truncation_with_singletons(event))
+
+    def test_non_continuous_ignored(self):
+        x = Continuous("x")
+        y = Symbolic("y", domain=Set.from_iterable(["a", "b"]))
+        event = SimpleEvent.from_data(
+            {
+                x: singleton(1.0) | singleton(2.0),
+                y: ("a", "b"),
+            }
+        ).as_composite_set()
+        self.assertTrue(event_compatible_for_truncation_with_singletons(event))
