@@ -11,7 +11,6 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
-    from pycram.datastructures.pose import PoseStamped
     from pycram.validation.goal_validator import MultiJointPositionGoalValidator
     from pycram.language import LanguageNode
     from semantic_digital_twin.datastructures.definitions import StaticJointState
@@ -78,11 +77,11 @@ class NavigationGoalNotReachedError(PlanFailure):
     Thrown when the navigation goal is not reached.
     """
 
-    current_pose: PoseStamped
+    current_pose: Pose
     """
     The current pose of the robot.
     """
-    goal_pose: PoseStamped
+    goal_pose: Pose
     """
     The goal pose of the robot.
     """

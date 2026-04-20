@@ -1,8 +1,7 @@
 from __future__ import annotations, absolute_import
 
-import traceback
 from dataclasses import dataclass, field
-from typing import Dict, Callable
+from typing import Dict
 from uuid import UUID
 
 from typing_extensions import (
@@ -16,6 +15,7 @@ from typing_extensions import (
 )
 
 from krrood.adapters.exceptions import JSONSerializationError
+from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from krrood.utils import DataclassException
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -29,8 +29,6 @@ if TYPE_CHECKING:
         KinematicStructureEntity,
     )
     from semantic_digital_twin.spatial_types.spatial_types import (
-        FloatVariable,
-        SymbolicMathType,
         SpatialType,
     )
     from semantic_digital_twin.spatial_types import Vector3
@@ -40,6 +38,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_modification import (
         WorldModification,
     )
+    from semantic_digital_twin.collision_checking.collision_matrix import CollisionCheck
 
 
 @dataclass
@@ -466,6 +465,7 @@ class AmbiguousNameError(ValueError):
 class UnresolvedNameError(ValueError):
     """Raised when no semantic annotation class matches a given name."""
 
+
 @dataclass
 class RootNodeNotFoundError(DataclassException):
     """
@@ -476,7 +476,10 @@ class RootNodeNotFoundError(DataclassException):
     """The candidate node names that were considered as potential roots."""
 
     def __post_init__(self):
-        self.message = f"Could not determine unique root node. Candidates: {self.candidates}"
+        self.message = (
+            f"Could not determine unique root node. Candidates: {self.candidates}"
+        )
+
 
 @dataclass
 class CollisionCheckingError(DataclassException):

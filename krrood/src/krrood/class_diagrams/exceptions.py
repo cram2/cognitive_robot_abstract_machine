@@ -62,7 +62,13 @@ class CouldNotResolveType(DataclassException):
     """
     The exception that was raised when resolving the type.
     """
+    extra_information: str = ""
+    """
+    Additional information about the error.
+    """
 
     def __post_init__(self):
-        self.message = f"Could not resolve type {self.type_name}"
+        self.message = (
+            f"Could not resolve type {self.type_name}.\n{self.extra_information}"
+        )
         super().__post_init__()

@@ -54,7 +54,7 @@ git clone -b humble-devel --single-branch https://github.com/pal-robotics/pal_gr
                pal_gripper/pal_gripper_gazeboo \
                pal_gripper/pal_gripper_simulation \
                pal_gripper/pal_parallel_gripper_wrapper
-git clone -b main --single-branch https://gitlab.informatik.uni-bremen.de/robokudo/robokudo_msgs.git
+git clone -b ros2_jazzy --single-branch https://gitlab.informatik.uni-bremen.de/robokudo/robokudo_msgs.git
 
 # ── Build the workspace ───────────────────────────────────────────────────────
 source /opt/ros/jazzy/setup.bash
