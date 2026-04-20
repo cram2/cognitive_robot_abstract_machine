@@ -1,5 +1,5 @@
 from semantic_digital_twin.predetermined_maps.kitchen_environment import KitchenEnvironment
-from semantic_digital_twin.reasoning.queries import query_semantic_annotations_on_surfaces, \
+from semantic_digital_twin.reasoning.queries import list_semantic_annotations_on_surfaces, \
     get_next_object_using_planar_distance, goal_surface_of_object, filter_annotations_by_color, \
     annotation_class_by_label, sort_annotations_by_volume
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
@@ -16,7 +16,7 @@ def test_load_environment_returns_world():
     assert world.root.name == PrefixedName("root")
 
 
-def test_query_semantic_annotations_on_surfaces(kitchen_environment_fixture):
+def test_list_semantic_annotations_on_surfaces(kitchen_environment_fixture):
     """
     Tests that giving Table annotations gives a list of the correct annotation on top.
     """
@@ -29,14 +29,14 @@ def test_query_semantic_annotations_on_surfaces(kitchen_environment_fixture):
     lettuce = kitchen_environment_fixture.get_semantic_annotation_by_name("lettuce")
     banana1 = kitchen_environment_fixture.get_semantic_annotation_by_name("banana1")
 
-    assert query_semantic_annotations_on_surfaces([table1, table2, table3], kitchen_environment_fixture) == [
+    assert list_semantic_annotations_on_surfaces([table1, table2, table3], kitchen_environment_fixture) == [
         apple,
         orange,
         banana1,
         carrot,
         lettuce
     ]
-    assert query_semantic_annotations_on_surfaces([], kitchen_environment_fixture) == []
+    assert list_semantic_annotations_on_surfaces([], kitchen_environment_fixture) == []
 
 
 def test_get_next_object_using_planar_distance(kitchen_environment_fixture):
@@ -121,7 +121,7 @@ def test_filter_annotations_by_color(kitchen_environment_fixture):
     assert filter_annotations_by_color(Color.RED(), [apple, orange]).tolist() == [apple]
     assert filter_annotations_by_color(Color.ORANGE(), [apple, orange]).tolist() == [orange]
     assert filter_annotations_by_color(Color.BLUE(), [apple, orange,carrot]).tolist() == []
-    assert filter_annotations_by_color(Color.ORANGE(), (query_semantic_annotations_on_surfaces([table1, table2], kitchen_environment_fixture))).tolist() == [orange, carrot]
+    assert filter_annotations_by_color(Color.ORANGE(), (list_semantic_annotations_on_surfaces([table1, table2], kitchen_environment_fixture))).tolist() == [orange, carrot]
     assert filter_annotations_by_color(Color.YELLOW(), []).tolist() == []
 
 def test_annotation_class_by_label():
@@ -150,4 +150,4 @@ def test_sort_annotations_by_volume(kitchen_environment_fixture):
     assert sort_annotations_by_volume([apple, carrot]) == [apple, carrot]
     assert sort_annotations_by_volume([table1, lettuce, apple]) == [table1, lettuce, apple]
     assert sort_annotations_by_volume([table1, lettuce, apple], False) == [apple, lettuce, table1]
-    assert sort_annotations_by_volume(query_semantic_annotations_on_surfaces([table2], kitchen_environment_fixture)) == [lettuce, carrot]
+    assert sort_annotations_by_volume(list_semantic_annotations_on_surfaces([table2], kitchen_environment_fixture)) == [lettuce, carrot]

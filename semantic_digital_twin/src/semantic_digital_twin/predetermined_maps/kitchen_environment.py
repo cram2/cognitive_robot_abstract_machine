@@ -270,14 +270,6 @@ class KitchenEnvironment:
             world.add_connection(cupboard_C_hinge_left)
             world.add_semantic_annotation(hinge_left)
 
-            # Create left door
-            # door_left_geom = ShapeCollection([Box(scale=door_scale, color=Color.WHITE())])
-            # door_left_body = Body(
-            #     name=PrefixedName("cupboard_door_left_body"),
-            #     collision=door_left_geom,
-            #     visual=door_left_geom,
-            # )
-            # door_left = Door(root=door_left_body, name=PrefixedName("cupboard_door_left"))
             left_door = Door.create_with_new_body_in_world(
                 world=world,
                 name=PrefixedName("cupboard_left_door"),
@@ -287,17 +279,6 @@ class KitchenEnvironment:
                 scale=door_scale,
             )
 
-            # Connect Door to Hinge (Fixed)
-            # Door center is at y=+0.20 relative to hinge (hinge at -0.40, door center at -0.20)
-            # hinge_left_C_door_left = FixedConnection(
-            #     parent=hinge_left_body,
-            #     child=door_left_body,
-            #     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-            #         x=0, y=0.20, z=0
-            #     ),
-            # )
-            # world.add_connection(hinge_left_C_door_left)
-            # world.add_semantic_annotation(door_left)
 
 
             # Right Door (Closed via Hinge)
@@ -320,13 +301,6 @@ class KitchenEnvironment:
             world.add_connection(cupboard_C_hinge_right)
             world.add_semantic_annotation(hinge_right)
 
-            # door_right_geom = ShapeCollection([Box(scale=door_scale, color=Color.WHITE())])
-            # door_right_body = Body(
-            #     name=PrefixedName("cupboard_door_right_body"),
-            #     collision=door_right_geom,
-            #     visual=door_right_geom,
-            # )
-            # door_right = Door(root=door_right_body, name=PrefixedName("cupboard_door_right"))
             right_door = Door.create_with_new_body_in_world(
                 world=world,
                 name=PrefixedName("cupboard_right_door"),
@@ -336,28 +310,7 @@ class KitchenEnvironment:
                 scale=door_scale,
             )
 
-            # hinge_right_C_door_right = FixedConnection(
-            #     parent=hinge_right_body,
-            #     child=door_right_body,
-            #     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-            #         x=0, y=-0.20, z=0
-            #     ),
-            # )
-            # world.add_connection(hinge_right_C_door_right)
-            # world.add_semantic_annotation(door_right)
 
-
-
-            # Left Handle
-            # handle_left_geom = ShapeCollection([Box(scale=Scale(0.04, 0.02, 0.02), color=Color.WHITE())])
-            # handle_left_body = Body(
-            #     name=PrefixedName("cupboard_handle_left_body"),
-            #     collision=handle_left_geom,
-            #     visual=handle_left_geom,
-            # )
-            # handle_left = Handle(
-            #     root=handle_left_body, name=PrefixedName("cupboard_handle_left")
-            # )
             left_door_handle = Handle.create_with_new_body_in_world(
                 world=world,
                 name=PrefixedName("left_door_handle"),
@@ -367,26 +320,6 @@ class KitchenEnvironment:
                 scale=Scale(0.04, 0.02, 0.02),
             )
 
-            # door_left_C_handle = FixedConnection(
-            #     parent=door_left.root,
-            #     child=handle_left_body,
-            #     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-            #         x=-0.01, y=0.16, z=0, yaw=np.pi
-            #     ),
-            # )
-            # world.add_connection(door_left_C_handle)
-            # world.add_semantic_annotation(handle_left)
-
-            # Right Handle
-            # handle_right_geom = ShapeCollection([Box(scale=Scale(0.04, 0.02, 0.02), color=Color.WHITE())])
-            # handle_right_body = Body(
-            #     name=PrefixedName("cupboard_handle_right_body"),
-            #     collision=handle_right_geom,
-            #     visual=handle_right_geom,
-            # )
-            # handle_right = Handle(
-            #     root=handle_right_body, name=PrefixedName("cupboard_handle_right")
-            # )
             right_door_handle = Handle.create_with_new_body_in_world(
                 world=world,
                 name=PrefixedName("right_door_handle"),
@@ -396,17 +329,7 @@ class KitchenEnvironment:
                 scale=Scale(0.04, 0.02, 0.02),
             )
 
-            # door_right_C_handle = FixedConnection(
-            #     parent=door_right.root,
-            #     child=handle_right_body,
-            #     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-            #         x=-0.01, y=-0.16, z=0, yaw=np.pi
-            #     ),
-            # )
-            # world.add_connection(door_right_C_handle)
-            # world.add_semantic_annotation(handle_right)
 
-            #left_door.add_hinge(left_door_hinge)
             left_door.add_handle(left_door_handle)
             right_door.add_handle(right_door_handle)
 

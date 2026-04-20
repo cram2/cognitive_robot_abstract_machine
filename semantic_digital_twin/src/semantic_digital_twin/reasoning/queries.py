@@ -11,7 +11,6 @@ from semantic_digital_twin.reasoning.predicates import (
     is_supporting, compute_euclidean_planar_distance,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasSupportingSurface, IsPerceivable, HasRootBody
-from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color
 
@@ -19,10 +18,9 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     SemanticAnnotation,
 )
-from test.conftest import kitchen_environment_fixture
 
 
-def query_semantic_annotations_on_surfaces(
+def list_semantic_annotations_on_surfaces(
     supporting_surfaces: List[HasSupportingSurface], world: World
 ) -> List[HasRootBody]:
     """
@@ -58,7 +56,7 @@ def get_next_object_using_planar_distance(
     """
     # if supporting_surface is None:
     #     return []
-    supported_semantic_annotations = variable_from(query_semantic_annotations_on_surfaces(
+    supported_semantic_annotations = variable_from(list_semantic_annotations_on_surfaces(
         [supporting_surface], main_body._world
     ))
     return entity(supported_semantic_annotations).ordered_by(
@@ -99,7 +97,7 @@ def goal_surface_of_object(
             break
 
     # Query annotations on the surfaces of the tables
-    objects = query_semantic_annotations_on_surfaces(
+    objects = list_semantic_annotations_on_surfaces(
         supporting_surfaces, object_of_interest._world
     )
 
@@ -195,6 +193,3 @@ def sort_annotations_by_volume(annotations: List[HasRootBody], order: Optional[b
             return 0.0
 
     return entity(annotaion_var).ordered_by(get_volume(annotaion_var), descending=not order)
-
-
-print(Vector3(x=4.55, y=4.72, z=1.01) + Vector3(x=-0.225, y=-0.40, z=-0.48250000000000004))
