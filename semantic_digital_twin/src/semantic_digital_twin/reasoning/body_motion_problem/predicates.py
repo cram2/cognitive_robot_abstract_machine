@@ -17,8 +17,9 @@ Together they form the axiom:
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Tuple, Type
 
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
@@ -66,13 +67,12 @@ class Causes(Predicate):
 
     tee_class: Optional[TEEClass] = field(default=None)
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self) -> bool:
         self._check_validity_intervals()
 
         if self.effect.is_achieved():
             return False
 
-        # Case 1: no trajectory yet — generate one via the physics model
         if (
             self.motion
             and self.motion.motion_model
@@ -81,8 +81,27 @@ class Causes(Predicate):
             trajectory, _ = self.motion.motion_model.run(self.effect, self.environment)
             if trajectory and len(trajectory) > 0:
                 self.motion.trajectory = trajectory
+                self.motion.secondary_trajectories = (
+                    self.motion.motion_model.build_secondary_trajectories(self.effect)
+                )
 
         return self._map_motion_to_effect()
+
+    def replay(self, step_delay: float = 0.05) -> None:
+        """
+        Re-apply the computed trajectory to the world with a per-step delay.
+
+        Leaves the world in the final state so the result is visible in RViz.
+        Call this after a successful __call__.
+
+        :param step_delay: Seconds to sleep between steps (default 50 ms ≈ 20 fps).
+        """
+        for i, position in enumerate(self.motion.trajectory):
+            updates = {self.motion.actuator: float(position)}
+            for conn, traj in self.motion.secondary_trajectories:
+                updates[conn] = float(traj[i])
+            self.environment.set_positions_1DOF_connection(updates)
+            time.sleep(step_delay)
 
     def _check_validity_intervals(self) -> None:
         """
@@ -126,15 +145,31 @@ class SatisfiesRequest(Predicate):
     Checks that a final SDT state (represented by an Effect) matches the
     intent of a task specification (TaskRequest).
 
-    Subclass this predicate to implement domain-specific semantic correctness
-    checks for a given TEE class.
+    When task_type and effect_type are provided, the base __call__ handles the
+    check directly. Subclass only when additional domain-specific validation is
+    needed (e.g. name-matching).
+
+    :param task_type: Expected task_type string (e.g. ``"pour"``).
+    :param effect_type: Expected Effect subclass (e.g. ``PouringEffect``).
     """
 
     task: TaskRequest
     effect: Effect
+    task_type: Optional[str] = field(default=None)
+    effect_type: Optional[Type[Effect]] = field(default=None)
 
-    def __call__(self, *args, **kwargs) -> bool:
-        raise NotImplementedError(f"{self.__class__.__name__} must implement __call__.")
+    def __call__(self) -> bool:
+        if self.task_type is not None and self.task.task_type != self.task_type:
+            return False
+        if self.effect_type is not None and not isinstance(
+            self.effect, self.effect_type
+        ):
+            return False
+        if self.task_type is None and self.effect_type is None:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} must set task_type/effect_type or implement __call__."
+            )
+        return True
 
 
 @dataclass
@@ -153,7 +188,7 @@ class CanPerform(Predicate):
     motion: Motion
     robot: AbstractRobot
 
-    def __call__(self, *args, **kwargs) -> bool:
+    def __call__(self) -> bool:
         raise NotImplementedError(f"{self.__class__.__name__} must implement __call__.")
 
     @staticmethod

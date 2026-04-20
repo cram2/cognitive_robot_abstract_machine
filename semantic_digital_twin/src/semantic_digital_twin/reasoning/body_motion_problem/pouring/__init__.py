@@ -16,10 +16,7 @@ from semantic_digital_twin.reasoning.body_motion_problem.pouring.physics import 
 )
 from semantic_digital_twin.reasoning.body_motion_problem.pouring.predicates import (
     CoupledPouringCanPerform,
-    CoupledPouringCauses,
     PouringCanPerform,
-    PouringCauses,
-    PouringSatisfiesRequest,
 )
 from semantic_digital_twin.reasoning.body_motion_problem.pouring.tee_class import (
     PouringTEEClass,
@@ -30,14 +27,11 @@ __all__ = [
     "ArticulatedPouringEquation",
     "ContainerGeometry",
     "CoupledPouringCanPerform",
-    "CoupledPouringCauses",
     "CoupledPouringMSCModel",
     "PouringCanPerform",
-    "PouringCauses",
     "PouringEffect",
     "PouringEquation",
     "PouringMSCModel",
-    "PouringSatisfiesRequest",
     "PouringTEEClass",
     "ReceiverFillEffect",
 ]

@@ -123,6 +123,21 @@ class PhysicsModel(ABC):
                  positions and achieved indicates whether the effect was satisfied.
         """
 
+    def build_secondary_trajectories(
+        self, effect: Effect
+    ) -> List[Tuple[Connection, List[float]]]:
+        """
+        Return secondary actuator trajectories recorded by the most recent run().
+
+        Override in physics models that drive more than one DOF alongside the
+        primary actuator (e.g. fill-level joint in pouring). The base returns
+        an empty list, meaning only the primary trajectory is replayed.
+
+        :param effect: The effect passed to the most recent run() call.
+        :return: List of (connection, positions) pairs parallel to the primary trajectory.
+        """
+        return []
+
 
 class OutOfScopeError(Exception):
     """Raised by Causes when world parameters fall outside I_Φ."""

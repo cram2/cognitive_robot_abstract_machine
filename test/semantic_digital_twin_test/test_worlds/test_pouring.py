@@ -26,14 +26,16 @@ from semantic_digital_twin.reasoning.body_motion_problem import (
     Motion,
     TaskRequest,
 )
+from semantic_digital_twin.reasoning.body_motion_problem.predicates import (
+    Causes,
+    SatisfiesRequest,
+)
 from semantic_digital_twin.reasoning.body_motion_problem.pouring import (
     ArticulatedPouringEquation,
     ContainerGeometry,
     PouringCanPerform,
-    PouringCauses,
     PouringEffect,
     PouringMSCModel,
-    PouringSatisfiesRequest,
 )
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel, HasRootBody
@@ -94,7 +96,9 @@ def test_pouring_satisfies_request(world_with_cup):
         goal_value=0.6,
     )
     task = TaskRequest(task_type="pour", name="cup")
-    assert PouringSatisfiesRequest(task=task, effect=effect)()
+    assert SatisfiesRequest(
+        task=task, effect=effect, task_type="pour", effect_type=PouringEffect
+    )()
 
 
 def test_pouring_satisfies_request_rejects_wrong_task_type(world_with_cup):
@@ -105,7 +109,9 @@ def test_pouring_satisfies_request_rejects_wrong_task_type(world_with_cup):
         goal_value=0.6,
     )
     task = TaskRequest(task_type="open", name="cup")
-    assert not PouringSatisfiesRequest(task=task, effect=effect)()
+    assert not SatisfiesRequest(
+        task=task, effect=effect, task_type="pour", effect_type=PouringEffect
+    )()
 
 
 def test_causes_pours_out_40_percent(world_with_cup, rclpy_node):
@@ -127,8 +133,10 @@ def test_causes_pours_out_40_percent(world_with_cup, rclpy_node):
     )
     task = TaskRequest(task_type="pour", name="cup")
 
-    assert PouringSatisfiesRequest(task=task, effect=effect)()
-    causes = PouringCauses(
+    assert SatisfiesRequest(
+        task=task, effect=effect, task_type="pour", effect_type=PouringEffect
+    )()
+    causes = Causes(
         effect=effect,
         environment=world,
         motion=motion,
@@ -183,7 +191,7 @@ def test_causes_does_not_hold_when_effect_already_achieved(world_with_cup):
         actuator=cup.fill_equation.tilt_connection,
         motion_model=PouringMSCModel(fill_equation=cup.fill_equation),
     )
-    assert not PouringCauses(
+    assert not Causes(
         effect=effect,
         environment=world,
         motion=motion,
@@ -239,7 +247,7 @@ def test_pouring_can_perform(pr2_world_with_cup, rclpy_node):
         motion_model=physics,
     )
 
-    causes = PouringCauses(effect=effect, environment=world, motion=motion)
+    causes = Causes(effect=effect, environment=world, motion=motion)
     assert causes(), "Causes must hold before testing CanPerform"
     causes.replay(step_delay=0.1)
     assert PouringCanPerform(
@@ -272,8 +280,13 @@ def test_eql_query_all_three_predicates(pr2_world_with_cup, rclpy_node):
 
     query = an(
         set_of(task_sym, effect_sym, motion_sym).where(
-            PouringSatisfiesRequest(task=task_sym, effect=effect_sym),
-            PouringCauses(effect=effect_sym, environment=world, motion=motion_sym),
+            SatisfiesRequest(
+                task=task_sym,
+                effect=effect_sym,
+                task_type="pour",
+                effect_type=PouringEffect,
+            ),
+            Causes(effect=effect_sym, environment=world, motion=motion_sym),
             PouringCanPerform(motion=motion_sym, robot=robot),
         )
     )

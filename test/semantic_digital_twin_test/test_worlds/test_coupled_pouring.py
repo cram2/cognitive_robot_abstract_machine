@@ -1,11 +1,11 @@
 """
 Tests for the coupled pouring chain (D_pour → receiver).
 
-Verifies that CoupledPouringCauses correctly models:
+Verifies that Causes with CoupledPouringMSCModel correctly models:
   source fill decrease → receiver fill increase (via QP volume conservation constraint)
 
 The source cup has a kinematic chain: world → PrismaticX → PrismaticZ → RevoluteY.
-The QP drives the x/z DOFs to keep the spilling rim above the receiver at every tick.
+The QP jointly optimises all DOFs to keep the spilling rim above the receiver.
 The receiver is a fixed container placed below the source.
 """
 
@@ -23,12 +23,11 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.reasoning.body_motion_problem import Motion
+from semantic_digital_twin.reasoning.body_motion_problem.predicates import Causes
 from semantic_digital_twin.reasoning.body_motion_problem.pouring import (
     ArticulatedPouringEquation,
     ContainerGeometry,
-    CoupledPouringCauses,
     CoupledPouringMSCModel,
-    PouringMSCModel,
     ReceiverFillEffect,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel, HasRootBody
@@ -182,14 +181,12 @@ def world_with_source_and_receiver():
         container_geometry=SOURCE_GEOMETRY,
     )
 
-    return world, source, receiver, receiver_opening, x_connection, z_connection
+    return world, source, receiver
 
 
 def test_receiver_fill_increases(world_with_source_and_receiver, rclpy_node):
-    """CoupledPouringCauses produces a tilt trajectory that fills the receiver to setpoint."""
-    world, source, receiver, receiver_opening, x_connection, z_connection = (
-        world_with_source_and_receiver
-    )
+    """Causes with CoupledPouringMSCModel produces a tilt trajectory that fills the receiver to setpoint."""
+    world, source, receiver = world_with_source_and_receiver
     viz = VizMarkerPublisher(_world=world, node=rclpy_node)
     viz.with_tf_publisher()
 
@@ -202,17 +199,11 @@ def test_receiver_fill_increases(world_with_source_and_receiver, rclpy_node):
         tolerance=0.05,
     )
 
-    source_physics = PouringMSCModel(
-        fill_equation=source.fill_equation, theta_max=math.pi / 2
-    )
     coupled_model = CoupledPouringMSCModel(
-        source_model=source_physics,
-        source_geometry=SOURCE_GEOMETRY,
-        receiver_geometry=RECEIVER_GEOMETRY,
-        x_translation_connection=x_connection,
-        z_translation_connection=z_connection,
-        receiver_opening_world=receiver_opening,
-        height_above_receiver=HEIGHT_ABOVE_RECEIVER,
+        source=source,
+        receiver=receiver,
+        root_link=world.root,
+        theta_max=math.pi / 2,
     )
 
     motion = Motion(
@@ -221,15 +212,14 @@ def test_receiver_fill_increases(world_with_source_and_receiver, rclpy_node):
         motion_model=coupled_model,
     )
 
-    causes = CoupledPouringCauses(
+    causes = Causes(
         effect=receiver_effect,
         environment=world,
         motion=motion,
-        source=source,
     )
 
     result = causes()
-    assert result, "CoupledPouringCauses must confirm the receiver fill is achieved"
+    assert result, "Causes must confirm the receiver fill is achieved"
     assert len(motion.trajectory) > 0, "Tilt trajectory must have been generated"
 
     receiver_fill_traj = coupled_model.last_receiver_fill_trajectory
@@ -243,9 +233,7 @@ def test_world_state_reset_after_coupled_model(
     world_with_source_and_receiver, rclpy_node
 ):
     """Source and receiver fill levels are restored after CoupledPouringMSCModel.run()."""
-    world, source, receiver, receiver_opening, x_connection, z_connection = (
-        world_with_source_and_receiver
-    )
+    world, source, receiver = world_with_source_and_receiver
     viz = VizMarkerPublisher(_world=world, node=rclpy_node)
     viz.with_tf_publisher()
 
@@ -260,13 +248,10 @@ def test_world_state_reset_after_coupled_model(
     )
 
     coupled_model = CoupledPouringMSCModel(
-        source_model=PouringMSCModel(fill_equation=source.fill_equation),
-        source_geometry=SOURCE_GEOMETRY,
-        receiver_geometry=RECEIVER_GEOMETRY,
-        x_translation_connection=x_connection,
-        z_translation_connection=z_connection,
-        receiver_opening_world=receiver_opening,
-        height_above_receiver=HEIGHT_ABOVE_RECEIVER,
+        source=source,
+        receiver=receiver,
+        root_link=world.root,
+        theta_max=math.pi / 2,
     )
     coupled_model.run(receiver_effect, world)
 

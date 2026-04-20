@@ -25,7 +25,7 @@ class PouringEffect(MonotoneDecreasingEffect):
     ``current_value <= goal_value + tolerance``.
 
     The target object must be a :class:`~semantic_digital_twin.semantic_annotations.mixins.HasFillLevel`
-    so that :class:`~semantic_digital_twin.reasoning.body_motion_problem.pouring.predicates.PouringCauses`
+    so that :class:`~semantic_digital_twin.reasoning.body_motion_problem.predicates.Causes`
     can access the fill connection and its governing equation.
     """
 

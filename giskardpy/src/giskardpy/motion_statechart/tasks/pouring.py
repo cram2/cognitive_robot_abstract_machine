@@ -12,6 +12,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Optional
 
+import numpy as np
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -23,7 +24,9 @@ from semantic_digital_twin.reasoning.body_motion_problem.pouring.articulated imp
     PouringEquation,
 )
 from semantic_digital_twin.semantic_annotations.mixins import ContainerGeometry
+from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.world_description.connections import Connection
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False)
@@ -161,33 +164,28 @@ class CoupledPouringTask(PouringTask):
     """
     Extends :class:`PouringTask` with receiver fill and kinematic rim-positioning constraints.
 
-    Adds three QP constraints on top of the source fill ODE and tilt ramp:
+    Adds two groups of QP constraints on top of the source fill ODE and tilt ramp:
 
     1. Receiver fill velocity: ``ḣ_r = max(0, −ḣ_s) · (h_s·r_s) / (h_r·r_r)``
-    2. Cup x-axis position: drives x-translation DOF to keep the spilling rim above the receiver
-    3. Cup z-axis position: drives z-translation DOF to maintain ``height_above_receiver`` clearance
-
-    The rim constraints are nonlinear in the tilt angle but expressed fully symbolically,
-    so the QP progresses all DOFs simultaneously.
+    2. Rim position: full FK from ``root_link`` to ``tip_link`` keeps the spilling rim
+       at ``receiver_target`` by jointly optimising all DOFs in the kinematic chain.
 
     :param receiver_fill_connection: Fill-level DOF of the receiving container.
-    :param x_translation_connection: Prismatic x-DOF of the source cup body.
-    :param z_translation_connection: Prismatic z-DOF of the source cup body.
+    :param root_link: Root of the kinematic chain that positions the source cup.
+    :param tip_link: Tip body (cup body) of the kinematic chain.
     :param source_geometry: Physical dimensions of the source container.
     :param receiver_geometry: Physical dimensions of the receiver container.
-    :param receiver_x: World-frame x of the receiver opening centre.
-    :param receiver_z_rim: World-frame z target for the spilling rim
-        (= receiver opening z + height_above_receiver).
+    :param receiver_target: World-frame [x, y, z] target for the spilling rim
+        (= receiver opening xyz + height_above_receiver in z).
     :param goal_receiver_fill: Target normalised fill level for the receiver.
     """
 
     receiver_fill_connection: Connection = field(kw_only=True)
-    x_translation_connection: Connection = field(kw_only=True)
-    z_translation_connection: Connection = field(kw_only=True)
+    root_link: Body = field(kw_only=True)
+    tip_link: Body = field(kw_only=True)
     source_geometry: ContainerGeometry = field(kw_only=True)
     receiver_geometry: ContainerGeometry = field(kw_only=True)
-    receiver_x: float = field(kw_only=True)
-    receiver_z_rim: float = field(kw_only=True)
+    receiver_target: np.ndarray = field(kw_only=True)
     goal_receiver_fill: float = field(kw_only=True)
 
     def _tilt_goal_expression(self, fill_sym) -> sm.Expression:
@@ -230,8 +228,6 @@ class CoupledPouringTask(PouringTask):
         source_fill_sym = self.fill_equation.fill_connection.dof.variables.position
         tilt_sym = self.fill_equation.tilt_connection.dof.variables.position
         receiver_fill_sym = self.receiver_fill_connection.dof.variables.position
-        x_sym = self.x_translation_connection.dof.variables.position
-        z_sym = self.z_translation_connection.dof.variables.position
 
         r = self.source_geometry.half_width
         A = self.source_geometry.height
@@ -250,26 +246,24 @@ class CoupledPouringTask(PouringTask):
             name=str(self.receiver_fill_connection.name),
         )
 
-        x_target = self.receiver_x - r * sm.cos(tilt_sym) - A * sm.sin(tilt_sym)
-        z_target = self.receiver_z_rim - A * sm.cos(tilt_sym) + r * sm.sin(tilt_sym)
-
-        x_vel = self.x_translation_connection.dof.limits.upper.velocity
-        z_vel = self.z_translation_connection.dof.limits.upper.velocity
-
-        artifacts.constraints.add_equality_constraint(
-            name=str(self.x_translation_connection.name),
-            reference_velocity=x_vel,
-            equality_bound=x_target - x_sym,
-            quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
-            task_expression=x_sym,
+        root_T_tip = context.world.compose_forward_kinematics_expression(
+            self.root_link, self.tip_link
         )
-        artifacts.constraints.add_equality_constraint(
-            name=str(self.z_translation_connection.name),
-            reference_velocity=z_vel,
-            equality_bound=z_target - z_sym,
-            quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
-            task_expression=z_sym,
-        )
+        tip_P_rim = Point3(r, 0.0, A, reference_frame=self.tip_link)
+        root_P_rim = root_T_tip @ tip_P_rim
+
+        for axis, rim_sym, target in [
+            ("x", root_P_rim.x, float(self.receiver_target[0])),
+            ("y", root_P_rim.y, float(self.receiver_target[1])),
+            ("z", root_P_rim.z, float(self.receiver_target[2])),
+        ]:
+            artifacts.constraints.add_equality_constraint(
+                name=f"{self.tip_link.name}_rim_{axis}",
+                reference_velocity=1.0,
+                equality_bound=sm.Scalar(target) - rim_sym,
+                quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
+                task_expression=rim_sym,
+            )
         return artifacts
 
     def on_tick(

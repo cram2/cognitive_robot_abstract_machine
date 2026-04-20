@@ -1489,10 +1489,6 @@ class CausesDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    polymorphic_type: Mapped[str] = mapped_column(
-        String(255), nullable=False, use_existing_column=True
-    )
-
     effect_id: Mapped[int] = mapped_column(
         ForeignKey("EffectDAO.database_id", use_alter=True),
         nullable=True,
@@ -1529,11 +1525,6 @@ class CausesDAO(
     tee_class: Mapped[TEEClassDAO] = relationship(
         "TEEClassDAO", uselist=False, foreign_keys=[tee_class_id], post_update=True
     )
-
-    __mapper_args__ = {
-        "polymorphic_on": "polymorphic_type",
-        "polymorphic_identity": "CausesDAO",
-    }
 
 
 class ClosestPointsDAO(
@@ -2378,25 +2369,6 @@ class ContainerGeometryDAO(
     half_width: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
-class CoupledPouringCausesDAO(
-    CausesDAO,
-    DataAccessObject[
-        semantic_digital_twin.reasoning.body_motion_problem.pouring.predicates.CoupledPouringCauses
-    ],
-):
-
-    __tablename__ = "CoupledPouringCausesDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(CausesDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "CoupledPouringCausesDAO",
-        "inherit_condition": database_id == CausesDAO.database_id,
-    }
-
-
 class CoupledPouringMSCModelDAO(
     Base,
     DataAccessObject[
@@ -2410,65 +2382,21 @@ class CoupledPouringMSCModelDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
+    theta_max: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    ramp_margin: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    timeout: Mapped[builtins.int] = mapped_column(use_existing_column=True)
     height_above_receiver: Mapped[builtins.float] = mapped_column(
         use_existing_column=True
     )
 
-    source_model_id: Mapped[int] = mapped_column(
-        ForeignKey("PouringMSCModelDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    source_geometry_id: Mapped[int] = mapped_column(
-        ForeignKey("ContainerGeometryDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    receiver_geometry_id: Mapped[int] = mapped_column(
-        ForeignKey("ContainerGeometryDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    x_translation_connection_id: Mapped[int] = mapped_column(
-        ForeignKey("ConnectionDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    z_translation_connection_id: Mapped[int] = mapped_column(
-        ForeignKey("ConnectionDAO.database_id", use_alter=True),
+    root_link_id: Mapped[int] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    source_model: Mapped[PouringMSCModelDAO] = relationship(
-        "PouringMSCModelDAO",
-        uselist=False,
-        foreign_keys=[source_model_id],
-        post_update=True,
-    )
-    source_geometry: Mapped[ContainerGeometryDAO] = relationship(
-        "ContainerGeometryDAO",
-        uselist=False,
-        foreign_keys=[source_geometry_id],
-        post_update=True,
-    )
-    receiver_geometry: Mapped[ContainerGeometryDAO] = relationship(
-        "ContainerGeometryDAO",
-        uselist=False,
-        foreign_keys=[receiver_geometry_id],
-        post_update=True,
-    )
-    x_translation_connection: Mapped[ConnectionDAO] = relationship(
-        "ConnectionDAO",
-        uselist=False,
-        foreign_keys=[x_translation_connection_id],
-        post_update=True,
-    )
-    z_translation_connection: Mapped[ConnectionDAO] = relationship(
-        "ConnectionDAO",
-        uselist=False,
-        foreign_keys=[z_translation_connection_id],
-        post_update=True,
+    root_link: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
     )
 
 
@@ -3769,25 +3697,6 @@ class CoupledPouringCanPerformDAO(
     }
 
 
-class PouringCausesDAO(
-    CausesDAO,
-    DataAccessObject[
-        semantic_digital_twin.reasoning.body_motion_problem.pouring.predicates.PouringCauses
-    ],
-):
-
-    __tablename__ = "PouringCausesDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(CausesDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PouringCausesDAO",
-        "inherit_condition": database_id == CausesDAO.database_id,
-    }
-
-
 class PouringEffectDAO(
     MonotoneDecreasingEffectDAO,
     DataAccessObject[
@@ -4555,6 +4464,10 @@ class SatisfiesRequestDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
+    task_type: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
     polymorphic_type: Mapped[str] = mapped_column(
         String(255), nullable=False, use_existing_column=True
     )
@@ -4600,27 +4513,6 @@ class ContainerSatisfiesRequestDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "ContainerSatisfiesRequestDAO",
-        "inherit_condition": database_id == SatisfiesRequestDAO.database_id,
-    }
-
-
-class PouringSatisfiesRequestDAO(
-    SatisfiesRequestDAO,
-    DataAccessObject[
-        semantic_digital_twin.reasoning.body_motion_problem.pouring.predicates.PouringSatisfiesRequest
-    ],
-):
-
-    __tablename__ = "PouringSatisfiesRequestDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SatisfiesRequestDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PouringSatisfiesRequestDAO",
         "inherit_condition": database_id == SatisfiesRequestDAO.database_id,
     }
 

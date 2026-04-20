@@ -7,10 +7,10 @@ the fill-level ODE and controls the tilt joint via QP.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-import numpy as np
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.graph_node import EndMotion
@@ -24,9 +24,10 @@ from semantic_digital_twin.reasoning.body_motion_problem.types import (
     Effect,
     PhysicsModel,
 )
-from semantic_digital_twin.semantic_annotations.mixins import ContainerGeometry
+from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -94,6 +95,17 @@ class PouringMSCModel(PhysicsModel):
         self.last_fill_trajectory = fill_trajectory
         return tilt_trajectory, achieved
 
+    def build_secondary_trajectories(
+        self, effect: Effect
+    ) -> List[Tuple[Connection, List[float]]]:
+        """
+        Return the fill-level trajectory recorded by the most recent run().
+
+        :param effect: Effect whose target_object provides the fill connection.
+        :return: Single-entry list of (fill_connection, fill_level_positions).
+        """
+        return [(effect.target_object.fill_connection, self.last_fill_trajectory)]
+
     def _build_msc(self, effect: Effect) -> MotionStatechart:
         """
         Build the MotionStatechart for a single pouring manoeuvre.
@@ -121,30 +133,33 @@ class CoupledPouringMSCModel(PhysicsModel):
 
     Runs a :class:`~giskardpy.motion_statechart.tasks.pouring.CoupledPouringTask`
     MotionStatechart that drives tilt, source fill, receiver fill, and cup body
-    position simultaneously via QP constraints. The kinematic rim-positioning
-    constraints keep the spilling rim above the receiver at every tick.
+    position simultaneously via QP constraints. The full FK from ``root_link`` to the
+    source cup body keeps the spilling rim above the receiver at every tick.
 
-    :param source_model: Configured source-side physics model; used as a config
-        holder for ``fill_equation``, ``theta_max``, ``ramp_margin``, and ``timeout``.
-    :param source_geometry: Interior dimensions of the source cup.
-    :param receiver_geometry: Interior dimensions of the receiver cup.
-    :param x_translation_connection: Prismatic x-DOF of the source cup body.
-    :param z_translation_connection: Prismatic z-DOF of the source cup body.
-    :param receiver_opening_world: World-frame xyz of the receiver opening top-centre.
-    :param height_above_receiver: Desired rim clearance above the receiver opening.
+    :param source: Semantic annotation carrying ``fill_equation``, ``fill_connection``,
+        ``container_geometry``, and ``root`` (cup body = tip link).
+    :param receiver: Semantic annotation carrying ``fill_connection``,
+        ``container_geometry``, and ``root`` (used to read world position).
+    :param root_link: Root of the kinematic chain that positions the source cup.
+    :param theta_max: Maximum tilt angle in radians.
+    :param ramp_margin: Fill-level units above goal at which tilt ramp-down begins.
+    :param timeout: Maximum simulation ticks before aborting.
+    :param height_above_receiver: Desired rim clearance above the receiver opening (m).
     """
 
-    source_model: PouringMSCModel
-    source_geometry: ContainerGeometry
-    receiver_geometry: ContainerGeometry
-    x_translation_connection: Connection
-    z_translation_connection: Connection
-    receiver_opening_world: np.ndarray
+    source: HasFillLevel
+    receiver: HasFillLevel
+    root_link: Body
+    theta_max: float = field(default=math.pi / 3)
+    ramp_margin: float = field(default=0.15)
+    timeout: int = field(default=500)
     height_above_receiver: float = field(default=0.1)
 
+    last_source_fill_trajectory: List[float] = field(default_factory=list, init=False)
     last_receiver_fill_trajectory: List[float] = field(default_factory=list, init=False)
-    last_x_trajectory: List[float] = field(default_factory=list, init=False)
-    last_z_trajectory: List[float] = field(default_factory=list, init=False)
+    _last_chain_trajectories: Dict[Connection, List[float]] = field(
+        default_factory=dict, init=False
+    )
 
     def run(self, effect: Effect, world: World) -> Tuple[Optional[List[float]], bool]:
         """
@@ -162,33 +177,58 @@ class CoupledPouringMSCModel(PhysicsModel):
         )
         executor.compile(motion_statechart=msc)
 
-        tilt_connection = self.source_model.fill_equation.tilt_connection
-        source_fill_connection = self.source_model.fill_equation.fill_connection
-        receiver_fill_connection = effect.target_object.fill_connection
+        tilt_connection = self.source.fill_equation.tilt_connection
+        source_fill_connection = self.source.fill_connection
+        receiver_fill_connection = self.receiver.fill_connection
+        chain_connections = self._get_kinematic_chain_connections()
 
         tilt_traj: List[float] = []
         source_fill_traj: List[float] = []
         receiver_fill_traj: List[float] = []
-        x_traj: List[float] = []
-        z_traj: List[float] = []
+        chain_trajs: Dict[Connection, List[float]] = {c: [] for c in chain_connections}
 
         with world.reset_state_context():
-            for _ in range(self.source_model.timeout):
+            for _ in range(self.timeout):
                 executor.tick()
                 tilt_traj.append(float(tilt_connection.position))
                 source_fill_traj.append(float(source_fill_connection.position))
                 receiver_fill_traj.append(float(receiver_fill_connection.position))
-                x_traj.append(float(self.x_translation_connection.position))
-                z_traj.append(float(self.z_translation_connection.position))
+                for conn in chain_connections:
+                    chain_trajs[conn].append(float(conn.position))
                 if msc.is_end_motion():
                     break
             achieved = effect.is_achieved()
 
-        self.source_model.last_fill_trajectory = source_fill_traj
+        self.last_source_fill_trajectory = source_fill_traj
         self.last_receiver_fill_trajectory = receiver_fill_traj
-        self.last_x_trajectory = x_traj
-        self.last_z_trajectory = z_traj
+        self._last_chain_trajectories = chain_trajs
         return tilt_traj, achieved
+
+    def build_secondary_trajectories(
+        self, effect: Effect
+    ) -> List[Tuple[Connection, List[float]]]:
+        """
+        Return secondary trajectories recorded by the most recent run().
+
+        :param effect: Effect (unused; receiver fill connection is taken from ``self.receiver``).
+        :return: Source fill, receiver fill, and all kinematic chain DOF trajectories.
+        """
+        result: List[Tuple[Connection, List[float]]] = [
+            (self.source.fill_connection, self.last_source_fill_trajectory),
+            (self.receiver.fill_connection, self.last_receiver_fill_trajectory),
+        ]
+        result.extend(self._last_chain_trajectories.items())
+        return result
+
+    def _get_kinematic_chain_connections(self) -> List[Connection]:
+        """Collect all connections from just above the tilt joint up to root_link."""
+        connections: List[Connection] = []
+        current = self.source.fill_equation.tilt_connection.parent
+        while current is not None and current != self.root_link:
+            conn = current.parent_connection
+            connections.append(conn)
+            current = conn.parent
+        return connections
 
     def _build_msc(self, effect: Effect) -> MotionStatechart:
         """
@@ -197,21 +237,25 @@ class CoupledPouringMSCModel(PhysicsModel):
         :param effect: ReceiverFillEffect providing goal_value and tolerance.
         :return: Compiled-ready MotionStatechart with CoupledPouringTask and EndMotion.
         """
+        receiver_center = self.receiver.root.global_transform.to_position().to_np()[:3]
+        receiver_target = receiver_center.copy()
+        receiver_target[2] += (
+            self.receiver.container_geometry.height / 2 + self.height_above_receiver
+        )
+
         msc = MotionStatechart()
         task = CoupledPouringTask(
-            fill_equation=self.source_model.fill_equation,
+            fill_equation=self.source.fill_equation,
             goal_value=0.0,
             tolerance=effect.tolerance,
-            theta_max=self.source_model.theta_max,
-            ramp_margin=self.source_model.ramp_margin,
-            receiver_fill_connection=effect.target_object.fill_connection,
-            x_translation_connection=self.x_translation_connection,
-            z_translation_connection=self.z_translation_connection,
-            source_geometry=self.source_geometry,
-            receiver_geometry=self.receiver_geometry,
-            receiver_x=float(self.receiver_opening_world[0]),
-            receiver_z_rim=float(self.receiver_opening_world[2])
-            + self.height_above_receiver,
+            theta_max=self.theta_max,
+            ramp_margin=self.ramp_margin,
+            receiver_fill_connection=self.receiver.fill_connection,
+            root_link=self.root_link,
+            tip_link=self.source.root,
+            source_geometry=self.source.container_geometry,
+            receiver_geometry=self.receiver.container_geometry,
+            receiver_target=receiver_target,
             goal_receiver_fill=effect.goal_value,
         )
         msc.add_node(task)

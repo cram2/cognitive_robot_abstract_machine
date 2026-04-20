@@ -55,7 +55,7 @@ class ContainerSatisfiesRequest(SatisfiesRequest):
     that the effect's target object matches the task's target name.
     """
 
-    def __call__(self, *args, **kwargs) -> bool:
+    def __call__(self) -> bool:
         return self._check(self.task, self.effect)
 
     @staticmethod
@@ -83,7 +83,7 @@ class ContainerCanPerform(CanPerform):
     while respecting external collision constraints.
     """
 
-    def __call__(self, *args, **kwargs) -> bool:
+    def __call__(self) -> bool:
         """
         Check if any of the robot's grippers can follow the handle trajectory.
         """
@@ -166,7 +166,7 @@ class ContainerCanPerform(CanPerform):
         Convert the actuator-space trajectory to a sequence of handle poses in world space.
         """
         handle_trajectory = []
-        for position in self.motion.trajectory[:]:
+        for position in self.motion.trajectory:
             joint_config = {self.motion.actuator.name.name: position}
             pose = link_pose_for_joint_config(target_body, joint_config)
             handle_trajectory.append(pose)
