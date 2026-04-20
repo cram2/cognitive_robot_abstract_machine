@@ -9,8 +9,7 @@ from pycram.robot_plans.training_environment import MoveToReachTrainingEnvironme
 
 
 def test_move_to_reach(pycram_testing_session):
-    rclpy.init()
-    training_environment = MoveToReachTrainingEnvironment(visualize=True)
+    training_environment = MoveToReachTrainingEnvironment(visualize=False)
 
     training_environment.generate_episodes(2)
 
