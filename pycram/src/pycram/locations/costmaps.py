@@ -310,6 +310,9 @@ class Costmap(PoseGeneratorBackend):
                 f"Can only combine two locations other type was {type(other)}"
             )
 
+    def __and__(self, other):
+        return self.merge(other)
+
     def partitioning_rectangles(self) -> List[Rectangle]:
         """
         Partition the map attached to this locations into rectangles. The rectangles are axis aligned, exhaustive and
