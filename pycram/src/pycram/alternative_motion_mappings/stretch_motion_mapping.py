@@ -62,16 +62,16 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
                 ),
                 Parallel(
                     [
-                        AlignPlanes(
-                            root_link=self.world.root,
-                            tip_link=self.robot.root,
-                            tip_normal=Vector3(
-                                1, 0, 0, reference_frame=self.robot.root
-                            ),
-                            goal_normal=Vector3(
-                                -1, 0, 0, reference_frame=self.world.root
-                            ),
-                        ),
+                        # AlignPlanes(
+                        #     root_link=self.world.root,
+                        #     tip_link=self.robot.root,
+                        #     tip_normal=Vector3(
+                        #         1, 0, 0, reference_frame=self.robot.root
+                        #     ),
+                        #     goal_normal=Vector3(
+                        #         -1, 0, 0, reference_frame=self.world.root
+                        #     ),
+                        # ),
                         CartesianPose(
                             root_link=self.world.root,
                             tip_link=tip,
