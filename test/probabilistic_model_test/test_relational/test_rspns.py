@@ -130,13 +130,7 @@ def data_preparation(mutable_model_world):
     m2, prob = move_and_pick_up_distribution.truncated(
         complete_event, singleton_allowed=True
     )
-    print(m2)
-    print(prob)
-
-    exit()
-    probabilistic_registry = DictRegistry(
-        {MoveAndPickUpAction: move_and_pick_up_distribution}
-    )
+    probabilistic_registry = DictRegistry({MoveAndPickUpAction: m2})
 
     backend = ProbabilisticBackend(probabilistic_registry, number_of_samples=50)
 
