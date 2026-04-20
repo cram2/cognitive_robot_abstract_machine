@@ -2,16 +2,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Optional, Any
 
+import numpy as np
 from typing_extensions import Optional, Type, Any
 
 from pycram.datastructures.enums import DetectionTechnique, DetectionState
 from pycram.datastructures.grasp import GraspDescription
 from pycram.perception import PerceptionQuery
 from pycram.plans.factories import sequential
+from pycram.plans.failures import NavigationGoalNotReachedError
 from pycram.robot_plans import MoveManipulatorMotion
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.navigation import NavigateAction
+from pycram.robot_plans.actions.core.robot_body import MoveManipulatorAction
 from semantic_digital_twin.robots.abstract_robot import Manipulator
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -82,3 +86,56 @@ class DetectAction(ActionDescription):
         return
         # if not result:
         #     raise PerceptionObjectNotFound(self.object_designator, self.technique, self.region)
+
+
+@dataclass
+class MoveToReach(ActionDescription):
+    """
+    Let the robot move to `standing_pose` and reach with `manipulator` at `target_pose`.
+    """
+
+    standing_pose: Pose
+    """
+    The pose that the robot should stand at.
+    """
+
+    manipulator: Manipulator
+    """
+    The Manipulator to move to the target pose
+    """
+
+    target_pose: Pose
+    """
+    Pose that should be reached.
+    """
+
+    grasp_description: GraspDescription
+    """
+    The semantic description that should be used for the reaching
+    """
+
+    def execute(self):
+        self.add_subplan(
+            sequential(
+                [
+                    NavigateAction(self.standing_pose),
+                    MoveManipulatorAction(
+                        self.target_pose,
+                        self.manipulator,
+                        allow_gripper_collision=False,
+                    ),
+                ]
+            )
+        ).perform()
+
+    def validate_postcondition(self, result: Optional[Any] = None):
+
+        root_T_robot_base = self.world.transform(self.standing_pose, self.world.root)
+
+        if not np.allclose(
+            root_T_robot_base, self.robot.base.root.global_pose.to_np(), atol=0.1
+        ):
+            raise NavigationGoalNotReachedError(
+                goal_pose=root_T_robot_base,
+                current_pose=self.robot.base.root.global_pose,
+            )

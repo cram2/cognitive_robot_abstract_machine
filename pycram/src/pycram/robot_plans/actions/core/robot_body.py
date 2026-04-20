@@ -3,8 +3,9 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Tuple, List
+from typing import Tuple, List, Optional, Any
 
+import numpy as np
 from typing_extensions import Optional, Dict, Any
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
@@ -13,6 +14,9 @@ from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
 )
+from semantic_digital_twin.robots.abstract_robot import Manipulator
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from ... import MoveManipulatorMotion
 from ....datastructures.dataclasses import Context
 from pycram.datastructures.enums import AxisIdentifier, Arms
 
@@ -28,6 +32,7 @@ from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
 )
+from ....plans.failures import ManipulatorDidNotReachTarget
 
 
 @dataclass
@@ -85,7 +90,6 @@ class SetGripperAction(ActionDescription):
                 [MoveGripperMotion(gripper=arm, motion=self.motion) for arm in arms]
             )
         ).perform()
-
 
 
 @dataclass
@@ -238,3 +242,45 @@ class FollowToolCenterPointPathAction(ActionDescription):
         max_wait_time: timedelta = timedelta(seconds=2),
     ):
         pass
+
+
+@dataclass
+class MoveManipulatorAction(ActionDescription):
+    """
+    Move the manipulator to a specific pose.
+    """
+
+    target_pose: Pose
+    """
+    The pose where the manipulator should be moved to.
+    """
+
+    manipulator: Manipulator
+    """
+    The manipulator that should be moved.
+    """
+
+    allow_gripper_collision: bool
+    """
+    If the gripper can collide with something.
+    """
+
+    def execute(self):
+        self.add_subplan(
+            execute_single(
+                MoveManipulatorMotion(
+                    self.target_pose,
+                    self.manipulator,
+                    self.allow_gripper_collision,
+                )
+            )
+        ).perform()
+
+    def validate_postcondition(self, result: Optional[Any] = None):
+
+        if not np.allclose(
+            self.manipulator.tool_frame.global_pose.to_np(),
+            self.target_pose.to_np(),
+            atol=0.1,
+        ):
+            raise ManipulatorDidNotReachTarget(self.manipulator, self.target_pose)

@@ -246,5 +246,3 @@ class ProbabilisticBackend(GenerativeBackend):
                 truncated.variables, sample
             )
             yield instance
-
-        raise StopIteration()
