@@ -1,4 +1,4 @@
-"""Conftest for reasoning tests — shared PycramIntrospector fixture."""
+"""Shared fixtures for the bridge test package."""
 
 from __future__ import annotations
 
@@ -9,5 +9,5 @@ from llmr.bridge.introspect import PycramIntrospector
 
 @pytest.fixture
 def introspector() -> PycramIntrospector:
-    """Return a fresh PycramIntrospector instance."""
+    """Return a fresh :class:`PycramIntrospector` for each test."""
     return PycramIntrospector()

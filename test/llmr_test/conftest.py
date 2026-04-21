@@ -1,7 +1,5 @@
-"""Root conftest for llmr tests — krrood-aligned test fixtures.
+"""Root conftest for llmr tests — krrood-aligned test fixtures."""
 
-
-"""
 from __future__ import annotations
 
 import pytest

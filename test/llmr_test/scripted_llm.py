@@ -9,10 +9,10 @@ SerializingScriptedLLM is a variant that exercises the real JSON serialization p
 Use it when you need to verify that schema changes, field renames, or validator
 additions are caught — the standard ScriptedLLM would silently pass them through.
 """
+
 from __future__ import annotations
 
-from typing import Type
-from typing_extensions import Any, List
+from typing_extensions import Any, List, Type
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult

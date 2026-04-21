@@ -2,6 +2,7 @@
 
 Uses ScriptedLLM with pre-built responses. No network, no API keys.
 """
+
 from __future__ import annotations
 
 from ..scripted_llm import ScriptedLLM
@@ -33,7 +34,9 @@ class TestDecompose:
             steps=[
                 _AtomicStep(instruction="navigate to the table", dependencies=[]),
                 _AtomicStep(instruction="pick up the milk", dependencies=[]),
-                _AtomicStep(instruction="place the milk in the fridge", dependencies=[1]),
+                _AtomicStep(
+                    instruction="place the milk in the fridge", dependencies=[1]
+                ),
             ]
         )
         llm = ScriptedLLM(responses=[response])
@@ -91,7 +94,9 @@ class TestDecompose:
             steps=[
                 _AtomicStep(instruction="go to the table", dependencies=[]),
                 _AtomicStep(instruction="pick up milk", dependencies=[]),
-                _AtomicStep(instruction="go to the table", dependencies=[]),  # duplicate
+                _AtomicStep(
+                    instruction="go to the table", dependencies=[]
+                ),  # duplicate
             ]
         )
         llm = ScriptedLLM(responses=[response])
@@ -122,6 +127,7 @@ class TestDecompose:
             def with_structured_output(self, schema):
                 def _failing_invoke(messages):
                     raise RuntimeError("LLM error")
+
                 return RunnableLambda(_failing_invoke)
 
         llm = FailingLLM()

@@ -11,11 +11,23 @@ from llmr.schemas.entities import EntityDescriptionSchema
 from llmr.world.grounder import (
     EntityGrounder,
     GroundingResult,
+    ground_expected_entity,
+    grounder_can_return_type,
     resolve_symbol_class,
     _camel_to_tokens,
 )
 from llmr.world.serializer import body_display_name, body_xyz, body_bounding_box
 from .conftest import WorldBody
+
+
+class Manipulator(Symbol):
+    def __init__(self, name: str = "manipulator"):
+        self.name = name
+
+
+class PrefixedNameLike:
+    def __init__(self, name: str):
+        self.name = name
 
 
 class TestEntityGrounder:
@@ -139,6 +151,39 @@ class TestEntityGrounder:
         result = grounder.ground(description)
         assert result.warning is not None
         assert isinstance(result.warning, str)
+
+
+class TestExpectedTypeGrounding:
+    """Expected-type grounding helpers used when action fields need a Symbol subtype."""
+
+    def test_grounder_can_return_type_checks_search_scope(self) -> None:
+        assert grounder_can_return_type(
+            EntityGrounder(groundable_type=Symbol),
+            Manipulator,
+        )
+        assert not grounder_can_return_type(
+            EntityGrounder(groundable_type=WorldBody),
+            Manipulator,
+        )
+
+    def test_ground_expected_entity_handles_prefixed_arm_names(self) -> None:
+        alpha = SimpleNamespace(name=PrefixedNameLike("alpha_manipulator"))
+        beta = SimpleNamespace(name=PrefixedNameLike("beta_manipulator"))
+        resolved_params = {"arm": SimpleNamespace(name=PrefixedNameLike("alpha"))}
+
+        class FakeSymbolGraph:
+            def get_instances_of_type(self, raw_type):
+                assert raw_type is Manipulator
+                return [beta, alpha]
+
+        result = ground_expected_entity(
+            Manipulator,
+            EntityDescriptionSchema(name="manipulator"),
+            resolved_params,
+            symbol_graph=FakeSymbolGraph(),
+        )
+
+        assert result is alpha
 
 
 class TestResolveSymbolClass:

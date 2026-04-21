@@ -1,215 +1,239 @@
-"""Tests for factory functions — nl_plan, nl_sequential, resolve_match, resolve_params.
+"""Tests for :mod:`llmr.factory` — user-facing NL-driven entry points.
 
-Uses ScriptedLLM with pre-built responses. Real SymbolGraph cleared via autouse.
+``execute_single`` is patched per-test because it wraps PyCRAM's real factory,
+which the pure-llmr tests must not invoke.
 """
+
 from __future__ import annotations
+
+from types import SimpleNamespace
+from typing_extensions import Any, Dict, List
 
 import pytest
 
-from .scripted_llm import ScriptedLLM
-from .test_actions import MockPickUpAction
-
-from llmr.factory import (
-    _fully_underspecified,
-    _get_required_schema_fields,
-    _get_settable_fields,
-    resolve_params,
+from llmr.exceptions import LLMActionClassificationFailed
+from llmr.factory import nl_plan, nl_sequential, resolve_match, resolve_params
+from llmr.schemas import (
+    ActionClassification,
+    ActionReasoningOutput,
+    EntityDescriptionSchema,
+    SlotValue,
 )
-from llmr.exceptions import LLMUnresolvedRequiredFields
-from llmr.schemas.slots import ActionReasoningOutput, SlotValue
-from krrood.entity_query_language.query.match import Match
-from krrood.symbol_graph.symbol_graph import Symbol
+
+from ._fixtures.actions import MockNavigateAction, MockPickUpAction
+from ._fixtures.symbols import WorldBody
+from ._fixtures.worlds import symbol_world  # noqa: F401
+from .scripted_llm import ScriptedLLM
 
 
-class MockBody(Symbol):
-    def __init__(self, name: str):
-        self.name = name
+@pytest.fixture
+def fake_execute_single(monkeypatch: pytest.MonkeyPatch) -> List[Any]:
+    """Replace ``execute_single`` in factory with a no-op recorder.
+
+    Returns the list of ``(match, context)`` tuples that the factory forwarded.
+    """
+    calls: List[Any] = []
+
+    def _fake(match: Any, context: Any) -> Any:
+        calls.append((match, context))
+        return SimpleNamespace(perform=lambda: None, match=match, context=context)
+
+    monkeypatch.setattr("llmr.factory.execute_single", _fake)
+    return calls
 
 
-def _free_field_names(match) -> set[str]:
-    return {
-        attr.attribute_name
-        for attr in match.matches_with_variables
-        if attr.assigned_variable._value_ is ...
-    }
+class TestNlPlan:
+    """:func:`nl_plan` — classify → build match → backend → plan node."""
+
+    def test_classifies_and_returns_plan_node(
+        self,
+        fake_execute_single: List[Any],
+        symbol_world: Dict[str, Any],  # noqa: F811
+    ) -> None:
+        llm = ScriptedLLM(
+            responses=[
+                ActionClassification(action_type="MockPickUpAction"),
+                ActionReasoningOutput(
+                    action_type="MockPickUpAction",
+                    slots=[
+                        SlotValue(
+                            field_name="object_designator",
+                            entity_description=EntityDescriptionSchema(
+                                name="milk_on_table"
+                            ),
+                        )
+                    ],
+                ),
+            ]
+        )
+        context = SimpleNamespace(query_backend=None)
+        plan = nl_plan(
+            instruction="pick up the milk",
+            context=context,
+            llm=llm,
+            groundable_type=WorldBody,
+            action_registry={"MockPickUpAction": MockPickUpAction},
+        )
+        # Factory forwarded (match, context) exactly once.
+        assert len(fake_execute_single) == 1
+        forwarded_match, forwarded_context = fake_execute_single[0]
+        assert forwarded_context is context
+        assert forwarded_match.type is MockPickUpAction
+        # Backend was attached to the context.
+        assert context.query_backend is not None
+        # PlanNode stub is returned.
+        assert hasattr(plan, "perform")
+
+    def test_raises_when_classifier_returns_none(
+        self, fake_execute_single: List[Any]
+    ) -> None:
+        """An unknown action_type from the classifier yields ``LLMActionClassificationFailed``."""
+        llm = ScriptedLLM(
+            responses=[ActionClassification(action_type="NotARegisteredAction")]
+        )
+        context = SimpleNamespace(query_backend=None)
+        with pytest.raises(LLMActionClassificationFailed):
+            nl_plan(
+                instruction="do something weird",
+                context=context,
+                llm=llm,
+                action_registry={"MockPickUpAction": MockPickUpAction},
+            )
+        assert fake_execute_single == []
 
 
-class TestFullyUnderspecified:
-    """_fully_underspecified() — Match construction with free slots."""
+class TestNlSequential:
+    """:func:`nl_sequential` — decompose then plan each step."""
 
-    def test_returns_match_with_free_required_fields(self) -> None:
-        """Returns Match with required fields set to ...."""
-        match = _fully_underspecified(MockPickUpAction)
-        assert _free_field_names(match) == {"object_designator"}
+    def test_returns_one_plan_per_decomposed_step(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        fake_execute_single: List[Any],
+        symbol_world: Dict[str, Any],  # noqa: F811
+    ) -> None:
+        # Stub the decomposer so the test does not invoke the LLM twice.
+        from llmr.reasoning import decomposer as decomposer_mod
 
-    def test_match_with_all_required_fields(self) -> None:
-        """All required fields are marked as free."""
-        match = _fully_underspecified(MockPickUpAction)
-        assert match.kwargs == {"object_designator": ...}
+        def _stub_decompose(self: Any, instruction: str) -> Any:
+            return decomposer_mod.DecomposedPlan(
+                steps=["navigate to the table", "pick up the milk"],
+                dependencies={},
+            )
 
-    def test_optional_fields_excluded_from_match(self) -> None:
-        """Optional fields are not included in the Match."""
-        match = _fully_underspecified(MockPickUpAction)
-        assert "grasp_description" not in _free_field_names(match)
-        assert "timeout" not in _free_field_names(match)
+        monkeypatch.setattr(decomposer_mod.TaskDecomposer, "decompose", _stub_decompose)
 
-    def test_internal_fields_skipped(self) -> None:
-        """Internal fields (id, plan_node) are skipped."""
-        match = _fully_underspecified(MockPickUpAction)
-        assert "id" not in _free_field_names(match)
-        assert "plan_node" not in _free_field_names(match)
+        llm = ScriptedLLM(
+            responses=[
+                # Step 1: classification + slot filler for MockNavigateAction
+                ActionClassification(action_type="MockNavigateAction"),
+                ActionReasoningOutput(
+                    action_type="MockNavigateAction",
+                    slots=[
+                        SlotValue(
+                            field_name="target_location",
+                            entity_description=EntityDescriptionSchema(name="table"),
+                        )
+                    ],
+                ),
+                # Step 2: classification + slot filler for MockPickUpAction
+                ActionClassification(action_type="MockPickUpAction"),
+                ActionReasoningOutput(
+                    action_type="MockPickUpAction",
+                    slots=[
+                        SlotValue(
+                            field_name="object_designator",
+                            entity_description=EntityDescriptionSchema(
+                                name="milk_on_table"
+                            ),
+                        )
+                    ],
+                ),
+            ]
+        )
+        registry = {
+            "MockNavigateAction": MockNavigateAction,
+            "MockPickUpAction": MockPickUpAction,
+        }
+        context = SimpleNamespace(query_backend=None)
+        plans = nl_sequential(
+            instruction="go to the table and pick up the milk",
+            context=context,
+            llm=llm,
+            groundable_type=WorldBody,
+            action_registry=registry,
+        )
+        assert len(plans) == 2
+        assert len(fake_execute_single) == 2
 
 
-class TestGetRequiredSchemaFields:
-    """_get_required_schema_fields() — introspection-based required field discovery."""
+class TestResolveMatch:
+    """:func:`resolve_match` — backend wiring for an already-built Match."""
 
-    def test_returns_only_non_optional_fields(self) -> None:
-        """Returns list of required (non-optional) field names."""
-        fields = _get_required_schema_fields(MockPickUpAction)
-        assert fields == ["object_designator"]
+    def test_attaches_backend_and_delegates_to_execute_single(
+        self,
+        fake_execute_single: List[Any],
+        symbol_world: Dict[str, Any],  # noqa: F811
+    ) -> None:
+        from llmr.bridge.match_reader import required_match
 
-    def test_returns_none_on_introspection_failure(self) -> None:
-        """Returns None if introspection fails."""
-        # Pass a non-dataclass to trigger failure
-        result = _get_required_schema_fields(dict)
-        assert result is None
-
-    def test_skips_internal_fields(self) -> None:
-        """Internal fields (id, plan_node) are skipped."""
-        fields = _get_required_schema_fields(MockPickUpAction)
-        assert fields == ["object_designator"]
-
-    def test_uses_introspector_and_excludes_optional_fields(self) -> None:
-        """Uses PycramIntrospector and excludes optional fields from required list."""
-        fields = _get_required_schema_fields(MockPickUpAction)
-        assert fields is not None
-        assert "object_designator" in fields
-        # grasp_description and timeout are optional — must not appear
-        assert "grasp_description" not in fields
-        assert "timeout" not in fields
-
-
-class TestGetSettableFields:
-    """_get_settable_fields() — field discovery fallback."""
-
-    def test_returns_all_non_underscore_fields(self) -> None:
-        """Returns all public (non-underscore) fields."""
-        fields = _get_settable_fields(MockPickUpAction)
-        # Should include all public fields
-        assert len(fields) > 0
-        assert all(not f.startswith("_") for f in fields)
-
-    def test_skips_id_and_plan_node(self) -> None:
-        """id and plan_node are skipped."""
-        fields = _get_settable_fields(MockPickUpAction)
-        assert "id" not in fields
-        assert "plan_node" not in fields
-
-    def test_handles_non_dataclass(self) -> None:
-        """Handles non-dataclass objects with __init__ signature."""
-        fields = _get_settable_fields(dict)
-        # dict should return empty or valid signature params
-        assert isinstance(fields, list)
+        match = required_match(MockPickUpAction)
+        llm = ScriptedLLM(
+            responses=[
+                ActionReasoningOutput(
+                    action_type="MockPickUpAction",
+                    slots=[
+                        SlotValue(
+                            field_name="object_designator",
+                            entity_description=EntityDescriptionSchema(
+                                name="milk_on_table"
+                            ),
+                        )
+                    ],
+                )
+            ]
+        )
+        context = SimpleNamespace(query_backend=None)
+        plan = resolve_match(
+            match,
+            context=context,
+            llm=llm,
+            groundable_type=WorldBody,
+            instruction="pick up the milk",
+        )
+        assert hasattr(plan, "perform")
+        assert context.query_backend is not None
+        assert fake_execute_single == [(match, context)]
 
 
 class TestResolveParams:
-    """resolve_params() — standalone parameter resolution (no context/execution)."""
+    """:func:`resolve_params` — non-executing variant that returns the action instance."""
 
-    def test_returns_concrete_action_instance(self) -> None:
-        """resolve_params returns a concrete action instance."""
-        output = ActionReasoningOutput(
-            action_type="MockPickUpAction",
-            slots=[
-                SlotValue(field_name="timeout", value="12.5")
-            ],
+    def test_returns_constructed_action_instance(
+        self, symbol_world: Dict[str, Any]  # noqa: F811
+    ) -> None:
+        from llmr.bridge.match_reader import required_match
+
+        match = required_match(MockPickUpAction)
+        llm = ScriptedLLM(
+            responses=[
+                ActionReasoningOutput(
+                    action_type="MockPickUpAction",
+                    slots=[
+                        SlotValue(
+                            field_name="object_designator",
+                            entity_description=EntityDescriptionSchema(
+                                name="milk_on_table"
+                            ),
+                        )
+                    ],
+                )
+            ]
         )
-        llm = ScriptedLLM(responses=[output])
-        milk = MockBody("milk")
-
-        match = Match(MockPickUpAction)(object_designator=milk, timeout=...)
-
-        result = resolve_params(match, llm=llm, strict_required=False)
-
-        assert result == MockPickUpAction(object_designator=milk, timeout=12.5)
-
-    def test_does_not_require_context(self) -> None:
-        """resolve_params does not require a PyCRAM Context."""
-        output = ActionReasoningOutput(action_type="MockPickUpAction", slots=[])
-        llm = ScriptedLLM(responses=[output])
-        milk = MockBody("milk")
-
-        match = Match(MockPickUpAction)(object_designator=milk)
-
-        result = resolve_params(match, llm=llm)
-
-        assert result == MockPickUpAction(object_designator=milk)
-
-    def test_accepts_custom_instructions(self) -> None:
-        """resolve_params accepts instruction parameter for context."""
-        output = ActionReasoningOutput(action_type="MockPickUpAction", slots=[])
-        llm = ScriptedLLM(responses=[output])
-        milk = MockBody("milk")
-
-        match = Match(MockPickUpAction)(object_designator=milk)
-
         result = resolve_params(
             match,
             llm=llm,
+            groundable_type=WorldBody,
             instruction="pick up the milk",
         )
-
-        assert result == MockPickUpAction(object_designator=milk)
-
-    def test_accepts_groundable_type(self) -> None:
-        """resolve_params accepts groundable_type parameter."""
-        output = ActionReasoningOutput(action_type="MockPickUpAction", slots=[])
-        llm = ScriptedLLM(responses=[output])
-        milk = MockBody("milk")
-
-        match = Match(MockPickUpAction)(object_designator=milk)
-
-        result = resolve_params(
-            match,
-            llm=llm,
-            groundable_type=Symbol,
-        )
-
-        assert result == MockPickUpAction(object_designator=milk)
-
-    def test_strict_required_mode(self) -> None:
-        """resolve_params respects strict_required parameter."""
-        output = ActionReasoningOutput(action_type="MockPickUpAction", slots=[])
-        llm = ScriptedLLM(responses=[output])
-
-        match = Match(MockPickUpAction)(object_designator=...)
-
-        with pytest.raises(LLMUnresolvedRequiredFields) as exc_info:
-            resolve_params(
-                match,
-                llm=llm,
-                strict_required=True,
-            )
-
-        assert exc_info.value.unresolved_fields == ["object_designator"]
-
-
-class TestMatchConstruction:
-    """Basic Match construction for action classes."""
-
-    def test_match_for_simple_action(self) -> None:
-        """Can construct a Match for a simple action."""
-        match = Match(MockPickUpAction)
-        assert match is not None
-
-    def test_match_with_free_fields(self) -> None:
-        """Can construct a Match with free fields (...)."""
-        match = Match(MockPickUpAction)(object_designator=...)
-        assert _free_field_names(match) == {"object_designator"}
-
-    def test_match_with_fixed_slots(self) -> None:
-        """Can construct a Match with fixed slot values."""
-        from test.llmr_test.test_actions import MockGraspDescription, GraspType
-
-        grasp = MockGraspDescription(grasp_type=GraspType.FRONT)
-        match = Match(MockPickUpAction)(grasp_description=grasp)
-        assert match.kwargs == {"grasp_description": grasp}
+        assert isinstance(result, MockPickUpAction)
+        assert result.object_designator is symbol_world["milk_on_table"]

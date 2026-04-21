@@ -3,6 +3,7 @@
 All exceptions inherit from krrood.utils.DataclassException and provide
 structured error messages via __post_init__.
 """
+
 from __future__ import annotations
 
 import pytest

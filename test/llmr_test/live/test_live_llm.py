@@ -3,6 +3,7 @@
 These tests verify provider/schema integration without asserting fragile prose.
 The deterministic ScriptedLLM suite remains the default production test path.
 """
+
 from __future__ import annotations
 
 import os
@@ -11,8 +12,8 @@ import pytest
 from dotenv import load_dotenv
 
 from llmr.reasoning.slot_filler import classify_action, run_slot_filler
-from test.llmr_test.test_actions import MockPickUpAction
 
+from .._fixtures.actions import MockPickUpAction
 
 load_dotenv("llmr/.env", override=True)
 

@@ -1,6 +1,9 @@
-"""Tests for LLM factory — make_llm and LLMProvider.
-"""
+"""Tests for LLM factory — make_llm and LLMProvider."""
+
 from __future__ import annotations
+
+import sys
+from types import SimpleNamespace
 
 import pytest
 from llmr.exceptions import LLMProviderNotSupported
@@ -17,6 +20,7 @@ class TestMakeLlm:
         # Monkeypatch the import to fail
         import sys
         import builtins
+
         original_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):
@@ -34,6 +38,7 @@ class TestMakeLlm:
     ) -> None:
         """make_llm with OLLAMA raises ImportError if langchain_ollama not available."""
         import builtins
+
         original_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):
@@ -52,8 +57,36 @@ class TestMakeLlm:
         with pytest.raises(LLMProviderNotSupported):
             make_llm("unknown_provider", model="test")  # type: ignore
 
+    def test_default_does_not_import_dotenv(self, monkeypatch) -> None:
+        """make_llm does not load .env files unless explicitly requested."""
+        import builtins
+
+        original_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "dotenv":
+                raise AssertionError("dotenv should not be imported by default")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr("builtins.__import__", mock_import)
+
+        with pytest.raises(LLMProviderNotSupported):
+            make_llm("unknown_provider", model="test")  # type: ignore
+
+    def test_load_env_true_loads_dotenv(self, monkeypatch) -> None:
+        """make_llm can explicitly load .env files at call time."""
+        calls = []
+        fake_dotenv = SimpleNamespace(load_dotenv=lambda: calls.append("loaded"))
+        monkeypatch.setitem(sys.modules, "dotenv", fake_dotenv)
+
+        with pytest.raises(LLMProviderNotSupported):
+            make_llm("unknown_provider", model="test", load_env=True)  # type: ignore
+
+        assert calls == ["loaded"]
+
     def test_model_name_passed_through(self, monkeypatch) -> None:
         """make_llm passes model name to the provider client."""
+
         # Mock ChatOpenAI to capture the model argument
         class FakeChatOpenAI:
             def __init__(self, model: str, temperature: float = 0.0, **kwargs):
@@ -72,6 +105,7 @@ class TestMakeLlm:
 
     def test_temperature_passed_through(self, monkeypatch) -> None:
         """make_llm passes temperature to the provider client."""
+
         class FakeChatOpenAI:
             def __init__(self, model: str, temperature: float = 0.0, **kwargs):
                 self.model = model
