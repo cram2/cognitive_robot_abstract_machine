@@ -38,6 +38,9 @@ class PoseGraspAction(ActionDescription):
     use_collision_avoidance: bool = True
     """Whether to enable collision avoidance during the grasp motion."""
 
+    check_blocking: bool = True
+    """Whether to skip grasp poses that are blocked by obstacles (IK + collision check)."""
+
     _resolved_grasp_pose: Optional[Pose] = field(default=None, init=False, repr=False)
     """Grasp pose resolved during precondition validation, consumed in execute."""
 
@@ -68,9 +71,10 @@ class PoseGraspAction(ActionDescription):
         hand = ViewManager.get_end_effector_view(self.arm, self.robot)
         tool_frame = hand.tool_frame
 
-        blocking_bods = blocking(
-            pose.to_homogeneous_matrix(), self.world.root, tool_frame
-        )
+        with self.world.reset_state_context():
+            blocking_bods = blocking(
+                pose.to_homogeneous_matrix(), self.world.root, tool_frame
+            )
 
         target_bodies = set(self.target.bodies)
         actual_blocking = [
@@ -86,10 +90,17 @@ class PoseGraspAction(ActionDescription):
     def validate_precondition(self):
         if not isinstance(next(self.target.grasp_poses(), None), Pose):
             raise PlanFailure()
-        self._resolved_grasp_pose = next(
-            (pose for pose in self.target.grasp_poses() if self._is_graspable(pose)),
-            None,
-        )
+        if self.check_blocking:
+            self._resolved_grasp_pose = next(
+                (
+                    pose
+                    for pose in self.target.grasp_poses()
+                    if self._is_graspable(pose)
+                ),
+                None,
+            )
+        else:
+            self._resolved_grasp_pose = next(self.target.grasp_poses(), None)
         if self._resolved_grasp_pose is None:
             raise PlanFailure()
 
@@ -126,6 +137,9 @@ class PoseGraspAndLiftAction(ActionDescription):
     use_collision_avoidance: bool = True
     """Whether to enable collision avoidance during the grasp and retract motions."""
 
+    check_blocking: bool = True
+    """Whether to skip grasp poses that are blocked by obstacles (IK + collision check)."""
+
     def execute(self) -> None:
         hand = ViewManager.get_end_effector_view(self.arm, self.robot)
 
@@ -135,6 +149,7 @@ class PoseGraspAndLiftAction(ActionDescription):
                     target=self.target,
                     arm=self.arm,
                     use_collision_avoidance=self.use_collision_avoidance,
+                    check_blocking=self.check_blocking,
                 )
             )
         ).perform()

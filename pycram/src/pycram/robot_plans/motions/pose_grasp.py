@@ -105,7 +105,8 @@ class PoseGraspMotion(CollisionAwareArmMotion):
     @property
     def _motion_chart(self) -> Task:
         world = self.world
-        tool_frame = ViewManager.get_end_effector_view(self.arm, self.robot).tool_frame
+        hand = ViewManager.get_end_effector_view(self.arm, self.robot)
+        tool_frame = hand.tool_frame
 
         pre_grasp_pose, grasp_pose = self.pose_sequence
 
@@ -121,8 +122,21 @@ class PoseGraspMotion(CollisionAwareArmMotion):
             tip_link=tool_frame,
             reference_linear_velocity=self.grasp_approach_velocity,
         )
-        grasp_sequence = Sequence([move_to_pre_grasp, move_to_grasp])
-        return self._with_collision_avoidance([grasp_sequence])
+
+        if not self.use_collision_avoidance:
+            return Sequence([move_to_pre_grasp, move_to_grasp])
+
+        pre_grasp_step = Parallel(
+            [
+                move_to_pre_grasp,
+                ExternalCollisionAvoidance(robot=hand._robot),
+                SelfCollisionAvoidance(robot=hand._robot),
+            ],
+            minimum_success=1,
+        )
+        grasp_step = self._with_collision_avoidance([move_to_grasp])
+
+        return Sequence([pre_grasp_step, grasp_step])
 
 
 @dataclass(kw_only=True)
