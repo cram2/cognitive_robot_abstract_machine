@@ -249,12 +249,12 @@ class HasMobileBase(RobotSpecification):
         self.mobile_base = mobile_base
 
     def _setup_specifications(self, world: World):
-        mobile_base = self._setup_mobile_base_semantic_annotation(world)
+        mobile_base = self.setup_mobile_base_semantic_annotation(world)
         world.add_semantic_annotation(mobile_base)
         self.add_mobile_base(mobile_base)
 
     @abstractmethod
-    def _setup_mobile_base_semantic_annotation(self, world: World) -> MobileBase: ...
+    def setup_mobile_base_semantic_annotation(self, world: World) -> MobileBase: ...
 
 
 @dataclass(eq=False)
