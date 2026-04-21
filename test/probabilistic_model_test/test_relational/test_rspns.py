@@ -174,14 +174,12 @@ def test_move_and_pick_up(database, mutable_model_world, data_preparation):
     dataframe = preprocess_dataframe(feature_extractor.features, dataframe)
     sorted = dataframe.sort_index(axis=1)
     final = sorted.to_numpy()
-    move_and_pick_up_distribution.plot_structure()
-    plt.savefig(f"test_move_and_pick_up_{datetime.datetime.now()}.png")
     # assert sorted.columns == [v.name for v in move_and_pick_up_distribution.variables]
-    print("distribution", move_and_pick_up_distribution.leaves)
-    print("likelihood", move_and_pick_up_distribution.likelihood(final))
-    print(
-        f"Log likelihood of the move and pick up distribution: {np.mean(move_and_pick_up_distribution.log_likelihood(final))}"
+    like_learned = np.mean(template.probabilistic_circuit.log_likelihood(final))
+    like_move_and_pick_up_distribution = np.mean(
+        move_and_pick_up_distribution.log_likelihood(final)
     )
+
     assert np.mean(template.probabilistic_circuit.log_likelihood(final)) > np.mean(
         move_and_pick_up_distribution.log_likelihood(final)
     )

@@ -14,6 +14,8 @@ from typing import (
     Union,
 )
 
+from sqlalchemy import Column
+
 from krrood.entity_query_language.core.mapped_variable import MappedVariable, Attribute
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import variable
@@ -22,6 +24,7 @@ from krrood.ormatic.data_access_objects.helper import (
     get_alternative_mapping,
     get_dao_class,
 )
+from krrood.ormatic.exceptions import UnsupportedColumnType
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
 from probabilistic_model.probabilistic_circuit.relational.rspns import (
@@ -29,6 +32,7 @@ from probabilistic_model.probabilistic_circuit.relational.rspns import (
     RSPNSpecification,
 )
 from random_events.variable import variable_from_name_and_type, compatible_types
+from krrood_test.dataset.ormatic_interface import Base
 
 
 def get_aggregate_statistics(instance: Any) -> List[Tuple[Any, str]]:
@@ -48,6 +52,27 @@ def get_aggregate_statistics(instance: Any) -> List[Tuple[Any, str]]:
         statistics.append((attr(), attr._statistic_name))
 
     return statistics
+
+
+def get_python_type_from_sqlalchemy_column(column: Column):
+    try:
+        python_type = [column.type.python_type]
+    except NotImplementedError:
+        python_type = [
+            key
+            for key, value in Base.type_mappings.items()
+            if value == type(column.type)
+        ]
+
+    if not python_type:
+        raise UnsupportedColumnType(column.type)
+
+    if len(python_type) > 1:
+        raise TypeError(f"Multiple types found for column {column.name}")
+
+    python_type = python_type[0]
+
+    return python_type
 
 
 def get_features_of_class(
@@ -78,7 +103,10 @@ def get_features_of_class(
         current_symbolic_attribute_access = getattr(
             symbolic_attribute_access, attribute.name
         )
-        current_symbolic_attribute_access._type_ = attribute.type.python_type
+
+        current_symbolic_attribute_access._type_ = (
+            get_python_type_from_sqlalchemy_column(attribute)
+        )
         result.append(current_symbolic_attribute_access)
 
     for part in specification.unique_parts:

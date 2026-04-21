@@ -11,6 +11,7 @@ from krrood.utils import DataclassException
 if TYPE_CHECKING:
     from krrood.ormatic.data_access_objects.alternative_mappings import FunctionMapping
 
+
 @dataclass
 class NoGenericError(DataclassException, TypeError):
     """
@@ -105,3 +106,15 @@ class UncallableFunction(NotImplementedError):
             f"The reconstructed function was a lambda function and hence cannot be called again. "
             f"The function tried to be reconstructed from {self.function_mapping}"
         )
+
+
+@dataclass
+class UnsupportedColumnType(DataclassException, TypeError):
+    """
+    Exception raised when a column type is neither a type_mapping nor a builtin sqlalchemy type.
+    """
+
+    column_type: Type
+
+    def __post_init__(self):
+        self.message = f"Column type: {self.column_type} is neither a builtin sqlalchemy type nor does it exist in the dict of type_mappings."
