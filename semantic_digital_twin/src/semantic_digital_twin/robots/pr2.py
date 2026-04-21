@@ -185,7 +185,6 @@ class PR2MobileBase(MobileBase, HasTorso):
 
         return cls(
             root=world.get_body_by_name("base_link"),
-            torso=cls._setup_default_torso_semantic_annotation(world),
         )
 
 
