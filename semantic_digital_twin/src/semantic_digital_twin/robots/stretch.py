@@ -235,7 +235,7 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
 
         gripper_close = JointState.from_mapping(
             name=PrefixedName("gripper_close", prefix=self.name.name),
-            mapping=dict(zip(gripper_joints, [-0.0, -0.0])),
+            mapping=dict(zip(gripper_joints, [0.0, 0.0])),
             state_type=GripperState.CLOSE,
         )
 
