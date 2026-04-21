@@ -73,18 +73,14 @@ class PlaceAction(ActionDescription):
         self.add_subplan(
             sequential(
                 [
-                    sequential(
-                        children=[
-                            MoveToolCenterPointMotion(
-                                target_pre_pose, self.arm, allow_gripper_collision=False
-                            ),
-                            MoveToolCenterPointMotion(
-                                target_pose,
-                                self.arm,
-                                allow_gripper_collision=False,
-                                movement_type=MovementType.CARTESIAN,
-                            ),
-                        ]
+                    MoveToolCenterPointMotion(
+                        target_pre_pose, self.arm, allow_gripper_collision=False
+                    ),
+                    MoveToolCenterPointMotion(
+                        target_pose,
+                        self.arm,
+                        allow_gripper_collision=False,
+                        movement_type=MovementType.CARTESIAN,
                     ),
                     MoveGripperMotion(GripperState.OPEN, self.arm),
                     MoveToolCenterPointMotion(retract_pose, self.arm),
