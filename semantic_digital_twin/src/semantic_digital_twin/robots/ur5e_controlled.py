@@ -43,7 +43,7 @@ class UR5Controlled(AbstractRobot, HasOneArm):
     def _setup_collision_rules(self):
         pass
 
-    def _setup_arm_semantic_annotations(self):
+    def setup_arm_semantic_annotations(self):
         world = self._world
         # Create arm
         gripper_thumb = Finger.create_and_add_to_world(

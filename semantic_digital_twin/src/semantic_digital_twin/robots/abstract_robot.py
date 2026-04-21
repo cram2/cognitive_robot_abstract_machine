@@ -71,7 +71,7 @@ class HasFingers(RobotSpecification):
 
     def _setup_specifications(self, world: World):
         super()._setup_specifications(world)
-        fingers, thumb = self._setup_finger_semantic_annotations(world)
+        fingers, thumb = self.setup_finger_semantic_annotations(world)
         world.add_semantic_annotations(fingers)
         world.add_semantic_annotation(thumb)
         for finger in fingers:
@@ -79,7 +79,7 @@ class HasFingers(RobotSpecification):
         self.add_thumb(thumb)
 
     @abstractmethod
-    def _setup_finger_semantic_annotations(
+    def setup_finger_semantic_annotations(
         self, world: World
     ) -> Tuple[list[Finger], Finger]: ...
 
@@ -89,9 +89,9 @@ class HasTwoFingers(HasFingers, ABC):
 
     @property
     def finger(self):
-        if len(self.fingers) != 1 or self.thumb is not None:
+        if len(self.fingers) != 1 or self.thumb is None:
             raise Exception(
-                f"This robot has {len(self.fingers)} fingers and {bool(self.thumb)} thumbs. Should have exactly one finger and one thumb"
+                f"This robot has {len(self.fingers)} fingers and {int(bool(self.thumb))} thumbs. Should have exactly one finger and one thumb"
             )
         return self.fingers[0]
 
@@ -107,13 +107,13 @@ class HasSensors(RobotSpecification):
 
     def _setup_specifications(self, world: World):
         super()._setup_specifications(world)
-        sensors = self._setup_sensor_semantic_annotations(world)
+        sensors = self.setup_sensor_semantic_annotations(world)
         world.add_semantic_annotations(sensors)
         for sensor in sensors:
             self.add_sensor(sensor)
 
     @abstractmethod
-    def _setup_sensor_semantic_annotations(self, world: World) -> list[Sensor]: ...
+    def setup_sensor_semantic_annotations(self, world: World) -> list[Sensor]: ...
 
 
 @dataclass(eq=False)
@@ -141,12 +141,12 @@ class HasEndEffector(RobotSpecification, ABC):
 
     def _setup_specifications(self, world: World):
         super()._setup_specifications(world)
-        end_effector = self._setup_end_effector_semantic_annotation(world)
+        end_effector = self.setup_end_effector_semantic_annotation(world)
         world.add_semantic_annotation(end_effector)
         self.add_end_effector(end_effector)
 
     @abstractmethod
-    def _setup_end_effector_semantic_annotation(self, world: World) -> EndEffector: ...
+    def setup_end_effector_semantic_annotation(self, world: World) -> EndEffector: ...
 
 
 @dataclass(eq=False)
@@ -169,13 +169,13 @@ class HasArms(RobotSpecification):
 
     def _setup_specifications(self, world: World):
         super()._setup_specifications(world)
-        arms = self._setup_arm_semantic_annotations(world)
+        arms = self.setup_arm_semantic_annotations(world)
         world.add_semantic_annotations(arms)
         for arm in arms:
             self.add_arm(arm)
 
     @abstractmethod
-    def _setup_arm_semantic_annotations(self, world: World) -> list[Arm]: ...
+    def setup_arm_semantic_annotations(self, world: World) -> list[Arm]: ...
 
 
 @dataclass(eq=False)
@@ -266,12 +266,12 @@ class HasTorso(RobotSpecification):
         self.torso = torso
 
     def _setup_specifications(self, world: World):
-        torso = self._setup_default_torso_semantic_annotation(world)
+        torso = self.setup_default_torso_semantic_annotation(world)
         world.add_semantic_annotation(torso)
         self.add_torso(torso)
 
     @abstractmethod
-    def _setup_default_torso_semantic_annotation(self, world: World) -> Torso: ...
+    def setup_default_torso_semantic_annotation(self, world: World) -> Torso: ...
 
 
 @dataclass(eq=False)
@@ -283,12 +283,12 @@ class HasNeck(RobotSpecification):
         self.neck = neck
 
     def _setup_specifications(self, world: World):
-        neck = self._setup_neck_semantic_annotations(world)
+        neck = self.setup_neck_semantic_annotations(world)
         world.add_semantic_annotation(neck)
         self.add_neck(neck)
 
     @abstractmethod
-    def _setup_neck_semantic_annotations(self, world: World) -> Neck: ...
+    def setup_neck_semantic_annotations(self, world: World) -> Neck: ...
 
 
 @dataclass(eq=False)
@@ -319,7 +319,8 @@ class AbstractRobot(Agent, RobotSpecification, ABC):
                 ),
             )
             world.add_semantic_annotation(self)
-            self._setup_specifications(world)
+            self.setup_mobile_base_semantic_annotation()
+            # self._setup_specifications(world)
 
     @property
     def controlled_connections(self) -> list[ActiveConnection]:

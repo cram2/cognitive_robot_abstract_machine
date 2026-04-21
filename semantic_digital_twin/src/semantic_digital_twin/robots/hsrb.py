@@ -57,7 +57,7 @@ class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
     def _get_robot_root_body(cls, world: World) -> Self:
         return world.get_body_by_name("base_footprint")
 
-    def _setup_arm_semantic_annotations(self):
+    def setup_arm_semantic_annotations(self):
         gripper_thumb = Finger.create_and_add_to_world(
             name=PrefixedName("thumb", prefix=self.name.name),
             root_name="hand_l_proximal_link",

@@ -52,7 +52,7 @@ class Justin(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
     def _setup_collision_rules(self):
         pass
 
-    def _setup_arm_semantic_annotations(self):
+    def setup_arm_semantic_annotations(self):
         # TODO a lot of stuff here is wrong bc MoAswad modelled it wrongly
         world = self._world
         # Create left arm

@@ -217,7 +217,7 @@ class AbstractRobotPart(HasRootBody, AggregatesRobotParts, ABC):
 
     @classmethod
     @abstractmethod
-    def setup_default_configuration(cls, world: World): ...
+    def setup_default_configuration_in_world(cls, world: World) -> Self: ...
 
 
 @dataclass(eq=False)

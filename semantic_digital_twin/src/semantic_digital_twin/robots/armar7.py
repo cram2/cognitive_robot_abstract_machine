@@ -40,7 +40,7 @@ class Armar7(AbstractRobot, HasLeftRightArm, HasMobileBase, HasTorso):
     Class that describes the Armar7 Robot.
     """
 
-    def _setup_arm_semantic_annotations(self):
+    def setup_arm_semantic_annotations(self):
         # Create left arm
         left_gripper_thumb = Finger.create_and_add_to_world(
             name=PrefixedName("left_gripper_thumb", prefix=self.name.name),

@@ -49,7 +49,7 @@ class Stretch(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
     def _get_robot_root_body(cls, world: World) -> Self:
         return world.get_body_by_name("base_link")
 
-    def _setup_arm_semantic_annotations(self):
+    def setup_arm_semantic_annotations(self):
         # Create arm
         gripper_thumb = Finger.create_and_add_to_world(
             name=PrefixedName("gripper_thumb", prefix=self.name.name),
