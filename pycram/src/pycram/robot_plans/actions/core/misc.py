@@ -5,7 +5,12 @@ from datetime import timedelta
 
 from typing_extensions import Optional, Type, Any
 
-from pycram.datastructures.enums import DetectionTechnique, DetectionState
+from pycram.datastructures.enums import (
+    DetectionTechnique,
+    DetectionState,
+    ExecutionType,
+)
+from pycram.motion_executor import MotionExecutor
 from pycram.perception import PerceptionQuery
 from pycram.robot_plans.actions.base import ActionDescription
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -68,7 +73,11 @@ class DetectAction(ActionDescription):
             self.object_sem_annotation, region_bb, self.robot, self.world
         )
 
-        return query.from_world()
+        return (
+            query.from_world()
+            if MotionExecutor.execution_type == ExecutionType.SIMULATED
+            else query.from_robokudo()
+        )
 
     def validate(
         self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None

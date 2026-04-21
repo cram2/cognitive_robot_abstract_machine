@@ -1,5 +1,10 @@
+import logging
 from dataclasses import dataclass
 
+from rclpy.action import ActionClient
+from robokudo_msgs.action import Query
+
+from pycram.datastructures.dataclasses import Context
 from semantic_digital_twin.reasoning.predicates import visible
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Camera
 from semantic_digital_twin.world import World
@@ -11,6 +16,8 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
 )
 from typing_extensions import Type, List
+
+logger = logging.getLogger("pycram")
 
 
 @dataclass
@@ -33,6 +40,11 @@ class PerceptionQuery:
     world: World
     """
     The world in which the object should be detected.
+    """
+
+    context: Context
+    """
+    The context of the plan
     """
 
     def from_world(self) -> List[Body]:
@@ -73,4 +85,16 @@ class PerceptionQuery:
         return result
 
     def from_robokudo(self):
-        pass
+        from robokudo_msgs.msg import ObjectDesignator
+
+        self._client = ActionClient(self.context.ros_node, Query, "/robokudo/query")
+        logger.info("Waiting for action server /robokudo/query")
+        self._client.wait_for_server()
+
+        future = self._client.send_goal_async(Query.Goal())
+        future.add_done_callback(self.robokudo_callback)
+
+    def robokudo_callback(self, future):
+        result = future.result().result
+        for obj in result.res:
+            print(obj)
