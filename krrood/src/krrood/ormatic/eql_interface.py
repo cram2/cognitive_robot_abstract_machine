@@ -13,12 +13,12 @@ from krrood.entity_query_language.query.query import (
 )
 from krrood.entity_query_language.query.operations import Where, OrderedBy
 from krrood.entity_query_language.query.quantifiers import ResultQuantifier, An, The
-from krrood.entity_query_language.operators.core_logical_operators import AND, OR
+from krrood.entity_query_language.operators.core_logical_operators import AND, OR, Not
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Variable, Literal
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.operators.comparator import Comparator
-from krrood.entity_query_language.operators.aggregators import Aggregator, CountAll, Count
+from krrood.entity_query_language.operators.aggregators import Aggregator, CountAll, Count, Max, Min, Sum, Average
 
 from krrood.ormatic.data_access_objects.helper import get_dao_class
 
@@ -392,45 +392,6 @@ class EQLTranslator:
         """Get the root condition from the query."""
         return self.eql_query._conditions_root_
 
-    @property
-    def _sql_limit(self) -> Optional[int]:
-        quantifier = self.eql_query._quantifier_expression_
-        if quantifier is None:
-            return None
-        return quantifier._limit_
-
-    @property
-    def _sql_order_by(self) -> Optional[Any]:
-        builder = self.eql_query._ordered_by_builder_
-        if builder is None:
-            return None
-        if isinstance(builder.variable, Attribute):
-            col = self.translate_attribute(builder.variable)
-            return col.desc() if builder.descending else col
-        return builder.variable
-
-    @property
-    def _sql_group_by(self) -> Optional[List[Any]]:
-        builder = self.eql_query._grouped_by_builder_
-        if builder is None:
-            return None
-        columns = []
-        for var in builder.variables_to_group_by:
-            if isinstance(var, Attribute):
-                columns.append(self.translate_attribute(var))
-        return columns if columns else None
-
-    @property
-    def _sql_having(self) -> Optional[Any]:
-        builder = self.eql_query._having_builder_
-        if builder is None:
-            return None
-        return self.translate_query(builder.conditions_expression)
-
-    @property
-    def _sql_distinct(self) -> bool:
-        return bool(self.eql_query._distinct_on)
-
     def translate(self) -> None:
         """Translate the EQL query to SQL."""
         dao_class = get_dao_class(self.select_like.selected_variable._type_)
@@ -441,27 +402,38 @@ class EQLTranslator:
 
         self.sql_query = select(dao_class)
 
-        where_expr = self.eql_query._where_expression_
-        if where_expr is not None:
-            conditions = self.translate_query(where_expr)
+        if self.eql_query._where_expression_ is not None:
+            conditions = self.translate_query(self.eql_query._where_expression_)
             if conditions is not None:
                 self.sql_query = self.sql_query.where(conditions)
 
-        group_by_cols = self._sql_group_by
-        if group_by_cols:
-            self.sql_query = self.sql_query.group_by(*group_by_cols)
+        if self.eql_query._grouped_by_builder_ is not None:
+            columns = [
+                self.translate_attribute(var)
+                for var in self.eql_query._grouped_by_builder_.variables_to_group_by
+                if isinstance(var, Attribute)
+            ]
+            if columns:
+                self.sql_query = self.sql_query.group_by(*columns)
 
-        having_condition = self._sql_having
-        if having_condition is not None:
-            self.sql_query = self.sql_query.having(having_condition)
+        if self.eql_query._having_builder_ is not None:
+            having = self.translate_query(
+                self.eql_query._having_builder_.conditions_expression
+            )
+            if having is not None:
+                self.sql_query = self.sql_query.having(having)
 
-        if self._sql_limit is not None:
-            self.sql_query = self.sql_query.limit(self._sql_limit)
+        if self.eql_query._ordered_by_builder_ is not None:
+            col = self.translate_attribute(self.eql_query._ordered_by_builder_.variable)
+            if self.eql_query._ordered_by_builder_.descending:
+                col = col.desc()
+            self.sql_query = self.sql_query.order_by(col)
 
-        if self._sql_order_by is not None:
-            self.sql_query = self.sql_query.order_by(self._sql_order_by)
+        quantifier = self.eql_query._quantifier_expression_
+        if quantifier is not None and quantifier._limit_ is not None:
+            self.sql_query = self.sql_query.limit(quantifier._limit_)
 
-        if self._sql_distinct:
+        if self.eql_query._distinct_on:
             self.sql_query = self.sql_query.distinct()
 
     def evaluate(self) -> List[Any]:
@@ -496,6 +468,9 @@ class EQLTranslator:
             return self.translate_and(query)
         if isinstance(query, OR):
             return self.translate_or(query)
+        if isinstance(query, Not):
+            inner = self.translate_query(query._child_)
+            return sa_not(inner)
         if isinstance(query, Comparator):
             return self.translate_comparator(query)
         if isinstance(query, Attribute):
@@ -673,6 +648,23 @@ class EQLTranslator:
         if isinstance(operand, Count):
             col = self.translate_attribute(operand._child_)
             return func.count(col)
+
+        if isinstance(operand, Max):
+            col = self.translate_attribute(operand._child_)
+            return func.max(col)
+
+        if isinstance(operand, Min):
+            col = self.translate_attribute(operand._child_)
+            return func.min(col)
+
+        if isinstance(operand, Average):
+            col = self.translate_attribute(operand._child_)
+            return func.avg(col)
+
+        if isinstance(operand, Sum):
+            col = self.translate_attribute(operand._child_)
+            return func.sum(col)
+
 
         if isinstance(operand, Literal):
             extractor = DomainValueExtractor(self.session)
