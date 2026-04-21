@@ -1,17 +1,16 @@
 import logging
 
-from krrood.entity_query_language.factories import entity, variable, in_, inference, an
 from numpy.ma.testutils import (
     assert_equal,
 )  # You could replace this with numpy's regular assert for better compatibility
 
+from krrood.entity_query_language.factories import entity, variable, in_, inference, an
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world_description.world_entity import (

@@ -9,6 +9,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 from typing_extensions import Optional, Union, List
 
+from semantic_digital_twin import utils
 from semantic_digital_twin.robots.abstract_robot import Manipulator, AbstractRobot
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -23,7 +24,6 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from pycram.datastructures.rotations import Rotations
 from pycram.datastructures.enums import (
-    Grasp,
     AxisIdentifier,
     ApproachDirection,
     VerticalAlignment,
@@ -82,20 +82,41 @@ class GraspDescription:
 
         world = target._world
 
-        grasp_pose_R_gripper = self.grasp_orientation()
-        target_R_gripper = (
+        grasp_pose_R_gripper_goal = self.grasp_orientation()
+
+        # if we just did target_T_grasp_pose @ grasp_pose_R_gripper_goal we would also rotate the translation in the
+        # global frame, which we dont want here. Thus we just multiply the rotations, and take the translation as is
+        target_R_gripper_goal = (
             target_T_grasp_pose.to_rotation_matrix()
-            @ grasp_pose_R_gripper.to_rotation_matrix()
+            @ grasp_pose_R_gripper_goal.to_rotation_matrix()
         )
-        target_T_gripper: Pose = Pose(
+        target_T_gripper_goal: Pose = Pose(
             position=target_T_grasp_pose.to_position(),
-            orientation=target_R_gripper.to_quaternion(),
+            orientation=target_R_gripper_goal.to_quaternion(),
             reference_frame=target,
         )
 
-        pre_pose, _ = self.approach_sequence(target_T_gripper, body)
+        if body:
+            bb_in_frame = body.collision.as_bounding_box_collection_in_frame(
+                body
+            ).bounding_box()
 
-        target_T_gripper_copy = deepcopy(target_T_gripper)
+            approach_axis = np.array(self.approach_direction.axis.value, dtype=bool)
+
+            # Pre-pose calculation
+            offset = (
+                np.array(bb_in_frame.dimensions)[approach_axis] / 2
+                + self.manipulation_offset
+            )[0]
+        else:
+            offset = 0
+
+        target_T_gripper_goal_copy = deepcopy(target_T_gripper_goal)
+        pre_pose = translate_pose_along_local_axis(
+            target_T_gripper_goal_copy, self.manipulation_axis(), -offset
+        )
+
+        target_T_gripper_goal_copy = deepcopy(target_T_gripper_goal)
 
         # Lift pose calculation. We want the lift pose to be moved along the global z-axis, but the final pose should be in the target frame.
         map_T_grasp = world.transform(
@@ -113,37 +134,14 @@ class GraspDescription:
 
         # the lift pose is adjusted for the gripper orientation, but without rotating the point we want to grasp
         lift_pose = Pose(
-            target_P_lift, target_T_gripper.to_quaternion(), reference_frame=target
+            target_P_lift, target_T_gripper_goal.to_quaternion(), reference_frame=target
         )
 
-        sequence = [pre_pose, target_T_gripper_copy, lift_pose]
+        sequence = [pre_pose, target_T_gripper_goal_copy, lift_pose]
 
         if reverse:
             sequence.reverse()
         return sequence
-
-    def approach_sequence(self, grasp_pose: Pose, body: Body) -> List[Pose]:
-        """Compute [pre_grasp, grasp] from an already-resolved gripper tool frame pose.
-
-        Unlike grasp_pose_sequence, the orientation is already encoded in the pose so
-        grasp_orientation() is not applied. The pre-grasp offset accounts for the
-        body's bounding box half-extent along the approach axis plus manipulation_offset.
-        """
-        if body is not None:
-            bounding_box = body.collision.as_bounding_box_collection_in_frame(
-                body
-            ).bounding_box()
-            approach_axis = np.array(self.approach_direction.axis.value, dtype=bool)
-            offset = (
-                np.array(bounding_box.dimensions)[approach_axis] / 2
-                + self.manipulation_offset
-            )[0]
-        else:
-            offset = self.manipulation_offset
-        pre_pose = translate_pose_along_local_axis(
-            deepcopy(grasp_pose), self.manipulation_axis(), -offset
-        )
-        return [pre_pose, grasp_pose]
 
     def grasp_pose_sequence(self, body: Body):
         """
@@ -402,6 +400,9 @@ class GraspDescription:
         )
 
         return primary_face, secondary_face
+
+    def __hash__(self):
+        return id(self)
 
 
 @dataclass

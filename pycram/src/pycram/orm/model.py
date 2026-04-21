@@ -97,10 +97,19 @@ class NumpyType(TypeDecorator):
     """
 
     impl = types.LargeBinary(4 * 1024 * 1024 * 1024 - 1)  # 4 GB max
+    cache_ok = True  # SQLAlchemy 1.4/2.x type caching hint
 
-    def process_bind_param(self, value: np.ndarray, dialect):
-        array = value.astype(np.float64)
-        return array.tobytes()
+    def process_bind_param(self, value, dialect):
+        # Allow NULLs
+        if value is None:
+            return None
+        # Accept lists/tuples and ensure float64 dtype without copying if possible
+        arr = np.asarray(value, dtype=np.float64)
+        return arr.tobytes(order="C")
 
-    def process_result_value(self, value: impl, dialect) -> Optional[np.ndarray]:
+    def process_result_value(self, value, dialect):
+        # Propagate NULLs
+        if value is None:
+            return None
+        # Recreate as 1-D float64 array; shape information is not stored
         return np.frombuffer(value, dtype=np.float64)

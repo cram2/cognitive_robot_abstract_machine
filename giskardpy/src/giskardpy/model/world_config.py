@@ -19,6 +19,7 @@ from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     OmniDrive,
     FixedConnection,
+    DifferentialDrive,
 )
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -101,60 +102,37 @@ class WorldWithOmniDriveRobot(WorldConfig):
         self.world.merge_world(world_with_robot, odom)
 
 
+@dataclass
 class WorldWithDiffDriveRobot(WorldConfig):
-    map_name: str
-    localization_joint_name: str
-    odom_link_name: str
-    drive_joint_name: str
-
-    def __init__(
-        self,
-        urdf: str,
-        map_name: str = "map",
-        localization_joint_name: str = "localization",
-        odom_link_name: str = "odom",
-        drive_joint_name: str = "brumbrum",
-    ):
-        super().__init__()
-        self.urdf = urdf
-        self.map_name = map_name
-        self.localization_joint_name = localization_joint_name
-        self.odom_link_name = odom_link_name
-        self.drive_joint_name = drive_joint_name
+    urdf: str = field(kw_only=True)
+    root_name: PrefixedName = field(default=PrefixedName("map"))
+    robot_name: PrefixedName = field(default=PrefixedName("robot"))
+    odom_body_name: PrefixedName = field(default=PrefixedName("odom"))
+    urdf_view: AbstractRobot = field(kw_only=True, default=MinimalRobot)
+    localization: Connection6DoF = field(init=False)
+    robot: AbstractRobot = field(init=False)
 
     def setup_world(self):
-        self.set_default_limits(
-            {
-                Derivatives.velocity: 1,
-                Derivatives.acceleration: np.inf,
-                Derivatives.jerk: None,
-            }
+        map = Body(name=self.root_name)
+        odom = Body(name=self.odom_body_name)
+        self.localization = Connection6DoF.create_with_dofs(
+            parent=map, child=odom, world=self.world
         )
-        self.add_empty_link(PrefixedName(self.map_name))
-        self.add_empty_link(PrefixedName(self.odom_link_name))
-        self.add_6dof_joint(
-            parent_link=self.map_name,
-            child_link=self.odom_link_name,
-            joint_name=self.localization_joint_name,
+        self.world.add_connection(self.localization)
+
+        urdf_parser = URDFParser(urdf=self.urdf, prefix="")
+        world_with_robot = urdf_parser.parse()
+        self.robot = self.urdf_view.from_world(world_with_robot)
+
+        odom = DifferentialDrive.create_with_dofs(
+            parent=odom,
+            child=world_with_robot.root,
+            translation_velocity_limits=0.2,
+            rotation_velocity_limits=0.2,
+            world=self.world,
         )
-        self.add_robot_urdf(urdf=self.urdf)
-        root_link_name = self.get_root_link_of_group(self.robot_group_name)
-        self.add_diff_drive_joint(
-            name=self.drive_joint_name,
-            parent_link_name=self.odom_link_name,
-            child_link_name=root_link_name,
-            translation_limits={
-                Derivatives.velocity: 0.2,
-                Derivatives.acceleration: np.inf,
-                Derivatives.jerk: None,
-            },
-            rotation_limits={
-                Derivatives.velocity: 0.2,
-                Derivatives.acceleration: np.inf,
-                Derivatives.jerk: None,
-            },
-            robot_group_name=self.robot_group_name,
-        )
+
+        self.world.merge_world(world_with_robot, odom)
 
 
 @dataclass

@@ -2,16 +2,28 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING
-
 from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
 from krrood.utils import DataclassException
+from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
+from typing_extensions import TYPE_CHECKING, Type
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import (
         MotionStatechartNode,
         TrinaryCondition,
     )
+
+
+@dataclass
+class CollisionViolatedError(DataclassException):
+    message: str = field(init=False)
+    violated_collisions: list[ClosestPoints]
+    thresholds: list[float]
+
+    def __post_init__(self):
+        self.message = f"Violated collision constraints: \n"
+        for collision, threshold in zip(self.violated_collisions, self.thresholds):
+            self.message += f"{str(collision.body_a.name), str(collision.body_b.name)}: {collision.distance} < {threshold}\n"
 
 
 @dataclass
@@ -105,7 +117,7 @@ class NonObservationVariableError(InvalidConditionError):
 
 @dataclass
 class MissingContextExtensionError(MotionStatechartError):
-    expected_extension: type
+    expected_extension: Type
 
     def __post_init__(self):
         self.message = (
@@ -115,7 +127,7 @@ class MissingContextExtensionError(MotionStatechartError):
 
 @dataclass
 class DuplicateContextExtensionError(MotionStatechartError):
-    extension_type: type
+    extension_type: Type
 
     def __post_init__(self):
         self.message = f"Extension of type {self.extension_type.__name__} already exists. You cannot add it twice."

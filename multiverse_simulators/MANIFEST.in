@@ -1,1 +1,0 @@
-recursive-include src/mujoco_connector/mujoco_plugin *

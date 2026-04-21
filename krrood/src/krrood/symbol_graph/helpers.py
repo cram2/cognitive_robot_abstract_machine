@@ -3,7 +3,7 @@ from dataclasses import is_dataclass, fields
 from typing_extensions import Optional, Any, Type
 
 from krrood.class_diagrams.class_diagram import WrappedClass, ParseError
-from krrood.class_diagrams.failures import ClassIsUnMappedInClassDiagram
+from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 

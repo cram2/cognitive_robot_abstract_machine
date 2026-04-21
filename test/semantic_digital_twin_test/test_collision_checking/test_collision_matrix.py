@@ -43,7 +43,11 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    FixedConnection,
+)
 from semantic_digital_twin.world_description.geometry import Sphere
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -474,7 +478,7 @@ class TestCollisionGroups:
         def on_collision_matrix_update(self): ...
 
     @pytest.mark.parametrize(
-        "fix_name", ["pr2_world_state_reset", "cylinder_bot_world"]
+        "fix_name", ["pr2_world_state_reset", "cylinder_bot_world", "tracy_world"]
     )
     def test_collision_groups(self, fix_name, request):
         world = request.getfixturevalue(fix_name)
@@ -509,15 +513,20 @@ class TestCollisionGroups:
             except AssertionError:
                 pass
 
-        # the parent connection of every group is controlled, unless it's the root group
+        # the parent connection of every group is controlled, or the parent body belongs to a different AbstractRobot
+        body_to_robot = {}
+        for r in world.get_semantic_annotations_by_type(AbstractRobot):
+            for b in r.bodies:
+                body_to_robot[b] = r
         for group in collision_group_consumer.collision_groups:
             if group.root == world.root:
                 continue
-            assert (
-                group.root.parent_connection.is_controlled
-            ), f"parent of group root {group.root.name} is not controlled"
-            for body in group.bodies:
-                assert body == group.root or not body.parent_connection.is_controlled
+            parent = group.root.parent_connection.parent
+            assert group.root.parent_connection.is_controlled or body_to_robot.get(
+                parent
+            ) != body_to_robot.get(
+                group.root
+            ), f"group root {group.root.name} does not have a controlled parent connection and is not an ownership boundary"
 
         # no group body should be in another group body
         for group1, group2 in combinations(
@@ -530,6 +539,42 @@ class TestCollisionGroups:
         # ever body with a collision should be in a group
         for body in robot.bodies_with_collision:
             collision_group_consumer.get_collision_group(body)
+
+    def test_robot_base_and_external_body_connected_to_same_virtual_parent(self):
+        world = World()
+        with world.modify_world():
+            robot_base = Body(
+                name=PrefixedName("robot_base"),
+                collision=ShapeCollection([Sphere(radius=0.3)]),
+            )
+            world.add_body(robot_base)
+            MinimalRobot.from_world(world)  # robot.root = robot_base
+
+        with world.modify_world():
+            map_body = Body(name=PrefixedName("map"))
+            obstacle = Body(
+                name=PrefixedName("obstacle"),
+                collision=ShapeCollection([Sphere(radius=0.1)]),
+            )
+            world.add_connection(FixedConnection(parent=map_body, child=robot_base))
+            world.add_connection(
+                Connection6DoF.create_with_dofs(
+                    world, map_body, obstacle, PrefixedName("obstacle_conn")
+                )
+            )
+
+        collision_manager = world.collision_manager
+        collision_manager.collision_consumers = [
+            consumer := self.MockCollisionGroupConsumer()
+        ]
+        world._notify_model_change()
+
+        robot_base_group = consumer.get_collision_group(robot_base)
+        obstacle_group = consumer.get_collision_group(obstacle)
+
+        assert robot_base_group is not obstacle_group
+        assert robot_base not in obstacle_group.bodies
+        assert obstacle not in robot_base_group.bodies
 
     def test_is_collision_groups_combination_checked(self, pr2_world_state_reset):
         group_a = CollisionGroup(

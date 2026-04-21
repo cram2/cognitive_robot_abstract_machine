@@ -7,11 +7,18 @@ from typing import Tuple, List
 
 from typing_extensions import Optional, Dict, Any
 
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from semantic_digital_twin.datastructures.definitions import (
+    TorsoState,
+    GripperState,
+    StaticJointState,
+)
+from ....datastructures.dataclasses import Context
 from pycram.datastructures.enums import AxisIdentifier, Arms
 
 from pycram.datastructures.trajectory import PoseTrajectory
 from pycram.plans.factories import execute_single, sequential
-from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
 from pycram.robot_plans.motions.gripper import MoveGripperMotion, MoveTCPWaypointsMotion
 from pycram.robot_plans.motions.robot_body import MoveJointsMotion
 from pycram.validation.goal_validator import create_multiple_joint_goal_validator
@@ -45,28 +52,15 @@ class MoveTorsoAction(ActionDescription):
             )
         ).perform()
 
-    def validate(
-        self,
-        result: Optional[Any] = None,
-        max_wait_time: timedelta = timedelta(seconds=2),
-    ):
+    @staticmethod
+    def post_condition(
+        variables, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression | bool:
         """
-        Create a goal validator for the joint positions and wait until the goal is achieved or the timeout is reached.
+        The target joint state for the torso needs to be archived
         """
-
-        joint_positions: dict = (
-            RobotDescription.current_robot_description.get_static_joint_chain(
-                "torso", self.torso_state
-            )
-        )
-        validator = create_multiple_joint_goal_validator(
-            World.current_world.robot, joint_positions
-        )
-        validator.wait_until_goal_is_achieved(
-            max_wait_time=max_wait_time, time_per_read=timedelta(milliseconds=20)
-        )
-        if not validator.goal_achieved:
-            raise TorsoGoalNotReached(validator)
+        joint_state = context.robot.torso.get_joint_state_by_type(kwargs["torso_state"])
+        return joint_state.is_achieved()
 
 
 @dataclass
@@ -92,15 +86,6 @@ class SetGripperAction(ActionDescription):
             )
         ).perform()
 
-    def validate(
-        self,
-        result: Optional[Any] = None,
-        max_wait_time: timedelta = timedelta(seconds=2),
-    ):
-        """
-        Needs gripper state to be read or perceived.
-        """
-        pass
 
 
 @dataclass
@@ -133,26 +118,6 @@ class ParkArmsAction(ActionDescription):
             names.extend([c.name.name for c in joint_state.connections])
             values.extend(joint_state.target_values)
         return names, values
-
-    def validate(
-        self,
-        result: Optional[Any] = None,
-        max_wait_time: timedelta = timedelta(seconds=2),
-    ):
-        """
-        Create a goal validator for the joint positions and wait until the goal is achieved or the timeout is reached.
-        """
-        joint_poses = self.get_joint_poses()
-        validator = create_multiple_joint_goal_validator(
-            World.current_world.robot, joint_poses
-        )
-        validator.wait_until_goal_is_achieved(
-            max_wait_time=max_wait_time, time_per_read=timedelta(milliseconds=20)
-        )
-        if not validator.goal_achieved:
-            raise ConfigurationNotReached(
-                validator, configuration_type=StaticJointState.Park
-            )
 
 
 @dataclass
@@ -237,26 +202,6 @@ class CarryAction(ActionDescription):
         }[axis]
         v.frame_id = link
         return v
-
-    def validate(
-        self,
-        result: Optional[Any] = None,
-        max_wait_time: timedelta = timedelta(seconds=2),
-    ):
-        """
-        Create a goal validator for the joint positions and wait until the goal is achieved or the timeout is reached.
-        """
-        joint_poses = self.get_joint_poses()
-        validator = create_multiple_joint_goal_validator(
-            World.current_world.robot, joint_poses
-        )
-        validator.wait_until_goal_is_achieved(
-            max_wait_time=max_wait_time, time_per_read=timedelta(milliseconds=20)
-        )
-        if not validator.goal_achieved:
-            raise ConfigurationNotReached(
-                validator, configuration_type=StaticJointState.Park
-            )
 
 
 @dataclass

@@ -1,4 +1,4 @@
-from krrood.ormatic.data_access_objects.helper import get_dao_classfrom pycram.orm.ormatic_interface import ResolvedActionNodeMappingDAOfrom pycram.orm.model import ResolvedActionNodeMapping---
+---
 jupyter:
   jupytext:
     text_representation:

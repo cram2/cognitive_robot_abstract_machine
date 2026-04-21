@@ -70,6 +70,7 @@ import krrood.ormatic.custom_types
 import krrood.ormatic.data_access_objects.alternative_mappings
 import krrood.ormatic.type_dict
 import numpy
+import pycram.alternative_motion_mapping
 import pycram.alternative_motion_mappings.hsrb_motion_mapping
 import pycram.alternative_motion_mappings.stretch_motion_mapping
 import pycram.alternative_motion_mappings.tiago_motion_mapping
@@ -455,6 +456,25 @@ class MaxAvoidedCollisionsOverrideDAO_bodies_association(
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
     target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
+
+
+class MotionDidNotFinishDAO_failed_motions_association(
+    Base, AssociationDataAccessObject
+):
+
+    __tablename__ = "_11518060191843909188525547339320308867042936462725591594310587"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_motiondidnotfinishdao_id: Mapped[int] = mapped_column(
+        ForeignKey("MotionDidNotFinishDAO.database_id")
+    )
+    target_motionstatechartnodedao_id: Mapped[int] = mapped_column(
+        ForeignKey("MotionStatechartNodeDAO.database_id")
+    )
+
+    target: Mapped[MotionStatechartNodeDAO] = relationship(
+        "MotionStatechartNodeDAO", foreign_keys=[target_motionstatechartnodedao_id]
+    )
 
 
 class MotionExecutorDAO_motions_association(Base, AssociationDataAccessObject):
@@ -1719,7 +1739,7 @@ class AccelerationVariableDAO(
 
 
 class AlternativeMotionDAO(
-    Base, DataAccessObject[pycram.robot_plans.motions.base.AlternativeMotion]
+    Base, DataAccessObject[pycram.alternative_motion_mapping.AlternativeMotion]
 ):
 
     __tablename__ = "AlternativeMotionDAO"
@@ -2592,6 +2612,26 @@ class ConditionColorsDAO(
     )
 
 
+class ConditionNotSatisfiedDAO(
+    Base, DataAccessObject[pycram.exceptions.ConditionNotSatisfied]
+):
+
+    __tablename__ = "ConditionNotSatisfiedDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    message: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    pre_condition: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+
+    action: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+
 class ConstraintBuilderDAO(
     Base,
     DataAccessObject[
@@ -2939,16 +2979,6 @@ class DesignatorDAO(Base, DataAccessObject[pycram.plans.designator.Designator]):
 
     polymorphic_type: Mapped[str] = mapped_column(
         String(255), nullable=False, use_existing_column=True
-    )
-
-    plan_node_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("PlanNodeDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    plan_node: Mapped[PlanNodeDAO] = relationship(
-        "PlanNodeDAO", uselist=False, foreign_keys=[plan_node_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -3656,6 +3686,27 @@ class FrozenBoxDAO(
     )
 
 
+class FrozenIndexBoxDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer.FrozenIndexBox
+    ],
+):
+
+    __tablename__ = "FrozenIndexBoxDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    x0: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    x1: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    y0: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    y1: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    z0: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    z1: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+
 class GraspDescriptionDAO(
     Base, DataAccessObject[pycram.datastructures.grasp.GraspDescription]
 ):
@@ -3883,27 +3934,6 @@ class IncorrectWorldStateValueShapeErrorDAO(
     dof_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
-
-
-class IndexBoxDAO(
-    Base,
-    DataAccessObject[
-        semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer.FrozenIndexBox
-    ],
-):
-
-    __tablename__ = "IndexBoxDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    x0: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-    x1: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-    y0: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-    y1: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-    z0: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-    z1: Mapped[builtins.int] = mapped_column(use_existing_column=True)
 
 
 class InertialDAO(
@@ -4745,6 +4775,30 @@ class MixingActionDAO(
         "polymorphic_identity": "MixingActionDAO",
         "inherit_condition": database_id == ActionDescriptionDAO.database_id,
     }
+
+
+class MotionDidNotFinishDAO(
+    Base, DataAccessObject[pycram.exceptions.MotionDidNotFinish]
+):
+
+    __tablename__ = "MotionDidNotFinishDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    message: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    failed_motions: Mapped[
+        builtins.list[MotionDidNotFinishDAO_failed_motions_association]
+    ] = relationship(
+        "MotionDidNotFinishDAO_failed_motions_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[MotionDidNotFinishDAO_failed_motions_association.source_motiondidnotfinishdao_id]",
+    )
 
 
 class MotionExecutorDAO(Base, DataAccessObject[pycram.motion_executor.MotionExecutor]):
@@ -7559,6 +7613,9 @@ class ContextDAO(
         primary_key=True,
         use_existing_column=True,
     )
+
+    evaluate_conditions: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    debug: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
 
     world_id: Mapped[int] = mapped_column(
         ForeignKey("WorldMappingDAO.database_id", use_alter=True),
@@ -12408,6 +12465,11 @@ class TransportActionDAO(
         nullable=True,
         use_existing_column=True,
     )
+    grasp_description_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("GraspDescriptionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
 
     object_designator: Mapped[BodyDAO] = relationship(
         "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
@@ -12416,6 +12478,12 @@ class TransportActionDAO(
         "PoseMappingDAO",
         uselist=False,
         foreign_keys=[target_location_id],
+        post_update=True,
+    )
+    grasp_description: Mapped[GraspDescriptionDAO] = relationship(
+        "GraspDescriptionDAO",
+        uselist=False,
+        foreign_keys=[grasp_description_id],
         post_update=True,
     )
 

@@ -12,6 +12,7 @@ import sklearn.datasets
 from jpt.learning.impurity import Impurity
 from jpt.variables import infer_from_dataframe as old_infer_from_dataframe
 from jpt.trees import JPT as OldJPT
+
 from jpt.learning.preprocessing import preprocess_data as old_preprocess_data
 from krrood.adapters.json_serializer import to_json, from_json
 from random_events.interval import closed
@@ -91,9 +92,7 @@ class InferFromDataFrameTestCase(unittest.TestCase):
         self.assertEqual(self.data.dtypes.iloc[2], Enum)
 
     def test_infer_from_dataframe_with_scaling(self):
-        real, integer, symbol = infer_variables_from_dataframe(
-            self.data
-        )
+        real, integer, symbol = infer_variables_from_dataframe(self.data)
         self.assertEqual(real.variable.name, "real")
         self.assertEqual(integer.variable.name, "integer")
         self.assertEqual(symbol.variable.name, "symbol")
@@ -119,10 +118,10 @@ class JPTTestCase(unittest.TestCase):
         data["real"] = np.random.normal(2, 4, 100).astype(np.float32)
         data["symbol"] = random.choices(list(SymbolEnum), k=100)
         self.data = data
-        self.real, self.integer, self.symbol = infer_variables_from_dataframe(
-            self.data
+        self.real, self.integer, self.symbol = infer_variables_from_dataframe(self.data)
+        self.model = JointProbabilityTree(
+            annotated_variables=[self.real, self.integer, self.symbol]
         )
-        self.model = JointProbabilityTree(annotated_variables=[self.real, self.integer, self.symbol])
 
     def test_construct_impurity(self):
         impurity = self.model.construct_impurity()
@@ -262,7 +261,9 @@ class BreastCancerTestCase(unittest.TestCase):
             cls.data, min_samples_per_quantile=600
         )
 
-        cls.model = JointProbabilityTree(annotated_variables=variables, min_samples_per_leaf=0.4)
+        cls.model = JointProbabilityTree(
+            annotated_variables=variables, min_samples_per_leaf=0.4
+        )
         cls.pc = cls.model.fit(cls.data)
 
     def test_serialization(self):
@@ -332,10 +333,10 @@ class MNISTTestCase(unittest.TestCase):
         df["digit"] = target
         df["digit"] = df["digit"].astype(str)
 
-        variables = infer_variables_from_dataframe(
-            df, min_likelihood_improvement=0.01
+        variables = infer_variables_from_dataframe(df, min_likelihood_improvement=0.01)
+        cls.model = JointProbabilityTree(
+            annotated_variables=variables, min_samples_per_leaf=0.1
         )
-        cls.model = JointProbabilityTree(annotated_variables=variables, min_samples_per_leaf=0.1)
         cls.model.fit(df)
 
     def test_serialization(self):
@@ -371,8 +372,16 @@ class GaussianJPTTestCase(unittest.TestCase):
         np.random.seed(69)
         pc = ProbabilisticCircuit()
         prod = ProductUnit(probabilistic_circuit=pc)
-        prod.add_subcircuit(leaf(GaussianDistribution(variable=Continuous("x"), location=2, scale=4), pc))
-        prod.add_subcircuit(leaf(GaussianDistribution(variable=Continuous("y"), location=2, scale=4), pc))
+        prod.add_subcircuit(
+            leaf(
+                GaussianDistribution(variable=Continuous("x"), location=2, scale=4), pc
+            )
+        )
+        prod.add_subcircuit(
+            leaf(
+                GaussianDistribution(variable=Continuous("y"), location=2, scale=4), pc
+            )
+        )
         cls.multivariate_normal = pc
         samples = cls.multivariate_normal.sample(1000)
         cls.data = pd.DataFrame(
@@ -380,8 +389,7 @@ class GaussianJPTTestCase(unittest.TestCase):
         )
 
         cls.x, cls.y = infer_variables_from_dataframe(
-            cls.data,
-            min_samples_per_quantile=20
+            cls.data, min_samples_per_quantile=20
         )
 
     def test_plot_2d_jpt(self):

@@ -47,6 +47,7 @@ from krrood.entity_query_language.core.variable import (
     Literal,
 )
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
+from krrood.utils import memoize
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType
@@ -237,7 +238,7 @@ class GroupedByBuilder(ExpressionBuilder):
             variables_to_group_by=tuple(self.variables_to_group_by),
         )
 
-    @lru_cache
+    @memoize
     def assert_correct_selected_variables(self):
         """
         Assert that the selected variables are correct.
@@ -258,7 +259,7 @@ class GroupedByBuilder(ExpressionBuilder):
                 query=self.query,
             )
 
-    @lru_cache
+    @memoize
     def variable_is_in_or_derived_from_a_grouped_by_variable(
         self, variable: SymbolicExpression
     ) -> bool:

@@ -21,7 +21,7 @@ from pycram.datastructures.enums import (
     ApproachDirection,
     VerticalAlignment,
 )
-from pycram.robot_plans.actions.base import ActionDescription
+from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
 
 
 @dataclass

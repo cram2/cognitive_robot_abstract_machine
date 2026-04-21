@@ -1,6 +1,8 @@
 from collections import defaultdict
+from dataclasses import dataclass
 
 import pytest
+from typing_extensions import Type, Any
 
 import krrood.entity_query_language.factories as eql
 from krrood.entity_query_language.exceptions import (
@@ -19,8 +21,9 @@ from krrood.entity_query_language.factories import (
     a,
     flat_variable,
 )
+from krrood.utils import inheritance_path_length
 from ..dataset.example_classes import KRROODVectorsWithProperty
-from krrood.entity_query_language.predicate import length
+from krrood.entity_query_language.predicate import length, symbolic_function
 from krrood.entity_query_language.query.operations import GroupedBy
 from ..dataset.department_and_employee import Department, Employee
 from ..dataset.example_classes import NamedNumbers
@@ -479,12 +482,14 @@ def test_multiple_aggregations_per_group_on_same_variable(departments_and_employ
         results, 2, 25000, max_salary, department, avg_salary, employees, departments
     )
 
+
 def test_property_selection():
     """
     Test that properties can be selected from entities in a query.
     """
     v = variable(KRROODVectorsWithProperty, None)
     q = an(entity(v).where(v.vectors[0].x == 1))
+
 
 def test_having_node_hierarchy(departments_and_employees):
 
@@ -693,3 +698,41 @@ def test_mode_and_multi_mode(
     var2 = number_variable_with_repeated_values_for_more_than_one_number
     assert eql.mode(var2).tolist() == [2]
     assert eql.multimode(var2).tolist() == [2, 3]
+
+
+def test_nearest_object_type():
+    @dataclass
+    class BaseObject: ...
+
+    @dataclass
+    class Object1(BaseObject): ...
+
+    @dataclass
+    class Object2(BaseObject): ...
+
+    @dataclass
+    class Level2Object(Object1): ...
+
+    @symbolic_function
+    def symbolic_distance(type1: Type, type2: Type) -> int | None:
+        return inheritance_path_length(type1, type2)
+
+    @symbolic_function
+    def eql_mro(object_: Any) -> tuple[Type]:
+        return object_.__class__.__mro__
+
+    objects = [BaseObject(), Object1(), Object2()]
+    object_of_interest = Level2Object()
+    object_var = eql.variable_from(objects)
+    object_super_class = flat_variable(eql_mro(object_var))
+    distance = symbolic_distance(type(object_of_interest), object_super_class)
+    object_distances = (
+        set_of(object_var, min_distance := eql.min(distance))
+        .where(distance != None)
+        .grouped_by(object_var)
+    )
+    best_object_and_distance = eql.min(
+        object_distances, key=lambda x: x[min_distance]
+    ).first()
+    assert best_object_and_distance[object_var] == objects[1]
+    assert best_object_and_distance[min_distance] == 1

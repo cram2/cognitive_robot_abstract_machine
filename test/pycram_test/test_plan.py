@@ -17,6 +17,7 @@ from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import TaskStatus
+from pycram.exceptions import MotionDidNotFinish
 from pycram.language import CodeNode
 from pycram.motion_executor import simulated_robot
 from pycram.orm.ormatic_interface import *  # type: ignore
@@ -362,6 +363,7 @@ def test_algebra_sequential_plan(mutable_model_world):
     assert the correctness of sampled values after conditioning and truncation.
     """
     world, robot_view, context = mutable_model_world
+    context.evaluate_conditions = False
 
     target_location = underspecified(PoseMapping.from_point_mapping_quaternion_mapping)(
         point_mapping=underspecified(Point3Mapping)(
@@ -392,6 +394,7 @@ def test_algebra_sequential_plan(mutable_model_world):
 
 def test_parameterization_of_pick_up(mutable_model_world):
     world, robot_view, context = mutable_model_world
+    context.evaluate_conditions = False
 
     milk = world.get_body_by_name("milk.stl")
 
@@ -431,5 +434,5 @@ def test_parameterization_of_pick_up(mutable_model_world):
     with simulated_robot:
         try:
             plan.perform()
-        except TimeoutError:
+        except MotionDidNotFinish:
             pass

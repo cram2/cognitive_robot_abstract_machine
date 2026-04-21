@@ -15,9 +15,9 @@ from krrood.class_diagrams.class_diagram import (
     WrappedClass,
     Inheritance,
 )
-from krrood.class_diagrams.failures import ClassIsUnMappedInClassDiagram
+from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
-from krrood.utils import module_and_class_name
+from krrood.utils import module_and_class_name, memoize
 
 if TYPE_CHECKING:
     from krrood.ormatic.ormatic import ORMatic
@@ -492,7 +492,7 @@ class WrappedTable:
 
         return result
 
-    @lru_cache(maxsize=None)
+    @memoize
     def parse_fields(self):
 
         for f in self.fields:

@@ -2,10 +2,6 @@ from copy import deepcopy
 
 import numpy as np
 
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from semantic_digital_twin.reasoning.predicates import (
     contact,
     visible,
@@ -19,12 +15,15 @@ from semantic_digital_twin.reasoning.predicates import (
     occluding_bodies,
     is_supported_by,
     reachable,
+    is_place_occupied,
 )
 from semantic_digital_twin.reasoning.robot_predicates import (
     robot_in_collision,
     robot_holds_body,
     blocking,
     is_body_in_gripper,
+    bodies_in_gripper,
+    is_pose_free_for_robot,
 )
 from semantic_digital_twin.robots.abstract_robot import Camera, ParallelGripper
 from semantic_digital_twin.robots.pr2 import PR2
@@ -34,7 +33,12 @@ from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
 )
-from semantic_digital_twin.world_description.geometry import Box, Scale, Color
+from semantic_digital_twin.world_description.geometry import (
+    Box,
+    Scale,
+    Color,
+    BoundingBox,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body, Region
 
@@ -438,3 +442,83 @@ def test_blocking(pr2_world_copy):
         pr2.left_arm.root,
         pr2.left_arm.manipulator.tool_frame,
     )
+
+
+def test_region_is_occupied(pr2_world_state_reset):
+    view = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+
+    target_region = BoundingBox(
+        3, 2, 0, 4, 3, 2, pr2_world_state_reset.root.global_pose
+    )
+    assert not is_place_occupied(target_region, pr2_world_state_reset)
+
+    view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        3.5, 2.5, 0
+    )
+    pr2_world_state_reset.notify_state_change()
+
+    assert is_place_occupied(target_region, pr2_world_state_reset)
+
+    assert not is_place_occupied(
+        target_region, pr2_world_state_reset, view.bodies_with_collision
+    )
+
+
+def test_is_pose_free_for_robot(pr2_apartment_state_reset):
+    view = pr2_apartment_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    assert is_pose_free_for_robot(
+        view,
+        HomogeneousTransformationMatrix.from_xyz_rpy(
+            2, -2, 0, reference_frame=pr2_apartment_state_reset.root
+        ),
+    )
+
+    assert not is_pose_free_for_robot(
+        view,
+        HomogeneousTransformationMatrix.from_xyz_rpy(
+            2.5, 2, 0, reference_frame=pr2_apartment_state_reset.root
+        ),
+    )
+
+    view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        2, -2, 0
+    )
+
+    assert is_pose_free_for_robot(
+        view,
+        HomogeneousTransformationMatrix.from_xyz_rpy(
+            2, -2, 0, reference_frame=pr2_apartment_state_reset.root
+        ),
+    )
+
+    assert is_pose_free_for_robot(
+        view,
+        HomogeneousTransformationMatrix.from_xyz_rpy(
+            2.1, -2.1, 0, reference_frame=pr2_apartment_state_reset.root
+        ),
+    )
+
+
+def test_bodies_in_gripper(pr2_apartment_world):
+    world = deepcopy(pr2_apartment_world)
+    tcp = world.get_body_by_name("l_gripper_tool_frame")
+    pr2 = PR2.from_world(world)
+
+    with world.modify_world():
+        body = Body(
+            name=PrefixedName("mock_milk"),
+            collision=ShapeCollection([Box(scale=Scale(0.05, 0.05, 0.3))]),
+        )
+
+        connection = FixedConnection(tcp, body)
+        world.add_connection(connection)
+
+    pr2.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        2, -2, 0
+    )
+
+    bodies = bodies_in_gripper(pr2.left_arm.manipulator)
+
+    assert len(bodies) == 1
+    assert bodies[0].name.name == "mock_milk"
+    assert bodies[0] == body

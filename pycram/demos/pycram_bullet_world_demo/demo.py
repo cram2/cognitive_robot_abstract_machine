@@ -1,7 +1,8 @@
 import os
 
 from pycram.datastructures.dataclasses import Context
-from pycram.datastructures.enums import Arms
+from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from pycram.datastructures.grasp import GraspDescription
 
 from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import sequential
@@ -46,7 +47,11 @@ with world.modify_world():
         ),
     )
     connection = FixedConnection(
-        parent=world.get_body_by_name("cabinet10_drawer_top"), child=spoon.root
+        parent=world.get_body_by_name("cabinet10_drawer_top"),
+        child=spoon.root,
+        parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            -0.05, -0.05, 0
+        ),
     )
     world.merge_world(spoon, connection)
 
@@ -59,12 +64,13 @@ try:
         VizMarkerPublisher,
     )
 
-    v = VizMarkerPublisher(_world=world, node=rclpy.create_node("viz_marker"))
+    node = rclpy.create_node("viz_marker")
+    v = VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
 except ImportError:
-    pass
+    node = None
 
 pr2 = PR2.from_world(world)
-context = Context.from_world(world)
+context = Context(world=world, robot=pr2)
 
 with world.modify_world():
     world_reasoner = WorldReasoner(world)
@@ -82,26 +88,29 @@ with world.modify_world():
         )
     )
 
+context.evaluate_conditions = False
+
 plan = sequential(
     [
         ParkArmsAction(Arms.BOTH),
         MoveTorsoAction(TorsoState.HIGH),
         TransportAction(
             world.get_body_by_name("milk.stl"),
-            Pose.from_xyz_rpy(4.9, 3.3, 0.8, reference_frame=world.root),
+            Pose.from_xyz_rpy(4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
             world.get_body_by_name("bowl.stl"),
-            Pose.from_xyz_rpy(5, 3.3, 0.75, reference_frame=world.root),
+            Pose.from_xyz_rpy(5, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
             world.get_body_by_name("spoon.stl"),
-            Pose.from_xyz_quaternion(
-                5.1, 3.3, 0.75, 0, 0, 1, 1, reference_frame=world.root
-            ),
+            Pose.from_xyz_rpy(5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
+            GraspDescription(
+                ApproachDirection.FRONT, VerticalAlignment.TOP, pr2.left_arm.manipulator
+            ),
         ),
     ],
     context=context,

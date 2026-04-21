@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 import math
 import trimesh.boolean
+from trimesh.collision import CollisionManager
+
 from krrood.entity_query_language.predicate import (
     Predicate,
     Symbol,
@@ -29,6 +31,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     Region,
@@ -488,3 +491,61 @@ class ContainsType(Predicate):
 
     def __call__(self) -> bool:
         return any(isinstance(obj, self.obj_type) for obj in self.iterable)
+
+
+@symbolic_function
+def is_place_occupied(
+    box: BoundingBox, world: World, allowed_bodies: List[Body] = None
+) -> bool:
+    """
+    Checks if the given region (as a box at its pose) intersects with any collidable
+    object in the world, excluding `allowed_bodies`.
+
+    The region is converted to a box mesh at the region pose and tested against
+    each body's world-aligned collision mesh using trimesh's collision manager.
+
+    :param box: The region (axis-aligned box in its own local frame with pose in `region.origin`).
+    :param world: The world providing bodies with enabled collisions.
+    :param allowed_bodies: Bodies to ignore during the check.
+    :return: True if any collision is found, False otherwise.
+    """
+    allowed_bodies = set(allowed_bodies or [])
+
+    # Build a mesh for the region box at its current pose
+    region_box_shape = box.as_shape()  # returns a Box centered at the region
+    region_mesh = region_box_shape.mesh.copy()
+    # region_mesh.apply_transform(region_box_shape.origin.to_np())
+    region_mesh.apply_transform(
+        world.transform(region_box_shape.origin, world.root).to_np()
+    )
+
+    # Prepare collision manager with the region mesh
+    cm = CollisionManager()
+    cm.add_object("region", region_mesh)
+
+    # Iterate over collidable bodies and test collision
+    for body in world.bodies_with_collision:
+        if body in allowed_bodies:
+            continue
+
+        mesh_local = getattr(body.collision, "combined_mesh", None)
+        if mesh_local is None or getattr(mesh_local, "is_empty", False):
+            continue
+
+        # Transform body mesh into world frame
+        body_mesh = mesh_local.copy()
+        body_mesh.apply_transform(body.global_pose.to_np())
+
+        # Early exit on first collision
+        if cm.in_collision_single(body_mesh):
+            return True
+
+    return False
+
+
+@symbolic_function
+def allclose(array1: np.ndarray, array2: np.ndarray, atol=1e-3) -> bool:
+    """
+    Symbolic wrapper around `np.allclose`.
+    """
+    return np.allclose(array1, array2, atol=atol)

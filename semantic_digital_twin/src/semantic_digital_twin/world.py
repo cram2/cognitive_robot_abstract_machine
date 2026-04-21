@@ -104,6 +104,7 @@ from semantic_digital_twin.world_description.world_modification import (
     RemoveActuatorModification,
 )
 from semantic_digital_twin.world_description.world_state import WorldState
+from krrood.utils import memoize, clear_memoization_cache
 
 if TYPE_CHECKING:
     from semantic_digital_twin.spatial_types import GenericSpatialType
@@ -200,6 +201,7 @@ class WorldModelUpdateContextManager:
             raise exc_val
 
         self.world.delete_orphaned_dofs()
+        clear_memoization_cache(self.world)
         model_manager = self.world._model_manager
         model_manager._active_world_model_update_context_manager_ids.remove(self._id)
 
@@ -467,7 +469,7 @@ class World(HasSimulatorProperties):
 
     # %% Properties
     @property
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def root(self) -> Optional[KinematicStructureEntity]:
         """
         The root of the world is the unique node with in-degree 0.
@@ -797,7 +799,7 @@ class World(HasSimulatorProperties):
     def remove_degree_of_freedom(self, dof: DegreeOfFreedom) -> None:
         if self.is_degree_of_freedom_in_world(dof):
             self._remove_degree_of_freedom(dof)
-            self.get_degree_of_freedom_by_name.cache_clear()
+            clear_memoization_cache(self)
 
     @atomic_world_modification(modification=RemoveDegreeOfFreedomModification)
     def _remove_degree_of_freedom(self, dof: DegreeOfFreedom) -> None:
@@ -864,7 +866,7 @@ class World(HasSimulatorProperties):
             dof.has_hardware_interface = value
 
     # %% Getter
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_connection(
         self, parent: KinematicStructureEntity, child: KinematicStructureEntity
     ) -> Connection:
@@ -873,7 +875,7 @@ class World(HasSimulatorProperties):
         """
         return self.kinematic_structure.get_edge_data(parent.index, child.index)
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_connections_by_type(
         self, connection_type: Type[GenericConnection]
     ) -> List[GenericConnection]:
@@ -887,7 +889,7 @@ class World(HasSimulatorProperties):
             connection_type, self.connections
         )
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_semantic_annotations_by_type(
         self, semantic_annotation_type: Type[GenericSemanticAnnotation]
     ) -> List[GenericSemanticAnnotation]:
@@ -901,7 +903,7 @@ class World(HasSimulatorProperties):
             semantic_annotation_type, self.semantic_annotations
         )
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_kinematic_structure_entity_by_type(
         self, entity_type: Type[GenericKinematicStructureEntity]
     ) -> List[GenericKinematicStructureEntity]:
@@ -927,7 +929,7 @@ class World(HasSimulatorProperties):
         """
         return [entity for entity in iterable if isinstance(entity, world_entity_type)]
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_semantic_annotation_by_name(
         self, name: Union[str, PrefixedName]
     ) -> SemanticAnnotation:
@@ -938,7 +940,7 @@ class World(HasSimulatorProperties):
         )
         return semantic_annotation
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_kinematic_structure_entity_by_name(
         self, name: Union[str, PrefixedName]
     ) -> KinematicStructureEntity:
@@ -946,11 +948,11 @@ class World(HasSimulatorProperties):
             name, self.kinematic_structure_entities
         )
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_body_by_name(self, name: Union[str, PrefixedName]) -> Body:
         return self._get_world_entity_by_name_from_iterable(name, self.bodies)
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_degree_of_freedom_by_name(
         self, name: Union[str, PrefixedName]
     ) -> DegreeOfFreedom:
@@ -958,7 +960,7 @@ class World(HasSimulatorProperties):
             name, self.degrees_of_freedom
         )
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_connection_by_name(self, name: Union[str, PrefixedName]) -> Connection:
         return self._get_world_entity_by_name_from_iterable(name, self.connections)
 
@@ -993,7 +995,7 @@ class World(HasSimulatorProperties):
             case _:
                 raise DuplicateWorldEntityError(matches)
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_semantic_annotations_by_name(
         self, name: Union[str, PrefixedName]
     ) -> List[SemanticAnnotation]:
@@ -1001,7 +1003,7 @@ class World(HasSimulatorProperties):
             name, self.semantic_annotations
         )
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_kinematic_structure_entities_by_name(
         self, name: Union[str, PrefixedName]
     ) -> List[KinematicStructureEntity]:
@@ -1009,11 +1011,11 @@ class World(HasSimulatorProperties):
             name, self.kinematic_structure_entities
         )
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_bodies_by_name(self, name: Union[str, PrefixedName]) -> List[Body]:
         return self._get_world_entities_by_name_from_iterable(name, self.bodies)
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_degrees_of_freedom_by_name(
         self, name: Union[str, PrefixedName]
     ) -> List[DegreeOfFreedom]:
@@ -1021,7 +1023,7 @@ class World(HasSimulatorProperties):
             name, self.degrees_of_freedom
         )
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_connections_by_name(
         self, name: Union[str, PrefixedName]
     ) -> List[Connection]:
@@ -1236,7 +1238,7 @@ class World(HasSimulatorProperties):
         self._travel_branch(root, visitor)
         return visitor.connections
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def get_kinematic_structure_entities_of_branch(
         self, root: KinematicStructureEntity
     ) -> List[KinematicStructureEntity]:
@@ -1400,7 +1402,7 @@ class World(HasSimulatorProperties):
             self.remove_degree_of_freedom(dof)
 
     # %% Kinematic Structure Computations
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def compute_descendent_child_kinematic_structure_entities(
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> List[KinematicStructureEntity]:
@@ -1418,7 +1420,7 @@ class World(HasSimulatorProperties):
             )
         return children
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def compute_child_kinematic_structure_entities(
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> List[KinematicStructureEntity]:
@@ -1462,7 +1464,7 @@ class World(HasSimulatorProperties):
         parent = self.kinematic_structure.predecessors(kinematic_structure_entity.index)
         return parent[0] if parent else None
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def compute_chain_of_connections(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> List[Connection]:
@@ -1525,7 +1527,7 @@ class World(HasSimulatorProperties):
         new_tip_body = new_tip.parent if new_tip in downward_chain else new_tip.child
         return new_root_body, new_tip_body
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def compute_split_chain_of_connections(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> Tuple[List[Connection], List[Connection]]:
@@ -1558,7 +1560,7 @@ class World(HasSimulatorProperties):
         ]
         return root_connections, tip_connections
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def compute_split_chain_of_kinematic_structure_entities(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> Tuple[
@@ -1623,7 +1625,7 @@ class World(HasSimulatorProperties):
 
         return divergence_index - 1
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def compute_chain_of_kinematic_structure_entities(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> List[KinematicStructureEntity]:
@@ -1635,7 +1637,7 @@ class World(HasSimulatorProperties):
         )
         return [self.kinematic_structure[index] for index in path_indeces]
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+    @memoize
     def _compute_chain_of_kinematic_structure_entities_indexes(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> List[int]:

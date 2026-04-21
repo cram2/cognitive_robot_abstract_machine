@@ -1,0 +1,17 @@
+# Table of contents
+# Learn more at https://jupyterbook.org/customize/toc.html
+
+format: jb-book
+root: intro
+parts:
+- caption: User Guide
+  chapters:
+    - file: user_guide
+      sections:
+        - file: motion_statecharts
+        - file: examples/basic_motion
+        - file: examples/cartesian_goals
+
+- caption: References
+  chapters:
+    - file: autoapi/index

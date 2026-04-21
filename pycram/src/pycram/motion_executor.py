@@ -18,6 +18,7 @@ from giskardpy.motion_statechart.motion_statechart import (
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.ros_executor import Ros2Executor
 from pycram.datastructures.enums import ExecutionType
+from pycram.exceptions import MotionDidNotFinish
 
 from semantic_digital_twin.world import World
 
@@ -95,21 +96,25 @@ class MotionExecutor:
             ros_node=self.ros_node,
         )
         executor.compile(self.motion_state_chart)
-        try:
-            # execute the motion state chart until it is done
-            counter = 0
-            while counter < 2000:
-                if self.plan_node.is_interrupted:
-                    return
-                elif self.plan_node.is_paused:
-                    time.sleep(0.01)
-                    continue
+        # execute the motion state chart until it is done
+        counter = 0
+        while counter < 2000:
+            if self.plan_node.is_interrupted:
+                return
+            elif self.plan_node.is_paused:
+                time.sleep(0.01)
+                continue
 
-                executor.tick()
-                counter += 1
-                if executor.motion_statechart.is_end_motion():
-                    break
-        except TimeoutError as e:
+            executor.tick()
+            counter += 1
+            if executor.motion_statechart.is_end_motion():
+                break
+
+        executor._set_velocity_acceleration_jerk_to_zero()
+        executor.motion_statechart.cleanup_nodes(context=executor.context)
+        executor.context.cleanup()
+
+        if not executor.motion_statechart.is_end_motion():
             failed_nodes = [
                 (
                     node
@@ -121,11 +126,7 @@ class MotionExecutor:
             ]
             failed_nodes = list(filter(None, failed_nodes))
             logger.error(f"Failed Nodes: {failed_nodes}")
-            raise e
-        finally:
-            executor._set_velocity_acceleration_jerk_to_zero()
-            executor.motion_statechart.cleanup_nodes(context=executor.context)
-            executor.context.cleanup()
+            raise MotionDidNotFinish(failed_nodes)
 
     def _monitor_interrupt(self, giskard_wrapper, kill_event: threading.Event):
         while True:
@@ -136,7 +137,7 @@ class MotionExecutor:
             time.sleep(0.01)
 
     def _execute_for_real(self):
-        from giskardpy_ros.python_interface.python_interface import GiskardWrapper
+        from giskardpy.middleware.ros2.python_interface import GiskardWrapper
 
         giskard = GiskardWrapper(self.ros_node)
 

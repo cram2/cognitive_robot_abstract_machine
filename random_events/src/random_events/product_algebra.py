@@ -91,10 +91,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
 
     def _update_cpp_object(self):
         self.cpp_object = rl.SimpleEvent(
-            {
-                variable.cpp_object: value.cpp_object
-                for variable, value in self.items()
-            }
+            {variable.cpp_object: value.cpp_object for variable, value in self.items()}
         )
 
     def _setitem_without_cpp(self, key: VariableMapKey, value: Any):
@@ -421,7 +418,7 @@ class Event(AbstractCompositeSet):
     simple_set_example: SimpleEvent = field(init=False)
 
     @classmethod
-    def from_simple_sets(cls, *simple_sets: Iterable[SimpleEvent]):
+    def from_simple_sets(cls, *simple_sets: SimpleEvent):
         if isinstance(simple_sets, SimpleEvent):
             simple_sets = (simple_sets,)
         instance = cls.__new__(cls)

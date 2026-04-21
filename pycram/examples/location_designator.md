@@ -1,4 +1,4 @@
-from pycram.motion_executor import simulated_robotfrom pycram.robot_plans import NavigateActionDescription---
+---
 jupyter:
   jupytext:
     text_representation:

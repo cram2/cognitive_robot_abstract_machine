@@ -35,7 +35,6 @@ The user guide is divided into multiple chapters teaching you the following topi
   - [](persistence-of-annotated-worlds)
   - Synchronizing worlds across multiple processes
   - Pipelines
-  - [](multiverse)
   - Inverse Kinematics
   - Collision Checking
   - Casadi

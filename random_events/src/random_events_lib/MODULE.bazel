@@ -1,0 +1,17 @@
+###############################################################################
+# Bazel now uses Bzlmod by default to manage external dependencies.
+# Please consider migrating your external dependencies from WORKSPACE to MODULE.bazel.
+#
+# For more details, please check https://github.com/bazelbuild/bazel/issues/18958
+###############################################################################
+
+module(
+    name = "random_events_lib",
+    version = "0.0.1",
+)
+
+bazel_dep(name = "pybind11_bazel", version = "2.13.6")
+bazel_dep(name = "rules_cc", version = "0.0.17")
+bazel_dep(name = "googletest", version = "1.15.2")
+bazel_dep(name = "rules_python", version = "1.0.0")
+bazel_dep(name = "platforms", version = "0.0.10")

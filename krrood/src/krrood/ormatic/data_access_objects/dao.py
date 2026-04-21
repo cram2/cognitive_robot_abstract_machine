@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import logging
 import threading
-from dataclasses import fields
+from dataclasses import dataclass, field, is_dataclass, fields, MISSING
+from functools import lru_cache
+
+from krrood.utils import memoize
 from typing import _GenericAlias
 
 import rustworkx
@@ -33,6 +36,19 @@ from krrood.ormatic.data_access_objects.from_dao import (
 )
 from krrood.ormatic.data_access_objects.helper import get_dao_class, to_dao
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
+
+@lru_cache
+def _get_type_hints_cached(clazz: Type) -> Dict[str, Any]:
+    """
+    Get type hints for a class.
+    """
+    try:
+        return get_type_hints(clazz)
+    except Exception:
+        return {}
+
+
+from collections import deque
 from krrood.ormatic.exceptions import (
     NoGenericError,
     NoDAOFoundDuringParsingError,

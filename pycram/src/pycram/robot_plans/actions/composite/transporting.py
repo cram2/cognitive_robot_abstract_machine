@@ -21,7 +21,7 @@ from pycram.robot_plans.actions.core.pick_up import PickUpAction
 from pycram.robot_plans.actions.core.placing import PlaceAction
 from pycram.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.reasoning.predicates import InsideOf
+from semantic_digital_twin.reasoning.predicates import InsideOf, allclose
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
@@ -54,6 +54,11 @@ class TransportAction(ActionDescription):
     arm: Optional[Arms]
     """
     Arm that should be used
+    """
+
+    grasp_description: Optional[GraspDescription] = None
+    """
+    Grasp Description that should be used for picking up the object
     """
 
     def inside_container(self) -> List[Body]:
@@ -104,6 +109,7 @@ class TransportAction(ActionDescription):
             reachable_arm=self.arm,
             reachable=True,
             context=self.plan_node.plan.context,
+            grasp_description=self.grasp_description,
         )
         # Tries to find a pick-up position for the robot that uses the given arm
 
@@ -123,9 +129,6 @@ class TransportAction(ActionDescription):
                     ),
                     ParkArmsAction(Arms.BOTH),
                     MoveTorsoAction(TorsoState.HIGH),
-                    self._make_navigate_action_for_placing(
-                        pickup_pose.grasp_description
-                    ),
                 ]
             )
         ).perform()
@@ -137,9 +140,7 @@ class TransportAction(ActionDescription):
         return sequential(
             children=[
                 self._make_navigate_action_for_placing(pickup_pose.grasp_description),
-                PlaceAction(
-                    self.object_designator, self.target_location, pickup_pose.arm
-                ),
+                PlaceAction(self.object_designator, self.target_location, self.arm),
                 ParkArmsAction(Arms.BOTH),
             ]
         )

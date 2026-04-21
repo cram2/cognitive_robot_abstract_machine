@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
+import rclpy
 from rustworkx import NoEdgeBetweenNodes
 
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
@@ -210,7 +211,7 @@ def test_grasping(immutable_tracy_block_world):
     assert dist < 0.01
 
 
-def test_pick_up_multi(mutable_tracy_block_world):
+def test_pick_up_tracy(mutable_tracy_block_world):
     world, view, context = mutable_tracy_block_world
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
@@ -241,13 +242,13 @@ def test_pick_up_multi(mutable_tracy_block_world):
     plan.validate()
 
 
-def test_place_multi(mutable_tracy_block_world):
+def test_place_tracy(mutable_tracy_block_world):
     world, view, context = mutable_tracy_block_world
 
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
+        VerticalAlignment.TOP,
         left_arm.manipulator,
     )
 

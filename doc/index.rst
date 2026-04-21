@@ -37,8 +37,8 @@ CRAM consists of the following sub-packages:
    annotations to provide a comprehensive understanding of
    the robot's environment and tasks.
 
--  `Giskardpy <https://github.com/SemRoCo/giskardpy>`__ is a
-   Python library for motion control for robots. It uses constraint-
+-  `Giskardpy <https://cram2.github.io/cognitive_robot_abstract_machine/giskardpy>`__
+   is a Python library for motion control for robots. It uses constraint-
    and optimization-based task-space control to control the whole
    body of a robot.
 
@@ -83,14 +83,8 @@ Activate / deactivate
 ..code:: bash
 
   workon cram-env
+
   deactivate
-
-Pull the submodules:
-
-.. code:: bash
-
-  cd cognitive_robot_abstract_machine
-  git submodule update --init --recursive
 
 Install using UV
 ~~~~~~~~~~~~~~~~

@@ -33,6 +33,16 @@ workon cram-env
 deactivate
 ```
 
+#### Optional: Create symlink for ROS2 packages
+If you are using this repo with ROS2, you need to create a symlink for the ROS2 packages.
+Currently, only jazzy is supported.
+```bash
+cd <your_ros2_ws_path>/src
+ln -s <your_cram_repo_path>/cram_ros2_packages cram_ros2_packages
+colcon build
+```
+
+
 ### Install using UV 
 
 To install the whole repo we use uv (https://github.com/astral-sh/uv), first to install uv:

@@ -11,6 +11,24 @@ node: Node = None
 executor: MultiThreadedExecutor = None
 spinner_thread: Thread = None
 
+import functools
+from threading import RLock
+from rclpy.action import ActionClient
+
+# ROS2 Jazzy race condition fix for ActionClient
+# See https://github.com/ros2/rclpy/issues/1589
+_original_action_client_init = ActionClient.__init__
+
+
+@functools.wraps(_original_action_client_init)
+def _patched_action_client_init(self, *args, **kwargs):
+    if not hasattr(self, "_lock"):
+        self._lock = RLock()
+    _original_action_client_init(self, *args, **kwargs)
+
+
+ActionClient.__init__ = _patched_action_client_init
+
 
 def spinner_thread_target():
     """

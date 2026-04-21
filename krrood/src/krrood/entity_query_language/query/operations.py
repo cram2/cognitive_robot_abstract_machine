@@ -48,6 +48,7 @@ from krrood.entity_query_language.operators.set_operations import (
 )
 from krrood.entity_query_language.utils import ensure_hashable, is_iterable
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
+from krrood.utils import memoize
 
 GroupKey = Tuple[Any, ...]
 """
@@ -275,7 +276,7 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
                     group[id_] = []
                 group[id_].append(val)
 
-    @lru_cache
+    @memoize
     def is_already_grouped(self, var_id: uuid.UUID) -> bool:
         expression = self._get_expression_by_id_(var_id)
         return (

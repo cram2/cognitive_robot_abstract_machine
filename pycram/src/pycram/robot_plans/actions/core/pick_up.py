@@ -1,18 +1,24 @@
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from dataclasses import dataclass
-from datetime import timedelta
 
-from typing_extensions import Optional, Any
+from typing_extensions import Any, Dict
 
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.factories import and_, or_, not_, variable_from
+from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     Arms,
     MovementType,
-    FindBodyInRegionMethod,
 )
 from pycram.datastructures.grasp import GraspDescription
 from pycram.plans.factories import sequential, execute_single
+from pycram.pose_validator import (
+    pose_sequence_reachability_validator,
+)
+from pycram.querying.predicates import GripperIsFree
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.motions.gripper import (
     MoveGripperMotion,
@@ -20,6 +26,8 @@ from pycram.robot_plans.motions.gripper import (
 )
 from pycram.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.reasoning.predicates import allclose
+from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -75,29 +83,49 @@ class ReachAction(ActionDescription):
             )
         ).perform()
 
-    def validate(
-        self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
-    ):
+    @staticmethod
+    def pre_condition(
+        variables, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
         """
-        Check if object is contained in the gripper such that it can be grasped and picked up.
+        The sequence in which the robot would reach the target pose needs to be achiveable
         """
-        fingers_link_names = self.arm_chain.end_effector.fingers_link_names
-        if fingers_link_names:
-            if not is_body_between_fingers(
-                self.object_designator,
-                fingers_link_names,
-                method=FindBodyInRegionMethod.MultiRay,
-            ):
-                raise ObjectNotInGraspingArea(
-                    self.object_designator,
-                    World.robot,
-                    self.arm,
-                    self.grasp_description,
-                )
-        else:
-            logger.warning(
-                f"Cannot validate reaching to pick up action for arm {self.arm} as no finger links are defined."
-            )
+        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        test_world = deepcopy(context.world)
+        grasp_pose_sequence = kwargs["grasp_description"]._pose_sequence(
+            kwargs["target_pose"],
+            kwargs["object_designator"],
+            reverse=kwargs["reverse_reach_order"],
+        )
+        return and_(
+            pose_sequence_reachability_validator(
+                grasp_pose_sequence,
+                manipulator.tool_frame,
+                context.robot.from_world(test_world),
+                test_world,
+                context.robot.full_body_controlled,
+            ),
+        )
+
+    @staticmethod
+    def post_condition(
+        variables, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression | bool:
+        """
+        The end effector needs to be close to the target pose
+        """
+        manipulator = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
+        return or_(
+            is_body_in_gripper(variable_from(kwargs["object_designator"]), manipulator)
+            > 0.9,
+            allclose(
+                variable_from(kwargs["object_designator"].global_pose.to_position()),
+                ViewManager.get_end_effector_view(
+                    kwargs["arm"], context.robot
+                ).tool_frame.global_pose.to_position(),
+                atol=3e-2,
+            ),
+        )
 
 
 @dataclass
@@ -158,16 +186,41 @@ class PickUpAction(ActionDescription):
             )
         ).perform()
 
-    def validate(
-        self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
-    ):
+    @staticmethod
+    def pre_condition(
+        variables: Dict, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
         """
-        Check if picked up object is in contact with the gripper.
+        The gripper with which to grasp the object needs to be free and the object needs to be reachable
         """
-        if not has_gripper_grasped_body(self.arm, self.object_designator):
-            raise ObjectNotGraspedError(
-                self.object_designator, World.robot, self.arm, self.grasp_description
-            )
+        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        test_world = deepcopy(context.world)
+        grasp_pose_sequence = kwargs["grasp_description"].grasp_pose_sequence(
+            kwargs["object_designator"]
+        )
+        return and_(
+            GripperIsFree(manipulator),
+            pose_sequence_reachability_validator(
+                grasp_pose_sequence,
+                manipulator.tool_frame,
+                context.robot.from_world(test_world),
+                test_world,
+                context.robot.full_body_controlled,
+            ),
+        )
+
+    @staticmethod
+    def post_condition(
+        variables: Dict, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
+        """
+        The object needs to be in the griper frame
+        """
+        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        return or_(
+            not_(GripperIsFree(manipulator)),
+            is_body_in_gripper(kwargs["object_designator"], manipulator) > 0.9,
+        )
 
 
 @dataclass

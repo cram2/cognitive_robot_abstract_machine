@@ -2,14 +2,27 @@ from __future__ import annotations
 
 from collections import defaultdict
 from textwrap import fill
+
 from typing_extensions import Optional, List, Dict, Tuple, TYPE_CHECKING, Any
 
-import igraph as ig
-import matplotlib as mpl
-import numpy as np
-from matplotlib import pyplot as plt
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
-from matplotlib.path import Path
+try:
+    import matplotlib as mpl
+    # Ensure a non-interactive backend for headless environments
+    # Needs to be done before importing pyplot
+    try:
+        mpl.use("Agg")
+    except Exception:
+        pass
+    from matplotlib import pyplot as plt
+    from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+    from matplotlib.path import Path
+except ModuleNotFoundError:
+    mpl = None
+
+try:
+    import numpy as np
+except ModuleNotFoundError:
+    np = None
 
 from krrood.rustworkx_utils.utils import ColorLegend
 
@@ -25,22 +38,22 @@ class GraphVisualizer:
     """
 
     def __init__(
-        self,
-        node: RWXNode,
-        figsize=(80, 80),
-        node_size=7000,
-        font_size=25,
-        spacing_x: float = 4,
-        spacing_y: float = 4,
-        curve_scale: float = 0.5,
-        layout: str = "tidy",
-        edge_style: str = "orthogonal",
-        label_max_chars_per_line: Optional[int] = 13,
-        orthogonal_spline_ratio_threshold: float = 3,
-        orthogonal_crossings_threshold: int = 4,
-        orthogonal_min_length_threshold: Optional[float] = 4,
-        filename: str = "pdf_graph.pdf",
-        title: str = "Directed Query Graph (Top to Bottom)",
+            self,
+            node: RWXNode,
+            figsize=(80, 80),
+            node_size=7000,
+            font_size=25,
+            spacing_x: float = 4,
+            spacing_y: float = 4,
+            curve_scale: float = 0.5,
+            layout: str = "tidy",
+            edge_style: str = "orthogonal",
+            label_max_chars_per_line: Optional[int] = 13,
+            orthogonal_spline_ratio_threshold: float = 3,
+            orthogonal_crossings_threshold: int = 4,
+            orthogonal_min_length_threshold: Optional[float] = 4,
+            filename: str = "pdf_graph.pdf",
+            title: str = "Directed Query Graph (Top to Bottom)",
     ):
         self.node = node
         self.params = dict(
@@ -82,17 +95,16 @@ class GraphVisualizer:
         self._style_and_save(fig, ax)
         return fig, ax
 
-    # ---- Steps ----
-    def _check_dependencies(self):
-        if not ig or not mpl or not fill:
-            raise RuntimeError(
-                "igraph, matplotlib, textwrap must be installed to visualize the graph."
+    @classmethod
+    def _check_dependencies(cls):
+        if mpl is None:
+            raise ModuleNotFoundError("matplotlib must be installed to visualize the graph. (pip install matplotlib)",
+                                      name="matplotlib")
+        elif np is None:
+            raise ModuleNotFoundError(
+                "numpy must be installed to visualize the graph. (pip install numpy)",
+                name="numpy"
             )
-        # Ensure a non-interactive backend for headless environments
-        try:
-            mpl.use("Agg")
-        except Exception:
-            pass
 
     def _build_rooted_subgraph(self):
         root = self.node.root
@@ -160,7 +172,7 @@ class GraphVisualizer:
             return {nid: idx for idx, nid in enumerate(layer_nodes)}
 
         def sort_by_barycenter(
-            current_layer: List[int], reference_layer: List[int], use_preds: bool
+                current_layer: List[int], reference_layer: List[int], use_preds: bool
         ) -> List[int]:
             ref_pos = compute_order_index(reference_layer)
 
@@ -329,16 +341,16 @@ class GraphVisualizer:
                     if _dist_pt_seg_l(xn, yn, ax_, ay_, bx_, by_) < thr:
                         near_hits += 1
         cong_factor = (
-            1.0 + min(1.5, near_hits / float(max(1, len(ordered_nodes)))) * 0.35
+                1.0 + min(1.5, near_hits / float(max(1, len(ordered_nodes)))) * 0.35
         )
         base_w, base_h = 12.0, 9.0
         w_scale = (
-            max(1.0, (max_width / 2.0) * label_factor_w)
-            * float(self.params["spacing_x"])
-            * cong_factor
+                max(1.0, (max_width / 2.0) * label_factor_w)
+                * float(self.params["spacing_x"])
+                * cong_factor
         )
         h_scale = (
-            max(1.0, (depth / 3.0)) * float(self.params["spacing_y"]) * cong_factor
+                max(1.0, (depth / 3.0)) * float(self.params["spacing_y"]) * cong_factor
         )
         self.ctx["figsize"] = (base_w * w_scale, base_h * h_scale)
 
@@ -565,10 +577,10 @@ class GraphVisualizer:
         return float(np.hypot(px - cx, py - cy))
 
     def _seg_blocked(
-        self,
-        p_start: Tuple[float, float],
-        p_end: Tuple[float, float],
-        ignore: Tuple[int, int],
+            self,
+            p_start: Tuple[float, float],
+            p_end: Tuple[float, float],
+            ignore: Tuple[int, int],
     ):
         """Return True if the segment p_start->p_end intersects any obstacle rectangle.
         Uses a robust Cohen–Sutherland style clipping check to detect any intersection,
@@ -661,7 +673,7 @@ class GraphVisualizer:
                     min_d = d
                     nearest = (cx, cy)
                 if (min(x0, x1) <= cx <= max(x0, x1)) and (
-                    min(y0, y1) <= cy <= max(y0, y1)
+                        min(y0, y1) <= cy <= max(y0, y1)
                 ):
                     if self._dist_pt_seg(cx, cy, x0, y0, x1, y1) < 0.06:
                         near_count += 1
@@ -747,9 +759,9 @@ class GraphVisualizer:
                     p2 = (xm, y0)
                     p3 = (xm, y1)
                     if (
-                        within_x(xm)
-                        and not self._seg_blocked(p1, p2, ignore=(u, v))
-                        and not self._seg_blocked(p2, p3, ignore=(u, v))
+                            within_x(xm)
+                            and not self._seg_blocked(p1, p2, ignore=(u, v))
+                            and not self._seg_blocked(p2, p3, ignore=(u, v))
                     ):
                         return [p1, p2, p3]
                     return None
@@ -760,9 +772,9 @@ class GraphVisualizer:
                     p2 = (x0, ym)
                     p3 = (x1, ym)
                     if (
-                        within_y(ym)
-                        and not self._seg_blocked(p1, p2, ignore=(u, v))
-                        and not self._seg_blocked(p2, p3, ignore=(u, v))
+                            within_y(ym)
+                            and not self._seg_blocked(p1, p2, ignore=(u, v))
+                            and not self._seg_blocked(p2, p3, ignore=(u, v))
                     ):
                         return [p1, p2, p3]
                     return None
@@ -774,10 +786,10 @@ class GraphVisualizer:
                     p3 = (x1, ym)
                     p4 = (x1, y1)
                     if (
-                        within_y(ym)
-                        and (not self._seg_blocked(p1, p2, ignore=(u, v)))
-                        and (not self._seg_blocked(p2, p3, ignore=(u, v)))
-                        and (not self._seg_blocked(p3, p4, ignore=(u, v)))
+                            within_y(ym)
+                            and (not self._seg_blocked(p1, p2, ignore=(u, v)))
+                            and (not self._seg_blocked(p2, p3, ignore=(u, v)))
+                            and (not self._seg_blocked(p3, p4, ignore=(u, v)))
                     ):
                         return [p1, p2, p3, p4]
                     return None
@@ -797,35 +809,35 @@ class GraphVisualizer:
                         if abs(ax0 - ax1) < 1e-12:  # vertical
                             xv = ax0
                             for (
-                                ori,
-                                x0s,
-                                y0s,
-                                x1s,
-                                y1s,
-                                u_prev,
-                                v_prev,
+                                    ori,
+                                    x0s,
+                                    y0s,
+                                    x1s,
+                                    y1s,
+                                    u_prev,
+                                    v_prev,
                             ) in prev_ortho_segments:
                                 if (
-                                    ori == "v"
-                                    and min(y0s, y1s) <= ay0 <= max(y0s, y1s)
-                                    and abs(x0s - xv) < 1e-9
+                                        ori == "v"
+                                        and min(y0s, y1s) <= ay0 <= max(y0s, y1s)
+                                        and abs(x0s - xv) < 1e-9
                                 ):
                                     crosses += 1
                         else:  # horizontal
                             yh = ay0
                             for (
-                                ori,
-                                x0s,
-                                y0s,
-                                x1s,
-                                y1s,
-                                u_prev,
-                                v_prev,
+                                    ori,
+                                    x0s,
+                                    y0s,
+                                    x1s,
+                                    y1s,
+                                    u_prev,
+                                    v_prev,
                             ) in prev_ortho_segments:
                                 if (
-                                    ori == "h"
-                                    and min(x0s, x1s) <= ax0 <= max(x0s, x1s)
-                                    and abs(y0s - yh) < 1e-9
+                                        ori == "h"
+                                        and min(x0s, x1s) <= ax0 <= max(x0s, x1s)
+                                        and abs(y0s - yh) < 1e-9
                                 ):
                                     crosses += 1
                     return crosses
@@ -859,12 +871,12 @@ class GraphVisualizer:
                 cross_thr = int(self.params.get("orthogonal_crossings_threshold", 2))
                 min_len_thr = self.params.get("orthogonal_min_length_threshold", None)
                 should_min_len = (min_len_thr is not None) and (
-                    straight_len > float(min_len_thr)
+                        straight_len > float(min_len_thr)
                 )
                 if (
-                    (length_ratio > ratio_thr)
-                    or (crosses > cross_thr)
-                    or should_min_len
+                        (length_ratio > ratio_thr)
+                        or (crosses > cross_thr)
+                        or should_min_len
                 ):
                     # Fallback to spline for problematic or long orthogonal path
                     dvec = np.array([x1 - x0, y1 - y0], dtype=float)
@@ -927,10 +939,10 @@ class GraphVisualizer:
                         pre_pts.append(p)
                     else:
                         if (
-                            float(
-                                np.hypot(p[0] - pre_pts[-1][0], p[1] - pre_pts[-1][1])
-                            )
-                            > 1e-12
+                                float(
+                                    np.hypot(p[0] - pre_pts[-1][0], p[1] - pre_pts[-1][1])
+                                )
+                                > 1e-12
                         ):
                             pre_pts.append(p)
                 pts = pre_pts if len(pre_pts) >= 2 else pts

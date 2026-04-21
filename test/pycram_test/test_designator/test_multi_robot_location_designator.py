@@ -30,7 +30,7 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 
 
-@pytest.fixture(scope="session", params=["hsrb", "stretch", "tiago", "pr2"])
+@pytest.fixture(scope="module", params=["hsrb", "stretch", "tiago", "pr2"])
 def setup_multi_robot_simple_apartment(
     request,
     hsr_world_setup,

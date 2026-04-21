@@ -2,6 +2,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
 from probabilistic_model.distributions.distributions import (
     SymbolicDistribution,
     IntegerDistribution,
+    DiracDeltaDistribution,
 )
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution

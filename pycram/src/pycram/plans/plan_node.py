@@ -16,13 +16,14 @@ from krrood.entity_query_language.query.match import Match
 from pycram.datastructures.enums import TaskStatus
 from pycram.plans.failures import PlanFailure
 from pycram.motion_executor import MotionExecutor
-from pycram.plans.designator import Designator
 
 from pycram.plans.plan_entity import PlanEntity
 from pycram.datastructures.execution_data import ExecutionData
+from pycram.plans.designator import Designator
 
 if TYPE_CHECKING:
     from pycram.robot_plans import ActionDescription, BaseMotion
+
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,21 @@ class PlanNode(PlanEntity):
             if sibling.layer_index > self.layer_index
         ][0]
 
+    @property
+    def previous_nodes(self) -> List[PlanNode]:
+        """
+        Gets the previous nodes to the given node. Previous meaning the nodes that are before the given one in
+        depth first order of nodes.
+
+        :return: The previous nodes as a list of nodes
+        """
+        previous_nodes = []
+        for search_node in self.plan.nodes:
+            if search_node == self:
+                break
+            previous_nodes.append(search_node)
+        return previous_nodes
+
     def get_previous_node_by_designator_type(
         self, *type_: Type[Designator]
     ) -> Optional[DesignatorNode]:
@@ -192,7 +208,7 @@ class PlanNode(PlanEntity):
         :param type_: The types of the designator to search for.
         :return: The previous node with a designator of the specified type, or None if not found.
         """
-        for sibling in self.left_siblings[::-1]:
+        for sibling in reversed(self.previous_nodes):
             if isinstance(sibling, DesignatorNode) and isinstance(
                 sibling.designator, type_
             ):
@@ -380,6 +396,7 @@ class ActionNode(DesignatorNode):
             motion_node.motion.motion_chart
             for motion_node in self.descendants
             if isinstance(motion_node, MotionNode)
+            and self is motion_node.parent_action_node
         ]
 
     def construct_motion_state_chart(self):
@@ -463,7 +480,7 @@ class MotionNode(DesignatorNode):
         """
         Returns the next resolved action node in the plan above this motion node.
         """
-        for node in reversed(self.path):
+        for node in self.path:
             if isinstance(node, ActionNode):
                 return node
         return None
