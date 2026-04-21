@@ -114,23 +114,9 @@ class GaussianDistribution(ContinuousDistribution):
 
         return VariableMap({self.variable: moment})
 
-    def log_conditional_from_simple_interval(
-        self, interval: SimpleInterval, singleton_allowed: bool = False
+    def log_conditional_from_simple_interval_if_not_singleton(
+        self, interval: SimpleInterval
     ) -> Tuple[Optional[ContinuousDistribution], float]:
-        if singleton_allowed and interval.is_singleton():
-            log_likelihood = self.log_likelihood(np.array([[interval.lower]]))[0]
-            if log_likelihood == -np.inf:
-                return None, -np.inf
-
-            return (
-                DiracDeltaDistribution(
-                    variable=self.variable,
-                    location=interval.lower,
-                    density_cap=1.0,
-                ),
-                log_likelihood,
-            )
-
         cdf_values = self.cumulative_distribution_function(
             simple_interval_as_array(interval).reshape(-1, 1)
         )

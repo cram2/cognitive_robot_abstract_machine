@@ -668,6 +668,21 @@ class SumUnit(InnerUnit):
                 self.index, subcircuit.index, log_weight - total_weight
             )
 
+    def is_normalized(self, tolerance: float = 1e-6) -> bool:
+        """
+        Return True iff this SumUnit's log-weights sum to log(1) == 0.
+
+        Uses logsumexp for numerical stability, matching normalize().
+        An empty SumUnit (no subcircuits) is considered normalized.
+
+        :param tolerance: Maximum absolute deviation from 0.0 permitted.
+        :returns: True if the weights are normalised within tolerance.
+        """
+        log_weights = self.log_weights
+        if len(log_weights) == 0:
+            return True
+        return abs(float(logsumexp(log_weights))) < tolerance
+
     def is_deterministic(self) -> bool:
         """
         :return: If this unit is deterministic or not.
@@ -801,6 +816,35 @@ class ProductUnit(InnerUnit):
         for start_index, amount in self.result_of_current_query:
             for subcircuit in self.subcircuits:
                 subcircuit.result_of_current_query.append([start_index, amount])
+
+    def attach_marginal_circuit(
+        self,
+        marginal_circuit: "ProbabilisticCircuit",
+        target_circuit: "ProbabilisticCircuit",
+    ) -> None:
+        """
+        Attach the root of marginal_circuit as a child of this ProductUnit,
+        constructing fresh nodes owned by target_circuit.
+
+        marginal() and log_truncated_in_place() return flat circuits
+        (SumUnit -> leaves, or a single leaf), so one level of recursion
+        suffices to copy all nodes into target_circuit.
+
+        :param marginal_circuit: The marginal or truncated circuit whose root
+            to attach as a child of this ProductUnit.
+        :param target_circuit: The owning circuit for all newly created nodes.
+        """
+        root = marginal_circuit.root
+        if isinstance(root, SumUnit):
+            new_sum_unit = SumUnit(probabilistic_circuit=target_circuit)
+            for child_log_weight, child_subcircuit in root.log_weighted_subcircuits:
+                new_sum_unit.add_subcircuit(
+                    leaf(copy.deepcopy(child_subcircuit.distribution), target_circuit),
+                    child_log_weight,
+                )
+            self.add_subcircuit(new_sum_unit)
+        else:
+            self.add_subcircuit(leaf(copy.deepcopy(root.distribution), target_circuit))
 
 
 @dataclass

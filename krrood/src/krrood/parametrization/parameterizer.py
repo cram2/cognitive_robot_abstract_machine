@@ -227,10 +227,31 @@ class UnderspecifiedParameters:
             mapped_variable = self.statement._get_mapped_variable_by_name(
                 variable_.name
             )
+            attribute_match = [
+                match
+                for match in self.statement.matches_with_variables
+                if match.name_from_variable_access_path == variable_.name
+            ]
+            attribute_match = attribute_match[0] if attribute_match else None
+            if attribute_match is None:
+                continue
             if mapped_variable is None:
                 continue
 
-            if not variable_.is_numeric:
+            if attribute_match and isinstance(
+                attribute_match.assigned_value, SymbolicExpression
+            ):
+                [domain_index] = [
+                    val
+                    for index, val in variable_.domain.hash_map.items()
+                    if index == value
+                ]
+                [value] = [
+                    domain_value
+                    for domain_value in attribute_match.assigned_value.tolist()
+                    if hash(domain_value) == domain_index
+                ]
+            elif not variable_.is_numeric:
                 [value] = [
                     domain_value.element
                     for domain_value in variable_.domain

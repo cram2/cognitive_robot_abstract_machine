@@ -4,8 +4,11 @@ from enum import IntEnum
 from krrood.adapters.json_serializer import to_json, from_json
 
 from probabilistic_model.distributions.distributions import *
-from probabilistic_model.utils import MissingDict
-from random_events.interval import open_closed
+from probabilistic_model.utils import (
+    MissingDict,
+    event_compatible_for_truncation_with_singletons,
+)
+from random_events.interval import open_closed, open
 
 
 class TestEnum(IntEnum):
@@ -292,9 +295,9 @@ class DiracDeltaDistributionTestCase(unittest.TestCase):
 
         # singleton at the location
         event = SimpleEvent.from_data({x: singleton(1.0)}).as_composite_set()
-        conditional, probability = dist.truncated(event, singleton_allowed=True)
+        conditional, probability = dist.truncated(event)
         self.assertEqual(conditional, dist)
-        self.assertAlmostEqual(probability, 2.0)
+        self.assertAlmostEqual(probability, 1.0)
 
         # singleton elsewhere
         event_away = SimpleEvent.from_data({x: singleton(0.0)}).as_composite_set()
@@ -328,5 +331,34 @@ class DiracDeltaDistributionTestCase(unittest.TestCase):
         self.assertIsInstance(conditional, SymbolicDistribution)
         self.assertAlmostEqual(probability, 0.4)
 
+
 if __name__ == "__main__":
     unittest.main()
+
+
+class EventCompatibleForTruncationTestCase(unittest.TestCase):
+    def test_all_singletons(self):
+        x = Continuous("x")
+        event = SimpleEvent.from_data(
+            {x: singleton(1.0) | singleton(2.0)}
+        ).as_composite_set()
+        self.assertTrue(event_compatible_for_truncation_with_singletons(event))
+
+    def test_mixed_singleton_and_interval(self):
+        x = Continuous("x")
+        # choose a singleton that lies outside the interval so the union doesn't merge
+        event = SimpleEvent.from_data(
+            {x: singleton(3.0) | closed(0.0, 2.0)}
+        ).as_composite_set()
+        self.assertFalse(event_compatible_for_truncation_with_singletons(event))
+
+    def test_non_continuous_ignored(self):
+        x = Continuous("x")
+        y = Symbolic("y", domain=Set.from_iterable(["a", "b"]))
+        event = SimpleEvent.from_data(
+            {
+                x: singleton(1.0) | singleton(2.0),
+                y: ("a", "b"),
+            }
+        ).as_composite_set()
+        self.assertTrue(event_compatible_for_truncation_with_singletons(event))

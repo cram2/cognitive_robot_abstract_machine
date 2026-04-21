@@ -10,7 +10,9 @@ from random_events.variable import Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Type, Tuple, Self
 
-from probabilistic_model.probabilistic_circuit.jax.inner_layer import RustworkxLayerConverter
+from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
+    RustworkxLayerConverter,
+)
 from probabilistic_model.probabilistic_circuit.jax.input_layer import ContinuousLayer
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     Unit,

@@ -11,6 +11,11 @@ import numpy as np
 import objgraph
 import pytest
 
+try:
+    from pycram.datastructures.dataclasses import Context
+except ModuleNotFoundError:
+    # ROS dependencies.
+    Context = None
 from semantic_digital_twin.adapters.package_resolver import PathResolver
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
@@ -23,11 +28,8 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.utils import recursive_subclasses
-try:
-    from pycram.datastructures.dataclasses import Context  # type: ignore
-except ImportError:
-    # Adds ROS dependency
-    pass
+
+# from pycram.datastructures.dataclasses import Context  # type: ignore
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -118,12 +120,8 @@ def cleanup_after_test():
 @pytest.fixture(autouse=True, scope="module")
 def count_worlds():
     yield
-    unreachable = gc.collect()
     world_in_mem = objgraph.count("World")
-    print(f"Number of worlds after test: {objgraph.count("World")}")
     if world_in_mem > 30:
-        print("Unreachable objects found:", unreachable)
-        print(f"Number of worlds after test: {objgraph.count("World")}")
         raise MemoryError(
             "Something is leaking worlds, there are more than 20 worlds in memory after the test"
         )

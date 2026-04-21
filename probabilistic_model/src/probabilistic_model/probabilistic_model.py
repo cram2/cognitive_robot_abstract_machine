@@ -206,7 +206,7 @@ class ProbabilisticModel(ABC):
         If the event is impossible, the truncated distribution is None and the probability is 0.
 
         :param event: The event to condition on.
-        :param singleton_allowed: If True, allow singletons in the event. Singletons are handeled differently. This allows for events where entire dimensions contain only unions over singleton intervals to produce non-zero probabilities. Be aware that the returned log-probability might not be the actual probability as densities may have influenced it. It is the responsibility of the caller to check if the event is compatible with the model.
+        :param singleton_allowed: If True, allow singletons in the event. Singletons are handeled differently. This allows for events where entire dimensions contain only unions over singleton intervals to produce non-zero probabilities. Be aware that the returned log-probability might not be the actual probability as densities may have influenced it. It is the responsibility of the caller to check if the event is compatible with the model. It can be checked by using the `event_compatible_for_truncation_with_singletons` function in the utils module.
         :return: The truncated distribution and the probability of the event.
         """
         event.fill_missing_variables(set(self.variables))

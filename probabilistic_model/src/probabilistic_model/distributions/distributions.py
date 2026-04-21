@@ -20,7 +20,11 @@ from probabilistic_model.probabilistic_model import (
     MomentType,
     CenterType,
 )
-from probabilistic_model.utils import MissingDict, interval_as_array
+from probabilistic_model.utils import (
+    MissingDict,
+    interval_as_array,
+    simple_interval_as_array,
+)
 from random_events.set import SetElement, Set
 from random_events.sigma_algebra import AbstractCompositeSet
 from random_events.variable import Variable, Continuous, Symbolic, Integer
@@ -115,7 +119,7 @@ class ContinuousDistribution(UnivariateDistribution):
 
     def log_truncated(
         self, event: Event, singleton_allowed: bool = False
-    ) -> Tuple[Optional[Self], float]:
+    ) -> Tuple[Optional[ContinuousDistribution], float]:
         if event.is_empty():
             return None, -np.inf
 
@@ -148,7 +152,7 @@ class ContinuousDistribution(UnivariateDistribution):
 
     def log_conditional_from_simple_interval(
         self, interval: SimpleInterval, singleton_allowed: bool = False
-    ) -> Tuple[Self, float]:
+    ) -> Tuple[Optional[ContinuousDistribution], float]:
         """
         Calculate the truncated distribution given a simple interval.
 
@@ -156,7 +160,32 @@ class ContinuousDistribution(UnivariateDistribution):
         :param singleton_allowed: Whether the simple interval is allowed to be a singleton.
         :return: The truncated distribution and the log-probability of the interval.
         """
-        raise NotImplementedError
+        if singleton_allowed and interval.is_singleton():
+            log_likelihood = self.log_likelihood(np.array([[interval.lower]]))[0]
+            if log_likelihood == -np.inf:
+                return None, -np.inf
+
+            return (
+                DiracDeltaDistribution(
+                    variable=self.variable,
+                    location=interval.lower,
+                    density_cap=1.0,
+                ),
+                log_likelihood,
+            )
+        else:
+            return self.log_conditional_from_simple_interval_if_not_singleton(interval)
+
+    @abstractmethod
+    def log_conditional_from_simple_interval_if_not_singleton(
+        self, interval: SimpleInterval
+    ) -> Tuple[Optional[ContinuousDistribution], float]:
+        """
+        Calculate the truncated distribution given a simple interval that is not a singleton.
+
+        :param interval: The simple interval
+        :return: The truncated distribution and the log-probability of the interval.
+        """
 
 
 @dataclass(eq=False)
@@ -481,7 +510,7 @@ class SymbolicDistribution(DiscreteDistribution):
         return self
 
 
-@dataclass(eq=False)
+@dataclass
 class IntegerDistribution(ContinuousDistribution, DiscreteDistribution):
     """
     Abstract base class for integer distributions. Integer distributions also implement the methods of continuous
@@ -505,6 +534,11 @@ class IntegerDistribution(ContinuousDistribution, DiscreteDistribution):
 
     def probabilities_for_plotting(self) -> Dict[Union[int, str], float]:
         return {x: p_x for x, p_x in self.probabilities.items() if p_x > 0}
+
+    def log_conditional_from_simple_interval_if_not_singleton(
+        self, interval: SimpleInterval
+    ) -> Tuple[Optional[ContinuousDistribution], float]:
+        raise UndefinedOperationError(self)
 
     @property
     def univariate_support(self) -> Interval:
@@ -660,12 +694,10 @@ class DiracDeltaDistribution(ContinuousDistribution):
     def univariate_support(self) -> Interval:
         return singleton(self.location)
 
-    def log_conditional_from_simple_interval(
-        self, interval: SimpleInterval, singleton_allowed: bool = False
+    def log_conditional_from_simple_interval_if_not_singleton(
+        self, interval: SimpleInterval
     ) -> Tuple[Optional[ContinuousDistribution], float]:
         if interval.contains(self.location):
-            if singleton_allowed and interval.is_singleton():
-                return self, np.log(self.density_cap)
             return self, 0.0
         else:
             return None, -np.inf
