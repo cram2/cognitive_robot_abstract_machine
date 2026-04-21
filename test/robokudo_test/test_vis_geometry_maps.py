@@ -4,7 +4,7 @@ import numpy as np
 import open3d as o3d
 import pytest
 from robokudo.vis.multiprocessed_o3d_visualizer import (
-    GeometryMemoryMapFactory,
+    Geometry3DMemoryMapFactory,
     SharedMemoryManager,
 )
 
@@ -35,7 +35,9 @@ class TestVisGeometryMaps(object):
             assert input_pcd.has_normals(), "PointCloud should have normals"
             assert input_pcd.has_covariances(), "PointCloud should have covariances"
 
-            memory_map = GeometryMemoryMapFactory.from_geometry("PointCloud", input_pcd)
+            memory_map = Geometry3DMemoryMapFactory.from_geometry(
+                "PointCloud", input_pcd
+            )
             write_idx = write_manager.append(memory_map)
             memory_map.write_geometry(shm, write_idx, input_pcd)
 
@@ -86,8 +88,8 @@ class TestVisGeometryMaps(object):
                 np.random.rand(1000, 3)
             )
 
-            memory_map = GeometryMemoryMapFactory.from_geometry(
-                "TriangleMesh", input_mesh
+            memory_map = Geometry3DMemoryMapFactory.from_geometry(
+                "MeshBase", input_mesh
             )
             write_idx = write_manager.append(memory_map)
             memory_map.write_geometry(shm, write_idx, input_mesh)
@@ -162,7 +164,7 @@ class TestVisGeometryMaps(object):
                 ),
             ]
 
-            memory_map = GeometryMemoryMapFactory.from_geometry(
+            memory_map = Geometry3DMemoryMapFactory.from_geometry(
                 "TriangleMesh", input_mesh
             )
             write_idx = write_manager.append(memory_map)
@@ -247,8 +249,8 @@ class TestVisGeometryMaps(object):
             )
             input_mesh.tetras = o3d.utility.Vector4iVector(np.random.rand(1000, 4))
 
-            memory_map = GeometryMemoryMapFactory.from_geometry(
-                "TriangleMesh", input_mesh
+            memory_map = Geometry3DMemoryMapFactory.from_geometry(
+                "TetraMesh", input_mesh
             )
             write_idx = write_manager.append(memory_map)
             memory_map.write_geometry(shm, write_idx, input_mesh)
@@ -280,6 +282,96 @@ class TestVisGeometryMaps(object):
                 np.asarray(output_mesh.tetras) == np.asarray(input_mesh.tetras)
             )
 
+    def test_half_edge_mesh_maps(self, write_manager: SharedMemoryManager) -> None:
+        """Test writing and reading triangle meshes with the shared memory manager."""
+        iterations = 3
+        read_idx = 0
+
+        mesh_size = (
+            (np.dtype(np.float64).itemsize * (3 + 3 + 3 + 3 + 2))
+            + (np.dtype(np.int32).itemsize * (3 + 1))
+            + (np.dtype(np.int64).itemsize * (3 + 2 + 3))
+        ) * 1000 + ((np.dtype(np.uint8).itemsize * (512 * 512)) * 2)
+
+        shm = shared_memory.SharedMemory(
+            create=True,
+            size=mesh_size * iterations,
+        )
+
+        input_meshes = []
+        for _ in range(iterations):
+            t_mesh = o3d.geometry.TriangleMesh.create_cylinder()
+            t_mesh.vertex_colors = o3d.utility.Vector3dVector(
+                np.random.rand(len(t_mesh.vertices), 3)
+            )
+            t_mesh.compute_vertex_normals()
+            t_mesh.compute_triangle_normals()
+
+            assert t_mesh.has_vertex_normals(), "Mesh should have vertex normals"
+            assert t_mesh.has_triangle_normals(), "Mesh should have triangle normals"
+
+            input_mesh = o3d.geometry.HalfEdgeTriangleMesh.create_from_triangle_mesh(
+                t_mesh
+            )
+
+            memory_map = Geometry3DMemoryMapFactory.from_geometry(
+                "HalfEdgeTriangleMesh", input_mesh
+            )
+            write_idx = write_manager.append(memory_map)
+            memory_map.write_geometry(shm, write_idx, input_mesh)
+
+            input_meshes.append(input_mesh)
+
+        for i, (read_ixd, memory_map) in enumerate(write_manager.read()):
+            input_mesh = input_meshes[i]
+
+            geometry_dict, read_idx = memory_map.as_geometry_dict(shm, read_idx)
+            output_mesh = geometry_dict["geometry"]
+
+            assert (
+                output_mesh != input_mesh
+            ), "Output and input meshes should be different objects"
+
+            assert np.all(
+                np.asarray(output_mesh.vertices) == np.asarray(input_mesh.vertices)
+            )
+            assert np.all(
+                np.asarray(output_mesh.vertex_colors)
+                == np.asarray(input_mesh.vertex_colors)
+            )
+            assert np.all(
+                np.asarray(output_mesh.vertex_normals)
+                == np.asarray(input_mesh.vertex_normals)
+            )
+
+            assert np.all(
+                np.asarray(output_mesh.triangles) == np.asarray(input_mesh.triangles)
+            )
+            assert np.all(
+                np.asarray(output_mesh.triangle_normals)
+                == np.asarray(input_mesh.triangle_normals)
+            )
+            for j in range(len(output_mesh.ordered_half_edge_from_vertex)):
+                assert isinstance(
+                    output_mesh.ordered_half_edge_from_vertex[j], o3d.utility.IntVector
+                )
+                assert np.all(
+                    np.asarray(output_mesh.ordered_half_edge_from_vertex[j])
+                    == np.asarray(input_mesh.ordered_half_edge_from_vertex[j])
+                )
+            for j in range(len(output_mesh.half_edges)):
+                assert isinstance(output_mesh.half_edges[j], o3d.geometry.HalfEdge)
+                assert output_mesh.half_edges[j].next == input_mesh.half_edges[j].next
+                assert (
+                    output_mesh.half_edges[j].triangle_index
+                    == input_mesh.half_edges[j].triangle_index
+                )
+                assert output_mesh.half_edges[j].twin == input_mesh.half_edges[j].twin
+                assert np.all(
+                    output_mesh.half_edges[j].vertex_indices
+                    == input_mesh.half_edges[j].vertex_indices
+                )
+
     def test_oriented_bounding_box_maps(
         self, write_manager: SharedMemoryManager
     ) -> None:
@@ -303,7 +395,7 @@ class TestVisGeometryMaps(object):
             input_obb.extent = np.random.rand(3)
             input_obb.R = np.random.rand(3, 3)
 
-            memory_map = GeometryMemoryMapFactory.from_geometry(
+            memory_map = Geometry3DMemoryMapFactory.from_geometry(
                 "OrientedBoundingBox", input_obb
             )
             write_idx = write_manager.append(memory_map)
@@ -346,7 +438,7 @@ class TestVisGeometryMaps(object):
             input_obb.min_bound = np.random.rand(3)
             input_obb.color = np.random.rand(3)
 
-            memory_map = GeometryMemoryMapFactory.from_geometry(
+            memory_map = Geometry3DMemoryMapFactory.from_geometry(
                 "AxisAlignedBoundingBox", input_obb
             )
             write_idx = write_manager.append(memory_map)
@@ -393,7 +485,7 @@ class TestVisGeometryMaps(object):
             input_lineset.colors = o3d.utility.Vector3dVector(np.random.rand(1000, 3))
             input_lineset.lines = o3d.utility.Vector2iVector(np.random.rand(1000, 2))
 
-            memory_map = GeometryMemoryMapFactory.from_geometry(
+            memory_map = Geometry3DMemoryMapFactory.from_geometry(
                 "LineSet", input_lineset
             )
             write_idx = write_manager.append(memory_map)
