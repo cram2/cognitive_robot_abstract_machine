@@ -9,6 +9,13 @@ from CGAL.CGAL_AABB_tree import AABB_tree_Triangle_3_soup
 
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Quaternion
 
+from krrood.ormatic.utils import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy import select
+
+from pycram.orm.ormatic_interface import GrasPoseMappingDAO
+from semantic_digital_twin.orm.ormatic_interface import BodyDAO
+
 @dataclass
 class ScoredGrasp:
     """
@@ -27,13 +34,13 @@ class ScoredGrasp:
 class GraspScorer:
     """Evaluates and ranks grasp poses using geometric checks and heuristics."""
     
-    w_normal: float = 15.0
+    weight_normal: float = 15.0
     """Weight assigned to well-aligned opposing normals."""
     
-    w_distance: float = 5.0
+    weight_distance: float = 5.0
     """Weight assigned to the magnitude of grip distance between contacts."""
     
-    w_clearance: float = 10.0
+    weight_clearance: float = 10.0
     """Weight for maintaining safe clearance above the ground plane."""
     
     penalty_collision: float = -1000.0
@@ -51,8 +58,14 @@ class GraspScorer:
     ground_plane_z: float = 0.0
     """The predefined absolute Z-axis bounds considered as the ground."""
 
-    def _trimesh_to_cgal_triangles(self, mesh: trimesh.Trimesh) -> List[Triangle_3]:
-        """Converts a Trimesh object into a list of CGAL Triangle_3 objects."""
+    @staticmethod
+    def _trimesh_to_cgal_triangles(mesh: trimesh.Trimesh) -> List[Triangle_3]:
+        """
+        Converts a Trimesh object into a list of CGAL Triangle_3 objects.
+        
+        :param mesh: A trimesh.Trimesh object to be converted.
+        :return: A list containing CGAL Triangle_3 objects representing the mesh faces.
+        """
         triangles = []
         for face in mesh.faces:
             p1_coords, p2_coords, p3_coords = mesh.vertices[face]
@@ -87,7 +100,7 @@ class GraspScorer:
 
         # --- 1. Collision Check ---
         gripper_cgal_triangles = self._trimesh_to_cgal_triangles(gripper_at_pose)
-        if any(object_tree.do_intersect(tri) for tri in gripper_cgal_triangles):
+        if any(object_tree.do_intersect(triangle) for triangle in gripper_cgal_triangles):
             total_score += self.penalty_collision
 
         # --- 2. Clearance Check ---
@@ -106,7 +119,7 @@ class GraspScorer:
         ray_origins_world = trimesh.transform_points(ray_origins_local, grasp_pose_matrix)
         ray_directions_world = trimesh.transform_points(ray_directions_local, grasp_pose_matrix, translate=False)
 
-        locations, index_ray, index_tri = object_mesh.ray.intersects_location(
+        locations, index_ray, index_triangle = object_mesh.ray.intersects_location(
             ray_origins=ray_origins_world, ray_directions=ray_directions_world
         )
 
@@ -114,14 +127,14 @@ class GraspScorer:
         if len(locations) == 2:
             # IDEAL CASE: Two contacts found, calculate a full, detailed score.
             contact_p1, contact_p2 = locations
-            normal_p1 = object_mesh.face_normals[index_tri[0]]
-            normal_p2 = object_mesh.face_normals[index_tri[1]]
+            normal_p1 = object_mesh.face_normals[index_triangle[0]]
+            normal_p2 = object_mesh.face_normals[index_triangle[1]]
 
             normal_score = max(0.0, -np.dot(normal_p1, normal_p2))
             distance_score = np.linalg.norm(contact_p1 - contact_p2)
             clearance_score = min_gripper_z
 
-            positive_score = (self.w_normal * normal_score) + (self.w_distance * distance_score) + (self.w_clearance * clearance_score)
+            positive_score = (self.weight_normal * normal_score) + (self.weight_distance * distance_score) + (self.weight_clearance * clearance_score)
             total_score += positive_score
 
         elif len(locations) == 1:
@@ -167,30 +180,39 @@ class GraspScorer:
 
 def load_successful_grasps_from_dataset(dataset_path: str, gripper_name: str, object_uuid: str) -> List[Pose]:
     """
-    Helper to read dataset and return a list of successful grasp poses.
+    Helper to read dataset and return a list of successful grasp poses using ormatic.
     
-    :param dataset_path: The root directory path of the dataset.
+    :param dataset_path: The database path or root directory path containing the dataset SQLite database.
     :param gripper_name: The name of the gripper used in the dataset.
     :param object_uuid: The unique identifier for the target object.
     :return: A list of Pose objects representing successful grasp poses. Returns an empty list if no grasps are found or an error occurs.
     """
-    from dataset import GraspWebDatasetReader
-    webdataset_reader = GraspWebDatasetReader(os.path.join(dataset_path, gripper_name))
+
     try:
-        grasp_data = webdataset_reader.read_grasps_by_uuid(object_uuid)
-        if grasp_data is None: 
-            return []
-        grasp_poses_matrices = np.array(grasp_data["grasps"]["transforms"])
-        grasp_mask = np.array(grasp_data["grasps"]["object_in_gripper"])
-        
-        import transforms3d
-        grasps = []
-        for matrix in grasp_poses_matrices[grasp_mask]:
-            pos = matrix[:3, 3]
-            quat = transforms3d.quaternions.mat2quat(matrix[:3, :3]) # [w, x, y, z]
-            grasps.append(Pose(Point3(*pos), Quaternion(*quat)))
+        if not dataset_path.startswith("sqlite"):
+            if os.path.isdir(dataset_path):
+                db_uri = f"sqlite+pysqlite:///{os.path.join(dataset_path, f'{gripper_name}.sqlite')}"
+            else:
+                db_uri = f"sqlite+pysqlite:///{dataset_path}"
+        else:
+            db_uri = dataset_path
+
+        engine = create_engine(db_uri, echo=False)
+        with Session(engine) as session:
+            try:
+                target_uuid = uuid.UUID(object_uuid) if isinstance(object_uuid, str) else object_uuid
+            except ValueError:
+                target_uuid = object_uuid
+
+            query = (
+                select(GrasPoseMappingDAO)
+                .join(BodyDAO, GrasPoseMappingDAO.reference_frame_id == BodyDAO.database_id)
+                .where(BodyDAO.id == target_uuid)
+            )
             
-        return grasps
+            grasp_daos = session.scalars(query).all()
+            return [dao.from_dao() for dao in grasp_daos]
+            
     except Exception as e:
         print(f"Error reading grasps for {object_uuid}: {e}")
         return []
