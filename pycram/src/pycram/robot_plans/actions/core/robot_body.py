@@ -9,6 +9,7 @@ import numpy as np
 from typing_extensions import Optional, Dict, Any
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.variable import Variable
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     GripperState,
@@ -276,11 +277,14 @@ class MoveManipulatorAction(ActionDescription):
             )
         ).perform()
 
-    def validate_postcondition(self, result: Optional[Any] = None):
-
-        if not np.allclose(
-            self.manipulator.tool_frame.global_pose.to_np(),
-            self.target_pose.to_np(),
+    @staticmethod
+    def post_condition(
+        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
+        manipulator = variables["manipulator"]
+        target_pose = variables["target_pose"]
+        return np.allclose(
+            manipulator.tool_frame.global_pose.to_np(),
+            target_pose.to_np(),
             atol=0.1,
-        ):
-            raise ManipulatorDidNotReachTarget(self.manipulator, self.target_pose)
+        )

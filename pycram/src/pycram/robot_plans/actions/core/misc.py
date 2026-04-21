@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 
 import numpy as np
 from typing_extensions import Optional, Type, Any
+
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.variable import Variable
+from pycram.datastructures.dataclasses import Context
 
 from pycram.datastructures.enums import DetectionTechnique, DetectionState
 from pycram.datastructures.grasp import GraspDescription
@@ -128,14 +132,12 @@ class MoveToReach(ActionDescription):
             )
         ).perform()
 
-    def validate_postcondition(self, result: Optional[Any] = None):
-
-        root_T_robot_base = self.world.transform(self.standing_pose, self.world.root)
-
-        if not np.allclose(
-            root_T_robot_base, self.robot.base.root.global_pose.to_np(), atol=0.1
-        ):
-            raise NavigationGoalNotReachedError(
-                goal_pose=root_T_robot_base,
-                current_pose=self.robot.base.root.global_pose,
-            )
+    @staticmethod
+    def post_condition(
+        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
+        standing_pose = variables["standing_pose"]
+        root_T_robot_base = context.world.transform(standing_pose, context.world.root)
+        return np.allclose(
+            root_T_robot_base, context.robot.base.root.global_pose.to_np(), atol=0.1
+        )
