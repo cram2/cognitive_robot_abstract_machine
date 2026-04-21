@@ -1,31 +1,28 @@
-"""
-Slot filler — dynamic LLM prompts driven by pycram action introspection.
+"""Slot filler — dynamic LLM prompts driven by action introspection.
 
 Two public functions:
 
   classify_action()  — NL instruction → action class (for nl_plan factory)
   run_slot_filler()  — action class + free slots → ActionReasoningOutput
 """
+
 from __future__ import annotations
 
 import inspect
 import logging
-import typing
 from dataclasses import replace
-from typing_extensions import Any, Dict, List, Optional
+from typing import TYPE_CHECKING
+from typing_extensions import Any, Dict, List, Optional, Tuple
 
-if typing.TYPE_CHECKING:
+from llmr.bridge.introspect import FieldKind, PycramIntrospector
+from llmr.exceptions import LLMActionRegistryEmpty
+from llmr.schemas import ActionClassification, ActionReasoningOutput
+
+if TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
-    from llmr.pycram_bridge.introspector import ActionSchema, FieldSpec
+    from llmr.bridge.introspect import ActionSchema, FieldSpec
 
 logger = logging.getLogger(__name__)
-
-from llmr.exceptions import LLMActionRegistryEmpty
-from llmr._utils import slot_prompt_name as _slot_prompt_name
-from llmr.schemas.slots import (
-    ActionClassification,
-    ActionReasoningOutput,
-)
 
 
 # ── System prompts ─────────────────────────────────────────────────────────────
@@ -47,14 +44,15 @@ ENTITY SLOTS  (objects / surfaces in the world)
 Return a SlotValue with:
   - field_name  = the role name exactly as listed
   - entity_description populated:
-      name           = noun phrase from the instruction (head noun only, no articles)
-      semantic_type  = ontological type from world annotations (null if unknown)
+      name           = exact name from Available Semantic Types (for the matching
+                       instance) or body_name from Scene Objects
+      semantic_type  = EXACT type name from Available Semantic Types that matches
+                       the slot's expected type; null only if no match found
       spatial_context = spatial qualifier from instruction ("on the table") or null
       attributes     = discriminating key/value attributes (color, size) or null
   - reasoning   = 1-2 sentences explaining which world object was identified
 
 The entity_description is used for symbolic grounding in SymbolGraph.
-The name must be the local part of the body name visible in the world context.
 
 ────────────────────────────────────────────────────
 PARAMETER SLOTS  (enum, primitive, complex sub-fields)
@@ -66,11 +64,9 @@ Return a SlotValue with:
 
 For ENUM slots use EXACTLY one of the listed allowed values. Never paraphrase,
 translate, or describe enum values in natural language.
-For COMPLEX fields use dotted names (e.g. 'grasp_description.grasp_type').
-For ENTITY slots inside complex fields (e.g. 'grasp_description.manipulator'),
-return a SlotValue with entity_description populated — treat them like any other
-entity slot. For Manipulator fields, choose a concrete manipulator/gripper name
-from the world context; never use the robot/platform name.
+Complex dataclass fields are resolved through nested KRROOD Match leaves. When
+a dotted field is listed (e.g. 'grasp_description.manipulator'), return a
+SlotValue using that exact dotted field_name.
 
 Always provide per-slot reasoning. Return structured JSON.
 """
@@ -91,6 +87,7 @@ Return structured JSON.
 
 # ── Public: action classification ─────────────────────────────────────────────
 
+
 def classify_action(
     instruction: str,
     llm: "BaseChatModel",
@@ -100,24 +97,27 @@ def classify_action(
 
     :param instruction:     The NL instruction.
     :param llm:             LangChain-compatible chat model.
-    :param action_registry: Pre-built {class_name: class} dict; auto-discovered by the bridge if None.
-    :returns: The matched action class, or None if classification fails.
+    :param action_registry: Pre-built ``{class_name: class}``; auto-discovered by the bridge if ``None``.
+    :returns: The matched action class, or ``None`` if classification fails.
     """
     if action_registry is None:
         from llmr.pycram_bridge import discover_action_classes
+
         action_registry = discover_action_classes()
     if not action_registry:
         raise LLMActionRegistryEmpty()
 
-    class_list = _format_action_catalog(action_registry)
-    system = _CLASSIFIER_SYSTEM.format(action_classes=class_list)
-
+    system = _CLASSIFIER_SYSTEM.format(
+        action_classes=_build_action_catalog(action_registry)
+    )
     structured_llm = llm.with_structured_output(ActionClassification)
     try:
-        result: ActionClassification = structured_llm.invoke([
-            {"role": "system", "content": system},
-            {"role": "user", "content": instruction},
-        ])
+        result: ActionClassification = structured_llm.invoke(
+            [
+                {"role": "system", "content": system},
+                {"role": "user", "content": instruction},
+            ]
+        )
         return action_registry.get(result.action_type)
     except Exception:
         logger.exception("classify_action: LLM call failed")
@@ -125,6 +125,7 @@ def classify_action(
 
 
 # ── Public: slot filling ───────────────────────────────────────────────────────
+
 
 def run_slot_filler(
     instruction: Optional[str],
@@ -136,49 +137,38 @@ def run_slot_filler(
 ) -> Optional[ActionReasoningOutput]:
     """Resolve free Match slots using LLM reasoning driven by action introspection.
 
-    The prompt is built dynamically from PycramIntrospector output:
-      - ENTITY/POSE fields get an entity-description section with role, type, and docstring
-        (includes Manipulator, Camera — all Symbol subclasses ground from SymbolGraph)
-      - ENUM fields list all valid member names from the actual Enum class
-      - COMPLEX fields are expanded into dotted sub-field entries
+    The prompt is built dynamically from the bridge's introspection output:
+      - ENTITY/POSE fields get an entity-description section with role, type, and docstring.
+      - ENUM fields list all valid member names from the actual Enum class.
+      - Nested complex dataclass leaves are handled as dotted field names.
 
     :param instruction:     Natural-language instruction.
     :param action_cls:      The action dataclass being resolved.
     :param free_slot_names: Field names (from the Match expression) to fill.
-    :param fixed_slots:     Already-resolved {field_name: value} map.
-    :param world_context:   Serialized world state string.
+    :param fixed_slots:     Already-resolved ``{field_name: value}`` map.
+    :param world_context:   Serialised world state string.
     :param llm:             LangChain-compatible chat model.
-    :returns: ActionReasoningOutput on success; None on LLM failure.
+    :returns: :class:`ActionReasoningOutput` on success; ``None`` on LLM failure.
     """
-    # Normalise names: strip the root 'ClassName.' prefix while preserving
-    # nested paths such as 'grasp_description.approach_direction'.
-    slot_names = [_slot_prompt_name(n, action_cls) for n in free_slot_names]
-    prompt_fixed_slots = {
-        _slot_prompt_name(k, action_cls): v for k, v in fixed_slots.items()
-    }
+    slot_names = [_strip_root(n, action_cls) for n in free_slot_names]
+    prompt_fixed_slots = {_strip_root(k, action_cls): v for k, v in fixed_slots.items()}
 
-    # ── Introspect action class → field specs ──────────────────────────────────
-    action_schema = _introspect_action_schema(action_cls)
-    field_specs = _select_free_slot_specs(action_schema, slot_names)
-
-    # ── Build dynamic user message ─────────────────────────────────────────────
-    user_message = _build_dynamic_message(
+    user_message, expected_slot_names = _build_prompt(
         instruction=instruction,
         action_cls=action_cls,
-        action_schema=action_schema,
         free_slot_names=slot_names,
         fixed_slots=prompt_fixed_slots,
         world_context=world_context,
-        field_specs=field_specs,
     )
 
     structured_llm = llm.with_structured_output(ActionReasoningOutput)
     try:
-        output: ActionReasoningOutput = structured_llm.invoke([
-            {"role": "system", "content": _SLOT_FILLER_SYSTEM},
-            {"role": "user", "content": user_message},
-        ])
-        return output
+        return _invoke_with_repair(
+            structured_llm=structured_llm,
+            action_cls=action_cls,
+            user_message=user_message,
+            expected_slot_names=expected_slot_names,
+        )
     except Exception:
         logger.exception("run_slot_filler: LLM call failed for %s", action_cls.__name__)
         return None
@@ -186,66 +176,84 @@ def run_slot_filler(
 
 # ── Prompt construction ────────────────────────────────────────────────────────
 
-def _introspect_action_schema(action_cls: type) -> Optional["ActionSchema"]:
-    """Return the KRROOD-backed action schema, or None when introspection fails."""
-    try:
-        from llmr.pycram_bridge.introspector import PycramIntrospector
 
-        return PycramIntrospector().introspect(action_cls)
-    except Exception as exc:
-        logger.debug(
-            "_introspect_action_schema: introspection failed for %s: %s",
-            action_cls.__name__, exc,
-        )
-        return None
-
-
-def _select_free_slot_specs(
-    action_schema: Optional["ActionSchema"],
-    free_slot_names: List[str],
-) -> Dict[str, "FieldSpec"]:
-    """Return a {field_name: FieldSpec} map for the given free slot names."""
-    if action_schema is None:
-        return {}
-
-    slot_names = set(free_slot_names)
-    selected: Dict[str, "FieldSpec"] = {}
-    for field in action_schema.fields:
-        if field.name in slot_names:
-            selected[field.name] = field
-        for sub_field in field.sub_fields:
-            dotted_name = f"{field.name}.{sub_field.name}"
-            if dotted_name in slot_names:
-                selected[dotted_name] = replace(sub_field, name=dotted_name)
-    return selected
-
-
-def _build_dynamic_message(
+def _build_prompt(
     instruction: Optional[str],
     action_cls: type,
-    action_schema: Optional["ActionSchema"],
     free_slot_names: List[str],
     fixed_slots: Dict[str, Any],
     world_context: str,
-    field_specs: Dict[str, "FieldSpec"],
-) -> str:
-    """Build the rich user message for the slot-filler LLM call.
+) -> Tuple[str, List[str]]:
+    """Build the slot-filler user message and the list of expected SlotValue field_names.
 
-    Sections:
-      - Action type + docstring (from action class)
-      - Entity slots: role, type name, docstring
-      - Parameter slots: name, type, allowed enum values, docstring
-      - Complex slots: expanded into dotted sub-field entries
-      - Fixed slots: already-resolved values (do not change)
-      - World context
+    COMPLEX slots are dropped from the expected list — those leaves surface as
+    nested dotted field_names (``'grasp_description.grasp_type'``).
     """
-    from llmr.pycram_bridge.introspector import FieldKind
+    try:
+        action_schema: Optional["ActionSchema"] = PycramIntrospector().introspect(
+            action_cls
+        )
+    except Exception as exc:
+        logger.debug(
+            "_build_prompt: introspection failed for %s: %s",
+            action_cls.__name__,
+            exc,
+        )
+        action_schema = None
 
-    lines: List[str] = [f"Action type: {action_cls.__name__}"]
+    # Resolve each requested slot name to its FieldSpec (including dotted sub-fields).
+    name_set = set(free_slot_names)
+    field_specs: Dict[str, "FieldSpec"] = {}
+    if action_schema is not None:
+        for fld in action_schema.fields:
+            if fld.name in name_set:
+                field_specs[fld.name] = fld
+            for sub in fld.sub_fields:
+                dotted = f"{fld.name}.{sub.name}"
+                if dotted in name_set:
+                    field_specs[dotted] = replace(sub, name=dotted)
+
+    # Partition slots by kind and collect the LLM-visible expected names.
+    entity_specs: List["FieldSpec"] = []
+    param_specs: List["FieldSpec"] = []
+    unknown_names: List[str] = []
+    expected: List[str] = []
+    for name in free_slot_names:
+        fspec = field_specs.get(name)
+        if fspec is None:
+            unknown_names.append(name)
+            expected.append(name)
+        elif fspec.kind in (FieldKind.ENTITY, FieldKind.POSE, FieldKind.TYPE_REF):
+            entity_specs.append(fspec)
+            expected.append(name)
+        elif fspec.kind == FieldKind.COMPLEX:
+            # nested leaves surface as dotted names, not this parent.
+            continue
+        else:
+            param_specs.append(fspec)
+            expected.append(name)
+    expected = list(dict.fromkeys(expected))
+
+    # Header
+    lines: List[str] = []
     if instruction:
-        lines.insert(0, f"Instruction: {instruction!r}")
+        lines.append(f"Instruction: {instruction!r}")
+    lines.append(f"Action type: {action_cls.__name__}")
 
-    # Action class docstring from the same schema that provides field metadata.
+    if expected:
+        lines += [
+            "",
+            "Required free slot field_names:",
+            *[f"  - {name}" for name in expected],
+            (
+                f"Return exactly {len(expected)} SlotValue entries, "
+                "one for each field_name above. Do not omit enum or primitive "
+                "slots when the instruction leaves them implicit; infer a "
+                "reasonable action parameter from the action semantics and "
+                "world context."
+            ),
+        ]
+
     action_doc = (
         action_schema.docstring
         if action_schema is not None
@@ -254,121 +262,126 @@ def _build_dynamic_message(
     if action_doc:
         lines += ["", f"Action description: {action_doc}"]
 
-    # ── Classify free slots by kind ────────────────────────────────────────────
-    entity_specs: List["FieldSpec"] = []
-    param_specs: List["FieldSpec"] = []    # ENUM + PRIMITIVE
-    complex_specs: List["FieldSpec"] = []  # COMPLEX
-    unknown_names: List[str] = []          # no introspection data
-
-    for name in free_slot_names:
-        fspec = field_specs.get(name)
-        if fspec is None:
-            unknown_names.append(name)
-            continue
-        if fspec.kind in (FieldKind.ENTITY, FieldKind.POSE, FieldKind.TYPE_REF):
-            entity_specs.append(fspec)
-        elif fspec.kind == FieldKind.ENUM:
-            param_specs.append(fspec)
-        elif fspec.kind == FieldKind.PRIMITIVE:
-            param_specs.append(fspec)
-        elif fspec.kind == FieldKind.COMPLEX:
-            complex_specs.append(fspec)
-
-    # ── Entity slots section ───────────────────────────────────────────────────
     if entity_specs:
-        lines += ["", "── Entity slots (world objects) ──────────────────────────────────────"]
-        lines.append(
-            "For each entity slot: return a SlotValue with entity_description populated."
-        )
-        for fspec in entity_specs:
-            type_name = (
-                fspec.raw_type.__name__
-                if isinstance(fspec.raw_type, type) else str(fspec.raw_type)
+        lines += [
+            "",
+            "── Entity slots (world objects) ──────────────────────────────────────",
+            "For each entity slot: return a SlotValue with entity_description populated.",
+        ]
+        for f in entity_specs:
+            pose_note = (
+                " [return .global_pose of the grounded body]"
+                if f.kind == FieldKind.POSE
+                else ""
             )
-            pose_note = " [return .global_pose of the grounded body]" if fspec.kind == FieldKind.POSE else ""
-            doc_str = f": {fspec.docstring}" if fspec.docstring else ""
-            lines.append(f"  - {fspec.name} ({type_name}{pose_note}){doc_str}")
+            doc_str = f": {f.docstring}" if f.docstring else ""
+            lines.append(
+                f"  - {f.name} ({_type_display(f.raw_type)}{pose_note}){doc_str}"
+            )
 
-    # ── Parameter slots section ────────────────────────────────────────────────
     if param_specs:
-        lines += ["", "── Parameter slots (discrete / primitive values) ──────────────────────"]
-        lines.append("For each: return a SlotValue with value = chosen string.")
-        for fspec in param_specs:
-            type_name = (
-                fspec.raw_type.__name__
-                if isinstance(fspec.raw_type, type) else str(fspec.raw_type)
-            )
-            if fspec.enum_members:
-                members_str = " | ".join(fspec.enum_members)
-                doc_str = f" — {fspec.docstring}" if fspec.docstring else ""
-                lines.append(
-                    f"  - {fspec.name} (allowed values: {members_str}){doc_str}"
-                )
+        lines += [
+            "",
+            "── Parameter slots (discrete / primitive values) ──────────────────────",
+            "For each: return a SlotValue with value = chosen string.",
+        ]
+        for f in param_specs:
+            if f.enum_members:
+                members_str = " | ".join(f.enum_members)
+                doc_str = f" — {f.docstring}" if f.docstring else ""
+                lines.append(f"  - {f.name} (allowed values: {members_str}){doc_str}")
             else:
-                doc_str = f": {fspec.docstring}" if fspec.docstring else ""
-                lines.append(f"  - {fspec.name} ({type_name}){doc_str}")
+                doc_str = f": {f.docstring}" if f.docstring else ""
+                lines.append(f"  - {f.name} ({_type_display(f.raw_type)}){doc_str}")
 
-    # ── Complex slots section ──────────────────────────────────────────────────
-    if complex_specs:
-        lines += ["", "── Complex slots (expand into dotted sub-field SlotValues) ────────────"]
-        lines.append(
-            "For each complex field, return individual SlotValues with dotted names."
-        )
-        for fspec in complex_specs:
-            type_name = (
-                fspec.raw_type.__name__
-                if isinstance(fspec.raw_type, type) else str(fspec.raw_type)
-            )
-            doc_str = f": {fspec.docstring}" if fspec.docstring else ""
-            lines.append(f"  {fspec.name} ({type_name}){doc_str}")
-            if fspec.sub_fields:
-                for sub in fspec.sub_fields:
-                    sub_type = (
-                        sub.raw_type.__name__
-                        if isinstance(sub.raw_type, type) else str(sub.raw_type)
-                    )
-                    if sub.enum_members:
-                        members_str = " | ".join(sub.enum_members)
-                        sub_doc = f" — {sub.docstring}" if sub.docstring else ""
-                        lines.append(
-                            f"    {fspec.name}.{sub.name} "
-                            f"(allowed values: {members_str}){sub_doc}"
-                        )
-                    else:
-                        sub_doc = f": {sub.docstring}" if sub.docstring else ""
-                        if "manipulator" in sub_type.lower():
-                            sub_doc += (
-                                " Choose a concrete gripper/manipulator name, "
-                                "not the robot name."
-                            )
-                        lines.append(
-                            f"    {fspec.name}.{sub.name} ({sub_type}){sub_doc}"
-                        )
-
-    # ── Unknown / fallback slots ───────────────────────────────────────────────
     if unknown_names:
-        lines += ["", "── Additional free slots (no type info — fill by best judgement) ────────"]
-        for name in unknown_names:
-            lines.append(f"  - {name}")
+        lines += [
+            "",
+            "── Additional free slots (no type info — fill by best judgement) ────────",
+            *[f"  - {name}" for name in unknown_names],
+        ]
 
-    # ── Fixed slots ────────────────────────────────────────────────────────────
     if fixed_slots:
-        lines += ["", "── Already-fixed slots (honour these, do not change) ─────────────────────"]
-        for fname, val in fixed_slots.items():
-            lines.append(f"  - {fname} = {val!r}")
+        lines += [
+            "",
+            "── Already-fixed slots (honour these, do not change) ─────────────────────",
+        ]
+        lines.extend(f"  - {fname} = {val!r}" for fname, val in fixed_slots.items())
 
-    # ── World context ──────────────────────────────────────────────────────────
     lines += ["", world_context]
+    return "\n".join(lines), expected
 
-    return "\n".join(lines)
+
+def _invoke_with_repair(
+    structured_llm: Any,
+    action_cls: type,
+    user_message: str,
+    expected_slot_names: List[str],
+) -> ActionReasoningOutput:
+    """Invoke the slot-filler LLM; if slots are missing, make one repair call and merge."""
+    output: ActionReasoningOutput = structured_llm.invoke(
+        [
+            {"role": "system", "content": _SLOT_FILLER_SYSTEM},
+            {"role": "user", "content": user_message},
+        ]
+    )
+    _normalise_output_slot_names(output, action_cls)
+
+    returned = {slot.field_name for slot in output.slots}
+    missing = [name for name in expected_slot_names if name not in returned]
+    if not missing:
+        return output
+
+    logger.warning(
+        "run_slot_filler: LLM omitted required slot(s) for %s: %s",
+        action_cls.__name__,
+        ", ".join(missing),
+    )
+    repair_message = "\n".join(
+        [
+            user_message,
+            "",
+            "Correction: the previous structured response omitted required free slots.",
+            "Missing field_names:",
+            *[f"  - {name}" for name in missing],
+            "",
+            (
+                "Return a complete ActionReasoningOutput. Include one SlotValue "
+                "for each required field_name:"
+            ),
+            *[f"  - {name}" for name in expected_slot_names],
+            "",
+            "Previous structured response:",
+            output.model_dump_json(),
+        ]
+    )
+    repaired: ActionReasoningOutput = structured_llm.invoke(
+        [
+            {"role": "system", "content": _SLOT_FILLER_SYSTEM},
+            {"role": "user", "content": repair_message},
+        ]
+    )
+    _normalise_output_slot_names(repaired, action_cls)
+
+    merged = {slot.field_name: slot for slot in output.slots}
+    for slot in repaired.slots:
+        merged[slot.field_name] = slot
+    return repaired.model_copy(update={"slots": list(merged.values())})
 
 
-def _format_action_catalog(action_registry: Dict[str, type]) -> str:
+def _normalise_output_slot_names(
+    output: ActionReasoningOutput,
+    action_cls: type,
+) -> None:
+    """Strip root class prefixes from returned field names in-place."""
+    for slot in output.slots:
+        slot.field_name = _strip_root(slot.field_name, action_cls)
+
+
+def _build_action_catalog(action_registry: Dict[str, type]) -> str:
     """Return classifier prompt lines with action names, docs, and field summaries."""
     try:
-        from llmr.pycram_bridge import PycramIntrospector
-
-        introspector = PycramIntrospector()
+        introspector: Optional[PycramIntrospector] = PycramIntrospector()
     except Exception:
         introspector = None
 
@@ -382,13 +395,12 @@ def _format_action_catalog(action_registry: Dict[str, type]) -> str:
             except Exception:
                 schema = None
 
-        doc = " ".join(
-            (
-                schema.docstring
-                if schema is not None
-                else (inspect.getdoc(action_cls) or "")
-            ).split()
+        doc_source = (
+            schema.docstring
+            if schema is not None
+            else (inspect.getdoc(action_cls) or "")
         )
+        doc = " ".join(doc_source.split())
         if len(doc) > 180:
             doc = f"{doc[:177]}..."
 
@@ -397,20 +409,27 @@ def _format_action_catalog(action_registry: Dict[str, type]) -> str:
             header += f": {doc}"
         lines.append(header)
 
-        if schema is None:
+        if schema is None or not schema.fields:
             continue
-        if schema.fields:
-            fields = ", ".join(_format_catalog_field(field) for field in schema.fields)
-            lines.append(f"    fields: {fields}")
+        field_summaries = ", ".join(
+            f"{f.name}:{_type_display(f.raw_type)}"
+            f"({'optional' if f.is_optional else 'required'})"
+            for f in schema.fields
+        )
+        lines.append(f"    fields: {field_summaries}")
 
     return "\n".join(lines)
 
 
-def _format_catalog_field(fspec: "FieldSpec") -> str:
-    type_name = (
-        fspec.raw_type.__name__
-        if isinstance(fspec.raw_type, type)
-        else str(fspec.raw_type)
-    )
-    required = "optional" if fspec.is_optional else "required"
-    return f"{fspec.name}:{type_name}({required})"
+# ── Small inline helpers ──────────────────────────────────────────────────────
+
+
+def _strip_root(name: str, action_cls: type) -> str:
+    """Strip a leading ``<ActionClass>.`` prefix; preserve nested dotted paths."""
+    prefix = f"{action_cls.__name__}."
+    return name[len(prefix) :] if name.startswith(prefix) else name
+
+
+def _type_display(raw_type: Any) -> str:
+    """Clean display name for a raw type annotation."""
+    return raw_type.__name__ if isinstance(raw_type, type) else str(raw_type)

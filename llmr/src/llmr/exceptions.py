@@ -3,6 +3,7 @@ Structured exceptions for llmr.
 
 All exceptions inherit from :class:`krrood.utils.DataclassException`
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

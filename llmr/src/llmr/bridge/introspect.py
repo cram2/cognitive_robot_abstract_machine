@@ -8,6 +8,7 @@ FieldKind classification drives the slot-filler prompt and per-slot resolution i
   PRIMITIVE bool / int / float / str → taken directly from LLM output.
   TYPE_REF  Type[X] annotation → resolved to a Symbol subclass via SymbolGraph class diagram.
 """
+
 from __future__ import annotations
 
 import ast
@@ -21,11 +22,13 @@ from typing_extensions import Any, ClassVar, Dict, List, Type
 
 from krrood.class_diagrams.attribute_introspector import (
     AttributeIntrospector,
+    DataclassOnlyIntrospector,
     DiscoveredAttribute,
 )
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.symbol_graph.symbol_graph import Symbol
+from krrood.utils import get_default_values_for_dataclass
 
 import logging
 
@@ -37,12 +40,13 @@ logger = logging.getLogger(__name__)
 
 class FieldKind(str, Enum):
     """How an action field should be resolved — drives prompt generation and slot resolution."""
-    ENTITY    = "entity"
-    POSE      = "pose"
-    ENUM      = "enum"
-    COMPLEX   = "complex"
+
+    ENTITY = "entity"
+    POSE = "pose"
+    ENUM = "enum"
+    COMPLEX = "complex"
     PRIMITIVE = "primitive"
-    TYPE_REF  = "type_ref"
+    TYPE_REF = "type_ref"
 
 
 # Sentinel meaning "field has no default" — cannot use dataclasses.MISSING
@@ -56,22 +60,24 @@ class FieldSpec:
     """Metadata for one action dataclass field, used to build slot-filler prompts."""
 
     name: str
-    raw_type: Any                           # resolved Python type (not a string)
+    raw_type: Any  # resolved Python type (not a string)
     kind: FieldKind
-    docstring: str = ""                     # attribute docstring from class source
+    docstring: str = ""  # attribute docstring from class source
     is_optional: bool = False
-    default: Any = field(default_factory=lambda: NO_DEFAULT)  # NO_DEFAULT means required
-    enum_members: List[str] = field(default_factory=list)      # for ENUM kind
-    sub_fields: List["FieldSpec"] = field(default_factory=list) # for COMPLEX kind
+    default: Any = field(
+        default_factory=lambda: NO_DEFAULT
+    )  # NO_DEFAULT means required
+    enum_members: List[str] = field(default_factory=list)  # for ENUM kind
+    sub_fields: List["FieldSpec"] = field(default_factory=list)  # for COMPLEX kind
 
 
 @dataclass
 class ActionSchema:
     """Full introspection result for one action class — action type, docstring, and per-field specs."""
 
-    action_type: str       # e.g. "PickUpAction"
-    action_cls: Any        # the actual class object
-    docstring: str         # class-level docstring
+    action_type: str  # e.g. "PickUpAction"
+    action_cls: Any  # the actual class object
+    docstring: str  # class-level docstring
     fields: List[FieldSpec]
 
 
@@ -79,17 +85,20 @@ class ActionSchema:
 
 
 @dataclass
-class OwnDataclassIntrospector(AttributeIntrospector):
-    """Discover only fields declared directly on the inspected dataclass."""
+class OwnDataclassIntrospector(DataclassOnlyIntrospector):
+    """Discover only fields declared directly on the inspected dataclass.
+
+    Delegates all standard checks (is_dataclass, _ prefix, init=False) to
+    krrood's DataclassOnlyIntrospector and adds only the own-annotations
+    filter to exclude inherited fields (e.g. Designator.plan_node).
+    """
 
     def discover(self, owner_cls: Type) -> List[DiscoveredAttribute]:
         own_names = set(getattr(owner_cls, "__annotations__", {}))
-        if not dataclasses.is_dataclass(owner_cls):
-            return []
         return [
-            DiscoveredAttribute(public_name=f.name, field=f)
-            for f in dataclasses.fields(owner_cls)
-            if f.name in own_names and not f.name.startswith("_") and f.init
+            attr
+            for attr in super().discover(owner_cls)
+            if attr.public_name in own_names
         ]
 
 
@@ -108,7 +117,9 @@ class PycramIntrospector:
 
     # Names of types (and their subclasses via MRO) treated as spatial poses.
     # Matched against every class in the type's MRO — no world-package import needed.
-    POSE_TYPE_NAMES: ClassVar[frozenset] = frozenset({"Pose", "HomogeneousTransformationMatrix"})
+    POSE_TYPE_NAMES: ClassVar[frozenset] = frozenset(
+        {"Pose", "HomogeneousTransformationMatrix"}
+    )
 
     introspector: AttributeIntrospector = field(
         default_factory=OwnDataclassIntrospector
@@ -124,6 +135,7 @@ class PycramIntrospector:
 
         cls_doc = (inspect.getdoc(action_cls) or "").strip()
         field_docs = self._extract_field_docstrings(action_cls)
+        defaults = get_default_values_for_dataclass(action_cls)
         class_diagram = ClassDiagram([action_cls], introspector=self.introspector)
         wrapped_class = class_diagram.get_wrapped_class(action_cls)
 
@@ -133,6 +145,7 @@ class PycramIntrospector:
                 self._field_spec_from_wrapped_field(
                     wrapped_field=wrapped_field,
                     field_docs=field_docs,
+                    defaults=defaults,
                     depth=_depth,
                 )
             )
@@ -148,6 +161,7 @@ class PycramIntrospector:
         self,
         wrapped_field: WrappedField,
         field_docs: Dict[str, str],
+        defaults: Dict[str, Any],
         depth: int,
     ) -> FieldSpec:
         """Convert KRROOD field metadata into llmr's prompt-facing schema."""
@@ -160,24 +174,14 @@ class PycramIntrospector:
         else:
             raw_type = wrapped_field.type_endpoint
             kind = self.classify_type(raw_type, depth)
-        dc_field = wrapped_field.field
 
-        has_default = dc_field.default is not dataclasses.MISSING
-        has_factory = dc_field.default_factory is not dataclasses.MISSING  # type: ignore[misc]
-        if has_default:
-            field_default = dc_field.default
-        elif has_factory:
-            field_default = dc_field.default_factory  # type: ignore[misc]
-        else:
-            field_default = NO_DEFAULT
-
+        has_default = wrapped_field.name in defaults
         spec = FieldSpec(
             name=wrapped_field.name,
             raw_type=raw_type,
             kind=kind,
             docstring=field_docs.get(wrapped_field.name, ""),
-            is_optional=wrapped_field.is_optional or has_default or has_factory,
-            default=field_default,
+            is_optional=wrapped_field.is_optional or has_default,
         )
 
         if kind == FieldKind.ENUM:
@@ -191,7 +195,9 @@ class PycramIntrospector:
                 logger.debug("Cannot introspect sub-fields of %s: %s", raw_type, exc)
 
         elif kind == FieldKind.TYPE_REF:
-            args = typing.get_args(raw_type) or typing.get_args(wrapped_field.resolved_type)
+            args = typing.get_args(raw_type) or typing.get_args(
+                wrapped_field.resolved_type
+            )
             if args:
                 spec.raw_type = args[0]
 

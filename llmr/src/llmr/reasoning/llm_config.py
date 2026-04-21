@@ -11,12 +11,12 @@ This keeps the dependency surface minimal: only langchain-core is required.
 Provider-specific packages (langchain-openai, langchain-ollama) are optional
 extras installed by the user based on their setup.
 """
+
 from __future__ import annotations
 
 import typing
 from enum import Enum
 
-from dotenv import load_dotenv
 from typing_extensions import Any
 
 from llmr.exceptions import LLMProviderNotSupported
@@ -24,11 +24,10 @@ from llmr.exceptions import LLMProviderNotSupported
 if typing.TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
 
-load_dotenv()
-
 
 class LLMProvider(str, Enum):
     """Provider tag passed to ``make_llm()`` to select the LangChain backend."""
+
     OPENAI = "openai"
     OLLAMA = "ollama"
 
@@ -37,6 +36,7 @@ def make_llm(
     provider: LLMProvider,
     model: str,
     temperature: float = 0.0,
+    load_env: bool = False,
     **kwargs: Any,
 ) -> "BaseChatModel":
     """
@@ -48,6 +48,8 @@ def make_llm(
     :param provider:    LLM provider (OPENAI or OLLAMA).
     :param model:       Model name/identifier (e.g. "gpt-4o", "qwen3:14b").
     :param temperature: Sampling temperature. Use 0.0 for deterministic output.
+    :param load_env:    Load a local .env file before constructing the provider client.
+                        Defaults to False so importing llmr has no environment side effects.
     :param kwargs:      Additional provider-specific arguments passed to the client.
     :returns: A LangChain BaseChatModel instance.
 
@@ -62,13 +64,22 @@ def make_llm(
         # Or with Ollama for local inference:
         llm = make_llm(LLMProvider.OLLAMA, model="qwen3:14b")
     """
+    if load_env:
+        try:
+            from dotenv import load_dotenv
+        except ImportError as e:
+            raise ImportError(
+                "python-dotenv is not installed. "
+                "Install it or load environment variables before calling make_llm()."
+            ) from e
+        load_dotenv()
+
     if provider == LLMProvider.OPENAI:
         try:
             from langchain_openai import ChatOpenAI
         except ImportError as e:
             raise ImportError(
-                "langchain-openai is not installed. "
-                "Run: pip install 'llmr[openai]'"
+                "langchain-openai is not installed. " "Run: pip install 'llmr[openai]'"
             ) from e
         return ChatOpenAI(model=model, temperature=temperature, **kwargs)
 
@@ -77,8 +88,7 @@ def make_llm(
             from langchain_ollama import ChatOllama
         except ImportError as e:
             raise ImportError(
-                "langchain-ollama is not installed. "
-                "Run: pip install 'llmr[ollama]'"
+                "langchain-ollama is not installed. " "Run: pip install 'llmr[ollama]'"
             ) from e
         return ChatOllama(model=model, temperature=temperature, **kwargs)
 

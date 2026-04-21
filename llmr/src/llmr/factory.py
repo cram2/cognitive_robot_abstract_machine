@@ -2,21 +2,20 @@
 
 All pycram access goes through llmr.pycram_bridge.
 """
+
 from __future__ import annotations
 
-import inspect
-import typing
+from typing import TYPE_CHECKING
 from typing_extensions import Any, Callable, Dict, List, Optional
 
 from krrood.symbol_graph.symbol_graph import Symbol
+from llmr.bridge.introspect import PycramIntrospector
+from llmr.bridge.match_reader import required_match
 from llmr.exceptions import LLMActionClassificationFailed
 from llmr.pycram_bridge import PycramContext, PycramPlanNode, execute_single
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
-    from krrood.entity_query_language.query.match import Match
-
-_SKIP_FIELDS = {"id", "plan_node"}
 
 
 def nl_plan(
@@ -45,7 +44,6 @@ def nl_plan(
     :returns: A PlanNode ready to be performed.
     :raises ValueError: If the LLM cannot classify the action type.
     """
-    from llmr.backend import LLMBackend
     from llmr.reasoning.slot_filler import classify_action
 
     # Step 1: Classify action type from NL instruction
@@ -58,10 +56,10 @@ def nl_plan(
         raise LLMActionClassificationFailed(instruction=instruction)
 
     # Step 2: Build an underspecified Match for required schema fields.
-    match = _fully_underspecified(action_cls)
+    match = required_match(action_cls, PycramIntrospector())
 
     # Step 3: Set strict LLMBackend on context.
-    context.query_backend = LLMBackend(
+    context.query_backend = _backend(
         llm=llm,
         groundable_type=groundable_type,
         instruction=instruction,
@@ -131,8 +129,7 @@ def resolve_match(
     :param strict_required: Raise if required fields remain unresolved before construction.
     :returns: A PlanNode ready to be performed.
     """
-    from llmr.backend import LLMBackend
-    context.query_backend = LLMBackend(
+    context.query_backend = _backend(
         llm=llm,
         groundable_type=groundable_type,
         instruction=instruction,
@@ -156,9 +153,7 @@ def resolve_params(
     PyCRAM PlanNode creation.  The supplied Match is still updated by the backend as
     part of normal KRROOD evaluation.
     """
-    from llmr.backend import LLMBackend
-
-    backend = LLMBackend(
+    backend = _backend(
         llm=llm,
         groundable_type=groundable_type,
         instruction=instruction,
@@ -168,61 +163,20 @@ def resolve_params(
     return next(iter(backend.evaluate(match)))
 
 
-# ── Internal helpers ───────────────────────────────────────────────────────────
+def _backend(
+    llm: "BaseChatModel",
+    groundable_type: type,
+    instruction: Optional[str],
+    strict_required: bool,
+    world_context_provider: Optional[Callable[[], str]] = None,
+) -> Any:
+    """Create the LLM backend used by factory entry points."""
+    from llmr.backend import LLMBackend
 
-def _fully_underspecified(action_cls: type) -> "Match[Any]":
-    """Return a Match(*action_cls*) with required schema fields set to ``...``."""
-    from krrood.entity_query_language.query.match import Match
-
-    free_fields = _get_required_schema_fields(action_cls)
-    if free_fields is None:
-        free_fields = _get_settable_fields(action_cls)
-    match = Match(action_cls)
-    if free_fields:
-        match(**{name: ... for name in free_fields})
-    return match
-
-
-def _get_settable_fields(action_cls: type) -> List[str]:
-    """Return names of all settable fields on an action class.
-
-    Skips internal krrood/pycram bookkeeping fields that the LLM must not fill.
-    """
-    schema_fields = _get_schema_fields(action_cls, required_only=False)
-    if schema_fields is not None:
-        return schema_fields
-
-    try:
-        sig = inspect.signature(action_cls.__init__)
-        return [
-            name
-            for name, param in sig.parameters.items()
-            if name != "self" and not name.startswith("_")
-        ]
-    except (TypeError, ValueError):
-        return []
-
-
-def _get_required_schema_fields(action_cls: type) -> Optional[List[str]]:
-    """Return required action fields from PycramIntrospector, or None on failure."""
-    return _get_schema_fields(action_cls, required_only=True)
-
-
-def _get_schema_fields(action_cls: type, required_only: bool) -> Optional[List[str]]:
-    """Return prompt-settable field names from the KRROOD-backed action schema."""
-    try:
-        from llmr.pycram_bridge import PycramIntrospector
-
-        schema = PycramIntrospector().introspect(action_cls)
-    except Exception:
-        return None
-
-    return [
-        field.name
-        for field in schema.fields
-        if (
-            (not required_only or not field.is_optional)
-            and not field.name.startswith("_")
-            and field.name not in _SKIP_FIELDS
-        )
-    ]
+    return LLMBackend(
+        llm=llm,
+        groundable_type=groundable_type,
+        instruction=instruction,
+        world_context_provider=world_context_provider,
+        strict_required=strict_required,
+    )

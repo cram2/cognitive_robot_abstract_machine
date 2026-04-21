@@ -1,17 +1,22 @@
-"""
-World serializer — converts SymbolGraph state into an LLM-readable string.
+"""World-state gateway: read SymbolGraph contents and resolve Symbol classes by name.
 
-Package-independent: uses SymbolGraph (krrood) as the sole data source.
-
-The caller passes groundable_type (for example a Body class from its world
-package) so this module never imports a world directly.
+Single access point for every SymbolGraph query used by llmr:
+  serialize_world_from_symbol_graph — LLM-readable world-context string.
+  resolve_symbol_class              — semantic-type string → Symbol subclass.
+  get_instances                     — safe wrapper over SymbolGraph.get_instances_of_type.
+  body_display_name / body_xyz / body_bounding_box — duck-typed body helpers.
 """
+
 from __future__ import annotations
 
+import logging
+import re
 from dataclasses import dataclass, field
 from typing_extensions import Any, Callable, Dict, List, Optional, Set, Tuple, Type
 
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
+
+logger = logging.getLogger(__name__)
 
 _ROBOT_ANNOTATION_TYPE_NAMES = frozenset(
     {
@@ -19,6 +24,26 @@ _ROBOT_ANNOTATION_TYPE_NAMES = frozenset(
         "SemanticRobotAnnotation",
         "KinematicChain",
         "Manipulator",
+        "ParallelGripper",
+        "HumanoidGripper",
+        "Sensor",
+        "Camera",
+        "Base",
+        "Torso",
+        "Neck",
+        "Arm",
+        "Finger",
+    }
+)
+
+# Subset shown in "Available Semantic Types" for LLM grounding.
+# Includes abstract types (e.g. Manipulator) so instances appear under the type
+# name the action schema uses, not just the concrete subclass name.
+_ROBOT_CONTEXT_TYPE_NAMES = frozenset(
+    {
+        "Manipulator",
+        "ParallelGripper",
+        "HumanoidGripper",
         "Sensor",
         "Camera",
         "Base",
@@ -31,14 +56,24 @@ _ROBOT_ANNOTATION_TYPE_NAMES = frozenset(
 
 # Fallback only: semantic robot annotations are preferred when present.
 _STRUCTURAL_SUFFIXES = (
-    "_link", "_frame", "_joint", "_screw", "_plate",
-    "_optical_frame", "_motor", "_pad", "_finger",
+    "_link",
+    "_frame",
+    "_joint",
+    "_screw",
+    "_plate",
+    "_optical_frame",
+    "_motor",
+    "_pad",
+    "_finger",
 )
 
 
 def _is_structural_name(name: str) -> bool:
     """Fallback name heuristic for robot kinematic links when semantic metadata is unavailable."""
     return any(name.endswith(s) for s in _STRUCTURAL_SUFFIXES)
+
+
+# ── World serialisation ───────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
@@ -161,7 +196,9 @@ def _collect_body_records(
         ):
             continue
 
-        parent_name = _nearest_parent_name(body) if options.include_parent_context else None
+        parent_name = (
+            _nearest_parent_name(body) if options.include_parent_context else None
+        )
         xyz = body_xyz(body) if options.include_geometry else None
         size = body_bounding_box(body) if options.include_geometry else None
         records.append(
@@ -192,11 +229,31 @@ def _collect_annotations(
         inst = wrapped.instance
         if inst is None:
             continue
+
+        ann_type = type(inst).__name__
+        inst_mro_names = {cls.__name__ for cls in type(inst).__mro__}
+
+        # Robot semantic annotations: checked BEFORE the .bodies guard because
+        # Manipulator subclasses (e.g. ParallelGripper, SuctionGripper) don't
+        # inherit KinematicChain and have no .bodies property.
+        # MRO check catches any subclass of a known abstract type without requiring
+        # explicit enumeration of every concrete robot component class.
+        # Register the instance under every parent type in _ROBOT_CONTEXT_TYPE_NAMES
+        # so the LLM sees it under the abstract type name the action schema uses
+        # (e.g. Manipulator) not only under the concrete class name.
+        if inst_mro_names & _ROBOT_ANNOTATION_TYPE_NAMES:
+            inst_name = body_display_name(inst) or f"{ann_type}@{id(inst):x}"
+            for cls in type(inst).__mro__:
+                if cls.__name__ in _ROBOT_CONTEXT_TYPE_NAMES:
+                    names_list = annotation_summary.setdefault(cls.__name__, [])
+                    if inst_name not in names_list:
+                        names_list.append(inst_name)
+            continue
+
         bodies_attr = getattr(inst, "bodies", None)
         if bodies_attr is None:
             continue
 
-        ann_type = type(inst).__name__
         try:
             bodies = list(bodies_attr)
         except Exception:
@@ -243,8 +300,12 @@ def _collect_relation_lines(
         if id(source) not in visible_ids and id(target) not in visible_ids:
             continue
 
-        source_name = body_display_name(source) or f"{type(source).__name__}@{id(source):x}"
-        target_name = body_display_name(target) or f"{type(target).__name__}@{id(target):x}"
+        source_name = (
+            body_display_name(source) or f"{type(source).__name__}@{id(source):x}"
+        )
+        target_name = (
+            body_display_name(target) or f"{type(target).__name__}@{id(target):x}"
+        )
         if not options.include_structural and (
             _is_structural_body(source, source_name, structural_body_ids, options)
             or _is_structural_body(target, target_name, structural_body_ids, options)
@@ -376,7 +437,7 @@ def _render_world_context(
     extra_context: str,
     options: WorldSerializationOptions,
 ) -> str:
-    shown_records = records[:max(options.max_objects, 0)]
+    shown_records = records[: max(options.max_objects, 0)]
     unique_types = sorted(
         {ann_type for record in records for ann_type in record.semantic_types}
         | set(annotation_summary)
@@ -405,7 +466,9 @@ def _render_world_context(
     lines.extend(_render_scene_table(shown_records, options))
 
     if len(shown_records) < len(records):
-        lines.append(f"- Truncated {len(records) - len(shown_records)} additional object(s).")
+        lines.append(
+            f"- Truncated {len(records) - len(shown_records)} additional object(s)."
+        )
 
     lines += ["", "## Available Semantic Types"]
     if annotation_summary:
@@ -440,7 +503,9 @@ def _render_scene_table(
         "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     if not records:
-        rows.append("| - | - | - | - | - | - | No scene objects found in SymbolGraph. |")
+        rows.append(
+            "| - | - | - | - | - | - | No scene objects found in SymbolGraph. |"
+        )
         return rows
 
     for record in records:
@@ -481,7 +546,7 @@ def _format_tuple(
 
 
 # ── Duck-type body helpers (public, reusable) ──────────────────────────────────
-# These use plain getattr / duck typing
+# These use plain getattr / duck typing.
 # If name/pose attribute conventions change, fix only here.
 
 
@@ -512,11 +577,67 @@ def body_bounding_box(
     try:
         ref = reference_frame if reference_frame is not None else body
         dims = (
-            body.collision
-            .as_bounding_box_collection_in_frame(ref)
+            body.collision.as_bounding_box_collection_in_frame(ref)
             .bounding_box()
             .dimensions
         )
         return float(dims[0]), float(dims[1]), float(dims[2])
     except Exception:
         return None
+
+
+# ── Symbol class / instance resolution ────────────────────────────────────────
+
+
+def _camel_to_tokens(name: str) -> str:
+    """Split a CamelCase class name into a lowercase token string for fuzzy matching."""
+    return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", name).lower()
+
+
+def resolve_symbol_class(
+    semantic_type: str,
+    symbol_graph: Optional[SymbolGraph] = None,
+) -> Optional[Type[Symbol]]:
+    """Resolve a semantic-type string to a Symbol subclass via the SymbolGraph class diagram.
+
+    Matches (in order) exact class name, camel-case token split, and any
+    ``_synonyms`` classvar on the subclass.
+
+    :param semantic_type: String from the LLM slot schema.
+    :param symbol_graph: Existing SymbolGraph to query; defaults to the singleton.
+    :return: Matching Symbol subclass, or ``None`` if nothing found.
+    """
+    query = semantic_type.strip().lower()
+    query_tokens = query.replace("_", " ").replace("-", " ")
+
+    try:
+        class_diagram = (symbol_graph or SymbolGraph()).class_diagram
+    except Exception:
+        logger.debug(
+            "SymbolGraph not yet initialised — cannot resolve '%s'.", semantic_type
+        )
+        return None
+
+    for wrapped_cls in class_diagram.wrapped_classes:
+        cls = wrapped_cls.clazz
+        if cls.__name__.lower() == query:
+            return cls
+        if _camel_to_tokens(cls.__name__) == query_tokens:
+            return cls
+        synonyms = getattr(cls, "_synonyms", set())
+        if any(s.lower() == query_tokens for s in synonyms):
+            return cls
+
+    return None
+
+
+def get_instances(
+    cls: Optional[type] = None,
+    symbol_graph: Optional[SymbolGraph] = None,
+) -> List[Any]:
+    """Return SymbolGraph instances of *cls* (defaults to all :class:`Symbol` instances)."""
+    try:
+        graph = symbol_graph or SymbolGraph()
+        return list(graph.get_instances_of_type(cls if cls is not None else Symbol))
+    except Exception:
+        return []

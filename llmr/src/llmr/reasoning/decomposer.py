@@ -1,4 +1,5 @@
 """TaskDecomposer — splits compound NL instructions into atomic robot steps with object-flow dependency tracking."""
+
 from __future__ import annotations
 
 import typing
@@ -34,14 +35,17 @@ class DecomposedPlan:
 # Internal LLM schemas                                                         #
 # --------------------------------------------------------------------------- #
 
+
 class _AtomicStep(BaseModel):
     """LLM structured-output schema for one atomic step and its object-flow dependencies."""
+
     instruction: str
     dependencies: List[int]
 
 
 class _DecomposedInstructions(BaseModel):
     """LLM structured-output schema for the full decomposed plan."""
+
     steps: List[_AtomicStep]
 
 
@@ -82,6 +86,7 @@ Return structured JSON matching the schema.
 # TaskDecomposer                                                               #
 # --------------------------------------------------------------------------- #
 
+
 class TaskDecomposer:
     """
     Splits a (potentially compound) NL instruction into atomic steps with
@@ -116,10 +121,12 @@ class TaskDecomposer:
         """
         structured_llm = self._llm.with_structured_output(_DecomposedInstructions)
         try:
-            result: _DecomposedInstructions = structured_llm.invoke([
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": instruction},
-            ])
+            result: _DecomposedInstructions = structured_llm.invoke(
+                [
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": instruction},
+                ]
+            )
             steps = self._dedup(result.steps)
             deps = self._build_deps(steps)
             return DecomposedPlan(

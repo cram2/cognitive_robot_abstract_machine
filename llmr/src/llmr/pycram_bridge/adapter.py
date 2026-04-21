@@ -2,12 +2,17 @@
 
 This is the module in llmr that imports or scans PyCRAM packages.
 """
+
 from __future__ import annotations
 
+import dataclasses
 import importlib
 import inspect
+import logging
 import pkgutil
 from typing_extensions import Any, Dict, Protocol, runtime_checkable
+
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -31,28 +36,32 @@ def execute_single(match: Any, context: Any) -> PycramPlanNode:
     return _fn(match, context)
 
 
-def discover_action_classes(
-    package_root: str = "pycram.robot_plans.actions",
-) -> Dict[str, type]:
-    """Scan *package_root* and return concrete PyCRAM action classes."""
+def discover_action_classes() -> Dict[str, type]:
+    """Return all concrete PyCRAM action classes rooted at ActionDescription.
+
+    Loads every module under ``pycram.robot_plans.actions`` once so that
+    Python registers all subclasses, then uses krrood's recursive_subclasses
+    to collect them — no name-suffix heuristics or module filters needed.
+    """
+    from krrood.utils import recursive_subclasses
+
     try:
-        actions_pkg = importlib.import_module(package_root)
+        _pkg = importlib.import_module("pycram.robot_plans.actions")
     except ImportError:
         return {}
 
-    result: Dict[str, type] = {}
-    for _, module_name, _ in pkgutil.walk_packages(
-        actions_pkg.__path__, prefix=actions_pkg.__name__ + "."
+    for _, modname, _ in pkgutil.walk_packages(
+        _pkg.__path__, prefix=_pkg.__name__ + "."
     ):
         try:
-            mod = importlib.import_module(module_name)
-            for name, obj in inspect.getmembers(mod, inspect.isclass):
-                if (
-                    name.endswith("Action")
-                    and not inspect.isabstract(obj)
-                    and obj.__module__.startswith("pycram")
-                ):
-                    result[name] = obj
-        except Exception:
-            continue
-    return result
+            importlib.import_module(modname)
+        except Exception as exc:
+            logger.debug("discover_action_classes: skipping %s: %s", modname, exc)
+
+    from pycram.robot_plans.actions.base import ActionDescription
+
+    return {
+        cls.__name__: cls
+        for cls in recursive_subclasses(ActionDescription)
+        if dataclasses.is_dataclass(cls) and not inspect.isabstract(cls)
+    }

@@ -17,25 +17,27 @@ Package layout
 --------------
   backend.py              LLMBackend — the GenerativeBackend implementation
   factory.py              nl_plan() / nl_sequential() / resolve_params() — user-facing entry points
-  schemas/
-    entities.py           EntityDescriptionSchema — pre-grounding entity description
-    slots.py              SlotValue, ActionReasoningOutput, ActionClassification
+  exceptions.py           typed llmr exceptions
+  schemas.py              EntityDescriptionSchema, SlotValue, ActionReasoningOutput, ActionClassification
+  bridge/                 single gateway to krrood — all krrood calls funnel here
+    introspect.py         PycramIntrospector, FieldKind, ActionSchema, FieldSpec
+    world_reader.py       SymbolGraph read + serialize_world_from_symbol_graph
+    match_reader.py       Match snapshot: MatchData, MatchSlot, read_match, required_match
   pycram_bridge/
-    introspector.py       PycramIntrospector, FieldKind, ActionSchema, FieldSpec
     adapter.py            PyCRAM execution and action-discovery boundary
-  world/
-    serializer.py         serialize_world_from_symbol_graph() — world → LLM string
-    grounder.py           EntityGrounder — description → Symbol instance
   reasoning/
     slot_filler.py        run_slot_filler(), classify_action() — LLM prompt pipeline
     decomposer.py         TaskDecomposer — compound NL → atomic steps
     llm_config.py         make_llm(), LLMProvider — LLM factory
+  resolution/
+    grounder.py           EntityGrounder — description → Symbol instance
+    slot_resolution.py    LLM slot output coercion and grounding dispatch
 
 Quickstart — simple (fully NL-driven)
 ---------------------------------------
 ::
 
-    from llmr import LLMBackend, nl_plan, nl_sequential
+    from llmr import nl_plan, nl_sequential
     from llmr.reasoning.llm_config import make_llm, LLMProvider
     from your_world_package import Body  # caller's groundable type
 
@@ -62,9 +64,19 @@ Quickstart — power user (action type known, LLM fills free slots)
 ::
 
     from krrood.entity_query_language.query.match import Match
+    from llmr import resolve_match, resolve_params
     from your_action_package import PickUpAction
+    from your_action_package import GraspDescription
 
-    match = Match(PickUpAction)(object_designator=..., arm=..., grasp_description=...)
+    match = Match(PickUpAction)(
+        object_designator=...,
+        arm=...,
+        grasp_description=Match(GraspDescription)(
+            approach_direction=...,
+            vertical_alignment=...,
+            manipulator=...,
+        ),
+    )
     action = resolve_params(
         match,
         llm=llm,
