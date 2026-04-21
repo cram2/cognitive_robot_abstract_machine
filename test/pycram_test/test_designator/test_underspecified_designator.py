@@ -16,6 +16,7 @@ from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import sequential, execute_single
 from pycram.robot_plans.actions.core.navigation import NavigateAction
 from pycram.robot_plans.actions.core.pick_up import PickUpAction
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
@@ -52,11 +53,11 @@ def test_underspecified_action_with_ellipsis(mutable_model_world):
         target_location=underspecified(Pose.from_xyz_rpy)(
             x=...,
             y=...,
-            z=...,
+            z=0,
             roll=0,
             pitch=0,
             yaw=0,
-            reference_frame=world.root,
+            reference_frame=context.robot.root,
         ),
         keep_joint_states=...,
     )
