@@ -1,76 +1,63 @@
-import logging
-import os
-import sys
-
-import pycram
-from ormatic.ormatic import logger, ORMatic
-from ormatic.utils import classes_of_module, recursive_subclasses, ORMaticExplicitMapping
-from pycram.datastructures import pose
-from pycram.datastructures.dataclasses import FrozenObject, RayResult, MultiverseRayResult, MultiverseContactPoint, \
-    ReasoningResult, \
-    MultiverseMetaData, VirtualMobileBaseJoints, Rotations, TextAnnotation, VirtualJoint, ContactPointsList, \
-    ClosestPointsList, State, CollisionCallbacks, MultiBody, Colors, ManipulatorData
-from sqlacodegen.generators import TablesGenerator
-from sqlalchemy import create_engine
-from sqlalchemy.orm import registry, Session
-
-from segmind.datastructures import events, mixins
-from segmind.datastructures.events import InsertionEvent
-from segmind.detectors.atomic_event_detectors import AtomicEventDetector
-
 # ----------------------------------------------------------------------------------------------------------------------
-# This script generates the ORM classes for the segmind package.
+# This script generates the ORM classes for the semantic_digital_twin package.
 # Dataclasses can be mapped automatically to the ORM model
 # using the ORMatic library, they just have to be registered in the classes list.
 # Classes that are self_mapped and explicitly_mapped are already mapped in the model.py file. Look there for more
 # information on how to map them.
 # ----------------------------------------------------------------------------------------------------------------------
+from __future__ import annotations
+import logging
+import os
+from dataclasses import is_dataclass
 
-# create set of classes that should be mapped
-classes = set()
-classes |= set(recursive_subclasses(ORMaticExplicitMapping))
-classes |= set(classes_of_module(events)) - {InsertionEvent}
-# classes |= set(classes_of_module(mixins))
-pycram_dataclasses = set(classes_of_module(pycram.datastructures.dataclasses))
-pycram_dataclasses -= {RayResult, MultiverseRayResult, MultiverseContactPoint, ReasoningResult, MultiverseMetaData,
-                       VirtualMobileBaseJoints, Rotations, TextAnnotation, VirtualJoint,
-                       MultiBody, CollisionCallbacks, Colors, ManipulatorData}
-pycram_dataclasses -= set(recursive_subclasses(State)) | {State}
-classes |= pycram_dataclasses
-classes |= set(classes_of_module(pose))
-classes -= set(recursive_subclasses(AtomicEventDetector)) | {AtomicEventDetector}
+import segmind
+from krrood.class_diagrams import ClassDiagram
+from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
+from krrood.ormatic.ormatic import ORMatic
+from krrood.ormatic.utils import classes_of_module, classes_of_package
+from krrood.utils import recursive_subclasses
+
+all_classes = set(classes_of_package(segmind))
+all_classes -= set(classes_of_module(segmind.orm.ormatic_interface))
+
+
+# keep only dataclasses that are NOT AlternativeMapping subclasses
+all_classes = {
+    c for c in all_classes if is_dataclass(c) and not issubclass(c, AlternativeMapping)
+}
+
+alternative_mappings = [
+    am
+    for am in recursive_subclasses(AlternativeMapping)
+    if am.original_class() in all_classes and not am.__module__.startswith("test.")
+]
+
 
 def generate_orm():
     """
-    Generate the ORM classes for the pycram package.
+    Generate the ORM classes for the segmind package.
     """
-    # Set up logging
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+    logging.basicConfig(level=logging.INFO)  # Or your preferred config
+    logging.getLogger("krrood").setLevel(logging.DEBUG)
 
-    mapper_registry = registry()
-    engine = create_engine('sqlite:///:memory:')
-    session = Session(engine)
+    class_diagram = ClassDiagram(
+        list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
+    )
 
-    # Create an ORMatic object with the classes to be mapped
-    ormatic = ORMatic(list(classes), mapper_registry)
+    instance = ORMatic(
+        class_dependency_graph=class_diagram,
+        alternative_mappings=alternative_mappings,
+    )
+    instance.make_all_tables()
 
-    # Generate the ORM classes
-    ormatic.make_all_tables()
-
-    # Create the tables in the database
-    mapper_registry.metadata.create_all(session.bind)
-
-    # Write the generated code to a file
-    generator = TablesGenerator(mapper_registry.metadata, session.bind, [])
-
-    path = os.path.abspath(os.path.join(os.getcwd(), '../src/segmind/orm/'))
-    with open(os.path.join(path, 'ormatic_interface.py'), 'w') as f:
-        ormatic.to_python_file(generator, f)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.abspath(
+        os.path.join(script_dir, "..", "src", "segmind", "orm")
+    )
+    with open(os.path.join(path, "ormatic_interface.py"), "w") as f:
+        instance.to_sqlalchemy_file(f)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     generate_orm()
