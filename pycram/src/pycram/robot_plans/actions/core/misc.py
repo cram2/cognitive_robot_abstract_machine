@@ -98,19 +98,19 @@ class MoveToReach(ActionDescription):
     Let the robot move to a position facing the target and reach with a manipulator.
     """
 
-    standing_position: Point3
+    robot_x: float
     """
-    The position where the robot should stand.
+    The x position where the robot should stand w. r. t. the target.
+    """
+
+    robot_y: float
+    """
+    The y position where the robot should stand w. r. t. the target.
     """
 
     hip_rotation: float
     """
     Additional yaw applied to the orientation facing the target directly.
-    """
-
-    manipulator: Manipulator
-    """
-    The Manipulator to move to the target pose.
     """
 
     target_pose: Pose
@@ -144,7 +144,7 @@ class MoveToReach(ActionDescription):
                     NavigateAction(self.standing_pose),
                     MoveManipulatorAction(
                         self.target_pose,
-                        self.manipulator,
+                        self.grasp_description.manipulator,
                         allow_gripper_collision=False,
                     ),
                 ]
