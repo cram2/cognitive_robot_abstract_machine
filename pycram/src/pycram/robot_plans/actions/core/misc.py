@@ -22,7 +22,7 @@ from pycram.robot_plans.actions.core.navigation import NavigateAction
 from pycram.robot_plans.actions.core.robot_body import MoveManipulatorAction
 from semantic_digital_twin.robots.abstract_robot import Manipulator
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Quaternion
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Region,
@@ -95,17 +95,22 @@ class DetectAction(ActionDescription):
 @dataclass
 class MoveToReach(ActionDescription):
     """
-    Let the robot move to `standing_pose` and reach with `manipulator` at `target_pose`.
+    Let the robot move to a position facing the target and reach with a manipulator.
     """
 
-    standing_pose: Pose
+    standing_position: Point3
     """
-    The pose that the robot should stand at.
+    The position where the robot should stand.
+    """
+
+    hip_rotation: float
+    """
+    Additional yaw applied to the orientation facing the target directly.
     """
 
     manipulator: Manipulator
     """
-    The Manipulator to move to the target pose
+    The Manipulator to move to the target pose.
     """
 
     target_pose: Pose
@@ -115,8 +120,22 @@ class MoveToReach(ActionDescription):
 
     grasp_description: GraspDescription
     """
-    The semantic description that should be used for the reaching
+    The semantic description for the reaching.
     """
+
+    @property
+    def standing_pose(self) -> Pose:
+        """
+        The pose that the robot should stand at, calculated from standing_position and hip_rotation.
+        """
+        target_pos = self.target_pose.to_position()
+        diff_x = target_pos.x - self.standing_position.x
+        diff_y = target_pos.y - self.standing_position.y
+        base_yaw = np.arctan2(diff_y, diff_x)
+
+        total_yaw = base_yaw + self.hip_rotation
+        orientation = Quaternion.from_rpy(0, 0, total_yaw)
+        return Pose(self.standing_position, orientation)
 
     def execute(self):
         self.add_subplan(
@@ -136,8 +155,19 @@ class MoveToReach(ActionDescription):
     def post_condition(
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> SymbolicExpression:
-        standing_pose = variables["standing_pose"]
-        root_T_robot_base = context.world.transform(standing_pose, context.world.root)
+        standing_position = variables["standing_position"]
+        hip_rotation = variables["hip_rotation"]
+        target_pose = variables["target_pose"]
+
+        target_pos = target_pose.to_position()
+        diff_x = target_pos.x - standing_position.x
+        diff_y = target_pos.y - standing_position.y
+        base_yaw = np.arctan2(diff_y, diff_x)
+        total_yaw = base_yaw + hip_rotation
+
+        expected_pose = Pose(standing_position, Quaternion.from_rpy(0, 0, total_yaw))
+
+        root_T_robot_base = context.world.transform(expected_pose, context.world.root)
         return np.allclose(
             root_T_robot_base, context.robot.base.root.global_pose.to_np(), atol=0.1
         )

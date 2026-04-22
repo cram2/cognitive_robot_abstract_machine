@@ -27,7 +27,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     AbstractRobot,
 )
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -160,23 +160,21 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         world = self.setup_world()
         [robot] = world.get_semantic_annotations_by_type(AbstractRobot)
         target_pose = Pose.from_xyz_rpy(
-            x=1,
-            y=1,
+            x=0,
+            y=0,
             z=1,
             reference_frame=world.root,
         )
 
         move_to_reach = underspecified(MoveToReach)(
             target_pose=target_pose,
-            standing_pose=underspecified(Pose.from_xyz_rpy)(
+            standing_position=underspecified(Point3)(
                 x=...,
                 y=...,
                 z=float(robot.root.global_pose.z),
-                roll=0.0,
-                pitch=0.0,
-                yaw=...,
                 reference_frame=target_pose.reference_frame,
             ),
+            hip_rotation=...,
             manipulator=variable(Manipulator, world.semantic_annotations),
             grasp_description=underspecified(GraspDescription)(
                 approach_direction=...,
