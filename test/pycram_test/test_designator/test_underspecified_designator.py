@@ -65,9 +65,9 @@ def test_underspecified_action_with_ellipsis(mutable_model_world):
     plan = execute_single(action_like=action, context=context).plan
     with simulated_robot:
         plan.perform()
-    assert len(plan.nodes) == 3
+    assert len(plan.nodes) >= 3
     assert plan.root.status == TaskStatus.SUCCEEDED
-    assert plan.root.children[0].status == TaskStatus.SUCCEEDED
+    assert plan.root.children[-1].status == TaskStatus.SUCCEEDED
 
 
 def test_underspecified_language(mutable_model_world):

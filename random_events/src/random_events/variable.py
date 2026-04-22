@@ -1,4 +1,5 @@
 import enum
+import types
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import assert_never
@@ -204,6 +205,7 @@ def variable_from_name_and_type(name: str, type_: Type) -> Variable:
     :param type_: The type of the variable
     :return: The created variable
     """
+
     if issubclass(type_, enum.Enum):
         result = Symbolic(name=name, domain=Set.from_iterable(type_))
     elif issubclass(type_, bool):

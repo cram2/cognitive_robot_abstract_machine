@@ -35,7 +35,7 @@ class ContextIsUnavailable(DataclassException):
 
 
 @dataclass
-class ConditionNotSatisfied(DataclassException):
+class ConditionNotSatisfied(PlanFailure):
 
     pre_condition: bool
     action: Type[ActionDescription]
