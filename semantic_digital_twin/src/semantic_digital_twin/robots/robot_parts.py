@@ -30,7 +30,6 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasTwoFingers,
     HasEndEffector,
     HasCameras,
-    HasRobotParts,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
@@ -67,7 +66,7 @@ logger = logging.getLogger("semantic_digital_twin")
 
 
 @dataclass(eq=False)
-class AggregatesRobotParts(HasRobotParts, ABC):
+class HasRobotParts(ABC):
     @property
     def _robot_parts(self) -> list[AbstractRobotPart]:
         """
@@ -96,18 +95,57 @@ class AggregatesRobotParts(HasRobotParts, ABC):
             wrapped_field = WrappedField(wrapped_class, field_.field)
 
             if isinstance(value, list_like_classes) and issubclass(
-                wrapped_field.contained_type, AggregatesRobotParts
+                wrapped_field.contained_type, HasRobotParts
             ):
                 for robot_part in value:
                     robot_parts.extend(robot_part._aggregate_robot_parts(seen))
-            elif isinstance(value, AggregatesRobotParts):
+            elif isinstance(value, HasRobotParts):
                 robot_parts.extend(value._aggregate_robot_parts(seen))
 
         return robot_parts
 
+    def _log_missing_fields(self):
+        """
+        Logs any fields that are empty, which could indicate missing information in the robot annotation.
+        Primarily used for manual validation purposes.
+        """
+        wrapped_class = WrappedClass(self.__class__)
+        introspector = DataclassOnlyIntrospector()
+        for field_ in introspector.discover(self.__class__):
+            self._process_field(wrapped_class, field_)
+
+    def _process_field(self, wrapped_class: WrappedClass, field: DiscoveredAttribute):
+        """
+        Processes a single field of the dataclass, checking if it is empty, and logs a warning if it is.
+
+        :param wrapped_class: The wrapped class of the dataclass.
+        :param field: The discovered attribute of the dataclass.
+        """
+        value = getattr(self, field.public_name)
+        wrapped_field = WrappedField(wrapped_class, field.field)
+        type_endpoint = wrapped_field.type_endpoint
+
+        if isinstance(value, list_like_classes) and issubclass(
+            wrapped_field.contained_type, HasRobotParts
+        ):
+            if not value:
+                self._log_missing_field(field)
+                return
+
+            for robot_part in value:
+                robot_part._log_missing_fields()
+
+        elif issubclass(type_endpoint, HasRobotParts) and value is None:
+            self._log_missing_field(field)
+
+    def _log_missing_field(self, field: DiscoveredAttribute):
+        logger.info(
+            f"The field {field.public_name} of {self.__class__.__name__} is empty."
+        )
+
 
 @dataclass(eq=False)
-class AbstractRobotPart(HasRootBody, AggregatesRobotParts, ABC):
+class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     """
     Abstract base class for all robot parts.
     """
@@ -117,9 +155,6 @@ class AbstractRobotPart(HasRootBody, AggregatesRobotParts, ABC):
     Common joint states for the current robot part.
     """
 
-    def _setup_robot_parts(self):
-        super()._setup_robot_parts()
-
     @classmethod
     @abstractmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -128,6 +163,19 @@ class AbstractRobotPart(HasRootBody, AggregatesRobotParts, ABC):
         """
         Sets up a default configuration of this robot part in the world, below the given robot root.
         This is used to set up a default configuration of the robot part in the world after parsing a URDF.
+        """
+
+    @abstractmethod
+    def setup_hardware_interfaces(self):
+        """
+        Sets up a default hardware interface for this robot part by setting the has_hardware_interface flag to True for
+         relevant connections of this robot part. Implement as "pass" if this robot part does not have any hardware interfaces.
+        """
+
+    @abstractmethod
+    def setup_joint_states(self):
+        """
+        Sets up default joint states for this robot part. Implement as "pass" if this robot part does not have any joint states.
         """
 
     @synchronized_attribute_modification
@@ -183,7 +231,7 @@ class AbstractRobotPart(HasRootBody, AggregatesRobotParts, ABC):
             raise DuplicateRobotAssignmentsError(robot_part=self, robots=robot)
         return robot[0]
 
-    def _default_hardware_interface_setup(self):
+    def _setup_hardware_interfaces_for_active_connections(self):
         """
         Sets up a default hardware interface for the robot part by setting the has_hardware_interface flag to True for
          all active connections of all robot parts in this robot part
@@ -405,18 +453,10 @@ class MobileBase(AbstractRobotPart, ABC):
 
 
 @dataclass(eq=False)
-class AbstractRobot(Agent, AggregatesRobotParts, ABC):
+class AbstractRobot(Agent, HasRobotParts, ABC):
     """
     Specification of an abstract robot
     """
-
-    def _setup_robot_parts(self):
-        """
-        Sets up the robot parts for this robot.
-        """
-        super()._setup_robot_parts()
-        for robot_part in self._robot_parts:
-            robot_part._setup_robot_parts()
 
     @classmethod
     @abstractmethod
@@ -455,7 +495,9 @@ class AbstractRobot(Agent, AggregatesRobotParts, ABC):
             )
             world.add_semantic_annotation(self)
             self.setup_robot_part_semantic_annotations()
-            self._setup_robot_parts()
+            for robot_part in self._robot_parts:
+                robot_part.setup_hardware_interfaces()
+                robot_part.setup_joint_states()
             return self
 
     @property
