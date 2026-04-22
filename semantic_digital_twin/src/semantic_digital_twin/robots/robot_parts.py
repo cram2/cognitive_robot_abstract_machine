@@ -60,8 +60,14 @@ logger = logging.getLogger("semantic_digital_twin")
 
 @dataclass(eq=False)
 class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
+    """
+    Abstract base class for all robot parts.
+    """
 
     joint_states: list[JointState] = field(default_factory=list)
+    """
+    Common joint states for the current robot part.
+    """
 
     @synchronized_attribute_modification
     def add_joint_state(self, joint_state: JointState):
@@ -96,11 +102,14 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         **kwargs,
     ) -> Self:
         raise UselessConceptError(
-            message="The bodies needed for RobotParts should already exist in the world, by parsing a URDF"
+            message="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
         )
 
     @property
     def _robot(self) -> Optional[AbstractRobot]:
+        """
+        Computes backreference to the robot this robot part belongs to.
+        """
         from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 
         robot_variable = variable(AbstractRobot, self._world.semantic_annotations)
@@ -135,12 +144,24 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
 
 @dataclass(eq=False)
 class KinematicChain(AbstractRobotPart, ABC):
+    """
+    A kinematic chain is a robot part that consists of a chain of bodies and connections between them.
+    It has a root body and a tip body, and the connections between them can be computed using the world description.
+    """
 
     tip: Body = field(kw_only=True)
+    """
+    The body at the end of the kinematic chain.
+    """
 
     def _kinematic_structure_entities(
         self, visited: Set[int]
     ) -> list[KinematicStructureEntity]:
+        """
+        Computes the kinematic structure entities of this kinematic chain, which are the bodies and connections that
+        make up the kinematic chain, including the bodies of any robot parts that are part of this kinematic chain.
+
+        """
         if id(self) in visited:
             return []
         visited.add(id(self))
@@ -176,26 +197,60 @@ class FieldOfView:
     """
 
     vertical_angle: float
+    """
+    The vertical angle of the camera's field of view, in radians.
+    """
+
     horizontal_angle: float
+    """
+    The horizontal angle of the camera's field of view, in radians.
+    """
 
 
 @dataclass(eq=False)
-class Sensor(AbstractRobotPart, ABC): ...
+class Sensor(AbstractRobotPart, ABC):
+    """
+    Abstract base class for all sensors. A sensor is a robot part that can perceive the environment.
+    """
 
 
 @dataclass(eq=False)
 class Camera(Sensor, ABC):
-    forward_facing_axis: Vector3 = field(kw_only=True)
-    field_of_view: FieldOfView = field(kw_only=True)
-    default_camera: bool = False
+    """
+    A camera is a sensor that captures images of the environment.
+    """
 
-    # these should be calculated values i think?
+    forward_facing_axis: Vector3 = field(kw_only=True)
+    """
+    The axis of the camera that is facing forward.
+    """
+
+    field_of_view: FieldOfView = field(kw_only=True)
+    """
+    The field of view of the camera, defined by the vertical and horizontal angles of the camera's view.
+    """
+
+    default_camera: bool = False
+    """
+    Whether this camera is the default camera of the robot. Used for quick access.
+    """
+
     minimal_height: float = 0.0
+    """
+    The minimal height of the camera above the ground, in meters.
+    """
+
     maximal_height: float = 1.0
+    """
+    The maximal height of the camera above the ground, in meters.
+    """
 
 
 @dataclass(eq=False)
 class Finger(KinematicChain, ABC):
+    """
+    A finger is a kinematic chain attached to a gripper to manipulate objects.
+    """
 
     finger_tip_frame: Optional[Body] = None
     """
@@ -206,7 +261,7 @@ class Finger(KinematicChain, ABC):
 @dataclass(eq=False)
 class EndEffector(AbstractRobotPart, ABC):
     """
-    Abstract base class of robot manipulators. Always has a tool frame.
+    Abstract base class of robot end effector. Always has a tool frame.
     """
 
     tool_frame: Body = field(kw_only=True)
@@ -231,27 +286,39 @@ class EndEffector(AbstractRobotPart, ABC):
 
 
 @dataclass(eq=False)
-class MechanicalGripper(EndEffector, ABC): ...
+class ParallelGripper(EndEffector, HasTwoFingers, ABC):
+    """
+    A parallel gripper is an end effector that has two fingers that move in parallel to grasp objects.
+    """
 
 
 @dataclass(eq=False)
-class ParallelGripper(MechanicalGripper, HasTwoFingers, ABC): ...
+class HumanoidHand(EndEffector, HasFingers, ABC):
+    """
+    A humanoid hand is an end effector that has multiple fingers that can move independently to grasp objects.
+    """
 
 
 @dataclass(eq=False)
-class HumanoidHand(MechanicalGripper, HasFingers, ABC): ...
+class Torso(KinematicChain, ABC):
+    """
+    The torso of a robot, which is a kinematic chain providing additional shared degrees of freedom to its
+    attachments, such as arms or the neck.
+    """
 
 
 @dataclass(eq=False)
-class Torso(KinematicChain, ABC): ...
+class Arm(KinematicChain, HasEndEffector, ABC):
+    """
+    An arm is a kinematic chain that has an end effector attached to it.
+    """
 
 
 @dataclass(eq=False)
-class Arm(KinematicChain, HasEndEffector, ABC): ...
-
-
-@dataclass(eq=False)
-class Neck(KinematicChain, HasCameras, ABC): ...
+class Neck(KinematicChain, HasCameras, ABC):
+    """
+    The neck of a robot, which is a kinematic chain that has a camera attached to it.
+    """
 
 
 @dataclass(eq=False)
