@@ -1,5 +1,9 @@
 import logging
 
+from numpy.ma.testutils import (
+    assert_equal,
+)  # You could replace this with numpy's regular assert for better compatibility
+
 from krrood.entity_query_language.factories import entity, variable, in_, inference, an
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,

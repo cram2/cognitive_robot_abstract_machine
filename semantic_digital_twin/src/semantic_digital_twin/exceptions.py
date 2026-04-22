@@ -1,8 +1,7 @@
 from __future__ import annotations, absolute_import
 
-import traceback
 from dataclasses import dataclass, field
-from typing import Dict, Callable
+from typing import Dict
 from uuid import UUID
 
 from typing_extensions import (
@@ -16,6 +15,7 @@ from typing_extensions import (
 )
 
 from krrood.adapters.exceptions import JSONSerializationError
+from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from krrood.utils import DataclassException
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -30,8 +30,6 @@ if TYPE_CHECKING:
         KinematicStructureEntity,
     )
     from semantic_digital_twin.spatial_types.spatial_types import (
-        FloatVariable,
-        SymbolicMathType,
         SpatialType,
     )
     from semantic_digital_twin.spatial_types import Vector3

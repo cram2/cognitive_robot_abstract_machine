@@ -141,24 +141,6 @@ def test_perform_execute_single(immutable_model_world):
     plan.validate()
 
 
-@pytest.mark.skip(
-    reason="currently flaky and parallel is not working correctly rn anyways"
-)
-def test_perform_parallel_desig(immutable_model_world):
-    world, robot_view, context = immutable_model_world
-
-    plan = parallel(
-        [ParkArmsAction(Arms.BOTH), MoveTorsoAction(TorsoState.HIGH)],
-        context,
-    ).plan
-
-    with simulated_robot:
-        plan.perform()
-
-    for node in plan.nodes:
-        assert node.status == TaskStatus.SUCCEEDED
-
-
 def test_perform_single_designator(immutable_model_world):
     world, robot_view, context = immutable_model_world
 
