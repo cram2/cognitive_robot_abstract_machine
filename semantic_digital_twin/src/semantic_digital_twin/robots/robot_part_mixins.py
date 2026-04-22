@@ -4,10 +4,18 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Union
+from typing import Union, Set
+from uuid import UUID
 
 from typing_extensions import TYPE_CHECKING, Type
 
+from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.attribute_introspector import (
+    DataclassOnlyIntrospector,
+    DiscoveredAttribute,
+)
+from krrood.class_diagrams.class_diagram import WrappedClass
+from krrood.class_diagrams.wrapped_field import WrappedField
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
@@ -26,13 +34,66 @@ if TYPE_CHECKING:
         Torso,
         Neck,
         HumanoidHand,
+        AbstractRobotPart,
     )
 
 logger = logging.getLogger("semantic_digital_twin")
 
 
 @dataclass(eq=False)
-class HasFingers(ABC):
+class HasRobotParts(ABC):
+    """
+    Mixin class for classes that have robot parts to provide shared utility functions.
+    """
+
+    @abstractmethod
+    def _setup_robot_parts(self):
+        """
+        Sets up the robot part by adding the necessary semantic annotations and hardware interfaces.
+        """
+
+    def _log_missing_fields(self):
+        """
+        Logs any fields that are empty, which could indicate missing information in the robot annotation.
+        Primarily used for manual validation purposes.
+        """
+        wrapped_class = WrappedClass(self.__class__)
+        introspector = DataclassOnlyIntrospector()
+        for field_ in introspector.discover(self.__class__):
+            self._process_field(wrapped_class, field_)
+
+    def _process_field(self, wrapped_class: WrappedClass, field: DiscoveredAttribute):
+        """
+        Processes a single field of the dataclass, checking if it is empty, and logs a warning if it is.
+
+        :param wrapped_class: The wrapped class of the dataclass.
+        :param field: The discovered attribute of the dataclass.
+        """
+        value = getattr(self, field.public_name)
+        wrapped_field = WrappedField(wrapped_class, field.field)
+        type_endpoint = wrapped_field.type_endpoint
+
+        if isinstance(value, list_like_classes) and issubclass(
+            wrapped_field.contained_type, HasRobotParts
+        ):
+            if not value:
+                self._log_missing_field(field)
+                return
+
+            for robot_part in value:
+                robot_part._log_missing_fields()
+
+        elif issubclass(type_endpoint, HasRobotParts) and value is None:
+            self._log_missing_field(field)
+
+    def _log_missing_field(self, field: DiscoveredAttribute):
+        logger.info(
+            f"The field {field.public_name} of {self.__class__.__name__} is empty."
+        )
+
+
+@dataclass(eq=False)
+class HasFingers(HasRobotParts, ABC):
     """
     Mixin class for robots or robot parts that have fingers as their direct children.
     """
@@ -46,6 +107,9 @@ class HasFingers(ABC):
     """
     The thumb is a finger that always needs to be involved in the manipulation of objects.
     """
+
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
 
     @synchronized_attribute_modification
     def add_finger(self, finger: Finger):
@@ -82,7 +146,7 @@ class HasTwoFingers(HasFingers, ABC):
 
 
 @dataclass(eq=False)
-class HasSensors(ABC):
+class HasSensors(HasRobotParts, ABC):
     """
     Mixin class for robots or robot parts that have sensors
     """
@@ -91,6 +155,9 @@ class HasSensors(ABC):
     """
     The list of sensors associated with the robot part.
     """
+
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
 
     @synchronized_attribute_modification
     def add_sensor(self, sensor: Sensor):
@@ -121,7 +188,7 @@ class HasCameras(HasSensors, ABC):
 
 
 @dataclass(eq=False)
-class HasEndEffector(ABC):
+class HasEndEffector(HasRobotParts, ABC):
     """
     Mixin class for robots or robot parts that have an end effector as their direct child.
     """
@@ -131,6 +198,11 @@ class HasEndEffector(ABC):
     The end effector attached to the robot part.
     """
 
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+        self.setup_end_effector_hardware_interfaces()
+        self.setup_end_effector_joint_states()
+
     @synchronized_attribute_modification
     def add_end_effector(self, end_effector: EndEffector):
         self.end_effector = end_effector
@@ -139,6 +211,18 @@ class HasEndEffector(ABC):
     def setup_end_effector_semantic_annotation(self):
         """
         Sets up the semantic annotation for the end effector of this robot part.
+        """
+
+    @abstractmethod
+    def setup_end_effector_hardware_interfaces(self):
+        """
+        Sets up the hardware interfaces for the end effector of this robot part.
+        """
+
+    @abstractmethod
+    def setup_end_effector_joint_states(self):
+        """
+        Sets up the joint states for the end effector of this robot part.
         """
 
 
@@ -167,7 +251,7 @@ class HasHumanoidHand(HasEndEffector, ABC):
 
 
 @dataclass(eq=False)
-class HasArms(ABC):
+class HasArms(HasRobotParts, ABC):
     """
     Mixin class for robots or robot parts that have arms as their direct children.
     """
@@ -177,6 +261,11 @@ class HasArms(ABC):
     The list of arms attached to the robot part.
     """
 
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+        self.setup_arm_hardware_interfaces()
+        self.setup_arm_joint_states()
+
     @synchronized_attribute_modification
     def add_arm(self, arm: Arm):
         self.arms.append(arm)
@@ -185,6 +274,18 @@ class HasArms(ABC):
     def setup_arm_semantic_annotations(self):
         """
         Sets up the semantic annotations for the arms of this robot part.
+        """
+
+    @abstractmethod
+    def setup_arm_hardware_interfaces(self):
+        """
+        Sets up the hardware interfaces for the arms of this robot part.
+        """
+
+    @abstractmethod
+    def setup_arm_joint_states(self):
+        """
+        Sets up the joint states for the arms of this robot part.
         """
 
 
@@ -251,7 +352,7 @@ class HasLeftRightArm(HasArms, ABC):
 
 
 @dataclass(eq=False)
-class HasMobileBase(ABC):
+class HasMobileBase(HasRobotParts, ABC):
     """
     Mixin class for robots that have a mobile base.
     """
@@ -260,6 +361,9 @@ class HasMobileBase(ABC):
     """
     The mobile base attached to the robot part.
     """
+
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
 
     @synchronized_attribute_modification
     def add_mobile_base(self, mobile_base: MobileBase):
@@ -273,7 +377,7 @@ class HasMobileBase(ABC):
 
 
 @dataclass(eq=False)
-class HasTorso(ABC):
+class HasTorso(HasRobotParts, ABC):
     """
     Mixin class for robots or robot parts that have a torso as their direct child.
     """
@@ -282,6 +386,11 @@ class HasTorso(ABC):
     """
     The torso attached to the robot part.
     """
+
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+        self.setup_torso_hardware_interfaces()
+        self.setup_torso_joint_states()
 
     @synchronized_attribute_modification
     def add_torso(self, torso: Torso):
@@ -293,9 +402,21 @@ class HasTorso(ABC):
         Sets up the semantic annotation for the torso of this robot part.
         """
 
+    @abstractmethod
+    def setup_torso_hardware_interfaces(self):
+        """
+        Sets up the hardware interfaces for the torso of this robot part.
+        """
+
+    @abstractmethod
+    def setup_torso_joint_states(self):
+        """
+        Sets up the joint states for the torso of this robot part.
+        """
+
 
 @dataclass(eq=False)
-class HasNeck(ABC):
+class HasNeck(HasRobotParts, ABC):
     """
     Mixin class for robots or robot parts that have a neck as their direct child.
     """
@@ -305,12 +426,22 @@ class HasNeck(ABC):
     The neck attached to the robot part.
     """
 
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+        self.setup_neck_hardware_interfaces()
+
     @synchronized_attribute_modification
     def add_neck(self, neck: Neck):
         self.neck = neck
 
     @abstractmethod
-    def setup_neck_semantic_annotations(self):
+    def setup_neck_semantic_annotation(self):
         """
         Sets up the semantic annotation for the neck of this robot part.
+        """
+
+    @abstractmethod
+    def setup_neck_hardware_interfaces(self):
+        """
+        Sets up the hardware interfaces for the neck of this robot part.
         """
