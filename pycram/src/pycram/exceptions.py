@@ -5,7 +5,7 @@ from typing_extensions import TYPE_CHECKING, Type, List
 
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from krrood.entity_query_language.factories import ConditionType, get_false_statements
-from krrood.utils import DataclassException
+from krrood.exceptions import DataclassException
 from pycram.plans.failures import PlanFailure
 
 if TYPE_CHECKING:
