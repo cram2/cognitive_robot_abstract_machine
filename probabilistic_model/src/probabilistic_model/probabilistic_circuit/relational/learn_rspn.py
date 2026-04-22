@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from collections import deque
 import enum
 from dataclasses import dataclass
 import numpy as np
@@ -75,6 +75,57 @@ def get_python_type_from_sqlalchemy_column(column: Column):
     return python_type
 
 
+def get_features_of_class_bfs(
+    example_instance: DataAccessObject,
+    symbolic_attribute_access: Variable,
+    result: List,
+    seen: Set,
+):
+    """
+    BFS version: traverses the object graph level-by-level instead of recursively (DFS).
+    """
+
+    queue = deque()
+    queue.append((example_instance, symbolic_attribute_access))
+
+    while queue:
+        current_instance, current_symbolic = queue.popleft()
+
+        if id(current_instance) in seen:
+            continue
+        seen.add(id(current_instance))
+
+        specification = RSPNSpecification(type(current_instance))
+
+        # Process attributes (same as before)
+        for attribute in specification.attributes:
+            value = getattr(current_instance, attribute.key)
+
+            if not isinstance(value, compatible_types):
+                continue
+
+            current_symbolic_attribute_access = getattr(
+                current_symbolic, attribute.name
+            )
+
+            current_symbolic_attribute_access._type_ = (
+                get_python_type_from_sqlalchemy_column(attribute)
+            )
+
+            result.append(current_symbolic_attribute_access)
+
+        # Enqueue children instead of recursing
+        for part in specification.unique_parts:
+            value = getattr(current_instance, part)
+
+            if value is None:
+                continue
+
+            queue.append((value, getattr(current_symbolic, part)))
+
+    return result
+
+
 def get_features_of_class(
     example_instance: DataAccessObject,
     symbolic_attribute_access: Variable,
@@ -130,7 +181,7 @@ def LearnRSPN(cls: Any, instances: List[DataAccessObject]) -> RSPNTemplate:
 
     Returns the root node (ProductUnit or SumUnit) within a ProbabilisticCircuit.
     """
-    features = get_features_of_class(instances[0], variable(cls, []), [], set())
+    features = get_features_of_class_bfs(instances[0], variable(cls, []), [], set())
     if not features:
         raise ValueError(f"No features found for class {cls}")
 

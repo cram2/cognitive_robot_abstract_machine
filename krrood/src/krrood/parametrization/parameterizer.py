@@ -27,6 +27,7 @@ from krrood.parametrization.random_events_translator import (
 from probabilistic_model.probabilistic_circuit.relational.learn_rspn import (
     get_features_of_class,
     FeatureExtractor,
+    get_features_of_class_bfs,
 )
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.set import Set
@@ -141,7 +142,7 @@ class UnderspecifiedParameters:
         hashes = [hash(obj) for obj in domain_objects]
         data_access_objects = [to_dao(obj, state=state) for obj in domain_objects]
 
-        features = get_features_of_class(
+        features = get_features_of_class_bfs(
             data_access_objects[0],
             attribute_match.assigned_variable,
             [],
