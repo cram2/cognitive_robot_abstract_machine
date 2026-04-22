@@ -27,6 +27,7 @@ from semantic_digital_twin.robots.abstract_robot import (
     HasTwoFingers,
     HasEndEffector,
     HasCameras,
+    HasRobotParts,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.spatial_types import (
@@ -58,52 +59,7 @@ logger = logging.getLogger("semantic_digital_twin")
 
 
 @dataclass(eq=False)
-class AggregatesRobotParts(ABC):
-    """
-    Mixin for classes which can iterate through its own fields to aggregate all robot parts
-    references (including recursively).
-    """
-
-    @property
-    def _robot_parts(self) -> list[AbstractRobotPart]:
-        """
-        Serves as a generic interface to access all robot parts assigned to a robot part.
-        Returns a list of all robot parts assigned directly to this robot part.
-        """
-        return self._aggregate_robot_parts(set())
-
-    def _aggregate_robot_parts(self, seen: Set[UUID]) -> list[AbstractRobotPart]:
-        """
-        Recursively aggregates all robot parts assigned to this robot part, including itself if it is a robot part.
-         Uses a set of seen UUIDs to avoid infinite recursion in case of cyclic references and duplicates.
-        """
-        wrapped_class = WrappedClass(self.__class__)
-        introspector = DataclassOnlyIntrospector()
-        robot_parts = []
-
-        if isinstance(self, AbstractRobotPart):
-            if self.id in seen:
-                return []
-            seen.add(self.id)
-            robot_parts.append(self)
-
-        for field_ in introspector.discover(self.__class__):
-            value = getattr(self, field_.public_name)
-            wrapped_field = WrappedField(wrapped_class, field_.field)
-
-            if isinstance(value, list_like_classes) and issubclass(
-                wrapped_field.contained_type, AbstractRobotPart
-            ):
-                for robot_part in value:
-                    robot_parts.extend(robot_part._aggregate_robot_parts(seen))
-            elif isinstance(value, AbstractRobotPart):
-                robot_parts.extend(value._aggregate_robot_parts(seen))
-
-        return robot_parts
-
-
-@dataclass(eq=False)
-class AbstractRobotPart(HasRootBody, AggregatesRobotParts, ABC):
+class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
 
     joint_states: list[JointState] = field(default_factory=list)
 
@@ -143,45 +99,6 @@ class AbstractRobotPart(HasRootBody, AggregatesRobotParts, ABC):
             message="The bodies needed for RobotParts should already exist in the world, by parsing a URDF"
         )
 
-    def _log_missing_fields(self):
-        """
-        Logs any fields that are empty, which could indicate missing information in the robot annotation.
-        Primarily used for manual validation purposes.
-        """
-        wrapped_class = WrappedClass(self.__class__)
-        introspector = DataclassOnlyIntrospector()
-        for field_ in introspector.discover(self.__class__):
-            self._process_field(wrapped_class, field_)
-
-    def _process_field(self, wrapped_class: WrappedClass, field: DiscoveredAttribute):
-        """
-        Processes a single field of the dataclass, checking if it is empty, and logs a warning if it is.
-
-        :param wrapped_class: The wrapped class of the dataclass.
-        :param field: The discovered attribute of the dataclass.
-        """
-        value = getattr(self, field.public_name)
-        wrapped_field = WrappedField(wrapped_class, field.field)
-        type_endpoint = wrapped_field.type_endpoint
-
-        if isinstance(value, list_like_classes) and issubclass(
-            wrapped_field.contained_type, AbstractRobotPart
-        ):
-            if not value:
-                self._log_missing_field(field)
-                return
-
-            for robot_part in value:
-                robot_part._log_missing_fields()
-
-        elif issubclass(type_endpoint, AbstractRobotPart) and value is None:
-            self._log_missing_field(field)
-
-    def _log_missing_field(self, field: DiscoveredAttribute):
-        logger.info(
-            f"The field {field.public_name} of {self.__class__.__name__} is empty."
-        )
-
     @property
     def _robot(self) -> Optional[AbstractRobot]:
         from semantic_digital_twin.robots.abstract_robot import AbstractRobot
@@ -214,10 +131,6 @@ class AbstractRobotPart(HasRootBody, AggregatesRobotParts, ABC):
             for connection in self.connections
             if isinstance(connection, ActiveConnection)
         ]
-
-    @classmethod
-    @abstractmethod
-    def setup_default_configuration_in_world(cls, world: World) -> Self: ...
 
 
 @dataclass(eq=False)
@@ -326,7 +239,7 @@ class ParallelGripper(MechanicalGripper, HasTwoFingers, ABC): ...
 
 
 @dataclass(eq=False)
-class HumanoidHand(EndEffector, HasFingers, ABC): ...
+class HumanoidHand(MechanicalGripper, HasFingers, ABC): ...
 
 
 @dataclass(eq=False)

@@ -1,13 +1,23 @@
 from __future__ import annotations
+
+import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Union, Tuple, Optional, List
+from typing import Union, Tuple, Optional, List, Set
+from uuid import UUID
 
 from typing_extensions import TYPE_CHECKING, Type, Self, DefaultDict
 
+from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.attribute_introspector import (
+    DataclassOnlyIntrospector,
+    DiscoveredAttribute,
+)
+from krrood.class_diagrams.class_diagram import WrappedClass
+from krrood.class_diagrams.wrapped_field import WrappedField
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import MissingDefaultCameraError
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
@@ -40,18 +50,100 @@ if TYPE_CHECKING:
         MobileBase,
         Torso,
         Neck,
+        HumanoidHand,
+        AbstractRobotPart,
     )
 
-
-@dataclass(eq=False)
-class RobotSpecification:
-
-    @abstractmethod
-    def _setup_specifications(self, world: World): ...
+logger = logging.getLogger("semantic_digital_twin")
 
 
 @dataclass(eq=False)
-class HasFingers(RobotSpecification):
+class HasRobotParts(ABC):
+    """
+    Marker class for all robot parts, including the robot itself.
+    This class serves as a common ancestor for all robot parts, allowing for easy identification and
+    aggregation of robot parts within a robot semantic annotation.
+    """
+
+    @property
+    def _robot_parts(self) -> list[AbstractRobotPart]:
+        """
+        Serves as a generic interface to access all robot parts assigned to a robot part.
+        Returns a list of all robot parts assigned directly to this robot part.
+        """
+        return self._aggregate_robot_parts(set())
+
+    def _aggregate_robot_parts(self, seen: Set[UUID]) -> list[AbstractRobotPart]:
+        """
+        Recursively aggregates all robot parts assigned to this robot part, including itself if it is a robot part.
+         Uses a set of seen UUIDs to avoid infinite recursion in case of cyclic references and duplicates.
+        """
+        wrapped_class = WrappedClass(self.__class__)
+        introspector = DataclassOnlyIntrospector()
+        robot_parts = []
+
+        if isinstance(self, HasRobotParts):
+            if self.id in seen:
+                return []
+            seen.add(self.id)
+            robot_parts.append(self)
+
+        for field_ in introspector.discover(self.__class__):
+            value = getattr(self, field_.public_name)
+            wrapped_field = WrappedField(wrapped_class, field_.field)
+
+            if isinstance(value, list_like_classes) and issubclass(
+                wrapped_field.contained_type, HasRobotParts
+            ):
+                for robot_part in value:
+                    robot_parts.extend(robot_part._aggregate_robot_parts(seen))
+            elif isinstance(value, HasRobotParts):
+                robot_parts.extend(value._aggregate_robot_parts(seen))
+
+        return robot_parts
+
+    def _log_missing_fields(self):
+        """
+        Logs any fields that are empty, which could indicate missing information in the robot annotation.
+        Primarily used for manual validation purposes.
+        """
+        wrapped_class = WrappedClass(self.__class__)
+        introspector = DataclassOnlyIntrospector()
+        for field_ in introspector.discover(self.__class__):
+            self._process_field(wrapped_class, field_)
+
+    def _process_field(self, wrapped_class: WrappedClass, field: DiscoveredAttribute):
+        """
+        Processes a single field of the dataclass, checking if it is empty, and logs a warning if it is.
+
+        :param wrapped_class: The wrapped class of the dataclass.
+        :param field: The discovered attribute of the dataclass.
+        """
+        value = getattr(self, field.public_name)
+        wrapped_field = WrappedField(wrapped_class, field.field)
+        type_endpoint = wrapped_field.type_endpoint
+
+        if isinstance(value, list_like_classes) and issubclass(
+            wrapped_field.contained_type, HasRobotParts
+        ):
+            if not value:
+                self._log_missing_field(field)
+                return
+
+            for robot_part in value:
+                robot_part._log_missing_fields()
+
+        elif issubclass(type_endpoint, HasRobotParts) and value is None:
+            self._log_missing_field(field)
+
+    def _log_missing_field(self, field: DiscoveredAttribute):
+        logger.info(
+            f"The field {field.public_name} of {self.__class__.__name__} is empty."
+        )
+
+
+@dataclass(eq=False)
+class HasFingers(ABC):
 
     fingers: list[Finger] = field(default_factory=list)
 
@@ -69,19 +161,8 @@ class HasFingers(RobotSpecification):
             raise Exception(f"This finger is already part of the robot {self}.")
         self.thumb = thumb
 
-    def _setup_specifications(self, world: World):
-        super()._setup_specifications(world)
-        fingers, thumb = self.setup_finger_semantic_annotations(world)
-        world.add_semantic_annotations(fingers)
-        world.add_semantic_annotation(thumb)
-        for finger in fingers:
-            self.add_finger(finger)
-        self.add_thumb(thumb)
-
     @abstractmethod
-    def setup_finger_semantic_annotations(
-        self, world: World
-    ) -> Tuple[list[Finger], Finger]: ...
+    def setup_finger_semantic_annotations(self, world: World): ...
 
 
 @dataclass(eq=False)
@@ -97,7 +178,7 @@ class HasTwoFingers(HasFingers, ABC):
 
 
 @dataclass(eq=False)
-class HasSensors(RobotSpecification):
+class HasSensors(ABC):
 
     sensors: list[Sensor] = field(default_factory=list)
 
@@ -105,15 +186,8 @@ class HasSensors(RobotSpecification):
     def add_sensor(self, sensor: Sensor):
         self.sensors.append(sensor)
 
-    def _setup_specifications(self, world: World):
-        super()._setup_specifications(world)
-        sensors = self.setup_sensor_semantic_annotations(world)
-        world.add_semantic_annotations(sensors)
-        for sensor in sensors:
-            self.add_sensor(sensor)
-
     @abstractmethod
-    def setup_sensor_semantic_annotations(self, world: World) -> list[Sensor]: ...
+    def setup_sensor_semantic_annotations(self): ...
 
 
 @dataclass(eq=False)
@@ -131,7 +205,7 @@ class HasCameras(HasSensors, ABC):
 
 
 @dataclass(eq=False)
-class HasEndEffector(RobotSpecification, ABC):
+class HasEndEffector(ABC):
 
     end_effector: EndEffector = field(default=None)
 
@@ -139,14 +213,8 @@ class HasEndEffector(RobotSpecification, ABC):
     def add_end_effector(self, end_effector: EndEffector):
         self.end_effector = end_effector
 
-    def _setup_specifications(self, world: World):
-        super()._setup_specifications(world)
-        end_effector = self.setup_end_effector_semantic_annotation(world)
-        world.add_semantic_annotation(end_effector)
-        self.add_end_effector(end_effector)
-
     @abstractmethod
-    def setup_end_effector_semantic_annotation(self, world: World) -> EndEffector: ...
+    def setup_end_effector_semantic_annotation(self): ...
 
 
 @dataclass(eq=False)
@@ -160,22 +228,20 @@ class HasParallelGripper(HasMechanicalGripper, ABC):
 
 
 @dataclass(eq=False)
-class HasArms(RobotSpecification):
+class HasHumanoidHand(HasMechanicalGripper, ABC):
+    end_effector: HumanoidHand = field(default=None)
+
+
+@dataclass(eq=False)
+class HasArms(ABC):
     arms: list[Arm] = field(default_factory=list)
 
     @synchronized_attribute_modification
     def add_arm(self, arm: Arm):
         self.arms.append(arm)
 
-    def _setup_specifications(self, world: World):
-        super()._setup_specifications(world)
-        arms = self.setup_arm_semantic_annotations(world)
-        world.add_semantic_annotations(arms)
-        for arm in arms:
-            self.add_arm(arm)
-
     @abstractmethod
-    def setup_arm_semantic_annotations(self, world: World) -> list[Arm]: ...
+    def setup_arm_semantic_annotations(self): ...
 
 
 @dataclass(eq=False)
@@ -241,68 +307,53 @@ class HasLeftRightArm(HasArms, ABC):
 
 
 @dataclass(eq=False)
-class HasMobileBase(RobotSpecification):
+class HasMobileBase(ABC):
     mobile_base: MobileBase = field(default=None)
 
     @synchronized_attribute_modification
     def add_mobile_base(self, mobile_base: MobileBase):
         self.mobile_base = mobile_base
 
-    def _setup_specifications(self, world: World):
-        mobile_base = self.setup_mobile_base_semantic_annotation(world)
-        world.add_semantic_annotation(mobile_base)
-        self.add_mobile_base(mobile_base)
-
     @abstractmethod
-    def setup_mobile_base_semantic_annotation(self, world: World) -> MobileBase: ...
+    def setup_mobile_base_semantic_annotation(self): ...
 
 
 @dataclass(eq=False)
-class HasTorso(RobotSpecification):
+class HasTorso(ABC):
     torso: Torso = field(default=None)
 
     @synchronized_attribute_modification
     def add_torso(self, torso: Torso):
         self.torso = torso
 
-    def _setup_specifications(self, world: World):
-        torso = self.setup_default_torso_semantic_annotation(world)
-        world.add_semantic_annotation(torso)
-        self.add_torso(torso)
-
     @abstractmethod
-    def setup_default_torso_semantic_annotation(self, world: World) -> Torso: ...
+    def setup_default_torso_semantic_annotation(self): ...
 
 
 @dataclass(eq=False)
-class HasNeck(RobotSpecification):
+class HasNeck(ABC):
     neck: Neck = field(default=None)
 
     @synchronized_attribute_modification
     def add_neck(self, neck: Neck):
         self.neck = neck
 
-    def _setup_specifications(self, world: World):
-        neck = self.setup_neck_semantic_annotations(world)
-        world.add_semantic_annotation(neck)
-        self.add_neck(neck)
-
     @abstractmethod
-    def setup_neck_semantic_annotations(self, world: World) -> Neck: ...
+    def setup_neck_semantic_annotations(self): ...
 
 
 @dataclass(eq=False)
-class AbstractRobot(Agent, RobotSpecification, ABC):
+class AbstractRobot(Agent, HasRobotParts, ABC):
     """
     Specification of an abstract robot
     """
 
-    def _setup_specifications(self, world: World):
-        super()._setup_specifications(world)
-
     @classmethod
     @abstractmethod
     def _get_root_body_name(cls) -> str: ...
+
+    @abstractmethod
+    def setup_robot_part_semantic_annotations(self): ...
 
     @classmethod
     def from_world(cls, world: World) -> Self:
@@ -313,14 +364,13 @@ class AbstractRobot(Agent, RobotSpecification, ABC):
         world = branch_root._world
         with world.modify_world():
             self = cls(
-                name=PrefixedName(name=cls.__name__),
                 root=world.get_body_in_branch_by_name(
                     branch_root=branch_root, name=cls._get_root_body_name()
                 ),
             )
             world.add_semantic_annotation(self)
-            self.setup_mobile_base_semantic_annotation()
-            # self._setup_specifications(world)
+            self.setup_robot_part_semantic_annotations()
+            return self
 
     @property
     def controlled_connections(self) -> list[ActiveConnection]:

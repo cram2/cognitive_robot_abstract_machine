@@ -1317,7 +1317,7 @@ class AccelerationVariableDAO(
 
 class AggregatesRobotPartsDAO(
     Base,
-    DataAccessObject[semantic_digital_twin.robots.robot_parts.AggregatesRobotParts],
+    DataAccessObject[semantic_digital_twin.robots.robot_parts.HasRobotParts],
 ):
 
     __tablename__ = "AggregatesRobotPartsDAO"

@@ -259,6 +259,9 @@ class PR2(AbstractRobot, HasMobileBase):
         mobile_base.setup_default_torso_semantic_annotation()
         self.add_mobile_base(mobile_base)
 
+    def setup_robot_part_semantic_annotations(self):
+        self.setup_mobile_base_semantic_annotation()
+
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(
             lambda: 1.0,
