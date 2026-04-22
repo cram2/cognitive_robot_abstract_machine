@@ -1,4 +1,5 @@
 import os
+from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
 from importlib.resources import files
@@ -48,14 +49,14 @@ class PR2KinectV1(Camera):
 
 
 @dataclass(eq=False)
-class PR2Finger(Finger):
+class PR2Finger(Finger, ABC): ...
+
+
+@dataclass(eq=False)
+class PR2RightGripperLeftFinger(PR2Finger):
 
     @classmethod
     def setup_default_configuration_in_world(cls, world: World):
-        raise NotImplementedError
-
-    @classmethod
-    def setup_right_gripper_left_finger_configuration(cls, world: World):
         finger = cls(
             root=world.get_body_by_name("r_gripper_l_finger_link"),
             tip=world.get_body_by_name("r_gripper_l_finger_tip_link"),
@@ -63,8 +64,12 @@ class PR2Finger(Finger):
         world.add_semantic_annotation(finger)
         return finger
 
+
+@dataclass(eq=False)
+class PR2RightGripperRightFinger(PR2Finger):
+
     @classmethod
-    def setup_right_gripper_right_finger_configuration(cls, world: World):
+    def setup_default_configuration_in_world(cls, world: World):
         finger = cls(
             root=world.get_body_by_name("r_gripper_r_finger_link"),
             tip=world.get_body_by_name("r_gripper_r_finger_tip_link"),
@@ -72,8 +77,12 @@ class PR2Finger(Finger):
         world.add_semantic_annotation(finger)
         return finger
 
+
+@dataclass(eq=False)
+class PR2LeftGripperLeftFinger(PR2Finger):
+
     @classmethod
-    def setup_left_gripper_left_finger_configuration(cls, world: World):
+    def setup_default_configuration_in_world(cls, world: World):
         finger = cls(
             root=world.get_body_by_name("l_gripper_l_finger_link"),
             tip=world.get_body_by_name("l_gripper_l_finger_tip_link"),
@@ -81,8 +90,12 @@ class PR2Finger(Finger):
         world.add_semantic_annotation(finger)
         return finger
 
+
+@dataclass(eq=False)
+class PR2LeftGripperRightFinger(PR2Finger):
+
     @classmethod
-    def setup_left_gripper_right_finger_configuration(cls, world: World):
+    def setup_default_configuration_in_world(cls, world: World):
         finger = cls(
             root=world.get_body_by_name("l_gripper_r_finger_link"),
             tip=world.get_body_by_name("l_gripper_r_finger_tip_link"),
@@ -92,14 +105,10 @@ class PR2Finger(Finger):
 
 
 @dataclass(eq=False)
-class PR2Gripper(ParallelGripper):
+class PR2RightGripper(ParallelGripper):
 
     @classmethod
     def setup_default_configuration_in_world(cls, world: World):
-        raise NotImplementedError
-
-    @classmethod
-    def setup_right_gripper_configuration(cls, world: World):
         right_gripper = cls(
             root=world.get_body_by_name("r_gripper_palm_link"),
             tool_frame=world.get_body_by_name("r_gripper_tool_frame"),
@@ -108,8 +117,21 @@ class PR2Gripper(ParallelGripper):
         world.add_semantic_annotation(right_gripper)
         return right_gripper
 
+    def setup_finger_semantic_annotations(self):
+        thumb = PR2RightGripperLeftFinger.setup_default_configuration_in_world(
+            self._world
+        )
+        self.add_thumb(thumb)
+        finger = PR2RightGripperRightFinger.setup_default_configuration_in_world(
+            self._world
+        )
+        self.add_finger(finger)
+
+
+@dataclass(eq=False)
+class PR2LeftGripper(ParallelGripper):
     @classmethod
-    def setup_left_gripper_configuration(cls, world: World):
+    def setup_default_configuration_in_world(cls, world: World):
         left_gripper = cls(
             root=world.get_body_by_name("l_gripper_palm_link"),
             tool_frame=world.get_body_by_name("l_gripper_tool_frame"),
@@ -118,19 +140,14 @@ class PR2Gripper(ParallelGripper):
         world.add_semantic_annotation(left_gripper)
         return left_gripper
 
-    def setup_finger_semantic_annotations(self, world: World):
-        raise NotImplementedError
-
-    def setup_right_gripper_finger_semantic_annotations(self):
-        thumb = PR2Finger.setup_right_gripper_right_finger_configuration(self._world)
+    def setup_finger_semantic_annotations(self):
+        thumb = PR2LeftGripperRightFinger.setup_default_configuration_in_world(
+            self._world
+        )
         self.add_thumb(thumb)
-        finger = PR2Finger.setup_right_gripper_left_finger_configuration(self._world)
-        self.add_finger(finger)
-
-    def setup_left_gripper_finger_semantic_annotations(self):
-        thumb = PR2Finger.setup_left_gripper_right_finger_configuration(self._world)
-        self.add_thumb(thumb)
-        finger = PR2Finger.setup_left_gripper_left_finger_configuration(self._world)
+        finger = PR2LeftGripperLeftFinger.setup_default_configuration_in_world(
+            self._world
+        )
         self.add_finger(finger)
 
 
@@ -152,14 +169,10 @@ class PR2Neck(Neck, HasCameras):
 
 
 @dataclass(eq=False)
-class PR2Arm(Arm, HasParallelGripper):
+class PR2LeftArm(Arm, HasParallelGripper):
 
     @classmethod
     def setup_default_configuration_in_world(cls, world: World):
-        raise NotImplementedError
-
-    @classmethod
-    def setup_left_arm_configuration(cls, world: World):
         left_arm = cls(
             root=world.get_body_by_name("torso_lift_link"),
             tip=world.get_body_by_name("l_wrist_roll_link"),
@@ -167,8 +180,16 @@ class PR2Arm(Arm, HasParallelGripper):
         world.add_semantic_annotation(left_arm)
         return left_arm
 
+    def setup_end_effector_semantic_annotation(self):
+        gripper = PR2LeftGripper.setup_default_configuration_in_world(self._world)
+        self.add_end_effector(gripper)
+        gripper.setup_finger_semantic_annotations()
+
+
+@dataclass(eq=False)
+class PR2RightArm(Arm, HasParallelGripper):
     @classmethod
-    def setup_right_arm_configuration(cls, world: World) -> Self:
+    def setup_default_configuration_in_world(cls, world: World) -> Self:
         right_arm = cls(
             root=world.get_body_by_name("torso_lift_link"),
             tip=world.get_body_by_name("r_wrist_roll_link"),
@@ -177,17 +198,9 @@ class PR2Arm(Arm, HasParallelGripper):
         return right_arm
 
     def setup_end_effector_semantic_annotation(self):
-        raise NotImplementedError
-
-    def setup_right_end_effector_semantic_annotation(self):
-        gripper = PR2Gripper.setup_right_gripper_configuration(self._world)
+        gripper = PR2RightGripper.setup_default_configuration_in_world(self._world)
         self.add_end_effector(gripper)
-        gripper.setup_right_gripper_finger_semantic_annotations()
-
-    def setup_left_end_effector_semantic_annotation(self):
-        gripper = PR2Gripper.setup_left_gripper_configuration(self._world)
-        self.add_end_effector(gripper)
-        gripper.setup_left_gripper_finger_semantic_annotations()
+        gripper.setup_finger_semantic_annotations()
 
 
 @dataclass(eq=False)
@@ -203,13 +216,13 @@ class PR2Torso(Torso, HasLeftRightArm, HasNeck):
         return torso
 
     def setup_arm_semantic_annotations(self):
-        left_arm = PR2Arm.setup_left_arm_configuration(self._world)
+        left_arm = PR2LeftArm.setup_default_configuration_in_world(self._world)
         self.add_arm(left_arm)
-        left_arm.setup_left_end_effector_semantic_annotation()
+        left_arm.setup_end_effector_semantic_annotation()
 
-        right_arm = PR2Arm.setup_right_arm_configuration(self._world)
+        right_arm = PR2RightArm.setup_default_configuration_in_world(self._world)
         self.add_arm(right_arm)
-        right_arm.setup_right_end_effector_semantic_annotation()
+        right_arm.setup_end_effector_semantic_annotation()
 
     def setup_neck_semantic_annotations(self):
         neck = PR2Neck.setup_default_configuration_in_world(self._world)
