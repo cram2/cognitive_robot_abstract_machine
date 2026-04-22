@@ -123,20 +123,6 @@ class MoveToReach(ActionDescription):
     The semantic description for the reaching.
     """
 
-    @property
-    def standing_pose(self) -> Pose:
-        """
-        The pose that the robot should stand at, calculated from standing_position and hip_rotation.
-        """
-        target_pos = self.target_pose.to_position()
-        diff_x = target_pos.x - self.standing_position.x
-        diff_y = target_pos.y - self.standing_position.y
-        base_yaw = np.arctan2(diff_y, diff_x)
-
-        total_yaw = base_yaw + self.hip_rotation
-        orientation = Quaternion.from_rpy(0, 0, total_yaw)
-        return Pose(self.standing_position, orientation)
-
     def execute(self):
         self.add_subplan(
             sequential(
@@ -151,21 +137,60 @@ class MoveToReach(ActionDescription):
             )
         ).perform()
 
+    @property
+    def manipulator(self) -> Manipulator:
+        """
+        Returns the manipulator that is used for reaching.
+
+        :return: The manipulator.
+        """
+        return self.grasp_description.manipulator
+
+    @property
+    def standing_pose(self) -> Pose:
+        """
+        Calculates the pose where the robot should stand to reach the target.
+
+        :return: The calculated standing pose.
+        """
+        target_homogeneous_matrix = self.target_pose.to_homogeneous_matrix()
+        relative_position = Point3(self.robot_x, self.robot_y, 0)
+        standing_position = target_homogeneous_matrix @ relative_position
+        standing_position.z = self.robot.root.global_pose.z
+
+        difference_x = self.target_pose.x - standing_position.x
+        difference_y = self.target_pose.y - standing_position.y
+        base_yaw = np.arctan2(difference_y, difference_x)
+        total_yaw = base_yaw + self.hip_rotation
+
+        standing_pose = Pose(
+            standing_position,
+            Quaternion.from_rpy(0, 0, total_yaw),
+            reference_frame=self.robot.root,
+        )
+        return standing_pose
+
     @staticmethod
     def post_condition(
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> SymbolicExpression:
-        standing_position = variables["standing_position"]
-        hip_rotation = variables["hip_rotation"]
         target_pose = variables["target_pose"]
 
-        target_pos = target_pose.to_position()
-        diff_x = target_pos.x - standing_position.x
-        diff_y = target_pos.y - standing_position.y
-        base_yaw = np.arctan2(diff_y, diff_x)
-        total_yaw = base_yaw + hip_rotation
+        target_homogeneous_matrix = target_pose.to_homogeneous_matrix()
+        relative_position = Point3(variables["robot_x"], variables["robot_y"], 0)
+        standing_position = target_homogeneous_matrix @ relative_position
+        standing_position.z = context.robot.root.global_pose.z
 
-        expected_pose = Pose(standing_position, Quaternion.from_rpy(0, 0, total_yaw))
+        difference_x = target_pose.x - standing_position.x
+        difference_y = target_pose.y - standing_position.y
+        base_yaw = np.arctan2(difference_y, difference_x)
+        total_yaw = base_yaw + variables["hip_rotation"]
+
+        expected_pose = Pose(
+            standing_position,
+            Quaternion.from_rpy(0, 0, total_yaw),
+            reference_frame=context.robot.root,
+        )
 
         root_T_robot_base = context.world.transform(expected_pose, context.world.root)
         return np.allclose(

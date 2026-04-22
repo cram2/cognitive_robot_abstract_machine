@@ -168,14 +168,9 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
 
         move_to_reach = underspecified(MoveToReach)(
             target_pose=target_pose,
-            standing_position=underspecified(Point3)(
-                x=...,
-                y=...,
-                z=float(robot.root.global_pose.z),
-                reference_frame=target_pose.reference_frame,
-            ),
+            robot_x=...,
+            robot_y=...,
             hip_rotation=...,
-            manipulator=variable(Manipulator, world.semantic_annotations),
             grasp_description=underspecified(GraspDescription)(
                 approach_direction=...,
                 vertical_alignment=...,
