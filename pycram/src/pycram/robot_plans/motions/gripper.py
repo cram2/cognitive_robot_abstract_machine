@@ -8,7 +8,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.robots.abstract_robot import HasMobileBase
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 from pycram.robot_plans.motions.base import BaseMotion

@@ -49,7 +49,7 @@ from semantic_digital_twin.exceptions import (
     AtomicWorldModificationNotAtomic,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
     ForwardKinematicsManager,
 )

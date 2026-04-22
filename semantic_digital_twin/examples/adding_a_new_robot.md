@@ -59,8 +59,10 @@ from dataclasses import dataclass
 from typing import Self
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import HasLeftRightArm, HasTorso, HasMobileBase, AbstractRobot
+from semantic_digital_twin.robots.robot_part_mixins import HasLeftRightArm, HasTorso, HasMobileBase
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
+
 
 @dataclass(eq=False)
 class MyNewRobot(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
@@ -80,7 +82,6 @@ class MyNewRobot(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         Here you specify which body in the world is the root body of the robot.
         """
 
-
     def _setup_arm_semantic_annotations(self):
         """
         Here you setup the semantic annotations for the arms. This is usually done by defining the fingers, then the 
@@ -91,7 +92,6 @@ class MyNewRobot(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         """
         Here you specify which connections can be communicated with using a hardware interface on the real robot.
         """
-
 
     def _setup_arm_joint_state(self):
         """
@@ -108,7 +108,6 @@ class MyNewRobot(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         """
         Here you specify which connections can be communicated with using a hardware interface on the real robot.
         """
-
 
     def _setup_torso_joint_state(self):
         """

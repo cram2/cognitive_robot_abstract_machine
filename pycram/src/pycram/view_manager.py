@@ -4,10 +4,10 @@ from typing_extensions import Optional, Tuple
 
 from krrood.entity_query_language.predicate import symbolic_function
 from pycram.datastructures.enums import Arms
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.robot_parts import (
     Manipulator,
     KinematicChain,
+    AbstractRobot,
 )
 
 

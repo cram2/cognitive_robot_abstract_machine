@@ -15177,7 +15177,7 @@ class AgentDAO(
 
 class AbstractRobotDAO(
     AgentDAO,
-    DataAccessObject[semantic_digital_twin.robots.abstract_robot.AbstractRobot],
+    DataAccessObject[semantic_digital_twin.robots.robot_parts.AbstractRobot],
 ):
 
     __tablename__ = "AbstractRobotDAO"

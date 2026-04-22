@@ -11,7 +11,7 @@ from krrood.ormatic.data_access_objects.helper import get_dao_class
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world import World
