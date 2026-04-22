@@ -223,9 +223,7 @@ def preprocess_dataframe(
         if feature._type_ is bool:
             df[column] = df[column].astype(int)
         elif isinstance(feature._type_, enum.EnumType):
-            df[column] = df[column].apply(
-                lambda x: hash(x.value) if isinstance(x, enum.Enum) else x
-            )
+            df[column] = df[column].apply(lambda x: hash(x))
         elif feature._type_ not in compatible_types and feature._type_ is not None:
             raise TypeError(f"Unsupported type {feature._type_} for column {column}")
     return df

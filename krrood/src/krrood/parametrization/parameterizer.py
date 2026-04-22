@@ -159,8 +159,9 @@ class UnderspecifiedParameters:
     def _create_variable_from_literal_value(
         self, attribute_match: AttributeMatch
     ) -> random_events.variable.Variable:
+        name = f"{attribute_match.name_from_variable_access_path}"
         result = random_events.variable.Continuous(
-            name=attribute_match.name,
+            name=name,
             domain=singleton(attribute_match.assigned_value),
         )
         event = Event.from_simple_sets(

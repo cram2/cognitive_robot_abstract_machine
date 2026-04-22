@@ -146,6 +146,9 @@ def data_preparation(mutable_model_world):
     backend = ProbabilisticBackend(probabilistic_registry, number_of_samples=50)
 
     samples = list(backend.evaluate(move_and_pick_up_description))
+    assert all(
+        [sample.object_designator == samples[0].object_designator for sample in samples]
+    )
     return samples, m2
 
 
@@ -155,8 +158,7 @@ def test_move_and_pick_up(database, mutable_model_world, data_preparation):
     # avg log likelihood auf den traingsdaten und dann auf dem gelernten circuit, der sollte hoehere log likelihood haben
     data_access_objects = [to_dao(value) for value in samples]
     template = LearnRSPN(MoveAndPickUpAction, data_access_objects)
-    template.probabilistic_circuit.plot_structure()
-    plt.savefig(f"test_template_{datetime.datetime.now()}.png")
+
     feature_extractor = FeatureExtractor(
         get_features_of_class_bfs(
             to_dao(samples[0]), variable(MoveAndPickUpAction, []), [], set()
@@ -175,7 +177,7 @@ def test_move_and_pick_up(database, mutable_model_world, data_preparation):
     ]
     # remove unnecessary variables from circuit (obj_desig, ref_frame, manip)
     m2 = m2.marginal(identical_variables)
-    # like_learned = np.mean(template.probabilistic_circuit.log_likelihood(final))
+    like_learned = np.mean(template.probabilistic_circuit.log_likelihood(final))
     like_move_and_pick_up_distribution = np.mean(m2.log_likelihood(final))
 
     assert np.mean(template.probabilistic_circuit.log_likelihood(final)) > np.mean(
