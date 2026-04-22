@@ -116,17 +116,24 @@ def data_preparation(mutable_model_world):
     parameters = UnderspecifiedParameters(move_and_pick_up_description)
 
     move_and_pick_up_distribution = fully_factorized(parameters.variables.values())
-    assert len(parameters.generated_events) == 3
-    complete_event = parameters.generated_events[0]
+    assert len(parameters.events_from_symbolic_expressions) == 3
+    complete_event = parameters.events_from_symbolic_expressions[0]
     complete_event.fill_missing_variables(parameters.variables.values())
 
     [
         event.fill_missing_variables(parameters.variables.values())
-        for event in parameters.generated_events
+        for event in parameters.events_from_symbolic_expressions
     ]
 
-    complete_event = parameters.generated_events[0]
-    for other_event in parameters.generated_events[1:]:
+    [
+        event.fill_missing_variables(parameters.variables.values())
+        for event in parameters.events_from_literal_values
+    ]
+
+    complete_event = parameters.events_from_symbolic_expressions[0]
+    for other_event in parameters.events_from_symbolic_expressions[1:]:
+        complete_event = complete_event.intersection_with(other_event)
+    for other_event in parameters.events_from_literal_values:
         complete_event = complete_event.intersection_with(other_event)
 
     m2, prob = move_and_pick_up_distribution.truncated(
@@ -168,7 +175,7 @@ def test_move_and_pick_up(database, mutable_model_world, data_preparation):
     ]
     # remove unnecessary variables from circuit (obj_desig, ref_frame, manip)
     m2 = m2.marginal(identical_variables)
-    like_learned = np.mean(template.probabilistic_circuit.log_likelihood(final))
+    # like_learned = np.mean(template.probabilistic_circuit.log_likelihood(final))
     like_move_and_pick_up_distribution = np.mean(m2.log_likelihood(final))
 
     assert np.mean(template.probabilistic_circuit.log_likelihood(final)) > np.mean(

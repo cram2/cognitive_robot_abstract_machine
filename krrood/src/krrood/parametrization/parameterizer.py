@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 from dataclasses import dataclass, field
 from functools import cached_property
+from types import NoneType
 from typing import Dict, Optional, Tuple
 
 import numpy as np
@@ -10,6 +11,7 @@ from typing_extensions import Any
 
 import random_events.variable
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.variable import Literal, Variable
 from krrood.entity_query_language.factories import and_
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
@@ -29,8 +31,9 @@ from probabilistic_model.probabilistic_circuit.relational.learn_rspn import (
     FeatureExtractor,
     get_features_of_class_bfs,
 )
+from random_events.interval import singleton
 from random_events.product_algebra import Event, SimpleEvent
-from random_events.set import Set
+from random_events.set import Set, SetElement
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -84,11 +87,26 @@ class UnderspecifiedParameters:
     Only exists if the statement has a where condition.
     """
 
-    generated_events: typing.List[Event] = field(init=False, default_factory=list)
+    events_from_symbolic_expressions: typing.List[Event] = field(
+        init=False, default_factory=list
+    )
+    """
+    List of events that are created from symbolic expressions, e.g. fixed variable assignments
+    """
+
+    events_from_literal_values: typing.List[Event] = field(
+        init=False, default_factory=list
+    )
+    """
+    List of events that are created from literal values
+    """
 
     _symbolic_expression_event_cache: Dict[
         SymbolicExpression, Tuple[Event, Dict[str, random_events.variable.Variable]]
     ] = field(init=False, default_factory=dict)
+    """
+    A cache for events that are created from symbolic expressions.
+    """
 
     def __post_init__(self):
         self.statement.expression.build()
@@ -109,6 +127,16 @@ class UnderspecifiedParameters:
         for attribute_match in self.statement.matches_with_variables:
             name = attribute_match.name_from_variable_access_path
 
+            if isinstance(
+                attribute_match.assigned_variable, Literal
+            ) and not isinstance(
+                attribute_match.assigned_value,
+                (SymbolicExpression, type(Ellipsis), NoneType),
+            ):
+                variable = self._create_variable_from_literal_value(attribute_match)
+                result[variable.name] = variable
+                continue
+
             if isinstance(attribute_match.assigned_value, SymbolicExpression):
                 variables = self._create_variables_from_symbolic_expression(
                     attribute_match
@@ -126,6 +154,19 @@ class UnderspecifiedParameters:
             )
 
             result[random_events_variable.name] = random_events_variable
+        return result
+
+    def _create_variable_from_literal_value(
+        self, attribute_match: AttributeMatch
+    ) -> random_events.variable.Variable:
+        result = random_events.variable.Continuous(
+            name=attribute_match.name,
+            domain=singleton(attribute_match.assigned_value),
+        )
+        event = Event.from_simple_sets(
+            SimpleEvent.from_data({result: attribute_match.assigned_value})
+        )
+        self.events_from_literal_values.append(event)
         return result
 
     def _create_variables_from_symbolic_expression(
@@ -184,7 +225,7 @@ class UnderspecifiedParameters:
             simple_events.append(current_simple_event)
 
         resulting_event = Event.from_simple_sets(*simple_events)
-        self.generated_events.append(resulting_event)
+        self.events_from_symbolic_expressions.append(resulting_event)
         self._symbolic_expression_event_cache[attribute_match.assigned_value] = (
             resulting_event,
             result,
