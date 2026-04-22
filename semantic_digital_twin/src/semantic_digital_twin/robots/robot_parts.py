@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections import defaultdict
+from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Optional, Self, TYPE_CHECKING, Set
+from typing import Optional, Self, TYPE_CHECKING, Set, List, DefaultDict
 from uuid import UUID
 
 from krrood.adapters.json_serializer import list_like_classes
@@ -21,24 +23,32 @@ from semantic_digital_twin.exceptions import (
     NoJointStateWithType,
     UselessConceptError,
     DuplicateRobotAssignmentsError,
+    MissingDefaultCameraError,
 )
 from semantic_digital_twin.robots.abstract_robot import (
     HasFingers,
     HasTwoFingers,
     HasEndEffector,
     HasCameras,
-    HasRobotParts,
+    logger,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
 from semantic_digital_twin.spatial_types import (
     Quaternion,
     Vector3,
     RotationMatrix,
     HomogeneousTransformationMatrix,
 )
-from semantic_digital_twin.world_description.connections import ActiveConnection
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection,
+    Drive,
+    ActiveConnection1DOF,
+)
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
+    DegreeOfFreedom,
 )
 from semantic_digital_twin.world_description.geometry import BoundingBox, Scale
 from semantic_digital_twin.world_description.world_entity import (
@@ -52,10 +62,91 @@ from semantic_digital_twin.world_description.world_modification import (
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
-    from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-
 
 logger = logging.getLogger("semantic_digital_twin")
+
+
+@dataclass(eq=False)
+class HasRobotParts(ABC):
+    """
+    Mixin class for classes that have robot parts to provide shared utility functions.
+    """
+
+    @property
+    def _robot_parts(self) -> list[AbstractRobotPart]:
+        """
+        Serves as a generic interface to access all robot parts assigned to a robot part.
+        Returns a list of all robot parts assigned directly to this robot part.
+        """
+        return self._aggregate_robot_parts(set())
+
+    def _aggregate_robot_parts(self, seen: Set[UUID]) -> list[AbstractRobotPart]:
+        """
+        Recursively aggregates all robot parts assigned to this robot part, including itself if it is a robot part.
+         Uses a set of seen UUIDs to avoid infinite recursion in case of cyclic references and duplicates.
+        """
+        wrapped_class = WrappedClass(self.__class__)
+        introspector = DataclassOnlyIntrospector()
+        robot_parts = []
+
+        if isinstance(self, HasRobotParts):
+            if self.id in seen:
+                return []
+            seen.add(self.id)
+            robot_parts.append(self)
+
+        for field_ in introspector.discover(self.__class__):
+            value = getattr(self, field_.public_name)
+            wrapped_field = WrappedField(wrapped_class, field_.field)
+
+            if isinstance(value, list_like_classes) and issubclass(
+                wrapped_field.contained_type, HasRobotParts
+            ):
+                for robot_part in value:
+                    robot_parts.extend(robot_part._aggregate_robot_parts(seen))
+            elif isinstance(value, HasRobotParts):
+                robot_parts.extend(value._aggregate_robot_parts(seen))
+
+        return robot_parts
+
+    def _log_missing_fields(self):
+        """
+        Logs any fields that are empty, which could indicate missing information in the robot annotation.
+        Primarily used for manual validation purposes.
+        """
+        wrapped_class = WrappedClass(self.__class__)
+        introspector = DataclassOnlyIntrospector()
+        for field_ in introspector.discover(self.__class__):
+            self._process_field(wrapped_class, field_)
+
+    def _process_field(self, wrapped_class: WrappedClass, field: DiscoveredAttribute):
+        """
+        Processes a single field of the dataclass, checking if it is empty, and logs a warning if it is.
+
+        :param wrapped_class: The wrapped class of the dataclass.
+        :param field: The discovered attribute of the dataclass.
+        """
+        value = getattr(self, field.public_name)
+        wrapped_field = WrappedField(wrapped_class, field.field)
+        type_endpoint = wrapped_field.type_endpoint
+
+        if isinstance(value, list_like_classes) and issubclass(
+            wrapped_field.contained_type, HasRobotParts
+        ):
+            if not value:
+                self._log_missing_field(field)
+                return
+
+            for robot_part in value:
+                robot_part._log_missing_fields()
+
+        elif issubclass(type_endpoint, HasRobotParts) and value is None:
+            self._log_missing_field(field)
+
+    def _log_missing_field(self, field: DiscoveredAttribute):
+        logger.info(
+            f"The field {field.public_name} of {self.__class__.__name__} is empty."
+        )
 
 
 @dataclass(eq=False)
@@ -68,6 +159,16 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     """
     Common joint states for the current robot part.
     """
+
+    @classmethod
+    @abstractmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        """
+        Sets up a default configuration of this robot part in the world, below the given robot root.
+        This is used to set up a default configuration of the robot part in the world after parsing a URDF.
+        """
 
     @synchronized_attribute_modification
     def add_joint_state(self, joint_state: JointState):
@@ -110,8 +211,6 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         """
         Computes backreference to the robot this robot part belongs to.
         """
-        from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-
         robot_variable = variable(AbstractRobot, self._world.semantic_annotations)
         robot = (
             a(entity(robot_variable))
@@ -343,3 +442,152 @@ class MobileBase(AbstractRobotPart, ABC):
         return self.root.collision.as_bounding_box_collection_in_frame(
             self._world.root
         ).bounding_box()
+
+
+@dataclass(eq=False)
+class AbstractRobot(Agent, HasRobotParts, ABC):
+    """
+    Specification of an abstract robot
+    """
+
+    @classmethod
+    @abstractmethod
+    def _get_root_body_name(cls) -> str:
+        """
+        Returns the name of the root body of the robot in the world, which serves as the entry point for traversing the
+        robot's kinematic structure.
+        """
+
+    @abstractmethod
+    def setup_robot_part_semantic_annotations(self):
+        """
+        Sets up the semantic annotations for all robot parts of this robot.
+        """
+
+    @classmethod
+    def from_world(cls, world: World) -> Self:
+        """
+        Creates a robot from a world.
+        """
+        return cls.from_branch_in_world(world.root)
+
+    @classmethod
+    def from_branch_in_world(cls, branch_root: KinematicStructureEntity) -> Self:
+        """
+        Creates a robot from a branch in a world.
+        This is useful when you have multiple of the same robots in the same world, which would normally cause naming conflicts.
+        """
+        world = branch_root._world
+        with world.modify_world():
+            self = cls(
+                root=world.get_body_in_branch_by_name(
+                    branch_root=branch_root, name=cls._get_root_body_name()
+                ),
+            )
+            world.add_semantic_annotation(self)
+            self.setup_robot_part_semantic_annotations()
+            return self
+
+    @property
+    def controlled_connections(self) -> list[ActiveConnection]:
+        """
+        A subset of the robot's connections that are controlled by a controller.
+        """
+        return [
+            connection
+            for connection in self.connections
+            if isinstance(connection, ActiveConnection) and connection.is_controlled
+        ]
+
+    @property
+    def degrees_of_freedom_with_hardware_interface(self) -> List[DegreeOfFreedom]:
+        """
+        The number of degrees of freedom of the robot, which is the sum of the degrees of freedom of all its manipulators.
+        """
+        dofs = []
+        for connection in self.connections:
+            dofs.extend(connection.controlled_dofs)
+        return dofs
+
+    def validate(self) -> bool:
+        """
+        Validates the robot semantic annotation.
+            The validation process includes:
+            1. Printing out missing fields of any robot part, so that the user can check if they are intentionally left blank.
+            2. Deepcopy the resulting world to ensure that all parts of the robot are initialized in the correct order
+            3. Assert that the copied world is the same as the original world
+            4. Assert that the robot semantic annotation has a default camera.
+
+        :return: True if the robot semantic annotation is valid, False otherwise.
+        """
+
+        for robot_part in self._robot_parts:
+            robot_part._log_missing_fields()
+
+        self_world_copy = deepcopy(self._world)
+
+        assert set(self_world_copy._world_entity_hash_table.keys()) == set(
+            self._world._world_entity_hash_table.keys()
+        )
+
+        assert (
+            self_world_copy.get_semantic_annotations_by_type(AbstractRobot)[
+                0
+            ].get_default_camera()
+            is not None
+        )
+
+        return True
+
+    def _setup_velocity_limits(self):
+        vel_limits = defaultdict(
+            lambda: 1.0,
+        )
+        self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
+
+    @property
+    def drive(self) -> Optional[Drive]:
+        """
+        The connection which the robot uses for driving.
+        """
+        try:
+            parent_connection = self.root.parent_connection
+            if isinstance(parent_connection, Drive):
+                return parent_connection
+        except AttributeError:
+            pass
+
+    def tighten_dof_velocity_limits_of_1dof_connections(
+        self,
+        new_limits: DefaultDict[ActiveConnection1DOF, float],
+    ):
+        """
+        Convenience method for tightening the velocity limits of all one degree-of-freedom (1DOF)
+        active connections in the system.
+
+        The method iterates through all connections of type `ActiveConnection1DOF`
+        and configures their velocity limits by overwriting the existing
+        lower and upper limit values with the provided ones.
+
+        :param new_limits: A dictionary linking 1DOF connections to their corresponding
+            new velocity limits. The keys are of type `ActiveConnection1DOF`, and the
+            values represent the new velocity limits specific to each connection.
+        """
+        for connection in self._world.get_connections_by_type(ActiveConnection1DOF):
+            connection.raw_dof._overwrite_dof_limits(
+                new_lower_limits=DerivativeMap(
+                    None, -new_limits[connection], None, None
+                ),
+                new_upper_limits=DerivativeMap(
+                    None, new_limits[connection], None, None
+                ),
+            )
+
+    def get_default_camera(self) -> Camera:
+        """
+        Returns the default camera of the robot.
+        """
+        for robot_part in self._robot_parts:
+            if isinstance(robot_part, Camera) and robot_part.default_camera:
+                return robot_part
+        raise MissingDefaultCameraError(type(self))
