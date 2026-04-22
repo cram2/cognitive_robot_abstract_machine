@@ -21,6 +21,7 @@ dependencies = [
   "probabilistic_model",
   "physics_simulators",
   "ipykernel>=7.2.0",
+  "lark-parser>=0.12.0",
 ]
 
 [tool.uv.workspace]
