@@ -10,7 +10,7 @@ from pycram.datastructures.enums import Arms
 from pycram.locations.locations import (
     GiskardLocation,
 )
-from pycram.locations.new_locations import (
+from pycram.locations.factories import (
     reachability_location,
     visibility_location,
     accessing_location,
