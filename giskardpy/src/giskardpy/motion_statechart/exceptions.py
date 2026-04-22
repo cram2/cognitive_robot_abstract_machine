@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
 from krrood.utils import DataclassException
 from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
-from typing_extensions import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Type
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import (
@@ -117,7 +117,7 @@ class NonObservationVariableError(InvalidConditionError):
 
 @dataclass
 class MissingContextExtensionError(MotionStatechartError):
-    expected_extension: type
+    expected_extension: Type
 
     def __post_init__(self):
         self.message = (
@@ -127,7 +127,7 @@ class MissingContextExtensionError(MotionStatechartError):
 
 @dataclass
 class DuplicateContextExtensionError(MotionStatechartError):
-    extension_type: type
+    extension_type: Type
 
     def __post_init__(self):
         self.message = f"Extension of type {self.extension_type.__name__} already exists. You cannot add it twice."

@@ -18,7 +18,11 @@ apt install -y \
     graphviz-dev \
     ros-jazzy-rclpy-message-converter \
     pip \
-    python3-colcon-common-extensions
+    python3-colcon-common-extensions \
+    ros-jazzy-compressed-image-transport \
+    ros-jazzy-image-transport \
+    ros-jazzy-image-transport-plugins \
+    git-lfs
 
 # ── ROS 2 workspace – robot description packages ──────────────────────────────
 mkdir -p "$OVERLAY_WS/src"
@@ -50,6 +54,7 @@ git clone -b humble-devel --single-branch https://github.com/pal-robotics/pal_gr
                pal_gripper/pal_gripper_gazeboo \
                pal_gripper/pal_gripper_simulation \
                pal_gripper/pal_parallel_gripper_wrapper
+git clone -b ros2_jazzy --single-branch https://gitlab.informatik.uni-bremen.de/robokudo/robokudo_msgs.git
 
 # ── Build the workspace ───────────────────────────────────────────────────────
 source /opt/ros/jazzy/setup.bash

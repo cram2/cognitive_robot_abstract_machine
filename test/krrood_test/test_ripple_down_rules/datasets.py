@@ -61,6 +61,7 @@ def get_dataset(dataset_id, cache_file: Optional[str] = None):
     dataset = load_cached_dataset(cache_file) if cache_file else None
     if dataset is None:
         print("Downloading dataset...")
+
         dataset = fetch_ucirepo(id=dataset_id)
 
         # Check if dataset is valid before caching
@@ -90,7 +91,11 @@ def load_zoo_dataset(
     :return: all cases and targets.
     """
     # fetch dataset
-    zoo = get_dataset(111, cache_file)
+    try:
+        zoo = get_dataset(111, cache_file)
+    except ConnectionError:
+        print("Error: Failed to fetch dataset. Please check your internet connection.")
+        return [], []
 
     # data (as pandas dataframes)
     X = zoo["features"]
