@@ -21,6 +21,7 @@ dependencies = [
   "probabilistic_model",
   "physics_simulators",
   "ipykernel>=7.2.0",
+  "llmr",
 ]
 
 [tool.uv.workspace]
@@ -31,7 +32,8 @@ members = [
   "krrood",
   "random_events",
   "probabilistic_model",
-  "physics_simulators"
+  "physics_simulators",
+  "llmr",
 ]
 
 [tool.uv.sources]
@@ -42,6 +44,7 @@ krrood                = { workspace = true }
 probabilistic_model   = { workspace = true }
 random_events         = { workspace = true }
 physics_simulators    = { workspace = true }
+llmr                  = { workspace = true }
 
 [tool.poetry]
 package-mode = false
@@ -54,6 +57,7 @@ krrood = { path = "krrood", develop = true }
 random_events = { path = "random_events", develop = true }
 probabilistic_model = { path = "probabilistic_model", develop = true }
 physics_simulators = { path = "physics_simulators", develop = true }
+llmr = { path = "llmr", develop = true }
 
 [tool.setuptools]
 packages = []

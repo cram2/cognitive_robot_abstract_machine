@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llmr"
+version = "0.1.0"
+description = """
+LLM-powered GenerativeBackend for KRROOD.
+Resolves underspecified PyCRAM action Match expressions via LLM reasoning
+rather than probabilistic sampling or deterministic EQL lookup.
+Dependency direction: llmr -> krrood (krrood has zero knowledge of us).
+"""
+requires-python = ">=3.10"
+dependencies = [
+    "langchain-core>=0.2.0",
+    "pydantic>=2.0.0",
+    "typing_extensions>=4.0.0",
+]
+
+[project.optional-dependencies]
+openai  = ["langchain-openai>=0.1.0"]
+ollama  = ["langchain-ollama>=0.1.0"]
+dev     = ["pytest", "pytest-asyncio"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
