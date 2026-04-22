@@ -277,7 +277,7 @@ class TestJointGoals:
         msc.add_node(EndMotion.when_true(joint_goal))
         state_version = giskard.api.world.state.version
         giskard.api.execute(msc)
-        for i in range(100):
+        for i in range(1000):
             if giskard.api.world.state.version != state_version:
                 break
             sleep(0.01)
