@@ -1,11 +1,7 @@
-import gc
-import linecache
 import os
 import threading
 import time
-import tracemalloc
 from copy import deepcopy
-from functools import _lru_cache_wrapper
 
 import numpy as np
 import objgraph
@@ -28,7 +24,6 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.utils import recursive_subclasses
-
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName

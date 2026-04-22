@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from typing_extensions import TYPE_CHECKING
 
-from krrood.utils import DataclassException
+from krrood.exceptions import DataclassException
 from pycram.datastructures.enums import Arms
 from semantic_digital_twin.robots.abstract_robot import Manipulator
 from semantic_digital_twin.spatial_types.spatial_types import Pose
