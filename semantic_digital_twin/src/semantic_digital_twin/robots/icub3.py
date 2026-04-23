@@ -525,7 +525,7 @@ class ICub3(AbstractRobot, HasTorso, HasMobileBase):
     def _get_root_body_name(cls) -> str:
         return "base_footprint"
 
-    def setup_default_torso_semantic_annotation(self):
+    def setup_torso_semantic_annotation(self):
         torso = ICub3Torso.setup_default_configuration_in_world_below_robot_root(
             self.root
         )
@@ -543,4 +543,4 @@ class ICub3(AbstractRobot, HasTorso, HasMobileBase):
 
     def setup_robot_part_semantic_annotations(self):
         self.setup_mobile_base_semantic_annotation()
-        self.setup_default_torso_semantic_annotation()
+        self.setup_torso_semantic_annotation()

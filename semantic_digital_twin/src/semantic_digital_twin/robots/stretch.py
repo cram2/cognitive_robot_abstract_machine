@@ -416,7 +416,7 @@ class StretchMobileBase(MobileBase, HasTorso):
         world.add_semantic_annotation(mobile_base)
         return mobile_base
 
-    def setup_default_torso_semantic_annotation(self):
+    def setup_torso_semantic_annotation(self):
         torso = StretchTorso.setup_default_configuration_in_world_below_robot_root(
             self.root
         )
@@ -438,7 +438,7 @@ class Stretch(AbstractRobot, HasMobileBase):
                 self.root
             )
         )
-        mobile_base.setup_default_torso_semantic_annotation()
+        mobile_base.setup_torso_semantic_annotation()
         self.add_mobile_base(mobile_base)
 
     def setup_robot_part_semantic_annotations(self):

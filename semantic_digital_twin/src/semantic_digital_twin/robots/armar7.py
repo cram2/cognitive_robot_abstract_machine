@@ -544,7 +544,7 @@ class Armar7MobileBase(MobileBase, HasTorso):
         world.add_semantic_annotation(mobile_base)
         return mobile_base
 
-    def setup_default_torso_semantic_annotation(self):
+    def setup_torso_semantic_annotation(self):
         torso = Armar7Torso.setup_default_configuration_in_world_below_robot_root(
             self.root
         )
@@ -562,7 +562,7 @@ class Armar7(AbstractRobot, HasMobileBase):
                 self.root
             )
         )
-        mobile_base.setup_default_torso_semantic_annotation()
+        mobile_base.setup_torso_semantic_annotation()
         self.add_mobile_base(mobile_base)
 
     @classmethod

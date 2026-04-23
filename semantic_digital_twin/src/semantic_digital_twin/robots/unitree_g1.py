@@ -466,7 +466,7 @@ class UnitreeG1(AbstractRobot, HasMobileBase, HasTorso):
         )
         self.add_mobile_base(mobile_base)
 
-    def setup_default_torso_semantic_annotation(self):
+    def setup_torso_semantic_annotation(self):
         torso = UnitreeG1Torso.setup_default_configuration_in_world_below_robot_root(
             self.root
         )
@@ -479,7 +479,7 @@ class UnitreeG1(AbstractRobot, HasMobileBase, HasTorso):
         return "pelvis"
 
     def setup_robot_part_semantic_annotations(self):
-        self.setup_default_torso_semantic_annotation()
+        self.setup_torso_semantic_annotation()
         self.setup_mobile_base_semantic_annotation()
 
     def _setup_collision_rules(self):

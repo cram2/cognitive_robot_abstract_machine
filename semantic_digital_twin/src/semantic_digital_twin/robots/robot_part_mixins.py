@@ -296,7 +296,7 @@ class HasTorso(ABC):
         self.torso = torso
 
     @abstractmethod
-    def setup_default_torso_semantic_annotation(self):
+    def setup_torso_semantic_annotation(self):
         """
         Sets up the semantic annotation for the torso of this robot part.
         """

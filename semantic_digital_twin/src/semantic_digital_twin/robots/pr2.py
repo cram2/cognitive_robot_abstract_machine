@@ -474,7 +474,7 @@ class PR2MobileBase(MobileBase, HasTorso):
         world.add_semantic_annotation(self)
         return self
 
-    def setup_default_torso_semantic_annotation(self):
+    def setup_torso_semantic_annotation(self):
         torso = PR2Torso.setup_default_configuration_in_world_below_robot_root(
             self.root
         )
@@ -496,7 +496,7 @@ class PR2(AbstractRobot, HasMobileBase):
                 self.root
             )
         )
-        mobile_base.setup_default_torso_semantic_annotation()
+        mobile_base.setup_torso_semantic_annotation()
         self.add_mobile_base(mobile_base)
 
     def setup_robot_part_semantic_annotations(self):

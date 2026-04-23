@@ -471,7 +471,7 @@ class JustinMobileBase(MobileBase, HasTorso):
     def setup_joint_states(self):
         pass
 
-    def setup_default_torso_semantic_annotation(self):
+    def setup_torso_semantic_annotation(self):
         torso = JustinTorso.setup_default_configuration_in_world_below_robot_root(
             self.root
         )
@@ -497,4 +497,4 @@ class Justin(AbstractRobot, HasMobileBase):
             )
         )
         self.add_mobile_base(mobile_base)
-        mobile_base.setup_default_torso_semantic_annotation()
+        mobile_base.setup_torso_semantic_annotation()
