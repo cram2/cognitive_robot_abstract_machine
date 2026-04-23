@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
 from importlib.resources import files
@@ -48,7 +49,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 @dataclass(eq=False)
-class HSRBFinger(Finger):
+class HSRBFinger(Finger, ABC):
 
     def setup_hardware_interfaces(self):
         pass
