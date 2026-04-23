@@ -1,40 +1,63 @@
 from __future__ import annotations
 
 from abc import ABC
-from dataclasses import dataclass
 
+import numpy as np
+from dataclasses import dataclass
+from typing import Self
+
+from semantic_digital_twin.datastructures.definitions import (
+    GripperState,
+    StaticJointState,
+)
+from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import (
-    HasMobileBase,
-    HasTorso,
-    HasLeftRightArm,
-    HasHumanoidHand,
     HasCameras,
+    HasLeftRightArm,
+    HasNeck,
+    HasParallelGripper,
+    HasTorso,
+    HasMobileBase,
 )
 from semantic_digital_twin.robots.robot_parts import (
-    Finger,
-    HumanoidHand,
+    AbstractRobot,
     Arm,
     Camera,
     FieldOfView,
+    Finger,
+    Neck,
+    ParallelGripper,
     Torso,
     MobileBase,
-    AbstractRobot,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
-from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
 
 
 @dataclass(eq=False)
-class ICub3Finger(Finger, ABC): ...
+class ICub3Finger(Finger, ABC):
+
+    def setup_hardware_interfaces(self):
+        pass
+
+    def setup_joint_states(self):
+        pass
 
 
 @dataclass(eq=False)
 class ICub3LeftThumb(ICub3Finger):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         finger = cls(
-            root=world.get_body_by_name("l_hand_thumb_0"),
-            tip=world.get_body_by_name("l_hand_thumb_tip"),
+            root=world.get_body_in_branch_by_name(robot_root, "l_hand_thumb_0"),
+            tip=world.get_body_in_branch_by_name(robot_root, "l_hand_thumb_tip"),
         )
         world.add_semantic_annotation(finger)
         return finger
@@ -42,11 +65,15 @@ class ICub3LeftThumb(ICub3Finger):
 
 @dataclass(eq=False)
 class ICub3LeftIndexFinger(ICub3Finger):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         finger = cls(
-            root=world.get_body_by_name("l_hand_index_0"),
-            tip=world.get_body_by_name("l_hand_index_tip"),
+            root=world.get_body_in_branch_by_name(robot_root, "l_hand_index_0"),
+            tip=world.get_body_in_branch_by_name(robot_root, "l_hand_index_tip"),
         )
         world.add_semantic_annotation(finger)
         return finger
@@ -54,11 +81,15 @@ class ICub3LeftIndexFinger(ICub3Finger):
 
 @dataclass(eq=False)
 class ICub3LeftMiddleFinger(ICub3Finger):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         finger = cls(
-            root=world.get_body_by_name("l_hand_middle_0"),
-            tip=world.get_body_by_name("l_hand_middle_tip"),
+            root=world.get_body_in_branch_by_name(robot_root, "l_hand_middle_0"),
+            tip=world.get_body_in_branch_by_name(robot_root, "l_hand_middle_tip"),
         )
         world.add_semantic_annotation(finger)
         return finger
@@ -66,11 +97,15 @@ class ICub3LeftMiddleFinger(ICub3Finger):
 
 @dataclass(eq=False)
 class ICub3LeftRingFinger(ICub3Finger):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         finger = cls(
-            root=world.get_body_by_name("l_hand_ring_0"),
-            tip=world.get_body_by_name("l_hand_ring_tip"),
+            root=world.get_body_in_branch_by_name(robot_root, "l_hand_ring_0"),
+            tip=world.get_body_in_branch_by_name(robot_root, "l_hand_ring_tip"),
         )
         world.add_semantic_annotation(finger)
         return finger
@@ -78,11 +113,15 @@ class ICub3LeftRingFinger(ICub3Finger):
 
 @dataclass(eq=False)
 class ICub3LeftLittleFinger(ICub3Finger):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         finger = cls(
-            root=world.get_body_by_name("l_hand_little_0"),
-            tip=world.get_body_by_name("l_hand_little_tip"),
+            root=world.get_body_in_branch_by_name(robot_root, "l_hand_little_0"),
+            tip=world.get_body_in_branch_by_name(robot_root, "l_hand_little_tip"),
         )
         world.add_semantic_annotation(finger)
         return finger
@@ -90,11 +129,15 @@ class ICub3LeftLittleFinger(ICub3Finger):
 
 @dataclass(eq=False)
 class ICub3RightThumb(ICub3Finger):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         finger = cls(
-            root=world.get_body_by_name("r_hand_thumb_0"),
-            tip=world.get_body_by_name("r_hand_thumb_tip"),
+            root=world.get_body_in_branch_by_name(robot_root, "r_hand_thumb_0"),
+            tip=world.get_body_in_branch_by_name(robot_root, "r_hand_thumb_tip"),
         )
         world.add_semantic_annotation(finger)
         return finger
@@ -102,11 +145,15 @@ class ICub3RightThumb(ICub3Finger):
 
 @dataclass(eq=False)
 class ICub3RightIndexFinger(ICub3Finger):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         finger = cls(
-            root=world.get_body_by_name("r_hand_index_0"),
-            tip=world.get_body_by_name("r_hand_index_tip"),
+            root=world.get_body_in_branch_by_name(robot_root, "r_hand_index_0"),
+            tip=world.get_body_in_branch_by_name(robot_root, "r_hand_index_tip"),
         )
         world.add_semantic_annotation(finger)
         return finger
@@ -114,11 +161,15 @@ class ICub3RightIndexFinger(ICub3Finger):
 
 @dataclass(eq=False)
 class ICub3RightMiddleFinger(ICub3Finger):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         finger = cls(
-            root=world.get_body_by_name("r_hand_middle_0"),
-            tip=world.get_body_by_name("r_hand_middle_tip"),
+            root=world.get_body_in_branch_by_name(robot_root, "r_hand_middle_0"),
+            tip=world.get_body_in_branch_by_name(robot_root, "r_hand_middle_tip"),
         )
         world.add_semantic_annotation(finger)
         return finger
@@ -126,11 +177,15 @@ class ICub3RightMiddleFinger(ICub3Finger):
 
 @dataclass(eq=False)
 class ICub3RightRingFinger(ICub3Finger):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         finger = cls(
-            root=world.get_body_by_name("r_hand_ring_0"),
-            tip=world.get_body_by_name("r_hand_ring_tip"),
+            root=world.get_body_in_branch_by_name(robot_root, "r_hand_ring_0"),
+            tip=world.get_body_in_branch_by_name(robot_root, "r_hand_ring_tip"),
         )
         world.add_semantic_annotation(finger)
         return finger
@@ -138,184 +193,354 @@ class ICub3RightRingFinger(ICub3Finger):
 
 @dataclass(eq=False)
 class ICub3RightLittleFinger(ICub3Finger):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         finger = cls(
-            root=world.get_body_by_name("r_hand_little_0"),
-            tip=world.get_body_by_name("r_hand_little_tip"),
+            root=world.get_body_in_branch_by_name(robot_root, "r_hand_little_0"),
+            tip=world.get_body_in_branch_by_name(robot_root, "r_hand_little_tip"),
         )
         world.add_semantic_annotation(finger)
         return finger
 
 
 @dataclass(eq=False)
-class ICub3LeftHand(HumanoidHand):
+class ICub3Gripper(ParallelGripper, ABC):
+
+    def setup_hardware_interfaces(self):
+        self._setup_hardware_interfaces_for_active_connections()
+
+    def setup_joint_states(self):
+        gripper_joints = self.active_connections
+
+        gripper_open = JointState.from_mapping(
+            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
+            state_type=GripperState.OPEN,
+        )
+
+        close_vals = [
+            np.pi / 2,
+            np.pi / 2,
+            np.pi / 2,
+            np.pi / 2,
+            -0.3490658503988659,
+            np.pi / 2,
+            np.pi / 2,
+            np.pi / 2,
+            0.3490658503988659,
+            np.pi / 2,
+            np.pi / 2,
+            np.pi / 2,
+            0.3490658503988659,
+            np.pi / 2,
+            np.pi / 2,
+            np.pi / 2,
+            0.3490658503988659,
+            np.pi / 2,
+            np.pi / 2,
+            np.pi / 2,
+        ]
+
+        gripper_close = JointState.from_mapping(
+            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            mapping=dict(zip(gripper_joints, close_vals)),
+            state_type=GripperState.CLOSE,
+        )
+
+        self.add_joint_state(gripper_open)
+        self.add_joint_state(gripper_close)
+
+
+@dataclass(eq=False)
+class ICub3LeftHand(ICub3Gripper):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
-        hand = cls(
-            root=world.get_body_by_name("l_hand"),
-            tool_frame=world.get_body_by_name("l_gripper_tool_frame"),
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
+        gripper = cls(
+            root=world.get_body_in_branch_by_name(robot_root, "l_hand"),
+            tool_frame=world.get_body_in_branch_by_name(
+                robot_root, "l_gripper_tool_frame"
+            ),
             front_facing_orientation=Quaternion(0.5, 0.5, 0.5, 0.5),
         )
-        world.add_semantic_annotation(hand)
-        return hand
+        world.add_semantic_annotation(gripper)
+        return gripper
 
     def setup_finger_semantic_annotations(self):
-        thumb = ICub3LeftThumb.setup_default_configuration_in_world(self._world)
-        self.add_thumb(thumb)
+        self.add_thumb(
+            ICub3LeftThumb.setup_default_configuration_in_world_below_robot_root(
+                self.root
+            )
+        )
 
-        index = ICub3LeftIndexFinger.setup_default_configuration_in_world(self._world)
-        self.add_finger(index)
-
-        middle = ICub3LeftMiddleFinger.setup_default_configuration_in_world(self._world)
-        self.add_finger(middle)
-
-        ring = ICub3LeftRingFinger.setup_default_configuration_in_world(self._world)
-        self.add_finger(ring)
-
-        little = ICub3LeftLittleFinger.setup_default_configuration_in_world(self._world)
-        self.add_finger(little)
+        self.add_finger(
+            ICub3LeftIndexFinger.setup_default_configuration_in_world_below_robot_root(
+                self.root
+            )
+        )
+        self.add_finger(
+            ICub3LeftMiddleFinger.setup_default_configuration_in_world_below_robot_root(
+                self.root
+            )
+        )
+        self.add_finger(
+            ICub3LeftRingFinger.setup_default_configuration_in_world_below_robot_root(
+                self.root
+            )
+        )
+        self.add_finger(
+            ICub3LeftLittleFinger.setup_default_configuration_in_world_below_robot_root(
+                self.root
+            )
+        )
 
 
 @dataclass(eq=False)
-class ICub3RightHand(HumanoidHand):
+class ICub3RightHand(ICub3Gripper):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
-        hand = cls(
-            root=world.get_body_by_name("r_hand"),
-            tool_frame=world.get_body_by_name("r_gripper_tool_frame"),
-            front_facing_orientation=Quaternion(0, 0, -0.707, 0.707),
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
+        gripper = cls(
+            root=world.get_body_in_branch_by_name(robot_root, "r_hand"),
+            tool_frame=world.get_body_in_branch_by_name(
+                robot_root, "r_gripper_tool_frame"
+            ),
+            front_facing_orientation=Quaternion(0.5, 0.5, 0.5, 0.5),
         )
-        world.add_semantic_annotation(hand)
-        return hand
+        world.add_semantic_annotation(gripper)
+        return gripper
 
     def setup_finger_semantic_annotations(self):
-        thumb = ICub3RightThumb.setup_default_configuration_in_world(self._world)
-        self.add_thumb(thumb)
-
-        index = ICub3RightIndexFinger.setup_default_configuration_in_world(self._world)
-        self.add_finger(index)
-
-        middle = ICub3RightMiddleFinger.setup_default_configuration_in_world(
-            self._world
+        self.add_thumb(
+            ICub3RightThumb.setup_default_configuration_in_world_below_robot_root(
+                self.root
+            )
         )
-        self.add_finger(middle)
 
-        ring = ICub3RightRingFinger.setup_default_configuration_in_world(self._world)
-        self.add_finger(ring)
-
-        little = ICub3RightLittleFinger.setup_default_configuration_in_world(
-            self._world
+        self.add_finger(
+            ICub3RightIndexFinger.setup_default_configuration_in_world_below_robot_root(
+                self.root
+            )
         )
-        self.add_finger(little)
+        self.add_finger(
+            ICub3RightMiddleFinger.setup_default_configuration_in_world_below_robot_root(
+                self.root
+            )
+        )
+        self.add_finger(
+            ICub3RightRingFinger.setup_default_configuration_in_world_below_robot_root(
+                self.root
+            )
+        )
+        self.add_finger(
+            ICub3RightLittleFinger.setup_default_configuration_in_world_below_robot_root(
+                self.root
+            )
+        )
 
 
 @dataclass(eq=False)
-class ICub3LeftArm(Arm, HasHumanoidHand):
+class ICub3LeftArm(Arm, HasParallelGripper):
+
+    def setup_hardware_interfaces(self):
+        self._setup_hardware_interfaces_for_active_connections()
+
+    def setup_joint_states(self):
+        arm_park = JointState.from_mapping(
+            name=PrefixedName("left_arm_park", prefix=self.name.name),
+            mapping=dict(
+                zip(self.active_connections, [0.0] * len(self.active_connections))
+            ),
+            state_type=StaticJointState.PARK,
+        )
+        self.add_joint_state(arm_park)
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         arm = cls(
-            root=world.get_body_by_name("root_link"),
-            tip=world.get_body_by_name("l_hand"),
+            root=world.get_body_in_branch_by_name(robot_root, "root_link"),
+            tip=world.get_body_in_branch_by_name(robot_root, "l_hand"),
         )
         world.add_semantic_annotation(arm)
         return arm
 
     def setup_end_effector_semantic_annotation(self):
-        hand = ICub3LeftHand.setup_default_configuration_in_world(self._world)
-        self.add_end_effector(hand)
-        hand.setup_finger_semantic_annotations()
+        gripper = ICub3LeftHand.setup_default_configuration_in_world_below_robot_root(
+            self.root
+        )
+        self.add_end_effector(gripper)
+        gripper.setup_finger_semantic_annotations()
 
 
 @dataclass(eq=False)
-class ICub3RightArm(Arm, HasHumanoidHand):
+class ICub3RightArm(Arm, HasParallelGripper):
+
+    def setup_hardware_interfaces(self):
+        self._setup_hardware_interfaces_for_active_connections()
+
+    def setup_joint_states(self):
+        arm_park = JointState.from_mapping(
+            name=PrefixedName("right_arm_park", prefix=self.name.name),
+            mapping=dict(
+                zip(self.active_connections, [0.0] * len(self.active_connections))
+            ),
+            state_type=StaticJointState.PARK,
+        )
+        self.add_joint_state(arm_park)
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         arm = cls(
-            root=world.get_body_by_name("root_link"),
-            tip=world.get_body_by_name("r_hand"),
+            root=world.get_body_in_branch_by_name(robot_root, "root_link"),
+            tip=world.get_body_in_branch_by_name(robot_root, "r_hand"),
         )
         world.add_semantic_annotation(arm)
         return arm
 
     def setup_end_effector_semantic_annotation(self):
-        hand = ICub3RightHand.setup_default_configuration_in_world(self._world)
-        self.add_end_effector(hand)
-        hand.setup_finger_semantic_annotations()
+        gripper = ICub3RightHand.setup_default_configuration_in_world_below_robot_root(
+            self.root
+        )
+        self.add_end_effector(gripper)
+        gripper.setup_finger_semantic_annotations()
 
 
 @dataclass(eq=False)
-class ICub3Camera(Camera):
+class ICub3Neck(Neck, HasCameras):
+
+    def setup_hardware_interfaces(self):
+        self._setup_hardware_interfaces_for_active_connections()
+
+    def setup_joint_states(self):
+        pass
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
-        camera = cls(
-            root=world.get_body_by_name("head"),
-            forward_facing_axis=Vector3(1, 0, 0),
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
+        neck = cls(
+            root=world.get_body_in_branch_by_name(robot_root, "chest"),
+            tip=world.get_body_in_branch_by_name(robot_root, "head"),
+        )
+        world.add_semantic_annotation(neck)
+        return neck
+
+    def setup_sensor_semantic_annotations(self):
+        world = self.root._world
+        camera = Camera(
+            root=world.get_body_in_branch_by_name(self.root, "head"),
+            forward_facing_axis=Vector3.Z(),
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
-            minimal_height=1.27,
-            maximal_height=1.85,
-            default_camera=True,
+            minimal_height=0.75049,
+            maximal_height=0.99483,
         )
         world.add_semantic_annotation(camera)
-        return camera
+        self.add_sensor(camera)
 
 
 @dataclass(eq=False)
-class ICub3Torso(Torso, HasLeftRightArm, HasCameras):
+class ICub3Torso(Torso, HasLeftRightArm, HasNeck):
+
+    def setup_hardware_interfaces(self):
+        self._setup_hardware_interfaces_for_active_connections()
+
+    def setup_joint_states(self):
+        pass
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         torso = cls(
-            root=world.get_body_by_name("root_link"),
-            tip=world.get_body_by_name("chest"),
+            root=world.get_body_in_branch_by_name(robot_root, "root_link"),
+            tip=world.get_body_in_branch_by_name(robot_root, "chest"),
         )
         world.add_semantic_annotation(torso)
         return torso
 
     def setup_arm_semantic_annotations(self):
-        left_arm = ICub3LeftArm.setup_default_configuration_in_world(self._world)
+        left_arm = ICub3LeftArm.setup_default_configuration_in_world_below_robot_root(
+            self.root
+        )
         self.add_arm(left_arm)
         left_arm.setup_end_effector_semantic_annotation()
 
-        right_arm = ICub3RightArm.setup_default_configuration_in_world(self._world)
+        right_arm = ICub3RightArm.setup_default_configuration_in_world_below_robot_root(
+            self.root
+        )
         self.add_arm(right_arm)
         right_arm.setup_end_effector_semantic_annotation()
 
-    def setup_sensor_semantic_annotations(self):
-        camera = ICub3Camera.setup_default_configuration_in_world(self._world)
-        self.add_camera(camera)
+    def setup_neck_semantic_annotation(self):
+        neck = ICub3Neck.setup_default_configuration_in_world_below_robot_root(
+            self.root
+        )
+        neck.setup_sensor_semantic_annotations()
+        self.add_neck(neck)
 
 
 @dataclass(eq=False)
-class ICub3MobileBase(MobileBase, HasTorso):
+class ICub3MobileBase(MobileBase):
+
     @classmethod
-    def setup_default_configuration_in_world(cls, world: World):
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
         mobile_base = cls(
-            root=world.get_body_by_name("base_footprint"),
+            root=world.get_body_in_branch_by_name(robot_root, "l_hip_1"),
         )
         world.add_semantic_annotation(mobile_base)
         return mobile_base
 
-    def setup_default_torso_semantic_annotation(self):
-        torso = ICub3Torso.setup_default_configuration_in_world(self._world)
-        self.add_torso(torso)
-        torso.setup_arm_semantic_annotations()
-        torso.setup_sensor_semantic_annotations()
+    def setup_hardware_interfaces(self):
+        pass
+
+    def setup_joint_states(self):
+        pass
 
 
 @dataclass(eq=False)
-class ICub3(AbstractRobot, HasMobileBase):
-    """
-    Class that describes the iCub3 Robot.
-    """
+class ICub3(AbstractRobot, HasTorso, HasMobileBase):
 
     @classmethod
     def _get_root_body_name(cls) -> str:
         return "base_footprint"
 
+    def setup_default_torso_semantic_annotation(self):
+        torso = ICub3Torso.setup_default_configuration_in_world_below_robot_root(
+            self.root
+        )
+        self.add_torso(torso)
+        torso.setup_arm_semantic_annotations()
+        torso.setup_neck_semantic_annotation()
+
     def setup_mobile_base_semantic_annotation(self):
-        mobile_base = ICub3MobileBase.setup_default_configuration_in_world(self._world)
-        mobile_base.setup_default_torso_semantic_annotation()
+        mobile_base = (
+            ICub3MobileBase.setup_default_configuration_in_world_below_robot_root(
+                self.root
+            )
+        )
         self.add_mobile_base(mobile_base)
 
     def setup_robot_part_semantic_annotations(self):
         self.setup_mobile_base_semantic_annotation()
+        self.setup_default_torso_semantic_annotation()
