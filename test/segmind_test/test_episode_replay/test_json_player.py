@@ -38,8 +38,12 @@ def test_json_player_context():
 def test_json_player(test_json_player_context):
     context = test_json_player_context["context"]
     file_player = test_json_player_context["json_file_player"]
+    obj = context.world.bodies_with_collision[0]
+    frozen_pose = obj.global_pose
     file_player.start()
     assert file_player.is_alive()
+    time.sleep(2)
+    assert obj.global_pose != frozen_pose
     file_player.stop()
     time.sleep(0.5)
     assert len(context.world.bodies_with_collision) > 0

@@ -47,6 +47,7 @@ from krrood.ormatic.custom_types import TypeType
 class Base(DeclarativeBase):
     type_mappings = {
         typing.Type: krrood.ormatic.custom_types.TypeType,
+        builtins.type: krrood.ormatic.custom_types.TypeType,
         enum.Enum: krrood.ormatic.custom_types.PolymorphicEnumType,
         krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
         uuid.UUID: sqlalchemy.sql.sqltypes.UUID,

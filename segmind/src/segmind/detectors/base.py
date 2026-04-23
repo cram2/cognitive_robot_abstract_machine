@@ -75,7 +75,7 @@ class SegmindContext(ContextExtension):
     The event logger used to record detected events.
     """
 
-    placing_pairs: set = field(default_factory=set)
+    placing_pairs: set[Any] = field(default_factory=set)
     """
     Set of placing pairs, to avoid duplicate events
     """
@@ -85,7 +85,7 @@ class SegmindContext(ContextExtension):
     List of bodies that can be considered holes
     """
 
-    insertion_pairs: set = field(default_factory=set)
+    insertion_pairs: set[Any] = field(default_factory=set)
     """
     List of insertion pairs, to avoid duplicate events
     """
