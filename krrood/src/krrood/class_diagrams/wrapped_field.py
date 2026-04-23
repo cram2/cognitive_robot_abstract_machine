@@ -5,16 +5,15 @@ import inspect
 import logging
 import sys
 from collections.abc import Sequence
+from copy import copy
 from dataclasses import dataclass, Field, MISSING
 from datetime import datetime
 from functools import cached_property, lru_cache
 from inspect import isclass
 from types import NoneType
-from copy import copy
 from typing import Generic
 
 from typing_extensions import (
-    get_type_hints,
     get_origin,
     get_args,
     ClassVar,
@@ -25,13 +24,13 @@ from typing_extensions import (
     Union,
 )
 
-from krrood.class_diagrams.failures import MissingContainedTypeOfContainer
-from krrood.class_diagrams.utils import behaves_like_a_built_in_class
-from krrood.utils import module_and_class_name, memoize
+from krrood.class_diagrams.exceptions import MissingContainedTypeOfContainer
+from krrood.class_diagrams.utils import behaves_like_a_built_in_class, get_type_hints_of_object
+from krrood.utils import module_and_class_name, is_builtin_type
 
 if TYPE_CHECKING:
     from krrood.class_diagrams.class_diagram import WrappedClass
-    from krrood.ontomatic.property_descriptor import PropertyDescriptor
+    from krrood.ontomatic.property_descriptor.property_descriptor import PropertyDescriptor
 
 
 @dataclass
@@ -101,10 +100,8 @@ class WrappedField:
         """
         Resolve the type hint for this field.
 
-        If the field's type is already a concrete (non-string) type hint,
-        return it directly. Otherwise, resolve forward references by
-        iteratively building a namespace with classes from the class diagram
-        and sys.modules until all references are resolved.
+        :return: The resolved type hint.
+        :raises CouldNotResolveType: If the type cannot be resolved.
         """
         # Fast path: already-resolved type (e.g., provided by specialized generic introspector)
         if not isinstance(self.field.type, str):
@@ -120,12 +117,9 @@ class WrappedField:
         if origin is not None and not isinstance(clazz, type):
             clazz = origin
 
-        while True:
-            try:
-                return get_type_hints(clazz, localns=local_namespace)[self.field.name]
-            except NameError as e:
-                found_class = self._find_class_by_name(e.name)
-                local_namespace[e.name] = found_class
+        return get_type_hints_of_object(
+            clazz, namespace=tuple(local_namespace.items())
+        )[self.field.name]
 
     def _build_initial_namespace(self) -> dict:
         """
@@ -144,12 +138,14 @@ class WrappedField:
         if class_diagram is not None:
             for wrapped_class in class_diagram.wrapped_classes:
                 if wrapped_class.clazz.__name__ == class_name:
-                    return wrapped_class.clazz
+                    return wrapped_class.clazzs
         return manually_search_for_class_name(class_name)
 
     @cached_property
     def is_builtin_type(self) -> bool:
-        return self.type_endpoint in [int, float, str, bool, datetime, NoneType]
+        return is_builtin_type(self.type_endpoint) or (
+                self.type_endpoint in [datetime, NoneType]
+        )
 
     @cached_property
     def is_container(self) -> bool:

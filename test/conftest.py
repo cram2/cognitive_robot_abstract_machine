@@ -1,11 +1,7 @@
-import gc
-import linecache
 import os
 import threading
 import time
-import tracemalloc
 from copy import deepcopy
-from functools import _lru_cache_wrapper
 
 import numpy as np
 import objgraph
@@ -28,8 +24,6 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.utils import recursive_subclasses
-
-# from pycram.datastructures.dataclasses import Context  # type: ignore
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -120,12 +114,8 @@ def cleanup_after_test():
 @pytest.fixture(autouse=True, scope="module")
 def count_worlds():
     yield
-    unreachable = gc.collect()
     world_in_mem = objgraph.count("World")
-    print(f"Number of worlds after test: {objgraph.count("World")}")
     if world_in_mem > 30:
-        print("Unreachable objects found:", unreachable)
-        print(f"Number of worlds after test: {objgraph.count("World")}")
         raise MemoryError(
             "Something is leaking worlds, there are more than 20 worlds in memory after the test"
         )

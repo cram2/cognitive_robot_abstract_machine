@@ -101,6 +101,7 @@ class Base(DeclarativeBase):
     type_mappings = {
         trimesh.base.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
         typing.Type: krrood.ormatic.custom_types.TypeType,
+        builtins.type: krrood.ormatic.custom_types.TypeType,
         enum.Enum: krrood.ormatic.custom_types.PolymorphicEnumType,
         krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
         uuid.UUID: sqlalchemy.sql.sqltypes.UUID,
