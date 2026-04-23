@@ -92,12 +92,14 @@ class LossOfSupportDetector(AbstractDetector):
         new_support_pairs = self.get_relation(context, objects_to_check, is_supported_by)
         for body, support in list(latest_support.items()):
             loss_supports = (
-                support
+                support.copy()
                 if body not in new_support_pairs
                 else support - new_support_pairs[body]
             )
             if loss_supports:
-                latest_support.pop(body)
+                segmind_context.latest_support[body] -= loss_supports
+                if not segmind_context.latest_support[body]:
+                    segmind_context.latest_support.pop(body)
                 events.extend(
                     [
                         LossOfSupportEvent(tracked_object=body, with_object=s)
@@ -221,12 +223,14 @@ class LossOfContainmentDetector(BaseContainmentDetector):
         events = []
         for obj, containment_list in list(latest_containment.items()):
             lost_containments = (
-                containment_list
+                containment_list.copy()
                 if obj not in new_containment_pairs
                 else containment_list - new_containment_pairs[obj]
             )
             if lost_containments:
-                latest_containment.pop(obj)
+                latest_containment[obj] -= lost_containments
+                if not latest_containment[obj]:
+                    latest_containment.pop(obj)
                 events.extend(
                     [
                         LossOfContainmentEvent(tracked_object=obj, with_object=c)
