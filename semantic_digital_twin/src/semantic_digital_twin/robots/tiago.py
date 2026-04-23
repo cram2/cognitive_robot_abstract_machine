@@ -314,6 +314,7 @@ class TiagoCamera(Camera):
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=1.0665,
             maximal_height=1.4165,
+            default_camera=True,
         )
         world.add_semantic_annotation(camera)
 
@@ -450,6 +451,10 @@ class TiagoMobileBase(MobileBase, HasTorso):
 
 @dataclass(eq=False)
 class Tiago(AbstractRobot, HasMobileBase):
+
+    @classmethod
+    def get_ros_file_path(cls) -> str:
+        return "package://iai_tiago_description/urdf/tiago_from_our_robot.urdf"
 
     def setup_mobile_base_semantic_annotation(self):
         mobile_base = (

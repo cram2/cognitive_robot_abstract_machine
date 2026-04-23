@@ -362,11 +362,12 @@ class JustinCamera(Camera):
     ) -> Self:
         world = robot_root._world
         camera = cls(
-            root=world.get_body_in_branch_by_name(robot_root, "head_link2"),
+            root=world.get_body_in_branch_by_name(robot_root, "head2"),
             forward_facing_axis=Vector3.Z(),
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=0.75049,
             maximal_height=0.99483,
+            default_camera=True,
         )
         world.add_semantic_annotation(camera)
         return camera
@@ -482,6 +483,10 @@ class JustinMobileBase(MobileBase, HasTorso):
 
 @dataclass(eq=False)
 class Justin(AbstractRobot, HasMobileBase):
+
+    @classmethod
+    def get_ros_file_path(cls) -> str:
+        return "package://iai_dlr_rollin_justin/urdf/rollin_justin.urdf"
 
     @classmethod
     def _get_root_body_name(cls) -> str:

@@ -487,6 +487,10 @@ class PR2MobileBase(MobileBase, HasTorso):
 class PR2(AbstractRobot, HasMobileBase):
 
     @classmethod
+    def get_ros_file_path(cls) -> str:
+        return "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+
+    @classmethod
     def _get_root_body_name(cls) -> str:
         return "base_footprint"
 

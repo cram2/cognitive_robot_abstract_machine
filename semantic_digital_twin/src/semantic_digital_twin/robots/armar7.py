@@ -556,6 +556,10 @@ class Armar7MobileBase(MobileBase, HasTorso):
 @dataclass(eq=False)
 class Armar7(AbstractRobot, HasMobileBase):
 
+    @classmethod
+    def get_ros_file_path(cls) -> str:
+        pass
+
     def setup_mobile_base_semantic_annotation(self):
         mobile_base = (
             Armar7MobileBase.setup_default_configuration_in_world_below_robot_root(

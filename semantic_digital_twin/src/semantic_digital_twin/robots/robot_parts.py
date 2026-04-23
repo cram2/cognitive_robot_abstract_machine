@@ -460,6 +460,13 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
 
     @classmethod
     @abstractmethod
+    def get_ros_file_path(cls) -> str:
+        """
+        Returns a ROS file path pointing to the description of this robot, for example a URDF file.
+        """
+
+    @classmethod
+    @abstractmethod
     def _get_root_body_name(cls) -> str:
         """
         Returns the name of the root body of the robot in the world, which serves as the entry point for traversing the

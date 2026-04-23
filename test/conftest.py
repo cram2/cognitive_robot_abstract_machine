@@ -11,6 +11,8 @@ import numpy as np
 import objgraph
 import pytest
 
+from semantic_digital_twin.robots.justin import Justin
+
 try:
     from pycram.datastructures.dataclasses import Context
 except ModuleNotFoundError:
@@ -295,35 +297,35 @@ def self_collision_bot_world():
 
 
 @pytest.fixture()
-def robot_urdf_path_to_abstract_robot_mappings():
-    return {
-        "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro": PR2,
-        os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..",
-            "pycram",
-            "resources",
-            "robots",
-            "hsrb.urdf",
-        ): HSRB,
-        os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..",
-            "semantic_digital_twin",
-            "resources",
-            "urdf",
-            "tracy.urdf",
-        ): Tracy,
-        os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..",
-            "pycram",
-            "resources",
-            "robots",
-            "stretch_description.urdf",
-        ): Stretch,
-        "package://iai_tiago_description/urdf/tiago_from_our_robot.urdf": Tiago,
-    }
+def abstract_robot_list():
+    return [PR2, Tiago, Justin]
+    # return {
+    #     os.path.join(
+    #         os.path.dirname(os.path.abspath(__file__)),
+    #         "..",
+    #         "pycram",
+    #         "resources",
+    #         "robots",
+    #         "hsrb.urdf",
+    #     ): HSRB,
+    #     os.path.join(
+    #         os.path.dirname(os.path.abspath(__file__)),
+    #         "..",
+    #         "semantic_digital_twin",
+    #         "resources",
+    #         "urdf",
+    #         "tracy.urdf",
+    #     ): Tracy,
+    #     os.path.join(
+    #         os.path.dirname(os.path.abspath(__file__)),
+    #         "..",
+    #         "pycram",
+    #         "resources",
+    #         "robots",
+    #         "stretch_description.urdf",
+    #     ): Stretch,
+    #     : Tiago,
+    # }
 
 
 @pytest.fixture()
