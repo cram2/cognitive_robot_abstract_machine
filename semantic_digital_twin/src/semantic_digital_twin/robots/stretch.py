@@ -208,7 +208,7 @@ class StretchCameraColor(Camera):
             minimal_height=1.322,
             maximal_height=1.322,
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
-            default_camera=True
+            default_camera=True,
         )
         world.add_semantic_annotation(camera)
         return camera
@@ -235,7 +235,7 @@ class StretchCameraDepth(Camera):
             forward_facing_axis=Vector3.Z(),
             minimal_height=1.307,
             maximal_height=1.307,
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
         )
         world.add_semantic_annotation(camera)
         return camera
@@ -262,7 +262,7 @@ class StretchCameraInfra1(Camera):
             forward_facing_axis=Vector3.Z(),
             minimal_height=1.307,
             maximal_height=1.307,
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
         )
         world.add_semantic_annotation(camera)
         return camera
