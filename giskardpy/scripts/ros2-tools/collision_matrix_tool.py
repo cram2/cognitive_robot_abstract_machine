@@ -111,13 +111,14 @@ class SelfCollisionMatrixInterface:
     def load_urdf(self, urdf_path: str):
         robot_world = URDFParser.from_file(urdf_path).parse()
         self.self_collision_matrix_rule = SelfCollisionMatrixRule()
-        self.robot = MinimalRobot.from_world(robot_world)
+        MinimalRobot.from_world(robot_world)
         with self.world.modify_world():
             self.world.clear()
             self.world.add_body(map := Body(name=PrefixedName("map")))
             self.world.merge_world(
                 robot_world, FixedConnection(parent=map, child=robot_world.root)
             )
+        self.robot = self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
 
     def dye_all_bodies_white_transparent(self):
         with self.world.modify_world():
