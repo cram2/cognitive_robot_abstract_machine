@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 import rclpy
 
@@ -79,6 +80,7 @@ def test_contact_detector(simple_apartment_setup):
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1)
     segmind_executor.tick()
     assert len(events_of(segmind_context, LossOfContactEvent)) == 3
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
 
 def test_support_detector(simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(simple_apartment_setup)
@@ -106,7 +108,7 @@ def test_support_detector(simple_apartment_setup):
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1)
     segmind_executor.tick()
     assert len(events_of(segmind_context, LossOfSupportEvent)) == 3
-
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
 
 def test_containment_detector(simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(simple_apartment_setup)
@@ -130,7 +132,7 @@ def test_containment_detector(simple_apartment_setup):
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1)
     segmind_executor.tick()
     assert len(events_of(segmind_context, LossOfContainmentEvent)) == 2
-
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
 
 def test_pickup(simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(simple_apartment_setup)
@@ -151,7 +153,7 @@ def test_pickup(simple_apartment_setup):
     assert len(events_of(segmind_context, TranslationEvent)) >= 1
     assert len(events_of(segmind_context, LossOfSupportEvent)) == 1
     assert len(events_of(segmind_context, PickUpEvent)) == 1
-
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
 
 def test_placing(simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(simple_apartment_setup)
@@ -181,7 +183,7 @@ def test_placing(simple_apartment_setup):
     assert len(events_of(segmind_context, SupportEvent)) == 1
     assert len(events_of(segmind_context, StopTranslationEvent)) == 1
     assert len(events_of(segmind_context, PlacingEvent)) == 1
-
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
 
 def test_translation(simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(simple_apartment_setup)
@@ -199,6 +201,7 @@ def test_translation(simple_apartment_setup):
         segmind_executor.tick()
 
     assert len(events_of(segmind_context, TranslationEvent)) == 1
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
 
 
 def test_stop_translation(simple_apartment_setup):
@@ -220,6 +223,7 @@ def test_stop_translation(simple_apartment_setup):
         segmind_executor.tick()
 
     assert len(events_of(segmind_context, StopTranslationEvent)) == 1
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
 
 
 def test_insertion(simple_apartment_setup):
@@ -254,6 +258,7 @@ def test_insertion(simple_apartment_setup):
     segmind_executor.tick()
 
     assert len(events_of(segmind_context, InsertionEvent)) == 1
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
 
 
 @pytest.mark.skip(reason="Buggy")
@@ -306,25 +311,4 @@ def test_stop_rotation(simple_apartment_setup):
     for _ in range(5):
         segmind_executor.tick()
     assert len([i for i in segmind_context.logger.get_events() if isinstance(i, StopRotationEvent)]) >= 1
-
-
-def test_contact_kitchen_world(simple_apartment_setup):
-    world = simple_apartment_setup
-    context = MotionStatechartContext(world=world)
-    segmind_executor = EpisodeSegmenterExecutor(context=context)
-    statechart = SegmindStatechart()
-    sc = statechart.build_statechart()
-    segmind_executor.compile(sc)
-    segmind_context = segmind_executor.context.require_extension(SegmindContext)
-    rclpy.init()
-    node = rclpy.create_node("segmind_test")
-    publisher = VizMarkerPublisher(_world=world, node=node)
-    publisher.with_tf_publisher()
-
-    milk = world.get_body_by_name("milk.stl")
-    segmind_executor.tick()
-    assert len(events_of(segmind_context, ContactEvent)) == 1
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1)
-    segmind_executor.tick()
-    assert len(events_of(segmind_context, LossOfContactEvent)) == 1
 

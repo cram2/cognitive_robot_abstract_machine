@@ -101,6 +101,9 @@ class JSONPlayer(FilePlayer):
 
         return objects_poses
 
+    def get_joint_states(self, frame_data: FrameData) -> Dict[str, float]:
+        pass
+
 
     def transform_to_stl(self, path: str):
         """
