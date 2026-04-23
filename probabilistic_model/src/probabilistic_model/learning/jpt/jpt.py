@@ -8,6 +8,7 @@ import pandas as pd
 from jpt.learning.impurity import Impurity
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
+from random_events.interval import closed
 from random_events.product_algebra import VariableMap
 from random_events.variable import Variable, Continuous, Integer, Symbolic
 from typing_extensions import Self
@@ -19,6 +20,7 @@ from probabilistic_model.distributions.distributions import (
     SymbolicDistribution,
     IntegerDistribution,
 )
+from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     ProductUnit,
@@ -334,7 +336,6 @@ class JointProbabilityTree(SubclassJSONSerializer):
                         1 / annotated_variable.minimal_distance
                     )
                     distribution.root.distribution.tolerance = 1e-4
-                    # print(f"Variable {annotated_variable.variable.name} is constant at {distribution.root.distribution.location}. Density cap: {distribution.root.distribution.density_cap}")
                 nyga_root = distribution.root
                 new_nodes = self.probabilistic_circuit.mount(nyga_root)
                 result.add_subcircuit(new_nodes[nyga_root.index])
