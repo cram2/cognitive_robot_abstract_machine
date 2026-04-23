@@ -14,10 +14,10 @@ from semantic_digital_twin.robots.robot_parts import (
     Torso,
     FieldOfView,
     MobileBase,
-)
-from semantic_digital_twin.robots.abstract_robot import (
-    HasLeftRightArm,
     AbstractRobot,
+)
+from semantic_digital_twin.robots.robot_part_mixins import (
+    HasLeftRightArm,
     HasTorso,
     HasMobileBase,
 )
@@ -124,7 +124,7 @@ class Tiago(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
 
     def _setup_arm_hardware_interfaces(self):
         for arm in self.arms:
-            arm._default_hardware_interface_setup()
+            arm._setup_hardware_interfaces_for_active_connections()
 
     def _setup_arm_joint_state(self):
         # Create states
@@ -223,7 +223,7 @@ class Tiago(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         self.add_torso(torso)
 
     def _setup_torso_hardware_interfaces(self):
-        self.torso._default_hardware_interface_setup()
+        self.torso._setup_hardware_interfaces_for_active_connections()
 
     def _setup_torso_joint_state(self):
         torso_joint = [self._world.get_connection_by_name("torso_lift_joint")]
@@ -406,7 +406,7 @@ class TiagoMujoco(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
 
     def _setup_arm_hardware_interfaces(self):
         for arm in self.arms:
-            arm._default_hardware_interface_setup()
+            arm._setup_hardware_interfaces_for_active_connections()
 
     def _setup_arm_joint_state(self):
         # Create states
@@ -496,7 +496,7 @@ class TiagoMujoco(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         self.add_torso(torso)
 
     def _setup_torso_hardware_interfaces(self):
-        self.torso._default_hardware_interface_setup()
+        self.torso._setup_hardware_interfaces_for_active_connections()
 
     def _setup_torso_joint_state(self):
         torso_joint = [self._world.get_connection_by_name("torso_lift_joint")]

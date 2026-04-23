@@ -1,17 +1,13 @@
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass
 
-from semantic_digital_twin.datastructures.definitions import (
-    StaticJointState,
-    GripperState,
-)
-from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import (
-    AbstractRobot,
+from semantic_digital_twin.robots.robot_part_mixins import (
     HasMobileBase,
     HasOneArm,
+    HasParallelGripper,
+    HasCameras,
 )
 from semantic_digital_twin.robots.robot_parts import (
     Finger,
@@ -19,122 +15,134 @@ from semantic_digital_twin.robots.robot_parts import (
     Arm,
     Camera,
     FieldOfView,
+    MobileBase,
+    AbstractRobot,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    ActiveConnection1DOF,
-)
-from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False)
-class Donbot(AbstractRobot, HasOneArm, HasMobileBase):
-    """
-    Class that describes the Donbot Robot.
-    """
+class DonbotFinger(Finger, ABC): ...
 
-    def load_srdf(self):
-        """
-        Loads the SRDF file for the Donbot robot, if it exists.
-        """
-        ...
+
+@dataclass(eq=False)
+class DonbotLeftFinger(DonbotFinger):
 
     @classmethod
-    def _get_robot_root_body(cls, world: World) -> Body:
-        return world.get_body_by_name("base_footprint")
-
-    def _setup_collision_rules(self):
-        pass
-
-    def setup_arm_semantic_annotations(self):
-        world = self._world
-        # Create arm
-        gripper_thumb = Finger.create_and_add_to_world(
-            name=PrefixedName("gripper_thumb", prefix=self.name.name),
-            root_name="gripper_gripper_left_link",
-            tip_name="gripper_finger_right_link",
-            world=world,
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("gripper_gripper_left_link"),
+            tip=world.get_body_by_name("gripper_finger_right_link"),
         )
+        world.add_semantic_annotation(finger)
+        return finger
 
-        gripper_finger = Finger.create_and_add_to_world(
-            name=PrefixedName("gripper_finger", prefix=self.name.name),
-            root_name="gripper_gripper_left_link",
-            tip_name="gripper_finger_left_link",
-            world=world,
+
+@dataclass(eq=False)
+class DonbotRightFinger(DonbotFinger):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("gripper_gripper_left_link"),
+            tip=world.get_body_by_name("gripper_finger_left_link"),
         )
+        world.add_semantic_annotation(finger)
+        return finger
 
-        camera = Camera.create_and_add_to_world(
-            name=PrefixedName("camera_link", prefix=self.name.name),
-            root_name="camera_link",
+
+@dataclass(eq=False)
+class DonbotCamera(Camera):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        camera = cls(
+            root=world.get_body_by_name("camera_link"),
             forward_facing_axis=Vector3(0, 0, 1),
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=0.5,
             maximal_height=1.2,
-            world=world,
             default_camera=True,
         )
+        world.add_semantic_annotation(camera)
+        return camera
 
-        gripper = ParallelGripper.create_and_add_to_world(
-            name=PrefixedName("gripper", prefix=self.name.name),
-            root_name="gripper_base_link",
-            tool_frame_name="gripper_tool_frame",
+
+@dataclass(eq=False)
+class DonbotGripper(ParallelGripper, HasCameras):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        gripper = cls(
+            root=world.get_body_by_name("gripper_base_link"),
+            tool_frame=world.get_body_by_name("gripper_tool_frame"),
             front_facing_orientation=Quaternion(0.707, -0.707, 0.707, -0.707),
-            thumb=gripper_thumb,
-            finger=gripper_finger,
-            sensors=[camera],
-            world=world,
         )
-        arm = Arm.create_and_add_to_world(
-            name=PrefixedName("arm", prefix=self.name.name),
-            root_name="ur5_base_link",
-            tip_name="ur5_wrist_3_link",
-            manipulator=gripper,
-            world=world,
-        )
+        world.add_semantic_annotation(gripper)
+        return gripper
 
+    def setup_finger_semantic_annotations(self):
+        thumb = DonbotLeftFinger.setup_default_configuration_in_world(self._world)
+        self.add_thumb(thumb)
+        finger = DonbotRightFinger.setup_default_configuration_in_world(self._world)
+        self.add_finger(finger)
+
+    def setup_sensor_semantic_annotations(self):
+        camera = DonbotCamera.setup_default_configuration_in_world(self._world)
+        self.add_camera(camera)
+
+
+@dataclass(eq=False)
+class DonbotArm(Arm, HasParallelGripper):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        arm = cls(
+            root=world.get_body_by_name("ur5_base_link"),
+            tip=world.get_body_by_name("ur5_wrist_3_link"),
+        )
+        world.add_semantic_annotation(arm)
+        return arm
+
+    def setup_end_effector_semantic_annotation(self):
+        gripper = DonbotGripper.setup_default_configuration_in_world(self._world)
+        self.add_end_effector(gripper)
+        gripper.setup_finger_semantic_annotations()
+        gripper.setup_sensor_semantic_annotations()
+
+
+@dataclass(eq=False)
+class DonbotMobileBase(MobileBase, HasOneArm):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        mobile_base = cls(
+            root=world.get_body_by_name("base_footprint"),
+        )
+        world.add_semantic_annotation(mobile_base)
+        return mobile_base
+
+    def setup_arm_semantic_annotations(self):
+        arm = DonbotArm.setup_default_configuration_in_world(self._world)
         self.add_arm(arm)
+        arm.setup_end_effector_semantic_annotation()
 
-    def _setup_arm_hardware_interfaces(self):
-        self.arm._default_hardware_interface_setup()
 
-    def _setup_arm_joint_state(self):
-        arm_park = JointState.from_mapping(
-            name=PrefixedName("arm_park", prefix=self.name.name),
-            mapping=dict(
-                zip(
-                    [
-                        c
-                        for c in self.arm.connections
-                        if isinstance(c, ActiveConnection1DOF)
-                    ],
-                    [3.23, -1.51, -1.57, 0.0, 1.57, -1.65],
-                )
-            ),
-            state_type=StaticJointState.PARK,
-        )
+@dataclass(eq=False)
+class Donbot(AbstractRobot, HasMobileBase):
+    """
+    Class that describes the Donbot Robot.
+    """
 
-        self.arm.add_joint_state(arm_park)
+    @classmethod
+    def _get_root_body_name(cls) -> str:
+        return "base_footprint"
 
-        gripper = self.arm.manipulator
-        gripper_joints = [
-            c for c in gripper.connections if isinstance(c, ActiveConnection1DOF)
-        ]
+    def setup_mobile_base_semantic_annotation(self):
+        mobile_base = DonbotMobileBase.setup_default_configuration_in_world(self._world)
+        self.add_mobile_base(mobile_base)
+        mobile_base.setup_arm_semantic_annotations()
 
-        gripper_open = JointState.from_mapping(
-            name=PrefixedName("gripper_open", prefix=self.name.name),
-            mapping=dict(zip(gripper_joints, [0.109, -0.055])),
-            state_type=GripperState.OPEN,
-        )
-
-        gripper_close = JointState.from_mapping(
-            name=PrefixedName("gripper_close", prefix=self.name.name),
-            mapping=dict(zip(gripper_joints, [0.0065, -0.0027])),
-            state_type=GripperState.CLOSE,
-        )
-
-        gripper.add_joint_state(gripper_close)
-        gripper.add_joint_state(gripper_open)
-
-    def _setup_mobile_base_semantic_annotations(self):
-        pass
+    def setup_robot_part_semantic_annotations(self):
+        self.setup_mobile_base_semantic_annotation()

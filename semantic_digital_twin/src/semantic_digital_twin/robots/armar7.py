@@ -1,21 +1,16 @@
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass
 from typing import Self
 
-from semantic_digital_twin.robots.abstract_robot import (
+from semantic_digital_twin.robots.robot_part_mixins import (
     HasLeftRightArm,
-    AbstractRobot,
     HasMobileBase,
     HasTorso,
+    HasHumanoidHand,
+    HasCameras,
 )
-from semantic_digital_twin.datastructures.definitions import (
-    StaticJointState,
-    GripperState,
-    TorsoState,
-)
-from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import (
     Finger,
     Arm,
@@ -24,331 +19,330 @@ from semantic_digital_twin.robots.robot_parts import (
     Torso,
     HumanoidHand,
     MobileBase,
+    AbstractRobot,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
-
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    FixedConnection,
-    ActiveConnection1DOF,
-)
 
 
 @dataclass(eq=False)
-class Armar7(AbstractRobot, HasLeftRightArm, HasMobileBase, HasTorso):
-    """
-    Class that describes the Armar7 Robot.
-    """
+class Armar7Camera(Camera):
 
-    def setup_arm_semantic_annotations(self):
-        # Create left arm
-        left_gripper_thumb = Finger.create_and_add_to_world(
-            name=PrefixedName("left_gripper_thumb", prefix=self.name.name),
-            root_name="Hand L Palm_link",
-            tip_name="Thumb L Tip_link",
-            world=self._world,
-        )
-
-        left_gripper_ring = Finger.create_and_add_to_world(
-            name=PrefixedName("left_gripper_ring", prefix=self.name.name),
-            root_name="Hand L Palm_link",
-            tip_name="Ring L Tip_link",
-            world=self._world,
-        )
-
-        left_gripper_pinky = Finger.create_and_add_to_world(
-            name=PrefixedName("left_gripper_pinky", prefix=self.name.name),
-            root_name="Hand L Palm_link",
-            tip_name="Pinky L Tip_link",
-            world=self._world,
-        )
-
-        left_gripper_middle = Finger.create_and_add_to_world(
-            name=PrefixedName("left_gripper_middle", prefix=self.name.name),
-            root_name="Hand L Palm_link",
-            tip_name="Middle L Tip_link",
-            world=self._world,
-        )
-
-        left_gripper_index = Finger.create_and_add_to_world(
-            name=PrefixedName("left_gripper_index", prefix=self.name.name),
-            root_name="Hand L Palm_link",
-            tip_name="Index L Tip_link",
-            finger_tip_frame_name="Hand L Index TCP_link",
-            world=self._world,
-        )
-
-        left_gripper = HumanoidHand.create_and_add_to_world(
-            name=PrefixedName("left_gripper", prefix=self.name.name),
-            root_name="ArmL8_Wrist_Hemisphere_B_link",
-            tool_frame_name="Hand L TCP_link",
-            front_facing_orientation=Quaternion(
-                -0.5,
-                0.5,
-                -0.5,
-                0.5,
-            ),
-            thumb=left_gripper_thumb,
-            fingers=[
-                left_gripper_ring,
-                left_gripper_pinky,
-                left_gripper_middle,
-                left_gripper_index,
-            ],
-            world=self._world,
-        )
-
-        left_arm = Arm.create_and_add_to_world(
-            name=PrefixedName("left_arm", prefix=self.name.name),
-            root_name="CenterArms_fixed_link",
-            tip_name="ArmL8_Wrist_Hemisphere_B_link",
-            manipulator=left_gripper,
-            world=self._world,
-        )
-
-        self.add_arm(left_arm)
-
-        # Create right arm
-        right_gripper_thumb = Finger.create_and_add_to_world(
-            name=PrefixedName("right_gripper_thumb", prefix=self.name.name),
-            root_name="Hand R Palm_link",
-            tip_name="Thumb R Tip_link",
-            world=self._world,
-        )
-
-        right_gripper_ring = Finger.create_and_add_to_world(
-            name=PrefixedName("right_gripper_ring", prefix=self.name.name),
-            root_name="Hand R Palm_link",
-            tip_name="Ring R Tip_link",
-            world=self._world,
-        )
-
-        right_gripper_pinky = Finger.create_and_add_to_world(
-            name=PrefixedName("right_gripper_pinky", prefix=self.name.name),
-            root_name="Hand R Palm_link",
-            tip_name="Pinky R Tip_link",
-            world=self._world,
-        )
-
-        right_gripper_middle = Finger.create_and_add_to_world(
-            name=PrefixedName("right_gripper_middle", prefix=self.name.name),
-            root_name="Hand R Palm_link",
-            tip_name="Middle R Tip_link",
-            world=self._world,
-        )
-
-        right_gripper_index = Finger.create_and_add_to_world(
-            name=PrefixedName("right_gripper_index", prefix=self.name.name),
-            root_name="Hand R Palm_link",
-            tip_name="Index R Tip_link",
-            world=self._world,
-        )
-
-        right_gripper = HumanoidHand.create_and_add_to_world(
-            name=PrefixedName("right_gripper", prefix=self.name.name),
-            root_name="ArmR8_Wrist_Hemisphere_B_link",
-            tool_frame_name="Hand R TCP_link",
-            front_facing_orientation=Quaternion(
-                -0.5,
-                0.5,
-                -0.5,
-                0.5,
-            ),
-            thumb=right_gripper_thumb,
-            fingers=[
-                right_gripper_ring,
-                right_gripper_pinky,
-                right_gripper_middle,
-                right_gripper_index,
-            ],
-            world=self._world,
-        )
-
-        right_arm = Arm.create_and_add_to_world(
-            name=PrefixedName("right_arm", prefix=self.name.name),
-            root_name="CenterArms_fixed_link",
-            tip_name="ArmR8_Wrist_Hemisphere_B_link",
-            manipulator=right_gripper,
-            world=self._world,
-        )
-
-        self.add_arm(right_arm)
-
-    def _setup_arm_hardware_interfaces(self):
-        for arm in self.arms:
-            arm._default_hardware_interface_setup()
-
-    def _setup_arm_joint_state(self):
-        left_arm_park = JointState.from_mapping(
-            name=PrefixedName("left_arm_park", prefix=self.name.name),
-            mapping=dict(
-                zip(
-                    [
-                        c
-                        for c in self.left_arm.connections
-                        if isinstance(c, ActiveConnection1DOF)
-                    ],
-                    [0.0, 0.0, 0.25, 0.5, 1.0, 1.0, 0.0, 0.0],
-                )
-            ),
-            state_type=StaticJointState.PARK,
-        )
-
-        self.left_arm.add_joint_state(left_arm_park)
-
-        right_arm_park = JointState.from_mapping(
-            name=PrefixedName("right_arm_park", prefix=self.name.name),
-            mapping=dict(
-                zip(
-                    [
-                        c
-                        for c in self.right_arm.connections
-                        if isinstance(c, ActiveConnection1DOF)
-                    ],
-                    [0.0, 0.0, 0.25, -0.5, 1.0, -1.0, 0.0, 0.0],
-                )
-            ),
-            state_type=StaticJointState.PARK,
-        )
-
-        self.right_arm.add_joint_state(right_arm_park)
-
-        left_gripper_joints = [
-            c
-            for c in self.left_arm.manipulator.connections
-            if type(c) != FixedConnection
-        ]
-
-        left_gripper_open = JointState.from_mapping(
-            name=PrefixedName("left_gripper_open", prefix=self.name.name),
-            mapping=dict(
-                zip(
-                    left_gripper_joints,
-                    [0] * len(left_gripper_joints),
-                )
-            ),
-            state_type=GripperState.OPEN,
-        )
-
-        left_gripper_close = JointState.from_mapping(
-            name=PrefixedName("left_gripper_close", prefix=self.name.name),
-            mapping=dict(
-                zip(
-                    left_gripper_joints,
-                    [1.57] * len(left_gripper_joints),
-                )
-            ),
-            state_type=GripperState.CLOSE,
-        )
-
-        self.left_arm.manipulator.add_joint_state(left_gripper_close)
-        self.left_arm.manipulator.add_joint_state(left_gripper_open)
-
-        right_gripper_joints = [
-            c
-            for c in self.right_arm.manipulator.connections
-            if type(c) != FixedConnection
-        ]
-
-        right_gripper_open = JointState.from_mapping(
-            name=PrefixedName("right_gripper_open", prefix=self.name.name),
-            mapping=dict(
-                zip(
-                    right_gripper_joints,
-                    [0] * len(right_gripper_joints),
-                )
-            ),
-            state_type=GripperState.OPEN,
-        )
-
-        right_gripper_close = JointState.from_mapping(
-            name=PrefixedName("right_gripper_close", prefix=self.name.name),
-            mapping=dict(
-                zip(
-                    right_gripper_joints,
-                    [1.57] * len(right_gripper_joints),
-                )
-            ),
-            state_type=GripperState.CLOSE,
-        )
-
-        self.right_arm.manipulator.add_joint_state(right_gripper_close)
-        self.right_arm.manipulator.add_joint_state(right_gripper_open)
-
-    def _setup_mobile_base_semantic_annotations(self):
-        base = MobileBase.create_and_add_to_world(
-            name=PrefixedName("base", prefix=self.name.name),
-            root_name="Platform_body_link",
-            forward_axis=Vector3.Y(),
-            world=self._world,
-            full_body_controlled=False,
-        )
-
-        self.add_mobile_base(base)
-
-    def _setup_torso_semantic_annotations(self):
-
-        # Create camera and neck
-        camera = Camera.create_and_add_to_world(
-            name=PrefixedName("AzureKinect_RGB_link", prefix=self.name.name),
-            root_name="AzureKinect_RGB_link",
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        camera = cls(
+            root=world.get_body_by_name("AzureKinect_RGB_link"),
             forward_facing_axis=Vector3(0, 0, 1),
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=1.371500015258789,
             maximal_height=1.7365000247955322,
-            world=self._world,
             default_camera=True,
         )
+        world.add_semantic_annotation(camera)
+        return camera
 
-        # Create torso
-        torso = Torso.create_and_add_to_world(
-            name=PrefixedName("torso", prefix=self.name.name),
-            root_name="Platform_link",
-            tip_name="CenterArms_fixed_link",
-            world=self._world,
-            sensors=[camera],
-        )
-        self.add_torso(torso)
 
-        self._world.add_semantic_annotation(self)
+@dataclass(eq=False)
+class Armar7Finger(Finger, ABC): ...
 
-    def _setup_torso_hardware_interfaces(self):
-        self.torso._default_hardware_interface_setup()
 
-    def _setup_torso_joint_state(self):
-        torso_joints = [
-            c for c in self.torso.connections if isinstance(c, ActiveConnection1DOF)
-        ]
-
-        torso_low = JointState.from_mapping(
-            name=PrefixedName("torso_low", prefix=self.name.name),
-            mapping=dict(zip(torso_joints, [-0.757037, 1.74533, 2.18166 / 2])),
-            state_type=TorsoState.LOW,
-        )
-
-        torso_mid = JointState.from_mapping(
-            name=PrefixedName("torso_mid", prefix=self.name.name),
-            mapping=dict(zip(torso_joints, [-0.757037 / 2, 1.74533 / 2, 2.18166 / 4])),
-            state_type=TorsoState.MID,
-        )
-
-        torso_high = JointState.from_mapping(
-            name=PrefixedName("torso_high", prefix=self.name.name),
-            mapping=dict(zip(torso_joints, [0.0] * len(torso_joints))),
-            state_type=TorsoState.HIGH,
-        )
-
-        self.torso.add_joint_state(torso_low)
-        self.torso.add_joint_state(torso_mid)
-        self.torso.add_joint_state(torso_high)
-
-    def _setup_collision_rules(self):
-        pass
+@dataclass(eq=False)
+class Armar7LeftGripperThumb(Armar7Finger):
 
     @classmethod
-    def _get_robot_root_body(cls, world: World) -> Self:
-        # the actual root here is called "root", but this is such a generic name that i fear it will be
-        # duplicated in the world
-        return world.get_body_by_name(
-            "Dummy_Platform_link"
-        ).parent_kinematic_structure_entity
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("Hand L Palm_link"),
+            tip=world.get_body_by_name("Thumb L Tip_link"),
+        )
+        world.add_semantic_annotation(finger)
+        return finger
+
+
+@dataclass(eq=False)
+class Armar7LeftGripperRing(Armar7Finger):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("Hand L Palm_link"),
+            tip=world.get_body_by_name("Ring L Tip_link"),
+        )
+        world.add_semantic_annotation(finger)
+        return finger
+
+
+@dataclass(eq=False)
+class Armar7LeftGripperPinky(Armar7Finger):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("Hand L Palm_link"),
+            tip=world.get_body_by_name("Pinky L Tip_link"),
+        )
+        world.add_semantic_annotation(finger)
+        return finger
+
+
+@dataclass(eq=False)
+class Armar7LeftGripperMiddle(Armar7Finger):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("Hand L Palm_link"),
+            tip=world.get_body_by_name("Middle L Tip_link"),
+        )
+        world.add_semantic_annotation(finger)
+        return finger
+
+
+@dataclass(eq=False)
+class Armar7LeftGripperIndex(Armar7Finger):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("Hand L Palm_link"),
+            tip=world.get_body_by_name("Index L Tip_link"),
+            finger_tip_frame=world.get_body_by_name("Hand L Index TCP_link"),
+        )
+        world.add_semantic_annotation(finger)
+        return finger
+
+
+@dataclass(eq=False)
+class Armar7RightGripperThumb(Armar7Finger):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("Hand R Palm_link"),
+            tip=world.get_body_by_name("Thumb R Tip_link"),
+        )
+        world.add_semantic_annotation(finger)
+        return finger
+
+
+@dataclass(eq=False)
+class Armar7RightGripperRing(Armar7Finger):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("Hand R Palm_link"),
+            tip=world.get_body_by_name("Ring R Tip_link"),
+        )
+        world.add_semantic_annotation(finger)
+        return finger
+
+
+@dataclass(eq=False)
+class Armar7RightGripperPinky(Armar7Finger):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("Hand R Palm_link"),
+            tip=world.get_body_by_name("Pinky R Tip_link"),
+        )
+        world.add_semantic_annotation(finger)
+        return finger
+
+
+@dataclass(eq=False)
+class Armar7RightGripperMiddle(Armar7Finger):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("Hand R Palm_link"),
+            tip=world.get_body_by_name("Middle R Tip_link"),
+        )
+        world.add_semantic_annotation(finger)
+        return finger
+
+
+@dataclass(eq=False)
+class Armar7RightGripperIndex(Armar7Finger):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("Hand R Palm_link"),
+            tip=world.get_body_by_name("Index R Tip_link"),
+        )
+        world.add_semantic_annotation(finger)
+        return finger
+
+
+@dataclass(eq=False)
+class Armar7LeftGripper(HumanoidHand):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        left_gripper = cls(
+            root=world.get_body_by_name("ArmL8_Wrist_Hemisphere_B_link"),
+            tool_frame=world.get_body_by_name("Hand L TCP_link"),
+            front_facing_orientation=Quaternion(-0.5, 0.5, -0.5, 0.5),
+        )
+        world.add_semantic_annotation(left_gripper)
+        return left_gripper
+
+    def setup_finger_semantic_annotations(self):
+        thumb = Armar7LeftGripperThumb.setup_default_configuration_in_world(self._world)
+        self.add_thumb(thumb)
+
+        ring = Armar7LeftGripperRing.setup_default_configuration_in_world(self._world)
+        self.add_finger(ring)
+
+        pinky = Armar7LeftGripperPinky.setup_default_configuration_in_world(self._world)
+        self.add_finger(pinky)
+
+        middle = Armar7LeftGripperMiddle.setup_default_configuration_in_world(
+            self._world
+        )
+        self.add_finger(middle)
+
+        index = Armar7LeftGripperIndex.setup_default_configuration_in_world(self._world)
+        self.add_finger(index)
+
+
+@dataclass(eq=False)
+class Armar7RightGripper(HumanoidHand):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        right_gripper = cls(
+            root=world.get_body_by_name("ArmR8_Wrist_Hemisphere_B_link"),
+            tool_frame=world.get_body_by_name("Hand R TCP_link"),
+            front_facing_orientation=Quaternion(-0.5, 0.5, -0.5, 0.5),
+        )
+        world.add_semantic_annotation(right_gripper)
+        return right_gripper
+
+    def setup_finger_semantic_annotations(self):
+        thumb = Armar7RightGripperThumb.setup_default_configuration_in_world(
+            self._world
+        )
+        self.add_thumb(thumb)
+
+        ring = Armar7RightGripperRing.setup_default_configuration_in_world(self._world)
+        self.add_finger(ring)
+
+        pinky = Armar7RightGripperPinky.setup_default_configuration_in_world(
+            self._world
+        )
+        self.add_finger(pinky)
+
+        middle = Armar7RightGripperMiddle.setup_default_configuration_in_world(
+            self._world
+        )
+        self.add_finger(middle)
+
+        index = Armar7RightGripperIndex.setup_default_configuration_in_world(
+            self._world
+        )
+        self.add_finger(index)
+
+
+@dataclass(eq=False)
+class Armar7LeftArm(Arm, HasHumanoidHand):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        left_arm = cls(
+            root=world.get_body_by_name("CenterArms_fixed_link"),
+            tip=world.get_body_by_name("ArmL8_Wrist_Hemisphere_B_link"),
+        )
+        world.add_semantic_annotation(left_arm)
+        return left_arm
+
+    def setup_end_effector_semantic_annotation(self):
+        gripper = Armar7LeftGripper.setup_default_configuration_in_world(self._world)
+        self.add_end_effector(gripper)
+        gripper.setup_finger_semantic_annotations()
+
+
+@dataclass(eq=False)
+class Armar7RightArm(Arm, HasHumanoidHand):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        right_arm = cls(
+            root=world.get_body_by_name("CenterArms_fixed_link"),
+            tip=world.get_body_by_name("ArmR8_Wrist_Hemisphere_B_link"),
+        )
+        world.add_semantic_annotation(right_arm)
+        return right_arm
+
+    def setup_end_effector_semantic_annotation(self):
+        gripper = Armar7RightGripper.setup_default_configuration_in_world(self._world)
+        self.add_end_effector(gripper)
+        gripper.setup_finger_semantic_annotations()
+
+
+@dataclass(eq=False)
+class Armar7Torso(Torso, HasLeftRightArm, HasCameras):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        torso = cls(
+            root=world.get_body_by_name("Platform_link"),
+            tip=world.get_body_by_name("CenterArms_fixed_link"),
+        )
+        world.add_semantic_annotation(torso)
+        return torso
+
+    def setup_arm_semantic_annotations(self):
+        left_arm = Armar7LeftArm.setup_default_configuration_in_world(self._world)
+        self.add_arm(left_arm)
+        left_arm.setup_end_effector_semantic_annotation()
+
+        right_arm = Armar7RightArm.setup_default_configuration_in_world(self._world)
+        self.add_arm(right_arm)
+        right_arm.setup_end_effector_semantic_annotation()
+
+    def setup_sensor_semantic_annotations(self):
+        camera = Armar7Camera.setup_default_configuration_in_world(self._world)
+        self.add_camera(camera)
+
+
+@dataclass(eq=False)
+class Armar7MobileBase(MobileBase, HasTorso):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        mobile_base = cls(
+            root=world.get_body_by_name("Platform_body_link"),
+            forward_axis=Vector3.Y(),
+            full_body_controlled=False,
+        )
+        world.add_semantic_annotation(mobile_base)
+        return mobile_base
+
+    def setup_default_torso_semantic_annotation(self):
+        torso = Armar7Torso.setup_default_configuration_in_world(self._world)
+        self.add_torso(torso)
+        torso.setup_arm_semantic_annotations()
+        torso.setup_sensor_semantic_annotations()
+
+
+@dataclass(eq=False)
+class Armar7(AbstractRobot, HasMobileBase):
+    """
+    Class that describes the Armar7 Robot.
+    """
+
+    @classmethod
+    def _get_root_body_name(cls) -> str:
+        return "Dummy_Platform_link"
+
+    def setup_mobile_base_semantic_annotation(self):
+        mobile_base = Armar7MobileBase.setup_default_configuration_in_world(self._world)
+        mobile_base.setup_default_torso_semantic_annotation()
+        self.add_mobile_base(mobile_base)
+
+    def setup_robot_part_semantic_annotations(self):
+        self.setup_mobile_base_semantic_annotation()

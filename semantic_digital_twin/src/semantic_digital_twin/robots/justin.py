@@ -3,9 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Self
 
-from semantic_digital_twin.robots.abstract_robot import (
+from semantic_digital_twin.robots.robot_part_mixins import (
     HasLeftRightArm,
-    AbstractRobot,
     HasTorso,
     HasMobileBase,
 )
@@ -23,6 +22,7 @@ from semantic_digital_twin.robots.robot_parts import (
     Camera,
     FieldOfView,
     Torso,
+    AbstractRobot,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
@@ -160,7 +160,7 @@ class Justin(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
 
     def _setup_arm_hardware_interfaces(self):
         for arm in self.arms:
-            arm._default_hardware_interface_setup()
+            arm._setup_hardware_interfaces_for_active_connections()
 
     def _setup_arm_joint_state(self):
         left_arm = self.left_arm
@@ -351,7 +351,7 @@ class Justin(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
         self.add_torso(torso)
 
     def _setup_torso_hardware_interfaces(self):
-        self.torso._default_hardware_interface_setup()
+        self.torso._setup_hardware_interfaces_for_active_connections()
 
     def _setup_torso_joint_state(self):
         torso_joints = [self.torso.active_connections]

@@ -1,305 +1,256 @@
-import os
-from collections import defaultdict
+from __future__ import annotations
+
+from abc import ABC
 from dataclasses import dataclass
-from typing import Self
 
-from importlib.resources import files
-from pathlib import Path
-
+from semantic_digital_twin.robots.robot_part_mixins import (
+    HasMobileBase,
+    HasTorso,
+    HasOneArm,
+    HasParallelGripper,
+    HasCameras,
+)
 from semantic_digital_twin.robots.robot_parts import (
-    Arm,
     Finger,
     ParallelGripper,
+    Arm,
     Camera,
-    Torso,
     FieldOfView,
+    Torso,
     MobileBase,
-)
-from semantic_digital_twin.robots.abstract_robot import (
-    HasArms,
     AbstractRobot,
-    HasTorso,
-    HasMobileBase,
-    HasOneArm,
 )
-from semantic_digital_twin.collision_checking.collision_matrix import (
-    MaxAvoidedCollisionsOverride,
-)
-from semantic_digital_twin.collision_checking.collision_rules import (
-    SelfCollisionMatrixRule,
-    AvoidExternalCollisions,
-    AvoidSelfCollisions,
-)
-from semantic_digital_twin.datastructures.definitions import (
-    StaticJointState,
-    GripperState,
-    TorsoState,
-)
-from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import Quaternion
-from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    FixedConnection,
-    ActiveConnection,
-    ActiveConnection1DOF,
-)
 
 
 @dataclass(eq=False)
-class HSRB(AbstractRobot, HasOneArm, HasTorso, HasMobileBase):
+class HSRBFinger(Finger, ABC): ...
+
+
+@dataclass(eq=False)
+class HSRBLeftFinger(HSRBFinger):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("hand_l_proximal_link"),
+            tip=world.get_body_by_name("hand_l_distal_link"),
+        )
+        world.add_semantic_annotation(finger)
+        return finger
+
+
+@dataclass(eq=False)
+class HSRBRightFinger(HSRBFinger):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        finger = cls(
+            root=world.get_body_by_name("hand_r_proximal_link"),
+            tip=world.get_body_by_name("hand_r_finger_tip_frame"),
+        )
+        world.add_semantic_annotation(finger)
+        return finger
+
+
+@dataclass(eq=False)
+class HSRBHandCamera(Camera):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        camera = cls(
+            root=world.get_body_by_name("hand_camera_frame"),
+            forward_facing_axis=Vector3(0, 0, 1),
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            minimal_height=0.75049,
+            maximal_height=0.99483,
+            default_camera=False,
+        )
+        world.add_semantic_annotation(camera)
+        return camera
+
+
+@dataclass(eq=False)
+class HSRBGripper(ParallelGripper, HasCameras):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        gripper = cls(
+            root=world.get_body_by_name("hand_palm_link"),
+            tool_frame=world.get_body_by_name("hand_gripper_tool_frame"),
+            front_facing_orientation=Quaternion(-0.70710678, 0.0, -0.70710678, 0.0),
+        )
+        world.add_semantic_annotation(gripper)
+        return gripper
+
+    def setup_finger_semantic_annotations(self):
+        thumb = HSRBLeftFinger.setup_default_configuration_in_world(self._world)
+        self.add_thumb(thumb)
+        finger = HSRBRightFinger.setup_default_configuration_in_world(self._world)
+        self.add_finger(finger)
+
+    def setup_sensor_semantic_annotations(self):
+        camera = HSRBHandCamera.setup_default_configuration_in_world(self._world)
+        self.add_camera(camera)
+
+
+@dataclass(eq=False)
+class HSRBArm(Arm, HasParallelGripper):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        arm = cls(
+            root=world.get_body_by_name("arm_lift_link"),
+            tip=world.get_body_by_name("hand_palm_link"),
+        )
+        world.add_semantic_annotation(arm)
+        return arm
+
+    def setup_end_effector_semantic_annotation(self):
+        gripper = HSRBGripper.setup_default_configuration_in_world(self._world)
+        self.add_end_effector(gripper)
+        gripper.setup_finger_semantic_annotations()
+        gripper.setup_sensor_semantic_annotations()
+
+
+@dataclass(eq=False)
+class HSRBHeadCenterCamera(Camera):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        camera = cls(
+            root=world.get_body_by_name("head_center_camera_frame"),
+            forward_facing_axis=Vector3(0, 0, 1),
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            minimal_height=0.75049,
+            maximal_height=0.99483,
+            default_camera=True,
+        )
+        world.add_semantic_annotation(camera)
+        return camera
+
+
+@dataclass(eq=False)
+class HSRBHeadRightCamera(Camera):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        camera = cls(
+            root=world.get_body_by_name("head_r_stereo_camera_link"),
+            forward_facing_axis=Vector3(0, 0, 1),
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            minimal_height=0.75049,
+            maximal_height=0.99483,
+            default_camera=False,
+        )
+        world.add_semantic_annotation(camera)
+        return camera
+
+
+@dataclass(eq=False)
+class HSRBHeadLeftCamera(Camera):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        camera = cls(
+            root=world.get_body_by_name("head_l_stereo_camera_link"),
+            forward_facing_axis=Vector3(0, 0, 1),
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            minimal_height=0.75049,
+            maximal_height=0.99483,
+            default_camera=False,
+        )
+        world.add_semantic_annotation(camera)
+        return camera
+
+
+@dataclass(eq=False)
+class HSRBHeadRGBDCamera(Camera):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        camera = cls(
+            root=world.get_body_by_name("head_rgbd_sensor_link"),
+            forward_facing_axis=Vector3(0, 0, 1),
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            minimal_height=0.75049,
+            maximal_height=0.99483,
+            default_camera=False,
+        )
+        world.add_semantic_annotation(camera)
+        return camera
+
+
+@dataclass(eq=False)
+class HSRBTorso(Torso, HasOneArm, HasCameras):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        torso = cls(
+            root=world.get_body_by_name("base_link"),
+            tip=world.get_body_by_name("head_tilt_link"),
+        )
+        world.add_semantic_annotation(torso)
+        return torso
+
+    def setup_arm_semantic_annotations(self):
+        arm = HSRBArm.setup_default_configuration_in_world(self._world)
+        self.add_arm(arm)
+        arm.setup_end_effector_semantic_annotation()
+
+    def setup_sensor_semantic_annotations(self):
+        head_center = HSRBHeadCenterCamera.setup_default_configuration_in_world(
+            self._world
+        )
+        self.add_camera(head_center)
+
+        head_right = HSRBHeadRightCamera.setup_default_configuration_in_world(
+            self._world
+        )
+        self.add_camera(head_right)
+
+        head_left = HSRBHeadLeftCamera.setup_default_configuration_in_world(self._world)
+        self.add_camera(head_left)
+
+        head_rgbd = HSRBHeadRGBDCamera.setup_default_configuration_in_world(self._world)
+        self.add_camera(head_rgbd)
+
+
+@dataclass(eq=False)
+class HSRBMobileBase(MobileBase, HasTorso):
+
+    @classmethod
+    def setup_default_configuration_in_world(cls, world: World):
+        mobile_base = cls(
+            root=world.get_body_by_name("base_link"),
+            forward_axis=Vector3.X(),
+            full_body_controlled=True,
+        )
+        world.add_semantic_annotation(mobile_base)
+        return mobile_base
+
+    def setup_default_torso_semantic_annotation(self):
+        torso = HSRBTorso.setup_default_configuration_in_world(self._world)
+        self.add_torso(torso)
+        torso.setup_arm_semantic_annotations()
+        torso.setup_sensor_semantic_annotations()
+
+
+@dataclass(eq=False)
+class HSRB(AbstractRobot, HasMobileBase):
     """
     Class that describes the Human Support Robot variant B (https://upmroboticclub.wordpress.com/robot/).
     """
 
     @classmethod
-    def _get_robot_root_body(cls, world: World) -> Self:
-        return world.get_body_by_name("base_footprint")
+    def _get_root_body_name(cls) -> str:
+        return "base_footprint"
 
-    def setup_arm_semantic_annotations(self):
-        gripper_thumb = Finger.create_and_add_to_world(
-            name=PrefixedName("thumb", prefix=self.name.name),
-            root_name="hand_l_proximal_link",
-            tip_name="hand_l_distal_link",
-            world=self._world,
-        )
+    def setup_mobile_base_semantic_annotation(self):
+        mobile_base = HSRBMobileBase.setup_default_configuration_in_world(self._world)
+        mobile_base.setup_default_torso_semantic_annotation()
+        self.add_mobile_base(mobile_base)
 
-        gripper_finger = Finger.create_and_add_to_world(
-            name=PrefixedName("finger", prefix=self.name.name),
-            root_name="hand_r_proximal_link",
-            tip_name="hand_r_finger_tip_frame",  # "hand_r_distal_link",
-            world=self._world,
-        )
-
-        # the min and max height are incorrect, same with the FoV. needs to be corrected using the real robot
-        hand_camera = Camera.create_and_add_to_world(
-            name=PrefixedName("hand_camera", prefix=self.name.name),
-            root_name="hand_camera_frame",
-            forward_facing_axis=Vector3(0, 0, 1),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
-            minimal_height=0.75049,
-            maximal_height=0.99483,
-            world=self._world,
-            default_camera=False,
-        )
-
-        gripper = ParallelGripper.create_and_add_to_world(
-            name=PrefixedName("gripper", prefix=self.name.name),
-            root_name="hand_palm_link",
-            tool_frame_name="hand_gripper_tool_frame",
-            thumb=gripper_thumb,
-            finger=gripper_finger,
-            sensors=[hand_camera],
-            front_facing_orientation=Quaternion(
-                -0.70710678,
-                0.0,
-                -0.70710678,
-                0.0,
-            ),
-            world=self._world,
-        )
-
-        arm = Arm.create_and_add_to_world(
-            name=PrefixedName("arm", prefix=self.name.name),
-            root_name="arm_lift_link",
-            tip_name="hand_palm_link",
-            manipulator=gripper,
-            world=self._world,
-        )
-        self.add_arm(arm)
-
-    def _setup_arm_hardware_interfaces(self):
-        self.arm._default_hardware_interface_setup()
-
-    def _setup_arm_joint_state(self):
-        # Create states
-        arm_park = JointState.from_mapping(
-            name=PrefixedName("arm_park", prefix=self.name.name),
-            mapping=dict(
-                zip(
-                    [
-                        c
-                        for c in self.arm.connections
-                        if isinstance(c, ActiveConnection1DOF)
-                    ],
-                    [0.0, 1.5, -1.85, 0.0],
-                )
-            ),
-            state_type=StaticJointState.PARK,
-        )
-
-        self.arm.add_joint_state(arm_park)
-
-        gripper_joints = [
-            self._world.get_connection_by_name("hand_l_proximal_joint"),
-            self._world.get_connection_by_name("hand_r_proximal_joint"),
-            self._world.get_connection_by_name("hand_motor_joint"),
-        ]
-
-        gripper_open = JointState.from_mapping(
-            name=PrefixedName("gripper_open", prefix=self.name.name),
-            mapping=dict(zip(gripper_joints, [0.3, 0.3, 0.3])),
-            state_type=GripperState.OPEN,
-        )
-
-        gripper_close = JointState.from_mapping(
-            name=PrefixedName("gripper_close", prefix=self.name.name),
-            mapping=dict(zip(gripper_joints, [0.0, 0.0, 0.0])),
-            state_type=GripperState.CLOSE,
-        )
-
-        self.arm.manipulator.add_joint_state(gripper_close)
-        self.arm.manipulator.add_joint_state(gripper_open)
-
-    def _setup_torso_semantic_annotations(self):
-        # Create camera and neck
-        head_center_camera = Camera.create_and_add_to_world(
-            name=PrefixedName("head_center_camera", prefix=self.name.name),
-            root_name="head_center_camera_frame",
-            forward_facing_axis=Vector3(0, 0, 1),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
-            minimal_height=0.75049,
-            maximal_height=0.99483,
-            world=self._world,
-            default_camera=True,
-        )
-
-        head_r_camera = Camera.create_and_add_to_world(
-            name=PrefixedName("head_right_camera", prefix=self.name.name),
-            root_name="head_r_stereo_camera_link",
-            forward_facing_axis=Vector3(0, 0, 1),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
-            minimal_height=0.75049,
-            maximal_height=0.99483,
-            world=self._world,
-            default_camera=False,
-        )
-
-        head_l_camera = Camera.create_and_add_to_world(
-            name=PrefixedName("head_left_camera", prefix=self.name.name),
-            root_name="head_l_stereo_camera_link",
-            forward_facing_axis=Vector3(0, 0, 1),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
-            minimal_height=0.75049,
-            maximal_height=0.99483,
-            world=self._world,
-            default_camera=False,
-        )
-
-        head_rgbd_camera = Camera.create_and_add_to_world(
-            name=PrefixedName("head_rgbd_camera", prefix=self.name.name),
-            root_name="head_rgbd_sensor_link",
-            forward_facing_axis=Vector3(0, 0, 1),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
-            minimal_height=0.75049,
-            maximal_height=0.99483,
-            world=self._world,
-            default_camera=False,
-        )
-
-        # Create torso
-        torso = Torso.create_and_add_to_world(
-            name=PrefixedName("torso", prefix=self.name.name),
-            root_name="base_link",
-            tip_name="head_tilt_link",
-            sensors=[
-                head_center_camera,
-                head_r_camera,
-                head_l_camera,
-                head_rgbd_camera,
-            ],
-            world=self._world,
-        )
-        self.add_torso(torso)
-
-    def _setup_torso_hardware_interfaces(self):
-        self.torso._default_hardware_interface_setup()
-
-    def _setup_torso_joint_state(self):
-        torso_joint = [self._world.get_connection_by_name("torso_lift_joint")]
-
-        torso_low = JointState.from_mapping(
-            name=PrefixedName("torso_low", prefix=self.name.name),
-            mapping=dict(zip(torso_joint, [0.0])),
-            state_type=TorsoState.LOW,
-        )
-
-        torso_mid = JointState.from_mapping(
-            name=PrefixedName("torso_mid", prefix=self.name.name),
-            mapping=dict(zip(torso_joint, [0.17])),
-            state_type=TorsoState.MID,
-        )
-
-        torso_high = JointState.from_mapping(
-            name=PrefixedName("torso_high", prefix=self.name.name),
-            mapping=dict(zip(torso_joint, [0.32])),
-            state_type=TorsoState.HIGH,
-        )
-
-        self.torso.add_joint_state(torso_low)
-        self.torso.add_joint_state(torso_mid)
-        self.torso.add_joint_state(torso_high)
-
-    def _setup_mobile_base_semantic_annotations(self):
-        base = MobileBase.create_and_add_to_world(
-            name=PrefixedName("base", prefix=self.name.name),
-            root_name="base_link",
-            world=self._world,
-            forward_axis=Vector3.X(),
-            full_body_controlled=True,
-        )
-
-        self.add_mobile_base(base)
-
-    def _setup_collision_rules(self):
-        srdf_path = os.path.join(
-            Path(files("semantic_digital_twin")).parent.parent,
-            "resources",
-            "collision_configs",
-            "hsrb.srdf",
-        )
-        self._world.collision_manager.add_ignore_collision_rule(
-            SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
-        )
-        self._world.collision_manager.add_default_rule(
-            AvoidExternalCollisions(
-                buffer_zone_distance=0.05, violated_distance=0.0, robot=self
-            )
-        )
-
-        self._world.collision_manager.add_default_rule(
-            AvoidExternalCollisions(
-                buffer_zone_distance=0.1,
-                violated_distance=0.03,
-                robot=self,
-                body_subset={self._world.get_body_by_name("base_link")},
-            )
-        )
-        self._world.collision_manager.add_default_rule(
-            AvoidSelfCollisions(
-                buffer_zone_distance=0.03,
-                violated_distance=0.0,
-                robot=self,
-            )
-        )
-
-        self._world.collision_manager.max_avoided_bodies_rules.append(
-            MaxAvoidedCollisionsOverride(
-                2, bodies={self._world.get_body_by_name("base_link")}
-            )
-        )
-        self._world.collision_manager.max_avoided_bodies_rules.append(
-            MaxAvoidedCollisionsOverride(
-                4,
-                bodies=set(
-                    self._world.get_direct_child_bodies_with_collision(
-                        self._world.get_body_by_name("wrist_roll_link")
-                    )
-                ),
-            )
-        )
-
-    def _setup_velocity_limits(self):
-        vel_limits = defaultdict(lambda: 1)
-        self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
+    def setup_robot_part_semantic_annotations(self):
+        self.setup_mobile_base_semantic_annotation()
