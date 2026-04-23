@@ -302,34 +302,13 @@ class DiscreteDistribution(UnivariateDistribution):
         result = np.full(len(events), -np.inf)
         for x, p in self.probabilities.items():
             result[events == hash(x)] = np.log(p)
-
-        # for indices that are still -inf, it might be because the category was not in the domain
-        # but with laplace smoothing we should have covered the whole domain.
-        # However, if the event itself is not in the domain (e.g. 'bird' when domain is ['cat', 'dog']),
-        # hash(e) won't be in self.probabilities.
-        # We should assign the same probability as other unobserved categories if possible,
-        # or at least the laplace smoothed probability for a generic unobserved category.
-
-        if np.any(result == -np.inf):
-            if isinstance(self.variable, (Symbolic, Integer)):
-                domain_size = len(self.variable.domain.all_elements)
-            else:
-                domain_size = len(self.probabilities)
-
-            # This length should be from the data used to fit, but we don't store it.
-            # We can approximate it or use a very small probability.
-            # Since we used (count + 1) / (len(data) + domain_size),
-            # a missing value should get 1 / (len(data) + domain_size).
-            # We don't have len(data) here, so we'll use a small value.
-            result[result == -np.inf] = np.log(1e-10)
-
         return result
 
     def fit(self, data: npt.NDArray) -> Self:
         """
         Fit the distribution to the data.
 
-        The probabilities are set using Laplace smoothing with a pseudocount of 1.
+        The probabilities are set equal to the frequencies in the data.
         The data contains the indices of the domain elements (if symbolic) or the values (if integer).
 
         :param data: The data.
@@ -337,25 +316,8 @@ class DiscreteDistribution(UnivariateDistribution):
         """
         unique, counts = np.unique(data, return_counts=True)
         probabilities = MissingDict(float)
-
-        # get the domain size
-        if isinstance(self.variable, Symbolic):
-            domain_size = len(self.variable.domain.all_elements)
-        elif isinstance(self.variable, Integer):
-            domain_size = len(self.variable.domain.all_elements)
-        else:
-            domain_size = len(unique)
-
-        # apply laplace smoothing
         for value, count in zip(unique, counts):
-            probabilities[hash(value)] = (count + 1) / (len(data) + domain_size)
-
-        # fill missing values with laplace smoothing
-        if isinstance(self.variable, (Symbolic, Integer)):
-            for element in self.variable.domain.all_elements:
-                if hash(element) not in probabilities:
-                    probabilities[hash(element)] = 1 / (len(data) + domain_size)
-
+            probabilities[hash(value)] = count / len(data)
         self.probabilities = probabilities
         return self
 
@@ -541,17 +503,9 @@ class SymbolicDistribution(DiscreteDistribution):
         """
         unique, counts = np.unique(data, return_counts=True)
         probabilities = MissingDict(float)
-
-        domain_size = len(self.variable.domain.all_elements)
-
         for value, count in zip(unique, counts):
             set_element = self.variable.domain.simple_sets[value]
-            probabilities[hash(set_element)] = (count + 1) / (len(data) + domain_size)
-
-        for element in self.variable.domain.all_elements:
-            if hash(element) not in probabilities:
-                probabilities[hash(element)] = 1 / (len(data) + domain_size)
-
+            probabilities[hash(set_element)] = count / len(data)
         self.probabilities = probabilities
         return self
 
