@@ -332,6 +332,7 @@ class HSRBHeadRGBDCamera(Camera):
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=0.75049,
             maximal_height=0.99483,
+            default_camera=True,
         )
         world.add_semantic_annotation(camera)
         return camera
@@ -463,10 +464,16 @@ class HSRBMobileBase(MobileBase, HasTorso):
             self.root
         )
         self.add_torso(torso)
+        torso.setup_arm_semantic_annotations()
+        torso.setup_neck_semantic_annotation()
 
 
 @dataclass(eq=False)
 class HSRB(AbstractRobot, HasMobileBase):
+
+    @classmethod
+    def get_ros_file_path(cls) -> str:
+        return "package://hsr_description/robots/hsrb4s.urdf.xacro"
 
     @classmethod
     def _get_root_body_name(cls) -> str:
