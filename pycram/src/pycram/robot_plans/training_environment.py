@@ -1,11 +1,16 @@
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from typing import ClassVar
+from pathlib import Path
+from typing import ClassVar, Optional
 
 import rclpy
 
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import underspecified, variable
+from krrood.entity_query_language.query.match import Match
+from krrood.parametrization.model_registries import DictRegistry
+from krrood.parametrization.parameterizer import UnderspecifiedParameters
+from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.grasp import GraspDescription
 from pycram.motion_executor import simulated_robot
@@ -17,6 +22,8 @@ from pycram.plans.plan import Plan
 from pycram.plans.plan_node import UnderspecifiedNode
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.misc import MoveToReach
+from random_events.interval import closed
+from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -128,6 +135,8 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
 
     action_type = MoveToReach
 
+    model_path: Optional[Path] = None
+
     def setup_world(self, **kwargs) -> World:
         pr2_file = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
 
@@ -183,7 +192,35 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         move_to_reach.expression.limit(limit)
 
         context = Context(
-            world=world, robot=robot, query_backend=ProbabilisticBackend()
+            world=world, robot=robot, query_backend=self.setup_backend(move_to_reach)
         )
 
         return execute_single(move_to_reach, context=context).plan
+
+    def setup_backend(self, underspecified_action: Match) -> ProbabilisticBackend:
+        """
+        Create a backend containing the best guesses as distribution for this action in this environment.
+        :param underspecified_action: The underspecified action to create a backend for.
+        :return: The probabilistic backend
+        """
+        parameters = UnderspecifiedParameters(underspecified_action)
+        robot_x = parameters.variables["MoveToReach.robot_x"]
+        robot_y = parameters.variables["MoveToReach.robot_y"]
+        hip_rotation = parameters.variables["MoveToReach.hip_rotation"]
+        manipulation_offset = parameters.variables[
+            "MoveToReach.grasp_description.manipulation_offset"
+        ]
+
+        distribution = fully_factorized(
+            means={manipulation_offset: 0.05},
+            variances={robot_x: 0.5, robot_y: 0.5, hip_rotation: 0.1},
+            variables=parameters.variables.values(),
+        )
+
+        hip_rotation_condition = SimpleEvent.from_data(
+            {manipulation_offset: closed(0.0, 0.4)}
+        )
+        hip_rotation_condition.fill_missing_variables(distribution.variables)
+        distribution.log_truncated_of_simple_event_in_place(hip_rotation_condition)
+
+        return ProbabilisticBackend(DictRegistry({self.action_type: distribution}))

@@ -115,7 +115,7 @@ class MoveToReach(ActionDescription):
 
     target_pose: Pose
     """
-    Pose that should be reached.
+    Pose that should be reached by the manipulator.
     """
 
     grasp_description: GraspDescription

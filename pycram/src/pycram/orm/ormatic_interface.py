@@ -194,6 +194,7 @@ class Base(DeclarativeBase):
         krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
         uuid.UUID: sqlalchemy.sql.sqltypes.UUID,
         numpy.ndarray: pycram.orm.model.NumpyType,
+        builtins.type: krrood.ormatic.custom_types.TypeType,
     }
 
 
@@ -5013,6 +5014,10 @@ class DuplicateContextExtensionErrorDAO(
         use_existing_column=True,
     )
 
+    extension_type: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
     __mapper_args__ = {
         "polymorphic_identity": "DuplicateContextExtensionErrorDAO",
         "inherit_condition": database_id == MotionStatechartErrorDAO.database_id,
@@ -5102,6 +5107,10 @@ class MissingContextExtensionErrorDAO(
         ForeignKey(MotionStatechartErrorDAO.database_id),
         primary_key=True,
         use_existing_column=True,
+    )
+
+    expected_extension: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
     )
 
     __mapper_args__ = {
@@ -6446,16 +6455,10 @@ class MoveToReachDAO(
         use_existing_column=True,
     )
 
-    standing_pose_id: Mapped[int] = mapped_column(
-        ForeignKey("PoseMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    manipulator_id: Mapped[int] = mapped_column(
-        ForeignKey("ManipulatorDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
+    robot_x: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    robot_y: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    hip_rotation: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
     target_pose_id: Mapped[int] = mapped_column(
         ForeignKey("PoseMappingDAO.database_id", use_alter=True),
         nullable=True,
@@ -6467,15 +6470,6 @@ class MoveToReachDAO(
         use_existing_column=True,
     )
 
-    standing_pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO",
-        uselist=False,
-        foreign_keys=[standing_pose_id],
-        post_update=True,
-    )
-    manipulator: Mapped[ManipulatorDAO] = relationship(
-        "ManipulatorDAO", uselist=False, foreign_keys=[manipulator_id], post_update=True
-    )
     target_pose: Mapped[PoseMappingDAO] = relationship(
         "PoseMappingDAO", uselist=False, foreign_keys=[target_pose_id], post_update=True
     )
@@ -8087,6 +8081,27 @@ class NavigationGoalNotReachedErrorDAO(
         ForeignKey(PlanFailureDAO.database_id),
         primary_key=True,
         use_existing_column=True,
+    )
+
+    current_pose_id: Mapped[int] = mapped_column(
+        ForeignKey("PoseMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    goal_pose_id: Mapped[int] = mapped_column(
+        ForeignKey("PoseMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    current_pose: Mapped[PoseMappingDAO] = relationship(
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[current_pose_id],
+        post_update=True,
+    )
+    goal_pose: Mapped[PoseMappingDAO] = relationship(
+        "PoseMappingDAO", uselist=False, foreign_keys=[goal_pose_id], post_update=True
     )
 
     __mapper_args__ = {
