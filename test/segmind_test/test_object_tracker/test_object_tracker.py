@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 from semantic_digital_twin.world_description.world_entity import Body
-from segmind.datastructures.object_tracker import ObjectTracker, ObjectTrackerFactory
+from segmind.datastructures.object_tracker import ObjectEventTracker, ObjectTrackerFactory
 from segmind.datastructures.events import DetectionEvent, ContactEvent, PickUpEvent, PlacingEvent
 import pytest
 from datetime import timedelta
@@ -35,7 +35,7 @@ def body():
 
 @pytest.fixture
 def tracker(body):
-    return ObjectTracker(body=body, context=None, _event_history=[])
+    return ObjectEventTracker(body=body, context=None, _event_history=[])
 
 
 def test_add_event(tracker):

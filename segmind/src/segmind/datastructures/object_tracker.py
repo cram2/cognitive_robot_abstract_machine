@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from threading import RLock
-from typing import Callable, Tuple
+from typing import Callable, Tuple, ClassVar
 
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Type, Optional, TYPE_CHECKING, Dict, Set
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 set_logger_level(LogLevel.DEBUG)
 
 @dataclass
-class ObjectTracker:
+class ObjectEventTracker:
     """
     Tracks and manages events and movement status of an object.
 
@@ -41,6 +41,7 @@ class ObjectTracker:
     The body associated with this tracker.
     """
 
+    #Check with msc for the history
     _event_history: Optional[List[DetectionEvent]]
     """
     List of events associated with the object.
@@ -70,7 +71,6 @@ class ObjectTracker:
         then sorted based on the timestamp of each event.
 
         :param event: The event to be added to the history.
-        :type event: DetectionEvent
         """
         with self._lock:
             self._event_history.append(event)
@@ -86,7 +86,6 @@ class ObjectTracker:
         to ensure consistent data.
 
         :return: A list of events recorded in the event history.
-        :rtype: List[DetectionEvent]
         """
         with self._lock:
             return self._event_history
@@ -98,7 +97,6 @@ class ObjectTracker:
 
         This method ensures thread-safety while clearing the event history
         to maintain consistency in a multi-threaded environment.
-
         """
         with self._lock:
             self._event_history.clear()
@@ -108,7 +106,6 @@ class ObjectTracker:
         Retrieves the most recent event from the event history.
 
         :return: The latest event from the event history, or None if the history is empty.
-        :rtype: Optional[DetectionEvent]
         """
         with self._lock:
             try:
@@ -157,10 +154,7 @@ class ObjectTracker:
         history that occurs after the specified time.
 
         :param timestamp: The reference timestamp, in seconds, after which the event is searched for.
-        :type timestamp: float
-
         :return: The first event occurring after the given timestamp, or None if no such event exists.
-        :rtype: Optional[DetectionEvent]
         """
         with self._lock:
             first_event_index = self.get_index_of_first_event_after(timestamp)
@@ -172,14 +166,10 @@ class ObjectTracker:
         Returns the nearest event of a specified type to a given event.
 
         :param event: The reference event.
-        :type event: DetectionEvent
         :param event_type: The type of event to search for.
-        :type event_type: Type[DetectionEvent]
         :param tolerance: Maximum allowed time difference.
-        :type tolerance: Optional[timedelta]
 
         :return: The nearest matching event or None.
-        :rtype: Optional[EventUnion]
         """
         return self.get_nearest_event_of_type_to_timestamp(event.timestamp, event_type, tolerance)
 
@@ -189,14 +179,10 @@ class ObjectTracker:
         Finds the nearest event of a specified type to a timestamp.
 
         :param timestamp: Reference timestamp.
-        :type timestamp: float
         :param event_type: Event type to search for.
-        :type event_type: Type[DetectionEvent]
         :param tolerance: Maximum allowed time difference.
-        :type tolerance: Optional[timedelta]
 
         :return: Closest event or None.
-        :rtype: Optional[Event]
         """
         with self._lock:
             time_stamps = self.time_stamps_array
@@ -213,12 +199,9 @@ class ObjectTracker:
         Finds the nearest event to a timestamp.
 
         :param timestamp: Target timestamp.
-        :type timestamp: float
         :param tolerance: Optional tolerance.
-        :type tolerance: Optional[timedelta]
 
         :return: Nearest event or None.
-        :rtype: Optional[DetectionEvent]
         """
         with self._lock:
             time_stamps = self.time_stamps_array
@@ -226,20 +209,17 @@ class ObjectTracker:
             if nearest_event_index is not None:
                 return self._event_history[nearest_event_index]
 
+
     def _get_nearest_index(self, time_stamps: np.ndarray,
                            timestamp: float, tolerance: Optional[timedelta] = None) -> Optional[int]:
         """
         Finds the nearest index to a timestamp.
 
         :param time_stamps: Array of timestamps.
-        :type time_stamps: np.ndarray
         :param timestamp: Target timestamp.
-        :type timestamp: float
         :param tolerance: Optional tolerance.
-        :type tolerance: Optional[timedelta]
 
         :return: Index or None.
-        :rtype: Optional[int]
         """
         with self._lock:
             nearest_event_index = np.argmin(np.abs(time_stamps - timestamp))
@@ -253,27 +233,22 @@ class ObjectTracker:
         Finds nearest event to another event matching conditions.
 
         :param event: Reference event.
-        :type event: DetectionEvent
         :param conditions: Filtering function.
-        :type conditions: Callable[[Event], bool]
 
         :return: Matching event or None.
-        :rtype: Optional[DetectionEvent]
         """
         with self._lock:
             events = self.get_events_sorted_by_nearest_to_event(event)
             found_events = self.get_event_where(conditions, events=[e[0] for e in events])
             return found_events[0] if found_events else None
 
-    def get_events_sorted_by_nearest_to_event(self, event: DetectionEvent):
+    def get_events_sorted_by_nearest_to_event(self, event: DetectionEvent) -> List[Tuple[DetectionEvent, float]]:
         """
         Sorts events by proximity to an event.
 
         :param event: Reference event.
-        :type event: DetectionEvent
 
         :return: Sorted events.
-        :rtype: list
         """
         return self.get_events_sorted_by_nearest_to_timestamp(event.timestamp)
 
@@ -282,10 +257,8 @@ class ObjectTracker:
         Sorts events by proximity to a timestamp.
 
         :param timestamp: Reference timestamp.
-        :type timestamp: float
 
         :return: List of (event, time difference).
-        :rtype: List[Tuple[DetectionEvent, float]]
         """
         with self._lock:
             time_stamps = self.time_stamps_array
@@ -299,12 +272,9 @@ class ObjectTracker:
         Gets the first event of a type after an event.
 
         :param event_type: Event type.
-        :type event_type: Type[DetectionEvent]
         :param event: Reference event.
-        :type event: DetectionEvent
 
         :return: Matching event or None.
-        :rtype: Optional[EventUnion]
         """
         return self.get_first_event_of_type_after_timestamp(event_type, event.timestamp)
 
@@ -313,12 +283,9 @@ class ObjectTracker:
         Gets first event of a type after a timestamp.
 
         :param event_type: Event type.
-        :type event_type: Type[DetectionEvent]
         :param timestamp: Reference timestamp.
-        :type timestamp: float
 
         :return: Matching event or None.
-        :rtype: Optional[DetectionEvent]
         """
         with self._lock:
             start_index = self.get_index_of_first_event_after(timestamp)
@@ -332,12 +299,9 @@ class ObjectTracker:
         Gets first event of a type before an event.
 
         :param event_type: Event type.
-        :type event_type: Type[DetectionEvent]
         :param event: Reference event.
-        :type event: DetectionEvent
 
         :return: Matching event or None.
-        :rtype: Optional[EventUnion]
         """
         return self.get_first_event_of_type_before_timestamp(event_type, event.timestamp)
 
@@ -346,12 +310,9 @@ class ObjectTracker:
         Gets first event of a type before a timestamp.
 
         :param event_type: Event type.
-        :type event_type: Type[DetectionEvent]
         :param timestamp: Reference timestamp.
-        :type timestamp: float
 
         :return: Matching event or None.
-        :rtype: Optional[DetectionEvent]
         """
         with self._lock:
             start_index = self.get_index_of_first_event_before(timestamp)
@@ -365,10 +326,8 @@ class ObjectTracker:
         Gets index of first event after timestamp.
 
         :param timestamp: Reference timestamp.
-        :type timestamp: float
 
         :return: Index or None.
-        :rtype: Optional[int]
         """
         with self._lock:
             time_stamps = self.time_stamps_array
@@ -382,10 +341,8 @@ class ObjectTracker:
         Gets index of first event before timestamp.
 
         :param timestamp: Reference timestamp.
-        :type timestamp: float
 
         :return: Index or None.
-        :rtype: Optional[int]
         """
         with self._lock:
             time_stamps = self.time_stamps_array
@@ -399,12 +356,9 @@ class ObjectTracker:
         Gets events between two events.
 
         :param event1: Start event.
-        :type event1: DetectionEvent
         :param event2: End event.
-        :type event2: DetectionEvent
 
         :return: Events between them.
-        :rtype: List[DetectionEvent]
         """
         return [e for e in self.get_events_between_timestamps(event1.timestamp, event2.timestamp)
                 if e not in [event1, event2]]
@@ -414,12 +368,9 @@ class ObjectTracker:
         Gets events between timestamps.
 
         :param timestamp1: First timestamp.
-        :type timestamp1: float
         :param timestamp2: Second timestamp.
-        :type timestamp2: float
 
         :return: List of events.
-        :rtype: List[DetectionEvent]
         """
         with self._lock:
             time_stamps = self.time_stamps_array
@@ -438,26 +389,34 @@ class ObjectTracker:
         Filters events by condition.
 
         :param conditions: Condition function.
-        :type conditions: Callable[[Event], bool]
         :param events: Optional event list.
-        :type events: Optional[List[Event]]
 
         :return: Matching events.
-        :rtype: List[DetectionEvent]
         """
         events = events if events is not None else self._event_history
         return [event for event in events if conditions(event)]
 
     @property
     def time_stamps_array(self) -> np.ndarray:
+        """
+        Gets the time stamps as a NumPy array.
+
+        :return: NumPy array of time stamps.
+        """
         return np.array(self.time_stamps)
 
     @property
     def time_stamps(self) -> List[float]:
+        """
+        Gets the time stamps of the events.
+
+        :return: List of time stamps.
+        """
         with self._lock:
             return [event.timestamp for event in self._event_history]
 
 
+# Requires some refactoring to match the SOLID principles.
 class ObjectTrackerFactory:
     """
     Factory class to manage creation and access of ObjectTracker instances.
@@ -469,19 +428,26 @@ class ObjectTrackerFactory:
     specific tracker for a given Body.
     """
 
-    _trackers: Dict[Body, ObjectTracker] = {}
-    _lock: RLock = RLock()
+    _trackers: ClassVar[Dict[Body, ObjectEventTracker]] = {}
+    """
+    The dictionary mapping Body objects to their associated ObjectTracker instances.
+    """
+
+    _lock: ClassVar[RLock] = RLock()
+    """
+    threading.RLock object used for thread-safe access to the _trackers dictionary.
+    """
 
     @classmethod
-    def get_all_trackers(cls) -> List[ObjectTracker]:
+    def get_all_trackers(cls) -> List[ObjectEventTracker]:
         with cls._lock:
             return list(cls._trackers.values())
 
     @classmethod
-    def get_tracker(cls, obj: Body) -> ObjectTracker:
+    def get_tracker(cls, obj: Body) -> ObjectEventTracker:
         with cls._lock:
             if obj not in cls._trackers:
-                cls._trackers[obj] = ObjectTracker(body=obj, context=None, _event_history=[])
+                cls._trackers[obj] = ObjectEventTracker(body=obj, context=None, _event_history=[])
             return cls._trackers[obj]
 
 

@@ -55,7 +55,7 @@ class ContactDetector(AbstractDetector):
             if new_contacts:
                 segmind_context.latest_contact_bodies.setdefault(obj, set()).update(new_contacts)
                 events.extend(
-                    [ContactEvent(of_object=obj, with_object=c) for c in new_contacts]
+                    [ContactEvent(tracked_object=obj, with_object=c) for c in new_contacts]
                 )
 
         return events
@@ -104,7 +104,7 @@ class LossOfContactDetector(AbstractDetector):
 
                 events.extend(
                     [
-                        LossOfContactEvent(of_object=obj, with_object=s)
+                        LossOfContactEvent(tracked_object=obj, with_object=s)
                         for s in loss_contacts
                     ]
                 )

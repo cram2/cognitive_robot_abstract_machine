@@ -17,7 +17,7 @@ from semantic_digital_twin.world_description.world_entity import Body, Agent
 
 @dataclass
 class DetectionEvent(ABC):
-    timestamp: float = field(default_factory=time.time)
+    timestamp: datetime = field(default_factory=datetime.now().timestamp)
     """
     The time at which the event occurred, defaults to current time.
     """
@@ -197,7 +197,7 @@ class StopRotationEvent(MotionEvent):
     ...
 
 
-@dataclass(init=False, unsafe_hash=True)
+@dataclass(unsafe_hash=True)
 class AbstractContactEvent(EventWithTwoTrackedObjects, ABC):
     """
     Represents an event where two objects are in contact with each other.
@@ -233,33 +233,21 @@ class AbstractContactEvent(EventWithTwoTrackedObjects, ABC):
     Pose of the second object in contact.
     """
 
-    def __init__(self,
-                 of_object: Body,
-                 contact_bodies: Optional[list[Body]] = None,
-                 latest_contact_bodies: Optional[list[Body]] = None,
-                 with_object: Optional[Body] = None,
-                 timestamp: Optional[float] = None):
-        EventWithTwoTrackedObjects.__init__(self,
-                                            tracked_object=of_object,
-                                            with_object=with_object,
-                                            timestamp=timestamp if timestamp is not None else time.time())
-        self.contact_bodies: list[Body] = contact_bodies
-        self.latest_contact_bodies: list[Body] = latest_contact_bodies
-        self.bounding_box: BoundingBox = BoundingBox.from_mesh(
-            of_object.collision.combined_mesh,
-            origin=of_object.global_pose.to_homogeneous_matrix()
-        )
-        self.pose: Pose = of_object.global_pose
-        self.with_object_bounding_box: Optional[BoundingBox] = (
-            BoundingBox.from_mesh(
-                with_object.collision.combined_mesh,
-                origin=with_object.global_pose.to_homogeneous_matrix()
-            )
-            if with_object is not None
-            else None
-        )
-        self.with_object_pose: Optional[Pose] = with_object.global_pose if with_object is not None else None
+    def __post_init__(self):
+        super().__post_init__()
 
+        self.bounding_box = BoundingBox.from_mesh(
+            self.tracked_object.collision.combined_mesh,
+            origin=self.tracked_object.global_pose.to_homogeneous_matrix()
+        )
+        self.pose = self.tracked_object.global_pose
+
+        if self.with_object is not None:
+            self.with_object_bounding_box = BoundingBox.from_mesh(
+                self.with_object.collision.combined_mesh,
+                origin=self.with_object.global_pose.to_homogeneous_matrix()
+            )
+            self.with_object_pose = self.with_object.global_pose
 
 
 @dataclass(init=False, unsafe_hash=True)

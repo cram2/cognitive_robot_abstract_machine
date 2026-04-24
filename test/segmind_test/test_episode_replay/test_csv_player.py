@@ -53,7 +53,11 @@ def test_replay_episode(test_csv_player_context):
     episode_executor = test_csv_player_context["episode_executor"]
     file_player.start()
     assert file_player.is_alive()
+    obj = episode_executor.context.world.bodies_with_collision[0]
+    frozen_pose = obj.global_pose
+    time.sleep(0.5)
+    assert obj.global_pose != frozen_pose
     file_player.stop()
     time.sleep(0.5)
-    assert len(episode_executor.context.world.bodies_with_collision) > 0
+    assert len(episode_executor.context.world.bodies_with_collision) == 19
     assert not file_player.is_alive()

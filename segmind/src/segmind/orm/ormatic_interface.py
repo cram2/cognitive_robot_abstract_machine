@@ -16,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 
 import builtins
+import datetime
 import enum
 import krrood.adapters.json_serializer
 import krrood.ormatic.custom_types
@@ -184,7 +185,7 @@ class DetectionEventDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    timestamp: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    timestamp: Mapped[datetime.datetime] = mapped_column(use_existing_column=True)
     detector_thread_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
         use_existing_column=True
     )
@@ -692,11 +693,11 @@ class MotionEventDAO(
     }
 
 
-class ObjectTrackerDAO(
-    Base, DataAccessObject[segmind.datastructures.object_tracker.ObjectTracker]
+class ObjectEventTrackerDAO(
+    Base, DataAccessObject[segmind.datastructures.object_tracker.ObjectEventTracker]
 ):
 
-    __tablename__ = "ObjectTrackerDAO"
+    __tablename__ = "ObjectEventTrackerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True

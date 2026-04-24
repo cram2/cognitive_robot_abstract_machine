@@ -28,7 +28,7 @@ from pycrap.ontologies import Robot, Location, PhysicalObject
 from typing_extensions import Dict, Set
 
 from segmind.datastructures.events import AbstractAgentObjectInteractionEvent, PlacingEvent, PickUpEvent, InsertionEvent
-from segmind.datastructures.object_tracker import ObjectTrackerFactory, ObjectTracker
+from segmind.datastructures.object_tracker import ObjectTrackerFactory, ObjectEventTracker
 from segmind.detectors.coarse_event_detectors import GeneralPickUpDetector, select_transportable_objects, \
     PlacingDetector
 from segmind.detectors.spatial_relation_detector import InsertionDetector, SupportDetector, ContainmentDetector
@@ -242,7 +242,7 @@ while True:
 
     validate = True
     failed_insertion_action: Optional[ActionDescription] = None
-    failed_insertion_object_tracker: Optional[ObjectTracker] = None
+    failed_insertion_object_tracker: Optional[ObjectEventTracker] = None
     event_that_led_to_insertion_action: Optional[InsertionEvent] = None
     with real_robot:
         for event, partial_designator in action_descriptions:
