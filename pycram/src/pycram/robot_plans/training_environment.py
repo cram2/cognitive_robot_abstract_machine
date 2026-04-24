@@ -1,3 +1,4 @@
+import json
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -5,11 +6,15 @@ from typing import ClassVar, Optional
 
 import rclpy
 
+from krrood.adapters.json_serializer import from_json
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import underspecified, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
+from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
+    ProbabilisticCircuit,
+)
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.grasp import GraspDescription
@@ -191,9 +196,12 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
 
         move_to_reach.expression.limit(limit)
 
-        context = Context(
-            world=world, robot=robot, query_backend=self.setup_backend(move_to_reach)
-        )
+        if self.model_path:
+            self.setup_backend_from_path(move_to_reach)
+        else:
+            query_backend = self.setup_backend(move_to_reach)
+
+        context = Context(world=world, robot=robot, query_backend=query_backend)
 
         return execute_single(move_to_reach, context=context).plan
 
@@ -222,5 +230,17 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         )
         hip_rotation_condition.fill_missing_variables(distribution.variables)
         distribution.log_truncated_of_simple_event_in_place(hip_rotation_condition)
+
+        return ProbabilisticBackend(DictRegistry({self.action_type: distribution}))
+
+    def setup_backend_from_path(self, underspecified_action: Match):
+        with open(self.model_path) as f:
+            distribution = from_json(json.load(f))
+
+        # expand model with new variables
+        parameters = UnderspecifiedParameters(underspecified_action)
+        variables_not_in_parameters = set(parameters.variables.values()) - set(
+            distribution.variables
+        )
 
         return ProbabilisticBackend(DictRegistry({self.action_type: distribution}))
