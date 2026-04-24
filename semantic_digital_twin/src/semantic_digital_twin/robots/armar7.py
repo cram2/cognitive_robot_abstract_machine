@@ -421,6 +421,7 @@ class AzureKinectRGB(Camera):
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=1.3715,
             maximal_height=1.7365,
+            default_camera=True,
         )
         world.add_semantic_annotation(self)
         return self
@@ -538,7 +539,7 @@ class Armar7MobileBase(MobileBase, HasTorso):
     ) -> Self:
         world = robot_root._world
         mobile_base = cls(
-            root=world.get_body_in_branch_by_name(robot_root, "Platform_body_link"),
+            root=world.get_body_in_branch_by_name(robot_root, "Dummy_Platform_link"),
             forward_axis=Vector3.Y(),
         )
         world.add_semantic_annotation(mobile_base)
@@ -558,7 +559,7 @@ class Armar7(AbstractRobot, HasMobileBase):
 
     @classmethod
     def get_ros_file_path(cls) -> str:
-        pass
+        return "package://iai_kit_armar7/urdf/Armar7.urdf"
 
     def setup_mobile_base_semantic_annotation(self):
         mobile_base = (

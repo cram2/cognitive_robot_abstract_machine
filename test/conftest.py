@@ -11,6 +11,7 @@ import numpy as np
 import objgraph
 import pytest
 
+from semantic_digital_twin.robots.armar7 import Armar7
 from semantic_digital_twin.robots.justin import Justin
 
 try:
@@ -298,16 +299,8 @@ def self_collision_bot_world():
 
 @pytest.fixture()
 def abstract_robot_list():
-    return [Tracy]  # PR2, Tiago, Justin, HSRB]
+    return [Armar7]  # PR2, Tiago, Justin, HSRB, Tracy, Stretch]
     # return {
-    #     os.path.join(
-    #         os.path.dirname(os.path.abspath(__file__)),
-    #         "..",
-    #         "semantic_digital_twin",
-    #         "resources",
-    #         "urdf",
-    #         "tracy.urdf",
-    #     ): Tracy,
     #     os.path.join(
     #         os.path.dirname(os.path.abspath(__file__)),
     #         "..",
@@ -316,7 +309,6 @@ def abstract_robot_list():
     #         "robots",
     #         "stretch_description.urdf",
     #     ): Stretch,
-    #     : Tiago,
     # }
 
 

@@ -429,6 +429,12 @@ class StretchMobileBase(MobileBase, HasTorso):
 class Stretch(AbstractRobot, HasMobileBase):
 
     @classmethod
+    def get_ros_file_path(cls) -> str:
+        raise NotImplementedError(
+            "We dont have a urdf yet, we need to get it from the robot."
+        )
+
+    @classmethod
     def _get_root_body_name(cls) -> str:
         return "base_link"
 
