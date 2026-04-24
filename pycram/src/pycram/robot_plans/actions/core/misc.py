@@ -124,12 +124,22 @@ class MoveToReach(ActionDescription):
     """
 
     def execute(self):
+        grasp_orientation = self.grasp_description.grasp_orientation()
+        target_pose = Pose(
+            self.target_pose.to_position(),
+            (
+                self.target_pose.to_rotation_matrix()
+                @ grasp_orientation.to_rotation_matrix()
+            ).to_quaternion(),
+            self.target_pose.reference_frame,
+        )
+
         self.add_subplan(
             sequential(
                 [
                     NavigateAction(self.standing_pose),
                     MoveManipulatorAction(
-                        self.target_pose,
+                        target_pose,
                         self.grasp_description.manipulator,
                         allow_gripper_collision=False,
                     ),
@@ -175,6 +185,7 @@ class MoveToReach(ActionDescription):
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> SymbolicExpression:
         target_pose = variables["target_pose"]
+        grasp_description = variables["grasp_description"]
 
         target_homogeneous_matrix = target_pose.to_homogeneous_matrix()
         relative_position = Point3(variables["robot_x"], variables["robot_y"], 0)
@@ -193,6 +204,33 @@ class MoveToReach(ActionDescription):
         )
 
         root_T_robot_base = context.world.transform(expected_pose, context.world.root)
+
+        grasp_orientation = (
+            grasp_description.grasp_orientation()
+            if hasattr(grasp_description, "grasp_orientation")
+            else grasp_description.variable_value.grasp_orientation()
+        )
+        expected_target_pose = Pose(
+            target_pose.to_position(),
+            (
+                target_pose.to_rotation_matrix()
+                @ grasp_orientation.to_rotation_matrix()
+            ).to_quaternion(),
+            target_pose.reference_frame,
+        )
+
+        manipulator = (
+            grasp_description.manipulator
+            if hasattr(grasp_description, "manipulator")
+            else grasp_description.variable_value.manipulator
+        )
+
         return np.allclose(
-            root_T_robot_base, context.robot.base.root.global_pose.to_np(), atol=0.1
+            root_T_robot_base.to_np(),
+            context.robot.base.root.global_pose.to_np(),
+            atol=0.1,
+        ) and np.allclose(
+            manipulator.tool_frame.global_pose.to_np(),
+            expected_target_pose.to_np(),
+            atol=0.1,
         )
