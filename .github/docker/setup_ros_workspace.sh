@@ -33,7 +33,7 @@ git clone -b ros-jazzy-main --single-branch https://github.com/code-iai/iai_pr2.
 git clone -b ros2-jazzy --single-branch https://github.com/code-iai/hsr_description.git
 git clone -b ros2-jazzy --single-branch https://github.com/code-iai/iai_tracy.git \
     && rm -rf iai_tracy/iai_tracy_bringup iai_tracy/iai_tracy_ur
-git clone --single-branch https://github.com/maltehue/ros2_robotiq_gripper.git \
+git clone -b iai_dualarm --single-branch https://github.com/maltehue/ros2_robotiq_gripper.git \
     && rm -rf ros2_robotiq_gripper/robotiq_controllers \
                ros2_robotiq_gripper/robotiq_drivers \
                ros2_robotiq_gripper/robotiq_hardware_tests \

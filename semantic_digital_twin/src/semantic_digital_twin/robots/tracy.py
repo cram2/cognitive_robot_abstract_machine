@@ -313,6 +313,7 @@ class TracyCamera(Camera):
             field_of_view=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785),
             minimal_height=0.8,
             maximal_height=1.7,
+            default_camera=True,
         )
         world.add_semantic_annotation(camera)
         return camera
@@ -320,6 +321,10 @@ class TracyCamera(Camera):
 
 @dataclass(eq=False)
 class Tracy(AbstractRobot, HasLeftRightArm, HasCameras):
+
+    @classmethod
+    def get_ros_file_path(cls) -> str:
+        return "package://iai_tracy_description/urdf/tracy.urdf.xacro"
 
     def setup_sensor_semantic_annotations(self):
         camera = TracyCamera.setup_default_configuration_in_world_below_robot_root(

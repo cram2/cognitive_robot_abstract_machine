@@ -298,16 +298,8 @@ def self_collision_bot_world():
 
 @pytest.fixture()
 def abstract_robot_list():
-    return [PR2, Tiago, Justin]
+    return [Tracy]  # PR2, Tiago, Justin, HSRB]
     # return {
-    #     os.path.join(
-    #         os.path.dirname(os.path.abspath(__file__)),
-    #         "..",
-    #         "pycram",
-    #         "resources",
-    #         "robots",
-    #         "hsrb.urdf",
-    #     ): HSRB,
     #     os.path.join(
     #         os.path.dirname(os.path.abspath(__file__)),
     #         "..",
