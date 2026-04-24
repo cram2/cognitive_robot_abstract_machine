@@ -1,0 +1,9 @@
+repositories:
+  robokudo_msgs:
+    type: git
+    url: 'https://gitlab.informatik.uni-bremen.de/robokudo/robokudo_msgs.git'
+    version: 9dd0eca6496dccdf2f70bd19c276121826d2571d
+  robokudo_test_data:
+    type: git
+    url: 'https://gitlab.informatik.uni-bremen.de/robokudo/robokudo_test_data.git'
+    version: ros2_jazzy
