@@ -119,8 +119,7 @@ class VizMarkerPublisher(ModelChangeCallback):
             marker_ns = str(body.name)
             for i, shape in enumerate(shapes):
                 marker = SemDTToRos2Converter.convert(shape)
-                if not marker.mesh_use_embedded_materials:
-                    marker.color.a = self.alpha
+                marker.color.a *= self.alpha
                 marker.frame_locked = True
                 marker.id = i
                 marker.ns = marker_ns
