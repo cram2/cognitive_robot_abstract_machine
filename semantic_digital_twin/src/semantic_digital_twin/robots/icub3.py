@@ -422,6 +422,32 @@ class ICub3RightArm(Arm, HasParallelGripper):
 
 
 @dataclass(eq=False)
+class ICub3Camera(Camera):
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        world = robot_root._world
+        camera = cls(
+            root=world.get_body_in_branch_by_name(robot_root, "head"),
+            forward_facing_axis=Vector3.Z(),
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            minimal_height=0.75049,
+            maximal_height=0.99483,
+            default_camera=True,
+        )
+        world.add_semantic_annotation(camera)
+        return camera
+
+    def setup_hardware_interfaces(self):
+        pass
+
+    def setup_joint_states(self):
+        pass
+
+
+@dataclass(eq=False)
 class ICub3Neck(Neck, HasCameras):
 
     def setup_hardware_interfaces(self):
@@ -443,15 +469,9 @@ class ICub3Neck(Neck, HasCameras):
         return neck
 
     def setup_sensor_semantic_annotations(self):
-        world = self.root._world
-        camera = Camera(
-            root=world.get_body_in_branch_by_name(self.root, "head"),
-            forward_facing_axis=Vector3.Z(),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
-            minimal_height=0.75049,
-            maximal_height=0.99483,
+        camera = ICub3Camera.setup_default_configuration_in_world_below_robot_root(
+            self.root
         )
-        world.add_semantic_annotation(camera)
         self.add_sensor(camera)
 
 
@@ -520,6 +540,12 @@ class ICub3MobileBase(MobileBase):
 
 @dataclass(eq=False)
 class ICub3(AbstractRobot, HasTorso, HasMobileBase):
+
+    @classmethod
+    def get_ros_file_path(cls) -> str:
+        return (
+            "package://iai_icub_description/robots/iCubGazeboV3_visuomanip/iCub3.urdf"
+        )
 
     @classmethod
     def _get_root_body_name(cls) -> str:
