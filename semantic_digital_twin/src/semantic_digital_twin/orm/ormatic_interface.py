@@ -22,6 +22,7 @@ import krrood.ormatic.custom_types
 import krrood.ormatic.type_dict
 import semantic_digital_twin.adapters.sage_10k_dataset.loader
 import semantic_digital_twin.adapters.sage_10k_dataset.schema
+import semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations
 import semantic_digital_twin.callbacks.callback
 import semantic_digital_twin.collision_checking.collision_detector
 import semantic_digital_twin.collision_checking.collision_groups
@@ -3645,6 +3646,24 @@ class Sage10kRotationDAO(
         "polymorphic_identity": "Sage10kRotationDAO",
         "inherit_condition": database_id == HasXYZDAO.database_id,
     }
+
+
+class Sage10kSemanticAnnotationCreatorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.sage_10k_dataset.loader.Sage10kSemanticAnnotationCreator
+    ],
+):
+
+    __tablename__ = "Sage10kSemanticAnnotationCreatorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    raw_type_names: Mapped[typing.List[builtins.str]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
 
 
 class Sage10kSizeDAO(
@@ -8662,6 +8681,27 @@ class ProcthorBoxDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "ProcthorBoxDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+    }
+
+
+class Sage10kLabelDAO(
+    HasRootBodyDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.Sage10kLabel
+    ],
+):
+
+    __tablename__ = "Sage10kLabelDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Sage10kLabelDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
     }
 
