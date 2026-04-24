@@ -12,10 +12,13 @@ from krrood.entity_query_language.factories import underspecified, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProductUnit,
+)
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.grasp import GraspDescription
 from pycram.motion_executor import simulated_robot
@@ -141,6 +144,10 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
     action_type = MoveToReach
 
     model_path: Optional[Path] = None
+    """
+    Path to a model file that should be used for the action.
+    Creates a default model when this is None.
+    """
 
     def setup_world(self, **kwargs) -> World:
         pr2_file = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
@@ -197,7 +204,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         move_to_reach.expression.limit(limit)
 
         if self.model_path:
-            self.setup_backend_from_path(move_to_reach)
+            query_backend = self.setup_backend_from_path(move_to_reach)
         else:
             query_backend = self.setup_backend(move_to_reach)
 
@@ -234,13 +241,33 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         return ProbabilisticBackend(DictRegistry({self.action_type: distribution}))
 
     def setup_backend_from_path(self, underspecified_action: Match):
+        """
+        Setup a backend from a model file.
+        Adds the variables of the action to the loaded model if they don't exist.
+
+        :param underspecified_action: The action to load the model for.
+        :return: The probabilistic backend.
+        """
         with open(self.model_path) as f:
-            distribution = from_json(json.load(f))
+            distribution: ProbabilisticCircuit = from_json(json.load(f))
 
         # expand model with new variables
         parameters = UnderspecifiedParameters(underspecified_action)
         variables_not_in_parameters = set(parameters.variables.values()) - set(
             distribution.variables
         )
+        distribution_for_variables_not_in_parameters = fully_factorized(
+            variables_not_in_parameters
+        )
+        old_distribution_root = distribution.root
+        new_variables_distribution_root_index = (
+            distribution_for_variables_not_in_parameters.root.index
+        )
+        remap = distribution.mount(distribution_for_variables_not_in_parameters.root)
+        ff_root = remap[new_variables_distribution_root_index]
+
+        new_root = ProductUnit(probabilistic_circuit=distribution)
+        new_root.add_subcircuit(ff_root)
+        new_root.add_subcircuit(old_distribution_root)
 
         return ProbabilisticBackend(DictRegistry({self.action_type: distribution}))
