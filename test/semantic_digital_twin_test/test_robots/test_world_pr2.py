@@ -536,8 +536,8 @@ def test_split_chain_of_connections(pr2_world_state_reset):
     assert result2_names == chain2
 
 
-def test_robots_and_validate(abstract_robot_list):
-    for abstract_robot in abstract_robot_list:
+def test_robots_and_validate(supported_abstract_robots):
+    for abstract_robot in supported_abstract_robots:
         print(f"Testing robot: {abstract_robot.__name__}")
         world = URDFParser.from_file(abstract_robot.get_ros_file_path()).parse()
         robot = abstract_robot.from_world(world)

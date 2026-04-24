@@ -14,6 +14,8 @@ import pytest
 from semantic_digital_twin.robots.armar7 import Armar7
 from semantic_digital_twin.robots.icub3 import ICub3
 from semantic_digital_twin.robots.justin import Justin
+from semantic_digital_twin.robots.panda import Panda
+from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
 
 try:
     from pycram.datastructures.dataclasses import Context
@@ -299,8 +301,8 @@ def self_collision_bot_world():
 
 
 @pytest.fixture()
-def abstract_robot_list():
-    return [ICub3]  # PR2, Tiago, Justin, HSRB, Tracy, Stretch, Armar7]
+def supported_abstract_robots():
+    return [UnitreeG1]  # PR2, Tiago, Justin, HSRB, Tracy, Stretch, Armar7, ICub3]
 
 
 @pytest.fixture()

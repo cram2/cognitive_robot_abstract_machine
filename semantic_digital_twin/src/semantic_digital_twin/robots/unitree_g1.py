@@ -350,6 +350,7 @@ class D435(Camera):
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=1.27,
             maximal_height=1.60,
+            default_camera=True,
         )
         world.add_semantic_annotation(camera)
 
@@ -457,6 +458,10 @@ class UnitreeG1MobileBase(MobileBase):
 
 @dataclass(eq=False)
 class UnitreeG1(AbstractRobot, HasMobileBase, HasTorso):
+
+    @classmethod
+    def get_ros_file_path(cls) -> str:
+        return "package://iai_offis_g1_description/urdf/offis_unitree_g1.urdf"
 
     def setup_mobile_base_semantic_annotation(self):
         mobile_base = (
