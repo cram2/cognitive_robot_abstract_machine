@@ -25,7 +25,7 @@ from semantic_digital_twin.reasoning.robot_predicates import (
     bodies_in_gripper,
     is_pose_free_for_robot,
 )
-from semantic_digital_twin.robots.abstract_robot import Camera, ParallelGripper
+from semantic_digital_twin.robots.robot_parts import Camera, ParallelGripper
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world import World
@@ -181,7 +181,6 @@ def test_get_visible_objects(pr2_world_copy: World):
 
 def test_occluding_bodies(pr2_world_state_reset: World):
     world = deepcopy(pr2_world_state_reset)
-    PR2.from_world(world)
     world.get_body_by_name("base_footprint").parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
     )
@@ -502,7 +501,7 @@ def test_is_pose_free_for_robot(pr2_apartment_state_reset):
 def test_bodies_in_gripper(pr2_apartment_world):
     world = deepcopy(pr2_apartment_world)
     tcp = world.get_body_by_name("l_gripper_tool_frame")
-    pr2 = PR2.from_world(world)
+    pr2 = world.get_semantic_annotations_by_type(PR2)[0]
 
     with world.modify_world():
         body = Body(

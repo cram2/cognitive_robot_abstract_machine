@@ -205,6 +205,8 @@ def test_external_collision_avoidance_battle():
                 child=strong_robot_world.root,
             ),
         )
+        strong = world.get_kinematic_structure_entity_by_id(strong.id)
+        strong_robot_sa = world.get_semantic_annotation_by_id(strong_robot_sa.id)
         world.merge_world(
             weak_robot_world,
             omni2 := OmniDrive.create_with_dofs(
@@ -213,6 +215,9 @@ def test_external_collision_avoidance_battle():
                 child=weak_robot_world.root,
             ),
         )
+        weak = world.get_kinematic_structure_entity_by_id(weak.id)
+        weak_robot_sa = world.get_semantic_annotation_by_id(weak_robot_sa.id)
+
         omni1.has_hardware_interface = True
         omni2.has_hardware_interface = True
 
@@ -812,7 +817,7 @@ def test_hard_constraints_violated(cylinder_bot_world: World, rclpy_node):
 
 def test_collision_for_robot_with_static_base(tracy_world):
     world = deepcopy(tracy_world)
-    robot = Tracy.from_world(world)
+    robot = world.get_semantic_annotations_by_type(Tracy)[0]
 
     tool_frame = world.get_body_by_name("r_gripper_tool_frame")
     with world.modify_world():

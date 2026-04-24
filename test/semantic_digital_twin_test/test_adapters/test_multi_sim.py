@@ -57,7 +57,6 @@ logger.setLevel(logging.DEBUG)
 
 headless = os.environ.get("CI", "false").lower() == "true"
 only_run_test_in_CI = os.environ.get("CI", "false").lower() == "false"
-# only_run_test_in_CI = False
 
 pytestmark = pytest.mark.skipif(
     only_run_test_in_CI,

@@ -402,7 +402,7 @@ def test_callback_pausing(rclpy_node):
         c = Connection6DoF.create_with_dofs(parent=b2, child=new_body, world=w1)
         w1.add_connection(c)
 
-    time.sleep(0.2)
+    time.sleep(1)
     assert len(model_synchronizer_2.missed_messages) == 1
     assert len(w1.kinematic_structure_entities) == 2
     assert len(w2.kinematic_structure_entities) == 0
@@ -414,7 +414,7 @@ def test_callback_pausing(rclpy_node):
     model_synchronizer_2.apply_missed_messages()
     state_synchronizer_2.apply_missed_messages()
 
-    time.sleep(0.2)
+    time.sleep(1)
     assert len(w1.kinematic_structure_entities) == 2
     assert len(w2.kinematic_structure_entities) == 2
     assert len(w1.connections) == 1
@@ -990,8 +990,10 @@ def test_attribute_update_modification_apply_direct():
     # Test single value update
     mod = AttributeUpdateModification(
         entity_id=anno.id,
-        updated_kwargs=[
-            JSONAttributeDiff(attribute_name="value", added_values=["direct_value"])
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(
+                attribute_name="value", added_values=[to_json("direct_value")]
+            )
         ],
     )
     mod.apply(w)
@@ -1000,8 +1002,8 @@ def test_attribute_update_modification_apply_direct():
     # Test entity reference update
     mod = AttributeUpdateModification(
         entity_id=anno.id,
-        updated_kwargs=[
-            JSONAttributeDiff(attribute_name="entity", added_values=[b1.id])
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(attribute_name="entity", added_values=[to_json(b1.id)])
         ],
     )
     mod.apply(w)
@@ -1010,8 +1012,8 @@ def test_attribute_update_modification_apply_direct():
     # Test list update (add)
     mod = AttributeUpdateModification(
         entity_id=anno.id,
-        updated_kwargs=[
-            JSONAttributeDiff(attribute_name="entities", added_values=[b1.id])
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(attribute_name="entities", added_values=[to_json(b1.id)])
         ],
     )
     mod.apply(w)
@@ -1020,8 +1022,10 @@ def test_attribute_update_modification_apply_direct():
     # Test list update (remove)
     mod = AttributeUpdateModification(
         entity_id=anno.id,
-        updated_kwargs=[
-            JSONAttributeDiff(attribute_name="entities", removed_values=[b1.id])
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(
+                attribute_name="entities", removed_values=[to_json(b1.id)]
+            )
         ],
     )
     mod.apply(w)

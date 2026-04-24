@@ -1,519 +1,252 @@
 from __future__ import annotations
 
 import logging
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
 from collections import defaultdict
+from copy import deepcopy
 from dataclasses import dataclass, field
+from functools import cached_property
+from typing import List, Type, Union, TYPE_CHECKING, Optional
 
-from typing_extensions import (
-    Iterable,
-    Set,
-    TYPE_CHECKING,
-    Optional,
-    Self,
-    DefaultDict,
-    List,
-)
+from typing_extensions import Self, DefaultDict
 
-from semantic_digital_twin.datastructures.definitions import JointStateType
-from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import NoJointStateWithType
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.spatial_types.spatial_types import (
-    Vector3,
-    Quaternion,
+from semantic_digital_twin.exceptions import MissingDefaultCameraError
+from semantic_digital_twin.robots.robot_parts import (
+    Arm,
+    Torso,
+    MobileBase,
+    RobotPart,
+    Camera,
+    Manipulator,
+    Sensor,
+    AggregatesRobotParts,
 )
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
-    OmniDrive,
     ActiveConnection1DOF,
-    DifferentialDrive,
+    Drive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_digital_twin.world_description.geometry import BoundingBox
-from semantic_digital_twin.world_description.shape_collection import (
-    BoundingBoxCollection,
-)
-from semantic_digital_twin.world_description.world_entity import (
-    Body,
-    RootedSemanticAnnotation,
-    Agent,
-    Connection,
-)
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-    Region,
+from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_modification import (
+    synchronized_attribute_modification,
 )
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
+    from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
 
-
-@dataclass
-class SemanticRobotAnnotation(RootedSemanticAnnotation, ABC):
-    """
-    Represents a collection of connected robot bodies, starting from a root body, and ending in a unspecified collection
-    of tip bodies.
-    """
-
-    _robot: AbstractRobot = field(default=None)
-    """
-    The robot this semantic annotation belongs to
-    """
-
-    joint_states: list[JointState] = field(default_factory=list)
-    """
-    Fixed joint states that are defined for this manipulator, like open and close. 
-    """
-
-    def __post_init__(self):
-        if self._world is not None:
-            self._world.add_semantic_annotation(self)
-
-    def add_joint_state(self, joint_state: JointState):
-        """
-        Adds a joint state to this semantic annotation.
-        """
-        self.joint_states.append(joint_state)
-        joint_state.assign_to_robot(self._robot)
-
-    def get_joint_state_by_type(self, state_type: JointStateType) -> JointState:
-        """
-        Returns a JointState for a given joint state type.
-        :param state_type: The state type to search for
-        :return: The joint state with the given type
-        """
-        for j in self.joint_states:
-            if j.state_type == state_type:
-                return j
-        raise NoJointStateWithType(state_type)
-
-    @abstractmethod
-    def assign_to_robot(self, robot: AbstractRobot):
-        """
-        This method assigns the robot to the current semantic annotation, and then iterates through its own fields to call the
-        appropriate methods to att them to the robot.
-
-        :param robot: The robot to which this semantic annotation should be assigned.
-        """
-        ...
-
-
-@dataclass
-class KinematicChain(SemanticRobotAnnotation, ABC):
-    """
-    Abstract base class for kinematic chain in a robot, starting from a root body, and ending in a specific tip body.
-    A kinematic chain can contain both a manipulator and sensors at the same time. There are no assumptions about the
-    position of the manipulator or sensors in the kinematic chain
-    """
-
-    tip: Body = field(default=None)
-    """
-    The tip body of the kinematic chain, which is the last body in the chain.
-    """
-
-    manipulator: Optional[Manipulator] = None
-    """
-    The manipulator of the kinematic chain, if it exists. This is usually a gripper or similar device.
-    """
-
-    sensors: List[Sensor] = field(default_factory=list)
-    """
-    A collection of sensors in the kinematic chain, such as cameras or other sensors.
-    """
-
-    joint_states: list[JointState] = field(default_factory=list)
-    """
-    A list of pre-defined joint positions that this kinematic chain can perform, for example "park" for an arm.
-    """
-
-    @property
-    def bodies(self) -> Iterable[Body]:
-        """
-        Returns itself as a kinematic chain of bodies.
-        """
-        return [
-            entity
-            for entity in self._world.compute_chain_of_kinematic_structure_entities(
-                self.root, self.tip
-            )
-            if isinstance(entity, Body)
-        ]
-
-    @property
-    def kinematic_structure_entities(self) -> Iterable[KinematicStructureEntity]:
-        """
-        Returns itself as a kinematic chain of KinematicStructureEntity.
-        """
-        return self._world.compute_chain_of_kinematic_structure_entities(
-            self.root, self.tip
-        )
-
-    @property
-    def regions(self) -> Iterable[Region]:
-        """
-        Returns itself as a kinematic chain of KinematicStructureEntity.
-        """
-        return [
-            entity
-            for entity in self._world.compute_chain_of_kinematic_structure_entities(
-                self.root, self.tip
-            )
-            if isinstance(entity, Region)
-        ]
-
-    @property
-    def connections(self) -> Iterable[Connection]:
-        """
-        Returns the connections of the kinematic chain.
-        This is a list of connections between the bodies in the kinematic chain
-        """
-        return self._world.compute_chain_of_connections(self.root, self.tip)
-
-    def assign_to_robot(self, robot: AbstractRobot):
-        """
-        Assigns the kinematic chain to the given robot. This method ensures that the kinematic chain is only assigned
-        to one robot at a time, and raises an error if it is already assigned to another robot.
-        """
-        if self._robot is not None and self._robot != robot:
-            raise ValueError(
-                f"Kinematic chain {self.name} is already part of another robot: {self._robot.name}."
-            )
-        if self._robot is not None:
-            return
-        self._robot = robot
-        if self.manipulator is not None:
-            robot.add_manipulator(self.manipulator)
-        for sensor in self.sensors:
-            robot.add_sensor(sensor)
-
-    def __hash__(self):
-        """
-        Returns the hash of the kinematic chain, which is based on the root and tip bodies.
-        This allows for proper comparison and storage in sets or dictionaries.
-        """
-        return hash((self.name, self.root, self.tip))
-
-
-@dataclass
-class Arm(KinematicChain):
-    """
-    Represents an arm of a robot, which is a kinematic chain with a specific tip body.
-    An arm has a manipulators and potentially sensors.
-    """
-
-    def __hash__(self):
-        """
-        Returns the hash of the kinematic chain, which is based on the root and tip bodies.
-        This allows for proper comparison and storage in sets or dictionaries.
-        """
-        return hash((self.name, self.root, self.tip))
-
-
-@dataclass
-class Manipulator(SemanticRobotAnnotation, ABC):
-    """
-    Abstract base class of robot manipulators. Always has a tool frame.
-    """
-
-    tool_frame: Body = field(kw_only=True)
-
-    front_facing_orientation: Quaternion = field(kw_only=True)
-    """
-    The orientation of the manipulator's tool frame, which is usually the front-facing orientation.
-    """
-
-    front_facing_axis: Vector3 = field(kw_only=True)
-    """
-    The axis of the manipulator's tool frame that is facing forward.
-    """
-
-    def assign_to_robot(self, robot: AbstractRobot):
-        """
-        Assigns the manipulator to the given robot. This method ensures that the manipulator is only assigned
-        to one robot at a time, and raises an error if it is already assigned to another robot.
-        """
-        if self._robot is not None and self._robot != robot:
-            raise ValueError(
-                f"Manipulator {self.name} is already part of another robot: {self._robot.name}."
-            )
-        if self._robot is not None:
-            return
-        self._robot = robot
-
-    def __hash__(self):
-        """
-        Returns the hash of the kinematic chain, which is based on the root and tip bodies.
-        This allows for proper comparison and storage in sets or dictionaries.
-        """
-        return hash((self.name, self.root, self.tool_frame))
-
-
-@dataclass
-class Finger(KinematicChain):
-    """
-    A finger is a kinematic chain, since it should have an unambiguous tip body, and may contain sensors.
-    """
-
-    def __hash__(self):
-        """
-        Returns the hash of the kinematic chain, which is based on the root and tip bodies.
-        This allows for proper comparison and storage in sets or dictionaries.
-        """
-        return hash((self.name, self.root, self.tip))
-
-
-@dataclass
-class ParallelGripper(Manipulator):
-    """
-    Represents a parallel gripper of a robot. Contains a finger and a thumb. The thumb is a specific finger
-    that always needs to touch an object when grasping it, ensuring a stable grasp.
-    """
-
-    finger: Finger = field(default=None)
-    thumb: Finger = field(default=None)
-
-    def assign_to_robot(self, robot: AbstractRobot):
-        """
-        Assigns the parallel gripper to the given robot and calls the appropriate methods for the its finger and thumb.
-         This method ensures that the parallel gripper is only assigned to one robot at a time, and raises an error if
-         it is already assigned to another
-        """
-        if self._robot is not None and self._robot != robot:
-            raise ValueError(
-                f"ParallelGripper {self.name} is already part of another robot: {self._robot.name}."
-            )
-        if self._robot is not None:
-            return
-        self._robot = robot
-
-    def __hash__(self):
-        """
-        Returns the hash of the kinematic chain, which is based on the root and tip bodies.
-        This allows for proper comparison and storage in sets or dictionaries.
-        """
-        return hash((self.name, self.root, self.tool_frame))
-
-
-@dataclass
-class HumanoidGripper(Manipulator):
-    """
-    Represents a human-like gripper of a robot. Contains a collection of fingers and a thumb. The thumb is a specific finger
-    that always needs to touch an object when grasping it, ensuring a stable grasp.
-    """
-
-    fingers: List[Finger] = field(default_factory=list)
-    thumb: Finger = field(default=None)
-
-    def assign_to_robot(self, robot: AbstractRobot):
-        """
-        Assigns the humanoid gripper to the given robot and calls the appropriate methods for the its finger and thumb.
-         This method ensures that the humanoid gripper is only assigned to one robot at a time, and raises an error if
-         it is already assigned to another
-        """
-        if self._robot is not None and self._robot != robot:
-            raise ValueError(
-                f"ParallelGripper {self.name} is already part of another robot: {self._robot.name}."
-            )
-        if self._robot is not None:
-            return
-        self._robot = robot
-
-    def __hash__(self):
-        """
-        Returns the hash of the kinematic chain, which is based on the root and tip bodies.
-        This allows for proper comparison and storage in sets or dictionaries.
-        """
-        return hash((self.name, self.root, self.tool_frame))
-
-
-@dataclass
-class Sensor(SemanticRobotAnnotation, ABC):
-    """
-    Abstract base class for any kind of sensor in a robot.
-    """
-
-    def assign_to_robot(self, robot: AbstractRobot):
-        """
-        Assigns the sensor to the given robot. This method ensures that the sensor is only assigned
-        to one robot at a time, and raises an error if it is already assigned to another robot.
-        """
-        if self._robot is not None and self._robot != robot:
-            raise ValueError(
-                f"Sensor {self.name} is already part of another robot: {self._robot.name}."
-            )
-        if self._robot is not None:
-            return
-        self._robot = robot
-
-
-@dataclass
-class FieldOfView:
-    """
-    Represents the field of view of a camera sensor, defined by the vertical and horizontal angles of the camera's view.
-    """
-
-    vertical_angle: float
-    horizontal_angle: float
-
-
-@dataclass
-class Camera(Sensor):
-    """
-    Represents a camera sensor in a robot.
-    """
-
-    forward_facing_axis: Vector3 = field(default=None)
-    field_of_view: FieldOfView = field(default=None)
-    minimal_height: float = 0.0
-    maximal_height: float = 1.0
-    default_camera: bool = False
-
-    def __hash__(self):
-        """
-        Returns the hash of the kinematic chain, which is based on the root and tip bodies.
-        This allows for proper comparison and storage in sets or dictionaries.
-        """
-        return hash((self.name, self.root))
-
-
-@dataclass
-class Neck(KinematicChain):
-    """
-    Represents a special kinematic chain that connects the head of a robot with a collection of sensors, such as cameras
-    and which does not have a manipulator.
-    """
-
-    pitch_body: Optional[Body] = None
-    """
-    The body that allows pitch movement in the neck, if it exists.
-    """
-    yaw_body: Optional[Body] = None
-    """
-    The body that allows yaw movement in the neck, if it exists.
-    """
-
-    def __hash__(self):
-        """
-        Returns the hash of the kinematic chain, which is based on the root and tip bodies.
-        This allows for proper comparison and storage in sets or dictionaries.
-        """
-        return hash((self.name, self.root, self.tip))
-
-
-@dataclass
-class Torso(KinematicChain):
-    """
-    A Torso is a kinematic chain connecting the base of the robot with a collection of other kinematic chains.
-    """
-
-    def assign_to_robot(self, robot: AbstractRobot):
-        """
-        Assigns the torso to the given robot and calls the appropriate method for each of its attached kinematic chains.
-         This method ensures that the torso is only assigned to one robot at a time, and raises an error if it is
-         already assigned to another robot.
-        """
-        if self._robot is not None and self._robot != robot:
-            raise ValueError(
-                f"Torso {self.name} is already part of another robot: {self._robot.name}."
-            )
-        if self._robot is not None:
-            return
-        self._robot = robot
-
-    def __hash__(self):
-        """
-        Returns the hash of the kinematic chain, which is based on the root and tip bodies.
-        This allows for proper comparison and storage in sets or dictionaries.
-        """
-        return hash((self.name, self.root, self.tip))
-
-
-@dataclass
-class Base(KinematicChain):
-    """
-    The base of a robot
-    """
-
-    main_axis: Vector3 = field(default=Vector3(1, 0, 0), kw_only=True)
-    """
-    Axis along which the robot manipulates
-    """
-
-    @property
-    def bounding_box(self) -> BoundingBox:
-        bounding_boxes = [
-            kse.collision.as_bounding_box_collection_in_frame(
-                self._world.root
-            ).bounding_box()
-            for kse in self._world.compute_chain_of_kinematic_structure_entities(
-                self.root, self.tip
-            )
-            if kse.collision is not None
-        ]
-        bb_collection = BoundingBoxCollection(
-            bounding_boxes, reference_frame=self._world.root
-        )
-        return bb_collection.bounding_box()
-
-    def __hash__(self):
-        return hash((self.name, self.root, self.tip))
+logger = logging.getLogger("semantic_digital_twin")
 
 
 @dataclass(eq=False)
-class AbstractRobot(Agent, ABC):
+class RobotPartSetupMixin(AggregatesRobotParts, ABC):
     """
-    Specification of an abstract robot. A robot consists of:
-    - a root body, which is the base of the robot
-    - an optional torso, which is a kinematic chain (usually without a manipulator) connecting the base with a collection
-        of other kinematic chains
-    - an optional collection of manipulator chains, each containing a manipulator, such as a gripper
-    - an optional collection of sensor chains, each containing a sensor, such as a camera
-    => If a kinematic chain contains both a manipulator and a sensor, it will be part of both collections
+    Parent class for robot part mixins as well as abstract robot, to allow AbstractRobot to call all
+    HasRobotPart._setup_robot_parts() methods of its parent classes.
     """
 
-    torso: Optional[Torso] = None
+    @abstractmethod
+    def _setup_robot_parts(self): ...
+
+
+@dataclass(eq=False)
+class HasArms(RobotPartSetupMixin, ABC):
     """
-    The torso of the robot, which is a kinematic chain connecting the base with a collection of other kinematic chains.
+    Mixin class for robots that have arms.
     """
 
-    base: Optional[Base] = None
+    arms: List[Arm] = field(default_factory=list)
     """
-    The base of the robot, the part closes to the floor
-    """
-
-    manipulators: List[Manipulator] = field(default_factory=list)
-    """
-    A collection of manipulators in the robot, such as grippers.
+    A collection of arms in the robot.
     """
 
-    sensors: List[Sensor] = field(default_factory=list)
-    """
-    A collection of sensors in the robot, such as cameras.
-    """
+    @synchronized_attribute_modification
+    def add_arm(self, arm: Arm):
+        """
+        Adds a kinematic chain to the PR2 robot's collection of kinematic chains.
+        If the kinematic chain is an arm, it will be added to the left or right arm accordingly.
 
-    manipulator_chains: List[KinematicChain] = field(default_factory=list)
-    """
-    A collection of all kinematic chains containing a manipulator, such as a gripper.
-    """
+        :param arm: The kinematic chain to add to the PR2 robot.
+        """
+        self.arms.append(arm)
 
-    sensor_chains: List[KinematicChain] = field(default_factory=list)
-    """
-    A collection of all kinematic chains containing a sensor, such as a camera.
-    """
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+        self._setup_arm_semantic_annotations()
+        self._setup_arm_hardware_interfaces()
+        self._setup_arm_joint_state()
 
-    full_body_controlled: bool = field(default=False, kw_only=True)
+    @abstractmethod
+    def _setup_arm_semantic_annotations(self): ...
+
+    @abstractmethod
+    def _setup_arm_hardware_interfaces(self): ...
+
+    @abstractmethod
+    def _setup_arm_joint_state(self): ...
+
+    @property
+    def manipulators(self) -> list[RobotPart]:
+        """
+        A collection of all manipulators of the robot.
+        """
+        return [part for part in self._robot_parts if isinstance(part, Manipulator)]
+
+
+@dataclass(eq=False)
+class HasOneArm(HasArms, ABC):
     """
-    Whether this robots needs full-body control to be able to operate effectively 
+    Mixin class for robots that have exactly one arm.
     """
 
     @property
-    def controlled_connections(self) -> Set[ActiveConnection]:
+    def arm(self) -> Arm:
+        return self.arms[0]
+
+
+@dataclass(eq=False)
+class HasLeftRightArm(HasArms, ABC):
+    """
+    Mixin class for robots that have two arms and can specify which is the left and which is the right arm.
+    """
+
+    @cached_property
+    def left_arm(self):
+        from semantic_digital_twin.reasoning.predicates import LeftOf
+
+        return self._assign_left_right_arms(LeftOf)
+
+    @cached_property
+    def right_arm(self):
+        from semantic_digital_twin.reasoning.predicates import RightOf
+
+        return self._assign_left_right_arms(RightOf)
+
+    def _assign_left_right_arms(self, relation: Type[Union[LeftOf, RightOf]]) -> Arm:
+        """
+        Assigns the left and right arms based on their position relative to the robot's root body.
+        :param relation: The relation to use for determining left or right (LeftOf or RightOf).
+        :return: The arm that is on the left or right side of the robot.
+        """
+        assert (
+            len(self.arms) == 2
+        ), f"Must have exactly two arms to specify left and right arm, but found {len(self.arms)}."
+        pov = self.root.global_transform
+        first_arm = self.arms[0]
+        second_arm = self.arms[1]
+        # the arms may share a root, but the first body after the root should be different
+        world_P_first_body = first_arm.bodies[1].global_transform.to_position()
+        world_P_second_body = second_arm.bodies[1].global_transform.to_position()
+
+        return (
+            first_arm
+            if relation(
+                world_P_first_body,
+                world_P_second_body,
+                pov,
+            )()
+            else second_arm
+        )
+
+
+@dataclass(eq=False)
+class HasExternalSensors(RobotPartSetupMixin, ABC):
+    """
+    Mixin class for robots that have an external camera.
+    """
+
+    external_sensors: List[Sensor] = field(default_factory=list)
+    """
+    A collection of external sensors in the robot.
+    """
+
+    @synchronized_attribute_modification
+    def add_external_sensor(self, sensor: Sensor):
+        self.external_sensors.append(sensor)
+
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+        self._setup_external_sensors()
+
+    @abstractmethod
+    def _setup_external_sensors(self): ...
+
+
+@dataclass(eq=False)
+class HasTorso(RobotPartSetupMixin, ABC):
+    """
+    Mixin class for robots that have a torso.
+    """
+
+    torso: Optional[Torso] = field(default=None)
+    """
+    The torso of the robot, represented as an arm.
+    """
+
+    @synchronized_attribute_modification
+    def add_torso(self, torso: Torso):
+        self.torso = torso
+
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+        self._setup_torso_semantic_annotations()
+        self._setup_torso_hardware_interfaces()
+        self._setup_torso_joint_state()
+
+    @abstractmethod
+    def _setup_torso_semantic_annotations(self): ...
+
+    @abstractmethod
+    def _setup_torso_hardware_interfaces(self): ...
+
+    @abstractmethod
+    def _setup_torso_joint_state(self): ...
+
+
+@dataclass(eq=False)
+class HasMobileBase(RobotPartSetupMixin, ABC):
+
+    mobile_base: Optional[MobileBase] = field(default=None)
+
+    @synchronized_attribute_modification
+    def add_mobile_base(self, mobile_base: MobileBase):
+        self.mobile_base = mobile_base
+
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+        self._setup_mobile_base_semantic_annotations()
+
+    @abstractmethod
+    def _setup_mobile_base_semantic_annotations(self): ...
+
+    @property
+    def full_body_controlled(self):
+        return self.mobile_base.full_body_controlled
+
+
+@dataclass(eq=False)
+class AbstractRobot(Agent, RobotPartSetupMixin, ABC):
+    """
+    Specification of an abstract robot
+    """
+
+    def _setup_robot_parts(self):
+        super()._setup_robot_parts()
+
+    @property
+    def controlled_connections(self) -> list[ActiveConnection]:
         """
         A subset of the robot's connections that are controlled by a controller.
         """
-        return set(self._world.controlled_connections) & set(self.connections)
+        return [
+            connection
+            for connection in self.connections
+            if isinstance(connection, ActiveConnection) and connection.is_controlled
+        ]
 
     @property
     def degrees_of_freedom_with_hardware_interface(self) -> List[DegreeOfFreedom]:
@@ -522,14 +255,7 @@ class AbstractRobot(Agent, ABC):
         """
         dofs = []
         for connection in self.connections:
-            if isinstance(connection, ActiveConnection):
-                dofs.extend(
-                    [
-                        dof
-                        for dof in connection.active_dofs
-                        if dof.has_hardware_interface
-                    ]
-                )
+            dofs.extend(connection.controlled_dofs)
         return dofs
 
     @classmethod
@@ -544,21 +270,50 @@ class AbstractRobot(Agent, ABC):
         :return: A robot semantic annotation.
         """
         with world.modify_world():
-            robot = cls._init_empty_robot(world)
-            robot._setup_semantic_annotations()
+            robot_root_body = cls._get_robot_root_body(world)
+            robot = cls(
+                name=PrefixedName(cls.__name__, world.name),
+                root=robot_root_body,
+            )
             world.add_semantic_annotation(robot)
+            robot._setup_robot_parts()
             robot._setup_collision_rules()
             robot._setup_velocity_limits()
-            robot._setup_hardware_interfaces()
-            robot._setup_joint_states()
         return robot
+
+    def validate(self) -> bool:
+        """
+        Validates the robot semantic annotation.
+            The validation process includes:
+            1. Printing out missing fields of any robot part, so that the user can check if they are intentionally left blank.
+            2. Deepcopy the resulting world to ensure that all parts of the robot are initialized in the correct order
+            3. Assert that the copied world is the same as the original world
+            4. Assert that the robot semantic annotation has a default camera.
+
+        :return: True if the robot semantic annotation is valid, False otherwise.
+        """
+
+        for robot_part in self._robot_parts:
+            robot_part._log_missing_fields()
+
+        self_world_copy = deepcopy(self._world)
+
+        assert set(self_world_copy._world_entity_hash_table.keys()) == set(
+            self._world._world_entity_hash_table.keys()
+        )
+
+        assert (
+            self_world_copy.get_semantic_annotations_by_type(AbstractRobot)[
+                0
+            ].get_default_camera()
+            is not None
+        )
+
+        return True
 
     @classmethod
     @abstractmethod
-    def _init_empty_robot(cls, world: World) -> Self: ...
-
-    @abstractmethod
-    def _setup_semantic_annotations(self): ...
+    def _get_robot_root_body(cls, world: World) -> Body: ...
 
     @abstractmethod
     def _setup_collision_rules(self): ...
@@ -569,20 +324,14 @@ class AbstractRobot(Agent, ABC):
         )
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
-    @abstractmethod
-    def _setup_hardware_interfaces(self): ...
-
-    @abstractmethod
-    def _setup_joint_states(self): ...
-
     @property
-    def drive(self) -> Optional[OmniDrive]:
+    def drive(self) -> Optional[Drive]:
         """
         The connection which the robot uses for driving.
         """
         try:
             parent_connection = self.root.parent_connection
-            if isinstance(parent_connection, (OmniDrive, DifferentialDrive)):
+            if isinstance(parent_connection, Drive):
                 return parent_connection
         except AttributeError:
             pass
@@ -613,63 +362,15 @@ class AbstractRobot(Agent, ABC):
                 ),
             )
 
-    def add_manipulator(self, manipulator: Manipulator):
-        """
-        Adds a manipulator to the robot's collection of manipulators.
-        """
-        self.manipulators.append(manipulator)
-        self._semantic_annotations.add(manipulator)
-        manipulator.assign_to_robot(self)
-
-    def add_sensor(self, sensor: Sensor):
-        """
-        Adds a sensor to the robot's collection of sensors.
-        """
-        self.sensors.append(sensor)
-        self._semantic_annotations.add(sensor)
-        sensor.assign_to_robot(self)
-
-    def add_torso(self, torso: Torso):
-        """
-        Adds a torso to the robot's collection of kinematic chains.
-        """
-        if self.torso is not None:
-            raise ValueError(
-                f"Robot {self.name} already has a torso: {self.torso.name}."
-            )
-        self.torso = torso
-        self._semantic_annotations.add(torso)
-        torso.assign_to_robot(self)
-
-    def add_base(self, base: Base):
-        """
-        Adds the given base to the robot
-        """
-        if self.base is not None:
-            raise ValueError(f"Robot {self.name} already has a base: {self.base.name}.")
-        self.base = base
-        self._semantic_annotations.add(base)
-        base.assign_to_robot(self)
-
-    def add_kinematic_chain(self, kinematic_chain: KinematicChain):
-        """
-        Adds a kinematic chain to the robot's collection of kinematic chains.
-        This can be either a manipulator chain or a sensor chain.
-        """
-        if kinematic_chain.manipulator is None and not kinematic_chain.sensors:
-            logging.warning(
-                f"Kinematic chain {kinematic_chain.name} has no manipulator or sensors, so it was skipped. Did you mean to add it to the torso?"
-            )
-            return
-        if kinematic_chain.manipulator is not None:
-            self.manipulator_chains.append(kinematic_chain)
-        if kinematic_chain.sensors:
-            self.sensor_chains.append(kinematic_chain)
-        self._semantic_annotations.add(kinematic_chain)
-        kinematic_chain.assign_to_robot(self)
-
     def get_default_camera(self) -> Camera:
         for sensor in self.sensors:
             if isinstance(sensor, Camera) and sensor.default_camera:
                 return sensor
-        return [s for s in self.sensors if isinstance(s, Camera)][0]
+        raise MissingDefaultCameraError(type(self))
+
+    @property
+    def sensors(self) -> list[Sensor]:
+        """
+        A collection of all sensors of the robot.
+        """
+        return [part for part in self._robot_parts if isinstance(part, Sensor)]

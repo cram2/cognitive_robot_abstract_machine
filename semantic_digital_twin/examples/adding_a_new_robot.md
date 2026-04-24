@@ -59,46 +59,65 @@ from dataclasses import dataclass
 from typing import Self
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import (
-    AbstractRobot,
-)
-from semantic_digital_twin.robots.robot_mixins import HasNeck, SpecifiesLeftRightArm
+from semantic_digital_twin.robots.abstract_robot import HasLeftRightArm, HasTorso, HasMobileBase, AbstractRobot
 from semantic_digital_twin.world import World
 
-
 @dataclass(eq=False)
-class MyNewRobot(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
-    """  
-	A nice docstring for your new robot. In this case it has a neck and exactly 2 arms, which can be identified as "Left arm" and "Right arm"
+class MyNewRobot(AbstractRobot, HasLeftRightArm, HasTorso, HasMobileBase):
     """
-
-    @classmethod
-    def _init_empty_robot(cls, world: World) -> Self:
-        return cls(
-            name=PrefixedName(name="your_robots_name", prefix=world.name),
-            root=world.get_body_by_name("the_root_of_your_robot"),
-            _world=world,
-        )
+    A nice docstring for your new robot. In this case it has a neck and exactly 2 arms, which can be identified as "Left arm" and "Right arm"
+    """
 
     def _setup_collision_rules(self):
         """
-        In this method you load the robot srdf you generated with the script at `giskardpy/scripts/ros2-tools/collision_matrix_tool.py`, 
+        In this method you load the robot srdf you generated with the script at `giskardpy/scripts/ros2-tools/collision_matrix_tool.py`,
         and then set up collision rules.
         """
 
-    def _setup_semantic_annotations(self):
+    @classmethod
+    def _get_robot_root_body(cls, world: World) -> Body:
         """
-        Here you annotate the the bodies of your robot with different semantic annotations. Usually you work from the leaves to the
-        root. For example first you define the fingers, then create the gripper with the fingers, and then create the arm with the gripper
+        Here you specify which body in the world is the root body of the robot.
         """
 
-    def _setup_joint_states(self):
+
+    def _setup_arm_semantic_annotations(self):
+        """
+        Here you setup the semantic annotations for the arms. This is usually done by defining the fingers, then the 
+        gripper, then the arm. Always use the create_and_add_to_world method.
+        """
+
+    def _setup_arm_hardware_interfaces(self):
+        """
+        Here you specify which connections can be communicated with using a hardware interface on the real robot.
+        """
+
+
+    def _setup_arm_joint_state(self):
         """
         These joint states are usually used within pycram plans to put the robot into a specific, predefined state.
         """
 
-    def _setup_hardware_interfaces(self):
+    def _setup_torso_semantic_annotations(self):
         """
-        Here you specifiy which connections can be communicated with using a hardware interface on the real robot.
+        Here you setup the semantic annotations for the torso. This is usually done by defining the sensors, then the 
+        torso itself. Always use the create_and_add_to_world method.
+        """
+
+    def _setup_torso_hardware_interfaces(self):
+        """
+        Here you specify which connections can be communicated with using a hardware interface on the real robot.
+        """
+
+
+    def _setup_torso_joint_state(self):
+        """
+        These joint states are usually used within pycram plans to put the robot into a specific, predefined state.
+        """
+
+    def _setup_mobile_base_semantic_annotations(self):
+        """
+        Here you setup the semantic annotations for the mobile base.
+        Always use the create_and_add_to_world method.
         """
 ```

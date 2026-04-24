@@ -467,7 +467,7 @@ class OccupancyCostmap(Costmap):
         ) * self.resolution + np.array(origin_position[:2])
 
         # base height of the robot plus a safty offset
-        base_height = self.robot_view.base.bounding_box.height + 0.1
+        base_height = self.robot_view.mobile_base.bounding_box.height + 0.1
         # Add the z-coordinate to the grid, which is either 0 or 10
         indices_0 = np.pad(
             indices, (0, 1), mode="constant", constant_values=base_height
