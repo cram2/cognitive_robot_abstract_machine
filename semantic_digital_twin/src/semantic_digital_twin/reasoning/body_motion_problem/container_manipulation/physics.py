@@ -66,7 +66,7 @@ class RunMSCModel(PhysicsModel):
         context = MotionStatechartContext(world=world)
         executor = Executor(
             context=context,
-            pacer=SimulationPacer(real_time_factor=1.0),
+            # pacer=SimulationPacer(real_time_factor=1.0),
         )
         executor.compile(motion_statechart=self.msc)
 

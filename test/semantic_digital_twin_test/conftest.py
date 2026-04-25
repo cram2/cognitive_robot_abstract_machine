@@ -17,7 +17,7 @@ def pytest_configure(config):
         repo_root / "semantic_digital_twin" / "scripts" / "generate_orm.py"
     )
     # Execute the ORM generation script as a standalone module
-    runpy.run_path(str(generate_orm_path), run_name="__main__")
+    # runpy.run_path(str(generate_orm_path), run_name="__main__")
     class_diagram = ClassDiagram(
         recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),

@@ -2382,8 +2382,8 @@ class CoupledPouringMSCModelDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    theta_max: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    ramp_margin: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    target_outflow: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    initial_tilt: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     timeout: Mapped[builtins.int] = mapped_column(use_existing_column=True)
     height_above_receiver: Mapped[builtins.float] = mapped_column(
         use_existing_column=True
@@ -3812,8 +3812,8 @@ class PouringMSCModelDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    theta_max: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    ramp_margin: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    target_outflow: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    initial_tilt: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     timeout: Mapped[builtins.int] = mapped_column(use_existing_column=True)
 
     fill_equation_id: Mapped[int] = mapped_column(

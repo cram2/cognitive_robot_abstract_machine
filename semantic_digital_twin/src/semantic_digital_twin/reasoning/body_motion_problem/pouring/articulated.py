@@ -37,7 +37,7 @@ class PouringEquation(DifferentialEquation):
     k: float = field(default=1.0, kw_only=True)
 
     @abstractmethod
-    def symbolic_velocity(self, fill_sym: Scalar, tilt_sym: Scalar) -> Scalar:
+    def symbolic_velocity(self) -> Scalar:
         """
         Symbolic d(fill_normalized)/dt as a CasADi expression.
 
@@ -93,7 +93,7 @@ class ArticulatedPouringEquation(PouringEquation):
         r = self.container_geometry.half_width
         return sm.atan2(A - fill_sym * A, r)
 
-    def symbolic_velocity(self, fill_sym: Scalar, tilt_sym: Scalar) -> Scalar:
+    def symbolic_velocity(self) -> Scalar:
         """
         Symbolic d(fill_normalized)/dt as a CasADi expression.
 
@@ -103,8 +103,11 @@ class ArticulatedPouringEquation(PouringEquation):
         """
         A = self.container_geometry.height
         r = self.container_geometry.half_width
-        h_sym = fill_sym * A
+        h_sym = self.fill_connection.dof.variables.position * A
         L_sym = sm.sqrt((A - h_sym) ** 2 + r**2)
         phi_sym = sm.atan2(A - h_sym, r)
-        gap_sym = sm.max(sm.Scalar(0.0), L_sym * sm.sin(tilt_sym - phi_sym))
+        gap_sym = sm.max(
+            sm.Scalar(0.0),
+            L_sym * sm.sin(self.tilt_connection.dof.variables.position - phi_sym),
+        )
         return -self.k * gap_sym / A
