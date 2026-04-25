@@ -6,14 +6,10 @@ import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Set
 from urllib.parse import urlparse
 from zipfile import ZipFile
 
 import requests
-from graphql.pyutils import cached_property
-
-from semantic_digital_twin.adapters.sage_10k_dataset.utils import clean_type_name
 
 logger = logging.getLogger(__name__)
 from semantic_digital_twin.adapters.sage_10k_dataset.schema import Sage10kScene
@@ -155,23 +151,3 @@ class Sage10kDatasetLoader:
             urls.append(f"{base_url}/{relative_path}")
 
         return urls
-
-
-@dataclass
-class Sage10kSemanticAnnotationCreator:
-    """
-    Creates semantic annotations for Sage10k dataset scenes.
-    """
-
-    raw_type_names: List[str]
-
-    @cached_property
-    def cleaned_type_names(self) -> Set[str]:
-
-        cleaned_type_names = set()
-        for type_name in self.raw_type_names:
-            cleaned_type_name = clean_type_name(type_name)
-            if cleaned_type_name is not None:
-                cleaned_type_names.add(cleaned_type_name)
-
-        return cleaned_type_names

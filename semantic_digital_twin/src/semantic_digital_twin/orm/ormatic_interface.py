@@ -3651,7 +3651,7 @@ class Sage10kRotationDAO(
 class Sage10kSemanticAnnotationCreatorDAO(
     Base,
     DataAccessObject[
-        semantic_digital_twin.adapters.sage_10k_dataset.loader.Sage10kSemanticAnnotationCreator
+        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.Sage10kSemanticAnnotationCreator
     ],
 ):
 

@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pytest
+import rustworkx
 from sqlalchemy import select
 
 from pycram.datastructures.grasp import GraspDescription
@@ -14,6 +15,8 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.adapters.sage_10k_dataset.loader import (
     Sage10kDatasetLoader,
+)
+from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
     Sage10kSemanticAnnotationCreator,
 )
 from semantic_digital_twin.adapters.sage_10k_dataset.schema import Sage10kScene
@@ -269,7 +272,17 @@ def test_different_decomposition_methods(rclpy_node, sage10k_scene):
 
 def test_generation_of_semantic_annotation_hierarchy():
     session = semantic_digital_twin_sessionmaker()()
-    q = select(Sage10kObjectDAO.type)
+    q = select(Sage10kObjectDAO.type).limit(500)
     type_names = session.scalars(q).unique().all()
     creator = Sage10kSemanticAnnotationCreator(type_names)
-    print(creator.cleaned_type_names)
+    creator._create_word_hierarchy()
+
+    for node in creator.word_hierarchy.node_indices():
+        parents = creator.word_hierarchy.predecessors(node)
+        node_data = creator.word_hierarchy[node]
+        print(f"Type: {node_data}, Parents: {parents}")
+
+    print(
+        "Hierarchy is acyclic",
+        rustworkx.is_directed_acyclic_graph(creator.word_hierarchy),
+    )
