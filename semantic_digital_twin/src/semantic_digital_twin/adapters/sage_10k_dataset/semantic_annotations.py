@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import itertools
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, make_dataclass
 from itertools import takewhile
+from pathlib import Path
 from types import NoneType
 from typing import List, Set, Optional, Dict, Type, Tuple
 
@@ -13,6 +14,8 @@ from enum import Enum
 from graphql.pyutils import cached_property
 from rustworkx import DAGWouldCycle
 import logging
+
+from krrood.class_diagrams.module_generation import ModuleRenderer
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +65,6 @@ class Sage10kSemanticAnnotationCreator:
     The lemmatizer used to convert type names to singular form.
     """
 
-    word_hierarchy: rustworkx.PyDiGraph[str, NoneType] = field(init=False)
-
     @cached_property
     def cleaned_type_names(self) -> Set[str]:
 
@@ -91,7 +92,8 @@ class Sage10kSemanticAnnotationCreator:
 
         return cleaned_type
 
-    def _create_word_hierarchy(self):
+    @cached_property
+    def word_hierarchy(self) -> rustworkx.PyDiGraph:
         """
         Creates the word hierarchy graph by identifying IS_A relationships.
         Applies transitive reduction to the IS_A relationships to simplify the hierarchy.
@@ -134,7 +136,7 @@ class Sage10kSemanticAnnotationCreator:
         for p, c in reduced_is_a.edge_list():
             cleaned_hierarchy.add_edge(p, c, None)
 
-        self.word_hierarchy = cleaned_hierarchy
+        return cleaned_hierarchy
 
     def is_specialization_of(self, child_word: str, parent_word: str) -> bool:
         """
@@ -178,3 +180,32 @@ class Sage10kSemanticAnnotationCreator:
                 relevant_synsets.append(synset)
 
         return relevant_synsets
+
+    def write_annotations_to_file(self, output_file: Path):
+        """
+        Write the annotations to a file.
+
+        :param output_file: The path to write the annotations to.
+        """
+
+        name_to_dataclass = {}
+
+        for type_name_index in rustworkx.topological_sort(self.word_hierarchy):
+            type_name = self.word_hierarchy[type_name_index]
+
+            bases = self.word_hierarchy.predecessors(type_name_index)
+
+            if not bases:
+                bases = (Sage10kLabel,)
+            else:
+                bases = tuple(name_to_dataclass[node] for node in bases)
+
+            dataclass_ = make_dataclass(
+                cls_name=type_name,
+                bases=bases,
+                fields=[],
+            )
+            name_to_dataclass[type_name] = dataclass_
+
+        renderer = ModuleRenderer.from_dataclasses(name_to_dataclass.values())
+        renderer.write_to_file(output_file)

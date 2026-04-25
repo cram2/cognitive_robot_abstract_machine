@@ -7,8 +7,10 @@ import {{ import }}
 
 {% for class in module_description.classes %}
 @dataclass
-class {{ class.name }}{{ class.bases }}:
-
+class {{ class.type_.__name__ }}({{ ",".join(class.base_classes)}}):
+    {% if not class.fields %}
+    ...
+    {% endif %}
     {% for field in class.fields %}
     {{ field }}
     {% endfor %}
