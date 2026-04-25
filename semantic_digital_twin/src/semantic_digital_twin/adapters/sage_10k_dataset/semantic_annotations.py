@@ -4,14 +4,28 @@ import itertools
 from dataclasses import dataclass, field
 from itertools import takewhile
 from types import NoneType
-from typing import List, Set, Optional
+from typing import List, Set, Optional, Dict, Type, Tuple
 
 import enchant
 import rustworkx
 import tqdm
+from enum import Enum
 from graphql.pyutils import cached_property
 
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasRootBody,
+    HasSupportingSurface,
+    HasStorageSpace,
+    IsPerceivable,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Furniture,
+    Table,
+    Chair,
+    DrinkingContainer,
+    CookingContainer,
+    Food,
+)
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 
@@ -74,31 +88,54 @@ class Sage10kSemanticAnnotationCreator:
         return cleaned_type
 
     def _create_word_hierarchy(self):
-        self.word_hierarchy = rustworkx.PyDiGraph(multigraph=False)
+        """
+        Creates the word hierarchy graph by identifying IS_A relationships.
+        Applies transitive reduction to the IS_A relationships to simplify the hierarchy.
+        """
+        word_hierarchy = rustworkx.PyDiGraph(multigraph=False)
         for type_name in self.cleaned_type_names:
-            self.word_hierarchy.add_node(type_name)
+            word_hierarchy.add_node(type_name)
 
         for parent_index, child_index in tqdm.tqdm(
             itertools.product(
-                self.word_hierarchy.node_indices(), self.word_hierarchy.node_indices()
+                word_hierarchy.node_indices(), word_hierarchy.node_indices()
             ),
-            total=len(self.word_hierarchy.node_indices()) ** 2,
+            total=len(word_hierarchy.node_indices()) ** 2,
         ):
             if parent_index == child_index:
                 continue
 
-            parent_type = self.word_hierarchy.nodes()[parent_index]
-            child_type = self.word_hierarchy.nodes()[child_index]
+            parent_type = word_hierarchy.nodes()[parent_index]
+            child_type = word_hierarchy.nodes()[child_index]
 
             if self.is_specialization_of(
                 child_word=child_type, parent_word=parent_type
             ):
-                self.word_hierarchy.add_edge(parent_index, child_index, None)
+                word_hierarchy.add_edge(parent_index, child_index, None)
 
-    @staticmethod
-    def is_specialization_of(child_word: str, parent_word: str) -> bool:
-        child_synsets = wordnet.synsets(child_word, pos=wordnet.NOUN)
-        parent_synsets = wordnet.synsets(parent_word, pos=wordnet.NOUN)
+        cycles = list(rustworkx.simple_cycles(word_hierarchy))
+        for cycle in cycles:
+            print("Cycle detected:", [word_hierarchy.nodes()[node] for node in cycle])
+
+        # Apply Transitive Reduction for IS_A relationships
+        reduced_is_a, _ = rustworkx.transitive_reduction(word_hierarchy)
+
+        # Reconstruct word_hierarchy with reduced IS_A edges
+        cleaned_hierarchy = rustworkx.PyDiGraph(multigraph=False)
+        for node in self.word_hierarchy.nodes():
+            cleaned_hierarchy.add_node(node)
+
+        for p, c in reduced_is_a.edge_list():
+            cleaned_hierarchy.add_edge(p, c, None)
+
+        self.word_hierarchy = cleaned_hierarchy
+
+    def is_specialization_of(self, child_word: str, parent_word: str) -> bool:
+        """
+        Determines if a word is a specialization (hyponym) of another word.
+        """
+        child_synsets = self._get_relevant_synsets(child_word)
+        parent_synsets = self._get_relevant_synsets(parent_word)
 
         for child_synset in child_synsets:
             # Get all hypernyms excluding the synset itself to avoid cycles
@@ -115,3 +152,23 @@ class Sage10kSemanticAnnotationCreator:
                     return True
 
         return False
+
+    def _get_relevant_synsets(self, word: str) -> List[wordnet.Synset]:
+        """
+        Returns synsets for a word that are relevant to the domain of physical entities.
+        """
+        synsets = wordnet.synsets(word, pos=wordnet.NOUN)
+        if not synsets:
+            return []
+
+        relevant_synsets = []
+        root_synset = wordnet.synset("physical_entity.n.01")
+
+        for synset in synsets:
+
+            # Check if it's a descendant of any root synsets
+            all_hypernyms = {h for path in synset.hypernym_paths() for h in path}
+            if root_synset in all_hypernyms:
+                relevant_synsets.append(synset)
+
+        return relevant_synsets

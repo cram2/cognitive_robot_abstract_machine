@@ -272,7 +272,7 @@ def test_different_decomposition_methods(rclpy_node, sage10k_scene):
 
 def test_generation_of_semantic_annotation_hierarchy():
     session = semantic_digital_twin_sessionmaker()()
-    q = select(Sage10kObjectDAO.type).limit(500)
+    q = select(Sage10kObjectDAO.type)
     type_names = session.scalars(q).unique().all()
     creator = Sage10kSemanticAnnotationCreator(type_names)
     creator._create_word_hierarchy()
