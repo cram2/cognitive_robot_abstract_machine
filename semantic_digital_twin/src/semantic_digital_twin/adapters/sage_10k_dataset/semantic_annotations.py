@@ -101,8 +101,13 @@ class Sage10kSemanticAnnotationCreator:
         parent_synsets = wordnet.synsets(parent_word, pos=wordnet.NOUN)
 
         for child_synset in child_synsets:
+            # Get all hypernyms excluding the synset itself to avoid cycles
+            # between words that share the same synsets (e.g., bench and workbench)
             hypernyms = {
-                hypernym for path in child_synset.hypernym_paths() for hypernym in path
+                hypernym
+                for path in child_synset.hypernym_paths()
+                for hypernym in path
+                if hypernym != child_synset
             }
 
             for parent_synset in parent_synsets:
