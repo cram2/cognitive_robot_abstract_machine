@@ -1,9 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Self, TYPE_CHECKING
+from typing import Self
 
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Arm
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.soft_connections import SoftPCCConnection
@@ -11,9 +12,6 @@ from semantic_digital_twin.world_description.soft_connections import CosseratRod
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.geometry import Cylinder, Color
 from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
-
-if TYPE_CHECKING:
-    from semantic_digital_twin.world import World
 
 @dataclass(eq=False)
 class SoftTrunk(AbstractRobot):
@@ -30,51 +28,72 @@ class SoftTrunk(AbstractRobot):
     def _setup_joint_states(self): pass
     
     @classmethod
-    def build_pcc(cls, world: World, num_sections: int = 3, segs_per_section: int = 6, total_robot_length: float = 0.9) -> SoftTrunk:
-        section_length = total_robot_length / num_sections
-        seg_length = section_length / segs_per_section
+    def build_pcc(cls, world: World, 
+                  num_sections: int = 3, 
+                  segs_per_section: int = 6, 
+                  total_length: float = 0.9, 
+                  radius: float = 0.02) -> tuple:
+        """
+        Method to build a uniform PCC robot.
+        """
+        section_lengths = [total_length / num_sections] * num_sections
+        section_radii = [radius] * num_sections
+        section_resolutions = [segs_per_section] * num_sections
+        
+        return cls.build_custom_pcc(world, section_lengths, section_radii, section_resolutions)
+
+    @classmethod
+    def build_custom_pcc(cls, world: World, 
+                        section_lengths: list[float], 
+                        section_radii: list[float], 
+                        section_resolutions: list[int]) -> tuple:
+        """
+        The core logic for building PCC robots (Heterogeneous or Homogeneous).
+        """
+        num_sections = len(section_lengths)
+        prefix = "pcc"
         
         with world.modify_world():
-            root_body = Body(name=PrefixedName(name="base", prefix="pcc"))
+            root_body = Body(name=PrefixedName(name="base", prefix=prefix))
             world.add_body(root_body)
-            robot = cls(name=PrefixedName(name="pcc", prefix="robot"), root=root_body, _world=world)
+            robot = cls(name=PrefixedName(name="robot", prefix=prefix), root=root_body, _world=world)
             
             prev_body = root_body
-
-            kappas = []
-            phis = []
+            kappas, phis = [], []
 
             for s in range(num_sections):
-                # unique dofs for section
-                kappa = DegreeOfFreedom(name=PrefixedName(name=f"kappa_{s}", prefix="pcc"))
-                phi = DegreeOfFreedom(name=PrefixedName(name=f"phi_{s}", prefix="pcc"))
-                world.add_degree_of_freedom(kappa)
-                world.add_degree_of_freedom(phi)
-                kappas.append(kappa)
-                phis.append(phi)
+                # Create DOFs
+                kappa = DegreeOfFreedom(name=PrefixedName(name=f"kappa_{s}", prefix=prefix))
+                phi = DegreeOfFreedom(name=PrefixedName(name=f"phi_{s}", prefix=prefix))
+                world.add_degree_of_freedom(kappa); world.add_degree_of_freedom(phi)
+                kappas.append(kappa); phis.append(phi)
 
-                # Build the noodle for this section
-                for i in range(segs_per_section):
-                    # Color-code sections
+                # Section Dimensions
+                L_total = section_lengths[s]
+                radius = section_radii[s]
+                res = section_resolutions[s]
+                seg_len = L_total / res
+
+                # Build Segments
+                for i in range(res):
                     color_val = (s + 1) / num_sections
                     seg_visual = Cylinder(
-                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(z=-seg_length/2), 
-                        width=0.04, height=seg_length, 
+                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(z=-seg_len/2), 
+                        width=radius * 2, height=seg_len, 
                         color=Color(0.0, color_val, 1.0 - color_val, 1.0)
                     )
                     
-                    curr_body = Body(name=PrefixedName(name=f"sec{s}_seg{i}", prefix="pcc"), 
+                    curr_body = Body(name=PrefixedName(name=f"sec{s}_seg{i}", prefix=prefix), 
                                     visual=ShapeCollection([seg_visual]))
                     world.add_body(curr_body)
                     
-                    # Connect using the DOFs for this specific section
-                    conn = SoftPCCConnection(parent=prev_body, child=curr_body, 
-                                            kappa_dof=kappa, phi_dof=phi, length=seg_length)
+                    # Connection
+                    conn = SoftPCCConnection(prev_body, curr_body, kappa, phi, length=seg_len)
                     world.add_connection(conn)
                     prev_body = curr_body
 
-            # Register the whole thing as one arm
-            arm_chain = Arm(name=PrefixedName(name="snake", prefix="pcc"), 
+            # Semantic Registration
+            arm_chain = Arm(name=PrefixedName(name="arm", prefix=prefix), 
                             root=root_body, tip=prev_body, _world=world)
             robot.add_kinematic_chain(arm_chain)
             world.add_semantic_annotation(robot)
@@ -82,42 +101,83 @@ class SoftTrunk(AbstractRobot):
         return robot, kappas, phis
     
     @classmethod
-    def build_cosserat(cls, world: World, num_sections: int = 3, segs_per_section: int = 10, total_length: float = 0.9) -> tuple:
-        section_length = total_length / num_sections
-        seg_length = section_length / segs_per_section
+    def build_cosserat(cls, world: World, 
+                       num_sections: int = 3, 
+                       segs_per_section: int = 10, 
+                       total_length: float = 0.9, 
+                       radius: float = 0.02) -> tuple:
+        """
+        Method to build a uniform Cosserat Rod.
+        """
+        section_lengths = [total_length / num_sections] * num_sections
+        section_radii = [radius] * num_sections
+        section_resolutions = [segs_per_section] * num_sections
+        
+        return cls.build_custom_cosserat(world, section_lengths, section_radii, section_resolutions)
+
+    @classmethod
+    def build_custom_cosserat(cls, world: World, 
+                             section_lengths: list[float], 
+                             section_radii: list[float], 
+                             section_resolutions: list[int]) -> tuple:
+        """
+        The core logic for building heterogeneous Cosserat Rods.
+        """
+        num_sections = len(section_lengths)
+        prefix = "cosserat"
         
         with world.modify_world():
-            root_body = Body(name=PrefixedName(name="base", prefix="cosserat"))
+            root_body = Body(name=PrefixedName(name="base", prefix=prefix))
             world.add_body(root_body)
-            robot = cls(name=PrefixedName(name="cosserat", prefix="robot"), root=root_body, _world=world)
+            robot = cls(name=PrefixedName(name="robot", prefix=prefix), root=root_body, _world=world)
             
-            all_ux, all_uy, all_uz = [], [], []
             prev_body = root_body
+            all_ux, all_uy, all_uz, all_vz = [], [], [], []
 
             for s in range(num_sections):
-                # Create unique DOFs for this section
-                ux = DegreeOfFreedom(name=PrefixedName(name=f"ux_{s}", prefix="cosserat"))
-                uy = DegreeOfFreedom(name=PrefixedName(name=f"uy_{s}", prefix="cosserat"))
-                uz = DegreeOfFreedom(name=PrefixedName(name=f"uz_{s}", prefix="cosserat"))
-                world.add_degree_of_freedom(ux); world.add_degree_of_freedom(uy); world.add_degree_of_freedom(uz)
-                all_ux.append(ux); all_uy.append(uy); all_uz.append(uz)
+                # Create DOFs for this section
+                ux = DegreeOfFreedom(name=PrefixedName(name=f"ux_{s}", prefix=prefix))
+                uy = DegreeOfFreedom(name=PrefixedName(name=f"uy_{s}", prefix=prefix))
+                uz = DegreeOfFreedom(name=PrefixedName(name=f"uz_{s}", prefix=prefix))
+                vz = DegreeOfFreedom(name=PrefixedName(name=f"vz_{s}", prefix=prefix))
+                
+                world.add_degree_of_freedom(ux); world.add_degree_of_freedom(uy)
+                world.add_degree_of_freedom(uz); world.add_degree_of_freedom(vz)
+                
+                # Initialize extension to 1.0 (rest length)
+                world.state[vz.id].position = 1.0
+                
+                all_ux.append(ux); all_uy.append(uy)
+                all_uz.append(uz); all_vz.append(vz)
 
-                # Create the visual segments for this section
-                for i in range(segs_per_section):
+                # Section Dimensions
+                L_total = section_lengths[s]
+                radius = section_radii[s]
+                res = section_resolutions[s]
+                seg_len = L_total / res
+
+                # Build the noodle segments
+                for i in range(res):
                     color_val = (s + 1) / num_sections
                     seg_visual = Cylinder(
-                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(z=-seg_length/2), 
-                        width=0.04, height=seg_length, 
+                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(z=-seg_len/2), 
+                        width=radius * 2, height=seg_len, 
                         color=Color(color_val, 0.2, 1.0 - color_val, 1.0)
                     )
                     
-                    curr_body = Body(name=PrefixedName(name=f"sec{s}_seg{i}", prefix="cosserat"), 
+                    curr_body = Body(name=PrefixedName(name=f"sec{s}_seg{i}", prefix=prefix), 
                                     visual=ShapeCollection([seg_visual]))
                     world.add_body(curr_body)
                     
-                    # Connect segments using the section's DOFs
-                    conn = CosseratRodConnection(prev_body, curr_body, ux, uy, uz, length=seg_length)
+                    # Connect using the integrated solver
+                    conn = CosseratRodConnection(prev_body, curr_body, ux, uy, uz, vz, length=seg_len)
                     world.add_connection(conn)
                     prev_body = curr_body
 
-            return robot, all_ux, all_uy, all_uz
+            # Semantic Registration
+            arm_chain = Arm(name=PrefixedName(name="arm", prefix=prefix), 
+                            root=root_body, tip=prev_body, _world=world)
+            robot.add_kinematic_chain(arm_chain)
+            world.add_semantic_annotation(robot)
+
+        return robot, all_ux, all_uy, all_uz, all_vz
