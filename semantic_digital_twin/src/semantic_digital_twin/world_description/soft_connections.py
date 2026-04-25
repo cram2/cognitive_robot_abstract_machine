@@ -60,7 +60,7 @@ class CosseratRodConnection(Connection):
     """
     A connection using Cosserat Rod Theory integrated via RK4.
     """
-    def __init__(self, parent, child, ux_dof, uy_dof, uz_dof, length: float, name=None):
+    def __init__(self, parent, child, ux_dof, uy_dof, uz_dof, vz_dof, length: float, name=None):
         self.segment_length = length
         
         # DOFs represent the bending/twisting rates (Strains)
@@ -68,8 +68,10 @@ class CosseratRodConnection(Connection):
         uy = uy_dof.variables.position.casadi_sx # Bending Y
         uz = uz_dof.variables.position.casadi_sx # Torsion (Twist)
         
+        vz = vz_dof.variables.position.casadi_sx 
+
         # Strain vector: [bending_x, bending_y, torsion, shear_x, shear_y, extension]
-        xi = cs.vertcat(ux, uy, uz, 0, 0, 1)
+        xi = cs.vertcat(ux, uy, uz, 0, 0, vz)
         
         def hat(xi):
             u = xi[:3]; v = xi[3:]
@@ -101,7 +103,7 @@ class CosseratRodConnection(Connection):
         self.connection_T_child_expression = HomogeneousTransformationMatrix(T_accumulated)
         
         # DOFs linkage
-        self._active_dofs = [ux_dof, uy_dof, uz_dof]
+        self._active_dofs = [ux_dof, uy_dof, uz_dof, vz_dof]
         
         # Internal cache required by the World Model
         self._kinematics = HomogeneousTransformationMatrix()
