@@ -275,4 +275,4 @@ def test_generation_of_semantic_annotation_hierarchy():
     q = select(Sage10kObjectDAO.type).limit(500)
     type_names = session.scalars(q).unique().all()
     creator = Sage10kSemanticAnnotationCreator(type_names)
-    creator.write_annotations_to_file(...)
+    creator.write_annotations_to_file()

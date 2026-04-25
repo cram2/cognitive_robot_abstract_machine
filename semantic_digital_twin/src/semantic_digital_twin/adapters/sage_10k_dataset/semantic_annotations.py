@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import itertools
+import logging
 from dataclasses import dataclass, field, make_dataclass
 from itertools import takewhile
 from pathlib import Path
-from types import NoneType
-from typing import List, Set, Optional, Dict, Type, Tuple
+from typing import List, Set, Optional
 
 import enchant
 import rustworkx
 import tqdm
-from enum import Enum
 from graphql.pyutils import cached_property
-from rustworkx import DAGWouldCycle
-import logging
 
 from krrood.class_diagrams.module_generation import ModuleRenderer
 
@@ -21,17 +18,6 @@ logger = logging.getLogger(__name__)
 
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
-    HasSupportingSurface,
-    HasStorageSpace,
-    IsPerceivable,
-)
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Furniture,
-    Table,
-    Chair,
-    DrinkingContainer,
-    CookingContainer,
-    Food,
 )
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
@@ -181,12 +167,15 @@ class Sage10kSemanticAnnotationCreator:
 
         return relevant_synsets
 
-    def write_annotations_to_file(self, output_file: Path):
+    def write_annotations_to_file(self, output_file: Optional[Path] = None):
         """
         Write the annotations to a file.
 
         :param output_file: The path to write the annotations to.
         """
+
+        if output_file is None:
+            output_file = Path(__file__).parent / "generated_semantic_annotations.py"
 
         name_to_dataclass = {}
 
