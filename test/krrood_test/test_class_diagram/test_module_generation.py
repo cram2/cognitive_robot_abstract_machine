@@ -14,8 +14,6 @@ def test_module_generation():
         cls_name="InMemoryClass", bases=(Symbol,), fields=[]
     )
 
-    module_and_class_name(in_memory_class)
-
     in_memory_child_class = make_dataclass(
         cls_name="InMemoryChildClass", bases=(in_memory_class,), fields=[]
     )
