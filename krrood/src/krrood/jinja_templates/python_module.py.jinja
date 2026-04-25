@@ -1,0 +1,17 @@
+from __future__ import annotations
+from dataclasses import dataclass
+
+{% for import in module_description.imports %}
+import {{ import }}
+{% endfor %}
+
+{% for class in module_description.classes %}
+@dataclass
+class {{ class.name }}{{ class.bases }}:
+
+    {% for field in class.fields %}
+    {{ field }}
+    {% endfor %}
+
+{% endfor %}
+

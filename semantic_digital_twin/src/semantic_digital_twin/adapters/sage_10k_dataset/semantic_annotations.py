@@ -11,6 +11,10 @@ import rustworkx
 import tqdm
 from enum import Enum
 from graphql.pyutils import cached_property
+from rustworkx import DAGWouldCycle
+import logging
+
+logger = logging.getLogger(__name__)
 
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
@@ -92,7 +96,7 @@ class Sage10kSemanticAnnotationCreator:
         Creates the word hierarchy graph by identifying IS_A relationships.
         Applies transitive reduction to the IS_A relationships to simplify the hierarchy.
         """
-        word_hierarchy = rustworkx.PyDiGraph(multigraph=False)
+        word_hierarchy = rustworkx.PyDiGraph(multigraph=False, check_cycle=True)
         for type_name in self.cleaned_type_names:
             word_hierarchy.add_node(type_name)
 
@@ -111,18 +115,20 @@ class Sage10kSemanticAnnotationCreator:
             if self.is_specialization_of(
                 child_word=child_type, parent_word=parent_type
             ):
-                word_hierarchy.add_edge(parent_index, child_index, None)
-
-        cycles = list(rustworkx.simple_cycles(word_hierarchy))
-        for cycle in cycles:
-            print("Cycle detected:", [word_hierarchy.nodes()[node] for node in cycle])
+                try:
+                    word_hierarchy.add_edge(parent_index, child_index, None)
+                except rustworkx.DAGWouldCycle:
+                    logger.warning(
+                        f"Adding edge between {parent_type} and {child_type} would create a cycle. Skipping."
+                    )
+                    continue
 
         # Apply Transitive Reduction for IS_A relationships
         reduced_is_a, _ = rustworkx.transitive_reduction(word_hierarchy)
 
         # Reconstruct word_hierarchy with reduced IS_A edges
         cleaned_hierarchy = rustworkx.PyDiGraph(multigraph=False)
-        for node in self.word_hierarchy.nodes():
+        for node in word_hierarchy.nodes():
             cleaned_hierarchy.add_node(node)
 
         for p, c in reduced_is_a.edge_list():
