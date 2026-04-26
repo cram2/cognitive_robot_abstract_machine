@@ -33,6 +33,10 @@ from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
+    from semantic_digital_twin.physics.pouring_equations import (
+        InflowEquation,
+        PouringEquation,
+    )
 
 
 class HasUpdateState(ABC):
@@ -1145,3 +1149,47 @@ class DifferentialDrive(ActiveConnection, HasUpdateState):
             yaw_id=deepcopy(self.yaw_id),
             x_velocity_id=deepcopy(self.x_velocity_id),
         )
+
+
+@dataclass(eq=False)
+class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
+    """
+    Translating DOF representing the fill level of a container.
+
+    Integrates :attr:`outflow_equation` and :attr:`inflow_equation` each tick.
+    Either may be ``None``; the net velocity is their sum.
+    """
+
+    outflow_equation: Optional[PouringEquation] = field(
+        default=None, kw_only=True, init=False
+    )
+    """ODE governing how liquid leaves this container (e.g. tilting to pour)."""
+
+    inflow_equation: Optional[InflowEquation] = field(
+        default=None, kw_only=True, init=False
+    )
+    """ODE governing how liquid enters this container from an external source."""
+
+    def add_to_world(self, world):
+        super().add_to_world(world)
+        translation_axis = self.axis * self.dof.variables.position
+        self._kinematics = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=translation_axis[0],
+            y=translation_axis[1],
+            z=translation_axis[2],
+            child_frame=self.child,
+        )
+
+    def update_state(self, dt: float):
+        state = self._world.state
+        old_vel = state[self.dof.id].velocity
+        old_acc = state[self.dof.id].acceleration
+        velocity = sum(
+            eq.symbolic_velocity().evaluate()[0]
+            for eq in (self.outflow_equation, self.inflow_equation)
+            if eq is not None
+        )
+        state[self.dof.id].velocity = velocity
+        state[self.dof.id].acceleration = (velocity - old_vel) / dt
+        state[self.dof.id].jerk = (state[self.dof.id].acceleration - old_acc) / dt
+        state[self.dof.id].position = state[self.dof.id].position + velocity * dt

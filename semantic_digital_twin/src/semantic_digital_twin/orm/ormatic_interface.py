@@ -2294,7 +2294,7 @@ class ConstraintBuilderDAO(
 class ContainerGeometryDAO(
     Base,
     DataAccessObject[
-        semantic_digital_twin.semantic_annotations.mixins.ContainerGeometry
+        semantic_digital_twin.world_description.geometry.ContainerGeometry
     ],
 ):
 

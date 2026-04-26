@@ -23,10 +23,8 @@ from pycram.body_motion_problem.types import (
     Effect,
     PhysicsModel,
 )
-from semantic_digital_twin.physics.pouring_equations import (
-    HasFillLevel,
-    PouringEquation,
-)
+from semantic_digital_twin.physics.pouring_equations import PouringEquation
+from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection
 from semantic_digital_twin.world_description.world_entity import Body

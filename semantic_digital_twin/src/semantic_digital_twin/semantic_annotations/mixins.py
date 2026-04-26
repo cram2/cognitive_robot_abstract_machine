@@ -48,12 +48,13 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     PrismaticConnection,
+    RevoluteConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_description.geometry import Scale, ContainerGeometry
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
@@ -67,6 +68,14 @@ from semantic_digital_twin.world_description.world_entity import (
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
+from semantic_digital_twin.physics.pouring_equations import (
+    PouringEquation,
+    InflowEquation,
+)
+from semantic_digital_twin.world_description.connections import (
+    LiquidConnection,
+    RevoluteConnection,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -77,7 +86,6 @@ if TYPE_CHECKING:
         Slider,
         Aperture,
     )
-    from semantic_digital_twin.physics.differential_equation import DifferentialEquation
 
 
 @dataclass(eq=False)
@@ -753,9 +761,13 @@ class HasSupportingSurface(HasStorageSpace, ABC):
                 supporting_body=self.root,
             )
         )
-        objects = an(entity(
-            semantic_annotation := variable(HasRootBody, domain=self._world.semantic_annotations)
-        ).where(semantic_annotation.root == body)).evaluate()
+        objects = an(
+            entity(
+                semantic_annotation := variable(
+                    HasRootBody, domain=self._world.semantic_annotations
+                )
+            ).where(semantic_annotation.root == body)
+        ).evaluate()
         for obj in objects:
             if obj in self.objects:
                 continue
@@ -1035,14 +1047,121 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
 
 
 @dataclass(eq=False)
-@dataclass
-class ContainerGeometry:
-    """
-    Physical interior dimensions of a pourable container (rectangular cross-section).
+class HasContainerGeometry(HasRootBody, ABC):
+    """Mixin for semantic annotations whose collision geometry defines a pourable container interior."""
 
-    :param height: Total interior height of the container in metres.
-    :param half_width: Half of the opening width in metres.
+    @property
+    def container_geometry(self) -> ContainerGeometry:
+        """Interior dimensions derived from the body's collision geometry."""
+        return ContainerGeometry.from_body(self.root)
+
+
+class HasFillLevel(HasContainerGeometry):
+    """
+    Mixin that adds a virtual fill-level DOF to any semantic annotation.
+
+    The fill level is represented as a virtual :class:`LiquidConnection` whose
+    position encodes fill in the range ``[0, 1]``. Call :meth:`initialize_fill_level`
+    once after the annotation is placed in a world.
+
+    Optionally pass ``tilt_connection`` to :meth:`initialize_fill_level` to also
+    create a :attr:`liquid_surface_connection` — a revolute joint that counter-rotates
+    by the same DOF so the liquid surface body's XY plane stays parallel to the world
+    XY plane regardless of cup tilt.
+
+    After initialisation assign :attr:`fill_equation` (how the cup drains) and
+    :attr:`inflow_equation` (how the cup fills from an external source).
     """
 
-    height: float
-    half_width: float
+    fill_connection: Optional[PrismaticConnection] = field(default=None, kw_only=True)
+    """The virtual connection whose position encodes fill level in [0, 1]."""
+
+    liquid_surface_connection: Optional[RevoluteConnection] = field(
+        default=None, kw_only=True
+    )
+    """
+    Counter-rotation connection whose child body is always world-frame aligned.
+
+    Only present when ``tilt_connection`` was passed to :meth:`initialize_fill_level`.
+    """
+
+    @property
+    def fill_equation(self) -> Optional[PouringEquation]:
+        """ODE governing how this container drains when tilted."""
+        return self.__dict__.get("_fill_equation")
+
+    @fill_equation.setter
+    def fill_equation(self, equation: Optional[PouringEquation]) -> None:
+        self.__dict__["_fill_equation"] = equation
+        if self.fill_connection is not None:
+            self.fill_connection.outflow_equation = equation
+
+    @property
+    def inflow_equation(self) -> Optional[InflowEquation]:
+        """ODE governing how this container fills from an external source."""
+        return self.__dict__.get("_inflow_equation")
+
+    @inflow_equation.setter
+    def inflow_equation(self, equation: Optional[InflowEquation]) -> None:
+        self.__dict__["_inflow_equation"] = equation
+        if self.fill_connection is not None:
+            self.fill_connection.inflow_equation = equation
+
+    def initialize_fill_level(
+        self,
+        world,
+        parent_body: Body,
+        initial_fill: float = 1.0,
+        tilt_connection: Optional[RevoluteConnection] = None,
+    ) -> None:
+        """
+        Create the virtual fill-level DOF and attach it to the world.
+
+        :param world: The world to add the fill-level DOF to.
+        :param parent_body: The body the fill-level DOF is attached to.
+        :param initial_fill: Starting fill level in [0, 1].
+        :param tilt_connection: When provided, adds a liquid surface body whose
+            orientation is always aligned with the world frame.
+        """
+        phantom = Body(name=PrefixedName(f"{parent_body.name.name}_fill_level_phantom"))
+        with world.modify_world():
+            world.add_body(phantom)
+            connection = LiquidConnection.create_with_dofs(
+                world=world,
+                parent=parent_body,
+                child=phantom,
+                axis=Vector3(0, 0, 1),
+                dof_limits=DegreeOfFreedomLimits(
+                    lower=DerivativeMap(position=0.0, velocity=-1.0),
+                    upper=DerivativeMap(position=1.0, velocity=1.0),
+                ),
+            )
+            world.add_connection(connection)
+        self.fill_connection = connection
+        world.set_positions_1DOF_connection({connection: initial_fill})
+
+        if tilt_connection is not None:
+            surface_phantom = Body(
+                name=PrefixedName(f"{parent_body.name.name}_liquid_surface_phantom")
+            )
+            with world.modify_world():
+                world.add_body(surface_phantom)
+                surface_connection = RevoluteConnection(
+                    parent=phantom,
+                    child=surface_phantom,
+                    axis=tilt_connection.axis,
+                    dof_id=tilt_connection.dof_id,
+                    multiplier=-tilt_connection.multiplier,
+                )
+                world.add_connection(surface_connection)
+            self.liquid_surface_connection = surface_connection
+
+    @property
+    def fill_level(self) -> float:
+        """Current fill level in ``[0, 1]``."""
+        return float(self.fill_connection.position)
+
+    @property
+    def liquid_surface_body(self) -> Body:
+        """The body whose XY plane is always parallel to the world XY plane."""
+        return self.liquid_surface_connection.child

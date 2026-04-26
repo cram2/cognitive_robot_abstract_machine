@@ -8,6 +8,7 @@ from typing import Optional
 
 import pytest
 import rclpy
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -32,7 +33,6 @@ from pycram.body_motion_problem.pouring.physics import (
 from pycram.body_motion_problem.pouring.predicates import PouringCanPerform
 from semantic_digital_twin.physics.pouring_equations import (
     ArticulatedPouringEquation,
-    HasFillLevel,
     InflowEquation,
     PouringEquation,
 )
@@ -47,7 +47,7 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.mixins import (
-    ContainerGeometry,
+    HasFillLevel,
     HasRootBody,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door, Drawer
@@ -64,7 +64,11 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.geometry import (
+    Box,
+    Scale,
+    ContainerGeometry,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.world_description.world_entity import Body
@@ -76,7 +80,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False)
-class PourableContainer(HasRootBody, HasFillLevel):
+class PourableContainer(HasFillLevel):
     """
     Minimal pourable container for testing.
 
@@ -89,7 +93,7 @@ class PourableContainer(HasRootBody, HasFillLevel):
 
 
 @dataclass(eq=False)
-class ReceiverContainer(HasRootBody, HasFillLevel):
+class ReceiverContainer(HasFillLevel):
     """Receiver cup: fixed in world, initially empty."""
 
     @classproperty
@@ -157,16 +161,17 @@ def world_with_cup():
                 upper=DerivativeMap(position=math.pi / 2, velocity=2.0),
             ),
         )
-    cup.container_geometry = ContainerGeometry(height=1.0, half_width=0.2)
+    _cup_height = 1.0
+    _cup_half_width = 0.2
     cup_shape = Box(
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
-            z=cup.container_geometry.height / 2,
+            z=_cup_height / 2,
             reference_frame=cup.root,
         ),
         scale=Scale(
-            2 * cup.container_geometry.half_width,
-            2 * cup.container_geometry.half_width,
-            cup.container_geometry.height,
+            2 * _cup_half_width,
+            2 * _cup_half_width,
+            _cup_height,
         ),
     )
     with world.modify_world():
@@ -208,8 +213,8 @@ def pr2_world_with_cup(pr2_world_setup):
                 z=0.85,
                 reference_frame=world.root,
             ),
+            scale=Scale(0.08, 0.08, 0.12),
         )
-    cup.container_geometry = ContainerGeometry(height=0.12, half_width=0.04)
     cup.initialize_fill_level(
         world=world,
         parent_body=cup.root,
@@ -251,7 +256,6 @@ def world_with_source_and_receiver():
                 RECEIVER_GEOMETRY.height,
             ),
         )
-    receiver.container_geometry = RECEIVER_GEOMETRY
     receiver.initialize_fill_level(
         world=world, parent_body=receiver.root, initial_fill=0.0
     )
@@ -321,7 +325,6 @@ def world_with_source_and_receiver():
     source = PourableContainer(name=PrefixedName("source_cup"), root=cup_body)
     with world.modify_world():
         world.add_semantic_annotation(source)
-    source.container_geometry = SOURCE_GEOMETRY
     source.initialize_fill_level(
         world=world,
         parent_body=cup_body,
@@ -331,10 +334,17 @@ def world_with_source_and_receiver():
     source.fill_equation = ArticulatedPouringEquation(
         tilt_connection=tilt_connection,
         fill_connection=source.fill_connection,
-        container_geometry=SOURCE_GEOMETRY,
+        container_geometry=source.container_geometry,
         k=0.01,
     )
-    receiver.inflow_equation = InflowEquation(container_geometry=RECEIVER_GEOMETRY)
+    source_outflow = sm.max(sm.Scalar(0.0), -source.fill_equation.symbolic_velocity())
+    source_volume = (
+        source.container_geometry.half_width * source.container_geometry.height
+    )
+    receiver.inflow_equation = InflowEquation(
+        container_geometry=receiver.container_geometry,
+        inflow=source_outflow * source_volume,
+    )
     world.set_positions_1DOF_connection({tilt_connection: 0.1})
 
     return world, source, receiver

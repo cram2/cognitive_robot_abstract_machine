@@ -16,7 +16,7 @@ from pycram.body_motion_problem.types import (
 )
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.physics.pouring_equations import HasFillLevel
+    from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 
 
 @dataclass(eq=False, kw_only=True)
