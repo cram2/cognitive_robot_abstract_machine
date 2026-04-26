@@ -1,12 +1,10 @@
 import os
 import sys
+import unittest
 from unittest import TestCase
 
 from typing_extensions import List, Optional
 
-from krrood.ripple_down_rules.rules import MultiClassStopRule
-from .datasets import Habitat, Species, load_zoo_cases
-from .datasets import load_zoo_dataset
 from krrood.ripple_down_rules.datastructures.case import Case
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from krrood.ripple_down_rules.datastructures.enums import MCRDRMode
@@ -17,11 +15,14 @@ from krrood.ripple_down_rules.rdr import (
     GeneralRDR,
     RDRWithCodeWriter,
 )
+from krrood.ripple_down_rules.rules import MultiClassStopRule
 from krrood.ripple_down_rules.utils import (
     render_tree,
     make_set,
     extract_function_or_class_file,
 )
+from .datasets import Habitat, Species, load_zoo_cases
+from .datasets import load_zoo_dataset
 from .test_helpers.helpers import get_fit_scrdr, get_fit_mcrdr, get_fit_grdr
 
 try:
@@ -31,19 +32,24 @@ except ImportError as e:
     RDRCaseViewer = None
     QApplication = None
 
+TEST_RESULTS_DIR: str = os.path.join(os.path.dirname(__file__), "test_results")
+CACHE_FILE: str = os.path.join(TEST_RESULTS_DIR, "zoo_dataset.pkl")
+zoo_cases, _ = load_zoo_dataset(cache_file=CACHE_FILE)
 
+
+@unittest.skipIf(len(zoo_cases) == 0, "Failed to load dataset")
 class TestRDR(TestCase):
     all_cases: List[Case]
     targets: List[str]
     case_queries: List[CaseQuery]
-    test_results_dir: str = os.path.join(os.path.dirname(__file__), "test_results")
+    test_results_dir: str = TEST_RESULTS_DIR
     expert_answers_dir: str = os.path.join(
         os.path.dirname(__file__), "test_expert_answers"
     )
     generated_rdrs_dir: str = os.path.join(
         os.path.dirname(__file__), "test_generated_rdrs"
     )
-    cache_file: str = os.path.join(test_results_dir, "zoo_dataset.pkl")
+    cache_file: str = CACHE_FILE
     app: Optional[QApplication] = None
     viewer: Optional[RDRCaseViewer] = None
     use_gui: bool = False
@@ -126,9 +132,9 @@ class TestRDR(TestCase):
         assert len(all_rules) == len(all_og_rules)
         for rule, og_rule in zip(all_rules, all_og_rules):
             assert (
-                rule.conditions.split("conditions_")[1]
-                == rule.conclusion.split("conclusion_")[1]
-                == rule.uid
+                    rule.conditions.split("conditions_")[1]
+                    == rule.conclusion.split("conclusion_")[1]
+                    == rule.uid
             )
             assert rule.uid == og_rule.uid
             if not rule.parent:
@@ -157,16 +163,16 @@ class TestRDR(TestCase):
         model_path = os.path.join(save_dir, model_name)
         rules_root = MultiClassRDR.read_rule_tree_from_python(model_path)
         for rule, og_rule in zip(
-            [rules_root] + list(rules_root.descendants),
-            [scrdr_loaded.start_rule] + list(scrdr_loaded.start_rule.descendants),
+                [rules_root] + list(rules_root.descendants),
+                [scrdr_loaded.start_rule] + list(scrdr_loaded.start_rule.descendants),
         ):
             if isinstance(rule, MultiClassStopRule):
                 assert rule.conditions.split("conditions_")[1] == rule.uid
             else:
                 assert (
-                    rule.conditions.split("conditions_")[1]
-                    == rule.conclusion.split("conclusion_")[1]
-                    == rule.uid
+                        rule.conditions.split("conditions_")[1]
+                        == rule.conclusion.split("conclusion_")[1]
+                        == rule.uid
                 )
             assert rule.uid == og_rule.uid
             if not rule.parent:
@@ -239,9 +245,9 @@ class TestRDR(TestCase):
 
     def test_expert_incremental_save(self):
         if not os.path.exists(
-            os.path.join(
-                self.test_results_dir, "expert_incremental_save", "expert_answers.py"
-            )
+                os.path.join(
+                    self.test_results_dir, "expert_incremental_save", "expert_answers.py"
+                )
         ):
             return
             # os.remove(os.path.join(self.test_results_dir, "expert_incremental_save/expert_answers.py"))
@@ -260,9 +266,9 @@ class TestRDR(TestCase):
 
     def test_scrdr_incremental_save_and_load(self):
         if os.path.exists(
-            os.path.join(
-                self.test_results_dir, "scrdr_incremental_save", "animal_species_scrdr"
-            )
+                os.path.join(
+                    self.test_results_dir, "scrdr_incremental_save", "animal_species_scrdr"
+                )
         ):
             scrdr = SingleClassRDR.load(
                 os.path.join(self.test_results_dir, "scrdr_incremental_save"),

@@ -6,11 +6,13 @@ from typing import Tuple
 
 import numpy as np
 import trimesh
+from krrood.entity_query_language.factories import variable_from, entity, variable, an
 from polytope import bounding_box
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from random_events.product_algebra import Event
 from random_events.set import Set
 from random_events.variable import Symbolic
+from semantic_digital_twin.reasoning.predicates import is_supported_by
 from typing_extensions import (
     TYPE_CHECKING,
     List,
@@ -735,6 +737,29 @@ class HasSupportingSurface(HasStorageSpace, ABC):
         self._world.add_connection(self_C_supporting_surface)
         self.add_supporting_surface(supporting_surface)
         return supporting_surface
+
+    def infer_objects_on_surface(self):
+        """
+        Infer and add objects that are supported by this surface to the storage space.
+
+        This method queries the world for bodies that are supported by this annotation's root body,
+        finds their corresponding semantic annotations, and adds them to the objects list if they
+        are not already present.
+        """
+        bodies = variable_from(self._world.bodies_with_collision)
+        body = entity(bodies).where(
+            is_supported_by(
+                supported_body=bodies,
+                supporting_body=self.root,
+            )
+        )
+        objects = an(entity(
+            semantic_annotation := variable(HasRootBody, domain=self._world.semantic_annotations)
+        ).where(semantic_annotation.root == body)).evaluate()
+        for obj in objects:
+            if obj in self.objects:
+                continue
+            self.add_object(obj)
 
     @synchronized_attribute_modification
     def add_supporting_surface(self, region: Region):

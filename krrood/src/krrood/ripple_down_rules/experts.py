@@ -12,21 +12,31 @@ from typing_extensions import Tuple, Dict
 
 from typing_extensions import Optional, TYPE_CHECKING, List
 
-from krrood.ripple_down_rules.datastructures.callable_expression import CallableExpression
+from krrood.ripple_down_rules.datastructures.callable_expression import (
+    CallableExpression,
+)
 from krrood.ripple_down_rules.datastructures.case import show_current_and_corner_cases
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from krrood.ripple_down_rules.datastructures.enums import PromptFor
-from krrood.ripple_down_rules.user_interface.template_file_creator import TemplateFileCreator
-from krrood.ripple_down_rules.utils import extract_imports, extract_function_or_class_file, get_imports_from_scope, get_class_file_path
+from krrood.ripple_down_rules.exceptions import NoSavePathFoundForExpertAnswers, NoLoadPathFoundForExpertAnswers
+from krrood.ripple_down_rules.user_interface.template_file_creator import (
+    TemplateFileCreator,
+)
+from krrood.ripple_down_rules.utils import (
+    extract_function_or_class_file,
+    get_imports_from_scope,
+    get_class_file_path,
+)
+from krrood.utils import get_scope_from_imports
 
 try:
-    from .user_interface.gui import RDRCaseViewer
+    from krrood.ripple_down_rules.user_interface.gui import RDRCaseViewer
 except ImportError as e:
     RDRCaseViewer = None
 from krrood.ripple_down_rules.user_interface.prompt import UserPrompt
 
 if TYPE_CHECKING:
-    from .rdr import Rule
+    from krrood.ripple_down_rules.rdr import Rule
 
 
 class Expert(ABC):
@@ -36,6 +46,7 @@ class Expert(ABC):
     The expert can compare a case with a corner case and provide the differentiating features and can also
     provide one or multiple conclusions for a case.
     """
+
     all_expert_answers: Optional[List] = None
     """
     A list of all expert answers, used for testing purposes.
@@ -45,22 +56,26 @@ class Expert(ABC):
     A flag to indicate if the expert should use loaded answers or not.
     """
 
-    def __init__(self, use_loaded_answers: bool = False,
-                 append: bool = False,
-                 answers_save_path: Optional[str] = None):
+    def __init__(
+        self,
+        use_loaded_answers: bool = False,
+        append: bool = False,
+        answers_save_path: Optional[str] = None,
+    ):
         self.all_expert_answers = []
         self.use_loaded_answers = use_loaded_answers
         self.answers_save_path = answers_save_path
-        if answers_save_path is not None and os.path.exists(answers_save_path + '.py'):
+        if answers_save_path is not None and os.path.exists(answers_save_path + ".py"):
             if use_loaded_answers:
                 self.load_answers(answers_save_path)
             if not append:
-                os.remove(answers_save_path + '.py')
+                os.remove(answers_save_path + ".py")
         self.append = True
 
     @abstractmethod
-    def ask_for_conditions(self, case_query: CaseQuery, last_evaluated_rule: Optional[Rule] = None) \
-            -> CallableExpression:
+    def ask_for_conditions(
+        self, case_query: CaseQuery, last_evaluated_rule: Optional[Rule] = None
+    ) -> CallableExpression:
         """
         Ask the expert to provide the differentiating features between two cases or unique features for a case
         that doesn't have a corner case to compare to.
@@ -88,15 +103,21 @@ class Expert(ABC):
                      answers_save_path attribute.
         """
         if path is None and self.answers_save_path is None:
-            raise ValueError("No path provided to clear expert answers, either provide a path or set the "
-                             "answers_save_path attribute.")
+            raise ValueError(
+                "No path provided to clear expert answers, either provide a path or set the "
+                "answers_save_path attribute."
+            )
         if path is None:
             path = self.answers_save_path
-        if os.path.exists(path + '.py'):
-            os.remove(path + '.py')
+        if os.path.exists(path + ".py"):
+            os.remove(path + ".py")
         self.all_expert_answers = []
 
-    def save_answers(self, path: Optional[str] = None, expert_answers: Optional[List[Tuple[Dict, str]]] = None):
+    def save_answers(
+        self,
+        path: Optional[str] = None,
+        expert_answers: Optional[List[Tuple[Dict, str]]] = None,
+    ):
         """
         Save the expert answers to a file.
 
@@ -107,8 +128,7 @@ class Expert(ABC):
         if not any(expert_answers):
             return
         if path is None and self.answers_save_path is None:
-            raise ValueError("No path provided to save expert answers, either provide a path or set the "
-                             "answers_save_path attribute.")
+            raise NoSavePathFoundForExpertAnswers(self)
         if path is None:
             path = self.answers_save_path
         self._save_to_python(path, expert_answers=expert_answers)
@@ -120,15 +140,17 @@ class Expert(ABC):
         :param path: The path to save the answers to.
         """
         all_answers = self.all_expert_answers
-        if self.append and os.path.exists(path + '.json'):
+        if self.append and os.path.exists(path + ".json"):
             # read the file and append the new answers
-            with open(path + '.json', "r") as f:
+            with open(path + ".json", "r") as f:
                 old_answers = json.load(f)
                 all_answers = old_answers + all_answers
-        with open(path + '.json', "w") as f:
+        with open(path + ".json", "w") as f:
             json.dump(all_answers, f)
 
-    def _save_to_python(self, path: str, expert_answers: Optional[List[Tuple[Dict, str]]] = None):
+    def _save_to_python(
+        self, path: str, expert_answers: Optional[List[Tuple[Dict, str]]] = None
+    ):
         """
         Save the expert answers to a Python file.
 
@@ -137,25 +159,27 @@ class Expert(ABC):
         """
         expert_answers = expert_answers if expert_answers else self.all_expert_answers
         dir_name = os.path.dirname(path)
-        if not os.path.exists(dir_name + '/__init__.py'):
+        if not os.path.exists(dir_name + "/__init__.py"):
             os.makedirs(dir_name, exist_ok=True)
-            with open(dir_name + '/__init__.py', 'w') as f:
-                f.write('# This is an empty init file to make the directory a package.\n')
+            with open(dir_name + "/__init__.py", "w") as f:
+                f.write(
+                    "# This is an empty init file to make the directory a package.\n"
+                )
         # Current file data
         current_file_data = None
-        if os.path.exists(path + '.py'):
-            with open(path + '.py', 'r') as f:
+        if os.path.exists(path + ".py"):
+            with open(path + ".py", "r") as f:
                 current_file_data = f.read()
-        action = 'a' if self.append and current_file_data is not None else 'w'
-        with open(path + '.py', action) as f:
+        action = "a" if self.append and current_file_data is not None else "w"
+        with open(path + ".py", action) as f:
             for scope, func_source in expert_answers:
                 if len(scope) > 0:
-                    imports = '\n'.join(get_imports_from_scope(scope)) + '\n\n\n'
+                    imports = "\n".join(get_imports_from_scope(scope)) + "\n\n\n"
                 else:
-                    imports = ''
+                    imports = ""
                 if func_source is None:
-                    func_source = 'pass  # No user input provided for this case.\n'
-                f.write(imports + func_source + '\n' + '\n\n\n\'===New Answer===\'\n\n\n')
+                    func_source = "pass  # No user input provided for this case.\n"
+                f.write(imports + func_source + "\n" + "\n\n\n'===New Answer==='\n\n\n")
 
     def load_answers(self, path: Optional[str] = None):
         """
@@ -164,13 +188,12 @@ class Expert(ABC):
         :param path: The path to load the answers from.
         """
         if path is None and self.answers_save_path is None:
-            raise ValueError("No path provided to load expert answers from, either provide a path or set the "
-                             "answers_save_path attribute.")
+            raise NoLoadPathFoundForExpertAnswers(self)
         if path is None:
             path = self.answers_save_path
-        if os.path.exists(path + '.py'):
+        if os.path.exists(path + ".py"):
             self._load_answers_from_python(path)
-        elif os.path.exists(path + '.json'):
+        elif os.path.exists(path + ".json"):
             self._load_answers_from_json(path)
 
     def _load_answers_from_json(self, path: str):
@@ -179,7 +202,7 @@ class Expert(ABC):
 
         :param path: The path to load the answers from.
         """
-        with open(path + '.json', "r") as f:
+        with open(path + ".json", "r") as f:
             all_answers = json.load(f)
         self.all_expert_answers = [({}, answer) for answer in all_answers]
 
@@ -189,19 +212,22 @@ class Expert(ABC):
 
         :param path: The path to load the answers from.
         """
-        file_path = path + '.py'
+        file_path = path + ".py"
         with open(file_path, "r") as f:
-            all_answers = f.read().split('\n\n\n\'===New Answer===\'\n\n\n')[:-1]
-        all_function_sources = extract_function_or_class_file(file_path, [], as_list=True)
+            all_answers = f.read().split("\n\n\n'===New Answer==='\n\n\n")[:-1]
+        all_function_sources = extract_function_or_class_file(
+            file_path, [], as_list=True
+        )
         for i, answer in enumerate(all_answers):
-            answer = answer.strip('\n').strip()
-            if 'def ' not in answer and 'pass' in answer:
+            answer = answer.strip("\n").strip()
+            if "def " not in answer and "pass" in answer:
                 self.all_expert_answers.append(({}, None))
                 continue
-            scope = extract_imports(tree=ast.parse(answer))
-            func_name = all_function_sources[i].split('def ')[1].split('(')[0]
-            function_source = all_function_sources[i].replace(func_name,
-                                                              CallableExpression.encapsulating_function_name)
+            scope = get_scope_from_imports(tree=ast.parse(answer))
+            func_name = all_function_sources[i].split("def ")[1].split("(")[0]
+            function_source = all_function_sources[i].replace(
+                func_name, CallableExpression.encapsulating_function_name
+            )
             self.all_expert_answers.append((scope, function_source))
 
 
@@ -217,9 +243,9 @@ class AI(Expert):
         super().__init__(**kwargs)
         self.user_prompt = UserPrompt()
 
-    def ask_for_conditions(self, case_query: CaseQuery,
-                           last_evaluated_rule: Optional[Rule] = None) \
-            -> CallableExpression:
+    def ask_for_conditions(
+        self, case_query: CaseQuery, last_evaluated_rule: Optional[Rule] = None
+    ) -> CallableExpression:
         prompt_str = self.get_prompt_for_ai(case_query, PromptFor.Conditions)
         print(prompt_str)
         sys.exit()
@@ -227,7 +253,9 @@ class AI(Expert):
     def ask_for_conclusion(self, case_query: CaseQuery) -> Optional[CallableExpression]:
         prompt_str = self.get_prompt_for_ai(case_query, PromptFor.Conclusion)
         output_type_source = self.get_output_type_class_source(case_query)
-        prompt_str = f"\n\n\nOutput type(s) class source:\n{output_type_source}\n\n" + prompt_str
+        prompt_str = (
+            f"\n\n\nOutput type(s) class source:\n{output_type_source}\n\n" + prompt_str
+        )
         print(prompt_str)
         sys.exit()
 
@@ -242,25 +270,39 @@ class AI(Expert):
 
         def get_class_source(cls):
             cls_source_file = get_class_file_path(cls)
-            found_class_source = extract_function_or_class_file(cls_source_file, function_names=[cls.__name__],
-                                                                is_class=True,
-                                                                as_list=True)[0]
-            class_signature = found_class_source.split('\n')[0]
-            if '(' in class_signature:
-                parent_class_names = list(map(lambda x: x.strip(),
-                                              class_signature.split('(')[1].split(')')[0].split(',')))
-                parent_classes = [importlib.import_module(cls.__module__).__dict__.get(cls_name.strip())
-                                  for cls_name in parent_class_names]
+            found_class_source = extract_function_or_class_file(
+                cls_source_file,
+                function_names=[cls.__name__],
+                is_class=True,
+                as_list=True,
+            )[0]
+            class_signature = found_class_source.split("\n")[0]
+            if "(" in class_signature:
+                parent_class_names = list(
+                    map(
+                        lambda x: x.strip(),
+                        class_signature.split("(")[1].split(")")[0].split(","),
+                    )
+                )
+                parent_classes = [
+                    importlib.import_module(cls.__module__).__dict__.get(
+                        cls_name.strip()
+                    )
+                    for cls_name in parent_class_names
+                ]
             else:
                 parent_classes = []
             if is_dataclass(cls):
                 found_class_source = f"@dataclass\n{found_class_source}"
-            return '\n'.join([get_class_source(pcls) for pcls in parent_classes] + [found_class_source])
+            return "\n".join(
+                [get_class_source(pcls) for pcls in parent_classes]
+                + [found_class_source]
+            )
 
         found_class_sources = []
         for output_type in output_types:
             found_class_sources.append(get_class_source(output_type))
-        found_class_sources = '\n\n\n'.join(found_class_sources)
+        found_class_sources = "\n\n\n".join(found_class_sources)
         return found_class_sources
 
     def get_prompt_for_ai(self, case_query: CaseQuery, prompt_for: PromptFor) -> str:
@@ -276,8 +318,9 @@ class AI(Expert):
         template_file_creator = TemplateFileCreator(case_query, prompt_for=prompt_for)
         boilerplate_code = template_file_creator.build_boilerplate_code()
         initial_prompt_str = data_to_show + "\n\n" + boilerplate_code + "\n\n"
-        return self.user_prompt.build_prompt_str_for_ai(case_query, prompt_for=prompt_for,
-                                                        initial_prompt_str=initial_prompt_str)
+        return self.user_prompt.build_prompt_str_for_ai(
+            case_query, prompt_for=prompt_for, initial_prompt_str=initial_prompt_str
+        )
 
 
 class Human(Expert):
@@ -292,18 +335,23 @@ class Human(Expert):
         super().__init__(**kwargs)
         self.user_prompt = UserPrompt()
 
-    def ask_for_conditions(self, case_query: CaseQuery,
-                           last_evaluated_rule: Optional[Rule] = None) \
-            -> CallableExpression:
+    def ask_for_conditions(
+        self, case_query: CaseQuery, last_evaluated_rule: Optional[Rule] = None
+    ) -> CallableExpression:
         data_to_show = None
-        if (not self.use_loaded_answers or len(self.all_expert_answers) == 0) and self.user_prompt.viewer is None:
-            data_to_show = show_current_and_corner_cases(case_query.case,
-                                                         {case_query.attribute_name: case_query.target_value},
-                                                         last_evaluated_rule=last_evaluated_rule)
+        if (
+            not self.use_loaded_answers or len(self.all_expert_answers) == 0
+        ) and self.user_prompt.viewer is None:
+            data_to_show = show_current_and_corner_cases(
+                case_query.case,
+                {case_query.attribute_name: case_query.target_value},
+                last_evaluated_rule=last_evaluated_rule,
+            )
         return self._get_conditions(case_query, data_to_show)
 
-    def _get_conditions(self, case_query: CaseQuery, data_to_show: Optional[str] = None) \
-            -> CallableExpression:
+    def _get_conditions(
+        self, case_query: CaseQuery, data_to_show: Optional[str] = None
+    ) -> CallableExpression:
         """
         Ask the expert to provide the differentiating features between two cases or unique features for a case
         that doesn't have a corner case to compare to.
@@ -312,7 +360,11 @@ class Human(Expert):
         :return: The differentiating features as new rule conditions.
         """
         user_input = None
-        if self.use_loaded_answers and len(self.all_expert_answers) == 0 and self.append:
+        if (
+            self.use_loaded_answers
+            and len(self.all_expert_answers) == 0
+            and self.append
+        ):
             self.use_loaded_answers = False
         if self.use_loaded_answers:
             try:
@@ -323,11 +375,14 @@ class Human(Expert):
             case_query.scope.update(loaded_scope)
             condition = CallableExpression(user_input, bool, scope=case_query.scope)
             if self.answers_save_path is not None and not any(loaded_scope):
-                self.convert_json_answer_to_python_answer(case_query, user_input, condition, PromptFor.Conditions)
+                self.convert_json_answer_to_python_answer(
+                    case_query, user_input, condition, PromptFor.Conditions
+                )
         else:
-            user_input, condition = self.user_prompt.prompt_user_for_expression(case_query, PromptFor.Conditions,
-                                                                                prompt_str=data_to_show)
-        if user_input in ['exit', 'quit']:
+            user_input, condition = self.user_prompt.prompt_user_for_expression(
+                case_query, PromptFor.Conditions, prompt_str=data_to_show
+            )
+        if user_input in ["exit", "quit"]:
             sys.exit()
         if not self.use_loaded_answers:
             self.all_expert_answers.append((condition.scope, user_input))
@@ -336,17 +391,30 @@ class Human(Expert):
         case_query.conditions = condition
         return condition
 
-    def convert_json_answer_to_python_answer(self, case_query: CaseQuery, user_input: str,
-                                             callable_expression: CallableExpression,
-                                             prompt_for: PromptFor):
+    def convert_json_answer_to_python_answer(
+        self,
+        case_query: CaseQuery,
+        user_input: str,
+        callable_expression: CallableExpression,
+        prompt_for: PromptFor,
+    ):
+        """
+        Convert a JSON answer to a Python answer and save it. This is used for backward compatibility for answers that
+        were saved as JSON but need to be converted to Python code.
+
+        :param case_query: The case query containing the case to classify.
+        :param user_input: The user input to convert.
+        :param callable_expression: The callable expression to use for the answer.
+        :param prompt_for: The prompt for the expert.
+        """
         tfc = TemplateFileCreator(case_query, prompt_for=prompt_for)
         code = tfc.build_boilerplate_code()
-        if user_input.startswith('def'):
-            user_input = '\n'.join(user_input.split('\n')[1:])
+        if user_input.startswith("def"):
+            user_input = "\n".join(user_input.split("\n")[1:])
             user_input = indent(dedent(user_input), " " * 4).strip()
-            code = code.replace('pass', user_input)
+            code = code.replace("pass", user_input)
         else:
-            code = code.replace('pass', f"return {user_input}")
+            code = code.replace("pass", f"return {user_input}")
         self.save_answers(expert_answers=[({}, code)])
 
     def ask_for_conclusion(self, case_query: CaseQuery) -> Optional[CallableExpression]:
@@ -358,34 +426,46 @@ class Human(Expert):
         """
         expression: Optional[CallableExpression] = None
         expert_input: Optional[str] = None
-        if self.use_loaded_answers and len(self.all_expert_answers) == 0 and self.append:
+        if (
+            self.use_loaded_answers
+            and len(self.all_expert_answers) == 0
+            and self.append
+        ):
             self.use_loaded_answers = False
         if self.use_loaded_answers:
             try:
                 loaded_scope, expert_input = self.all_expert_answers.pop(0)
                 if expert_input is not None:
                     case_query.scope.update(loaded_scope)
-                    expression = CallableExpression(expert_input, case_query.attribute_type,
-                                                    scope=case_query.scope,
-                                                    mutually_exclusive=case_query.mutually_exclusive)
+                    expression = CallableExpression(
+                        expert_input,
+                        case_query.attribute_type,
+                        scope=case_query.scope,
+                        mutually_exclusive=case_query.mutually_exclusive,
+                    )
                     if self.answers_save_path is not None and not any(loaded_scope):
-                        self.convert_json_answer_to_python_answer(case_query, expert_input, expression,
-                                                                  PromptFor.Conclusion)
+                        self.convert_json_answer_to_python_answer(
+                            case_query, expert_input, expression, PromptFor.Conclusion
+                        )
             except IndexError:
                 self.use_loaded_answers = False
         if not self.use_loaded_answers:
             data_to_show = None
             if self.user_prompt.viewer is None:
                 data_to_show = show_current_and_corner_cases(case_query.case)
-            expert_input, expression = self.user_prompt.prompt_user_for_expression(case_query, PromptFor.Conclusion,
-                                                                                   prompt_str=data_to_show)
+            expert_input, expression = self.user_prompt.prompt_user_for_expression(
+                case_query, PromptFor.Conclusion, prompt_str=data_to_show
+            )
             if expert_input is None:
                 self.all_expert_answers.append(({}, None))
-            elif expert_input not in ['exit', 'quit']:
+            elif expert_input not in ["exit", "quit"]:
                 self.all_expert_answers.append((expression.scope, expert_input))
-            if self.answers_save_path is not None and expert_input not in ['exit', 'quit']:
+            if self.answers_save_path is not None and expert_input not in [
+                "exit",
+                "quit",
+            ]:
                 self.save_answers()
-        if expert_input in ['exit', 'quit']:
+        if expert_input in ["exit", "quit"]:
             sys.exit()
         case_query.target = expression
         return expression

@@ -16,7 +16,12 @@ class Person:
         self.name = name
         self.address = address
 
+TEST_RESULTS_DIR: str = os.path.join(os.path.dirname(__file__), "test_results")
+CACHE_FILE: str = os.path.join(TEST_RESULTS_DIR, "zoo_dataset.pkl")
+zoo_cases, _ = load_zoo_dataset(cache_file=CACHE_FILE)
 
+
+@unittest.skipIf(len(zoo_cases) == 0, "Failed to load dataset")
 class ObjectDiagramTestCase(unittest.TestCase):
     """Test case for generating object diagrams of the ripple down rules package."""
 
@@ -28,7 +33,7 @@ class ObjectDiagramTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.cases, cls.targets = load_zoo_dataset(
-            cache_file=f"{os.path.dirname(__file__)}/test_results/zoo"
+            cache_file=CACHE_FILE
         )
         cls.cq = CaseQuery(
             cls.cases[0], "species", (Species,), True, _target=cls.targets[0]
