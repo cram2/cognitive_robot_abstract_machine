@@ -912,3 +912,25 @@ def clear_memoization_cache(instance):
     """
     if hasattr(instance, "__memo__"):
         instance.__memo__.clear()
+
+
+def is_dynamic_class(cls: Type) -> bool:
+    """
+    Check if a class is dynamically created.
+
+    This is done by checking if the class is actually registered in that module under its own name
+    Normal classes will be found; classes created with  for instance make_dataclass  usually won't be
+    unless manually assigned.
+    :param cls: The class to check.
+    :return: True if the class is dynamically created, False otherwise.
+    """
+    # Ensure it is a class first
+    if not isclass(cls):
+        return False
+
+    # Get the module where the class claims to be defined
+    module = sys.modules.get(cls.__module__)
+    if module is None:
+        return True  # If module doesn't exist, it's likely dynamic
+
+    return getattr(module, cls.__name__, None) is not cls

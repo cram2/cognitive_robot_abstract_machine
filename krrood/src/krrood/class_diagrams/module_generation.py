@@ -6,7 +6,7 @@ from typing import List, Set, Type, Optional, Tuple
 
 import jinja2
 
-from krrood.utils import run_black_on_file, module_and_class_name
+from krrood.utils import run_black_on_file, module_and_class_name, is_dynamic_class
 
 
 @dataclass
@@ -38,7 +38,7 @@ class DataclassRenderer:
 
     def _initialized_base_classes(self):
         for base in self.type_.__bases__:
-            if base.__module__ == self.type_.__module__:
+            if is_dynamic_class(base):
                 self.base_classes.append(base.__name__)
             else:
                 self.base_classes.append(module_and_class_name(base))

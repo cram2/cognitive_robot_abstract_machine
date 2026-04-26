@@ -31,14 +31,9 @@ class Sage10kLabel(HasRootBody):
 
 
 @dataclass
-class Sage10kSemanticAnnotationCreator:
+class Sage10kTypeNameCleaner:
     """
-    Creates semantic annotations for Sage10k dataset scenes.
-    """
-
-    raw_type_names: List[str]
-    """
-    The raw type names that should be converted to semantic annotation classes.
+    Clean type names from the Sage10k dataset.
     """
 
     word_dictionary: enchant.Dict = field(default_factory=lambda: enchant.Dict("en_US"))
@@ -51,19 +46,21 @@ class Sage10kSemanticAnnotationCreator:
     The lemmatizer used to convert type names to singular form.
     """
 
-    @cached_property
-    def cleaned_type_names(self) -> Set[str]:
+    def clean(self, type_name: str) -> Optional[str]:
+        """
+        Clean a type name from the sage 10k dataset.
+        Types are cleaned by removing non-alphabetic characters.
+        Valid type names are types that are in:
+            - Singular form
+            - The word dictionary
 
-        cleaned_type_names = set()
-        for type_name in self.raw_type_names:
-            cleaned_type_name = self.clean_type_name(type_name)
-            if cleaned_type_name is not None:
-                cleaned_type_names.add(cleaned_type_name)
+        :param type_name: The type name to clean.
+        :return: The cleaned type name or None if the type name is invalid.
+        """
 
-        return cleaned_type_names
-
-    def clean_type_name(self, type_name: str) -> Optional[str]:
-        cleaned_type = "".join(takewhile(str.isalpha, type_name))
+        cleaned_type = " ".join(
+            "".join(takewhile(str.isalpha, word)) for word in type_name.split("_")
+        ).title()
 
         if not cleaned_type:
             return None
@@ -77,6 +74,41 @@ class Sage10kSemanticAnnotationCreator:
             return None
 
         return cleaned_type
+
+
+@dataclass
+class Sage10kSemanticAnnotationCreator:
+    """
+    Creates semantic annotations for Sage10k dataset scenes.
+    """
+
+    raw_type_names: List[str]
+    """
+    The raw type names that should be converted to semantic annotation classes.
+    """
+
+    type_name_cleaner: Sage10kTypeNameCleaner = field(
+        default_factory=Sage10kTypeNameCleaner
+    )
+    """
+    The type cleaner used to clean the type names.
+    """
+
+    annotation_prefix: str = "Sage10k"
+    """
+    The prefix for the generated semantic annotations.
+    """
+
+    @cached_property
+    def cleaned_type_names(self) -> Set[str]:
+
+        cleaned_type_names = set()
+        for type_name in self.raw_type_names:
+            cleaned_type_name = self.type_name_cleaner.clean(type_name)
+            if cleaned_type_name is not None:
+                cleaned_type_names.add(cleaned_type_name)
+
+        return cleaned_type_names
 
     @cached_property
     def word_hierarchy(self) -> rustworkx.PyDiGraph:
@@ -190,7 +222,7 @@ class Sage10kSemanticAnnotationCreator:
                 bases = tuple(name_to_dataclass[node] for node in bases)
 
             dataclass_ = make_dataclass(
-                cls_name=type_name,
+                cls_name=f"{self.annotation_prefix}{type_name}",
                 bases=bases,
                 fields=[],
             )

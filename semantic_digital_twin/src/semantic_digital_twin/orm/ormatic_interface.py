@@ -3661,8 +3661,25 @@ class Sage10kSemanticAnnotationCreatorDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
+    annotation_prefix: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
     raw_type_names: Mapped[typing.List[builtins.str]] = mapped_column(
         JSON, nullable=False, use_existing_column=True
+    )
+
+    type_name_cleaner_id: Mapped[int] = mapped_column(
+        ForeignKey("Sage10kTypeNameCleanerDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    type_name_cleaner: Mapped[Sage10kTypeNameCleanerDAO] = relationship(
+        "Sage10kTypeNameCleanerDAO",
+        uselist=False,
+        foreign_keys=[type_name_cleaner_id],
+        post_update=True,
     )
 
 
@@ -3689,6 +3706,20 @@ class Sage10kSizeDAO(
         "polymorphic_identity": "Sage10kSizeDAO",
         "inherit_condition": database_id == Sage10kBaseDAO.database_id,
     }
+
+
+class Sage10kTypeNameCleanerDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.Sage10kTypeNameCleaner
+    ],
+):
+
+    __tablename__ = "Sage10kTypeNameCleanerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
 
 
 class Sage10kWithIDDAO(
