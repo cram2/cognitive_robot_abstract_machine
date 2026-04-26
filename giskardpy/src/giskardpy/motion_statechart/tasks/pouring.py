@@ -19,7 +19,7 @@ from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
 )
 from giskardpy.motion_statechart.graph_node import NodeArtifacts, Task
-from semantic_digital_twin.reasoning.body_motion_problem.pouring.articulated import (
+from semantic_digital_twin.physics.pouring_equations import (
     PouringEquation,
 )
 from semantic_digital_twin.semantic_annotations.mixins import ContainerGeometry
@@ -109,8 +109,8 @@ class CoupledPouringTask(PouringTask):
     """
     Extends :class:`PouringTask` with kinematic rim-positioning constraints.
 
-    Receiver fill is driven by :class:`~semantic_digital_twin.reasoning.body_motion_problem.pouring.physics.InflowEquation`
-    wired on the receiver's :class:`~semantic_digital_twin.reasoning.body_motion_problem.pouring.physics.LiquidConnection`
+    Receiver fill is driven by :class:`~semantic_digital_twin.physics.pouring_equations.InflowEquation`
+    wired on the receiver's :class:`~semantic_digital_twin.physics.pouring_equations.LiquidConnection`
     before the simulation starts, so no QP constraint for receiver fill is needed here.
 
     :param receiver_fill_connection: Fill-level DOF of the receiving container.
