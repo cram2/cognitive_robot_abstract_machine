@@ -1,9 +1,9 @@
 """
-Physics model implementation for articulated container manipulation (D_artic).
+Physics model for articulated container manipulation.
 
-Implements Φ_artic using a MotionStatechart (MSC) to simulate rigid-body
-kinematics of articulated containers (drawers, doors) and record the
-resulting actuator trajectory.
+Simulates the rigid-body kinematics of articulated containers (drawers, doors)
+by executing a MotionStatechart against the world and recording the resulting
+actuator trajectory.
 """
 
 from __future__ import annotations
@@ -32,12 +32,12 @@ class MissingMotionStatechartError(Exception):
 @dataclass
 class RunMSCModel(PhysicsModel):
     """
-    Concrete physics model Φ_artic: execute a MotionStatechart against a World.
+    Physics model that executes a MotionStatechart against a World.
 
     The MotionStatechart must be fully parameterized before being passed in.
-    This model binds it to the provided World via Executor.compile, rolls it
-    out introspectively (recording the actuator trajectory after each tick),
-    and resets the World state before returning.
+    This model compiles it against the provided World, steps it tick-by-tick
+    while recording the actuator position after each tick, and resets the World
+    state before returning.
     """
 
     msc: MotionStatechart

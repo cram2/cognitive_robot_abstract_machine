@@ -1,8 +1,8 @@
 """
-Physics models for the pouring domain (D_pour).
+Physics models for the liquid pouring domain.
 
-Implements Φ_pour using MotionStatechart with PouringTask / CoupledPouringTask
-that integrates the fill-level ODE and controls the tilt joint via QP.
+Simulates pouring by integrating a fill-level differential equation coupled
+with QP-based tilt control via a MotionStatechart.
 """
 
 from __future__ import annotations
@@ -35,12 +35,12 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass
 class PouringMSCModel(PhysicsModel):
     """
-    Concrete physics model Φ_pour: execute a PouringTask MotionStatechart against a World.
+    Physics model for single-source pouring.
 
-    The MotionStatechart contains a single :class:`PouringTask` that integrates the
-    fill-level ODE and drives the tilt joint via QP. This model compiles the MSC,
-    ticks it until EndMotion, records both the tilt and fill trajectories, and
-    resets the World state before returning.
+    Simulates the process of tilting a cup to pour its contents by running a
+    MotionStatechart that integrates the fill-level ODE and drives the tilt joint
+    via QP. Records both the tilt-angle and fill-level trajectories, and resets
+    the world state before returning.
 
     ODE parameters and both connections are carried by :attr:`fill_equation`.
     """
@@ -138,21 +138,15 @@ class PouringMSCModel(PhysicsModel):
 @dataclass
 class CoupledPouringMSCModel(PhysicsModel):
     """
-    Physics model for the coupled pouring chain: source → receiver.
+    Physics model for coupled pouring: source container to receiver container.
 
-    Runs a :class:`~giskardpy.motion_statechart.tasks.pouring.CoupledPouringTask`
-    MotionStatechart that drives tilt, source fill, receiver fill, and cup body
-    position simultaneously via QP constraints.
+    Simulates the process of tilting a source cup over a receiver container,
+    tracking tilt, both fill levels, and cup position simultaneously via QP
+    constraints. The cup is positioned above the receiver and tilted until the
+    receiver reaches the desired fill level.
 
-    :param source: Semantic annotation carrying ``fill_equation``, ``fill_connection``,
-        ``container_geometry``, and ``root`` (cup body = tip link).
-    :param receiver: Semantic annotation carrying ``fill_connection``,
-        ``container_geometry``, and ``root`` (used to read world position).
-    :param root_link: Root of the kinematic chain that positions the source cup.
-    :param target_outflow: Desired rate of decrease for the normalized fill level.
-    :param initial_tilt: Initial tilt angle in radians to help the gradient-driven task.
-    :param timeout: Maximum simulation ticks before aborting.
-    :param height_above_receiver: Desired rim clearance above the receiver opening (m).
+    Records tilt, source fill, receiver fill, and all kinematic chain DOF
+    trajectories for downstream use by the embodiment feasibility predicate.
     """
 
     source: HasFillLevel

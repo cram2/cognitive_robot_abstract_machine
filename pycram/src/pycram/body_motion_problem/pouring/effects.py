@@ -1,5 +1,8 @@
 """
-Effect types for the pouring domain (D_pour).
+Effect types for the liquid pouring domain.
+
+Defines the goal-state representations used when pouring liquids, tracking
+fill levels of source and receiver containers.
 """
 
 from __future__ import annotations

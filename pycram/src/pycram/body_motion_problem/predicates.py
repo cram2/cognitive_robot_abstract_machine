@@ -1,26 +1,31 @@
 """
-Abstract BMP predicate definitions.
+BMP predicate definitions for the Law of Task-Achieving Body Motion.
 
-The three predicates of the Law of Task-Achieving Body Motion:
+The law states that a robot can successfully execute a manipulation task if and
+only if three independent conditions hold simultaneously:
 
-  SatisfiesRequest(Π, G_final) — semantic correctness
-  Causes(τ, G_final, Φ, I_Φ)  — causal sufficiency
-  CanPerform(R, τ)              — embodiment feasibility
+- **Semantic correctness** (SatisfiesRequest): the intended world-state change
+  matches the task goal, i.e. the right effect is the one that was requested.
+- **Causal sufficiency** (Causes): the motion physically produces that world-state
+  change under the scoped physics model within its declared validity range.
+- **Embodiment feasibility** (CanPerform): the robot can actually execute the
+  motion within its kinematic and dynamic limits.
 
-Together they form the axiom:
-  ∀R, E, Π, G, τ:
-    SatisfiesRequest(Π, G_final) ∧
-    Causes(τ, G_final, Φ, I_Φ) ∧
-    CanPerform(R, τ)
-    ⟹ CanAchieve(R, E, Π, τ)
+Each condition is an independently callable predicate. The same predicate
+structure applies uniformly across all manipulation domains. By holding some
+arguments fixed and solving for others, the predicates support motion generation,
+verification, failure diagnosis, and counterfactual reasoning.
 """
 
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
-from typing import List, Optional, Tuple, Type
+from abc import abstractmethod
+from dataclasses import dataclass
+from typing import Any, ClassVar, Optional
 
+from giskardpy.executor import Executor
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
 )
@@ -43,11 +48,17 @@ from semantic_digital_twin.world import World
 @dataclass
 class Causes(Predicate):
     """
-    Causal sufficiency predicate: Causes(τ, G_final, Φ, I_Φ).
+    Causal sufficiency predicate.
 
-    Checks whether trajectory τ is a physically valid explanation for
-    transitioning from the current SDT state to G_final under the scoped
-    physics model Φ.
+    Checks whether a motion trajectory physically produces the desired world-state
+    change under the scoped physics model. The check replays the trajectory in a
+    sandboxed copy of the world and tests whether the effect is achieved at the end.
+
+    If no trajectory is available but a physics model is attached to the motion,
+    the model is first used to generate a trajectory from the current world state.
+
+    Returns ``False`` if the effect is already achieved before the motion, treating
+    it as a no-op rather than a success.
     """
 
     effect: Effect
@@ -110,10 +121,12 @@ class Causes(Predicate):
 @dataclass
 class SatisfiesRequest(Predicate):
     """
-    Semantic correctness predicate: SatisfiesRequest(Π, G_final).
+    Semantic correctness predicate.
 
-    Checks that G_final satisfies the goal predicate Π_goal embedded in the
-    task specification, i.e. G_final ⊨ Π_goal.
+    Checks that the intended effect matches the goal condition embedded in the
+    task specification. This verifies that the proposed world-state change is
+    semantically consistent with what was requested, independently of whether
+    any motion can physically produce it.
     """
 
     task: TaskRequest
@@ -126,20 +139,94 @@ class SatisfiesRequest(Predicate):
 @dataclass
 class CanPerform(Predicate):
     """
-    Embodiment feasibility predicate: CanPerform(R, τ).
+    Embodiment feasibility predicate.
 
-    Checks whether trajectory τ is executable by robot R with respect to
-    kinematic and dynamic limits and absence of self-collision.
+    Checks whether a robot can physically execute a motion trajectory given its
+    kinematic and dynamic limits and collision-free constraints. The check runs a
+    whole-body motion planner that attempts to track the trajectory with each of
+    the robot's manipulators in turn.
 
-    Subclass this predicate to implement embodiment feasibility checks for
-    a specific robot morphology or TEE class.
+    Returns ``True`` as soon as any gripper successfully completes the trajectory.
+    Returns ``False`` if no gripper can complete it within the timeout.
+
+    Subclass and implement the abstract methods to define embodiment feasibility
+    for a specific manipulation domain.
     """
 
     motion: Motion
     robot: AbstractRobot
 
+    _timeout: ClassVar[int] = 500
+
     def __call__(self) -> bool:
-        raise NotImplementedError(f"{self.__class__.__name__} must implement __call__.")
+        if not self.motion.trajectory:
+            return False
+        target, trajectory = self._resolve_target_and_trajectory()
+        return self._execute_for_any_gripper(target, trajectory)
+
+    def _resolve_target_and_trajectory(self) -> tuple[Any, list]:
+        """
+        Resolve the target body and compute its world-space trajectory.
+
+        Override to wrap resolution in a world state reset context.
+        """
+        target = self._resolve_target()
+        return target, self._compute_body_trajectory(target)
+
+    @abstractmethod
+    def _resolve_target(self) -> Any:
+        """Return the target body or annotation that the gripper will track."""
+
+    @abstractmethod
+    def _compute_body_trajectory(self, target: Any) -> list:
+        """Convert the actuator-space trajectory to a sequence of world-space poses."""
+
+    @abstractmethod
+    def _build_msc(
+        self, root: Any, gripper: Any, target: Any, trajectory: list
+    ) -> MotionStatechart:
+        """Build the MotionStatechart for a single gripper attempt."""
+
+    @abstractmethod
+    def _build_collision_rules(self, gripper: Any, target: Any) -> list:
+        """Return the collision rules to apply for a single gripper attempt."""
+
+    def _build_executor(self, msc: MotionStatechart) -> Executor:
+        """Construct the Executor for a single gripper attempt."""
+        return Executor(context=MotionStatechartContext(world=self.robot._world))
+
+    def _is_expected_exception(self, exception: Exception) -> bool:
+        """Return True if the exception is an expected execution failure."""
+        return isinstance(exception, TimeoutError)
+
+    def _execute_for_any_gripper(self, target: Any, trajectory: list) -> bool:
+        root = self.robot._world.root
+        result = False
+        for gripper in self.robot.manipulators:
+            msc = self._build_msc(root, gripper, target, trajectory)
+
+            self.robot._world.collision_manager.clear_temporary_rules()
+            self.robot._world.collision_manager.extend_temporary_rule(
+                self._build_collision_rules(gripper, target)
+            )
+            self.robot._world.collision_manager.update_collision_matrix()
+
+            executor = self._build_executor(msc)
+            executor.compile(motion_statechart=msc)
+
+            with self.robot._world.reset_state_context():
+                try:
+                    executor.tick_until_end(timeout=self._timeout)
+                except Exception as exception:
+                    if not self._is_expected_exception(exception):
+                        raise
+                result = msc.is_end_motion()
+
+            self.robot._world.collision_manager.clear_temporary_rules()
+            if result:
+                break
+
+        return result
 
     @staticmethod
     def _build_cartesian_waypoint_sequence(
@@ -174,7 +261,7 @@ class CanPerform(Predicate):
         return Sequence(nodes=waypoints, name=sequence_name)
 
     @staticmethod
-    def _add_trajectory_following_nodes(
+    def _add_motion_termination_nodes(
         msc: MotionStatechart,
         sequence: Sequence,
         robot: AbstractRobot,
@@ -186,11 +273,7 @@ class CanPerform(Predicate):
         :param sequence: The Sequence node that triggers EndMotion on completion.
         :param robot: Robot used for collision avoidance.
         """
-        msc.add_node(
-            local_min_reached := LocalMinimumReached(name="local_minimum_reached")
-        )
         msc.add_node(EndMotion.when_true(sequence))
-        msc.add_node(CancelMotion.when_true(local_min_reached))
         msc.add_node(
             ExternalCollisionAvoidance(
                 name="external_collision_avoidance",

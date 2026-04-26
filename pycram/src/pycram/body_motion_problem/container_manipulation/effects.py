@@ -1,5 +1,8 @@
 """
-Domain-specific effect types for articulated container manipulation (D_artic).
+Effect types for articulated container manipulation.
+
+Defines the goal-state representations used when opening or closing articulated
+containers such as drawers and doors.
 """
 
 from __future__ import annotations

@@ -1,11 +1,17 @@
 """
 Core types for the Body Motion Problem (BMP) framework.
 
-Defines the data structures corresponding to the formal BMP entities:
-  - PhysicsModel  — the scoped physics Φ
-  - Effect        — a predicate over G_final (final SDT state)
-  - TaskRequest   — a manipulation task specification Π
-  - Motion        — a candidate trajectory τ
+The BMP framework decomposes the success of a robot manipulation action into
+three independently checkable properties: semantic correctness (does the outcome
+match the task?), causal sufficiency (does the motion physically produce that
+outcome?), and embodiment feasibility (can the robot execute the motion?).
+
+This module defines the data structures shared across all BMP domains:
+
+- ``Effect``       — a desired world-state change to verify against
+- ``TaskRequest``  — a manipulation task with a semantic goal condition
+- ``PhysicsModel`` — interface for simulating a motion against the world
+- ``Motion``       — a candidate motion as a sequence of actuator positions
 """
 
 from __future__ import annotations
@@ -26,10 +32,11 @@ class Effect:
     """
     Represents a desired or achieved effect in the environment.
 
-    Corresponds to a predicate over the final SDT state G_final.
-    An effect describes a change to a property of a target object,
-    such as opening a door (changing joint angle) or pouring liquid
-    (changing liquid level).
+    An effect describes a measurable change to a property of a target object,
+    such as the joint angle of a drawer (opening) or the fill level of a cup
+    (pouring). It provides both the goal value and a way to read the current
+    value, enabling the BMP predicates to check whether a motion achieved its
+    intent.
     """
 
     target_object: SemanticAnnotation
@@ -89,10 +96,12 @@ class MonotoneDecreasingEffect(Effect):
 @dataclass(eq=True)
 class TaskRequest:
     """
-    Represents a manipulation task specification Π.
+    Represents a manipulation task specification.
 
-    Contains the task type, name, and goal predicate Π_goal that determines
-    which final SDT states count as success.
+    Holds the task type, a name for the target, and a goal condition that
+    determines which effects count as success. The goal condition is checked
+    by the semantic correctness predicate to verify that a proposed outcome
+    matches the task intent.
     """
 
     task_type: str
@@ -102,15 +111,17 @@ class TaskRequest:
     """Name identifying the task or target object."""
 
     goal: Callable[[Effect], bool] = field(compare=False)
-    """Π_goal: predicate that checks whether an Effect satisfies this task."""
+    """Predicate that checks whether an Effect satisfies this task."""
 
 
 class PhysicsModel(ABC):
     """
-    Abstract physics model Φ used to simulate the causal effect of a motion.
+    Abstract physics model used to simulate the causal effect of a motion.
 
-    Corresponds to Φ_sim in Causes(τ, G_final, Φ, I_Φ): the model that
-    determines whether executing trajectory τ produces final state G_final.
+    Implementations define how a motion trajectory changes the world state
+    within a specific physical regime (e.g., rigid-body kinematics, fluid-flow
+    dynamics). The causal sufficiency predicate uses this model to verify or
+    generate motions.
     """
 
     @abstractmethod
@@ -140,10 +151,11 @@ class PhysicsModel(ABC):
 @dataclass(eq=True)
 class Motion:
     """
-    Represents a candidate motion trajectory τ over an actuator.
+    Represents a candidate motion as a sequence of actuator positions.
 
-    Trajectories are expressed in actuator (joint) space and optionally
-    backed by a physics model that can generate them from scratch.
+    Trajectories are expressed in actuator (joint) space. When a physics model
+    is provided and the trajectory is empty, the model is used to generate the
+    trajectory on demand during the causal sufficiency check.
     """
 
     trajectory: List[float]
@@ -153,7 +165,7 @@ class Motion:
     """The connection (joint) that is manipulated by this motion."""
 
     motion_model: Optional[PhysicsModel] = field(default=None)
-    """Optional physics model Φ used to generate the trajectory if it is empty."""
+    """Optional physics model used to generate the trajectory when it is empty."""
 
     secondary_trajectories: List[Tuple[Connection, List[float]]] = field(
         default_factory=list
