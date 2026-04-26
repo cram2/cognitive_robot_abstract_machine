@@ -11,8 +11,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from giskardpy.executor import Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 
 from pycram.body_motion_problem.types import (
@@ -62,22 +60,12 @@ class RunMSCModel(PhysicsModel):
             raise MissingMotionStatechartError(
                 "RunMSCModel requires a MotionStatechart instance to run."
             )
-
-        context = MotionStatechartContext(world=world)
-        executor = Executor(
-            context=context,
-        )
-        executor.compile(motion_statechart=self.msc)
-
         trajectory: List[float] = []
-        with world.reset_state_context():
-            for _ in range(self.timeout):
-                executor.tick()
-                trajectory.append(float(self.actuator.position))
-                if self.msc.is_end_motion():
-                    break
-
-            achieved = effect.is_achieved()
-
-        context.cleanup()
+        achieved = self._run_msc(
+            self.msc,
+            effect,
+            world,
+            self.timeout,
+            on_tick=lambda: trajectory.append(float(self.actuator.position)),
+        )
         return trajectory, achieved

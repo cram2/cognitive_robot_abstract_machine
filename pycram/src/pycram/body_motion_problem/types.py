@@ -20,6 +20,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Tuple
 
+from giskardpy.executor import Executor
+from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
@@ -121,7 +124,7 @@ class PhysicsModel(ABC):
     Implementations define how a motion trajectory changes the world state
     within a specific physical regime (e.g., rigid-body kinematics, fluid-flow
     dynamics). The causal sufficiency predicate uses this model to verify or
-    generate motions.
+    generate motions. The current implementation is limited to giskardpy MotionStatecharts.
     """
 
     @abstractmethod
@@ -146,6 +149,40 @@ class PhysicsModel(ABC):
         :return: List of (connection, positions) pairs parallel to the primary trajectory.
         """
         return []
+
+    def _run_msc(
+        self,
+        msc: MotionStatechart,
+        effect: Effect,
+        world: World,
+        timeout: int,
+        on_tick: Callable[[], None],
+        setup: Optional[Callable[[], None]] = None,
+    ) -> bool:
+        """
+        Execute a MotionStatechart tick-by-tick and return whether the effect was achieved.
+
+        :param msc: The compiled-ready MotionStatechart to execute.
+        :param effect: The desired effect; checked after the loop exits.
+        :param world: The world to simulate in (state is reset before returning).
+        :param timeout: Maximum number of ticks before aborting.
+        :param on_tick: Called after each tick to record trajectory samples.
+        :param setup: Optional callable run once inside the reset context before ticking.
+        :return: Whether effect.is_achieved() after the simulation.
+        """
+        context = MotionStatechartContext(world=world)
+        executor = Executor(context=context)
+        executor.compile(motion_statechart=msc)
+        with world.reset_state_context():
+            if setup is not None:
+                setup()
+            for _ in range(timeout):
+                executor.tick()
+                on_tick()
+                if msc.is_end_motion():
+                    break
+            achieved = effect.is_achieved()
+        return achieved
 
 
 @dataclass(eq=True)

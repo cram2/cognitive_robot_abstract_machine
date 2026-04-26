@@ -10,14 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-from giskardpy.executor import Executor, SimulationPacer
-from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.pouring import CoupledPouringTask, PouringTask
-from giskardpy.qp import qp_controller
-from giskardpy.qp.qp_controller_config import QPControllerConfig
 
 from pycram.body_motion_problem.types import (
     Effect,
@@ -67,38 +63,25 @@ class PouringMSCModel(PhysicsModel):
         :return: ``(tilt_trajectory, achieved)`` — tilt samples at each tick and success flag.
         """
         msc = self._build_msc(effect)
-        context = MotionStatechartContext(
-            world=world,
-            qp_controller_config=QPControllerConfig(
-                target_frequency=50,
-                prediction_horizon=30,
-            ),
-        )
-        executor = Executor(
-            context=context,
-            pacer=SimulationPacer(real_time_factor=1.0),
-        )
-        executor.compile(motion_statechart=msc)
-
         tilt_connection = self.fill_equation.tilt_connection
         fill_connection = self.fill_equation.fill_connection
-
         tilt_trajectory: List[float] = []
         fill_trajectory: List[float] = []
-        with world.reset_state_context():
-            # Start with a small tilt to jump-start the gradient-driven task
-            world.set_positions_1DOF_connection({tilt_connection: self.initial_tilt})
 
-            for _ in range(self.timeout):
-                executor.tick()
-                tilt_trajectory.append(float(tilt_connection.position))
-                fill_trajectory.append(float(fill_connection.position))
-                if msc.is_end_motion():
-                    break
+        def on_tick() -> None:
+            tilt_trajectory.append(float(tilt_connection.position))
+            fill_trajectory.append(float(fill_connection.position))
 
-            achieved = effect.is_achieved()
-
-        context.cleanup()
+        achieved = self._run_msc(
+            msc,
+            effect,
+            world,
+            self.timeout,
+            on_tick=on_tick,
+            setup=lambda: world.set_positions_1DOF_connection(
+                {tilt_connection: self.initial_tilt}
+            ),
+        )
         self.last_fill_trajectory = fill_trajectory
         return tilt_trajectory, achieved
 
@@ -172,11 +155,6 @@ class CoupledPouringMSCModel(PhysicsModel):
         """
         self.receiver.inflow_equation.source = self.source
         msc = self._build_msc(effect)
-        context = MotionStatechartContext(world=world)
-        executor = Executor(
-            context=context, pacer=SimulationPacer(real_time_factor=1.0)
-        )
-        executor.compile(motion_statechart=msc)
 
         tilt_connection = self.source.fill_equation.tilt_connection
         source_fill_connection = self.source.fill_connection
@@ -188,22 +166,23 @@ class CoupledPouringMSCModel(PhysicsModel):
         receiver_fill_traj: List[float] = []
         chain_trajs: Dict[Connection, List[float]] = {c: [] for c in chain_connections}
 
-        with world.reset_state_context():
-            # Start with a small tilt to jump-start the gradient-driven task
-            world.set_positions_1DOF_connection({tilt_connection: self.initial_tilt})
+        def on_tick() -> None:
+            tilt_traj.append(float(tilt_connection.position))
+            source_fill_traj.append(float(source_fill_connection.position))
+            receiver_fill_traj.append(float(receiver_fill_connection.position))
+            for conn in chain_connections:
+                chain_trajs[conn].append(float(conn.position))
 
-            for _ in range(self.timeout):
-                executor.tick()
-                tilt_traj.append(float(tilt_connection.position))
-                source_fill_traj.append(float(source_fill_connection.position))
-                receiver_fill_traj.append(float(receiver_fill_connection.position))
-                for conn in chain_connections:
-                    chain_trajs[conn].append(float(conn.position))
-                if msc.is_end_motion():
-                    break
-            achieved = effect.is_achieved()
-
-        context.cleanup()
+        achieved = self._run_msc(
+            msc,
+            effect,
+            world,
+            self.timeout,
+            on_tick=on_tick,
+            setup=lambda: world.set_positions_1DOF_connection(
+                {tilt_connection: self.initial_tilt}
+            ),
+        )
         self.receiver.inflow_equation.source = None
         self.last_source_fill_trajectory = source_fill_traj
         self.last_receiver_fill_trajectory = receiver_fill_traj
