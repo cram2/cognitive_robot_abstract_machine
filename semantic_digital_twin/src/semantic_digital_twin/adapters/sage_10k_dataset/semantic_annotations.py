@@ -11,6 +11,8 @@ import enchant
 import rustworkx
 import tqdm
 from graphql.pyutils import cached_property
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from krrood.class_diagrams.module_generation import ModuleRenderer
 
@@ -230,3 +232,19 @@ class Sage10kSemanticAnnotationCreator:
 
         renderer = ModuleRenderer.from_dataclasses(name_to_dataclass.values())
         renderer.write_to_file(output_file)
+
+
+def create_sage10k_labels_from_database(session: Session):
+    """
+    Create Sage10k semantic annotations from the database.
+    The database needs to have all scenes from sage 10k loaded for this to create the full annotations.
+    This does not mean that the full 980 GB of assets need to be available, just their scene descriptions.
+
+    :param session: Database session to query Sage10kObjectDAO types.
+    """
+    from semantic_digital_twin.orm.ormatic_interface import Sage10kObjectDAO
+
+    query = select(Sage10kObjectDAO.type)
+    type_names = session.scalars(query).unique().all()
+    creator = Sage10kSemanticAnnotationCreator(type_names)
+    creator.write_annotations_to_file()

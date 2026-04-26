@@ -271,8 +271,22 @@ def test_different_decomposition_methods(rclpy_node, sage10k_scene):
 
 
 def test_generation_of_semantic_annotation_hierarchy():
-    session = semantic_digital_twin_sessionmaker()()
-    q = select(Sage10kObjectDAO.type).limit(500)
-    type_names = session.scalars(q).unique().all()
+    """
+    Test the generation of type hierarchies from words in a minimal setting.
+    Whenever a better solution to this is discovered, update this test such that the new knowledge
+    is a requirement.
+    """
+    type_names = ["chair", "armchair", "table", "diningtable123", "asdasdjfa"]
     creator = Sage10kSemanticAnnotationCreator(type_names)
-    creator.write_annotations_to_file()
+    assert creator.cleaned_type_names == {
+        "Chair",
+        "Armchair",
+        "Table",
+    }
+    edges = [
+        (creator.word_hierarchy[parent], creator.word_hierarchy[child])
+        for parent, child in creator.word_hierarchy.edge_list()
+    ]
+    assert edges == [
+        ("Chair", "Armchair"),
+    ]
