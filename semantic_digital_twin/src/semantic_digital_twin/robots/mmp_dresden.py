@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import numpy as np
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Self
 
+from semantic_digital_twin.datastructures.definitions import (
+    GripperState,
+    StaticJointState,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import (
@@ -86,7 +91,22 @@ class MMPDresdenGripper(ParallelGripper):
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self):
-        pass
+        gripper_joints = self.active_connections
+
+        gripper_open = JointState.from_mapping(
+            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            mapping=dict(zip(gripper_joints, [0.0])),
+            state_type=GripperState.OPEN,
+        )
+
+        gripper_close = JointState.from_mapping(
+            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            mapping=dict(zip(gripper_joints, [0.8])),
+            state_type=GripperState.CLOSE,
+        )
+
+        self.add_joint_state(gripper_open)
+        self.add_joint_state(gripper_close)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -149,7 +169,23 @@ class MMPDresdenArm(Arm, HasParallelGripper):
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self):
-        pass
+        arm_park = JointState.from_mapping(
+            name=PrefixedName("arm_park", prefix=self.name.name),
+            mapping=dict(zip(self.active_connections, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])),
+            state_type=StaticJointState.PARK,
+        )
+        arm_both = JointState.from_mapping(
+            name=PrefixedName("arm_both", prefix=self.name.name),
+            mapping=dict(
+                zip(
+                    self.active_connections,
+                    [np.pi / 2, -(np.pi / 2), 0.0, 0.0, 0.0, np.pi / 2],
+                )
+            ),
+            state_type=StaticJointState.PARK,
+        )
+        self.add_joint_state(arm_park)
+        self.add_joint_state(arm_both)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
