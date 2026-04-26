@@ -15,6 +15,10 @@ from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransfo
 
 @dataclass(eq=False)
 class SoftTrunk(AbstractRobot):
+    """
+    Class that describes a Soft Trunk.
+    """
+    
     @classmethod
     def _init_empty_robot(cls, world: World) -> Self:
         return cls(name=PrefixedName(name="soft_trunk", prefix="robot"), 
