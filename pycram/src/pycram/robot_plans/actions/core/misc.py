@@ -164,7 +164,11 @@ class MoveToReach(ActionDescription):
         :return: The calculated standing pose.
         """
         target_homogeneous_matrix = self.target_pose.to_homogeneous_matrix()
-        relative_position = Point3(self.robot_x, self.robot_y, 0)
+        relative_position = Point3(
+            float(target_homogeneous_matrix.x) + self.robot_x,
+            float(target_homogeneous_matrix.y) + self.robot_y,
+            0,
+        )
         standing_position = target_homogeneous_matrix @ relative_position
         standing_position.z = self.robot.root.global_pose.z
 
