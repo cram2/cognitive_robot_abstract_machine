@@ -87,14 +87,14 @@ class UnderspecifiedParameters:
     Only exists if the statement has a where condition.
     """
 
-    events_from_symbolic_expressions: typing.List[Event] = field(
+    _events_from_symbolic_expression: typing.List[Event] = field(
         init=False, default_factory=list
     )
     """
     List of events that are created from symbolic expressions, e.g. fixed variable assignments
     """
 
-    events_from_literal_values: typing.List[Event] = field(
+    _events_from_literal_values: typing.List[Event] = field(
         init=False, default_factory=list
     )
     """
@@ -167,7 +167,7 @@ class UnderspecifiedParameters:
         event = Event.from_simple_sets(
             SimpleEvent.from_data({result: attribute_match.assigned_value})
         )
-        self.events_from_literal_values.append(event)
+        self._events_from_literal_values.append(event)
         return result
 
     def _create_variables_from_symbolic_expression(
@@ -224,7 +224,7 @@ class UnderspecifiedParameters:
             simple_events.append(current_simple_event)
 
         resulting_event = Event.from_simple_sets(*simple_events)
-        self.events_from_symbolic_expressions.append(resulting_event)
+        self._events_from_symbolic_expression.append(resulting_event)
         self._symbolic_expression_event_cache[attribute_match.assigned_value] = (
             resulting_event,
             result,
@@ -250,6 +250,34 @@ class UnderspecifiedParameters:
 
             result[variable] = literal.assigned_variable._value_
         return result
+
+    @cached_property
+    def conditioning_event(self) -> Optional[Event]:
+        """
+        :return: An event that can be used for conditioning a probabilistic model. This event includes all facts from the statement,
+        including the `where` conditions.
+        """
+        if not self._events_from_symbolic_expression:
+            return None
+
+        variables = self.variables.values()
+
+        [
+            event.fill_missing_variables(variables)
+            for event in self._events_from_symbolic_expression
+        ]
+        [
+            event.fill_missing_variables(variables)
+            for event in self._events_from_literal_values
+        ]
+
+        complete_event = self._events_from_symbolic_expression[0]
+        complete_event.fill_missing_variables(variables)
+        for other_event in (
+            self._events_from_symbolic_expression[1:] + self._events_from_literal_values
+        ):
+            complete_event = complete_event.intersection_with(other_event)
+        return complete_event
 
     def create_instance_from_variables_and_sample(
         self,

@@ -114,56 +114,35 @@ def data_preparation(mutable_model_world):
     )
 
     parameters = UnderspecifiedParameters(move_and_pick_up_description)
+    fully_factorized_circuit = fully_factorized(parameters.variables.values())
+    assert len(parameters._events_from_symbolic_expression) == 3
 
-    move_and_pick_up_distribution = fully_factorized(parameters.variables.values())
-    assert len(parameters.events_from_symbolic_expressions) == 3
-    complete_event = parameters.events_from_symbolic_expressions[0]
-    complete_event.fill_missing_variables(parameters.variables.values())
-
-    [
-        event.fill_missing_variables(parameters.variables.values())
-        for event in parameters.events_from_symbolic_expressions
-    ]
-
-    [
-        event.fill_missing_variables(parameters.variables.values())
-        for event in parameters.events_from_literal_values
-    ]
-
-    complete_event = parameters.events_from_symbolic_expressions[0]
-    for other_event in parameters.events_from_symbolic_expressions[1:]:
-        complete_event = complete_event.intersection_with(other_event)
-    for other_event in parameters.events_from_literal_values:
-        complete_event = complete_event.intersection_with(other_event)
-
-    m2, prob = move_and_pick_up_distribution.truncated(
-        complete_event, singleton_allowed=True
-    )
+    if parameters.conditioning_event is not None:
+        fully_factorized_circuit, _ = fully_factorized_circuit.truncated(
+            parameters.conditioning_event, singleton_allowed=True
+        )
     probabilistic_registry = DictRegistry(
-        {MoveAndPickUpAction: move_and_pick_up_distribution}
+        {MoveAndPickUpAction: fully_factorized_circuit}
     )
 
     np.random.seed(69)
-
     backend = ProbabilisticBackend(probabilistic_registry, number_of_samples=50)
-
     samples = list(backend.evaluate(move_and_pick_up_description))
     assert all(
         [sample.object_designator == samples[0].object_designator for sample in samples]
     )
-    return samples, m2
+    samples_to_daos = [to_dao(sample) for sample in samples]
+
+    return samples_to_daos, fully_factorized_circuit
 
 
 def test_move_and_pick_up(database, mutable_model_world, data_preparation):
-    samples, m2 = data_preparation
-
-    # avg log likelihood auf den traingsdaten und dann auf dem gelernten circuit, der sollte hoehere log likelihood haben
-    data_access_objects = [to_dao(value) for value in samples]
+    samples, circuit = data_preparation
 
     feature_extractor = FeatureExtractor(
-        get_features_of_class_bfs(to_dao(samples[0]), variable(MoveAndPickUpAction, []))
+        get_features_of_class_bfs(samples[0], variable(MoveAndPickUpAction, []))
     )
-    dataframe = feature_extractor.create_dataframe(data_access_objects)
+    dataframe = feature_extractor.create_dataframe(samples)
     dataframe = preprocess_dataframe(feature_extractor.features, dataframe)
     sorted = dataframe.sort_index(axis=1)
     final = sorted.to_numpy()
@@ -171,72 +150,17 @@ def test_move_and_pick_up(database, mutable_model_world, data_preparation):
     # assert sorted.columns == [v.name for v in move_and_pick_up_distribution.variables]
     identical_variables = [
         variable
-        for variable in m2.variables
+        for variable in circuit.variables
         if variable.name in dataframe.columns.values
     ]
     # remove unnecessary variables from circuit (obj_desig, ref_frame, manip)
-    m2 = m2.marginal(identical_variables)
+    circuit = circuit.marginal(identical_variables)
 
-    template = LearnRSPN(MoveAndPickUpAction, data_access_objects)
+    template = LearnRSPN(MoveAndPickUpAction, samples)
 
-    # Debugging
-    # print(f"\nLearned circuit: {template.probabilistic_circuit}")
-    #
-    # for i, row in enumerate(final):
-    #     ll = template.probabilistic_circuit.log_likelihood(row.reshape(1, -1))
-    #     if ll == -np.inf:
-    #         print(f"Sample {i} has -inf LL")
-    #         for j, val in enumerate(row):
-    #             var = [
-    #                 v
-    #                 for v in template.probabilistic_circuit.variables
-    #                 if template.probabilistic_circuit.variable_to_index_map[v] == j
-    #             ][0]
-    #             marginal = template.probabilistic_circuit.marginal([var])
-    #             leaf_ll = marginal.log_likelihood(np.array([[val]]))
-    #             if leaf_ll == -np.inf:
-    #                 print(
-    #                     f"  Variable {j} ({dataframe.columns[j]}) has -inf LL: value={val}"
-    #                 )
-    #                 # Try to find the distribution
-    #                 for node in marginal.nodes():
-    #                     if hasattr(node, "distribution"):
-    #                         print(f"    Distribution: {node.distribution}")
-    #                         if hasattr(node.distribution, "location"):
-    #                             print(
-    #                                 f"    Location: {node.distribution.location}, Tolerance: {node.distribution.tolerance}"
-    #                             )
-    #
-    # log_likelihoods = template.probabilistic_circuit.log_likelihood(final)
-    # print(f"Log likelihoods: {log_likelihoods}")
-    #
-    # # Check if any column is constant
-    # for i, col in enumerate(final.T):
-    #     if len(np.unique(col)) == 1:
-    #         print(f"Column {i} ({dataframe.columns[i]}) is constant: {col[0]}")
-
-    impossible_samples = final[
-        template.probabilistic_circuit.log_likelihood(final) == -np.inf
-    ]
-
-    print(len(impossible_samples))
-    print(len(final))
-
-    print(f"Impossible samples: {impossible_samples}")
     assert np.mean(template.probabilistic_circuit.log_likelihood(final)) > np.mean(
-        m2.log_likelihood(final)
+        circuit.log_likelihood(final)
     )
-    # grounded = template.ground(values[0])
-    # grounded.probabilistic_circuit.plot_structure()
-    # plt.savefig(f"test_ground_{datetime.datetime.now()}.png")
-    # plt.close()
-
-    # exchangeable = underspecified(Nation)(persons=[underspecified(Person)(name="Checker Chang", age=...)])
-    # exchangeable_parameters = UnderspecifiedParameters(exchangeable)
-    # print([type(mapped_variable) for mapped_variable in exchangeable._get_mapped_variable_by_name(
-    #     "Nation.persons[0].age")._access_path_])
-    # print([mapped_variable._type_ for mapped_variable in move_and_pick_up_description._get_mapped_variable_by_name(
-    #     "MoveAndPickUpAction.standing_position.pose.position.z")._access_path_])
 
 
 def test_features_extraction(database, data_preparation):
