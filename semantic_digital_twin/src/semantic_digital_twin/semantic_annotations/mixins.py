@@ -1141,9 +1141,9 @@ class HasFillLevel(HasContainerGeometry):
         world.set_positions_1DOF_connection({connection: initial_fill})
 
         if tilt_connection is not None:
-            self.fill_connection.tilt_expression = (
-                tilt_connection.dof.variables.position
-            )
+            # self.fill_connection.tilt_expression = (
+            #     tilt_connection.dof.variables.position
+            # )
             surface_phantom = Body(
                 name=PrefixedName(f"{parent_body.name.name}_liquid_surface_phantom")
             )

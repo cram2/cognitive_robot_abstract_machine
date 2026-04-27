@@ -1171,8 +1171,8 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
     )
     """ODE governing how liquid enters this container from an external source."""
 
-    tilt_expression: Optional[Scalar] = field(default=None, kw_only=True, init=False)
-    """Symbolic tilt angle used by :attr:`outflow_equation` during physics integration."""
+    # tilt_expression: Optional[Scalar] = field(default=None, kw_only=True, init=False)
+    # """Symbolic tilt angle used by :attr:`outflow_equation` during physics integration."""
 
     def add_to_world(self, world):
         super().add_to_world(world)
@@ -1183,6 +1183,16 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
             z=translation_axis[2],
             child_frame=self.child,
         )
+
+    @property
+    def tilt_expression(self) -> Optional[Scalar]:
+        """Symbolic tilt angle used by :attr:`outflow_equation` during physics integration."""
+        from physics.pouring_equations import tilt_expression_from_fk
+
+        root_T_child = self._world.compose_forward_kinematics_expression(
+            self._world.root, self.child
+        )
+        return tilt_expression_from_fk(root_T_child)
 
     def update_state(self, dt: float):
         state = self._world.state

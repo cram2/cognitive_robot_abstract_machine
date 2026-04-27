@@ -94,64 +94,6 @@ class PouringTask(Task):
         """
         fill = float(self.fill_equation.fill_connection.position)
         outflow = float(self.fill_vel_ode.evaluate()[0])
-        if fill <= self.goal_value + self.tolerance and outflow <= 0.0:
-            return ObservationStateValues.TRUE
-        return None
-
-
-@dataclass(eq=False, repr=False)
-class CoupledPouringTask(PouringTask):
-    """
-    Motion Statechart task for pouring from one container into another.
-    """
-
-    receiver_fill_connection: Connection = field(kw_only=True)
-    source_geometry: ContainerGeometry = field(kw_only=True)
-    receiver_target: np.ndarray = field(kw_only=True)
-    goal_receiver_fill: float = field(kw_only=True)
-
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
-        """
-        Creates the pouring and rim positioning constraints.
-
-        :param context: The build context.
-        :return: The generated task artifacts.
-        """
-        artifacts = super().build(context)
-
-        r = self.source_geometry.half_width
-        A = self.source_geometry.height
-
-        root_T_tip = context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
-        )
-        tip_P_rim = Point3(r, 0.0, A, reference_frame=self.tip_link)
-        root_P_rim = root_T_tip @ tip_P_rim
-
-        for axis, rim_sym, target in [
-            ("x", root_P_rim.x, float(self.receiver_target[0])),
-            ("y", root_P_rim.y, float(self.receiver_target[1])),
-            ("z", root_P_rim.z, float(self.receiver_target[2])),
-        ]:
-            artifacts.constraints.add_equality_constraint(
-                name=f"{self.tip_link.name}_rim_{axis}",
-                reference_velocity=1.0,
-                equality_bound=sm.Scalar(target) - rim_sym,
-                quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA * 0.1,
-                task_expression=rim_sym,
-            )
-        return artifacts
-
-    def on_tick(
-        self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
-        """
-        Checks if the receiver goal fill level has been reached.
-
-        :param context: The runtime context.
-        :return: The observation state.
-        """
-        fill = float(self.receiver_fill_connection.position)
-        if fill >= self.goal_receiver_fill - self.tolerance:
+        if fill <= self.goal_value + self.tolerance and outflow >= 0.0:
             return ObservationStateValues.TRUE
         return None

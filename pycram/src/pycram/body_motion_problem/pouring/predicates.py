@@ -73,31 +73,3 @@ class PouringCanPerform(CanPerform):
         msc.add_node(full_sequence)
         self._add_motion_termination_nodes(msc, full_sequence, self.robot)
         return msc
-
-
-@dataclass
-class CoupledPouringCanPerform(PouringCanPerform):
-    """
-    Embodiment feasibility check for the coupled pouring domain.
-
-    Extends :class:`PouringCanPerform` by replaying x/z translation DOFs from
-    ``motion.secondary_trajectories`` alongside each tilt step.
-    """
-
-    def _compute_body_trajectory(self, target: Body) -> list:
-        """
-        Compute the cup body trajectory with x/z DOFs set from the recorded QP trajectory.
-        """
-        reasoning_world = deepcopy(target._world)
-        tilt_dof_id = self.motion.actuator.raw_dof.id
-        secondary_by_dof = {
-            conn.raw_dof.id: traj for conn, traj in self.motion.secondary_trajectories
-        }
-        trajectory = []
-        for i, tilt_angle in enumerate(self.motion.trajectory):
-            reasoning_world.state[tilt_dof_id].position = tilt_angle
-            for dof_id, traj in secondary_by_dof.items():
-                reasoning_world.state[dof_id].position = traj[i]
-            reasoning_world.notify_state_change()
-            trajectory.append(reasoning_world.get_body_by_name(target.name).global_pose)
-        return trajectory

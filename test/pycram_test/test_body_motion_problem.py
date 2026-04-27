@@ -3,12 +3,9 @@ from __future__ import annotations
 import math
 import random
 from copy import deepcopy
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 import pytest
-import rclpy
-import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -25,40 +22,30 @@ from pycram.body_motion_problem.container_manipulation.effects import (
     OpenedEffect,
 )
 from pycram.body_motion_problem.container_manipulation.physics import RunMSCModel
-from pycram.body_motion_problem.pouring.effects import PouringEffect, ReceiverFillEffect
+from pycram.body_motion_problem.pouring.effects import PouringEffect
 from pycram.body_motion_problem.pouring.physics import (
     PouringMSCModel,
-    CoupledPouringMSCModel,
 )
 from pycram.body_motion_problem.pouring.predicates import PouringCanPerform
 from semantic_digital_twin.physics.pouring_equations import (
     ArticulatedPouringEquation,
-    InflowEquation,
-    PouringEquation,
 )
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.physics.differential_equation import DifferentialEquation
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasFillLevel,
-    HasRootBody,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door, Drawer
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
-    ActiveConnection1DOF,
-    FixedConnection,
-    HasUpdateState,
-    PrismaticConnection,
     RevoluteConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -67,7 +54,6 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 from semantic_digital_twin.world_description.geometry import (
     Box,
     Scale,
-    ContainerGeometry,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.datastructures.definitions import StaticJointState
@@ -90,29 +76,6 @@ class PourableContainer(HasFillLevel):
     @classproperty
     def _parent_connection_type(self):
         return RevoluteConnection
-
-
-@dataclass(eq=False)
-class ReceiverContainer(HasFillLevel):
-    """Receiver cup: fixed in world, initially empty."""
-
-    @classproperty
-    def _parent_connection_type(self):
-        return FixedConnection
-
-
-# ---------------------------------------------------------------------------
-# Coupled-pouring geometry constants
-# ---------------------------------------------------------------------------
-
-SOURCE_GEOMETRY = ContainerGeometry(height=0.12, half_width=0.04)
-RECEIVER_GEOMETRY = ContainerGeometry(height=0.10, half_width=0.05)
-
-RECEIVER_TOP_Z = 0.70
-HEIGHT_ABOVE_RECEIVER = 0.10
-
-_SOURCE_RADIUS = SOURCE_GEOMETRY.half_width
-_SOURCE_HEIGHT = SOURCE_GEOMETRY.height
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +147,6 @@ def world_with_cup():
         tilt_connection=cup.root.parent_connection,
     )
     cup.fill_equation = ArticulatedPouringEquation(
-        tilt_connection=cup.root.parent_connection,
         fill_connection=cup.fill_connection,
         container_geometry=cup.container_geometry,
         k=1,
@@ -222,132 +184,11 @@ def pr2_world_with_cup(pr2_world_setup):
         tilt_connection=cup.root.parent_connection,
     )
     cup.fill_equation = ArticulatedPouringEquation(
-        tilt_connection=cup.root.parent_connection,
         fill_connection=cup.fill_connection,
         container_geometry=cup.container_geometry,
     )
     world.set_positions_1DOF_connection({cup.root.parent_connection: 0.1})
     return world, cup, robot
-
-
-@pytest.fixture
-def world_with_source_and_receiver():
-    """
-    World with source cup (kinematic chain: PrismaticX → PrismaticZ → RevoluteY)
-    positioned so its rim starts directly above the receiver opening.
-    """
-    world = World()
-    with world.modify_world():
-        world.add_body(Body(name=PrefixedName("map")))
-
-    with world.modify_world():
-        receiver = ReceiverContainer.create_with_new_body_in_world(
-            name=PrefixedName("receiver"),
-            world=world,
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=0.2,
-                y=0.0,
-                z=RECEIVER_TOP_Z - RECEIVER_GEOMETRY.height / 2,
-                reference_frame=world.root,
-            ),
-            scale=Scale(
-                2 * RECEIVER_GEOMETRY.half_width,
-                2 * RECEIVER_GEOMETRY.half_width,
-                RECEIVER_GEOMETRY.height,
-            ),
-        )
-    receiver.initialize_fill_level(
-        world=world, parent_body=receiver.root, initial_fill=0.0
-    )
-
-    receiver_center = receiver.root.global_pose.to_position().to_np()[:3]
-    receiver_opening = receiver_center.copy()
-    receiver_opening[2] += RECEIVER_GEOMETRY.height / 2
-    x_dof_initial = float(receiver_opening[0]) - _SOURCE_RADIUS
-    z_dof_initial = float(receiver_opening[2]) + HEIGHT_ABOVE_RECEIVER - _SOURCE_HEIGHT
-
-    x_dof_initial = x_dof_initial * -2
-    z_dof_initial = z_dof_initial * 1.2
-
-    x_body = Body(name=PrefixedName("source_x_translation"))
-    with world.modify_world():
-        world.add_body(x_body)
-        x_connection = PrismaticConnection.create_with_dofs(
-            world=world,
-            parent=world.root,
-            child=x_body,
-            axis=Vector3(1, 0, 0),
-            dof_limits=DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=-1.0, velocity=-2.0),
-                upper=DerivativeMap(position=1.0, velocity=2.0),
-            ),
-        )
-        world.add_connection(x_connection)
-    world.set_positions_1DOF_connection({x_connection: x_dof_initial})
-
-    z_body = Body(name=PrefixedName("source_z_translation"))
-    with world.modify_world():
-        world.add_body(z_body)
-        z_connection = PrismaticConnection.create_with_dofs(
-            world=world,
-            parent=x_body,
-            child=z_body,
-            axis=Vector3(0, 0, 1),
-            dof_limits=DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=0.0, velocity=-2.0),
-                upper=DerivativeMap(position=2.0, velocity=2.0),
-            ),
-        )
-        world.add_connection(z_connection)
-    world.set_positions_1DOF_connection({z_connection: z_dof_initial})
-
-    cup_body = Body(name=PrefixedName("source_cup"))
-    cup_shape = Box(
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=cup_body),
-        scale=Scale(2 * _SOURCE_RADIUS, 2 * _SOURCE_RADIUS, _SOURCE_HEIGHT),
-    )
-    cup_body.visual = ShapeCollection(shapes=[cup_shape])
-    cup_body.collision = ShapeCollection(shapes=[cup_shape])
-    with world.modify_world():
-        world.add_body(cup_body)
-        tilt_connection = RevoluteConnection.create_with_dofs(
-            world=world,
-            parent=z_body,
-            child=cup_body,
-            axis=Vector3(0, 1, 0),
-            dof_limits=DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=0.0, velocity=-2.0),
-                upper=DerivativeMap(position=math.pi / 2, velocity=2.0),
-            ),
-        )
-        world.add_connection(tilt_connection)
-
-    source = PourableContainer(name=PrefixedName("source_cup"), root=cup_body)
-    with world.modify_world():
-        world.add_semantic_annotation(source)
-    source.initialize_fill_level(
-        world=world,
-        parent_body=cup_body,
-        initial_fill=0.8,
-        tilt_connection=tilt_connection,
-    )
-    source.fill_equation = ArticulatedPouringEquation(
-        tilt_connection=tilt_connection,
-        fill_connection=source.fill_connection,
-        container_geometry=source.container_geometry,
-        k=0.01,
-    )
-    source_outflow = sm.max(sm.Scalar(0.0), -source.fill_equation.symbolic_velocity())
-    source_volume = (
-        source.container_geometry.half_width * source.container_geometry.height
-    )
-    receiver.inflow_equation = InflowEquation(
-        container_geometry=receiver.container_geometry,
-        inflow=source_outflow * source_volume,
-    )
-    world.set_positions_1DOF_connection({tilt_connection: 0.1})
-
-    return world, source, receiver
 
 
 # ---------------------------------------------------------------------------
@@ -547,11 +388,16 @@ class TestPouringPredicates:
         effect = PouringEffect(
             target_object=cup, property_getter=lambda c: c.fill_level, goal_value=0.6
         )
-        physics = PouringMSCModel(fill_equation=cup.fill_equation)
+        physics = PouringMSCModel(
+            fill_equation=cup.fill_equation,
+            tilt_connection=cup.root.parent_connection,
+            root_link=world.root,
+            tip_link=cup.root,
+        )
         physics.run(effect=effect, world=world)
 
         assert cup.fill_level == pytest.approx(fill_before)
-        assert cup.fill_equation.tilt_connection.position == pytest.approx(0.1)
+        assert cup.root.parent_connection.position == pytest.approx(0.1)
 
     def test_causes_does_not_hold_when_effect_already_achieved(self, world_with_cup):
         """Causes returns False when the fill level is already at or below the goal."""
@@ -562,38 +408,15 @@ class TestPouringPredicates:
         )
         motion = Motion(
             trajectory=[],
-            actuator=cup.fill_equation.tilt_connection,
-            motion_model=PouringMSCModel(fill_equation=cup.fill_equation),
+            actuator=cup.root.parent_connection,
+            motion_model=PouringMSCModel(
+                fill_equation=cup.fill_equation,
+                tilt_connection=cup.root.parent_connection,
+                root_link=world.root,
+                tip_link=cup.root,
+            ),
         )
         assert not Causes(effect=effect, environment=world, motion=motion)()
-
-    def test_world_state_reset_after_coupled_model(
-        self, world_with_source_and_receiver, rclpy_node
-    ):
-        """Source and receiver fill levels are restored after CoupledPouringMSCModel.run()."""
-        world, source, receiver = world_with_source_and_receiver
-        viz = VizMarkerPublisher(_world=world, node=rclpy_node)
-        viz.with_tf_publisher()
-
-        source_fill_before = source.fill_level
-        receiver_fill_before = receiver.fill_level
-
-        receiver_effect = ReceiverFillEffect(
-            target_object=receiver,
-            property_getter=lambda c: c.fill_level,
-            goal_value=0.3,
-            tolerance=0.05,
-        )
-        coupled_model = CoupledPouringMSCModel(
-            source=source,
-            receiver=receiver,
-            root_link=world.root,
-            reference_velocity=0.1,
-        )
-        coupled_model.run(receiver_effect, world)
-
-        assert source.fill_level == pytest.approx(source_fill_before)
-        assert receiver.fill_level == pytest.approx(receiver_fill_before)
 
 
 # ---------------------------------------------------------------------------
@@ -724,9 +547,13 @@ class TestPouringQueries:
         )
         motion = Motion(
             trajectory=[],
-            actuator=cup.fill_equation.tilt_connection,
+            actuator=cup.root.parent_connection,
             motion_model=PouringMSCModel(
-                fill_equation=cup.fill_equation, initial_tilt=0.1
+                fill_equation=cup.fill_equation,
+                tilt_connection=cup.root.parent_connection,
+                root_link=world.root,
+                tip_link=cup.root,
+                initial_tilt=0.1,
             ),
         )
         task = TaskRequest(
@@ -756,8 +583,13 @@ class TestPouringQueries:
         )
         motion = Motion(
             trajectory=[],
-            actuator=cup.fill_equation.tilt_connection,
-            motion_model=PouringMSCModel(fill_equation=cup.fill_equation),
+            actuator=cup.root.parent_connection,
+            motion_model=PouringMSCModel(
+                fill_equation=cup.fill_equation,
+                tilt_connection=cup.root.parent_connection,
+                root_link=world.root,
+                tip_link=cup.root,
+            ),
         )
 
         causes = Causes(effect=effect, environment=world, motion=motion)
@@ -783,8 +615,13 @@ class TestPouringQueries:
         )
         motion = Motion(
             trajectory=[],
-            actuator=cup.fill_equation.tilt_connection,
-            motion_model=PouringMSCModel(fill_equation=cup.fill_equation),
+            actuator=cup.root.parent_connection,
+            motion_model=PouringMSCModel(
+                fill_equation=cup.fill_equation,
+                tilt_connection=cup.root.parent_connection,
+                root_link=world.root,
+                tip_link=cup.root,
+            ),
         )
 
         task_sym = variable(TaskRequest, domain=[task])
@@ -817,7 +654,7 @@ class TestPouringQueries:
 
         motion = Motion(
             trajectory=trajectory,
-            actuator=cup.fill_equation.tilt_connection,
+            actuator=cup.root.parent_connection,
             dt=0.1,
         )
 
@@ -855,38 +692,6 @@ class TestPouringQueries:
         assert len(results) == 1
         assert results[0].data[task_sym].task_type == "pour"
         assert results[0].data[effect_sym].goal_value == pytest.approx(0.6)
-
-    @pytest.mark.skip(
-        reason="Needs further investigation on the CoupledPouringMSCModel's behavior"
-    )
-    def test_receiver_fill_increases(self, world_with_source_and_receiver, rclpy_node):
-        """CoupledPouringMSCModel produces a tilt trajectory that fills the receiver to the setpoint."""
-        world, source, receiver = world_with_source_and_receiver
-        viz = VizMarkerPublisher(_world=world, node=rclpy_node)
-        viz.with_tf_publisher()
-
-        goal_receiver_fill = 0.2
-        receiver_effect = ReceiverFillEffect(
-            target_object=receiver,
-            property_getter=lambda c: c.fill_level,
-            goal_value=goal_receiver_fill,
-            tolerance=0.05,
-        )
-        coupled_model = CoupledPouringMSCModel(
-            source=source,
-            receiver=receiver,
-            root_link=world.root,
-            reference_velocity=0.1,
-        )
-        motion = Motion(
-            trajectory=[],
-            actuator=source.fill_equation.tilt_connection,
-            motion_model=coupled_model,
-        )
-
-        causes = Causes(effect=receiver_effect, environment=world, motion=motion)
-        assert causes()
-        causes.replay(step_delay=0.01)
 
 
 # ---------------------------------------------------------------------------
