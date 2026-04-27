@@ -17,16 +17,19 @@ from semantic_digital_twin.adapters.sage_10k_dataset.loader import (
     Sage10kDatasetLoader,
 )
 from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
-    Sage10kSemanticAnnotationCreator,
+    Sage10kTypeNameCleaner,
+    NaturalLanguageDescriptionWithTypeDescription,
 )
 from semantic_digital_twin.adapters.sage_10k_dataset.schema import Sage10kScene
-from semantic_digital_twin.orm.ormatic_interface import Sage10kObjectDAO
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer import (
     BoxDecomposer,
 )
 from semantic_digital_twin.pipeline.pipeline import Pipeline
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.semantic_annotations.natural_language import (
+    NaturalLanguageDescription,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Book,
     BookFront,
@@ -155,13 +158,21 @@ def test_loader(rclpy_node, sage10k_scene):
     scene = sage10k_scene
     if scene is None:
         return
-    world = scene.create_world()
+    world = scene.create_world(Sage10kTypeNameCleaner())
     pub = VizMarkerPublisher(
         _world=world,
         node=rclpy_node,
     )
     pub.with_tf_publisher()
     verify_scene(world, scene)
+    assert (
+        len(
+            world.get_semantic_annotations_by_type(
+                NaturalLanguageDescriptionWithTypeDescription
+            )
+        )
+        > 0
+    )
 
 
 @pytest.mark.skipif(get_sage10k_scene() is None, reason="Sage10k dataset not available")
@@ -268,25 +279,3 @@ def test_different_decomposition_methods(rclpy_node, sage10k_scene):
         shape_source=ShapeSource.COLLISION_ONLY,
     )
     pub.with_tf_publisher()
-
-
-def test_generation_of_semantic_annotation_hierarchy():
-    """
-    Test the generation of type hierarchies from words in a minimal setting.
-    Whenever a better solution to this is discovered, update this test such that the new knowledge
-    is a requirement.
-    """
-    type_names = ["chair", "armchair", "table", "diningtable123", "asdasdjfa"]
-    creator = Sage10kSemanticAnnotationCreator(type_names)
-    assert creator.cleaned_type_names == {
-        "Chair",
-        "Armchair",
-        "Table",
-    }
-    edges = [
-        (creator.word_hierarchy[parent], creator.word_hierarchy[child])
-        for parent, child in creator.word_hierarchy.edge_list()
-    ]
-    assert edges == [
-        ("Chair", "Armchair"),
-    ]
