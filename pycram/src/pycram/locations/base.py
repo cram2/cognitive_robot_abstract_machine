@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass, field
 
 from typing_extensions import List, Iterator, Optional
@@ -13,7 +14,6 @@ from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
-
 
 logger = logging.getLogger("pycram")
 
@@ -58,12 +58,19 @@ class Location:
         return next(iter(self))
 
     def __iter__(self) -> Iterator[Pose]:
+        test_world = deepcopy(self.world)
+        test_robot = self.robot.__class__.from_world(test_world)
+        for validator in self.validators:
+            validator.world = test_world
+            validator.robot = test_robot
+
         for pose_candidate in self.generator:
-            self.robot.root.parent_connection.origin = pose_candidate
+
+            test_robot.root.parent_connection.origin = pose_candidate
 
             collisions = collision_check(
-                robot=self.robot,
-                world=self.world,
+                robot=test_robot,
+                world=test_world,
             )
 
             if collisions:

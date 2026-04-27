@@ -502,28 +502,28 @@ def simple_apartment_setup():
 
         box = Body(
             name=PrefixedName("box"),
-            collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
-            visual=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
+            collision=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
+            visual=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
         )
 
         box_2 = Body(
             name=PrefixedName("box_2"),
-            collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
-            visual=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
+            collision=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
+            visual=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
         )
 
         box_1_connection = FixedConnection(
             parent=world.root,
             child=box,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                2, 0, 0.5, reference_frame=world.root
+                2, 0, 0.375, reference_frame=world.root
             ),
         )
         box_2_connection = FixedConnection(
             parent=root,
             child=box_2,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                -2, 0, 0.5
+                -2, 0, 0.375
             ),
         )
 
@@ -596,7 +596,7 @@ def simple_apartment_setup():
     ).parse()
     world.merge_world_at_pose(
         milk_world,
-        HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi),
+        HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.02, yaw=np.pi),
     )
     return world
 
