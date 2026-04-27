@@ -1172,9 +1172,6 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
     )
     """ODE governing how liquid enters this container from an external source."""
 
-    # tilt_expression: Optional[Scalar] = field(default=None, kw_only=True, init=False)
-    # """Symbolic tilt angle used by :attr:`outflow_equation` during physics integration."""
-
     def add_to_world(self, world: World):
         super().add_to_world(world)
         translation_axis = self.axis * world.state[self.dof_id].position

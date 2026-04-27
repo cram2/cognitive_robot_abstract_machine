@@ -38,6 +38,7 @@ import semantic_digital_twin.mixin
 import semantic_digital_twin.orm.exceptions
 import semantic_digital_twin.orm.model
 import semantic_digital_twin.physics.differential_equation
+import semantic_digital_twin.physics.pouring_equations
 import semantic_digital_twin.pipeline.gltf_loader
 import semantic_digital_twin.pipeline.mesh_decomposition.base
 import semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer
@@ -89,6 +90,7 @@ import trimesh.base
 import typing
 import typing_extensions
 import uuid
+
 
 from krrood.ormatic.data_access_objects.dao import (
     DataAccessObject,
@@ -2690,6 +2692,38 @@ class InertialDAO(
     )
 
 
+class InflowEquationDAO(
+    DifferentialEquationDAO,
+    DataAccessObject[semantic_digital_twin.physics.pouring_equations.InflowEquation],
+):
+
+    __tablename__ = "InflowEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(DifferentialEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    container_geometry_id: Mapped[int] = mapped_column(
+        ForeignKey("ContainerGeometryDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    container_geometry: Mapped[ContainerGeometryDAO] = relationship(
+        "ContainerGeometryDAO",
+        uselist=False,
+        foreign_keys=[container_geometry_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "InflowEquationDAO",
+        "inherit_condition": database_id == DifferentialEquationDAO.database_id,
+    }
+
+
 class InvalidCollisionCheckErrorDAO(
     CollisionCheckingErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.InvalidCollisionCheckError],
@@ -3415,6 +3449,61 @@ class PositionVariableDAO(
     dof: Mapped[DegreeOfFreedomDAO] = relationship(
         "DegreeOfFreedomDAO", uselist=False, foreign_keys=[dof_id], post_update=True
     )
+
+
+class PouringEquationDAO(
+    DifferentialEquationDAO,
+    DataAccessObject[semantic_digital_twin.physics.pouring_equations.PouringEquation],
+):
+
+    __tablename__ = "PouringEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(DifferentialEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    k: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PouringEquationDAO",
+        "inherit_condition": database_id == DifferentialEquationDAO.database_id,
+    }
+
+
+class ArticulatedPouringEquationDAO(
+    PouringEquationDAO,
+    DataAccessObject[
+        semantic_digital_twin.physics.pouring_equations.ArticulatedPouringEquation
+    ],
+):
+
+    __tablename__ = "ArticulatedPouringEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(PouringEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    container_geometry_id: Mapped[int] = mapped_column(
+        ForeignKey("ContainerGeometryDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    container_geometry: Mapped[ContainerGeometryDAO] = relationship(
+        "ContainerGeometryDAO",
+        uselist=False,
+        foreign_keys=[container_geometry_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ArticulatedPouringEquationDAO",
+        "inherit_condition": database_id == PouringEquationDAO.database_id,
+    }
 
 
 class PrefixedNameDAO(
@@ -5779,6 +5868,27 @@ class ActiveConnection1DOFDAO(
     }
 
 
+class LiquidConnectionDAO(
+    ActiveConnection1DOFDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.connections.LiquidConnection
+    ],
+):
+
+    __tablename__ = "LiquidConnectionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ActiveConnection1DOFDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "LiquidConnectionDAO",
+        "inherit_condition": database_id == ActiveConnection1DOFDAO.database_id,
+    }
+
+
 class PrismaticConnectionDAO(
     ActiveConnection1DOFDAO,
     DataAccessObject[
@@ -7815,6 +7925,46 @@ class WallDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WallDAO",
         "inherit_condition": database_id == HasAperturesDAO.database_id,
+    }
+
+
+class HasContainerGeometryDAO(
+    HasRootBodyDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.mixins.HasContainerGeometry
+    ],
+):
+
+    __tablename__ = "HasContainerGeometryDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HasContainerGeometryDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+    }
+
+
+class HasFillLevelDAO(
+    HasContainerGeometryDAO,
+    DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasFillLevel],
+):
+
+    __tablename__ = "HasFillLevelDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasContainerGeometryDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HasFillLevelDAO",
+        "inherit_condition": database_id == HasContainerGeometryDAO.database_id,
     }
 
 
