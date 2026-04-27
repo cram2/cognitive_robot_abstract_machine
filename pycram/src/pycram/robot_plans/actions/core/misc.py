@@ -164,77 +164,10 @@ class MoveToReach(ActionDescription):
         :return: The calculated standing pose.
         """
         target_homogeneous_matrix = self.target_pose.to_homogeneous_matrix()
-        relative_position = Point3(
-            float(target_homogeneous_matrix.x) + self.robot_x,
-            float(target_homogeneous_matrix.y) + self.robot_y,
-            0,
+        relative_position = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=self.robot_x, y=self.robot_y, yaw=self.hip_rotation - np.pi
         )
         standing_position = target_homogeneous_matrix @ relative_position
         standing_position.z = self.robot.root.global_pose.z
 
-        difference_x = self.target_pose.x - standing_position.x
-        difference_y = self.target_pose.y - standing_position.y
-        base_yaw = np.arctan2(difference_y, difference_x)
-        total_yaw = base_yaw + self.hip_rotation
-
-        standing_pose = Pose(
-            standing_position,
-            Quaternion.from_rpy(0, 0, total_yaw),
-            reference_frame=self.robot.root,
-        )
-        return standing_pose
-
-    @staticmethod
-    def post_condition(
-        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression:
-        target_pose = variables["target_pose"]
-        grasp_description = variables["grasp_description"]
-
-        target_homogeneous_matrix = target_pose.to_homogeneous_matrix()
-        relative_position = Point3(variables["robot_x"], variables["robot_y"], 0)
-        standing_position = target_homogeneous_matrix @ relative_position
-        standing_position.z = context.robot.root.global_pose.z
-
-        difference_x = target_pose.x - standing_position.x
-        difference_y = target_pose.y - standing_position.y
-        base_yaw = np.arctan2(difference_y, difference_x)
-        total_yaw = base_yaw + variables["hip_rotation"]
-
-        expected_pose = Pose(
-            standing_position,
-            Quaternion.from_rpy(0, 0, total_yaw),
-            reference_frame=context.robot.root,
-        )
-
-        root_T_robot_base = context.world.transform(expected_pose, context.world.root)
-
-        grasp_orientation = (
-            grasp_description.grasp_orientation()
-            if hasattr(grasp_description, "grasp_orientation")
-            else grasp_description.variable_value.grasp_orientation()
-        )
-        expected_target_pose = Pose(
-            target_pose.to_position(),
-            (
-                target_pose.to_rotation_matrix()
-                @ grasp_orientation.to_rotation_matrix()
-            ).to_quaternion(),
-            target_pose.reference_frame,
-        )
-
-        manipulator = (
-            grasp_description.manipulator
-            if hasattr(grasp_description, "manipulator")
-            else grasp_description.variable_value.manipulator
-        )
-
-        return np.allclose(
-            root_T_robot_base.to_np(),
-            context.robot.base.root.global_pose.to_np(),
-            atol=0.1,
-        ) and np.allclose(
-            manipulator.tool_frame.global_pose.to_np(),
-            expected_target_pose.to_np(),
-            atol=0.1,
-        )
+        return standing_position.to_pose()

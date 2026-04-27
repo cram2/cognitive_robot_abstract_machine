@@ -24,3 +24,5 @@ deprecated
 PySide6
 qt-material
 superqt
+enchant
+nltk
