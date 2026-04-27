@@ -21,6 +21,7 @@ from giskardpy.motion_statechart.data_types import (
 from giskardpy.motion_statechart.graph_node import NodeArtifacts, Task
 from semantic_digital_twin.physics.pouring_equations import (
     PouringEquation,
+    tilt_expression_from_fk,
 )
 from semantic_digital_twin.world_description.geometry import ContainerGeometry
 from semantic_digital_twin.spatial_types import Point3
@@ -35,7 +36,13 @@ class PouringTask(Task):
     """
 
     fill_equation: PouringEquation
-    """Pouring ODE coupling the tilt joint to the fill-level DOF."""
+    """Pouring ODE coupling tilt to the fill-level DOF."""
+
+    root_link: Body = field(kw_only=True)
+    """Root of the kinematic chain used to derive the cup tilt expression."""
+
+    tip_link: Body = field(kw_only=True)
+    """Tip of the kinematic chain (the cup body)."""
 
     goal_value: float
     """Target fill level to achieve."""
@@ -59,9 +66,12 @@ class PouringTask(Task):
         artifacts = NodeArtifacts()
         fill_connection = self.fill_equation.fill_connection
         fill_sym = fill_connection.dof.variables.position
-        tilt_connection = self.fill_equation.tilt_connection
 
-        self.fill_vel_ode = self.fill_equation.symbolic_velocity()
+        root_T_tip = context.world.compose_forward_kinematics_expression(
+            self.root_link, self.tip_link
+        )
+        tilt_expr = tilt_expression_from_fk(root_T_tip)
+        self.fill_vel_ode = self.fill_equation.symbolic_velocity(tilt_expr)
 
         artifacts.constraints.add_equality_constraint(
             name=f"{fill_connection.name}",
@@ -96,8 +106,6 @@ class CoupledPouringTask(PouringTask):
     """
 
     receiver_fill_connection: Connection = field(kw_only=True)
-    root_link: Body = field(kw_only=True)
-    tip_link: Body = field(kw_only=True)
     source_geometry: ContainerGeometry = field(kw_only=True)
     receiver_target: np.ndarray = field(kw_only=True)
     goal_receiver_fill: float = field(kw_only=True)

@@ -94,10 +94,9 @@ def world_with_cup():
         tilt_connection=cup.root.parent_connection,
     )
     cup.fill_equation = ArticulatedPouringEquation(
-        tilt_connection=cup.root.parent_connection,
         fill_connection=cup.fill_connection,
         container_geometry=cup.container_geometry,
-        k=10,
+        k=1,
     )
     world.set_positions_1DOF_connection({cup.root.parent_connection: 0.1})
     return world, cup
@@ -212,13 +211,15 @@ def world_with_source_and_receiver():
         tilt_connection=tilt_connection,
     )
     source.fill_equation = ArticulatedPouringEquation(
-        tilt_connection=tilt_connection,
         fill_connection=source.fill_connection,
         container_geometry=source.container_geometry,
         k=100,
     )
 
-    source_outflow = sm.max(sm.Scalar(0.0), -source.fill_equation.symbolic_velocity())
+    source_outflow = sm.max(
+        sm.Scalar(0.0),
+        -source.fill_equation.symbolic_velocity(tilt_connection.dof.variables.position),
+    )
     source_volume = (
         source.container_geometry.half_width * source.container_geometry.height
     )
@@ -247,6 +248,8 @@ class TestPouringTask:
         msc = MotionStatechart()
         pouring_task = PouringTask(
             fill_equation=cup.fill_equation,
+            root_link=world.root,
+            tip_link=cup.root,
             goal_value=goal_fill,
             tolerance=tolerance,
             reference_velocity=0.05,
@@ -284,12 +287,12 @@ class TestPouringTask:
         msc = MotionStatechart()
         coupled_task = CoupledPouringTask(
             fill_equation=source.fill_equation,
+            root_link=world.root,
+            tip_link=source.root,
             goal_value=0.0,  # source goal (not used for termination in CoupledPouringTask)
             tolerance=tolerance,
             reference_velocity=0.5,  # Increase reference velocity to speed up pouring
             receiver_fill_connection=receiver.fill_connection,
-            root_link=world.root,
-            tip_link=source.root,
             source_geometry=source.container_geometry,
             receiver_target=receiver_target,
             goal_receiver_fill=goal_receiver_fill,

@@ -9,6 +9,7 @@ import numpy as np
 from typing_extensions import List, TYPE_CHECKING, Union, Optional, Dict, Any, Self
 
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -1170,6 +1171,9 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
     )
     """ODE governing how liquid enters this container from an external source."""
 
+    tilt_expression: Optional[Scalar] = field(default=None, kw_only=True, init=False)
+    """Symbolic tilt angle used by :attr:`outflow_equation` during physics integration."""
+
     def add_to_world(self, world):
         super().add_to_world(world)
         translation_axis = self.axis * self.dof.variables.position
@@ -1184,11 +1188,13 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
         state = self._world.state
         old_vel = state[self.dof.id].velocity
         old_acc = state[self.dof.id].acceleration
-        velocity = sum(
-            eq.symbolic_velocity().evaluate()[0]
-            for eq in (self.outflow_equation, self.inflow_equation)
-            if eq is not None
-        )
+        velocity = 0.0
+        if self.outflow_equation is not None:
+            velocity += self.outflow_equation.symbolic_velocity(
+                self.tilt_expression
+            ).evaluate()[0]
+        if self.inflow_equation is not None:
+            velocity += self.inflow_equation.symbolic_velocity().evaluate()[0]
         state[self.dof.id].velocity = velocity
         state[self.dof.id].acceleration = (velocity - old_vel) / dt
         state[self.dof.id].jerk = (state[self.dof.id].acceleration - old_acc) / dt

@@ -15,11 +15,9 @@ import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import Scalar
 
 from semantic_digital_twin.physics.differential_equation import DifferentialEquation
-from semantic_digital_twin.world_description.connections import (
-    PrismaticConnection,
-    RevoluteConnection,
-)
+from semantic_digital_twin.world_description.connections import PrismaticConnection
 from semantic_digital_twin.world_description.geometry import ContainerGeometry
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 
 
 @dataclass
@@ -27,24 +25,22 @@ class PouringEquation(DifferentialEquation):
     """
     Abstract ODE for pouring-domain fill-level dynamics.
 
-    Owns the tilt and fill connections plus the outflow rate constant ``k``.
-    Concrete subclasses implement :meth:`symbolic_velocity` and optionally
-    override :meth:`symbolic_tilt_floor`.
+    Owns the fill connection and outflow rate constant ``k``.
+    Concrete subclasses implement :meth:`symbolic_velocity`.
 
-    :param tilt_connection: Revolute DOF providing the current tilt angle θ.
     :param fill_connection: Prismatic DOF whose position encodes fill level in [0, 1].
     :param k: Outflow rate constant.
     """
 
-    tilt_connection: RevoluteConnection
     fill_connection: PrismaticConnection
     k: float = field(default=1.0, kw_only=True)
 
     @abstractmethod
-    def symbolic_velocity(self) -> Scalar:
+    def symbolic_velocity(self, tilt_expression: Scalar) -> Scalar:
         """
         Symbolic d(fill_normalized)/dt as a CasADi expression.
 
+        :param tilt_expression: Symbolic tilt angle θ in radians.
         :return: Symbolic desired fill velocity.
         """
 
@@ -87,8 +83,9 @@ class ArticulatedPouringEquation(PouringEquation):
         r = self.container_geometry.half_width
         return sm.atan2(A - fill_sym * A, r)
 
-    def symbolic_velocity(self) -> Scalar:
+    def symbolic_velocity(self, tilt_expression: Scalar) -> Scalar:
         """
+        :param tilt_expression: Symbolic tilt angle θ in radians.
         :return: Symbolic d(fill_normalized)/dt as a CasADi expression.
         """
         A = self.container_geometry.height
@@ -98,9 +95,23 @@ class ArticulatedPouringEquation(PouringEquation):
         phi_sym = sm.atan2(A - h_sym, r)
         gap_sym = sm.max(
             sm.Scalar(0.0),
-            L_sym * sm.sin(self.tilt_connection.dof.variables.position - phi_sym),
+            L_sym * sm.sin(tilt_expression - phi_sym),
         )
         return -self.k * gap_sym / A
+
+
+def tilt_expression_from_fk(root_T_cup: HomogeneousTransformationMatrix) -> Scalar:
+    """
+    Symbolic tilt angle of a cup about the vertical axis given its FK transform.
+
+    Uses the z-component of the cup's local up axis in the root frame:
+    θ = acos(R_zz).
+
+    :param root_T_cup: Symbolic FK expression from root to cup frame.
+    :return: Symbolic tilt angle in radians ∈ [-π, π].
+    """
+    cup_z_in_root = root_T_cup.to_rotation_matrix() @ Vector3(0, 0, 1)
+    return sm.acos(sm.limit(cup_z_in_root.z, -3.14, 3.14))
 
 
 @dataclass

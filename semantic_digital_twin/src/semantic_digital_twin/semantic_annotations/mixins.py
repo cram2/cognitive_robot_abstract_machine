@@ -1115,7 +1115,7 @@ class HasFillLevel(HasContainerGeometry):
         tilt_connection: Optional[RevoluteConnection] = None,
     ) -> None:
         """
-        Create the virtual fill-level DOF and attach it to the world.
+        Create the virtual fill-level DOF and the virtual liquid surface DOF and attach them to the world.
 
         :param world: The world to add the fill-level DOF to.
         :param parent_body: The body the fill-level DOF is attached to.
@@ -1141,6 +1141,9 @@ class HasFillLevel(HasContainerGeometry):
         world.set_positions_1DOF_connection({connection: initial_fill})
 
         if tilt_connection is not None:
+            self.fill_connection.tilt_expression = (
+                tilt_connection.dof.variables.position
+            )
             surface_phantom = Body(
                 name=PrefixedName(f"{parent_body.name.name}_liquid_surface_phantom")
             )
