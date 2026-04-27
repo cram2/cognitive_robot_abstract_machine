@@ -187,8 +187,6 @@ class UnderspecifiedParameters:
         features = get_features_of_class_bfs(
             data_access_objects[0],
             attribute_match.assigned_variable,
-            [],
-            set(),
         )
         extractor = FeatureExtractor(features)
 

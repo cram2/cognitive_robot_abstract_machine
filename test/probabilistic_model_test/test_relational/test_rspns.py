@@ -143,6 +143,8 @@ def data_preparation(mutable_model_world):
         {MoveAndPickUpAction: move_and_pick_up_distribution}
     )
 
+    np.random.seed(69)
+
     backend = ProbabilisticBackend(probabilistic_registry, number_of_samples=50)
 
     samples = list(backend.evaluate(move_and_pick_up_description))
@@ -157,12 +159,9 @@ def test_move_and_pick_up(database, mutable_model_world, data_preparation):
 
     # avg log likelihood auf den traingsdaten und dann auf dem gelernten circuit, der sollte hoehere log likelihood haben
     data_access_objects = [to_dao(value) for value in samples]
-    template = LearnRSPN(MoveAndPickUpAction, data_access_objects)
 
     feature_extractor = FeatureExtractor(
-        get_features_of_class_bfs(
-            to_dao(samples[0]), variable(MoveAndPickUpAction, []), [], set()
-        )
+        get_features_of_class_bfs(to_dao(samples[0]), variable(MoveAndPickUpAction, []))
     )
     dataframe = feature_extractor.create_dataframe(data_access_objects)
     dataframe = preprocess_dataframe(feature_extractor.features, dataframe)
@@ -177,16 +176,56 @@ def test_move_and_pick_up(database, mutable_model_world, data_preparation):
     ]
     # remove unnecessary variables from circuit (obj_desig, ref_frame, manip)
     m2 = m2.marginal(identical_variables)
-    like_learned = np.mean(template.probabilistic_circuit.log_likelihood(final))
-    like_move_and_pick_up_distribution = np.mean(m2.log_likelihood(final))
 
+    template = LearnRSPN(MoveAndPickUpAction, data_access_objects)
+
+    # Debugging
+    # print(f"\nLearned circuit: {template.probabilistic_circuit}")
+    #
+    # for i, row in enumerate(final):
+    #     ll = template.probabilistic_circuit.log_likelihood(row.reshape(1, -1))
+    #     if ll == -np.inf:
+    #         print(f"Sample {i} has -inf LL")
+    #         for j, val in enumerate(row):
+    #             var = [
+    #                 v
+    #                 for v in template.probabilistic_circuit.variables
+    #                 if template.probabilistic_circuit.variable_to_index_map[v] == j
+    #             ][0]
+    #             marginal = template.probabilistic_circuit.marginal([var])
+    #             leaf_ll = marginal.log_likelihood(np.array([[val]]))
+    #             if leaf_ll == -np.inf:
+    #                 print(
+    #                     f"  Variable {j} ({dataframe.columns[j]}) has -inf LL: value={val}"
+    #                 )
+    #                 # Try to find the distribution
+    #                 for node in marginal.nodes():
+    #                     if hasattr(node, "distribution"):
+    #                         print(f"    Distribution: {node.distribution}")
+    #                         if hasattr(node.distribution, "location"):
+    #                             print(
+    #                                 f"    Location: {node.distribution.location}, Tolerance: {node.distribution.tolerance}"
+    #                             )
+    #
+    # log_likelihoods = template.probabilistic_circuit.log_likelihood(final)
+    # print(f"Log likelihoods: {log_likelihoods}")
+    #
+    # # Check if any column is constant
+    # for i, col in enumerate(final.T):
+    #     if len(np.unique(col)) == 1:
+    #         print(f"Column {i} ({dataframe.columns[i]}) is constant: {col[0]}")
+
+    impossible_samples = final[
+        template.probabilistic_circuit.log_likelihood(final) == -np.inf
+    ]
+
+    print(len(impossible_samples))
+    print(len(final))
+
+    print(f"Impossible samples: {impossible_samples}")
     assert np.mean(template.probabilistic_circuit.log_likelihood(final)) > np.mean(
         m2.log_likelihood(final)
     )
-    template.probabilistic_circuit.plot_structure()
-    plt.savefig(f"test_{datetime.datetime.now()}.png")
-    plt.close()
-
     # grounded = template.ground(values[0])
     # grounded.probabilistic_circuit.plot_structure()
     # plt.savefig(f"test_ground_{datetime.datetime.now()}.png")

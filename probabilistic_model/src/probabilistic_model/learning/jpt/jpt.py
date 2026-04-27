@@ -12,9 +12,7 @@ from random_events.product_algebra import VariableMap
 from random_events.variable import Variable, Continuous, Integer, Symbolic
 from typing_extensions import Self
 
-from probabilistic_model.learning.jpt.variables import (
-    AnnotatedVariable
-)
+from probabilistic_model.learning.jpt.variables import AnnotatedVariable
 from probabilistic_model.learning.nyga_induction import NygaInduction
 from probabilistic_model.distributions.distributions import (
     DiracDeltaDistribution,
@@ -26,6 +24,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProductUnit,
     ProbabilisticCircuit,
     UnivariateDiscreteLeaf,
+    UnivariateContinuousLeaf,
 )
 from probabilistic_model.utils import MissingDict
 
@@ -126,7 +125,10 @@ class JointProbabilityTree(SubclassJSONSerializer):
 
     @property
     def variables(self) -> Tuple[Variable, ...]:
-        return tuple(annotated_variable.variable for annotated_variable in self.annotated_variables)
+        return tuple(
+            annotated_variable.variable
+            for annotated_variable in self.annotated_variables
+        )
 
     def set_targets_and_features(
         self,
@@ -323,15 +325,24 @@ class JointProbabilityTree(SubclassJSONSerializer):
                 )
                 distribution = distribution.fit(data[:, index])
 
-                if isinstance(distribution.root, DiracDeltaDistribution):
-                    distribution.root.density_cap = 1 / annotated_variable.minimal_distance
+                if isinstance(
+                    distribution.root, UnivariateContinuousLeaf
+                ) and isinstance(
+                    distribution.root.distribution, DiracDeltaDistribution
+                ):
+                    distribution.root.distribution.density_cap = (
+                        1 / annotated_variable.minimal_distance
+                    )
+                    distribution.root.distribution.tolerance = 1e-4
+                    # print(f"Variable {annotated_variable.variable.name} is constant at {distribution.root.distribution.location}. Density cap: {distribution.root.distribution.density_cap}")
                 nyga_root = distribution.root
                 new_nodes = self.probabilistic_circuit.mount(nyga_root)
                 result.add_subcircuit(new_nodes[nyga_root.index])
 
             elif isinstance(annotated_variable.variable, Symbolic):
                 distribution = SymbolicDistribution(
-                    variable=annotated_variable.variable, probabilities=MissingDict(float)
+                    variable=annotated_variable.variable,
+                    probabilities=MissingDict(float),
                 )
                 distribution.fit_from_indices(data[:, index].astype(int))
                 distribution = UnivariateDiscreteLeaf(
@@ -341,7 +352,8 @@ class JointProbabilityTree(SubclassJSONSerializer):
 
             elif isinstance(annotated_variable.variable, Integer):
                 distribution = IntegerDistribution(
-                    variable=annotated_variable.variable, probabilities=MissingDict(float)
+                    variable=annotated_variable.variable,
+                    probabilities=MissingDict(float),
                 )
                 distribution.fit(data[:, index])
                 distribution = UnivariateDiscreteLeaf(
@@ -405,7 +417,10 @@ class JointProbabilityTree(SubclassJSONSerializer):
             [len(variable.domain.simple_sets) for variable in self.symbolic_variables]
         )
         max_variances = np.array(
-            [annotated_variable.standard_deviation ** 2 for annotated_variable in self.annotated_variables]
+            [
+                annotated_variable.standard_deviation**2
+                for annotated_variable in self.annotated_variables
+            ]
         )
 
         min_impurity_improvement = np.array(
@@ -481,13 +496,19 @@ class JointProbabilityTree(SubclassJSONSerializer):
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         annotated_variable_from_init: List[AnnotatedVariable] = [
-            from_json(annotated_variable) for annotated_variable in data["annotated_variables_from_init"]
+            from_json(annotated_variable)
+            for annotated_variable in data["annotated_variables_from_init"]
         ]
         name_to_variable_map: Dict[str, Variable] = {
-            annotated_variable.variable.name: annotated_variable.variable for annotated_variable in annotated_variable_from_init
+            annotated_variable.variable.name: annotated_variable.variable
+            for annotated_variable in annotated_variable_from_init
         }
-        targets: List[Variable] = [name_to_variable_map[name] for name in data["targets"]]
-        features: List[Variable] = [name_to_variable_map[name] for name in data["features"]]
+        targets: List[Variable] = [
+            name_to_variable_map[name] for name in data["targets"]
+        ]
+        features: List[Variable] = [
+            name_to_variable_map[name] for name in data["features"]
+        ]
         _min_samples_leaf = data["min_samples_per_leaf"]
         min_impurity_improvement = data["min_impurity_improvement"]
         max_leaves = data["max_leaves"]

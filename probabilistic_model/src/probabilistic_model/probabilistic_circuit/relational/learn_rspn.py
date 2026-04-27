@@ -12,6 +12,7 @@ from typing import (
     Type,
     Set,
     Union,
+    Iterable,
 )
 
 from sqlalchemy import Column
@@ -78,13 +79,13 @@ def get_python_type_from_sqlalchemy_column(column: Column):
 def get_features_of_class_bfs(
     example_instance: DataAccessObject,
     symbolic_attribute_access: Variable,
-    result: List,
-    seen: Set,
 ):
     """
     BFS version: traverses the object graph level-by-level instead of recursively (DFS).
     """
 
+    result = []
+    seen = set()
     queue = deque()
     queue.append((example_instance, symbolic_attribute_access))
 
@@ -181,16 +182,18 @@ def LearnRSPN(cls: Any, instances: List[DataAccessObject]) -> RSPNTemplate:
 
     Returns the root node (ProductUnit or SumUnit) within a ProbabilisticCircuit.
     """
-    features = get_features_of_class_bfs(instances[0], variable(cls, []), [], set())
+    features = get_features_of_class_bfs(instances[0], variable(cls, []))
     if not features:
         raise ValueError(f"No features found for class {cls}")
 
     feature_extractor = FeatureExtractor(features)
 
     df: pd.DataFrame = feature_extractor.create_dataframe(instances)
+    df = preprocess_dataframe(features, df)
+    df = df.sort_index(axis=1)
     variables = infer_variables_from_dataframe(df)
 
-    jpt = JointProbabilityTree(variables, min_samples_per_leaf=15)
+    jpt = JointProbabilityTree(variables, min_samples_per_leaf=2)
     jpt = jpt.fit(df)
     rspn = RSPNTemplate(RSPNSpecification(get_dao_class(cls)), jpt)
     return rspn
@@ -198,7 +201,64 @@ def LearnRSPN(cls: Any, instances: List[DataAccessObject]) -> RSPNTemplate:
 
 @dataclass
 class FeatureExtractor:
+    """
+    A class to extract features from a given class. Features are all attributes of the class, propagating custom types/objects down. The features are represented as symbolic variables.
+    """
+
     features: List[MappedVariable]
+    """
+    The class to extract features from.
+    """
+
+    # @property
+    # def features(self):
+    #     result = []
+    #     seen = set()
+    #     queue = deque()
+    #     queue.append((example_instance, symbolic_attribute_access))
+    #
+    #     while queue:
+    #         current_instance, current_symbolic = queue.popleft()
+    #
+    #         if id(current_instance) in seen:
+    #             continue
+    #         seen.add(id(current_instance))
+    #
+    #         specification = RSPNSpecification(type(current_instance))
+    #
+    #         result.append(self._process_attributes(specification.attributes))
+    #
+    #         # Enqueue children instead of recursing
+    #         for part in specification.unique_parts:
+    #             value = getattr(current_instance, part)
+    #
+    #             if value is None:
+    #                 continue
+    #
+    #             queue.append((value, getattr(current_symbolic, part)))
+    #
+    #     return result
+    #
+    # def _process_attributes(self, attributes: Iterable, current_instance, current_symbolic):
+    #     result = []
+    #     for attribute in attributes:
+    #         value = getattr(current_instance, attribute.key)
+    #
+    #         if not isinstance(value, compatible_types):
+    #             continue
+    #
+    #         current_symbolic_attribute_access = getattr(
+    #             current_symbolic, attribute.name
+    #         )
+    #
+    #         current_symbolic_attribute_access._type_ = (
+    #             get_python_type_from_sqlalchemy_column(attribute)
+    #         )
+    #
+    #         result.append(current_symbolic_attribute_access)
+    #     return result
+    #
+    # def _process
 
     def apply_mapping(self, instance: Any) -> List:
         return [
@@ -207,6 +267,9 @@ class FeatureExtractor:
         ]
 
     def create_dataframe(self, instances: List[DataAccessObject]) -> pd.DataFrame:
+        """
+        Create a dataframe from the given instances.
+        """
         result = []
         for instance in instances:
             result.append(self.apply_mapping(instance))
