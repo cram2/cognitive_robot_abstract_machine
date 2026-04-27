@@ -48,11 +48,7 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.world_description.geometry import (
-    Box,
-    Scale,
-)
-from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -120,29 +116,10 @@ def world_with_cup():
                 lower=DerivativeMap(position=0.0, velocity=-2.0),
                 upper=DerivativeMap(position=math.pi / 2, velocity=2.0),
             ),
+            scale=Scale(0.4, 0.4, 1.0),
+            initial_fill=1.0,
+            k=1,
         )
-    _cup_height = 1.0
-    _cup_half_width = 0.2
-    cup_shape = Box(
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
-            z=_cup_height / 2,
-            reference_frame=cup.root,
-        ),
-        scale=Scale(
-            2 * _cup_half_width,
-            2 * _cup_half_width,
-            _cup_height,
-        ),
-    )
-    with world.modify_world():
-        cup.root.visual = ShapeCollection(shapes=[cup_shape])
-        cup.root.collision = ShapeCollection(shapes=[cup_shape])
-    cup.initialize_fill_level(
-        world=world,
-        parent_body=cup.root,
-        initial_fill=1.0,
-        k=1,
-    )
     world.set_positions_1DOF_connection({cup.root.parent_connection: 0.1})
     return world, cup
 
@@ -168,12 +145,8 @@ def pr2_world_with_cup(pr2_world_setup):
                 reference_frame=world.root,
             ),
             scale=Scale(0.08, 0.08, 0.12),
+            initial_fill=1.0,
         )
-    cup.initialize_fill_level(
-        world=world,
-        parent_body=cup.root,
-        initial_fill=1.0,
-    )
     world.set_positions_1DOF_connection({cup.root.parent_connection: 0.1})
     return world, cup, robot
 

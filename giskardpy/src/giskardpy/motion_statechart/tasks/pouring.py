@@ -1,11 +1,3 @@
-"""
-Giskardpy Tasks for the pouring domain (D_pour) of the BMP framework.
-
-Both the fill-level ODE (Torricelli) and the tilt goal are expressed as
-symbolic QP constraints in ``build()``. ``on_tick()`` is a pure observation
-check; it performs no integration and no QP manipulation.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field

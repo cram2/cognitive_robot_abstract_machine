@@ -1154,42 +1154,6 @@ class DifferentialDrive(ActiveConnection, HasUpdateState):
 
 
 @dataclass(eq=False)
-class LiquidSurfaceConnection(Connection):
-    """
-    Counter-rotation connection whose child body's orientation is always world-frame aligned.
-    Together with LiquidConnection it is used for visualizing the surface of an liquid under approximated physics.
-
-    Computes its rotation symbolically such that the child body's XY plane stays parallel
-    to the world XY plane regardless of how its parent is connected or tilted.
-    """
-
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
-
-        root_T_parent = self._world.compose_forward_kinematics_expression(
-            self._world.root, self.parent
-        )
-        parent_R_root = root_T_parent.to_rotation_matrix().inverse()
-
-        # Extract gravity vector in parent frame
-        # World Z is [0, 0, 1]. In parent frame it is parent_R_root * [0, 0, 1]
-        parent_V_world_z = parent_R_root.z_vector()
-
-        # We want child's Z to be world Z.
-        # So we need a rotation that maps parent frame's Z to parent_V_world_z?
-        # No, child frame Z should be world Z in world frame.
-        # In parent frame, child frame Z should be parent_V_world_z.
-
-        # We can construct parent_R_child such that its Z column is parent_V_world_z.
-        # To keep it simple and avoid arbitrary rotations around Z,
-        # we can use the inverse of parent's orientation.
-        self._kinematics = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            rotation_matrix=parent_R_root,
-            child_frame=self.child,
-        )
-
-
-@dataclass(eq=False)
 class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
     """
     Translating DOF representing the fill level of a container.
@@ -1211,9 +1175,9 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
     # tilt_expression: Optional[Scalar] = field(default=None, kw_only=True, init=False)
     # """Symbolic tilt angle used by :attr:`outflow_equation` during physics integration."""
 
-    def add_to_world(self, world):
+    def add_to_world(self, world: World):
         super().add_to_world(world)
-        translation_axis = self.axis * self.dof.variables.position
+        translation_axis = self.axis * world.state[self.dof_id].position
         self._kinematics = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=translation_axis[0],
             y=translation_axis[1],

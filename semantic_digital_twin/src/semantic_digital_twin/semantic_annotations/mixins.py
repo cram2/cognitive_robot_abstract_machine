@@ -48,8 +48,6 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     LiquidConnection,
-    LiquidSurfaceConnection,
-    RevoluteConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -1054,57 +1052,90 @@ class HasContainerGeometry(HasRootBody, ABC):
         return ContainerGeometry.from_body(self.root)
 
 
+@dataclass(eq=False)
 class HasFillLevel(HasContainerGeometry):
     """
     Mixin that adds a virtual fill-level DOF to any semantic annotation.
 
     The fill level is represented as a virtual :class:`LiquidConnection` whose
-    position encodes fill in the range ``[0, 1]``. Call :meth:`initialize_fill_level`
-    once after the annotation is placed in a world.
-
-    When ``parent_body`` is connected to its parent via a :class:`RevoluteConnection`,
-    a :attr:`liquid_surface_connection` is created automatically — a counter-rotating
-    revolute joint so the liquid surface body's XY plane stays parallel to the world
-    XY plane regardless of cup tilt.
-
-    After initialisation assign :attr:`fill_equation` (how the cup drains) and
-    :attr:`inflow_equation` (how the cup fills from an external source).
+    position encodes fill in the range ``[0, 1]``. Use :meth:`create_with_new_body_in_world`
+    for the standard construction path. When the body is constructed manually and placed
+    in the world before creating the semantic annotation, call :meth:`initialize_fill_level`
+    explicitly after the collision geometry has been set.
     """
 
-    fill_connection: Optional[LiquidConnection] = field(default=None, kw_only=True)
+    fill_connection: LiquidConnection = field(init=False)
     """The virtual connection whose position encodes fill level in [0, 1]."""
 
-    liquid_surface_connection: Optional[LiquidSurfaceConnection] = field(
-        default=None, kw_only=True
-    )
-    """
-    Counter-rotation connection whose child body is always world-frame aligned.
-    """
+    _fill_equation: Optional[PouringEquation] = field(default=None, init=False)
+    _inflow_equation: Optional[InflowEquation] = field(default=None, init=False)
+
+    @property
+    def fill_equation(self) -> Optional[PouringEquation]:
+        """ODE governing how this container drains when tilted."""
+        return self._fill_equation
+
+    @fill_equation.setter
+    def fill_equation(self, equation: Optional[PouringEquation]) -> None:
+        self._fill_equation = equation
+        self.fill_connection.outflow_equation = equation
+
+    @property
+    def inflow_equation(self) -> Optional[InflowEquation]:
+        """ODE governing how this container fills from an external source."""
+        return self._inflow_equation
+
+    @inflow_equation.setter
+    def inflow_equation(self, equation: Optional[InflowEquation]) -> None:
+        self._inflow_equation = equation
+        self.fill_connection.inflow_equation = equation
+
+    @classmethod
+    def create_with_new_body_in_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        initial_fill: float = 1.0,
+        k: float = 1.0,
+        **kwargs,
+    ) -> Self:
+        """
+        Create a new semantic annotation with a new body and an initialized fill level.
+
+        :param name: The name of the semantic annotation.
+        :param world: The world to add the annotation to.
+        :param initial_fill: Starting fill level in [0, 1].
+        :param k: Outflow rate constant for the articulated pouring equation.
+        :return: The created annotation with fill level ready to use.
+        """
+        instance = super().create_with_new_body_in_world(
+            name=name, world=world, **kwargs
+        )
+        instance.initialize_fill_level(world=world, initial_fill=initial_fill, k=k)
+        return instance
 
     def initialize_fill_level(
         self,
         world,
-        parent_body: Body,
         initial_fill: float = 1.0,
         k: float = 1.0,
     ) -> None:
         """
         Create the virtual fill-level DOF, attach it to the world, and wire up the pouring equation.
 
+        Only needed when the body is created outside :meth:`create_with_new_body_in_world`.
+        Must be called after the annotation's collision geometry is set.
+
         :param world: The world to add the fill-level DOF to.
-        :param parent_body: The body the fill-level DOF is attached to.
         :param initial_fill: Starting fill level in [0, 1].
         :param k: Outflow rate constant for the articulated pouring equation.
         """
-        phantom = Body(name=PrefixedName(f"{parent_body.name.name}_fill_level_phantom"))
-        surface_phantom = Body(
-            name=PrefixedName(f"{parent_body.name.name}_liquid_surface_phantom")
-        )
+        phantom = Body(name=PrefixedName(f"{self.root.name.name}_fill_level_phantom"))
         with world.modify_world():
             world.add_body(phantom)
             connection = LiquidConnection.create_with_dofs(
                 world=world,
-                parent=parent_body,
+                parent=self.root,
                 child=phantom,
                 axis=Vector3(0, 0, 1),
                 dof_limits=DegreeOfFreedomLimits(
@@ -1114,18 +1145,8 @@ class HasFillLevel(HasContainerGeometry):
             )
             world.add_connection(connection)
 
-        with world.modify_world():
-            world.add_body(surface_phantom)
-            surface_connection = LiquidSurfaceConnection(
-                parent=phantom,
-                child=surface_phantom,
-            )
-            world.add_connection(surface_connection)
-
         self.fill_connection = connection
-        self.liquid_surface_connection = surface_connection
         world.set_positions_1DOF_connection({connection: initial_fill})
-
         self.fill_equation = ArticulatedPouringEquation(
             container_geometry=self.container_geometry,
             k=k,
