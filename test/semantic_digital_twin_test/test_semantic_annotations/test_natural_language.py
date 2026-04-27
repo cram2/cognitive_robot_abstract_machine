@@ -11,18 +11,24 @@ from nltk.corpus import wordnet
 def test_natural_language_comparison():
 
     @symbolic_function
-    def similarity_key(target: Synset, sample: str):
-        sample_synset = wordnet.synsets(sample)[0]
-        return target.path_similarity(sample_synset)
+    def max_similarity(target: Synset, sample: str) -> Tuple[float, Synset]:
+        best_similarity, best_synset = (0, None)
+        for synset in wordnet.synsets(sample):
+            similarity = target.wup_similarity(synset)
+            if similarity > best_similarity:
+                best_similarity = similarity
+                best_synset = synset
+        return best_similarity, best_synset
 
-    book_annotation = NaturalLanguageDescription(root=None, description="Notebook")
-    bank_annotation = NaturalLanguageDescription(root=None, description="Bank")
-    annotations = [book_annotation, bank_annotation]
+    matching_annotation = NaturalLanguageDescription(root=None, description="Notebook")
+    non_matching_annotation = NaturalLanguageDescription(root=None, description="Bank")
+    annotations = [matching_annotation, non_matching_annotation]
 
-    book = wordnet.synsets("Book")[0]
+    book = wordnet.synsets("Book")[1]
 
     annotation = variable_from(annotations)
 
-    query = max(annotation, key=lambda a: similarity_key(book, a.description))
+    query = max(annotation, key=lambda a: max_similarity(book, a.description)[0])
     result = query.tolist()[0]
-    assert result is book_annotation
+
+    assert result is matching_annotation
