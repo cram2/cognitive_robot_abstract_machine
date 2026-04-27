@@ -24,5 +24,5 @@ def test_natural_language_comparison():
     annotation = variable_from(annotations)
 
     query = max(annotation, key=lambda a: similarity_key(book, a.description))
-    result = query.tolist()
+    result = query.tolist()[0]
     assert result is book_annotation
