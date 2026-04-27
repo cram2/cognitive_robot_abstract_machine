@@ -31,15 +31,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass(eq=False, repr=False)
 class PouringTask(Task):
     """
-    MSC Task that controls tilt and fill level via two symbolic QP constraints.
-
-    ``build()`` registers:
-
-    1. A velocity equality constraint on the fill joint encoding the fill-level ODE.
-    2. A gradient-driven tilt goal: it targets a desired outflow velocity
-       on the ODE symbolic expression, forcing the QP to find the necessary
-       tilt joint velocities to achieve that outflow. Outflow stops once the
-       fill level reaches ``goal_value``.
+    Motion Statechart task for controlling the tilt and fill level of a container.
     """
 
     fill_equation: PouringEquation
@@ -51,22 +43,18 @@ class PouringTask(Task):
     tolerance: float
     """Acceptance band around goal_value."""
 
-    target_outflow: float = field(default=0.05, kw_only=True)
+    reference_velocity: float = field(default=0.05, kw_only=True)
     """Desired rate of decrease for the normalized fill level."""
 
-    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
+    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
     """QP constraint weight for the tilt-driving gradient."""
-
-    max_velocity: float = field(default=1.0, kw_only=True)
-    """Maximum velocity for the tilt joint in rad/s."""
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
-        Register the fill ODE velocity constraint and the gradient-driven tilt constraint.
+        Creates the constraints for the fill level and the tilt angle.
 
-        :param context: MSC build context.
-        :return: NodeArtifacts with one velocity constraint (fill) and one gradient
-                 constraint (tilt-driving).
+        :param context: The build context.
+        :return: The generated task artifacts.
         """
         artifacts = NodeArtifacts()
         fill_connection = self.fill_equation.fill_connection
@@ -76,12 +64,12 @@ class PouringTask(Task):
         self.fill_vel_ode = self.fill_equation.symbolic_velocity()
 
         artifacts.constraints.add_equality_constraint(
-            name=f"{tilt_connection.name} 3",
+            name=f"{fill_connection.name}",
             equality_bound=sm.Scalar(self.goal_value) - fill_sym,
-            quadratic_weight=DefaultWeights.WEIGHT_ABOVE_CA,
+            quadratic_weight=self.weight,
             task_expression=fill_sym
-            + self.fill_vel_ode,  # This is linear approximation of fill sym as a function of fill and tilt. (one-step-ahead prediction, can be scaled by multiplication)
-            reference_velocity=self.target_outflow,
+            + self.fill_vel_ode,  # This is a linear approximation of fill sym as a function of fill and tilt.
+            reference_velocity=self.reference_velocity,
         )
         return artifacts
 
@@ -89,13 +77,10 @@ class PouringTask(Task):
         self, context: MotionStatechartContext
     ) -> Optional[ObservationStateValues]:
         """
-        Return TRUE when fill reaches the goal tolerance band, else None.
+        Checks if the goal fill level has been reached and that the outflow is zero.
 
-        The QP fill-velocity constraint ensures outflow stops once the tilt returns
-        upright, so checking only the fill level is sufficient.
-
-        :param context: MSC runtime context (unused; state is read directly from connections).
-        :return: ``TRUE`` when fill ≤ goal + tolerance, else ``None``.
+        :param context: The runtime context.
+        :return: The observation state.
         """
         fill = float(self.fill_equation.fill_connection.position)
         outflow = float(self.fill_vel_ode.evaluate()[0])
@@ -107,19 +92,7 @@ class PouringTask(Task):
 @dataclass(eq=False, repr=False)
 class CoupledPouringTask(PouringTask):
     """
-    Extends :class:`PouringTask` with kinematic rim-positioning constraints.
-
-    Receiver fill is driven by :class:`~semantic_digital_twin.physics.pouring_equations.InflowEquation`
-    wired on the receiver's :class:`~semantic_digital_twin.world_description.connections.LiquidConnection`
-    before the simulation starts, so no QP constraint for receiver fill is needed here.
-
-    :param receiver_fill_connection: Fill-level DOF of the receiving container.
-    :param root_link: Root of the kinematic chain that positions the source cup.
-    :param tip_link: Tip body (cup body) of the kinematic chain.
-    :param source_geometry: Physical dimensions of the source container.
-    :param receiver_target: World-frame [x, y, z] target for the spilling rim
-        (= receiver opening xyz + height_above_receiver in z).
-    :param goal_receiver_fill: Target normalised fill level for the receiver.
+    Motion Statechart task for pouring from one container into another.
     """
 
     receiver_fill_connection: Connection = field(kw_only=True)
@@ -131,10 +104,10 @@ class CoupledPouringTask(PouringTask):
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
-        Build source constraints via super(), then add rim positioning constraints.
+        Creates the pouring and rim positioning constraints.
 
-        :param context: MSC build context.
-        :return: NodeArtifacts with source tilt gradient and rim constraints.
+        :param context: The build context.
+        :return: The generated task artifacts.
         """
         artifacts = super().build(context)
 
@@ -165,10 +138,10 @@ class CoupledPouringTask(PouringTask):
         self, context: MotionStatechartContext
     ) -> Optional[ObservationStateValues]:
         """
-        Return TRUE when the receiver fill reaches the goal, else None.
+        Checks if the receiver goal fill level has been reached.
 
-        :param context: MSC runtime context (unused).
-        :return: ``TRUE`` when receiver fill ≥ goal_receiver_fill − tolerance, else ``None``.
+        :param context: The runtime context.
+        :return: The observation state.
         """
         fill = float(self.receiver_fill_connection.position)
         if fill >= self.goal_receiver_fill - self.tolerance:

@@ -588,7 +588,7 @@ class TestPouringPredicates:
             source=source,
             receiver=receiver,
             root_link=world.root,
-            target_outflow=0.1,
+            reference_velocity=0.1,
         )
         coupled_model.run(receiver_effect, world)
 
@@ -876,7 +876,7 @@ class TestPouringQueries:
             source=source,
             receiver=receiver,
             root_link=world.root,
-            target_outflow=0.1,
+            reference_velocity=0.1,
         )
         motion = Motion(
             trajectory=[],

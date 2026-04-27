@@ -42,7 +42,7 @@ class PouringMSCModel(PhysicsModel):
     fill_equation: PouringEquation
     """Pouring ODE — owns the tilt connection, fill connection, and k."""
 
-    target_outflow: float = field(default=0.05)
+    reference_velocity: float = field(default=0.05)
     """Desired rate of decrease for the normalized fill level."""
 
     initial_tilt: float = field(default=0.1)
@@ -108,7 +108,7 @@ class PouringMSCModel(PhysicsModel):
             fill_equation=self.fill_equation,
             goal_value=effect.goal_value,
             tolerance=effect.tolerance,
-            target_outflow=self.target_outflow,
+            reference_velocity=self.reference_velocity,
         )
         msc.add_node(task)
         msc.add_node(local_min := LocalMinimumReached())
@@ -133,7 +133,7 @@ class CoupledPouringMSCModel(PhysicsModel):
     source: HasFillLevel
     receiver: HasFillLevel
     root_link: Body
-    target_outflow: float = field(default=0.05)
+    reference_velocity: float = field(default=0.05)
     initial_tilt: float = field(default=0.1)
     timeout: int = field(default=2000)
     height_above_receiver: float = field(default=0.1)
@@ -233,7 +233,7 @@ class CoupledPouringMSCModel(PhysicsModel):
             fill_equation=self.source.fill_equation,
             goal_value=0.0,
             tolerance=effect.tolerance,
-            target_outflow=self.target_outflow,
+            reference_velocity=self.reference_velocity,
             receiver_fill_connection=self.receiver.fill_connection,
             root_link=self.root_link,
             tip_link=self.source.root,
