@@ -47,7 +47,8 @@ from semantic_digital_twin.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
+    LiquidConnection,
+    LiquidSurfaceConnection,
     RevoluteConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -69,12 +70,9 @@ from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
 from semantic_digital_twin.physics.pouring_equations import (
+    ArticulatedPouringEquation,
     PouringEquation,
     InflowEquation,
-)
-from semantic_digital_twin.world_description.connections import (
-    LiquidConnection,
-    RevoluteConnection,
 )
 
 if TYPE_CHECKING:
@@ -1064,66 +1062,44 @@ class HasFillLevel(HasContainerGeometry):
     position encodes fill in the range ``[0, 1]``. Call :meth:`initialize_fill_level`
     once after the annotation is placed in a world.
 
-    Optionally pass ``tilt_connection`` to :meth:`initialize_fill_level` to also
-    create a :attr:`liquid_surface_connection` — a revolute joint that counter-rotates
-    by the same DOF so the liquid surface body's XY plane stays parallel to the world
+    When ``parent_body`` is connected to its parent via a :class:`RevoluteConnection`,
+    a :attr:`liquid_surface_connection` is created automatically — a counter-rotating
+    revolute joint so the liquid surface body's XY plane stays parallel to the world
     XY plane regardless of cup tilt.
 
     After initialisation assign :attr:`fill_equation` (how the cup drains) and
     :attr:`inflow_equation` (how the cup fills from an external source).
     """
 
-    fill_connection: Optional[PrismaticConnection] = field(default=None, kw_only=True)
+    fill_connection: Optional[LiquidConnection] = field(default=None, kw_only=True)
     """The virtual connection whose position encodes fill level in [0, 1]."""
 
-    liquid_surface_connection: Optional[RevoluteConnection] = field(
+    liquid_surface_connection: Optional[LiquidSurfaceConnection] = field(
         default=None, kw_only=True
     )
     """
     Counter-rotation connection whose child body is always world-frame aligned.
-
-    Only present when ``tilt_connection`` was passed to :meth:`initialize_fill_level`.
     """
-
-    @property
-    def fill_equation(self) -> Optional[PouringEquation]:
-        """ODE governing how this container drains when tilted."""
-        return self.__dict__.get("_fill_equation")
-
-    @fill_equation.setter
-    def fill_equation(self, equation: Optional[PouringEquation]) -> None:
-        self.__dict__["_fill_equation"] = equation
-        if self.fill_connection is not None:
-            self.fill_connection.outflow_equation = equation
-
-    @property
-    def inflow_equation(self) -> Optional[InflowEquation]:
-        """ODE governing how this container fills from an external source."""
-        return self.__dict__.get("_inflow_equation")
-
-    @inflow_equation.setter
-    def inflow_equation(self, equation: Optional[InflowEquation]) -> None:
-        self.__dict__["_inflow_equation"] = equation
-        if self.fill_connection is not None:
-            self.fill_connection.inflow_equation = equation
 
     def initialize_fill_level(
         self,
         world,
         parent_body: Body,
         initial_fill: float = 1.0,
-        tilt_connection: Optional[RevoluteConnection] = None,
+        k: float = 1.0,
     ) -> None:
         """
-        Create the virtual fill-level DOF and the virtual liquid surface DOF and attach them to the world.
+        Create the virtual fill-level DOF, attach it to the world, and wire up the pouring equation.
 
         :param world: The world to add the fill-level DOF to.
         :param parent_body: The body the fill-level DOF is attached to.
         :param initial_fill: Starting fill level in [0, 1].
-        :param tilt_connection: When provided, adds a liquid surface body whose
-            orientation is always aligned with the world frame.
+        :param k: Outflow rate constant for the articulated pouring equation.
         """
         phantom = Body(name=PrefixedName(f"{parent_body.name.name}_fill_level_phantom"))
+        surface_phantom = Body(
+            name=PrefixedName(f"{parent_body.name.name}_liquid_surface_phantom")
+        )
         with world.modify_world():
             world.add_body(phantom)
             connection = LiquidConnection.create_with_dofs(
@@ -1137,34 +1113,25 @@ class HasFillLevel(HasContainerGeometry):
                 ),
             )
             world.add_connection(connection)
+
+        with world.modify_world():
+            world.add_body(surface_phantom)
+            surface_connection = LiquidSurfaceConnection(
+                parent=phantom,
+                child=surface_phantom,
+            )
+            world.add_connection(surface_connection)
+
         self.fill_connection = connection
+        self.liquid_surface_connection = surface_connection
         world.set_positions_1DOF_connection({connection: initial_fill})
 
-        if tilt_connection is not None:
-            # self.fill_connection.tilt_expression = (
-            #     tilt_connection.dof.variables.position
-            # )
-            surface_phantom = Body(
-                name=PrefixedName(f"{parent_body.name.name}_liquid_surface_phantom")
-            )
-            with world.modify_world():
-                world.add_body(surface_phantom)
-                surface_connection = RevoluteConnection(
-                    parent=phantom,
-                    child=surface_phantom,
-                    axis=tilt_connection.axis,
-                    dof_id=tilt_connection.dof_id,
-                    multiplier=-tilt_connection.multiplier,
-                )
-                world.add_connection(surface_connection)
-            self.liquid_surface_connection = surface_connection
+        self.fill_equation = ArticulatedPouringEquation(
+            container_geometry=self.container_geometry,
+            k=k,
+        )
 
     @property
     def fill_level(self) -> float:
         """Current fill level in ``[0, 1]``."""
         return float(self.fill_connection.position)
-
-    @property
-    def liquid_surface_body(self) -> Body:
-        """The body whose XY plane is always parallel to the world XY plane."""
-        return self.liquid_surface_connection.child

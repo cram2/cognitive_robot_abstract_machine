@@ -12,9 +12,6 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.pouring import PouringTask
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.physics.pouring_equations import (
-    ArticulatedPouringEquation,
-)
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -90,11 +87,6 @@ def world_with_cup():
         world=world,
         parent_body=cup.root,
         initial_fill=1.0,
-        tilt_connection=cup.root.parent_connection,
-    )
-    cup.fill_equation = ArticulatedPouringEquation(
-        fill_connection=cup.fill_connection,
-        container_geometry=cup.container_geometry,
         k=1,
     )
     world.set_positions_1DOF_connection({cup.root.parent_connection: 0.1})
@@ -118,6 +110,7 @@ class TestPouringTask:
         msc = MotionStatechart()
         pouring_task = PouringTask(
             fill_equation=cup.fill_equation,
+            fill_connection=cup.fill_connection,
             root_link=world.root,
             tip_link=cup.root,
             goal_value=goal_fill,
@@ -187,10 +180,6 @@ class TestPouringTask:
             world=world,
             parent_body=cup.root,
             initial_fill=1.0,
-        )
-        cup.fill_equation = ArticulatedPouringEquation(
-            fill_connection=cup.fill_connection,
-            container_geometry=cup.container_geometry,
             k=1.0,
         )
 
@@ -200,6 +189,7 @@ class TestPouringTask:
         msc = MotionStatechart()
         pouring_task = PouringTask(
             fill_equation=cup.fill_equation,
+            fill_connection=cup.fill_connection,
             root_link=world.root,
             tip_link=cup_body,
             goal_value=goal_fill,
@@ -218,5 +208,6 @@ class TestPouringTask:
         assert pouring_task.observation_state == ObservationStateValues.TRUE
         assert cup.fill_level == pytest.approx(goal_fill, abs=tolerance)
         assert cup.fill_equation.symbolic_velocity(
-            cup.fill_connection.tilt_expression
+            cup.fill_connection.tilt_expression,
+            cup.fill_connection.dof.variables.position,
         ).evaluate()[0] == pytest.approx(0.0, abs=1e-2)

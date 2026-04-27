@@ -10,6 +10,7 @@ from typing_extensions import List, TYPE_CHECKING, Union, Optional, Dict, Any, S
 
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.symbolic_math import Scalar
+from semantic_digital_twin.physics.pouring_equations import tilt_expression_from_fk
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -1153,6 +1154,42 @@ class DifferentialDrive(ActiveConnection, HasUpdateState):
 
 
 @dataclass(eq=False)
+class LiquidSurfaceConnection(Connection):
+    """
+    Counter-rotation connection whose child body's orientation is always world-frame aligned.
+    Together with LiquidConnection it is used for visualizing the surface of an liquid under approximated physics.
+
+    Computes its rotation symbolically such that the child body's XY plane stays parallel
+    to the world XY plane regardless of how its parent is connected or tilted.
+    """
+
+    def add_to_world(self, world: World):
+        super().add_to_world(world)
+
+        root_T_parent = self._world.compose_forward_kinematics_expression(
+            self._world.root, self.parent
+        )
+        parent_R_root = root_T_parent.to_rotation_matrix().inverse()
+
+        # Extract gravity vector in parent frame
+        # World Z is [0, 0, 1]. In parent frame it is parent_R_root * [0, 0, 1]
+        parent_V_world_z = parent_R_root.z_vector()
+
+        # We want child's Z to be world Z.
+        # So we need a rotation that maps parent frame's Z to parent_V_world_z?
+        # No, child frame Z should be world Z in world frame.
+        # In parent frame, child frame Z should be parent_V_world_z.
+
+        # We can construct parent_R_child such that its Z column is parent_V_world_z.
+        # To keep it simple and avoid arbitrary rotations around Z,
+        # we can use the inverse of parent's orientation.
+        self._kinematics = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            rotation_matrix=parent_R_root,
+            child_frame=self.child,
+        )
+
+
+@dataclass(eq=False)
 class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
     """
     Translating DOF representing the fill level of a container.
@@ -1187,8 +1224,6 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
     @property
     def tilt_expression(self) -> Optional[Scalar]:
         """Symbolic tilt angle used by :attr:`outflow_equation` during physics integration."""
-        from physics.pouring_equations import tilt_expression_from_fk
-
         root_T_child = self._world.compose_forward_kinematics_expression(
             self._world.root, self.child
         )
@@ -1201,7 +1236,8 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
         velocity = 0.0
         if self.outflow_equation is not None:
             velocity += self.outflow_equation.symbolic_velocity(
-                self.tilt_expression
+                self.tilt_expression,
+                self.dof.variables.position,
             ).evaluate()[0]
         if self.inflow_equation is not None:
             velocity += self.inflow_equation.symbolic_velocity().evaluate()[0]

@@ -23,9 +23,7 @@ from semantic_digital_twin.physics.pouring_equations import (
     PouringEquation,
     tilt_expression_from_fk,
 )
-from semantic_digital_twin.world_description.geometry import ContainerGeometry
-from semantic_digital_twin.spatial_types import Point3
-from semantic_digital_twin.world_description.connections import Connection
+from semantic_digital_twin.world_description.connections import LiquidConnection
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -37,6 +35,9 @@ class PouringTask(Task):
 
     fill_equation: PouringEquation
     """Pouring ODE coupling tilt to the fill-level DOF."""
+
+    fill_connection: LiquidConnection
+    """Virtual DOF whose position encodes fill level in [0, 1]."""
 
     root_link: Body = field(kw_only=True)
     """Root of the kinematic chain used to derive the cup tilt expression."""
@@ -64,17 +65,16 @@ class PouringTask(Task):
         :return: The generated task artifacts.
         """
         artifacts = NodeArtifacts()
-        fill_connection = self.fill_equation.fill_connection
-        fill_sym = fill_connection.dof.variables.position
+        fill_sym = self.fill_connection.dof.variables.position
 
         root_T_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
         tilt_expr = tilt_expression_from_fk(root_T_tip)
-        self.fill_vel_ode = self.fill_equation.symbolic_velocity(tilt_expr)
+        self.fill_vel_ode = self.fill_equation.symbolic_velocity(tilt_expr, fill_sym)
 
         artifacts.constraints.add_equality_constraint(
-            name=f"{fill_connection.name}",
+            name=f"{self.fill_connection.name}",
             equality_bound=sm.Scalar(self.goal_value) - fill_sym,
             quadratic_weight=self.weight,
             task_expression=fill_sym
@@ -92,7 +92,7 @@ class PouringTask(Task):
         :param context: The runtime context.
         :return: The observation state.
         """
-        fill = float(self.fill_equation.fill_connection.position)
+        fill = float(self.fill_connection.position)
         outflow = float(self.fill_vel_ode.evaluate()[0])
         if fill <= self.goal_value + self.tolerance and outflow >= 0.0:
             return ObservationStateValues.TRUE

@@ -14,7 +14,6 @@ import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import Scalar
 
 from semantic_digital_twin.physics.differential_equation import DifferentialEquation
-from semantic_digital_twin.world_description.connections import PrismaticConnection
 from semantic_digital_twin.world_description.geometry import ContainerGeometry
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 
@@ -24,22 +23,23 @@ class PouringEquation(DifferentialEquation):
     """
     Abstract ODE for pouring-domain fill-level dynamics.
 
-    Owns the fill connection and outflow rate constant ``k``.
+    Owns the outflow rate constant ``k``.
     Concrete subclasses implement :meth:`symbolic_velocity`.
 
-    :param fill_connection: Prismatic DOF whose position encodes fill level in [0, 1].
     :param k: Outflow rate constant.
     """
 
-    fill_connection: PrismaticConnection
     k: float = field(default=1.0, kw_only=True)
 
     @abstractmethod
-    def symbolic_velocity(self, tilt_expression: Scalar) -> Scalar:
+    def symbolic_velocity(
+        self, tilt_expression: Scalar, fill_expression: Scalar
+    ) -> Scalar:
         """
         Symbolic d(fill_normalized)/dt as a CasADi expression.
 
         :param tilt_expression: Symbolic tilt angle θ in radians.
+        :param fill_expression: Symbolic fill level in [0, 1].
         :return: Symbolic desired fill velocity.
         """
 
@@ -82,14 +82,17 @@ class ArticulatedPouringEquation(PouringEquation):
         r = self.container_geometry.half_width
         return sm.atan2(A - fill_sym * A, r)
 
-    def symbolic_velocity(self, tilt_expression: Scalar) -> Scalar:
+    def symbolic_velocity(
+        self, tilt_expression: Scalar, fill_expression: Scalar
+    ) -> Scalar:
         """
         :param tilt_expression: Symbolic tilt angle θ in radians.
+        :param fill_expression: Symbolic fill level in [0, 1].
         :return: Symbolic d(fill_normalized)/dt as a CasADi expression.
         """
         A = self.container_geometry.height
         r = self.container_geometry.half_width
-        h_sym = self.fill_connection.dof.variables.position * A
+        h_sym = fill_expression * A
         L_sym = sm.sqrt((A - h_sym) ** 2 + r**2)
         phi_sym = sm.atan2(A - h_sym, r)
         gap_sym = sm.max(

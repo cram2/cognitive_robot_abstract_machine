@@ -27,9 +27,6 @@ from pycram.body_motion_problem.pouring.physics import (
     PouringMSCModel,
 )
 from pycram.body_motion_problem.pouring.predicates import PouringCanPerform
-from semantic_digital_twin.physics.pouring_equations import (
-    ArticulatedPouringEquation,
-)
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -144,11 +141,6 @@ def world_with_cup():
         world=world,
         parent_body=cup.root,
         initial_fill=1.0,
-        tilt_connection=cup.root.parent_connection,
-    )
-    cup.fill_equation = ArticulatedPouringEquation(
-        fill_connection=cup.fill_connection,
-        container_geometry=cup.container_geometry,
         k=1,
     )
     world.set_positions_1DOF_connection({cup.root.parent_connection: 0.1})
@@ -181,11 +173,6 @@ def pr2_world_with_cup(pr2_world_setup):
         world=world,
         parent_body=cup.root,
         initial_fill=1.0,
-        tilt_connection=cup.root.parent_connection,
-    )
-    cup.fill_equation = ArticulatedPouringEquation(
-        fill_connection=cup.fill_connection,
-        container_geometry=cup.container_geometry,
     )
     world.set_positions_1DOF_connection({cup.root.parent_connection: 0.1})
     return world, cup, robot
@@ -390,6 +377,7 @@ class TestPouringPredicates:
         )
         physics = PouringMSCModel(
             fill_equation=cup.fill_equation,
+            fill_connection=cup.fill_connection,
             tilt_connection=cup.root.parent_connection,
             root_link=world.root,
             tip_link=cup.root,
@@ -411,6 +399,7 @@ class TestPouringPredicates:
             actuator=cup.root.parent_connection,
             motion_model=PouringMSCModel(
                 fill_equation=cup.fill_equation,
+                fill_connection=cup.fill_connection,
                 tilt_connection=cup.root.parent_connection,
                 root_link=world.root,
                 tip_link=cup.root,
@@ -550,6 +539,7 @@ class TestPouringQueries:
             actuator=cup.root.parent_connection,
             motion_model=PouringMSCModel(
                 fill_equation=cup.fill_equation,
+                fill_connection=cup.fill_connection,
                 tilt_connection=cup.root.parent_connection,
                 root_link=world.root,
                 tip_link=cup.root,
@@ -586,6 +576,7 @@ class TestPouringQueries:
             actuator=cup.root.parent_connection,
             motion_model=PouringMSCModel(
                 fill_equation=cup.fill_equation,
+                fill_connection=cup.fill_connection,
                 tilt_connection=cup.root.parent_connection,
                 root_link=world.root,
                 tip_link=cup.root,
@@ -618,6 +609,7 @@ class TestPouringQueries:
             actuator=cup.root.parent_connection,
             motion_model=PouringMSCModel(
                 fill_equation=cup.fill_equation,
+                fill_connection=cup.fill_connection,
                 tilt_connection=cup.root.parent_connection,
                 root_link=world.root,
                 tip_link=cup.root,

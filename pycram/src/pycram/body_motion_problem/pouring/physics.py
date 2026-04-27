@@ -22,7 +22,10 @@ from pycram.body_motion_problem.types import (
 from semantic_digital_twin.physics.pouring_equations import PouringEquation
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import Connection
+from semantic_digital_twin.world_description.connections import (
+    Connection,
+    LiquidConnection,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -37,7 +40,10 @@ class PouringMSCModel(PhysicsModel):
     """
 
     fill_equation: PouringEquation
-    """Pouring ODE — owns the fill connection and k."""
+    """Pouring ODE governing outflow rate."""
+
+    fill_connection: LiquidConnection
+    """Virtual DOF whose position encodes fill level in [0, 1]."""
 
     tilt_connection: Connection = field(kw_only=True)
     """Revolute connection whose angle drives pouring; used for trajectory recording and initial setup."""
@@ -69,13 +75,12 @@ class PouringMSCModel(PhysicsModel):
         :return: ``(tilt_trajectory, achieved)`` — tilt samples at each tick and success flag.
         """
         msc = self._build_msc(effect)
-        fill_connection = self.fill_equation.fill_connection
         tilt_trajectory: List[float] = []
         fill_trajectory: List[float] = []
 
         def on_tick() -> None:
             tilt_trajectory.append(float(self.tilt_connection.position))
-            fill_trajectory.append(float(fill_connection.position))
+            fill_trajectory.append(float(self.fill_connection.position))
 
         achieved = self._run_msc(
             msc,
@@ -111,6 +116,7 @@ class PouringMSCModel(PhysicsModel):
         msc = MotionStatechart()
         task = PouringTask(
             fill_equation=self.fill_equation,
+            fill_connection=self.fill_connection,
             root_link=self.root_link,
             tip_link=self.tip_link,
             goal_value=effect.goal_value,
