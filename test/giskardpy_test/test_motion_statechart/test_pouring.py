@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 import math
-from copy import deepcopy
 import pytest
 
-from adapters.ros.visualization.viz_marker import VizMarkerPublisher
-from giskardpy.executor import Executor, SimulationPacer
+from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.pouring import PouringTask
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -31,7 +28,6 @@ from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from dataclasses import dataclass
 from krrood.ormatic.utils import classproperty
-from krrood.utils import clear_memoization_cache
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     FixedConnection,
@@ -83,7 +79,6 @@ class TestPouringTask:
         to the target value.
         """
         world, cup = world_with_cup
-        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
 
         goal_fill = 0.6
         tolerance = 0.05
@@ -118,7 +113,6 @@ class TestPouringTask:
         Test that PouringTask works when the cup is held by the PR2 robot.
         """
         world = pr2_world_setup
-        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
 
         # 2. Create a cup setup
         gripper_frame = world.get_kinematic_structure_entity_by_name(

@@ -27,9 +27,6 @@ from pycram.body_motion_problem.pouring.physics import (
     PouringMSCModel,
 )
 from pycram.body_motion_problem.pouring.predicates import PouringCanPerform
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.pr2 import PR2
@@ -290,11 +287,12 @@ class TestContainerManipulationPredicates:
         # effects[0] = OpenedEffect, motions[1] = close motion — direction mismatch
         assert not Causes(effect=effects[0], motion=motions[1], environment=world)()
 
-    def test_can_execute(self, mutable_model_world, rclpy_node):
+    def test_can_execute(self, mutable_model_world):
         """ContainerCanPerform returns False for an empty trajectory and a bool for a non-empty one."""
         world = mutable_model_world
-        viz = VizMarkerPublisher(_world=world, node=rclpy_node)
-        viz.with_tf_publisher()
+        world.get_body_by_name("base_footprint").parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(1.2, 2, 0)
+        )
 
         _, motions, _, _, drawers = _extend_world(world, only_drawers=True)
         robot = PR2.from_world(world)
@@ -495,11 +493,9 @@ class TestContainerManipulationQueries:
 
 
 class TestPouringQueries:
-    def test_causes_pours_out_40_percent(self, world_with_cup, rclpy_node):
+    def test_causes_pours_out_40_percent(self, world_with_cup):
         """Causes predicate generates a trajectory that reduces fill level by 40%."""
         world, cup = world_with_cup
-        viz = VizMarkerPublisher(_world=world, node=rclpy_node)
-        viz.with_tf_publisher()
 
         goal_fill = 0.6
         effect = PouringEffect(
@@ -532,11 +528,9 @@ class TestPouringQueries:
         causes.replay(step_delay=0.001)
         assert cup.fill_level == pytest.approx(goal_fill, abs=0.1)
 
-    def test_pouring_can_perform(self, pr2_world_with_cup, rclpy_node):
+    def test_pouring_can_perform(self, pr2_world_with_cup):
         """PouringCanPerform confirms the PR2 can execute the tilt trajectory from Causes."""
         world, cup, robot = pr2_world_with_cup
-        viz = VizMarkerPublisher(_world=world, node=rclpy_node)
-        viz.with_tf_publisher()
 
         goal_fill = 0.6
         effect = PouringEffect(
@@ -560,11 +554,9 @@ class TestPouringQueries:
         assert causes()
         assert PouringCanPerform(motion=motion, robot=robot)()
 
-    def test_eql_query_all_three_predicates(self, pr2_world_with_cup, rclpy_node):
+    def test_eql_query_all_three_predicates(self, pr2_world_with_cup):
         """EQL query resolves task, effect, and motion simultaneously across all three BMP predicates."""
         world, cup, robot = pr2_world_with_cup
-        viz = VizMarkerPublisher(_world=world, node=rclpy_node)
-        viz.with_tf_publisher()
 
         goal_fill = 0.6
         task = TaskRequest(
@@ -608,12 +600,9 @@ class TestPouringQueries:
         assert result.data[effect_sym].goal_value == goal_fill
         assert len(result.data[motion_sym].trajectory) > 0
 
-    def test_infer_effects_and_tasks_from_given_motion(
-        self, world_with_cup, rclpy_node
-    ):
+    def test_infer_effects_and_tasks_from_given_motion(self, world_with_cup):
         """Given a fixed tilt trajectory, the query identifies which effects and task requests it satisfies."""
         world, cup = world_with_cup
-        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
 
         trajectory = [0.1, 1.0, 1.3] + ([1.3] * 30) + [1.3, 1.0, 0.7, 0.4, 0.1, 0.0]
 
@@ -665,11 +654,10 @@ class TestPouringQueries:
 @pytest.mark.skip(reason="Long-running tests are skipped in CI for now")
 class TestRobotIntegration:
     def test_query_motion_satisfying_task_request_stretch(
-        self, stretch_apartment_world, rclpy_node
+        self, stretch_apartment_world
     ):
         """Motion querying for open task using Stretch robot in the kitchen world (drawers only)."""
         world = stretch_apartment_world
-        # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
 
         effects, motions, open_task, _, drawers = _extend_world(
             world, only_drawers=True
@@ -691,13 +679,9 @@ class TestRobotIntegration:
         results = list(query.evaluate())
         assert len(results) > 1
 
-    def test_query_motion_satisfying_task_request_tiago(
-        self, tiago_apartment_world, rclpy_node
-    ):
+    def test_query_motion_satisfying_task_request_tiago(self, tiago_apartment_world):
         """Motion querying for open task using Tiago robot in the kitchen world (doors only)."""
         world = tiago_apartment_world
-        viz = VizMarkerPublisher(_world=world, node=rclpy_node)
-        viz.with_tf_publisher()
 
         effects, motions, open_task, _, _ = _extend_world(
             world, only_doors=False, only_drawers=True
@@ -724,13 +708,9 @@ class TestRobotIntegration:
         results = list(query.evaluate())
         assert len(results) >= 0  # =0 because of Tiago
 
-    def test_query_task_and_effect_satisfying_motion_pr2(
-        self, mutable_model_world, rclpy_node
-    ):
+    def test_query_task_and_effect_satisfying_motion_pr2(self, mutable_model_world):
         """Given a fixed motion on the first drawer, query recovers task and effect using PR2."""
         world = mutable_model_world
-        viz = VizMarkerPublisher(_world=world, node=rclpy_node)
-        viz.with_tf_publisher()
 
         effects, _, open_task, close_task, drawers = _extend_world(world)
 
