@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.pyrefly]
+project-includes = ["**/*"]
+project-excludes = ["**/*venv/**/*"]
+
+[project]
+name = "robokudo"
+authors = [
+    { name="Patrick Mania", email="pmania@uni-bremen.de" },
+]
+description = "Cognitive robot perception framework"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+keywords=["robotics", "perception"]
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+"Source" = 'https://gitlab.informatik.uni-bremen.de/robokudo/'
+"Bug Tracker" = 'https://gitlab.informatik.uni-bremen.de/robokudo/robokudo/-/issues'
+
+[tool.setuptools.packages.find]
+where = ["src"]  # list of folders that contain the packages (["."] by default)
+include = ["robokudo*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "robokudo.__version__"}
+dependencies = {file = "requirements.txt"}

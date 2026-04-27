@@ -5,7 +5,8 @@ from pathlib import Path
 from collections import defaultdict
 from typing import Any, Dict
 import pytest
-from krrood.utils import get_scope_from_imports, SourceDataNotProvided
+from krrood.utils import get_scope_from_imports
+from krrood.exceptions import SourceDataNotProvided
 
 
 def test_get_scope_from_imports_basic():
