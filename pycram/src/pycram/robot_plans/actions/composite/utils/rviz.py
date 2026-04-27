@@ -3,6 +3,7 @@ import numpy as np
 from geometry_msgs.msg import Point
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
+from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 
 _MARKER_GROUP_COUNTER = 0
 
@@ -435,6 +436,168 @@ class CostmapHeatmapRviz:
 
         arr = MarkerArray()
         arr.markers.append(marker)
+        self.pub.publish(arr)
+
+
+class CameraVisiblePointsRviz:
+    def __init__(
+        self,
+        world,
+        camera_pose,
+        *,
+        node,
+        frame_id="map",
+        topic="camera_visible_points",
+        marker_ns=None,
+        resolution=128,
+        min_distance=0.0,
+        max_distance=np.inf,
+        point_scale=0.01,
+        alpha=0.9,
+        show_rays=False,
+        ray_stride=8,
+        ray_alpha=0.2,
+        origin_scale=0.03,
+        republish_hz=2.0,
+    ):
+        """
+        Publish visible raytracer hit points from a camera pose as an RViz POINTS marker.
+        """
+        if node is None:
+            raise ValueError(
+                "node must be provided when publishing visible camera points"
+            )
+
+        self.world = world
+        self.camera_pose = camera_pose
+        self.node = node
+        self.frame_id = str(frame_id)
+        self.topic = _norm_topic(topic)
+        self.marker_ns = (
+            str(marker_ns)
+            if marker_ns is not None
+            else _next_marker_group("camera_visible_points")
+        )
+        self.resolution = int(resolution)
+        self.min_distance = float(min_distance)
+        self.max_distance = float(max_distance)
+        self.point_scale = float(point_scale)
+        self.alpha = float(alpha)
+        self.show_rays = bool(show_rays)
+        self.ray_stride = max(int(ray_stride), 1)
+        self.ray_alpha = float(ray_alpha)
+        self.origin_scale = float(origin_scale)
+        self.pub = self.node.create_publisher(MarkerArray, self.topic, 10)
+        self.ray_tracer = RayTracer(world)
+
+        self.node.get_logger().info(
+            f"Publishing visible camera points on {self.topic} in frame '{self.frame_id}'"
+        )
+
+        self.publish_once()
+
+        self._timer = None
+        if republish_hz is not None and float(republish_hz) > 0.0:
+            self._timer = self.node.create_timer(
+                1.0 / float(republish_hz), self.publish_once
+            )
+
+    def set_camera_pose(self, camera_pose):
+        self.camera_pose = camera_pose
+
+    def _visible_points_and_colors(self):
+        ray_origins, ray_directions, _ = self.ray_tracer.create_camera_rays(
+            self.camera_pose, resolution=self.resolution
+        )
+        target_points = ray_origins + ray_directions * 10.0
+        points, index_ray, _ = self.ray_tracer.ray_test(
+            ray_origins,
+            target_points,
+            multiple_hits=True,
+            min_distance=self.min_distance,
+            max_distance=self.max_distance,
+        )
+
+        if len(index_ray) == 0:
+            return np.zeros((0, 3), dtype=float), [], np.zeros((0, 3), dtype=float)
+
+        unique_index = np.unique(index_ray, return_index=True)[1]
+        points = np.asarray(points, dtype=float)[unique_index]
+        index_ray = np.asarray(index_ray, dtype=int)[unique_index]
+        hit_origins = np.asarray(ray_origins[index_ray], dtype=float)
+        depths = np.linalg.norm(points - hit_origins, axis=1)
+
+        if len(depths) == 0:
+            return np.zeros((0, 3), dtype=float), [], np.zeros((0, 3), dtype=float)
+
+        d_min = float(np.min(depths))
+        d_max = float(np.max(depths))
+        denom = d_max - d_min
+        normalized = np.ones_like(depths) if denom <= 0.0 else (depths - d_min) / denom
+        colors = [_heat_color(value, alpha=self.alpha) for value in normalized]
+        return points, colors, hit_origins
+
+    def publish_once(self):
+        now = self.node.get_clock().now().to_msg()
+        points_np, colors, hit_origins = self._visible_points_and_colors()
+        arr = MarkerArray()
+
+        points_marker = Marker()
+        points_marker.header.frame_id = self.frame_id
+        points_marker.header.stamp = now
+        points_marker.ns = self.marker_ns
+        points_marker.id = 0
+        points_marker.type = Marker.POINTS
+        points_marker.action = Marker.ADD
+        points_marker.pose.orientation.w = 1.0
+        points_marker.scale.x = self.point_scale
+        points_marker.scale.y = self.point_scale
+        points_marker.points = _as_points(points_np)
+        points_marker.colors = colors
+        arr.markers.append(points_marker)
+
+        origin_position, _ = _pose_to_position_and_orientation_lists(self.camera_pose)
+        origin_marker = Marker()
+        origin_marker.header.frame_id = self.frame_id
+        origin_marker.header.stamp = now
+        origin_marker.ns = self.marker_ns
+        origin_marker.id = 1
+        origin_marker.type = Marker.SPHERE
+        origin_marker.action = Marker.ADD
+        origin_marker.pose.orientation.w = 1.0
+        origin_marker.pose.position.x = float(origin_position[0])
+        origin_marker.pose.position.y = float(origin_position[1])
+        origin_marker.pose.position.z = float(origin_position[2])
+        origin_marker.scale.x = self.origin_scale
+        origin_marker.scale.y = self.origin_scale
+        origin_marker.scale.z = self.origin_scale
+        origin_marker.color = _color(1.0, 1.0, 1.0, 1.0)
+        arr.markers.append(origin_marker)
+
+        if self.show_rays and len(points_np) > 0:
+            ray_marker = Marker()
+            ray_marker.header.frame_id = self.frame_id
+            ray_marker.header.stamp = now
+            ray_marker.ns = self.marker_ns
+            ray_marker.id = 2
+            ray_marker.type = Marker.LINE_LIST
+            ray_marker.action = Marker.ADD
+            ray_marker.pose.orientation.w = 1.0
+            ray_marker.scale.x = self.point_scale * 0.35
+            ray_points = []
+            ray_colors = []
+            for i in range(0, len(points_np), self.ray_stride):
+                ray_points.extend(_as_points([hit_origins[i], points_np[i]]))
+                ray_colors.extend(
+                    [
+                        _color(1.0, 1.0, 1.0, self.ray_alpha),
+                        _color(1.0, 1.0, 1.0, self.ray_alpha),
+                    ]
+                )
+            ray_marker.points = ray_points
+            ray_marker.colors = ray_colors
+            arr.markers.append(ray_marker)
+
         self.pub.publish(arr)
 
 

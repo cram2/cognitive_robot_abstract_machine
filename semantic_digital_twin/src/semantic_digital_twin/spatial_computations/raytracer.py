@@ -187,13 +187,19 @@ class RayTracer:
             min_distance=min_distance,
             max_distance=max_distance,
         )
+
+        # A camera view may legitimately miss all geometry. In that case we return
+        # an empty depth image filled with the sentinel value used elsewhere.
+        if len(index_ray) == 0:
+            return np.zeros(self.scene.camera.resolution, dtype=np.float32) - 1
+
         unique_index = np.unique(index_ray, return_index=True)[1]
         index_ray = index_ray[unique_index]
         points = points[unique_index]
         ray_origins = ray_origins[unique_index]
 
         depth = trimesh.util.diagonal_dot(
-            points - ray_origins[0], ray_directions[index_ray]
+            points - ray_origins, ray_directions[index_ray]
         )
         pixel_ray = pixels[index_ray]
 
