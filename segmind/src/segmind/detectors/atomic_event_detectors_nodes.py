@@ -186,13 +186,8 @@ class MotionDetector(AbstractDetector):
         """
 
         latest_poses = context.latest_poses[obj]
-        p_last = np.array(latest_poses[-1].to_position().to_list())
-        for p in latest_poses[:-1]:
-            p_prev = np.array(p.to_position().to_list())
-            distance = np.linalg.norm(p_last - p_prev)
-            if distance > self.distance_threshold:
-                return True
-        return False
+
+        return (latest_poses[0].to_position() - latest_poses[-1].to_position()).norm() > self.distance_threshold
 
     def _is_stationary(self, poses: List[Pose]) -> bool:
         """
@@ -201,19 +196,10 @@ class MotionDetector(AbstractDetector):
         :param poses: List of recent poses.
         :return: True if stationary, False otherwise.
         """
-        p_last = np.array(poses[-1].to_position().to_list())
-
-        distances = [
-            np.linalg.norm(p_last - np.array(p.to_position().to_list()))
-            for p in poses[:-1]
-        ]
-
-        if not distances:
+        if len(poses) < self.window_size:
             return True
 
-        avg_distance = np.mean(distances)
-
-        return avg_distance < self.distance_threshold
+        return (poses[0].to_position() - poses[-1].to_position()).norm() < self.distance_threshold
 
 @dataclass(eq=False, repr=False)
 class TranslationDetector(MotionDetector):
