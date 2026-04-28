@@ -173,14 +173,13 @@ class UnderspecifiedParameters:
                             f"{name}.{get_clean_name_from_mapped_variable(feature)}"
                         ] = random_events.variable.Continuous(
                             name=f"{name}.{get_clean_name_from_mapped_variable(feature)}",
-                            domain=singleton(mapping),
                         )
                         event = Event.from_simple_sets(
                             SimpleEvent.from_data(
                                 {
                                     result[
                                         f"{name}.{get_clean_name_from_mapped_variable(feature)}"
-                                    ]: mapping
+                                    ]: singleton(mapping)
                                 }
                             )
                         )
@@ -232,7 +231,6 @@ class UnderspecifiedParameters:
         name = f"{attribute_match.name_from_variable_access_path}"
         result = random_events.variable.Continuous(
             name=name,
-            domain=singleton(attribute_match.assigned_value),
         )
         event = Event.from_simple_sets(
             SimpleEvent.from_data({result: attribute_match.assigned_value})

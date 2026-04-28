@@ -1964,6 +1964,14 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def z(self, value: sm.ScalarData):
         self[2, 3] = value
 
+    @property
+    def position(self) -> Point3:
+        return self.to_position()
+
+    @property
+    def orientation(self) -> Quaternion:
+        return self.to_quaternion()
+
     def to_position(self) -> Point3:
         result = Point3.from_iterable(
             self[:4, 3:], reference_frame=self.reference_frame

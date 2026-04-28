@@ -81,6 +81,10 @@ class ProbabilisticModel(ABC):
         :return: The variables of the model.
         """
 
+    def get_variable_by_name(self, name: str) -> Variable:
+        [variable] = [v for v in self.variables if v.name == name]
+        return variable
+
     @property
     @abstractmethod
     def support(self) -> Event:
