@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 import os
 
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from threading import RLock
-from segmind import set_logger_level, LogLevel, logger
 from typing_extensions import Callable, Optional, Dict, Generator, List
 
 from segmind.datastructures.enums import PlayerStatus
@@ -19,11 +18,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
-set_logger_level(LogLevel.DEBUG)
-try:
-    from pycram.worlds.multiverse import Multiverse
-except ImportError:
-    Multiverse = None
+logger = logging.getLogger(__name__)
 
 
 

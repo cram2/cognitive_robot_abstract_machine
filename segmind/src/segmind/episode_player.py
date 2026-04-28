@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from threading import RLock
 from typing import Any, Callable, ClassVar, Optional
 
-from segmind import LogLevel, logger, set_logger_level
 from segmind.datastructures.enums import PlayerStatus
 from segmind.utils import PropagatingThread
 from semantic_digital_twin.world import World
 
 
-set_logger_level(LogLevel.DEBUG)
+logger = logging.getLogger(__name__)
 
 try:
     from ripple_down_rules.user_interface.gui import RDRCaseViewer

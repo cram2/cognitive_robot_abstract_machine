@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import queue
 import threading
@@ -14,9 +15,9 @@ from segmind.datastructures.object_tracker import ObjectTrackerFactory
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Optional, Dict, Type, Callable, Tuple
 from typing import ClassVar
-from segmind import set_logger_level, LogLevel, logger
 
-set_logger_level(LogLevel.DEBUG)
+logger = logging.getLogger(__name__)
+
 
 ConditionFunction = Callable[[DetectionEvent], bool]
 CallbackFunction = Callable[[DetectionEvent], None]

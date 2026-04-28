@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-
+import logging
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Callable, Tuple, ClassVar
 
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import List, Type, Optional, TYPE_CHECKING, Dict, Set
-from segmind import logger, set_logger_level, LogLevel
+from typing_extensions import List, Type, Optional, TYPE_CHECKING, Dict
+
+logger = logging.getLogger(__name__)
+
 import numpy as np
 
 
@@ -16,7 +18,6 @@ if TYPE_CHECKING:
     from .events import DetectionEvent
     from ..detectors.base import SegmindContext
 
-set_logger_level(LogLevel.DEBUG)
 
 @dataclass
 class ObjectEventTracker:

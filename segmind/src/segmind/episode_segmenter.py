@@ -1,9 +1,9 @@
+import logging
 import os
 from dataclasses import field, dataclass
 from pathlib import Path
 from typing import Optional, List
 from giskardpy.executor import Executor
-from segmind import logger, set_logger_level, LogLevel
 from semantic_digital_twin.adapters.package_resolver import FileUriResolver
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -18,7 +18,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 from .detectors.base import DetectorStateChart, SegmindContext
 from .episode_player import EpisodePlayer
 
-set_logger_level(LogLevel.DEBUG)
+logger = logging.getLogger(__name__)
 
 @dataclass
 class EpisodeSegmenterExecutor(Executor):

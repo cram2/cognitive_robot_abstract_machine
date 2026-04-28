@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import logging
 import threading
 from abc import ABC, abstractmethod
-from segmind import set_logger_level, LogLevel
 from typing_extensions import Optional
 
-set_logger_level(LogLevel.DEBUG)
+logger = logging.getLogger(__name__)
 
 class PropagatingThread(threading.Thread, ABC):
     exc: Optional[Exception] = None

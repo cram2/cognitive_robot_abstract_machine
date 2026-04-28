@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -7,10 +8,9 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3, Quaternion
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Dict, Set
-from segmind import logger, set_logger_level, LogLevel
 from .data_player import FilePlayer, FrameData
 
-set_logger_level(LogLevel.DEBUG)
+logger = logging.getLogger(__name__)
 
 @dataclass(unsafe_hash=True, init=False)
 class CSVEpisodePlayer(FilePlayer):

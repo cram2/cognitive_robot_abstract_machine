@@ -1,22 +1,22 @@
 import datetime
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Set
 
 import numpy as np
-import pandas as pd
 import trimesh
 from trimesh import Geometry
 
-from segmind import logger, set_logger_level, LogLevel
-from segmind.players.data_player import FilePlayer, FrameData, FrameDataGenerator
+
+from segmind.players.data_player import FilePlayer, FrameData
 from semantic_digital_twin.spatial_types import RotationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
-set_logger_level(LogLevel.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(unsafe_hash=True, init=False)
