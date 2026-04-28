@@ -1,4 +1,5 @@
 import os
+from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
 from importlib.resources import files
@@ -179,10 +180,13 @@ class PR2LeftGripperRightFinger(Finger):
 
 
 @dataclass(eq=False)
-class PR2RightGripper(ParallelGripper):
-
+class PR2Gripper(ParallelGripper, ABC):
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
+
+
+@dataclass(eq=False)
+class PR2RightGripper(PR2Gripper):
 
     def setup_joint_states(self):
         right_gripper_joints = self.active_connections
@@ -229,10 +233,7 @@ class PR2RightGripper(ParallelGripper):
 
 
 @dataclass(eq=False)
-class PR2LeftGripper(ParallelGripper):
-
-    def setup_hardware_interfaces(self):
-        self._setup_hardware_interfaces_for_active_connections()
+class PR2LeftGripper(PR2Gripper):
 
     def setup_joint_states(self):
         left_gripper_joints = self.active_connections
@@ -588,3 +589,19 @@ class PR2(AbstractRobot, HasMobileBase):
                 ),
             ]
         )
+
+    @property
+    def left_arm(self) -> PR2LeftArm:
+        return self.torso.left_arm
+
+    @property
+    def right_arm(self) -> PR2RightArm:
+        return self.torso.right_arm
+
+    @property
+    def torso(self) -> PR2Torso:
+        return self.mobile_base.torso
+
+    @property
+    def end_effectors(self) -> list[PR2Gripper]:
+        return [self.left_arm.end_effector, self.right_arm.end_effector]

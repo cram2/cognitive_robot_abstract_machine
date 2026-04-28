@@ -413,7 +413,7 @@ def test_pr2_semantic_annotation(pr2_world_state_reset):
     # Ensure there are no loose bodies
     pr2_world_state_reset._notify_model_change()
 
-    assert len(pr2.manipulators) == 2
+    assert len(pr2.end_effectors) == 2
     assert len(pr2.arms) == 2
     assert len(pr2.sensors) == 1
     assert pr2.torso.name.name == "torso"
@@ -448,7 +448,7 @@ def test_tracy_semantic_annotation(tracy_world):
 
     tracy_world._notify_model_change()
 
-    assert len(tracy.manipulators) == 2
+    assert len(tracy.end_effectors) == 2
     assert len(tracy.sensors) == 1
 
 
@@ -456,7 +456,7 @@ def test_hsrb_semantic_annotation(hsr_world_setup):
     hsrb = hsr_world_setup.get_semantic_annotations_by_type(HSRB)[0]
     hsr_world_setup._notify_model_change()
 
-    assert len(hsrb.manipulators) == 1
+    assert len(hsrb.end_effector) == 1
     assert len(hsrb.arms) == 1
 
     assert len(hsrb.sensors) == 5

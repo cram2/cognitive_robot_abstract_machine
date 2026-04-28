@@ -546,3 +546,7 @@ class HSRB(AbstractRobot, HasMobileBase):
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(lambda: 1.0)
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
+
+    @property
+    def end_effector(self) -> HSRBGripper:
+        return self.mobile_base.torso.end_effector

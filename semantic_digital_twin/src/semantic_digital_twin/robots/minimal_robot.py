@@ -23,6 +23,10 @@ class MinimalRobot(AbstractRobot):
     bodies_of_branch: list[KinematicStructureEntity] = field(default_factory=list)
 
     @classmethod
+    def get_ros_file_path(cls) -> str:
+        return ""
+
+    @classmethod
     def _get_root_body_name(cls) -> str:
         # Minimal robot uses the world root as the robot root
         return ""

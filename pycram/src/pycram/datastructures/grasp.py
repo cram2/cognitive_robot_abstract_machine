@@ -9,7 +9,7 @@ import numpy as np
 from typing_extensions import Optional, Union, List
 
 from semantic_digital_twin import utils
-from semantic_digital_twin.robots.robot_parts import Manipulator
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vector3, Quaternion
 from semantic_digital_twin.world_description.world_entity import Body, KinematicStructureEntity
@@ -36,7 +36,7 @@ class GraspDescription:
     The alignment of the gripper with the body in the z-axis (TOP, BOTTOM).
     """
 
-    manipulator: Manipulator
+    manipulator: EndEffector
     """
     The manipulator that is used to grasp the body.
     """
@@ -242,7 +242,7 @@ class GraspDescription:
     @classmethod
     def calculate_grasp_descriptions(
         cls,
-        manipulator: Manipulator,
+        manipulator: EndEffector,
         pose: Pose,
         grasp_alignment: Optional[PreferredGraspAlignment] = None,
     ) -> List[GraspDescription]:

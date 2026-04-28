@@ -350,8 +350,7 @@ def cylinder_bot_diff_world():
 
 
 def world_with_urdf_factory(
-    urdf_path: str,
-    robot_semantic_annotation: Type[AbstractRobot] | None,
+    robot_semantic_annotation: Type[AbstractRobot],
     drive_connection_type: Type[OmniDrive | DifferentialDrive],
     robot_starting_pose: HomogeneousTransformationMatrix | None = None,
     urdf_path_resolver: PathResolver | None = None,
@@ -362,7 +361,8 @@ def world_with_urdf_factory(
     map -> odom_combined -> "urdf tree"
     """
     urdf_parser = URDFParser.from_file(
-        file_path=urdf_path, path_resolver=urdf_path_resolver
+        file_path=robot_semantic_annotation.get_ros_file_path(),
+        path_resolver=urdf_path_resolver,
     )
     world_with_urdf = urdf_parser.parse()
     if robot_semantic_annotation is not None:
@@ -396,8 +396,7 @@ def world_with_urdf_factory(
 
 @pytest.fixture(scope="session")
 def pr2_world_setup():
-    urdf_dir = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    return world_with_urdf_factory(urdf_dir, PR2, OmniDrive)
+    return world_with_urdf_factory(PR2, OmniDrive)
 
 
 @pytest.fixture(scope="function")
@@ -408,30 +407,14 @@ def pr2_world_copy(pr2_world_setup):
 
 @pytest.fixture(scope="session")
 def hsr_world_setup():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "pycram",
-        "resources",
-        "robots",
-    )
-    hsr = os.path.join(urdf_dir, "hsrb.urdf")
-    return world_with_urdf_factory(hsr, HSRB, OmniDrive)
+    return world_with_urdf_factory(HSRB, OmniDrive)
 
 
 @pytest.fixture(scope="session")
 def tracy_world():
     if not tracy_installed():
         pytest.skip("Tracy not installed")
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "urdf",
-    )
-    tracy = os.path.join(urdf_dir, "tracy.urdf")
-    tracy_parser = URDFParser.from_file(file_path=tracy)
+    tracy_parser = URDFParser.from_file(file_path=Tracy.get_ros_file_path())
     world_with_tracy = tracy_parser.parse()
     Tracy.from_world(world_with_tracy)
     return world_with_tracy
@@ -452,8 +435,7 @@ def stretch_world():
 
 @pytest.fixture(scope="session")
 def tiago_world():
-    tiago = "package://iai_tiago_description/urdf/tiago_from_our_robot.urdf"
-    return world_with_urdf_factory(tiago, Tiago, DifferentialDrive)
+    return world_with_urdf_factory(Tiago, DifferentialDrive)
 
 
 @pytest.fixture(scope="session")

@@ -7,7 +7,7 @@ from functools import cached_property
 from typing import Union, Set
 from uuid import UUID
 
-from typing_extensions import TYPE_CHECKING, Type
+from typing_extensions import TYPE_CHECKING, Type, TypeVar
 
 from krrood.adapters.json_serializer import list_like_classes
 from krrood.class_diagrams.attribute_introspector import (
@@ -16,6 +16,7 @@ from krrood.class_diagrams.attribute_introspector import (
 )
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
@@ -38,19 +39,28 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("semantic_digital_twin")
 
+GenericFinger = TypeVar("GenericFinger")
+GenericSensor = TypeVar("GenericSensor")
+GenericCamera = TypeVar("GenericCamera")
+GenericEndEffector = TypeVar("GenericEndEffector")
+GenericArm = TypeVar("GenericArm")
+GenericMobileBase = TypeVar("GenericMobileBase")
+GenericTorso = TypeVar("GenericTorso")
+GenericNeck = TypeVar("GenericNeck")
+
 
 @dataclass(eq=False)
-class HasFingers(ABC):
+class HasFingers(SubClassSafeGeneric[GenericFinger], ABC):
     """
     Mixin class for robots or robot parts that have fingers as their direct children.
     """
 
-    fingers: list[Finger] = field(default_factory=list)
+    fingers: list[GenericFinger] = field(default_factory=list)
     """
     The list of fingers attached to the robot.
     """
 
-    thumb: Finger = field(default=None)
+    thumb: GenericFinger = field(default=None)
     """
     The thumb is a finger that always needs to be involved in the manipulation of objects.
     """
@@ -74,14 +84,22 @@ class HasFingers(ABC):
         """
 
 
+GenericLeftFinger = TypeVar("GenericLeftFinger")
+GenericRightFinger = TypeVar("GenericRightFinger")
+
+
 @dataclass(eq=False)
-class HasTwoFingers(HasFingers, ABC):
+class HasTwoFingers(
+    HasFingers[GenericFinger],
+    SubClassSafeGeneric[GenericLeftFinger, GenericRightFinger],
+    ABC,
+):
     """
     Mixin class for robots or robot parts that have exactly two fingers, one of which is a thumb.
     """
 
     @property
-    def finger(self):
+    def finger(self) -> T:
         if len(self.fingers) != 1 or self.thumb is None:
             raise Exception(
                 f"This robot has {len(self.fingers)} fingers and {int(bool(self.thumb))} thumbs. Should have exactly one finger and one thumb"
@@ -90,12 +108,12 @@ class HasTwoFingers(HasFingers, ABC):
 
 
 @dataclass(eq=False)
-class HasSensors(ABC):
+class HasSensors(SubClassSafeGeneric[T], ABC):
     """
     Mixin class for robots or robot parts that have sensors
     """
 
-    sensors: list[Sensor] = field(default_factory=list)
+    sensors: list[T] = field(default_factory=list)
     """
     The list of sensors associated with the robot part.
     """
