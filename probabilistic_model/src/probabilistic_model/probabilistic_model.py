@@ -199,7 +199,7 @@ class ProbabilisticModel(ABC):
 
     def truncated(
         self, event: Event, singleton_allowed: bool = False
-    ) -> Tuple[Optional[Union[ProbabilisticModel, Self]], float]:
+    ) -> Tuple[Optional[ProbabilisticModel], float]:
         """
         Calculate the truncated distribution P(*| event) and the probability of the event.
 

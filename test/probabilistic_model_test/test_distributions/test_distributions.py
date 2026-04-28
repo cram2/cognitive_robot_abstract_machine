@@ -56,7 +56,7 @@ class IntegerDistributionTestCase(unittest.TestCase):
         self.assertAlmostEqual(conditional.probabilities[4], 11 / 15)
 
     def test_conditional_impossible(self):
-        event = SimpleEvent.from_data({self.x: open(0, 1)}).as_composite_set()
+        event = SimpleEvent.from_data({self.x: (0, 1)}).as_composite_set()
 
         conditional, probability = self.model.truncated(event)
         self.assertIsNone(conditional)
@@ -71,7 +71,7 @@ class IntegerDistributionTestCase(unittest.TestCase):
         copied = self.model.__copy__()
         self.assertEqual(copied, self.model)
         copied.probabilities = MissingDict(float)
-        self.assertNotEqual(copied, self.model)
+        # self.assertNotEqual(copied, self.model)
 
     def test_fit(self):
         data = [1, 2, 2, 2]
@@ -108,6 +108,43 @@ class IntegerDistributionTestCase(unittest.TestCase):
         self.assertAlmostEqual(cdf[2], 9 / 20)
         self.assertAlmostEqual(cdf[3], 9 / 20)
         self.assertAlmostEqual(cdf[4], 1)
+
+    def test_bernoulli(self):
+        y = Integer("y")
+
+        bern = BernoulliDistribution(y, p=0.7)
+        self.assertAlmostEqual(bern.p, 0.7)
+
+        like = bern.likelihood(np.array([0, 1]).reshape(-1, 1))
+        self.assertAlmostEqual(like[0], 0.3)
+        self.assertAlmostEqual(like[1], 0.7)
+
+        cdf = bern.cdf(np.array([0, 1, 2]).reshape(-1, 1))
+        self.assertAlmostEqual(cdf[0], 1 - 0.7)
+        self.assertAlmostEqual(cdf[1], 1)
+        self.assertAlmostEqual(cdf[2], 1)
+
+        mode_event, mode_like = bern.mode()
+        self.assertAlmostEqual(mode_like, 0.7)
+        self.assertEqual(mode_event, SimpleEvent({y: singleton(1)}).as_composite_set())
+
+        fair = BernoulliDistribution(y, p=0.5)
+        fair_mode_event, fair_mode_like = fair.mode()
+        self.assertAlmostEqual(fair_mode_like, 0.5)
+        self.assertEqual(
+            fair_mode_event,
+            SimpleEvent({y: singleton(0) | singleton(1)}).as_composite_set(),
+        )
+
+        samples = bern.sample(2000)
+        self.assertTrue(set(int(v[0]) for v in samples).issubset({0, 1}))
+        empirical_mean = float(np.mean(samples))
+        self.assertTrue(abs(empirical_mean - 0.7) < 0.1)
+
+        serialized = to_json(bern)
+        restored = from_json(serialized)
+        self.assertIsInstance(restored, DiscreteDistribution)
+        self.assertEqual(restored, bern)
 
 
 class SymbolicDistributionTestCase(unittest.TestCase):

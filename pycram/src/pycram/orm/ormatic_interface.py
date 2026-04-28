@@ -197,6 +197,7 @@ class Base(DeclarativeBase):
         krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
         uuid.UUID: sqlalchemy.sql.sqltypes.UUID,
         numpy.ndarray: pycram.orm.model.NumpyType,
+        builtins.type: krrood.ormatic.custom_types.TypeType,
     }
 
 

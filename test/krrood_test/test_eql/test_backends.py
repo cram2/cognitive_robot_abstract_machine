@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import pytest
 from sqlalchemy.orm import sessionmaker
 
 from krrood.entity_query_language.backends import (
@@ -20,8 +21,18 @@ from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
+from pycram.datastructures.enums import ApproachDirection
+from pycram.datastructures.grasp import GraspDescription
+from pycram.robot_plans.actions.composite.transporting import MoveAndPickUpAction
+from pycram.robot_plans.actions.core.misc import MoveToReach
+from random_events.interval import Interval, reals
 from random_events.set import Set
 from random_events.variable import Symbolic
+from semantic_digital_twin.orm.model import (
+    PoseMapping,
+    Point3Mapping,
+    QuaternionMapping,
+)
 from ..dataset.example_classes import (
     KRROODPose,
     KRROODPosition,
@@ -29,6 +40,7 @@ from ..dataset.example_classes import (
     Atom,
     Element,
 )
+from ..dataset.ormatic_interface import *  # type: ignore
 
 
 def test_selective_query_multiple_backends(session, database):
@@ -74,6 +86,75 @@ def test_probabilistic_backend_with_symbolic_expression():
     )
 
 
+def test_underspecified_parameters_with_partly_symbolic_expression():
+    prob_q = underspecified(KRROODPosition)(
+        x=..., y=..., z=variable(int, domain=[1, 2, 3])
+    )
+    parameters = UnderspecifiedParameters(prob_q)
+    variables = parameters.variables
+    assert len(variables) == 3
+    assert variables["KRROODPosition.x"].domain == reals()
+    assert variables["KRROODPosition.x"].is_numeric
+    assert variables["KRROODPosition.y"].domain == reals()
+    assert variables["KRROODPosition.y"].is_numeric
+    assert variables["KRROODPosition.z"].domain == Set.from_iterable([1, 2, 3])
+    assert not variables["KRROODPosition.z"].is_numeric
+
+
+def test_underspecified_parameters_with_full_symbolic_expression():
+    prob_q = variable(KRROODPosition, domain=[KRROODPosition(1, 2, 3)])
+
+    with pytest.raises(TypeError):
+        UnderspecifiedParameters(prob_q)
+
+
+def test_underspecified_parameters_with_only_underspecified():
+    prob_q = underspecified(PoseMapping.from_point_mapping_quaternion_mapping)(
+        position=underspecified(Point3Mapping)(
+            x=..., y=..., z=..., reference_frame=None
+        ),
+        orientation=underspecified(QuaternionMapping)(
+            x=..., y=..., z=..., w=..., reference_frame=None
+        ),
+        reference_frame=None,
+    )
+    parameters = UnderspecifiedParameters(prob_q)
+    variables = parameters.variables
+
+    assert len(variables) == 7
+
+
+def test_underspecified_parameters_with_only_literals():
+    prob_q = underspecified(PoseMapping.from_point_mapping_quaternion_mapping)(
+        position=KRROODPosition(1, 2, 3),
+        orientation=KRROODOrientation(0, 0, 0, 1),
+        reference_frame=None,
+    )
+    parameters = UnderspecifiedParameters(prob_q)
+    variables = parameters.variables
+
+    assert len(variables) == 7
+
+
+def test_enum_value_as_literal():
+    prob_q = underspecified(MoveToReach)(
+        target_pose=None,
+        robot_x=...,
+        robot_y=...,
+        hip_rotation=...,
+        grasp_description=underspecified(GraspDescription)(
+            approach_direction=ApproachDirection.FRONT,
+            vertical_alignment=...,
+            manipulator=None,
+            rotate_gripper=...,
+        ),
+    )
+    pm_backend = ProbabilisticBackend(number_of_samples=10)
+    values = list(pm_backend.evaluate(prob_q))
+    for value in values:
+        assert value.grasp_description.approach_direction == ApproachDirection.FRONT
+
+
 def test_probabilistic_query_backend():
     prob_q = underspecified(KRROODPose)(
         position=underspecified(KRROODPosition)(x=..., y=..., z=...),
@@ -95,7 +176,7 @@ def test_generative_eql_backend():
         element=...,
         type=variable_from([0, 1, 2]),
         charge=variable_from([0.0, 1.0, 2.0]),
-        timestamp=datetime.now(),
+        timestamp=datetime.datetime.now(),
     )
     q.resolve()
     q.where(q.variable.type > q.variable.charge)
