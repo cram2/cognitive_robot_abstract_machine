@@ -428,27 +428,20 @@ class Sage10kObject(Sage10kWithID):
         body.collision = collision
 
         if self.place_id in ["floor", "wall"]:
-            with world.modify_world():
-                root_C_body = FixedConnection.create_with_dofs(
-                    world=world,
-                    parent=parent,
-                    child=body,
-                    parent_T_connection_expression=root_T_body,
-                )
-                # Add the body to the world
-                world.add_body(body)
-                world.add_connection(root_C_body)
+            connection_type = FixedConnection
         else:
-            with world.modify_world():
-                root_C_body = Connection6DoF.create_with_dofs(
-                    world=world,
-                    parent=parent,
-                    child=body,
-                )
-                # Add the body to the world
-                world.add_body(body)
-                world.add_connection(root_C_body)
-            root_C_body.origin = root_T_body
+            connection_type = Connection6DoF
+
+        with world.modify_world():
+            root_C_body = connection_type.create_with_dofs(
+                world=world,
+                parent=parent,
+                child=body,
+                parent_T_connection_expression=root_T_body,
+            )
+            # Add the body to the world
+            world.add_body(body)
+            world.add_connection(root_C_body)
         return body
 
     def to_json(self) -> Dict[str, Any]:
