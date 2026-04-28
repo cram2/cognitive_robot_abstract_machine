@@ -12,6 +12,8 @@ from semantic_digital_twin.collision_checking.pybullet_collision_detector import
     convert_to_decomposed_obj_and_save_in_tmp,
     create_cache_dir,
 )
+from semantic_digital_twin.pipeline.mesh_decomposition.coacd import COACDMeshDecomposer
+from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -48,19 +50,32 @@ def convex_mesh():
     return mesh
 
 
-def test_convert_non_convex_mesh_decomposes(clean_cache, cache_dir, non_convex_mesh):
+@pytest.fixture(
+    scope="module",
+    params=[COACDMeshDecomposer, VHACDMeshDecomposer],
+    ids=["coacd", "vhacd"],
+)
+def mesh_decomposer(request):
+    return request.param()
+
+
+def test_convert_non_convex_mesh_decomposes(
+    clean_cache, cache_dir, non_convex_mesh, mesh_decomposer
+):
     """
     Test that for a non-convex mesh, the function produces a valid .obj file in the cache directory.
     """
     output_path = convert_to_decomposed_obj_and_save_in_tmp(
-        non_convex_mesh, cache_dir=cache_dir
+        non_convex_mesh, mesh_decomposer=mesh_decomposer, cache_dir=cache_dir
     )
 
     assert os.path.exists(output_path)
     assert output_path.endswith(".obj")
     assert str(cache_dir) in output_path
-    # For non-convex, it should have triggered VHACD (we can't easily check if VHACD ran
-    # but we can check if it exists and is not empty)
+    # The decomposer should have produced multiple convex parts, written as multiple
+    # 'o' groups in the OBJ. A single-group OBJ would mean decomposition didn't run.
+    n_objects = sum(1 for line in open(output_path) if line.startswith("o "))
+    assert n_objects > 1
     assert os.path.getsize(output_path) > 0
 
 
@@ -77,27 +92,33 @@ def test_convert_convex_mesh_saves_directly(clean_cache, cache_dir, convex_mesh)
     assert str(cache_dir) in output_path
 
 
-def test_convert_caching_behavior(clean_cache, non_convex_mesh):
+def test_convert_caching_behavior(clean_cache, cache_dir, non_convex_mesh, mesh_decomposer):
     """
     Test that calling the function twice with the same mesh returns the same file path
     and does not re-run the decomposition process (same modification time).
     """
-    path1 = convert_to_decomposed_obj_and_save_in_tmp(non_convex_mesh)
+    path1 = convert_to_decomposed_obj_and_save_in_tmp(
+        non_convex_mesh, mesh_decomposer=mesh_decomposer, cache_dir=cache_dir
+    )
 
     # Capture modification time
     mtime1 = os.path.getmtime(path1)
 
-    path2 = convert_to_decomposed_obj_and_save_in_tmp(non_convex_mesh)
+    path2 = convert_to_decomposed_obj_and_save_in_tmp(
+        non_convex_mesh, mesh_decomposer=mesh_decomposer, cache_dir=cache_dir
+    )
 
     assert path1 == path2
     assert os.path.getmtime(path2) == mtime1
 
 
-def test_generated_obj_is_loadable(clean_cache, non_convex_mesh):
+def test_generated_obj_is_loadable(clean_cache, cache_dir, non_convex_mesh, mesh_decomposer):
     """
     Verify that the generated file can be loaded via pb.load_convex_shape.
     """
-    output_path = convert_to_decomposed_obj_and_save_in_tmp(non_convex_mesh)
+    output_path = convert_to_decomposed_obj_and_save_in_tmp(
+        non_convex_mesh, mesh_decomposer=mesh_decomposer, cache_dir=cache_dir
+    )
     shape = pb.load_convex_shape(
         output_path, single_shape=False, scaling=pb.Vector3(1, 1, 1)
     )

@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List
+from typing import List, TYPE_CHECKING
 
 from pygments.styles import vs
 
 from semantic_digital_twin.pipeline.pipeline import Step
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Shape, Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
 
 
 @dataclass
