@@ -25,7 +25,7 @@ from semantic_digital_twin.collision_checking.collision_detector import (
 from semantic_digital_twin.collision_checking.collision_rules import AvoidAllCollisions
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,

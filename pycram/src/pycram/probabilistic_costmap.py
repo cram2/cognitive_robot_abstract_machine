@@ -4,7 +4,7 @@ from functools import cached_property
 import numpy as np
 import logging
 
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,

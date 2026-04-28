@@ -10,7 +10,7 @@ from giskardpy.model.world_config import (
     WorldWithOmniDriveRobot,
     WorldWithDiffDriveRobot,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,

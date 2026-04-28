@@ -21,7 +21,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AllowSelfCollisions,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -69,7 +69,7 @@ def visibility_validator(
     else:
         gen_body = object_or_pose
     r_t = world.ray_tracer
-    camera = list(robot.neck.sensors)[0]
+    camera = robot.get_default_camera()
     ray = r_t.ray_test(
         camera.bodies[0].global_transform.to_position().to_np()[:3],
         gen_body.global_transform.to_position().to_np()[:3],

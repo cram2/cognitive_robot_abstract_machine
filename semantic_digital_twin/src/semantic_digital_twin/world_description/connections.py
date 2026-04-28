@@ -194,6 +194,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         dof = DegreeOfFreedom(name=PrefixedName("dof", str(name)), limits=dof_limits)
         world.add_degree_of_freedom(dof)
         connection = cls(
+            name=name,
             parent=parent,
             child=child,
             axis=axis,
@@ -575,7 +576,14 @@ class Connection6DoF(Connection):
 
 
 @dataclass(eq=False)
-class OmniDrive(ActiveConnection, HasUpdateState):
+class Drive(ActiveConnection, HasUpdateState, ABC):
+    """
+    Superclass for connections that describe a drive, e.g., an omnidirectional drive or a differential drive.
+    """
+
+
+@dataclass(eq=False)
+class OmniDrive(Drive):
     """
     A connection describing an omnidirectional drive.
     It can rotate about its z-axis and drive on the x-y plane simultaneously.
@@ -872,7 +880,7 @@ class OmniDrive(ActiveConnection, HasUpdateState):
 
 
 @dataclass(eq=False)
-class DifferentialDrive(ActiveConnection, HasUpdateState):
+class DifferentialDrive(Drive):
     """
     A connection describing a differential drive.
     It can rotate around its z-axis and drive in x-direction. It allows movement in the x-y plane.

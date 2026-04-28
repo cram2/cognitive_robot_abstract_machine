@@ -19,7 +19,7 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 

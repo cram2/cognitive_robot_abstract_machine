@@ -191,13 +191,23 @@ def test_semantic_annotation_modifications(rclpy_node):
     ]
 
 
+def test_get_payload_as_json(rclpy_node, pr2_world_state_reset):
+    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
+
+    expected_payload_length = sum(
+        len(block.modifications)
+        for block in pr2_world_state_reset.get_world_model_manager().model_modification_blocks
+    )
+
+    payload = json.loads(fetcher.get_payload_as_json())
+    assert len(payload["modifications"][0]["modifications"]) == expected_payload_length
+
+
 def test_pr2_semantic_annotation(rclpy_node, pr2_world_state_reset):
     pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
     fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
 
-    pr2_world_copy = fetch_world_from_service(
-        rclpy_node,
-    )
+    pr2_world_copy = fetch_world_from_service(rclpy_node, timeout_seconds=10)
 
     fetched_pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
 

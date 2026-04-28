@@ -52,7 +52,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -135,7 +135,7 @@ class CostmapLocation(Location):
         ground_pose = deepcopy(target)
         ground_pose.z = 0
 
-        base_bb = self.robot.base.bounding_box
+        base_bb = self.robot.mobile_base.bounding_box
 
         occupancy = OccupancyCostmap(
             distance_to_obstacle=(base_bb.depth / 2 + base_bb.width / 2) / 2,
@@ -149,7 +149,7 @@ class CostmapLocation(Location):
         final_map = occupancy
 
         if visible:
-            camera = list(self.robot.neck.sensors)[0]
+            camera = self.robot.get_default_camera()
             visible = VisibilityCostmap(
                 min_height=camera.minimal_height,
                 max_height=camera.maximal_height,
@@ -219,9 +219,9 @@ class CostmapLocation(Location):
                 _world=test_world, node=self.context.ros_node
             ).with_tf_publisher()
 
-        robot = self.robot
+        robot_id = self.robot.id
 
-        test_robot = robot.from_world(test_world)
+        test_robot = test_world.get_semantic_annotation_by_id(robot_id)
 
         objects_in_hand = self.get_object_in_hand(test_robot, test_world)
         object_in_hand = objects_in_hand[0] if objects_in_hand else None
@@ -230,7 +230,7 @@ class CostmapLocation(Location):
         final_map.number_of_samples = 600
         final_map.orientation_generator = (
             OrientationGenerator.orientation_generator_for_axis(
-                list(self.robot.base.main_axis.to_np())
+                list(self.robot.mobile_base.forward_axis.to_np())
             )
         )
 
@@ -403,7 +403,7 @@ class AccessingLocation(Location):
         ground_pose = handle.global_pose
         ground_pose.z = 0
 
-        base_bb = self.robot.base.bounding_box
+        base_bb = self.robot.mobile_base.bounding_box
         occupancy = OccupancyCostmap(
             robot_view=self.robot,
             distance_to_obstacle=(base_bb.depth / 2 + base_bb.width / 2) / 2,
@@ -471,7 +471,7 @@ class AccessingLocation(Location):
         :yield: A location designator containing the pose and the arms that can be used.
         """
         test_world = deepcopy(self.world)
-        test_robot = self.robot.from_world(test_world)
+        test_robot = test_world.get_semantic_annotation_by_id(self.robot.id)
 
         final_map = self.setup_costmaps(self.handle)
 
@@ -491,7 +491,7 @@ class AccessingLocation(Location):
             except RobotInCollision:
                 continue
 
-            for arm_chain in test_robot.manipulator_chains:
+            for arm_chain in test_robot.arms:
                 grasp = GraspDescription(
                     ApproachDirection.FRONT,
                     VerticalAlignment.NoAlignment,
@@ -549,7 +549,7 @@ class GiskardLocation(Location):
         ground_pose = deepcopy(pose)
         ground_pose.z = 0.0
 
-        base_bb = self.robot.base.bounding_box
+        base_bb = self.robot.mobile_base.bounding_box
 
         occupancy_map = OccupancyCostmap(
             resolution=0.02,
@@ -638,7 +638,7 @@ class GiskardLocation(Location):
         test_world = deepcopy(self.world)
         test_world.name = "Test World"
 
-        test_robot = self.robot.__class__.from_world(test_world)
+        test_robot = test_world.get_semantic_annotation_by_id(self.robot.id)
         test_ee = test_world._get_world_entity_by_hash(hash(ee.manipulator.tool_frame))
         with test_world.modify_world():
             test_robot._setup_collision_rules()

@@ -4,7 +4,7 @@ from giskardpy.model.world_config import WorldWithOmniDriveRobot
 from giskardpy.middleware.ros2.robot_interface_config import (
     RobotInterfaceConfig,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world_description.connections import (

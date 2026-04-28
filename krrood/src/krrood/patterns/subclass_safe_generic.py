@@ -10,7 +10,9 @@ from typing_extensions import (
     TypeVar,
     Type,
     TYPE_CHECKING,
-    Optional, Dict, Any,
+    Optional,
+    Dict,
+    Any,
 )
 
 from krrood.class_diagrams.utils import (
@@ -57,10 +59,12 @@ class SubClassSafeGeneric(Generic[T], ABC):
         for name, result in resolution_results.items():
             if not result.resolved:
                 continue
-            cls._update_field_kwargs(name, {'type': result.resolved_type})
+            cls._update_field_kwargs(name, {"type": result.resolved_type})
 
     @classmethod
-    def _update_field_kwargs(cls, name: str, kwargs: Dict[str, Any], type_: Optional[Type] = None):
+    def _update_field_kwargs(
+        cls, name: str, kwargs: Dict[str, Any], type_: Optional[Type] = None
+    ):
         """
         Update the field kwargs with the provided keyword arguments.
 
@@ -76,7 +80,7 @@ class SubClassSafeGeneric(Generic[T], ABC):
                     setattr(attribute_value, key, value)
             else:
                 non_type_kwargs = copy(kwargs)
-                non_type_kwargs.pop('type', None)
+                non_type_kwargs.pop("type", None)
                 if non_type_kwargs:
                     setattr(cls, name, field(**non_type_kwargs))
         else:
@@ -88,8 +92,8 @@ class SubClassSafeGeneric(Generic[T], ABC):
                 setattr(cls, field_.name, field_)
             else:
                 setattr(cls, name, field(**kwargs))
-        if 'type' in kwargs:
-            cls.__annotations__[name] = kwargs['type']
+        if "type" in kwargs:
+            cls.__annotations__[name] = kwargs["type"]
         elif type_ is not None:
             cls.__annotations__[name] = type_
         elif field_ is not None:

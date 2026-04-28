@@ -1,7 +1,8 @@
 import importlib
 import enum
+import json
 
-from sqlalchemy import TypeDecorator
+from sqlalchemy import TypeDecorator, types
 from sqlalchemy import types
 from typing_extensions import Type, Optional
 
@@ -56,3 +57,24 @@ class PolymorphicEnumType(TypeDecorator):
         module = importlib.import_module(module_name)
         enum_class = getattr(module, class_name)
         return enum_class[member_name]
+
+
+class JSONDataType(TypeDecorator):
+    """
+    Type decorator for JSONData that stores JSON without automatic deserialization.
+
+    Unlike regular JSON columns which use the engine's custom json_deserializer
+    (that calls from_json()), this type keeps the data as raw JSON dictionaries/lists.
+    This is necessary for fields that should be deserialized later in application code.
+    """
+
+    impl = types.String
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        """Store the value as-is (already JSON-serializable)."""
+        return json.dumps(value)
+
+    def process_result_value(self, value, dialect):
+        """Return the value as-is (raw JSON, not deserialized)."""
+        return json.loads(value)

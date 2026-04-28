@@ -40,7 +40,7 @@ from semantic_digital_twin.collision_checking.pybullet_collision_detector import
     BulletCollisionDetector,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world import World
@@ -135,15 +135,17 @@ class TestCollisionRules:
         rule = AvoidCollisionBetweenGroups(
             buffer_zone_distance=0.05,
             violated_distance=0.0,
-            body_group_a=pr2.left_arm.bodies,
-            body_group_b=pr2.right_arm.bodies,
+            body_group_a=pr2.left_arm.bodies_with_collision,
+            body_group_b=pr2.right_arm.bodies_with_collision,
         )
         rule.update(pr2_world_state_reset)
         rule.apply_to_collision_matrix(collision_matrix)
         # -1 because torso is in both chains
         assert (
             len(collision_matrix.collision_checks)
-            == len(pr2.left_arm.bodies) * len(pr2.right_arm.bodies) - 1
+            == len(pr2.left_arm.bodies_with_collision)
+            * len(pr2.right_arm.bodies_with_collision)
+            - 1
         )
 
     def test_AvoidCollisionBetweenGroups2(self, cylinder_bot_world):

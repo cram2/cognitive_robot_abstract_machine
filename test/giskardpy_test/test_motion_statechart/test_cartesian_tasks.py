@@ -42,7 +42,7 @@ from krrood.symbolic_math.symbolic_math import (
     trinary_logic_not,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import Manipulator
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -410,7 +410,7 @@ class TestCartesianTasks:
             hsr_world_setup.add_connection(connection)
 
         hsr = hsr_world_setup.get_semantic_annotations_by_type(HSRB)[0]
-        hand = hsr_world_setup.get_semantic_annotations_by_type(Manipulator)[0]
+        hand = hsr_world_setup.get_semantic_annotations_by_type(EndEffector)[0]
         msc = MotionStatechart()
         orientation_goal = hand.front_facing_orientation.to_rotation_matrix()
         orientation_goal.reference_frame = hsr_world_setup.get_body_by_name(

@@ -30,7 +30,7 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
     SelfCollisionVariableManager,
     ExternalCollisionVariableManager,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types import (
     Vector3,
     Point3,
@@ -677,7 +677,7 @@ class SelfCollisionAvoidance(Goal):
             self.self_collision_manager.register_groups_of_body_combination(
                 group_a.root, group_b.root
             )
-            (group_a, group_b) = self.self_collision_manager.body_pair_to_group_pair(
+            group_a, group_b = self.self_collision_manager.body_pair_to_group_pair(
                 group_a.root, group_b.root
             )
 
@@ -727,7 +727,7 @@ class SelfCollisionDistanceMonitor(MotionStatechartNode):
         manager = context.self_collision_manager
 
         manager.register_groups_of_body_combination(self.body_a, self.body_b)
-        (group_a, group_b) = manager.body_pair_to_group_pair(self.body_a, self.body_b)
+        group_a, group_b = manager.body_pair_to_group_pair(self.body_a, self.body_b)
 
         distance_symbol = manager.get_contact_distance_symbol(group_a, group_b)
 
