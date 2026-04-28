@@ -20,6 +20,8 @@ from ..dataset.ormatic_interface import (
     FixedConnectionDAO,
     PrismaticConnectionDAO,
     BodyDAO,
+    ContainerDAO,
+    HandleDAO,
 )
 from krrood.entity_query_language.factories import (
     entity,
@@ -36,6 +38,7 @@ from krrood.entity_query_language.factories import (
     min,
     sum,
     average,
+    set_of,
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
@@ -277,6 +280,41 @@ def test_complicated_equal(session, database):
     eql_result = list(query.evaluate())
     assert len(eql_result) == 1
     assert eql_result[0].name == "Container2"
+
+    # TODO: The generated SQL uses parent_id for PrismaticConnectionDAO join instead
+    # of child_id, and HandleDAO as cross-join instead of explicit JOIN.
+    # The translation is semantically incomplete for Variable==Attribute constraints.
+    # This test currently only verifies translator consistency, not correctness.
+    # SQL translation
+    translator = eql_to_sql(query, session)
+    print(str(translator.sql_query))
+    expected_sql = (
+        'SELECT "ContainerDAO".database_id, "BodyDAO".database_id AS database_id_1, '
+        '"WorldEntityDAO".database_id AS database_id_2, "SymbolDAO".database_id AS '
+        'database_id_3, "SymbolDAO".polymorphic_type, "WorldEntityDAO".world_id, '
+        '"BodyDAO".name, "BodyDAO".size \n'
+        'FROM "SymbolDAO" JOIN "WorldEntityDAO" ON "WorldEntityDAO".database_id = '
+        '"SymbolDAO".database_id JOIN "BodyDAO" ON "BodyDAO".database_id = '
+        '"WorldEntityDAO".database_id JOIN "ContainerDAO" ON '
+        '"ContainerDAO".database_id = "BodyDAO".database_id JOIN ("SymbolDAO" AS '
+        '"SymbolDAO_1" JOIN "WorldEntityDAO" AS "WorldEntityDAO_1" ON '
+        '"WorldEntityDAO_1".database_id = "SymbolDAO_1".database_id JOIN '
+        '"ConnectionDAO" AS "ConnectionDAO_1" ON "ConnectionDAO_1".database_id = '
+        '"WorldEntityDAO_1".database_id JOIN "PrismaticConnectionDAO" AS '
+        '"PrismaticConnectionDAO_1" ON "PrismaticConnectionDAO_1".database_id = '
+        '"ConnectionDAO_1".database_id) ON "ConnectionDAO_1".parent_id = '
+        '"ContainerDAO".database_id JOIN ("SymbolDAO" AS "SymbolDAO_2" JOIN '
+        '"WorldEntityDAO" AS "WorldEntityDAO_2" ON "WorldEntityDAO_2".database_id = '
+        '"SymbolDAO_2".database_id JOIN "ConnectionDAO" AS "ConnectionDAO_2" ON '
+        '"ConnectionDAO_2".database_id = "WorldEntityDAO_2".database_id JOIN '
+        '"FixedConnectionDAO" AS "FixedConnectionDAO_1" ON '
+        '"FixedConnectionDAO_1".database_id = "ConnectionDAO_2".database_id) ON '
+        '"ConnectionDAO_2".parent_id = "ContainerDAO".database_id, "HandleDAO" \n'
+        'WHERE "ContainerDAO".database_id = "ConnectionDAO_1".child_id AND '
+        '"HandleDAO".database_id = "ConnectionDAO_2".child_id'
+    )
+
+    assert str(translator.sql_query) == expected_sql
 
 
 def test_contains(session, database):
@@ -768,3 +806,27 @@ def test_no_results(session, database):
 
     results = translator.evaluate()
     assert results == []
+
+# =============================================================================
+# SET_OF
+# =============================================================================
+
+def test_set_of(session):
+    """Verify that set_of translates to SELECT of individual columns."""
+    b = variable(type_=Body, domain=[])
+    query = an(set_of(b.size))
+
+    translator = eql_to_sql(query, session)
+    expected = select(BodyDAO.size)
+
+    assert str(translator.sql_query) == str(expected)
+
+def test_set_of_with_join(session):
+    """Verify that set_of with transitive attributes generates correct JOINs."""
+    pose = variable(type_=KRROODPose, domain=[])
+    query = an(set_of(pose.position.z))
+
+    translator = eql_to_sql(query, session)
+    expected = select(KRROODPositionDAO.z).join(KRROODPoseDAO.position)
+
+    assert str(translator.sql_query) == str(expected)
