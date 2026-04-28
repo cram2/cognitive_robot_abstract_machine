@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import types
 import typing
 from dataclasses import dataclass, field
 from functools import cached_property
+from inspect import isclass
+from typing import Dict, Optional
 from types import NoneType
 from typing import Dict, Optional, Tuple
 
 import numpy as np
-from typing_extensions import Any
+from typing_extensions import Any, get_args
 
 import random_events.variable
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
@@ -21,7 +24,7 @@ from krrood.entity_query_language.core.mapped_variable import (
 )
 from krrood.entity_query_language.predicate import symbolic_function
 from krrood.entity_query_language.query.match import MatchVariable, AttributeMatch
-from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.ormatic.data_access_objects.helper import to_dao, get_dao_class
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.parametrization.random_events_translator import (
     WhereExpressionToRandomEventTranslator,
@@ -133,24 +136,58 @@ class UnderspecifiedParameters:
                 attribute_match.assigned_value,
                 (SymbolicExpression, type(Ellipsis), NoneType),
             ):
+                # case Literal is Orientation(x=1,y=0,z=1)
+                if not isinstance(attribute_match.assigned_value, (int, float)):
+                    feature_extractor = FeatureExtractor(
+                        get_features_of_class_bfs(
+                            to_dao(attribute_match.assigned_value),
+                            attribute_match.assigned_variable,
+                        )
+                    )
+                    for feature in feature_extractor.features:
+                        mapping = feature.apply_mapping_on_external_root(
+                            attribute_match.assigned_value
+                        )
+                        result[
+                            f"{name}.{get_clean_name_from_mapped_variable(feature)}"
+                        ] = random_events.variable.Continuous(
+                            name=f"{name}.{get_clean_name_from_mapped_variable(feature)}",
+                            domain=singleton(mapping),
+                        )
+                    continue
                 variable = self._create_variable_from_literal_value(attribute_match)
                 result[variable.name] = variable
                 continue
 
+            assigned_type = attribute_match.assigned_variable._type_
             if isinstance(attribute_match.assigned_value, SymbolicExpression):
                 variables = self._create_variables_from_symbolic_expression(
                     attribute_match
                 )
                 result.update(variables)
                 continue
-            if attribute_match.assigned_variable._type_ is None or not issubclass(
-                attribute_match.assigned_variable._type_,
-                random_events.variable.compatible_types,
-            ):
+            elif assigned_type is None:
+                continue
+            elif type(assigned_type) is types.UnionType:
+                target_type = random_events.variable.most_appropriate_variable_type(
+                    get_args(assigned_type)
+                )
+
+            elif not isclass(assigned_type):
                 continue
 
+            elif issubclass(
+                assigned_type,
+                random_events.variable.compatible_types,
+            ):
+                target_type = attribute_match.assigned_variable._type_
+
+            else:
+                continue
+            if target_type is None:
+                continue
             random_events_variable = random_events.variable.variable_from_name_and_type(
-                name, attribute_match.assigned_variable._type_
+                name, target_type
             )
 
             result[random_events_variable.name] = random_events_variable
@@ -182,6 +219,18 @@ class UnderspecifiedParameters:
         state = ToDataAccessObjectState()
         domain_objects = attribute_match.assigned_value.tolist()
         hashes = [hash(obj) for obj in domain_objects]
+        if get_dao_class(type(domain_objects[0])) is None:
+            random_events_variable = random_events.variable.Symbolic(
+                name=attribute_match.name_from_variable_access_path,
+                domain=Set.from_iterable(hashes),
+            )
+            result[random_events_variable.name] = random_events_variable
+            self._events_from_symbolic_expression.append(
+                Event.from_simple_sets(
+                    SimpleEvent.from_data({random_events_variable: hashes})
+                )
+            )
+            return result
         data_access_objects = [to_dao(obj, state=state) for obj in domain_objects]
 
         features = get_features_of_class_bfs(

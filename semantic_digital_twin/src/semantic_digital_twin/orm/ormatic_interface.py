@@ -22,6 +22,7 @@ import krrood.ormatic.custom_types
 import krrood.ormatic.type_dict
 import semantic_digital_twin.adapters.sage_10k_dataset.loader
 import semantic_digital_twin.adapters.sage_10k_dataset.schema
+import semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations
 import semantic_digital_twin.callbacks.callback
 import semantic_digital_twin.collision_checking.collision_detector
 import semantic_digital_twin.collision_checking.collision_groups
@@ -67,6 +68,7 @@ import semantic_digital_twin.robots.unitree_g1
 import semantic_digital_twin.robots.ur5
 import semantic_digital_twin.robots.ur5e_controlled
 import semantic_digital_twin.semantic_annotations.mixins
+import semantic_digital_twin.semantic_annotations.natural_language
 import semantic_digital_twin.semantic_annotations.position_descriptions
 import semantic_digital_twin.semantic_annotations.semantic_annotations
 import semantic_digital_twin.spatial_computations.ik_solver
@@ -3670,6 +3672,20 @@ class Sage10kSizeDAO(
         "polymorphic_identity": "Sage10kSizeDAO",
         "inherit_condition": database_id == Sage10kBaseDAO.database_id,
     }
+
+
+class Sage10kTypeNameCleanerDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.Sage10kTypeNameCleaner
+    ],
+):
+
+    __tablename__ = "Sage10kTypeNameCleanerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
 
 
 class Sage10kWithIDDAO(
@@ -8579,6 +8595,56 @@ class LiquidCapDAO(
     __mapper_args__ = {
         "polymorphic_identity": "LiquidCapDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+    }
+
+
+class NaturalLanguageDescriptionDAO(
+    HasRootBodyDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.natural_language.NaturalLanguageDescription
+    ],
+):
+
+    __tablename__ = "NaturalLanguageDescriptionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    description: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NaturalLanguageDescriptionDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+    }
+
+
+class NaturalLanguageDescriptionWithTypeDescriptionDAO(
+    NaturalLanguageDescriptionDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.NaturalLanguageDescriptionWithTypeDescription
+    ],
+):
+
+    __tablename__ = "NaturalLanguageDescriptionWithTypeDescriptionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(NaturalLanguageDescriptionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    type_description: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NaturalLanguageDescriptionWithTypeDescriptionDAO",
+        "inherit_condition": database_id == NaturalLanguageDescriptionDAO.database_id,
     }
 
 

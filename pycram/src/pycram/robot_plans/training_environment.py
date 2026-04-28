@@ -1,3 +1,4 @@
+import json
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -5,12 +6,22 @@ from typing import ClassVar, Optional
 
 import rclpy
 
+from krrood.adapters.json_serializer import from_json
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import underspecified, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProbabilisticCircuit,
+)
+from probabilistic_model.probabilistic_circuit.rx.helper import (
+    fully_factorized,
+    expand_distribution,
+)
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProductUnit,
+)
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.grasp import GraspDescription
 from pycram.motion_executor import simulated_robot
@@ -136,6 +147,10 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
     action_type = MoveToReach
 
     model_path: Optional[Path] = None
+    """
+    Path to a model file that should be used for the action.
+    Creates a default model when this is None.
+    """
 
     def setup_world(self, **kwargs) -> World:
         pr2_file = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
@@ -191,9 +206,12 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
 
         move_to_reach.expression.limit(limit)
 
-        context = Context(
-            world=world, robot=robot, query_backend=self.setup_backend(move_to_reach)
-        )
+        if self.model_path:
+            query_backend = self.setup_backend_from_path(move_to_reach)
+        else:
+            query_backend = self.setup_backend(move_to_reach)
+
+        context = Context(world=world, robot=robot, query_backend=query_backend)
 
         return execute_single(move_to_reach, context=context).plan
 
@@ -222,5 +240,28 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         )
         hip_rotation_condition.fill_missing_variables(distribution.variables)
         distribution.log_truncated_of_simple_event_in_place(hip_rotation_condition)
+
+        return ProbabilisticBackend(DictRegistry({self.action_type: distribution}))
+
+    def setup_backend_from_path(self, underspecified_action: Match):
+        """
+        Setup a backend from a model file.
+        Adds the variables of the action to the loaded model if they don't exist.
+
+        :param underspecified_action: The action to load the model for.
+        :return: The probabilistic backend.
+        """
+        with open(self.model_path) as f:
+            distribution: ProbabilisticCircuit = from_json(json.load(f))
+
+        # expand model with new variables
+        parameters = UnderspecifiedParameters(underspecified_action)
+        variables_not_in_parameters = set(parameters.variables.values()) - set(
+            distribution.variables
+        )
+        distribution_for_variables_not_in_parameters = fully_factorized(
+            variables_not_in_parameters
+        )
+        expand_distribution(distribution, distribution_for_variables_not_in_parameters)
 
         return ProbabilisticBackend(DictRegistry({self.action_type: distribution}))

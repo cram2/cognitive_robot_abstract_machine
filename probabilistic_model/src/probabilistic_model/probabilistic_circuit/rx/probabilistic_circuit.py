@@ -1665,6 +1665,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         This will also remove the nodes in other and their descendants from their circuit.
 
         :param other: The other unit to mount.
+        :returns: A mapping from the indices of the nodes in `other` to the nodes in `self` that were added.
         """
         if other.probabilistic_circuit is not None:
             descendants = other.probabilistic_circuit.descendants(other)

@@ -96,7 +96,7 @@ def test_generative_eql_backend():
         element=...,
         type=variable_from([0, 1, 2]),
         charge=variable_from([0.0, 1.0, 2.0]),
-        timestamp=datetime.now(),
+        timestamp=datetime.datetime.now(),
     )
     q.resolve()
     q.where(q.variable.type > q.variable.charge)

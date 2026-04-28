@@ -31,6 +31,7 @@ from typing_extensions import (
 
 from krrood.adapters.json_serializer import list_like_classes
 from krrood.class_diagrams.class_diagram import WrappedClass
+from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     SymbolicExpression,
@@ -618,9 +619,15 @@ class AttributeMatch(AbstractMatchExpression[T]):
 
         if not isinstance(self.parent, AttributeMatch):
             return None
-        return get_field_type_endpoint(
-            self.parent.assigned_value.type, self.variable._attribute_name_
-        )
+
+        if isclass(self.parent.assigned_value.factory):
+            return get_field_type_endpoint(
+                self.parent.assigned_value.type, self.variable._attribute_name_
+            )
+        else:
+            return get_type_hints_of_object(self.parent.assigned_value.factory)[
+                self.variable._attribute_name_
+            ]
 
 
 def construct_graph_and_get_root(

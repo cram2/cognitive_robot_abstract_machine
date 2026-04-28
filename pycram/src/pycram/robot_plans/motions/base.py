@@ -28,7 +28,6 @@ class BaseMotion(Designator):
     Motions create exactly one goal.
     """
 
-    @abstractmethod
     def perform(self):
         """
         Passes this designator to the process module for execution. Will be overwritten by each motion.

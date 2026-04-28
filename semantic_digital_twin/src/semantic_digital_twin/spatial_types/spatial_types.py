@@ -948,7 +948,7 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return sm.Scalar.from_casadi_sx(ca.norm_2(self[:3].casadi_sx))
 
     @property
-    def x(self) -> sm.Scalar:
+    def x(self) -> sm.ScalarData:
         return self[0]
 
     @x.setter
@@ -956,7 +956,7 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         self[0] = value
 
     @property
-    def y(self) -> sm.Scalar:
+    def y(self) -> sm.ScalarData:
         return self[1]
 
     @y.setter
@@ -964,7 +964,7 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         self[1] = value
 
     @property
-    def z(self) -> sm.Scalar:
+    def z(self) -> sm.ScalarData:
         return self[2]
 
     @z.setter
@@ -1939,6 +1939,18 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     @property
     def y(self) -> sm.Scalar:
         return self[1, 3]
+
+    @property
+    def roll(self) -> sm.Scalar:
+        return self.to_rotation_matrix().to_rpy()[0]
+
+    @property
+    def pitch(self) -> sm.Scalar:
+        return self.to_rotation_matrix().to_rpy()[1]
+
+    @property
+    def yaw(self):
+        return self.to_rotation_matrix().to_rpy()[2]
 
     @y.setter
     def y(self, value: sm.ScalarData):

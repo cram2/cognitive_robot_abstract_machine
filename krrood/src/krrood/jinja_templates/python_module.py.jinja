@@ -1,0 +1,19 @@
+from __future__ import annotations
+from dataclasses import dataclass
+
+{% for import in module_description.imports %}
+import {{ import }}
+{% endfor %}
+
+{% for class in module_description.classes %}
+@dataclass
+class {{ class.type_.__name__ }}({{ ",".join(class.base_classes)}}):
+    {% if not class.fields %}
+    ...
+    {% endif %}
+    {% for field in class.fields %}
+    {{ field }}
+    {% endfor %}
+
+{% endfor %}
+

@@ -124,12 +124,22 @@ class MoveToReach(ActionDescription):
     """
 
     def execute(self):
+        grasp_orientation = self.grasp_description.grasp_orientation()
+        target_pose = Pose(
+            self.target_pose.to_position(),
+            (
+                self.target_pose.to_rotation_matrix()
+                @ grasp_orientation.to_rotation_matrix()
+            ).to_quaternion(),
+            self.target_pose.reference_frame,
+        )
+
         self.add_subplan(
             sequential(
                 [
                     NavigateAction(self.standing_pose),
                     MoveManipulatorAction(
-                        self.target_pose,
+                        target_pose,
                         self.grasp_description.manipulator,
                         allow_gripper_collision=False,
                     ),
@@ -154,45 +164,10 @@ class MoveToReach(ActionDescription):
         :return: The calculated standing pose.
         """
         target_homogeneous_matrix = self.target_pose.to_homogeneous_matrix()
-        relative_position = Point3(self.robot_x, self.robot_y, 0)
+        relative_position = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=self.robot_x, y=self.robot_y, yaw=self.hip_rotation - np.pi
+        )
         standing_position = target_homogeneous_matrix @ relative_position
         standing_position.z = self.robot.root.global_pose.z
 
-        difference_x = self.target_pose.x - standing_position.x
-        difference_y = self.target_pose.y - standing_position.y
-        base_yaw = np.arctan2(difference_y, difference_x)
-        total_yaw = base_yaw + self.hip_rotation
-
-        standing_pose = Pose(
-            standing_position,
-            Quaternion.from_rpy(0, 0, total_yaw),
-            reference_frame=self.robot.root,
-        )
-        return standing_pose
-
-    @staticmethod
-    def post_condition(
-        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression:
-        target_pose = variables["target_pose"]
-
-        target_homogeneous_matrix = target_pose.to_homogeneous_matrix()
-        relative_position = Point3(variables["robot_x"], variables["robot_y"], 0)
-        standing_position = target_homogeneous_matrix @ relative_position
-        standing_position.z = context.robot.root.global_pose.z
-
-        difference_x = target_pose.x - standing_position.x
-        difference_y = target_pose.y - standing_position.y
-        base_yaw = np.arctan2(difference_y, difference_x)
-        total_yaw = base_yaw + variables["hip_rotation"]
-
-        expected_pose = Pose(
-            standing_position,
-            Quaternion.from_rpy(0, 0, total_yaw),
-            reference_frame=context.robot.root,
-        )
-
-        root_T_robot_base = context.world.transform(expected_pose, context.world.root)
-        return np.allclose(
-            root_T_robot_base, context.robot.base.root.global_pose.to_np(), atol=0.1
-        )
+        return standing_position.to_pose()
