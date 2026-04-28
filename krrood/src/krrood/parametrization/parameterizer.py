@@ -3,6 +3,7 @@ from __future__ import annotations
 import types
 import typing
 from dataclasses import dataclass, field
+from enum import Enum
 from functools import cached_property
 from inspect import isclass
 from typing import Dict, Optional
@@ -37,6 +38,7 @@ from probabilistic_model.probabilistic_circuit.relational.learn_rspn import (
 from random_events.interval import singleton
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.set import Set, SetElement
+from random_events.variable import compatible_types
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -136,8 +138,27 @@ class UnderspecifiedParameters:
                 attribute_match.assigned_value,
                 (SymbolicExpression, type(Ellipsis), NoneType),
             ):
+                if issubclass(attribute_match.assigned_variable._type_, Enum):
+                    name = f"{attribute_match.name_from_variable_access_path}"
+                    variable = random_events.variable.Symbolic(
+                        name=name,
+                        domain=Set.from_iterable(
+                            attribute_match.assigned_variable._domain_
+                        ),
+                    )
+                    result[variable.name] = variable
+                    event = Event.from_simple_sets(
+                        SimpleEvent.from_data(
+                            {variable: attribute_match.assigned_variable._domain_}
+                        )
+                    )
+                    self._events_from_literal_values.append(event)
+                    continue
                 # case Literal is Orientation(x=1,y=0,z=1)
-                if not isinstance(attribute_match.assigned_value, (int, float)):
+                if isinstance(attribute_match.assigned_value, (int, float)):
+                    variable = self._create_variable_from_literal_value(attribute_match)
+                    result[variable.name] = variable
+                elif not isinstance(attribute_match.assigned_value, compatible_types):
                     feature_extractor = FeatureExtractor(
                         get_features_of_class_bfs(
                             to_dao(attribute_match.assigned_value),
@@ -154,7 +175,19 @@ class UnderspecifiedParameters:
                             name=f"{name}.{get_clean_name_from_mapped_variable(feature)}",
                             domain=singleton(mapping),
                         )
-                    continue
+                        event = Event.from_simple_sets(
+                            SimpleEvent.from_data(
+                                {
+                                    result[
+                                        f"{name}.{get_clean_name_from_mapped_variable(feature)}"
+                                    ]: mapping
+                                }
+                            )
+                        )
+                        self._events_from_literal_values.append(event)
+                continue
+
+                # continue
                 variable = self._create_variable_from_literal_value(attribute_match)
                 result[variable.name] = variable
                 continue
