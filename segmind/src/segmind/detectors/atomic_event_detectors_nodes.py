@@ -164,6 +164,19 @@ class MotionDetector(AbstractDetector):
         context.object_moving_status[obj] = is_moving
         return self._check_movement_and_trigger_event(context, obj)
 
+    def check_obj_rotation(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
+        """
+        Checks if an object is rotating based on its pose history.
+
+        :param context: The shared SegmindContext containing the information required to track events.
+        :param obj: The object to check.
+        :return: A RotationEvent if the object is rotating, otherwise None.
+        """
+        is_moving = self._calculate_is_rotating(context, obj)
+        context.object_moving_status[obj] = is_moving
+        return self._check_movement_and_trigger_event(context, obj)
+
+
     @abstractmethod
     def _check_movement_and_trigger_event(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
         """
@@ -188,6 +201,22 @@ class MotionDetector(AbstractDetector):
         latest_poses = context.latest_poses[obj]
 
         return (latest_poses[0].to_position() - latest_poses[-1].to_position()).norm() > self.distance_threshold
+
+
+    def _calculate_is_rotating(self, context:SegmindContext, obj:Body) -> bool:
+        """
+        Determines whether an object is rotating by evaluating the rotation error between its
+        recorded poses within the window.
+
+        :param context: The shared SegmindContext containing the information required to track events.
+        :param obj: The body to check.
+        :return: True if the object is rotating, False otherwise.
+        """
+        latest_poses = context.latest_poses[obj]
+
+        return float(latest_poses[0].to_rotation_matrix().rotational_error(
+                latest_poses[-1].to_rotation_matrix())) < self.distance_threshold
+
 
     def _is_stationary(self, poses: List[Pose]) -> bool:
         """
@@ -291,24 +320,6 @@ class RotationDetector(MotionDetector):
     Triggers a RotationEvent when an object starts rotating.
     """
 
-    def check_obj_movement(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
-        """
-        Checks if an object is rotating based on its pose history.
-
-        :param context: The shared SegmindContext containing the information required to track events.
-        :param obj: The object to check.
-        :return: A RotationEvent if the object is rotating, otherwise None.
-        """
-        latest_poses = context.latest_poses[obj]
-        is_moving = False
-        q_last = latest_poses[-1].to_quaternion().to_list()
-        for p in latest_poses[:-1]:
-            if not np.allclose(q_last, p.to_quaternion().to_list()):
-                is_moving = True
-                break
-        context.object_moving_status[obj] = is_moving
-        return self._check_movement_and_trigger_event(context, obj)
-
     def _check_movement_and_trigger_event(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
         """
         Checks if an object is rotating and triggers a RotationEvent if necessary.
@@ -317,18 +328,18 @@ class RotationDetector(MotionDetector):
         :param obj: The object to check.
         :return: The RotationEvent if the object is rotating, otherwise None.
         """
-        latest_motion_event = context.latest_motion_events.get(obj)
+        latest_rotation_event = context.latest_rotation_events.get(obj)
         latest_poses = context.latest_poses[obj]
-        is_moving = context.object_moving_status.get(obj)
+        is_rotating = context.object_rotation_status.get(obj)
 
-        if is_moving:
-            if latest_motion_event is None:
+        if is_rotating:
+            if latest_rotation_event is None:
                 new_event = RotationEvent(
                     tracked_object=obj,
                     start_pose=latest_poses[0],
                     current_pose=latest_poses[-1],
                 )
-                context.latest_motion_events[obj] = new_event
+                context.latest_rotation_events[obj] = new_event
                 return new_event
             else:
                 return None
@@ -343,25 +354,6 @@ class StopRotationDetector(MotionDetector):
     Triggers a StopRotationEvent when an object that was rotating stops.
     """
 
-    def check_obj_movement(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
-        """
-        Check if an object is rotating based on its pose history.
-
-        :param context: The shared SegmindContext containing the information required to track events.
-        :param obj: The object to check.
-        :return: A StopRotationEvent if the object is rotating, otherwise None.
-        """
-        latest_poses = context.latest_poses[obj]
-        # Check orientation closeness using quaternions.
-        is_moving = False
-        q_last = latest_poses[-1].to_quaternion().to_list()
-        for p in latest_poses[:-1]:
-            if not np.allclose(q_last, p.to_quaternion().to_list()):
-                is_moving = True
-                break
-        context.object_moving_status[obj] = is_moving
-        return self._check_movement_and_trigger_event(context, obj)
-
     def _check_movement_and_trigger_event(self, context: SegmindContext, obj: Body) -> Optional[DetectionEvent]:
         """
         Checks if an object is rotating and triggers a StopRotationEvent if necessary.
@@ -370,29 +362,24 @@ class StopRotationDetector(MotionDetector):
         :param obj: The object to check for movement.
         :return: The StopRotationEvent if the object stops rotating, otherwise None.
         """
-        latest_motion_event = context.latest_motion_events.get(obj)
+        latest_rotation_event = context.latest_rotation_events.get(obj)
         latest_poses = context.latest_poses[obj]
-        is_moving = context.object_moving_status.get(obj)
+        is_rotating = context.object_rotation_status.get(obj)
 
-        if is_moving:
+        if is_rotating:
             return None
 
-        if latest_motion_event is None:
+        if latest_rotation_event is None:
             return None
 
-        all_poses_same = all(
-            np.allclose(
-                p.to_quaternion().to_list(),
-                latest_poses[0].to_quaternion().to_list(),
-            )
-            for p in latest_poses
+        stop_event = StopRotationEvent(
+            tracked_object=obj,
+            start_pose=latest_rotation_event.start_pose,
+            current_pose=latest_poses[-1],
         )
-        if all_poses_same:
-            stop_event = StopRotationEvent(
-                tracked_object=obj,
-                start_pose=latest_motion_event.start_pose,
-                current_pose=latest_poses[-1],
-            )
-            del context.latest_motion_events[obj]
-            return stop_event
+
+        context.latest_rotation_events.pop(obj, None)
+
+        return stop_event
+
 

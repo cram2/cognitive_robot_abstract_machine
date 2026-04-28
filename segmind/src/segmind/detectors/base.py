@@ -46,6 +46,11 @@ class SegmindContext(ContextExtension):
     Dictionary mapping each body to a boolean indicating if it is currently moving.
     """
 
+    object_rotation_status: Dict[Body, bool] = field(default_factory=dict)
+    """
+    Dictionary mapping each body to a boolean indicating if it is currently rotating.
+    """
+
     latest_contact_bodies: IndexedBodyPairs = field(default_factory=dict)
     """
     Dictionary mapping each body to the set of bodies it is currently in contact with.
@@ -69,6 +74,11 @@ class SegmindContext(ContextExtension):
     latest_motion_events: Dict[Body, MotionEvent] = field(default_factory=dict)
     """
     Dictionary mapping each body to its currently active motion event, if any.
+    """
+
+    latest_rotation_events: Dict[Body, RotationEvent] = field(default_factory=dict)
+    """
+    Dictionary mapping each body to its currently active rotation event, if any.
     """
 
     logger: EventLogger = field(default_factory=EventLogger)
