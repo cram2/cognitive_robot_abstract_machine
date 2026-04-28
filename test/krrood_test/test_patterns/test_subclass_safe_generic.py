@@ -19,6 +19,7 @@ from ..dataset.classes_with_generic import (
     SubClassGenericThatRecreatesAField,
     SubClassGenericThatRecreatesAFieldWithAnotherVar,
     SubClassGenericThatRecreatesAFieldWithNonBuiltInType,
+    TwoGenericContainerBoundToBuiltIns,
 )
 
 
@@ -67,8 +68,8 @@ def assert_field_kwargs_are_preserved_when_resolving_generic_type(cls, kw_only=F
     evaluated_type = eval(field_.type, sys.modules[cls.__module__].__dict__)
     assert get_origin(evaluated_type) is list
     assert (
-            get_args(evaluated_type)[0]
-            is get_generic_type_param(cls, SubClassSafeGeneric)[0]
+        get_args(evaluated_type)[0]
+        is get_generic_type_param(cls, SubClassSafeGeneric)[0]
     )
 
 
@@ -89,17 +90,28 @@ def test_resolve_generic_type_subclass_with_new_type_var_as_generic_type():
     _assert_generic_type_is_resolved(cls)
 
 
+def test_resolve_two_generic_types_subclass_with_built_in_types():
+    cls = TwoGenericContainerBoundToBuiltIns
+    resolved_hints = get_type_hints(cls, include_extras=True)
+    assert resolved_hints[variable_from(cls).first_attribute._attribute_name_] is int
+    assert resolved_hints[variable_from(cls).second_attribute._attribute_name_] is str
+    list_of_first = resolved_hints[variable_from(cls).list_of_first._attribute_name_]
+    list_of_second = resolved_hints[variable_from(cls).list_of_second._attribute_name_]
+    assert get_origin(list_of_first) is list and get_args(list_of_first)[0] is int
+    assert get_origin(list_of_second) is list and get_args(list_of_second)[0] is str
+
+
 def _assert_generic_type_is_resolved(cls):
     resolved_hints = get_type_hints(cls, include_extras=True)
     generic_type = get_generic_type_param(cls, SubClassSafeGeneric)[0]
     assert (
-            resolved_hints[variable_from(cls).attribute_using_generic._attribute_name_]
-            is generic_type
+        resolved_hints[variable_from(cls).attribute_using_generic._attribute_name_]
+        is generic_type
     )
     nested_generic_type = resolved_hints[
         variable_from(cls).generic_attribute_using_generic._attribute_name_
     ]
     assert (
-            get_origin(nested_generic_type) is list
-            and get_args(nested_generic_type)[0] is generic_type
+        get_origin(nested_generic_type) is list
+        and get_args(nested_generic_type)[0] is generic_type
     )
