@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class SubClassSafeGeneric(ABC):
+class SubClassSafeGeneric(Generic[T], ABC):
     """
     A generic class that can be subclassed safely because it automatically updates the field types that use the generic
      type with the new specified type.
