@@ -87,6 +87,50 @@ class Color:
         return (self.R, self.G, self.B)
 
     @classmethod
+    def RED(self):
+        return Color(1, 0, 0)
+
+    @classmethod
+    def YELLOW(self):
+        return Color(1, 1, 0)
+
+    @classmethod
+    def GREEN(self):
+        return Color(0, 1, 0)
+
+    @classmethod
+    def CYAN(self):
+        return Color(0, 1, 1)
+
+    @classmethod
+    def BLUE(self):
+        return Color(0, 0, 1)
+
+    @classmethod
+    def MAGENTA(self):
+        return Color(1, 0, 1)
+
+    @classmethod
+    def WHITE(self):
+        return Color(1, 1, 1)
+
+    @classmethod
+    def BLACK(self):
+        return Color(0, 0, 0)
+
+    @classmethod
+    def GRAY(self):
+        return Color(0.498, 0.498, 0.498)
+
+    @classmethod
+    def BEIGE(self):
+        return Color(1, 0.827, 0.6078)
+
+    @classmethod
+    def ORANGE(self):
+        return Color(1, 0.647, 0)
+
+    @classmethod
     def from_list(cls, color: List[float]):
         """
         Set the rgba_color from a list of RGBA values.

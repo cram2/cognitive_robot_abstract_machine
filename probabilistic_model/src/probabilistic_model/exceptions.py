@@ -1,7 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
-from krrood.utils import DataclassException
+from krrood.exceptions import DataclassException
+
 if TYPE_CHECKING:
     from probabilistic_model.probabilistic_model import ProbabilisticModel
 

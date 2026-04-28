@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from krrood.utils import DataclassException
+from krrood.exceptions import DataclassException
 
 
 @dataclass
