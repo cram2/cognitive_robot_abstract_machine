@@ -531,7 +531,7 @@ class Mesh(Shape):
             visual=trimesh.visual.TextureVisuals(uv=uv_unindexed, image=texture_image),
         )
 
-        return Mesh.from_trimesh(mesh=mesh, origin=origin, scale=scale, file_type="obj")
+        return Mesh.from_trimesh(mesh=mesh, origin=origin, scale=scale, file_type="obj", texture_file_path=texture_file_path)
 
     @classmethod
     def from_trimesh(
@@ -556,7 +556,7 @@ class Mesh(Shape):
 
         # Each export gets its own subdir so material.mtl files never collide
         subdir = tempfile.mkdtemp(dir=dirname)
-        tmp_path = os.path.join(subdir, f"mesh.{file_type}")
+        tmp_path = os.path.join(subdir, f"{os.path.basename(subdir)}.{file_type}")
 
         try:
             mesh.export(tmp_path, file_type=file_type)
