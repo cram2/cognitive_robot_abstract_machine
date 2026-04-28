@@ -9,7 +9,6 @@ from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.entity_query_language.factories import variable
 from krrood.patterns.subclass_safe_generic import (
     SubClassSafeGeneric,
-    TwoGenericSubClassSafe,
     AbstractSubClassSafeGeneric,
 )
 from krrood.utils import T
