@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from time import sleep
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, List
 
 import rclpy
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
@@ -22,15 +22,6 @@ from giskardpy.middleware.ros2 import rospy
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
-# Configuration constants
-MARKER_SCALE = 0.25
-MARKER_BOX_SIZE = 0.175
-MARKER_COLOR_VALUE = 0.5
-MARKER_COLOR_ALPHA = 0.5
-MOTION_TIMEOUT_SECONDS = 20
-WORLD_ENTITY_RETRY_ATTEMPTS = 100
-WORLD_ENTITY_RETRY_DELAY = 0.5
-
 
 @dataclass
 class InteractiveMarkerNode:
@@ -46,7 +37,9 @@ class InteractiveMarkerNode:
     - root_links: List of root link names for kinematic chains
     - tip_links: List of tip link names corresponding to root_links
 
-    Example Node for .launch.py::
+    Example Node for .launch.py:
+
+    .. code-block:: python
 
         Node(
             package="giskardpy_ros",
@@ -66,6 +59,18 @@ class InteractiveMarkerNode:
         ),
     """
 
+    motion_timeout_seconds: float = 20
+    """
+    Timeout in seconds for motion execution.
+    """
+    world_entity_retry_attempts: int = 100
+    """
+    Number of retry attempts when finding world entities.
+    """
+    world_entity_retry_delay: float = 0.5
+    """
+    Delay in seconds between retry attempts for world entities.
+    """
     giskard: GiskardWrapper = field(init=False)
     """
     Wrapper for Giskard motion planner.
@@ -78,21 +83,19 @@ class InteractiveMarkerNode:
     """
     Interactive marker server for RViz.
     """
-    root_links: list = field(init=False)
+    root_links: List[str] = field(init=False)
     """
     List of root link names from parameters.
     """
-    tip_links: list = field(init=False)
+    tip_links: List[str] = field(init=False)
     """
     List of tip link names from parameters.
     """
 
     def __post_init__(self) -> None:
         """
-        Initialize the interactive marker node after dataclass initialization.
-
         Sets up the Giskard wrapper, reads parameters, creates kinematic chain markers,
-        and initializes the interactive marker server. Retries up to WORLD_ENTITY_RETRY_ATTEMPTS
+        and initializes the interactive marker server. Retries up to world_entity_retry_attempts
         times if world entities are not found initially.
 
         :raises WorldEntityNotFoundError: If kinematic structure entities cannot be found
@@ -119,17 +122,15 @@ class InteractiveMarkerNode:
 
     def _initialize_markers(self) -> None:
         """
-        Initialize kinematic chain markers with retry logic.
-
         Attempts to find kinematic structure entities and create markers for them.
-        Retries up to WORLD_ENTITY_RETRY_ATTEMPTS times with WORLD_ENTITY_RETRY_DELAY
+        Retries up to world_entity_retry_attempts times with world_entity_retry_delay
         between attempts.
 
         :raises WorldEntityNotFoundError: If entities cannot be found after all retries.
         """
         last_error: WorldEntityNotFoundError | None = None
 
-        for attempt in range(WORLD_ENTITY_RETRY_ATTEMPTS):
+        for attempt in range(self.world_entity_retry_attempts):
             try:
                 for root, tip in zip(self.root_links, self.tip_links):
                     root_body = (
@@ -147,10 +148,10 @@ class InteractiveMarkerNode:
             except WorldEntityNotFoundError as error:
                 last_error = error
                 self.markers.clear()
-                sleep(WORLD_ENTITY_RETRY_DELAY)
+                sleep(self.world_entity_retry_delay)
                 self.giskard.node_handle.get_logger().error(
-                    f"Failed to find bodies in world (attempt {attempt + 1}/{WORLD_ENTITY_RETRY_ATTEMPTS}), "
-                    f"retrying in {WORLD_ENTITY_RETRY_DELAY}s..."
+                    f"Failed to find bodies in world (attempt {attempt + 1}/{self.world_entity_retry_attempts}), "
+                    f"retrying in {self.world_entity_retry_delay}s..."
                 )
 
         if last_error is not None:
@@ -210,7 +211,7 @@ class InteractiveMarkerNode:
                     tip_link=kinematic_chain_marker.tip_body,
                     goal_pose=goal_transformation,
                 ),
-                motion_timeout := CountSeconds(seconds=MOTION_TIMEOUT_SECONDS),
+                motion_timeout := CountSeconds(seconds=self.motion_timeout_seconds),
             ]
         )
         motion_statechart.add_node(
@@ -252,6 +253,22 @@ class KinematicChainMarker:
     """
     Kinematic structure entity representing the tip body.
     """
+    marker_scale: float = 0.25
+    """
+    Scale of the interactive marker in meters.
+    """
+    marker_box_size: float = 0.175
+    """
+    Size of the marker box along each axis in meters.
+    """
+    marker_color_value: float = 0.5
+    """
+    RGB color value for the marker box (0.0 to 1.0).
+    """
+    marker_color_alpha: float = 0.5
+    """
+    Alpha transparency value for the marker box (0.0 to 1.0).
+    """
     name: str = field(init=False)
     """
     Formatted name combining root and tip links.
@@ -263,8 +280,6 @@ class KinematicChainMarker:
 
     def __post_init__(self) -> None:
         """
-        Initialize computed attributes after dataclass initialization.
-
         Creates the name attribute and initializes an empty InteractiveMarker object.
         """
         self.name = f"{self.root_link}/{self.tip_link}"
@@ -288,7 +303,7 @@ class KinematicChainMarker:
         """
         self.interactive_marker_message.header.frame_id = str(self.tip_body.name)
         self.interactive_marker_message.name = self.name
-        self.interactive_marker_message.scale = MARKER_SCALE
+        self.interactive_marker_message.scale = self.marker_scale
         self.interactive_marker_message.pose.orientation.w = 1.0
 
     def _add_box_control(self) -> None:
@@ -297,13 +312,13 @@ class KinematicChainMarker:
         """
         box_marker = Marker()
         box_marker.type = Marker.CUBE
-        box_marker.scale.x = MARKER_BOX_SIZE
-        box_marker.scale.y = MARKER_BOX_SIZE
-        box_marker.scale.z = MARKER_BOX_SIZE
-        box_marker.color.r = MARKER_COLOR_VALUE
-        box_marker.color.g = MARKER_COLOR_VALUE
-        box_marker.color.b = MARKER_COLOR_VALUE
-        box_marker.color.a = MARKER_COLOR_ALPHA
+        box_marker.scale.x = self.marker_box_size
+        box_marker.scale.y = self.marker_box_size
+        box_marker.scale.z = self.marker_box_size
+        box_marker.color.r = self.marker_color_value
+        box_marker.color.g = self.marker_color_value
+        box_marker.color.b = self.marker_color_value
+        box_marker.color.a = self.marker_color_alpha
 
         box_control = InteractiveMarkerControl()
         box_control.always_visible = True
