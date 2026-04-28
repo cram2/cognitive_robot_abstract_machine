@@ -7,12 +7,15 @@ from typing_extensions import Generator, Tuple
 import pycram.alternative_motion_mappings.hsrb_motion_mapping  # type: ignore
 import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
 import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
+from conftest import rclpy_node
 from pycram.datastructures.dataclasses import Context
-from pycram.datastructures.enums import Arms
+from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from pycram.datastructures.grasp import GraspDescription
 from pycram.locations.factories import (
     reachability_location,
     visibility_location,
     accessing_location,
+    giskard_reachability_location,
 )
 from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import sequential
@@ -277,6 +280,41 @@ def test_accessing_location_pose(immutable_model_world):
     location_desig = accessing_location(drawer, context=context, arm=Arms.RIGHT)
     with simulated_robot:
         pose = next(iter(location_desig))
+
+    assert len(pose.to_position().to_list()) == 4
+    assert len(pose.to_quaternion().to_list()) == 4
+
+
+def test_giskard_location_pose(immutable_multiple_robot_simple_apartment, rclpy_node):
+    world, robot, context = immutable_multiple_robot_simple_apartment
+    plan = sequential(
+        [
+            ParkArmsAction(Arms.BOTH),
+            MoveTorsoAction(TorsoState.HIGH),
+        ],
+        context,
+    )
+
+    context.ros_node = rclpy_node
+    context.debug = True
+
+    with simulated_robot:
+        plan.perform()
+
+        world.notify_state_change()
+
+        location = giskard_reachability_location(
+            world.get_body_by_name("milk.stl"),
+            context,
+            Arms.RIGHT,
+            GraspDescription(
+                ApproachDirection.FRONT,
+                VerticalAlignment.NoAlignment,
+                robot.left_arm.manipulator,
+            ),
+        )
+
+        pose = next(iter(location))
 
     assert len(pose.to_position().to_list()) == 4
     assert len(pose.to_quaternion().to_list()) == 4

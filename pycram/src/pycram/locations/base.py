@@ -10,6 +10,9 @@ from typing_extensions import List, Iterator, Optional
 from krrood.entity_query_language.predicate import Predicate
 from pycram.datastructures.dataclasses import Context
 from pycram.utils import collision_check
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
@@ -63,6 +66,11 @@ class Location:
         for validator in self.validators:
             validator.world = test_world
             validator.robot = test_robot
+
+        if self.context.debug:
+            VizMarkerPublisher(
+                _world=test_world, node=self.context.ros_node
+            ).with_tf_publisher()
 
         for pose_candidate in self.generator:
 

@@ -6,6 +6,7 @@ from krrood.adapters.json_serializer import list_like_classes
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
+from pycram.locations.backends import GiskardLocationBackend
 from pycram.locations.base import Location
 from pycram.locations.costmaps import OccupancyCostmap, RingCostmap, VisibilityCostmap
 from pycram.locations.pose_validator import (
@@ -176,6 +177,54 @@ def visibility_location(target: Union[Pose, Body], context: Context) -> Location
                 robot=context.robot,
                 target_pose=target_pose,
                 target_body=target_body,
+            )
+        ],
+    )
+
+
+def giskard_reachability_location(
+    target: Union[Pose, Body],
+    context: Context,
+    arm: Arms,
+    grasp_description: GraspDescription = None,
+) -> Location:
+    """
+    :param target:
+    :param context:
+    :param arm:
+    :param grasp_description:
+    :returns: A location that is reachable from the target pose, using Giskard for reachability estimation.
+    """
+    target_pose, target_body = (
+        (target.global_pose, target) if isinstance(target, Body) else (target, None)
+    )
+
+    man = ViewManager.get_end_effector_view(arm, context.robot)
+
+    grasp_description = grasp_description or GraspDescription(
+        ApproachDirection.FRONT,
+        VerticalAlignment.NoAlignment,
+        man,
+    )
+
+    backend = GiskardLocationBackend(
+        target_pose, arm, grasp_description, context.robot, context.world
+    )
+
+    return Location(
+        context,
+        target_pose,
+        backend,
+        [
+            ReachabilitySequenceValidator(
+                pose_sequence=grasp_description._pose_sequence(
+                    target_pose,
+                    _get_object_in_hand(context.robot, context.world, arm)
+                    or target_body,
+                ),
+                robot=context.robot,
+                world=context.world,
+                tip_link=man.tool_frame,
             )
         ],
     )
