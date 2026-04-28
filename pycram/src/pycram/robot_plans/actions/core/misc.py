@@ -21,7 +21,11 @@ from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.navigation import NavigateAction
 from pycram.robot_plans.actions.core.robot_body import MoveManipulatorAction
 from semantic_digital_twin.robots.abstract_robot import Manipulator
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    RotationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Quaternion
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
@@ -163,11 +167,23 @@ class MoveToReach(ActionDescription):
 
         :return: The calculated standing pose.
         """
-        target_homogeneous_matrix = self.target_pose.to_homogeneous_matrix()
-        relative_position = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=self.robot_x, y=self.robot_y, yaw=self.hip_rotation - np.pi
-        )
-        standing_position = target_homogeneous_matrix @ relative_position
-        standing_position.z = self.robot.root.global_pose.z
+        reference_T_target = self.target_pose.to_homogeneous_matrix()
+        target_V_robot = -Vector3(x=self.robot_x, y=self.robot_y)
+        target_V_robot.scale(1.0)
+        world_z = Vector3.Z()
+        target_R_robot_pointing_to_target = RotationMatrix.from_vectors(
+            x=target_V_robot, z=world_z
+        ) @ RotationMatrix.from_rpy(yaw=self.hip_rotation)
 
-        return standing_position.to_pose()
+        target_T_robot = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            point=Point3(
+                x=self.robot_x,
+                y=self.robot_y,
+            ),
+            rotation_matrix=target_R_robot_pointing_to_target,
+            reference_frame=self.target_pose.reference_frame,
+        )
+        reference_T_robot = reference_T_target @ target_T_robot
+        reference_T_robot.z = self.robot.root.global_pose.z
+
+        return reference_T_robot.to_pose()
