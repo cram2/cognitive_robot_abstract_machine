@@ -3,7 +3,7 @@ import trimesh
 import numpy as np
 import uuid
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Union
 from CGAL.CGAL_Kernel import Point_3, Triangle_3
 from CGAL.CGAL_AABB_tree import AABB_tree_Triangle_3_soup
 
@@ -178,41 +178,33 @@ class GraspScorer:
         ranked_grasps.sort(key=lambda x: x.score, reverse=True)
         return ranked_grasps
 
-def load_successful_grasps_from_dataset(dataset_path: str, gripper_name: str, object_uuid: str) -> List[Pose]:
+def load_successful_grasps_from_dataset(dataset_path: str, gripper_name: str, object_uuid: Union[str, uuid.UUID]) -> List[Pose]:
     """
     Helper to read dataset and return a list of successful grasp poses using ormatic.
     
     :param dataset_path: The database path or root directory path containing the dataset SQLite database.
     :param gripper_name: The name of the gripper used in the dataset.
-    :param object_uuid: The unique identifier for the target object.
-    :return: A list of Pose objects representing successful grasp poses. Returns an empty list if no grasps are found or an error occurs.
+    :param object_uuid: The unique identifier for the target object (string or UUID).
+    :return: A list of Pose objects representing successful grasp poses. Returns an empty list if no grasps are found.
     """
 
-    try:
-        if not dataset_path.startswith("sqlite"):
-            if os.path.isdir(dataset_path):
-                db_uri = f"sqlite+pysqlite:///{os.path.join(dataset_path, f'{gripper_name}.sqlite')}"
-            else:
-                db_uri = f"sqlite+pysqlite:///{dataset_path}"
+    if not dataset_path.startswith("sqlite"):
+        if os.path.isdir(dataset_path):
+            db_uri = f"sqlite+pysqlite:///{os.path.join(dataset_path, f'{gripper_name}.sqlite')}"
         else:
-            db_uri = dataset_path
+            db_uri = f"sqlite+pysqlite:///{dataset_path}"
+    else:
+        db_uri = dataset_path
 
-        engine = create_engine(db_uri, echo=False)
-        with Session(engine) as session:
-            try:
-                target_uuid = uuid.UUID(object_uuid) if isinstance(object_uuid, str) else object_uuid
-            except ValueError:
-                target_uuid = object_uuid
+    engine = create_engine(db_uri, echo=False)
+    with Session(engine) as session:
+        target_uuid = uuid.UUID(object_uuid) if isinstance(object_uuid, str) else object_uuid
 
-            query = (
-                select(GrasPoseMappingDAO)
-                .join(BodyDAO, GrasPoseMappingDAO.reference_frame_id == BodyDAO.database_id)
-                .where(BodyDAO.id == target_uuid)
-            )
-            
-            grasp_daos = session.scalars(query).all()
-            return [dao.from_dao() for dao in grasp_daos]
-            
-    except Exception as e:
-        print(f"Error reading grasps for {object_uuid}: {e}")
-        return []
+        query = (
+            select(GrasPoseMappingDAO)
+            .join(BodyDAO, GrasPoseMappingDAO.reference_frame_id == BodyDAO.database_id)
+            .where(BodyDAO.id == target_uuid)
+        )
+        
+        grasp_daos = session.scalars(query).all()
+        return [dao.from_dao() for dao in grasp_daos]
