@@ -9,6 +9,8 @@ import numpy as np
 from typing_extensions import List, TYPE_CHECKING, Union, Optional, Dict, Any, Self
 
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood.symbolic_math.symbolic_math import Scalar
+from semantic_digital_twin.physics.pouring_equations import tilt_expression_from_fk
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -33,6 +35,10 @@ from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
+    from semantic_digital_twin.physics.pouring_equations import (
+        InflowEquation,
+        PouringEquation,
+    )
 
 
 class HasUpdateState(ABC):
@@ -1145,3 +1151,58 @@ class DifferentialDrive(ActiveConnection, HasUpdateState):
             yaw_id=deepcopy(self.yaw_id),
             x_velocity_id=deepcopy(self.x_velocity_id),
         )
+
+
+@dataclass(eq=False)
+class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
+    """
+    Translating DOF representing the fill level of a container.
+
+    Integrates :attr:`outflow_equation` and :attr:`inflow_equation` each tick.
+    Either may be ``None``; the net velocity is their sum.
+    """
+
+    outflow_equation: Optional[PouringEquation] = field(
+        default=None, kw_only=True, init=False
+    )
+    """ODE governing how liquid leaves this container (e.g. tilting to pour)."""
+
+    inflow_equation: Optional[InflowEquation] = field(
+        default=None, kw_only=True, init=False
+    )
+    """ODE governing how liquid enters this container from an external source."""
+
+    def add_to_world(self, world: World):
+        super().add_to_world(world)
+        translation_axis = self.axis * world.state[self.dof_id].position
+        self._kinematics = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=translation_axis[0],
+            y=translation_axis[1],
+            z=translation_axis[2],
+            child_frame=self.child,
+        )
+
+    @property
+    def tilt_expression(self) -> Optional[Scalar]:
+        """Symbolic tilt angle used by :attr:`outflow_equation` during physics integration."""
+        root_T_child = self._world.compose_forward_kinematics_expression(
+            self._world.root, self.child
+        )
+        return tilt_expression_from_fk(root_T_child)
+
+    def update_state(self, dt: float):
+        state = self._world.state
+        old_vel = state[self.dof.id].velocity
+        old_acc = state[self.dof.id].acceleration
+        velocity = 0.0
+        if self.outflow_equation is not None:
+            velocity += self.outflow_equation.symbolic_velocity(
+                self.tilt_expression,
+                self.dof.variables.position,
+            ).evaluate()[0]
+        if self.inflow_equation is not None:
+            velocity += self.inflow_equation.symbolic_velocity().evaluate()[0]
+        state[self.dof.id].velocity = velocity
+        state[self.dof.id].acceleration = (velocity - old_vel) / dt
+        state[self.dof.id].jerk = (state[self.dof.id].acceleration - old_acc) / dt
+        state[self.dof.id].position = state[self.dof.id].position + velocity * dt

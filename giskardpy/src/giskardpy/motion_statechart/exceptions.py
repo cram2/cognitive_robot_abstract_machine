@@ -24,6 +24,7 @@ class CollisionViolatedError(DataclassException):
         self.message = f"Violated collision constraints: \n"
         for collision, threshold in zip(self.violated_collisions, self.thresholds):
             self.message += f"{str(collision.body_a.name), str(collision.body_b.name)}: {collision.distance} < {threshold}\n"
+        super().__post_init__()
 
 
 @dataclass
