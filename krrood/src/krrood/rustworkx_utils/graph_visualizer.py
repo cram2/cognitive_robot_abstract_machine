@@ -1122,8 +1122,9 @@ class GraphVisualizer:
                 va="center",
                 fontsize=font_size,
                 fontweight="medium",
+                color="black",
                 wrap=True,
-                bbox=dict(boxstyle="round,pad=0.28", facecolor="white", alpha=0.85),
+                bbox=dict(boxstyle="round,pad=0.28", facecolor="white", edgecolor="none", alpha=0.85),
                 zorder=3,
             )
         self.ctx["colors"] = colors
@@ -1163,14 +1164,17 @@ class GraphVisualizer:
         scale = 0.7 * (max(0.5, fw / 12.0) + max(0.5, fh / 9.0))
         legend_fs = float(np.clip(10.0 * scale, 8.0, 28.0))
         title_fs = float(np.clip(legend_fs * 1.1, 9.0, 32.0))
-        ax.legend(
+        legend = ax.legend(
             handles=handles,
             title="Node types",
             loc="upper left",
             framealpha=0.9,
             fontsize=legend_fs,
             title_fontsize=title_fs,
+            facecolor="white",
+            labelcolor="black",
         )
+        legend.get_title().set_color("black")
 
     def _style_and_save(self, fig, ax):
         # White backgrounds

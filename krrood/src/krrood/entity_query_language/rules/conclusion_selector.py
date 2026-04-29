@@ -41,7 +41,7 @@ class ConclusionSelector(TruthValueOperator, ABC):
     def create_and_update_rule_tree(
         cls,
         *conditions: ConditionType,
-    ) -> Self:
+    ) -> SymbolicExpression:
         """
         Create a new RDR rule (e.g., Refinement, Alternative, Next) and add it to the current rule tree.
 
@@ -61,7 +61,7 @@ class ConclusionSelector(TruthValueOperator, ABC):
             current_context, new_condition
         )
 
-        if new_context is not current_context:
+        if prev_parent is not None and new_context is not current_context:
             prev_parent._replace_child_(current_context, new_context)
 
         return new_condition
