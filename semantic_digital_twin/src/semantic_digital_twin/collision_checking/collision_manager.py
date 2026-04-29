@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from ..world import World
 
 
-@dataclass
+@dataclass(eq=False)
 class CollisionConsumer(ABC):
     """
     Interface for classes that want to be notified about changes in the collision matrix or when collision checking is performed.
@@ -69,6 +69,9 @@ class CollisionConsumer(ABC):
         """
         Called when the collision matrix is updated.
         """
+
+    def __hash__(self):
+        return hash(id(self))
 
 
 @dataclass(eq=False)
