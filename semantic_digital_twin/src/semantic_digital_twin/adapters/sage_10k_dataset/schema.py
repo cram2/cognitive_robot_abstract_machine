@@ -534,7 +534,7 @@ class Sage10kDoor(Sage10kWithID):
 
     position_on_wall: float
     """
-    Position on wall w. r. t. its starting point in meters?
+    Position on wall w. r. t. its starting point as percentage of the wall length.
     """
 
     width: float
@@ -617,7 +617,7 @@ class Sage10kDoor(Sage10kWithID):
         wall_length, _ = sage_10k_wall.wall_length_and_yaw
 
         parent_T_body = HomogeneousTransformationMatrix.from_xyz_rpy(
-            y=-self.position_on_wall,
+            y=-wall_length / 2 + (self.position_on_wall * wall_length),
             z=self.height / 2,
             reference_frame=parent,
         )
