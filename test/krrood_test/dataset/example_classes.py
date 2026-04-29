@@ -42,7 +42,7 @@ class KRROODPosition(Symbol):
     z: float
 
     @classmethod
-    def from_abc(cls, a: float, b: float, c: float) -> Position:
+    def from_abc(cls, a: float, b: float, c: float) -> KRROODPosition:
         return KRROODPosition(a, b, c)
 
 

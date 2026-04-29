@@ -10,8 +10,16 @@ from typing_extensions import Optional, Tuple, assert_never
 
 from krrood.adapters.exceptions import JSON_TYPE_NAME
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json
+from krrood.ripple_down_rules.utils import recursive_subclasses
 from krrood.utils import get_full_class_name
+from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
+    Sage10kTypeNameCleaner,
+    NaturalLanguageDescriptionWithTypeDescription,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.semantic_annotations.natural_language import (
+    NaturalLanguageDescription,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Floor,
     Wall,
@@ -20,10 +28,14 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Hinge,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
+)
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.geometry import Mesh, Scale, Box
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -397,7 +409,12 @@ class Sage10kObject(Sage10kWithID):
     """
 
     def create_in_world(
-        self, world: World, directory: Path, parent: KinematicStructureEntity, **kwargs
+        self,
+        world: World,
+        directory: Path,
+        parent: KinematicStructureEntity,
+        type_name_cleaner: Sage10kTypeNameCleaner,
+        **kwargs,
     ) -> Body:
         ply_file = directory / "objects" / f"{self.source_id}.ply"
         texture_file = directory / "objects" / f"{self.source_id}_texture.png"
@@ -442,6 +459,21 @@ class Sage10kObject(Sage10kWithID):
             # Add the body to the world
             world.add_body(body)
             world.add_connection(root_C_body)
+
+        # create semantic annotation if it exists
+        cleaned_type = type_name_cleaner.clean(self.type)
+        if not cleaned_type:
+            annotation = NaturalLanguageDescription(
+                root=body, description=self.description
+            )
+        else:
+            annotation = NaturalLanguageDescriptionWithTypeDescription(
+                root=body, description=self.description, type_description=cleaned_type
+            )
+
+        with world.modify_world():
+            world.add_semantic_annotation(annotation)
+
         return body
 
     def to_json(self) -> Dict[str, Any]:
@@ -664,12 +696,20 @@ class Sage10kDoor(Sage10kWithID):
         """
         world_root_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
 
+        if self.opens_inward:
+            lower = DerivativeMap(position=0.0)
+            upper = DerivativeMap(position=np.pi / 2)
+        else:
+            upper = DerivativeMap(position=0.0)
+            lower = DerivativeMap(position=-np.pi / 2)
+
         with world.modify_world():
             hinge = Hinge.create_with_new_body_in_world(
                 name=PrefixedName(name="hinge", prefix=door.root.name.name),
                 world=world,
                 active_axis=Vector3.Z(),
                 world_root_T_self=world_root_T_hinge,
+                connection_limits=DegreeOfFreedomLimits(lower=lower, upper=upper),
             )
             door.add_hinge(hinge)
 
@@ -779,7 +819,12 @@ class Sage10kRoom(Sage10kWithID):
         return floor_annotation
 
     def create_in_world(
-        self, world: World, directory: Path, parent: KinematicStructureEntity, **kwargs
+        self,
+        world: World,
+        directory: Path,
+        parent: KinematicStructureEntity,
+        type_name_cleaner: Sage10kTypeNameCleaner,
+        **kwargs,
     ) -> Body:
         self._create_floor(world, directory, parent)
 
@@ -824,7 +869,9 @@ class Sage10kRoom(Sage10kWithID):
 
         # create the objects
         for sage_object in self.objects:
-            sage_object.create_in_world(world, directory, parent=parent)
+            sage_object.create_in_world(
+                world, directory, parent=parent, type_name_cleaner=type_name_cleaner
+            )
 
         return world.root
 
@@ -915,7 +962,11 @@ class Sage10kScene(Sage10kWithID):
             rooms=[Sage10kRoom._from_json(r, **kwargs) for r in data["rooms"]],
         )
 
-    def create_world(self) -> World:
+    def create_world(self, type_name_cleaner: Sage10kTypeNameCleaner) -> World:
+        """
+        :param type_name_cleaner: This is used to assign the semantic annotations to the bodies.
+        :return: The semantically annotated world.
+        """
         world = World()
 
         root = Body(name=PrefixedName(name="root"))
@@ -924,5 +975,11 @@ class Sage10kScene(Sage10kWithID):
             world.add_body(root)
 
         for room in self.rooms:
-            room.create_in_world(world=world, directory=self.directory, parent=root)
+            room.create_in_world(
+                world=world,
+                directory=self.directory,
+                parent=root,
+                type_name_cleaner=type_name_cleaner,
+            )
+
         return world
