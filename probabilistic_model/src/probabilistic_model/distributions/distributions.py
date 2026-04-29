@@ -295,6 +295,12 @@ class DiscreteDistribution(UnivariateDistribution):
     A dict that maps from integers (hash(symbol) for symbols) to probabilities.
     """
 
+    def __post_init__(self):
+        if not isinstance(self.probabilities, MissingDict):
+            missing_dict = MissingDict(float)
+            missing_dict.update(self.probabilities)
+            self.probabilities = missing_dict
+
     def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
         events = events[:, 0]
 
