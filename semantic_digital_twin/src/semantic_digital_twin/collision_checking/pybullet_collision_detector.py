@@ -13,7 +13,6 @@ import giskardpy_bullet_bindings as bullet
 import numpy as np
 import trimesh
 from platformdirs import user_cache_dir
-from trimesh import Trimesh
 
 from giskardpy.utils.utils import create_path
 from semantic_digital_twin.collision_checking.collision_detector import (
@@ -50,7 +49,9 @@ CACHE_DIR = create_cache_dir("convex_decompositions")
 LOG_DIR = create_cache_dir("log")
 
 
-def trimesh_quantized_hash(mesh, decimals: int = 6, digest_size: int = 16) -> str:
+def trimesh_quantized_hash(
+    mesh: trimesh.Trimesh, decimals: int = 6, digest_size: int = 16
+) -> str:
     """
     Hash tolerant to tiny float differences by rounding vertices.
     Still order-sensitive (vertex/face order changes -> different hash).
@@ -201,7 +202,7 @@ def load_convex_mesh_shape(
     """
     if not mesh.mesh.is_convex and mesh_decomposer is not None:
         obj_pkg_filename = convert_to_decomposed_obj_and_save_in_tmp(
-            mesh=mesh.mesh, mesh_decomposer=mesh_decomposer
+            mesh=mesh, mesh_decomposer=mesh_decomposer
         )
     else:
         obj_pkg_filename = mesh.filename
@@ -222,7 +223,7 @@ def clear_cache(cache_dir: Path = CACHE_DIR):
 
 
 def convert_to_decomposed_obj_and_save_in_tmp(
-    mesh: Trimesh,
+    mesh: Mesh,
     mesh_decomposer: Optional[MeshDecomposer] = None,
     cache_dir: Path = CACHE_DIR,
     log_path: Path = LOG_DIR,
@@ -235,17 +236,17 @@ def convert_to_decomposed_obj_and_save_in_tmp(
     :param log_path: the path to the log file.
     :return: the path to the convex decomposition file.
     """
-    file_hash = trimesh_quantized_hash(mesh)
+    trimesh_obj = mesh.mesh
+    file_hash = trimesh_quantized_hash(trimesh_obj)
     obj_file_name = str(cache_dir / f"{file_hash}.obj")
     if not os.path.exists(obj_file_name):
-        obj_str = trimesh.exchange.obj.export_obj(mesh)
+        obj_str = trimesh.exchange.obj.export_obj(trimesh_obj)
         create_path(obj_file_name)
         with open(obj_file_name, "w") as f:
             f.write(obj_str)
-        if not mesh.is_convex and mesh_decomposer is not None:
-            wrapper = Mesh.from_trimesh(mesh=mesh, scale=Scale(1.0, 1.0, 1.0))
+        if not trimesh_obj.is_convex and mesh_decomposer is not None:
             with suppress_stdout_stderr():
-                parts = mesh_decomposer.apply_to_mesh(wrapper)
+                parts = mesh_decomposer.apply_to_mesh(mesh)
             trimesh.Scene([p.mesh for p in parts]).export(
                 obj_file_name, file_type="obj"
             )
@@ -303,7 +304,9 @@ class BulletCollisionDetector(CollisionDetector):
     The bullet collision objects in the order they are added to the world.
     This is only a cache for performance reasons.
     """
-    mesh_decomposer: Optional[MeshDecomposer] = field(default_factory=VHACDMeshDecomposer)
+    mesh_decomposer: Optional[MeshDecomposer] = field(
+        default_factory=VHACDMeshDecomposer
+    )
     """
     Decomposer used to split non-convex meshes into convex parts before handing them to
     Bullet. Defaults to VHACD; pass ``None`` to skip decomposition.

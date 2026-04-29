@@ -2,7 +2,6 @@ import os
 
 import giskardpy_bullet_bindings as pb
 import pytest
-import trimesh
 from importlib.resources import files
 from pathlib import Path
 
@@ -14,6 +13,7 @@ from semantic_digital_twin.collision_checking.pybullet_collision_detector import
 )
 from semantic_digital_twin.pipeline.mesh_decomposition.coacd import COACDMeshDecomposer
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
+from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -39,15 +39,13 @@ def non_convex_mesh():
     )
     world_with_stl = STLParser(stl_path).parse()
     body: Body = world_with_stl.root
-    mesh = body.collision[0]
-    return mesh.mesh
+    return body.collision[0]
 
 
 @pytest.fixture
 def convex_mesh():
     # A box is convex
-    mesh = trimesh.creation.box(extents=(1, 1, 1))
-    return mesh
+    return Mesh.box(extents=(1, 1, 1))
 
 
 @pytest.fixture(
@@ -92,7 +90,9 @@ def test_convert_convex_mesh_saves_directly(clean_cache, cache_dir, convex_mesh)
     assert str(cache_dir) in output_path
 
 
-def test_convert_caching_behavior(clean_cache, cache_dir, non_convex_mesh, mesh_decomposer):
+def test_convert_caching_behavior(
+    clean_cache, cache_dir, non_convex_mesh, mesh_decomposer
+):
     """
     Test that calling the function twice with the same mesh returns the same file path
     and does not re-run the decomposition process (same modification time).
@@ -112,7 +112,9 @@ def test_convert_caching_behavior(clean_cache, cache_dir, non_convex_mesh, mesh_
     assert os.path.getmtime(path2) == mtime1
 
 
-def test_generated_obj_is_loadable(clean_cache, cache_dir, non_convex_mesh, mesh_decomposer):
+def test_generated_obj_is_loadable(
+    clean_cache, cache_dir, non_convex_mesh, mesh_decomposer
+):
     """
     Verify that the generated file can be loaded via pb.load_convex_shape.
     """
