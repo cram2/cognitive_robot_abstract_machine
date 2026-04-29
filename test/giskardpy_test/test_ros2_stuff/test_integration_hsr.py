@@ -277,15 +277,19 @@ class TestJointGoals:
         msc.add_node(EndMotion.when_true(joint_goal))
         state_version = giskard.api.world.state.version
         giskard.api.execute(msc)
-        for i in range(100):
+        for i in range(1000):
             if giskard.api.world.state.version != state_version:
                 break
             sleep(0.01)
+        else:
+            assert False
+            #state version never changed
         np.testing.assert_almost_equal(
             giskard.api.world.state[arm_lift_joints.dof.id].position,
             0.5,
             decimal=2,
         )
+
 
 
 class TestCartGoals:

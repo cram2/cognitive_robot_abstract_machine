@@ -17,6 +17,25 @@ class UniformDistribution(ContinuousDistributionWithFiniteSupport):
     Class for uniform distributions over the half-open interval [lower, upper).
     """
 
+    def log_conditional_from_simple_interval_if_not_singleton(
+        self, interval: SimpleInterval
+    ) -> Tuple[Optional[ContinuousDistribution], float]:
+        probability = self.probability_of_simple_event(
+            SimpleEvent.from_data({self.variable: interval})
+        )
+        if probability == 0.0:
+            return None, -np.inf
+
+        # construct new interval
+        new_interval = self.interval.intersection_with(interval)
+
+        if new_interval.is_empty():
+            return None, -np.inf
+
+        return self.__class__(variable=self.variable, interval=new_interval), np.log(
+            probability
+        )
+
     def log_likelihood_without_bounds_check(self, x: npt.NDArray) -> npt.NDArray:
         return np.full((len(x),), self.log_probability_density_function_value())
 
@@ -29,26 +48,6 @@ class UniformDistribution(ContinuousDistributionWithFiniteSupport):
         return (
             self.interval.as_composite_set(),
             self.log_probability_density_function_value(),
-        )
-
-    def log_conditional_from_simple_interval(
-        self, interval: SimpleInterval
-    ) -> Tuple[Self, float]:
-        probability = self.probability_of_simple_event(
-            SimpleEvent.from_data({self.variable: interval})
-        )
-
-        if probability == 0.0:
-            return None, -np.inf
-
-        # construct new interval
-        new_interval = self.interval.intersection_with(interval)
-
-        if new_interval.is_empty():
-            return None, -np.inf
-
-        return self.__class__(variable=self.variable, interval=new_interval), np.log(
-            probability
         )
 
     def sample(self, amount: int) -> npt.NDArray:

@@ -19,8 +19,10 @@ dependencies = [
   "krrood",
   "random-events",
   "probabilistic_model",
+  "robokudo",
   "physics_simulators",
   "ipykernel>=7.2.0",
+  "lark-parser>=0.12.0",
 ]
 
 [tool.uv.workspace]
@@ -31,7 +33,8 @@ members = [
   "krrood",
   "random_events",
   "probabilistic_model",
-  "physics_simulators"
+  "physics_simulators",
+  "robokudo"
 ]
 
 [tool.uv.sources]
@@ -41,6 +44,7 @@ semantic_digital_twin = { workspace = true }
 krrood                = { workspace = true }
 probabilistic_model   = { workspace = true }
 random_events         = { workspace = true }
+robokudo              = { workspace = true }
 physics_simulators    = { workspace = true }
 
 [tool.poetry]
@@ -53,6 +57,7 @@ semantic_digital_twin = { path = "semantic_digital_twin", develop = true }
 krrood = { path = "krrood", develop = true }
 random_events = { path = "random_events", develop = true }
 probabilistic_model = { path = "probabilistic_model", develop = true }
+robokudo = { path = "robokudo", develop = true }
 physics_simulators = { path = "physics_simulators", develop = true }
 
 [tool.setuptools]

@@ -11,7 +11,7 @@ kernelspec:
   name: python3
 ---
 
-# Basic Motion Example
+# Basic Motion Statechart Example
 
 This example shows how to set up a basic `MotionStatechart` that runs for a specified amount of time using a `CountSeconds` monitor.
 
