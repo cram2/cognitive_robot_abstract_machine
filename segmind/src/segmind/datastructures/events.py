@@ -60,7 +60,7 @@ class EventWithTrackedObjects(DetectionEvent, ABC):
 
 
     @abstractmethod
-    def update_object_trackers_with_event(self) -> None:
+    def update_object_trackers_with_event(self, factory: ObjectTrackerFactory) -> None:
         """
         Update the object trackers of the involved objects with the event.
         """
@@ -77,8 +77,8 @@ class EventWithOneTrackedObject(EventWithTrackedObjects, HasPrimaryTrackedObject
     def tracked_objects(self) -> List[Body]:
         return [self.tracked_object]
 
-    def update_object_trackers_with_event(self) -> None:
-        ObjectTrackerFactory.get_tracker(self.tracked_object).add_event(self)
+    def update_object_trackers_with_event(self, factory: ObjectTrackerFactory) -> None:
+        factory.get_tracker(self.tracked_object).add_event(self)
 
     def __str__(self):
         return f"{self.__class__.__name__}: {self.tracked_object.name} - {self.timestamp}"
@@ -102,10 +102,10 @@ class EventWithTwoTrackedObjects(EventWithTrackedObjects, HasPrimaryAndSecondary
     def tracked_objects(self) -> List[Body]:
         return [self.tracked_object, self.with_object] if self.with_object is not None else [self.tracked_object]
 
-    def update_object_trackers_with_event(self) -> None:
-        ObjectTrackerFactory.get_tracker(self.tracked_object).add_event(self)
+    def update_object_trackers_with_event(self, factory: ObjectTrackerFactory) -> None:
+        factory.get_tracker(self.tracked_object).add_event(self)
         if self.with_object is not None:
-            ObjectTrackerFactory.get_tracker(self.with_object).add_event(self)
+            factory.get_tracker(self.with_object).add_event(self)
 
     def __str__(self):
         with_object_name = f" - {self.with_object.name}" if self.with_object is not None else ""
@@ -149,7 +149,7 @@ class LossOfSupportEvent(DefaultEventWithTwoTrackedObjects):
     ...
 
 
-@dataclass(init=False, unsafe_hash=True)
+@dataclass(unsafe_hash=True)
 class MotionEvent(EventWithOneTrackedObject, ABC):
     """
     Used to represent an event that involves an object that was stationary and then moved or
@@ -158,13 +158,8 @@ class MotionEvent(EventWithOneTrackedObject, ABC):
     start_pose: Pose = field(default_factory=Pose)
     current_pose: Pose = field(default_factory=Pose)
 
-    def __init__(self, tracked_object: Body, start_pose: Pose, current_pose: Pose,
-                 timestamp: Optional[float] = None):
-        EventWithOneTrackedObject.__init__(self, tracked_object=tracked_object,
-                                           timestamp=timestamp if timestamp is not None else datetime.now())
-        self.start_pose: Pose = start_pose
-        self.current_pose: Pose = current_pose
-
+    def __post_init__(self):
+        super().__post_init__()
 
 @dataclass(init=False, unsafe_hash=True)
 class TranslationEvent(MotionEvent):
@@ -286,32 +281,34 @@ class PlacingEvent(EventWithTwoTrackedObjects):
 
 
 
-@dataclass(init=False, unsafe_hash=True)
+@dataclass(unsafe_hash=True)
 class InsertionEvent(EventWithTwoTrackedObjects):
     """
     Represents an event where an object is inserted into another object.
     """
 
-    inserted_into_objects: List[Body] = field(init=False, default_factory=list, repr=False, hash=False)
+    inserted_into_objects: List[Body] = field(default_factory=list)
     """
     List of objects into which the object was inserted.
     """
 
-    inserted_into_objects_frozen_cp: List[BodyDAO] = field(init=False, default_factory=list, repr=False, hash=False)
+    inserted_into_objects_frozen_cp: List[BodyDAO] = field(default_factory=list)
+    """
+    Will be set to a copy of inserted_into_objects, to be used by ORMatic and the NEEMInterface.
+    """
 
-    def __init__(self, inserted_object: Body,
-                 inserted_into_objects: List[Body],
-                 through_hole: Body,
-                 timestamp: datetime = datetime.now(),
-                 ):
-        super().__init__(tracked_object=inserted_object,
-                         timestamp=timestamp, with_object=through_hole)
-        self.inserted_into_objects: List[Body] = inserted_into_objects
-        self.inserted_into_objects_frozen_cp: List[BodyDAO] = [obj for obj in inserted_into_objects]
+
+    def ___post__init__(self):
+        super().__post_init__()
+
+        if self.inserted_into_objects:
+            self.inserted_into_objects_frozen_cp = [obj for obj in self.inserted_into_objects]
+
 
     @property
     def through_hole(self) -> Aperture:
         return self.with_object.get_semantic_annotations_by_type(type_=Aperture)[0]
+
 
     def __str__(self):
         with_object_name = " - " + f" - ".join([obj.name.name for obj in self.inserted_into_objects])

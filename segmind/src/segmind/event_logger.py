@@ -118,10 +118,10 @@ class EventLogger:
         with self.event_callbacks_lock:
             self.event_callbacks[event_type] = [(condition, callback)]
 
-    def log_event(self, event: DetectionEvent):
+    def log_event(self, event: DetectionEvent, factory: ObjectTrackerFactory):
         if self.is_event_in_timeline(event):
             return
-        self.update_object_trackers_with_event(event)
+        self.update_object_trackers_with_event(event, factory)
         self.event_queue.put(event)
         self.annotate_scene_with_event(event)
         self.call_event_callbacks(event)
@@ -152,14 +152,15 @@ class EventLogger:
                 
 
     @staticmethod
-    def update_object_trackers_with_event(event: DetectionEvent) -> None:
+    def update_object_trackers_with_event(event: DetectionEvent, factory: ObjectTrackerFactory) -> None:
         """
         Update the event object trackers with the event.
 
         :param event: The event to update the object trackers with.
+        :param factory: The object tracker factory.
         """
         if isinstance(event, EventWithTrackedObjects):
-            event.update_object_trackers_with_event()
+            event.update_object_trackers_with_event(factory)
 
     def add_event_to_timeline_of_thread(self, event: DetectionEvent):
         """

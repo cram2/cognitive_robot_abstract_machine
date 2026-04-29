@@ -5,12 +5,13 @@ from functools import cached_property
 
 from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.ormatic.data_access_objects.helper import to_dao
+from segmind.datastructures.object_tracker import ObjectEventTracker, ObjectTrackerFactory
 from semantic_digital_twin.orm.ormatic_interface import BodyDAO
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Optional
 
 from test.krrood_test.dataset.ormatic_interface import WorldDAO
-from .object_tracker import ObjectTrackerFactory, ObjectEventTracker
+
 
 # Needs some refactoring, maybe merging with the semDT mixins at some point.
 

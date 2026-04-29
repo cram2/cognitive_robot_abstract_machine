@@ -297,9 +297,9 @@ class InsertionDetector(AbstractDetector):
 
                 events.append(
                     InsertionEvent(
-                        i.tracked_object,
-                        [j.with_object],
-                        i.with_object,
+                        tracked_object=i.tracked_object,
+                        with_object=i.with_object,
+                        inserted_into_objects=[j.with_object],
                     )
                 )
                 break

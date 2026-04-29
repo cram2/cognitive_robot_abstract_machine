@@ -36,6 +36,7 @@ import segmind.players.data_player
 import segmind.players.json_player
 import segmind.statecharts.segmind_statechart
 import semantic_digital_twin.semantic_annotations.semantic_annotations
+import semantic_digital_twin.world_description.world_entity
 import sqlalchemy.sql.sqltypes
 import typing
 import typing_extensions
@@ -607,6 +608,10 @@ class InsertionEventDAO(
         use_existing_column=True,
     )
 
+    inserted_into_objects: Mapped[
+        typing.List[semantic_digital_twin.world_description.world_entity.Body]
+    ] = mapped_column(JSON, nullable=False, use_existing_column=True)
+
     __mapper_args__ = {
         "polymorphic_identity": "InsertionEventDAO",
         "inherit_condition": database_id == EventWithTwoTrackedObjectsDAO.database_id,
@@ -836,6 +841,17 @@ class ObjectEventTrackerDAO(
     )
 
 
+class ObjectTrackerFactoryDAO(
+    Base, DataAccessObject[segmind.datastructures.object_tracker.ObjectTrackerFactory]
+):
+
+    __tablename__ = "ObjectTrackerFactoryDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
 class PickUpDetectorDAO(
     AbstractInteractionDetectorDAO,
     DataAccessObject[segmind.detectors.coarse_event_detector_nodes.PickUpDetector],
@@ -968,9 +984,20 @@ class SegmindContextDAO(Base, DataAccessObject[segmind.detectors.base.SegmindCon
         nullable=True,
         use_existing_column=True,
     )
+    tracker_registry_id: Mapped[int] = mapped_column(
+        ForeignKey("ObjectTrackerFactoryDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
 
     logger: Mapped[EventLoggerDAO] = relationship(
         "EventLoggerDAO", uselist=False, foreign_keys=[logger_id], post_update=True
+    )
+    tracker_registry: Mapped[ObjectTrackerFactoryDAO] = relationship(
+        "ObjectTrackerFactoryDAO",
+        uselist=False,
+        foreign_keys=[tracker_registry_id],
+        post_update=True,
     )
 
 

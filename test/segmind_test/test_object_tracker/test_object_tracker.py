@@ -106,14 +106,17 @@ def test_get_event_where(tracker):
 
 
 def test_object_tracker_factory(body):
-    ObjectTrackerFactory._trackers = {}
+    # 1. Instantiate the factory
+    factory = ObjectTrackerFactory()
 
-    tracker1 = ObjectTrackerFactory.get_tracker(body)
-    tracker2 = ObjectTrackerFactory.get_tracker(body)
+    # 2. Use the instance to get trackers
+    tracker1 = factory.get_tracker(body)
+    tracker2 = factory.get_tracker(body)
 
+    # 3. Assertions using the instance
     assert tracker1 is tracker2
-    assert body in ObjectTrackerFactory._trackers.keys()
-    assert tracker1 in ObjectTrackerFactory.get_all_trackers()
+    assert body in factory._trackers.keys()
+    assert tracker1 in factory.get_all_trackers()
 
 
 def test_get_first_event_before_after(tracker):

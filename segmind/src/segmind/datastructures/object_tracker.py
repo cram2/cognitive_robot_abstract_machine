@@ -3,7 +3,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Callable, Tuple, ClassVar
+from typing import Callable, Tuple
+
+
 
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import List, Type, Optional, TYPE_CHECKING, Dict
@@ -11,12 +13,9 @@ from typing_extensions import List, Type, Optional, TYPE_CHECKING, Dict
 logger = logging.getLogger(__name__)
 
 import numpy as np
-
-
-
 if TYPE_CHECKING:
-    from .events import DetectionEvent
-    from ..detectors.base import SegmindContext
+    from segmind.datastructures.events import DetectionEvent
+    from segmind.detectors.base import SegmindContext
 
 
 @dataclass
@@ -388,7 +387,7 @@ class ObjectEventTracker:
         return [event.timestamp for event in self._event_history]
 
 
-# Requires some refactoring to match the SOLID principles.
+@dataclass
 class ObjectTrackerFactory:
     """
     Factory class to manage creation and access of ObjectTracker instances.
@@ -400,19 +399,30 @@ class ObjectTrackerFactory:
     specific tracker for a given Body.
     """
 
-    _trackers: ClassVar[Dict[Body, ObjectEventTracker]] = {}
+    _trackers: Dict[Body, ObjectEventTracker] = field(default_factory=dict)
     """
     The dictionary mapping Body objects to their associated ObjectTracker instances.
     """
 
-    @classmethod
-    def get_all_trackers(cls) -> List[ObjectEventTracker]:
-        return list(cls._trackers.values())
+    def get_tracker(self, obj: Body) -> ObjectEventTracker:
+        """
+        Gets the ObjectTracker instance for a given Body object.
 
-    @classmethod
-    def get_tracker(cls, obj: Body) -> ObjectEventTracker:
-        if obj not in cls._trackers:
-            cls._trackers[obj] = ObjectEventTracker(body=obj, context=None, _event_history=[])
-        return cls._trackers[obj]
+        :param obj: The Body object for which to retrieve the ObjectTracker.
+        :return: The ObjectTracker instance associated with the Body.
+        """
+
+        if obj not in self._trackers:
+            self._trackers[obj] = ObjectEventTracker(body=obj, context=None, _event_history=[])
+        return self._trackers[obj]
+
+    def get_all_trackers(self) -> List[ObjectEventTracker]:
+        """
+        Retrieves all registered ObjectTracker instances.
+
+        :return: A list of all registered ObjectTracker instances.
+        """
+
+        return list(self._trackers.values())
 
 

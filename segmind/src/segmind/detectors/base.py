@@ -7,6 +7,7 @@ from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from segmind.datastructures.events import MotionEvent, DetectionEvent, RotationEvent
+from segmind.datastructures.object_tracker import ObjectTrackerFactory
 from segmind.event_logger import EventLogger
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Aperture
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -101,6 +102,11 @@ class SegmindContext(ContextExtension):
     List of insertion pairs, to avoid duplicate events
     """
 
+    tracker_registry: ObjectTrackerFactory = field(default_factory=ObjectTrackerFactory)
+    """
+    The object tracker registry.    
+    """
+
 @dataclass(repr=False, eq=False)
 class AbstractDetector(MotionStatechartNode, ABC):
     """
@@ -138,7 +144,7 @@ class AbstractDetector(MotionStatechartNode, ABC):
         )
         events = self.update_context_and_events(context, segmind_context_extension, objects_to_check)
         for e in events:
-            segmind_context_extension.logger.log_event(e)
+            segmind_context_extension.logger.log_event(e, segmind_context_extension.tracker_registry)
         return ObservationStateValues.TRUE if events else ObservationStateValues.FALSE
 
 
