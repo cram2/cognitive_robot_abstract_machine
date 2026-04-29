@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from adapters.ros.visualization.viz_marker import VizMarkerPublisher
+# from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -662,7 +662,7 @@ class TestRobotIntegration:
     ):
         """Motion querying for open task using Stretch robot in the kitchen world (drawers only)."""
         world = stretch_apartment_world
-        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+        # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, motions, open_task, _, drawers = _extend_world(
             world, only_drawers=True
         )
@@ -689,7 +689,7 @@ class TestRobotIntegration:
     ):
         """Motion querying for open task using Tiago robot in the kitchen world."""
         world = tiago_apartment_world
-        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+        # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, motions, open_task, _, _ = _extend_world(
             world, only_doors=False, only_drawers=True
         )
@@ -721,7 +721,7 @@ class TestRobotIntegration:
     ):
         """Given a fixed motion on the first drawer, query recovers task and effect using PR2."""
         world = mutable_model_world
-        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+        # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, _, open_task, close_task, drawers = _extend_world(world)
 
         motion = Motion(
