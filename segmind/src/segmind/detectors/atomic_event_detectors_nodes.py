@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Set, Any
 import numpy as np
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
+from krrood.symbolic_math.symbolic_math import Scalar
 from segmind.datastructures.events import (
     DetectionEvent,
     ContactEvent,
@@ -127,7 +128,7 @@ class MotionDetector(AbstractDetector):
     The window size indicates how many poses to consider for movement.
     """
 
-    distance_threshold: float = 0.005
+    distance_threshold: Scalar = 0.005
     """
     Threshold for the distance between two poses to be considered movement.
     """
@@ -211,7 +212,7 @@ class MotionDetector(AbstractDetector):
 
         latest_poses = context.latest_poses[obj]
 
-        return (latest_poses[0].to_position() - latest_poses[-1].to_position()).norm() > self.distance_threshold
+        return latest_poses[0].to_position().euclidean_distance(latest_poses[-1].to_position()) > self.distance_threshold
 
 
     def _calculate_is_rotating(self, context:SegmindContext, obj:Body) -> bool:
@@ -240,7 +241,8 @@ class MotionDetector(AbstractDetector):
         if len(poses) < self.window_size:
             return True
 
-        return (poses[0].to_position() - poses[-1].to_position()).norm() < self.distance_threshold
+        return poses[0].to_position().euclidean_distance(poses[-1].to_position()) < self.distance_threshold
+
 
 @dataclass(eq=False, repr=False)
 class TranslationDetector(MotionDetector):

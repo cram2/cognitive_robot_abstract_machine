@@ -19,7 +19,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 logger = logging.getLogger(__name__)
 
 
-@dataclass(unsafe_hash=True, init=False)
+@dataclass(unsafe_hash=True)
 class JSONPlayer(FilePlayer):
     """
     Plays the episode from a JSON file.

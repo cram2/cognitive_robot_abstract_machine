@@ -788,7 +788,6 @@ class MotionDetectorDAO(
     )
 
     window_size: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-    distance_threshold: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     rotation_threshold: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
     __mapper_args__ = {

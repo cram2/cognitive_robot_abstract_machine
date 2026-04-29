@@ -45,7 +45,7 @@ class FrameData:
 FrameDataGenerator = Generator[FrameData, None, None]
 
 
-@dataclass(unsafe_hash=True, init=False)
+@dataclass(unsafe_hash=True)
 class DataPlayer(EpisodePlayer, ABC):
     """
     A class that represents the thread that steps the world from a data generator.
