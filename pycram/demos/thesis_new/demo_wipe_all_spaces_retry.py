@@ -408,6 +408,8 @@ def _build_wipe_geometry_binding(target_data, target_pose):
 
 def main_wiping(seed=None, robot_name=None, environment_name=None):
     global session
+    initialize_csv(RESULTS_CSV_PATH, _results_csv_fieldnames())
+
     if session is None:
         session = pycram_sessionmaker()()
         Base.metadata.create_all(session.bind)
@@ -460,7 +462,6 @@ def main_wiping(seed=None, robot_name=None, environment_name=None):
     failed_target_names = set()
     successful_target_names = set()
     target_results = []
-    initialize_csv(RESULTS_CSV_PATH, _results_csv_fieldnames())
     debug_costmap_publishers = {}
 
     with simulated_robot_without_collision:
