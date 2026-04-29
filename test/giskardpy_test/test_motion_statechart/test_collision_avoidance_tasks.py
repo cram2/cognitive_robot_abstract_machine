@@ -1,8 +1,12 @@
 import json
+import time
 from copy import deepcopy
 
 import numpy as np
 import pytest
+
+from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
+from semantic_digital_twin.datastructures.definitions import StaticJointState
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -38,6 +42,9 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointState
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Door, Drawer
+from giskardpy.motion_statechart.goals.open_close import Open
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -49,6 +56,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AvoidAllCollisions,
     AllowAllCollisions,
+    AllowCollisionBetweenGroups,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
@@ -868,3 +876,120 @@ def test_collision_for_robot_with_static_base(tracy_world):
                 f"Gripper penetrated the obstacle (distance={contact.distance:.4f}m)."
                 "ExternalCollisionAvoidance is not avoiding the obstacle."
             )
+
+
+def test_collision_pr2_apartment(pr2_apartment_world, rclpy_node):
+    world = deepcopy(pr2_apartment_world)
+    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+
+    tool_frame = world.get_body_by_name("r_gripper_tool_frame")
+    robot = PR2.from_world(world)
+
+    left_arm_park = robot.left_arm.get_joint_state_by_type(StaticJointState.PARK)
+    right_arm_park = robot.right_arm.get_joint_state_by_type(StaticJointState.PARK)
+    world.set_positions_1DOF_connection(dict(left_arm_park.items()))
+    world.set_positions_1DOF_connection(dict(right_arm_park.items()))
+
+    world_reasoner = WorldReasoner(world)
+    inferred = world_reasoner.infer_semantic_annotations()
+    with world.modify_world():
+        world.add_semantic_annotations(inferred)
+
+    # Setup drawer and handle
+    drawer = [
+        body
+        for body in world.get_semantic_annotations_by_type(Drawer)
+        if "cabinet11_drawer_top" in str(body.bodies[0].name)
+    ][0]
+    handle = drawer.handle
+    actuator = drawer.root.parent_connection
+    upper_limit = actuator.active_dofs[0].limits.upper.position
+
+    # with collisions
+    msc = MotionStatechart()
+    msc.add_nodes(
+        [
+            UpdateTemporaryCollisionRules(
+                temporary_rules=[
+                    AvoidExternalCollisions(robot=robot),
+                    AllowCollisionBetweenGroups(
+                        body_group_a=[
+                            b
+                            for b in robot.right_arm.manipulator.bodies
+                            if b.has_collision()
+                        ],
+                        body_group_b=[
+                            b
+                            for b in world.bodies
+                            if "apartment" in str(b.name) and b.has_collision()
+                        ],
+                    ),
+                ]
+            ),
+            Sequence(
+                [
+                    CartesianPose(
+                        root_link=world.root,
+                        tip_link=tool_frame,
+                        goal_pose=handle.global_pose,
+                    ),
+                    Open(
+                        tip_link=tool_frame,
+                        environment_link=handle,
+                        goal_joint_state=upper_limit,
+                    ),
+                ]
+            ),
+            ExternalCollisionAvoidance(robot=robot),
+            SelfCollisionAvoidance(robot=robot),
+        ]
+    )
+    msc.add_node(EndMotion.when_true(msc.nodes[1]))
+
+    kin_sim = Executor(
+        MotionStatechartContext(world=world),
+        # pacer=SimulationPacer(real_time_factor=1),
+    )
+    kin_sim.compile(motion_statechart=msc)
+    with world.reset_state_context():
+        start_time = time.time()
+        kin_sim.tick_until_end(500)
+        end_time = time.time()
+        print(
+            f"tick_until_end with collisions took {end_time - start_time:.4f} seconds at kin_sim.time {kin_sim.time}"
+        )
+
+    # Without collisions
+    msc = MotionStatechart()
+    msc.add_node(
+        Sequence(
+            [
+                CartesianPose(
+                    root_link=world.root,
+                    tip_link=tool_frame,
+                    goal_pose=handle.global_pose,
+                ),
+                Open(
+                    tip_link=tool_frame,
+                    environment_link=handle,
+                    goal_joint_state=upper_limit,
+                ),
+            ]
+        )
+    )
+    msc.add_node(EndMotion.when_true(msc.nodes[0]))
+
+    kin_sim = Executor(
+        MotionStatechartContext(world=world),
+        # pacer=SimulationPacer(real_time_factor=1),
+    )
+    kin_sim.compile(motion_statechart=msc)
+    with world.reset_state_context():
+        start_time = time.time()
+        kin_sim.tick_until_end(500)
+        end_time = time.time()
+        print(
+            f"tick_until_end without collisions took {end_time - start_time:.4f} seconds at kin_sim.time {kin_sim.time}"
+        )
+
+    assert msc.is_end_motion()

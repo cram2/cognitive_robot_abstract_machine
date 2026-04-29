@@ -472,7 +472,7 @@ class TestCollisionRules:
 
 class TestCollisionGroups:
 
-    @dataclass
+    @dataclass(eq=False)
     class MockCollisionGroupConsumer(CollisionGroupConsumer):
         def on_compute_collisions(self, collision_results: CollisionCheckingResult): ...
         def on_collision_matrix_update(self): ...

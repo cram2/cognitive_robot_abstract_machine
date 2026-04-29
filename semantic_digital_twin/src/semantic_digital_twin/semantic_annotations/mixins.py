@@ -33,6 +33,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
+
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
@@ -45,11 +46,13 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
+    LiquidConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.world_description.geometry import Scale, ContainerGeometry
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
@@ -62,6 +65,11 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
+)
+from semantic_digital_twin.physics.pouring_equations import (
+    ArticulatedPouringEquation,
+    PouringEquation,
+    InflowEquation,
 )
 
 if TYPE_CHECKING:
@@ -749,9 +757,13 @@ class HasSupportingSurface(HasStorageSpace, ABC):
                 supporting_body=self.root,
             )
         )
-        objects = an(entity(
-            semantic_annotation := variable(HasRootBody, domain=self._world.semantic_annotations)
-        ).where(semantic_annotation.root == body)).evaluate()
+        objects = an(
+            entity(
+                semantic_annotation := variable(
+                    HasRootBody, domain=self._world.semantic_annotations
+                )
+            ).where(semantic_annotation.root == body)
+        ).evaluate()
         for obj in objects:
             if obj in self.objects:
                 continue
@@ -1028,3 +1040,119 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
         container_event = outer_box.as_composite_set() - inner_box.as_composite_set()
 
         return container_event
+
+
+@dataclass(eq=False)
+class HasContainerGeometry(HasRootBody, ABC):
+    """Mixin for semantic annotations whose collision geometry defines a pourable container interior."""
+
+    @property
+    def container_geometry(self) -> ContainerGeometry:
+        """Interior dimensions derived from the body's collision geometry."""
+        return ContainerGeometry.from_body(self.root)
+
+
+@dataclass(eq=False)
+class HasFillLevel(HasContainerGeometry):
+    """
+    Mixin that adds a virtual fill-level DOF to any semantic annotation.
+
+    The fill level is represented as a virtual :class:`LiquidConnection` whose
+    position encodes fill in the range ``[0, 1]``. Use :meth:`create_with_new_body_in_world`
+    for the standard construction path. When the body is constructed manually and placed
+    in the world before creating the semantic annotation, call :meth:`initialize_fill_level`
+    explicitly after the collision geometry has been set.
+    """
+
+    fill_connection: LiquidConnection = field(init=False)
+    """The virtual connection whose position encodes fill level in [0, 1]."""
+
+    _fill_equation: Optional[PouringEquation] = field(default=None, init=False)
+    _inflow_equation: Optional[InflowEquation] = field(default=None, init=False)
+
+    @property
+    def fill_equation(self) -> Optional[PouringEquation]:
+        """ODE governing how this container drains when tilted."""
+        return self._fill_equation
+
+    @fill_equation.setter
+    def fill_equation(self, equation: Optional[PouringEquation]) -> None:
+        self._fill_equation = equation
+        self.fill_connection.outflow_equation = equation
+
+    @property
+    def inflow_equation(self) -> Optional[InflowEquation]:
+        """ODE governing how this container fills from an external source."""
+        return self._inflow_equation
+
+    @inflow_equation.setter
+    def inflow_equation(self, equation: Optional[InflowEquation]) -> None:
+        self._inflow_equation = equation
+        self.fill_connection.inflow_equation = equation
+
+    @classmethod
+    def create_with_new_body_in_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        initial_fill: float = 1.0,
+        k: float = 1.0,
+        **kwargs,
+    ) -> Self:
+        """
+        Create a new semantic annotation with a new body and an initialized fill level.
+
+        :param name: The name of the semantic annotation.
+        :param world: The world to add the annotation to.
+        :param initial_fill: Starting fill level in [0, 1].
+        :param k: Outflow rate constant for the articulated pouring equation.
+        :return: The created annotation with fill level ready to use.
+        """
+        instance = super().create_with_new_body_in_world(
+            name=name, world=world, **kwargs
+        )
+        instance.initialize_fill_level(world=world, initial_fill=initial_fill, k=k)
+        return instance
+
+    def initialize_fill_level(
+        self,
+        world,
+        initial_fill: float = 1.0,
+        k: float = 1.0,
+    ) -> None:
+        """
+        Create the virtual fill-level DOF, attach it to the world, and wire up the pouring equation.
+
+        Only needed when the body is created outside :meth:`create_with_new_body_in_world`.
+        Must be called after the annotation's collision geometry is set.
+
+        :param world: The world to add the fill-level DOF to.
+        :param initial_fill: Starting fill level in [0, 1].
+        :param k: Outflow rate constant for the articulated pouring equation.
+        """
+        phantom = Body(name=PrefixedName(f"{self.root.name.name}_fill_level_phantom"))
+        with world.modify_world():
+            world.add_body(phantom)
+            connection = LiquidConnection.create_with_dofs(
+                world=world,
+                parent=self.root,
+                child=phantom,
+                axis=Vector3(0, 0, 1),
+                dof_limits=DegreeOfFreedomLimits(
+                    lower=DerivativeMap(position=0.0, velocity=-1.0),
+                    upper=DerivativeMap(position=1.0, velocity=1.0),
+                ),
+            )
+            world.add_connection(connection)
+
+        self.fill_connection = connection
+        world.set_positions_1DOF_connection({connection: initial_fill})
+        self.fill_equation = ArticulatedPouringEquation(
+            container_geometry=self.container_geometry,
+            k=k,
+        )
+
+    @property
+    def fill_level(self) -> float:
+        """Current fill level in ``[0, 1]``."""
+        return float(self.fill_connection.position)

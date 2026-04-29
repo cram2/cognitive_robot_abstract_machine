@@ -146,9 +146,6 @@ class ResetStateContextManager:
         exc_val: Optional[Exception],
         exc_tb: Optional[type],
     ) -> None:
-        if exc_val:
-            raise exc_val
-
         self.world.state._data[:] = self.state
         self.world.notify_state_change()
 
@@ -1935,6 +1932,14 @@ class World(HasSimulatorProperties):
             applied.
         """
         self.state._apply_control_commands(commands, dt, derivative)
+        self.step_physics(dt=dt)
+
+    def step_physics(self, dt: float) -> None:
+        """
+        Step all HasUpdateState connections forward by dt.
+
+        :param dt: Time elapsed since the previous step, in seconds.
+        """
         for connection in self.connections:
             match connection:
                 case HasUpdateState():
