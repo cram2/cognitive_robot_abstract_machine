@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from enum import StrEnum
 from itertools import takewhile
 from typing import Optional
 
@@ -72,3 +73,129 @@ class Sage10kTypeNameCleaner:
             return None
 
         return cleaned_type
+
+
+from enum import StrEnum
+
+
+class Sage10kNaturalLanguageCategory(StrEnum):
+    """
+    Words we can process with sage10k and wordnet
+    """
+
+
+class Sage10kGraspable(Sage10kNaturalLanguageCategory):
+    """
+    Words we can grasp
+    """
+
+    MANUAL = "Manual"
+    VOLUME = "Volume"
+    NOTEBOOK = "Notebook"
+    SCROLL = "Scroll"
+    PAPERBACK = "Paperback"
+    MAGAZINE = "Magazine"
+    BOOK = "Book"
+    TOME = "Tome"
+    CODEX = "Codex"
+    COOKBOOK = "Cookbook"
+    TOOTHPASTE = "Toothpaste"
+    TOOTHBRUSH = "Toothbrush"
+    RULER = "Ruler"
+    TRAY = "Tray"
+    CHARGER = "Charger"
+    SCREWDRIVER = "Screwdriver"
+    HAMMER = "Hammer"
+    DRILL = "Drill"
+    SAW = "Saw"
+    TOOL = "Tool"
+    WRENCH = "Wrench"
+    BRUSH = "Brush"
+    HAIRBRUSH = "Hairbrush"
+    COMB = "Comb"
+    CUP = "Cup"
+    PLATE = "Plate"
+    GLASS = "Glass"
+    MUG = "Mug"
+    UTENSIL = "Utensil"
+    BOWL = "Bowl"
+    POT = "Pot"
+    TEAPOT = "Teapot"
+    TEAKETTLE = "Teakettle"
+    HANGER = "Hanger"
+    SMARTPHONE = "Smartphone"
+    MOBILE = "Mobile"
+    HOLDER = "Holder"
+    PERFUME = "Perfume"
+    TOOLKIT = "Toolkit"
+    LOTION = "Lotion"
+    SYRINGE = "Syringe"
+    MOUSE = "Mouse"
+    GLOVE = "Glove"
+    KEY = "Key"
+    PEN = "Pen"
+    FOLIO = "Folio"
+    SHOE = "Shoe"
+    SPEAKER = "Speaker"
+    VASE = "Vase"
+    URN = "Urn"
+    TUBE = "Tube"
+    TABLET = "Tablet"
+    NAPKIN = "Napkin"
+    EARBUDS = "Earbuds"
+    HEADPHONE = "Headphone"
+    PHONE = "Phone"
+    KEYBOARD = "Keyboard"
+    PHOTO = "Photo"
+    FLOSS = "Floss"
+    TAPE = "Tape"
+    STAPLER = "Stapler"
+    STATUE = "Statue"
+    SCULPTURE = "Sculpture"
+    FIGURINE = "Figurine"
+    ORGANIZER = "Organizer"
+    REMOTE = "Remote"
+    LAPTOP = "Laptop"
+    CUSHION = "Cushion"
+    PILLOW = "Pillow"
+    BOTTLE = "Bottle"
+    PAPERCLIP = "Paperclip"
+    CANDLE = "Candle"
+    PAINTBRUSH = "Paintbrush"
+    DIAPER = "Diaper"
+
+
+class Sage10kNotGraspable(Sage10kNaturalLanguageCategory):
+    """
+    Words we cannot grasp
+    """
+
+    BASKET = "Basket"
+    MEDIA = "Media"
+    TOASTER = "Toaster"
+    DECORATIVE = "Decorative"
+    SPROUT = "Sprout"
+    LAMP = "Lamp"
+    PLANT = "Plant"
+    COFFEEMAKER = "Coffeemaker"
+    GLASSES = "Glasses"
+    DISPENSER = "Dispenser"
+    SHELF = "Shelf"
+    SPANNER = "Spanner"
+    SUPPLY = "Supply"
+    WATCH = "Watch"
+    MONITOR = "Monitor"
+    PALETTE = "Palette"
+    PEND = "Pend"
+    REMOTES = "Remotes"
+    COASTER = "Coaster"
+    PLIERS = "Pliers"
+    BOOKSHELF = "Bookshelf"
+    CUTLERY = "Cutlery"
+    CLOCK = "Clock"
+    SINK = "Sink"
+    BOOKS = "Books"
+    SUCCULENT = "Succulent"
+    RACK = "Rack"
+    TRASHCAN = "Trashcan"
+    HEADPHONES = "Headphones"
