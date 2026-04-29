@@ -41,6 +41,7 @@ import semantic_digital_twin.orm.model
 import semantic_digital_twin.pipeline.gltf_loader
 import semantic_digital_twin.pipeline.mesh_decomposition.base
 import semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer
+import semantic_digital_twin.pipeline.mesh_decomposition.bullet_vhacd
 import semantic_digital_twin.pipeline.mesh_decomposition.coacd
 import semantic_digital_twin.pipeline.mesh_decomposition.vhacd
 import semantic_digital_twin.pipeline.pipeline
@@ -4681,6 +4682,52 @@ class BoxDecomposerDAO(
     }
 
 
+class BulletVHACDMeshDecomposerDAO(
+    MeshDecomposerDAO,
+    DataAccessObject[
+        semantic_digital_twin.pipeline.mesh_decomposition.bullet_vhacd.BulletVHACDMeshDecomposer
+    ],
+):
+
+    __tablename__ = "BulletVHACDMeshDecomposerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MeshDecomposerDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    concavity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    alpha: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    beta: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    gamma: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    min_volume_per_convex_hull: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    resolution: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    max_vertices_per_convex_hull: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+    depth: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    plane_downsampling: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    convex_hull_downsampling: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+    pca: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    mode: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    convex_hull_approximation: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+    log_path: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "BulletVHACDMeshDecomposerDAO",
+        "inherit_condition": database_id == MeshDecomposerDAO.database_id,
+    }
+
+
 class COACDMeshDecomposerDAO(
     MeshDecomposerDAO,
     DataAccessObject[
@@ -6274,6 +6321,19 @@ class BulletCollisionDetectorDAO(
         ForeignKey(CollisionDetectorDAO.database_id),
         primary_key=True,
         use_existing_column=True,
+    )
+
+    mesh_decomposer_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("MeshDecomposerDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    mesh_decomposer: Mapped[MeshDecomposerDAO] = relationship(
+        "MeshDecomposerDAO",
+        uselist=False,
+        foreign_keys=[mesh_decomposer_id],
+        post_update=True,
     )
 
     __mapper_args__ = {
