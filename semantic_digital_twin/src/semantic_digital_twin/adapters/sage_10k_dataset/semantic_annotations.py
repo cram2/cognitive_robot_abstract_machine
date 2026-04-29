@@ -199,3 +199,15 @@ class Sage10kNotGraspable(Sage10kNaturalLanguageCategory):
     RACK = "Rack"
     TRASHCAN = "Trashcan"
     HEADPHONES = "Headphones"
+
+
+class Sage10kNonShittyScenes(StrEnum):
+    GYM = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_171403_layout_26384448.zip"
+    TV_STUDIO = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_180931_layout_d83fc25f.zip"
+    CRAFTSMAN_LOBBY = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_205353_layout_9584241f.zip"
+    FRENCH_CLOTHING_STORE = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251214_161815_layout_3644a72f.zip"
+    TROPICAL_WAREHOUSE = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251214_182016_layout_a72cf11f.zip"
+    VAPORWAVE = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_090236_layout_7e07a47a.zip"
+    ECLECTIC_RESIDENCE = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_090413_layout_d59e4e4b.zip"
+    SOUTHWESTERN_STORE = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_123747_layout_2d89d0a5.zip"
+    BRUTALIST_STORE = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_153933_layout_50ffb500.zip"
