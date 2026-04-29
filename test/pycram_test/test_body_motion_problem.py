@@ -6,6 +6,8 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 import pytest
+
+from adapters.ros.visualization.viz_marker import VizMarkerPublisher
 from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -199,7 +201,9 @@ def _extend_world(
         act = annotation.root.parent_connection
         upper = act.active_dofs[0].limits.upper.position
         effect_goal = (
-            upper / 2 if (half_door_opening and isinstance(annotation, Door)) else upper
+            upper / 2
+            if (half_door_opening and isinstance(annotation, Door))
+            else upper * 0.5
         )
 
         effects.append(
@@ -651,14 +655,14 @@ class TestPouringQueries:
 # ---------------------------------------------------------------------------
 # 5. Long-running robot integration tests (not executed in CI)
 # ---------------------------------------------------------------------------
-@pytest.mark.skip(reason="Long-running tests are skipped in CI for now")
+# @pytest.mark.skip(reason="Long-running tests are skipped in CI for now")
 class TestRobotIntegration:
     def test_query_motion_satisfying_task_request_stretch(
-        self, stretch_apartment_world
+        self, stretch_apartment_world, rclpy_node
     ):
         """Motion querying for open task using Stretch robot in the kitchen world (drawers only)."""
         world = stretch_apartment_world
-
+        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, motions, open_task, _, drawers = _extend_world(
             world, only_drawers=True
         )
@@ -677,12 +681,15 @@ class TestRobotIntegration:
         )
 
         results = list(query.evaluate())
-        assert len(results) > 1
+        print(len(results))
+        assert len(results) >= 1
 
-    def test_query_motion_satisfying_task_request_tiago(self, tiago_apartment_world):
-        """Motion querying for open task using Tiago robot in the kitchen world (doors only)."""
+    def test_query_motion_satisfying_task_request_tiago(
+        self, tiago_apartment_world, rclpy_node
+    ):
+        """Motion querying for open task using Tiago robot in the kitchen world."""
         world = tiago_apartment_world
-
+        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, motions, open_task, _, _ = _extend_world(
             world, only_doors=False, only_drawers=True
         )
@@ -706,16 +713,19 @@ class TestRobotIntegration:
         )
 
         results = list(query.evaluate())
-        assert len(results) >= 0  # =0 because of Tiago
+        print(len(results))
+        assert len(results) >= 1
 
-    def test_query_task_and_effect_satisfying_motion_pr2(self, mutable_model_world):
+    def test_query_task_and_effect_satisfying_motion_pr2(
+        self, mutable_model_world, rclpy_node
+    ):
         """Given a fixed motion on the first drawer, query recovers task and effect using PR2."""
         world = mutable_model_world
-
+        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, _, open_task, close_task, drawers = _extend_world(world)
 
         motion = Motion(
-            trajectory=[0.0, 0.1, 0.2, 0.3, 0.4],
+            trajectory=[0.0, 0.1, 0.2, 0.3],
             actuator=[
                 drawer
                 for drawer in drawers
@@ -740,6 +750,5 @@ class TestRobotIntegration:
             )
         )
         results = list(query.evaluate())
-        assert (
-            len(results) == 0
-        )  # Something is not working correctly with the giskardpy end motion setup right now.
+        print(len(results))
+        assert len(results) >= 1

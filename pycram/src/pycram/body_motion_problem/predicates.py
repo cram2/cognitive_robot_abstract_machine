@@ -274,6 +274,8 @@ class CanPerform(Predicate):
         :param robot: Robot used for collision avoidance.
         """
         msc.add_node(EndMotion.when_true(sequence))
+        msc.add_node(local_min := LocalMinimumReached(name="local_minimum_reached"))
+        msc.add_node(CancelMotion.when_true(local_min))
         msc.add_node(
             ExternalCollisionAvoidance(
                 name="external_collision_avoidance",

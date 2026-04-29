@@ -96,11 +96,17 @@ class ContainerCanPerform(CanPerform):
 
     def _build_collision_rules(self, gripper: Any, target: Any) -> list:
         handle_bodies = [target] if isinstance(target, Body) else list(target.bodies)
+        # Avoiding collision with the gripper and the whole apartment makes execution way faster than with only the handle
+        # Future improvement: avoid collision with the gripper apartment parts not related to the gripper.
         return [
             AvoidExternalCollisions(robot=self.robot),
             AllowCollisionBetweenGroups(
                 body_group_a=[b for b in gripper.bodies if b.has_collision()],
-                body_group_b=[b for b in handle_bodies if b.has_collision()],
+                body_group_b=[
+                    b
+                    for b in self.robot._world.bodies
+                    if "apartment" in str(b.name) and b.has_collision()
+                ],
             ),
         ]
 
