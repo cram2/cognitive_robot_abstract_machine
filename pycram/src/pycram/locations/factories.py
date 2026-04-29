@@ -208,7 +208,7 @@ def giskard_reachability_location(
     )
 
     backend = GiskardLocationBackend(
-        target_pose, arm, grasp_description, context.robot, context.world
+        target, arm, grasp_description, context.robot, context.world
     )
 
     return Location(

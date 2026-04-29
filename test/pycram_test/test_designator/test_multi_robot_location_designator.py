@@ -20,6 +20,7 @@ from pycram.locations.factories import (
 from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import sequential
 from pycram.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
+from pycram.view_manager import ViewManager
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -285,7 +286,7 @@ def test_accessing_location_pose(immutable_model_world):
     assert len(pose.to_quaternion().to_list()) == 4
 
 
-def test_giskard_location_pose(immutable_multiple_robot_simple_apartment, rclpy_node):
+def test_giskard_location_pose(immutable_multiple_robot_simple_apartment):
     world, robot, context = immutable_multiple_robot_simple_apartment
     plan = sequential(
         [
@@ -294,9 +295,6 @@ def test_giskard_location_pose(immutable_multiple_robot_simple_apartment, rclpy_
         ],
         context,
     )
-
-    context.ros_node = rclpy_node
-    context.debug = True
 
     with simulated_robot:
         plan.perform()
@@ -310,7 +308,7 @@ def test_giskard_location_pose(immutable_multiple_robot_simple_apartment, rclpy_
             GraspDescription(
                 ApproachDirection.FRONT,
                 VerticalAlignment.NoAlignment,
-                robot.left_arm.manipulator,
+                ViewManager.get_end_effector_view(Arms.RIGHT, robot),
             ),
         )
 

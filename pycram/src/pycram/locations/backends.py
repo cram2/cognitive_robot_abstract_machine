@@ -1,12 +1,13 @@
 from copy import deepcopy
 from dataclasses import dataclass
 
-from typing_extensions import List
+from typing_extensions import List, Union
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
+    UpdateTemporaryCollisionRules,
 )
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
@@ -21,8 +22,10 @@ from pycram.locations.costmaps import Costmap, OccupancyCostmap, GaussianCostmap
 from pycram.view_manager import ViewManager
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
+    AllowCollisionRule,
+    AllowCollisionBetweenGroups,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Manipulator
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -31,7 +34,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass
 class GiskardLocationBackend(PoseGeneratorBackend):
 
-    target_pose: Pose
+    target: Union[Pose, Body]
 
     arm: Arms
 
@@ -77,7 +80,7 @@ class GiskardLocationBackend(PoseGeneratorBackend):
         pose_sequence: List[Pose],
         world: World,
         robot_view: AbstractRobot,
-        end_effector: Body,
+        end_effector: Manipulator,
     ) -> Executor:
         """
         Setup the Giskard executor for a specific pose sequence and a given world.
@@ -92,7 +95,7 @@ class GiskardLocationBackend(PoseGeneratorBackend):
             nodes=[
                 CartesianPose(
                     root_link=world.root,
-                    tip_link=end_effector,
+                    tip_link=end_effector.tool_frame,
                     goal_pose=pose,
                 )
                 for pose in pose_sequence
@@ -109,6 +112,16 @@ class GiskardLocationBackend(PoseGeneratorBackend):
         msc.add_nodes(
             [
                 pose_seq,
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AllowCollisionBetweenGroups(
+                            body_group_a=end_effector.bodies_with_collision,
+                            body_group_b=(
+                                [self.target] if isinstance(self.target, Body) else []
+                            ),
+                        )
+                    ]
+                ),
                 ExternalCollisionAvoidance(
                     robot=robot_view, cancel_if_collision_violated=False
                 ),
@@ -132,14 +145,18 @@ class GiskardLocationBackend(PoseGeneratorBackend):
         with self.world.modify_world():
             self.robot._setup_collision_rules()
 
-        test_ee = ViewManager.get_end_effector_view(self.arm, self.robot).tool_frame
-        target_sequence = self.grasp_description._pose_sequence(self.target_pose)
+        target_pose = (
+            self.target if isinstance(self.target, Pose) else self.target.global_pose
+        )
+
+        test_ee = ViewManager.get_end_effector_view(self.arm, self.robot)
+        target_sequence = self.grasp_description._pose_sequence(target_pose)
 
         executor = self.setup_giskard_executor(
             target_sequence, self.world, self.robot, test_ee
         )
 
-        for pose_candidate in self.setup_costmap(self.target_pose):
+        for pose_candidate in self.setup_costmap(target_pose):
             self.robot.root.parent_connection.origin = pose_candidate
 
             try:
