@@ -4,6 +4,7 @@ import time
 
 import mujoco
 import pytest
+import numpy
 
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -473,5 +474,97 @@ def test_spawn_body_with_connections():
         }
 
         multi_sim.stop_simulation()
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+
+def test_world_sim_state_sync():
+    plane_half_thickness = 0.05
+    box_half_size = 0.1
+    init_pos = numpy.array([0.3, 0.2, 5.0])
+    target_pos = numpy.array(
+        [init_pos[0], init_pos[1], plane_half_thickness + box_half_size]
+    )
+
+    def spawn_state_sync_scene(
+        spawn_world: World,
+    ) -> tuple[Body, Connection6DoF]:
+        plane_body = Body(name=PrefixedName("ground_plane"))
+        plane_body.collision = ShapeCollection(
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        reference_frame=plane_body
+                    ),
+                    scale=Scale(2.0, 2.0, plane_half_thickness * 2),
+                    color=Color(1.0, 1.0, 0.0, 1.0),
+                )
+            ],
+            reference_frame=plane_body,
+        )
+
+        falling_box = Body(name=PrefixedName("falling_box"))
+        falling_box.collision = ShapeCollection(
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        reference_frame=falling_box
+                    ),
+                    scale=Scale(box_half_size * 2, box_half_size * 2, box_half_size * 2),
+                    color=Color(1.0, 0.0, 0.0, 1.0),
+                )
+            ],
+            reference_frame=falling_box,
+        )
+
+        with spawn_world.modify_world():
+            spawn_world.add_connection(
+                FixedConnection(parent=spawn_world.root, child=plane_body)
+            )
+            box_connection = Connection6DoF.create_with_dofs(
+                world=spawn_world,
+                parent=spawn_world.root,
+                child=falling_box,
+            )
+            spawn_world.add_connection(box_connection)
+        return falling_box, box_connection
+
+    world = World()
+    multi_sim = MujocoSim(
+        world=world,
+        headless=headless,
+        step_size=STEP_SIZE,
+    )
+
+    try:
+        multi_sim.start_simulation()
+        time.sleep(1)
+
+        falling_box, box_connection = spawn_state_sync_scene(world)
+
+        body_names = multi_sim.simulator.get_all_body_names().result
+        assert {"ground_plane", "falling_box"}.issubset(body_names), (
+            f"scene bodies were not spawned in the simulator; bodies={body_names}"
+        )
+
+        box_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=float(init_pos[0]),
+            y=float(init_pos[1]),
+            z=float(init_pos[2]),
+            reference_frame=falling_box,
+        )
+        time.sleep(2.5)
+
+        final_pos = numpy.asarray(
+            multi_sim.simulator.get_body_position("falling_box").result[:3],
+            dtype=float,
+        )
+
+        multi_sim.stop_simulation()
+
+        assert numpy.allclose(final_pos, target_pos, atol=1e-1), (
+            f"Box did not settle at target: final_pos={final_pos}, "
+            f"expected≈{target_pos}"
+        )
     finally:
         stop_multisim_if_running(multi_sim)
