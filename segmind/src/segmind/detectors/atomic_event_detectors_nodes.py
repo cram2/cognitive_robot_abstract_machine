@@ -132,6 +132,11 @@ class MotionDetector(AbstractDetector):
     Threshold for the distance between two poses to be considered movement.
     """
 
+    rotation_threshold: float = 0.1
+    """
+    Threshold for the rotation error between two poses to be considered rotation.
+    """
+
     def update_context_and_events(self, context: MotionStatechartContext, segmind_context:SegmindContext, tracked_objs: List[Body]) -> List[DetectionEvent]:
         """
         Updates the pose history for each tracked object and checks for motion events.
@@ -146,9 +151,15 @@ class MotionDetector(AbstractDetector):
             latest_poses = segmind_context.latest_poses.setdefault(obj, [])
             latest_poses.append(obj.global_pose)
             if len(latest_poses) >= self.window_size:
-                event = self.check_obj_movement(segmind_context, obj)
-                if event:
-                    events.append(event)
+                translation_events = self.check_obj_movement(segmind_context, obj)
+                rotation_events = self.check_obj_rotation(segmind_context, obj)
+
+                if translation_events:
+                    events.append(translation_events)
+
+                if rotation_events:
+                    events.append(rotation_events)
+
                 latest_poses.pop(0)
         return events
 
@@ -173,7 +184,7 @@ class MotionDetector(AbstractDetector):
         :return: A RotationEvent if the object is rotating, otherwise None.
         """
         is_moving = self._calculate_is_rotating(context, obj)
-        context.object_moving_status[obj] = is_moving
+        context.object_rotation_status[obj] = is_moving
         return self._check_movement_and_trigger_event(context, obj)
 
 
@@ -213,9 +224,10 @@ class MotionDetector(AbstractDetector):
         :return: True if the object is rotating, False otherwise.
         """
         latest_poses = context.latest_poses[obj]
+        result = float(latest_poses[0].to_rotation_matrix().rotational_error(
+                latest_poses[-1].to_rotation_matrix()))
 
-        return float(latest_poses[0].to_rotation_matrix().rotational_error(
-                latest_poses[-1].to_rotation_matrix())) < self.distance_threshold
+        return result > self.rotation_threshold
 
 
     def _is_stationary(self, poses: List[Pose]) -> bool:

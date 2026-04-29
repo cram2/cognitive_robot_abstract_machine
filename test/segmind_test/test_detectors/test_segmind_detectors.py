@@ -261,49 +261,37 @@ def test_insertion(simple_apartment_setup):
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
 
 
-@pytest.mark.skip(reason="Buggy")
 def test_rotation(simple_apartment_setup):
-    world = simple_apartment_setup
-    context = MotionStatechartContext(world=world)
-    segmind_executor = EpisodeSegmenterExecutor(context=context)
-    statechart = SegmindStatechart()
-    sc = statechart.build_statechart()
-    sc.add_node(RotationDetector())
-    segmind_executor.compile(sc)
-    segmind_context = segmind_executor.context.require_extension(SegmindContext)
+    segmind_executor, segmind_context, milk, box1, box2 = _build_executor(simple_apartment_setup)
+    statechart = SegmindStatechart().build_statechart(
+        [RotationDetector()])
+    segmind_executor.compile(statechart)
+    segmind_executor.tick()
 
-    cylinder = world.get_body_by_name("cylinder_body")
+
     assert len([i for i in segmind_context.logger.get_events() if isinstance(i, RotationEvent)]) == 0
 
     for i in range(5):
-        cylinder.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=-3, z=0.25, roll=i*0.1)
+        milk.parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(roll=i*0.1)
         )
         segmind_executor.tick()
 
     assert len([i for i in segmind_context.logger.get_events() if isinstance(i, RotationEvent)]) >= 1
 
-@pytest.mark.skip(reason="Buggy")
+
 def test_stop_rotation(simple_apartment_setup):
-    world = simple_apartment_setup
-    context = MotionStatechartContext(world=world)
-    segmind_executor = EpisodeSegmenterExecutor(context=context)
-    statechart = SegmindStatechart()
-    sc = statechart.build_statechart()
-    sc.add_node(RotationDetector())
-    sc.add_node(StopRotationDetector())
-    segmind_executor.compile(sc)
-    segmind_context = segmind_executor.context.require_extension(SegmindContext)
-
-
-
-    cylinder = world.get_body_by_name("cylinder_body")
+    segmind_executor, segmind_context, milk, box1, box2 = _build_executor(simple_apartment_setup)
+    statechart = SegmindStatechart().build_statechart(
+        [RotationDetector(), StopRotationDetector()])
+    segmind_executor.compile(statechart)
+    segmind_executor.tick()
 
     assert len([i for i in segmind_context.logger.get_events() if isinstance(i, RotationEvent)]) == 0
 
     for i in range(5):
-        cylinder.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=-3, z=0.25, roll=i*0.1)
+        milk.parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(roll=i*0.1)
         )
         segmind_executor.tick()
     assert len([i for i in segmind_context.logger.get_events() if isinstance(i, RotationEvent)]) >= 1
