@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<robot name="montessori_object_6" version="1.0">
+  <link name="montessori_object_6">
+    <inertial>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <mass value="0.006096569821238518"/>
+      <inertia ixx="3.4855600006267196e-07" ixy="0.0" ixz="0.0" iyy="3.4855600006267196e-07" iyz="0.0" izz="2.987619893701776e-07"/>
+    </inertial>
+    <collision name="MontessoriObject6">
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <cylinder radius="0.014999999664723873" length="0.029999999329447746"/>
+      </geometry>
+    </collision>
+  </link>
+</robot>
