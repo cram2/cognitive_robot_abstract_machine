@@ -21,6 +21,7 @@ import enum
 import krrood.adapters.json_serializer
 import krrood.ormatic.custom_types
 import krrood.ormatic.type_dict
+import segmind.datastructures.event_plotter
 import segmind.datastructures.events
 import segmind.datastructures.mixins
 import segmind.datastructures.object_tracker
@@ -274,6 +275,17 @@ class EventLoggerDAO(Base, DataAccessObject[segmind.event_logger.EventLogger]):
     )
 
     annotate_events: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+
+
+class EventPlotterDAO(
+    Base, DataAccessObject[segmind.datastructures.event_plotter.EventPlotter]
+):
+
+    __tablename__ = "EventPlotterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
 
 
 class EventWithTrackedObjectsDAO(

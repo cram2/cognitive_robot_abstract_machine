@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from os.path import dirname, abspath
 from threading import RLock
 
+from segmind.datastructures.event_plotter import EventPlotter
 from segmind.datastructures.events import DetectionEvent, EventWithTrackedObjects
 from segmind.datastructures.object_tracker import ObjectTrackerFactory
 from semantic_digital_twin.world_description.world_entity import Body
@@ -189,91 +190,12 @@ class EventLogger:
                 self.add_event_to_timeline_of_thread(event)
 
 
-    #refactor further and create a new EventPlotter class
     def plot_events(self, show: bool = True, save_path: Optional[str] = None):
         """
         Plot all events that have been logged in a timeline.
-
-        :param show: whether to show the plot (disable if running from docker, use the written file instead by setting
-        save_path to the save path you prefer).
-        :param save_path: the html plot will be save the given path, if not provided, it will not be saved.
         """
-        logger.debug("Plotting events:")
-        # construct a dataframe with the events
-        import pandas as pd
-        import plotly.express as px
-
-        data_dict = defaultdict(list)
-        for event in self.timeline:
-            start_timestamp = event.timestamp
-            if isinstance(start_timestamp, datetime):
-                start_timestamp = start_timestamp.timestamp()
-            
-            end_timestamp = getattr(event, 'end_timestamp', None)
-            if end_timestamp is None:
-                end_timestamp = start_timestamp + 0.1
-            elif isinstance(end_timestamp, datetime):
-                end_timestamp = end_timestamp.timestamp()
-
-            data_dict['start'].append(start_timestamp)
-            data_dict['end'].append(end_timestamp)
-            data_dict['event'].append(event.__class__.__name__)
-
-            tracked_objects = getattr(event, 'tracked_objects', [])
-            object_name = ", ".join([obj.name for obj in tracked_objects]) if tracked_objects else "None"
-            data_dict['object'].append(object_name)
-
-            obj_type = ", ".join([obj.obj_type.name for obj in tracked_objects if isinstance(obj, Body)]) if tracked_objects else "None"
-            data_dict['obj_type'].append(obj_type)
-
-            with_object = getattr(event, 'with_object', None)
-            data_dict['with_object'].append(with_object.name if with_object else None)
-            data_dict['with_obj_type'].append(with_object.obj_type.name if isinstance(with_object, Body) else None)
-
-        if not data_dict['start']:
-            logger.debug("No events to plot.")
-            return
-
-        # subtract the start time from all timestamps
-        min_start = min(data_dict['start'])
-        data_dict['start'] = [x - min_start for x in data_dict['start']]
-        data_dict['end'] = [x - min_start for x in data_dict['end']]
-
-        df = pd.DataFrame(data_dict)
-
-        fig = px.timeline(
-            df,
-            x_start=pd.to_datetime(df['start'], unit='s'),
-            x_end=pd.to_datetime(df['end'], unit='s'),
-            y='event',
-            color='event',
-            hover_data={'object': True, 'obj_type': True, 'with_object': True, 'with_obj_type': True},
-            title="Events Timeline"
-        )
-
-        fig.update_xaxes(tickformat='%S')
-        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightPink')
-        fig.update_layout(
-            font_family="Courier New",
-            font_color="black",
-            font_size=20,
-            title_font_family="Times New Roman",
-            title_font_color="black",
-            title_font_size=30,
-            legend_title_font_color="black",
-            legend_title_font_size=24,
-        )
-
-        if show:
-            fig.show()
-        if save_path:
-            if not os.path.exists(dirname(save_path)):
-                os.makedirs(dirname(save_path))
-            if not save_path.endswith('.html'):
-                save_path += '.html'
-            file_path = abspath(save_path)
-            fig.write_html(file_path)
-            logger.debug(f"Plot saved to {file_path}")
+        plotter = EventPlotter()
+        plotter.plot(self.get_events(), show=show, save_path=save_path)
 
     def print_events(self):
         """
