@@ -34,7 +34,7 @@ from robokudo.utils.type_conversion import (
     get_o3d_obb_from_bounding_box_annotation,
     get_transform_matrix_from_pose_annotation,
 )
-from semantic_digital_twin.world_description.geometry import FileMesh, Mesh
+from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
@@ -88,11 +88,12 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
 
     def _mesh_cache_key(self, shape: Mesh) -> Tuple[object, ...]:
         """Create a stable cache key for mesh conversion results."""
-        if isinstance(shape, FileMesh):
+        filename = getattr(shape, "filename", "")
+        if filename:
             try:
-                filename = str(Path(shape.filename).resolve())
+                filename = str(Path(filename).resolve())
             except OSError:
-                filename = shape.filename
+                pass
             return ("filemesh", filename)
         return ("mesh", id(shape.mesh))
 
