@@ -1,16 +1,30 @@
 from krrood.entity_query_language.factories import *
+from random_events.interval import closed
+from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
     NaturalLanguageDescriptionWithTypeDescription,
 )
+from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.pipeline.pipeline import BodyFilter, Pipeline
 from semantic_digital_twin.reasoning.predicates import is_supported_by
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageDescription,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import OmniDrive
+from semantic_digital_twin.world_description.graph_of_convex_sets import (
+    GraphOfConvexSets,
+)
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+)
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 def remove_clutter(
@@ -84,3 +98,41 @@ def bottles_on_benches(
 
 
 def open_door(robot: AbstractRobot, door: Door): ...
+
+
+def create_gcs(world: World):
+    search_space = BoundingBoxCollection.from_simple_event(
+        reference_frame=world.root,
+        simple_event=SimpleEvent.from_data(
+            {
+                SpatialVariables.x.value: closed(-10, 10),
+                SpatialVariables.y.value: closed(-10, 10),
+                SpatialVariables.z.value: closed(0.05, 2),
+            }
+        ),
+    )
+
+    gcs = GraphOfConvexSets.free_space_from_world(
+        world=world, search_space=search_space, bloat_obstacles=0.1
+    )
+    return gcs
+
+
+def create_pr2_in_world(world: World):
+    pr2_urdf = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+
+    pr2_parser = URDFParser.from_file(file_path=pr2_urdf)
+    world_with_pr2 = pr2_parser.parse()
+    with world_with_pr2.modify_world():
+        pr2_root = world_with_pr2.root
+        localization_body = Body(name=PrefixedName("odom_combined"))
+        world_with_pr2.add_kinematic_structure_entity(localization_body)
+        c_root_bf = OmniDrive.create_with_dofs(
+            parent=localization_body, child=pr2_root, world=world_with_pr2
+        )
+        world_with_pr2.add_connection(c_root_bf)
+
+    world.merge_world(world_with_pr2)
+
+    pr2 = PR2.from_world(world)
+    return pr2
