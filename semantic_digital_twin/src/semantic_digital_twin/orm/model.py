@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from io import BytesIO
-
 from uuid import UUID
 
 import numpy as np
@@ -9,9 +8,7 @@ import trimesh.exchange.stl
 from sqlalchemy import TypeDecorator, types
 from typing_extensions import List, Optional, Type
 
-
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
-
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_types import (
     RotationMatrix,
@@ -32,6 +29,9 @@ from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
     WorldEntity,
 )
+from semantic_digital_twin.world_description.world_modification import (
+    WorldModelModificationBlock,
+)
 from semantic_digital_twin.world_description.world_state import WorldState
 
 
@@ -42,7 +42,8 @@ class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
     semantic_annotations: List[SemanticAnnotation]
     degrees_of_freedom: List[DegreeOfFreedom]
     state: WorldState
-    name: Optional[str] = field(default=None)
+    name: Optional[str]
+    modification_history: List[WorldModelModificationBlock]
 
     @classmethod
     def from_domain_object(cls, obj: World):
@@ -54,27 +55,18 @@ class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
             state=obj.state,
             name=obj.name,
             simulator_additional_properties=obj.simulator_additional_properties,
+            modification_history=obj._model_manager.model_modification_blocks,
         )
 
     def to_domain_object(self) -> World:
         result = World(name=self.name)
 
         with result.modify_world():
-            for entity in self.kinematic_structure_entities:
-                result.add_kinematic_structure_entity(entity)
-
-            for dof in self.degrees_of_freedom:
-                result.add_degree_of_freedom(dof)
-
-            for connection in self.connections:
-                result.add_connection(connection)
-
-            for semantic_annotation in self.semantic_annotations:
-                result.add_semantic_annotation(semantic_annotation)
+            for modification_block in self.modification_history:
+                modification_block.apply(result)
 
             result.state = self.state
             result.state._world = result
-
         return result
 
     @classmethod

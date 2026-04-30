@@ -8,7 +8,7 @@ from abc import ABC
 from dataclasses import dataclass, fields, is_dataclass
 from dataclasses import field
 from types import NoneType
-from typing import List, Optional
+from typing import List, Optional, TypeAlias
 
 import numpy as np
 from typing_extensions import Dict, Any, Self, Union, Type, TypeVar
@@ -51,6 +51,11 @@ JSON_IS_CLASS = "__is_class__"
 """
 We need to remember if something is a class, because the type of a class is often just type.
 """
+
+
+# TODO: Manage to have JSONData as a proper type alias for the JSON typehints, while keeping everything ormaticable @tomsch420
+class JSONData:
+    pass
 
 
 @dataclass
@@ -207,8 +212,12 @@ def to_json(obj: Union[SubclassJSONSerializer, Any]) -> JSON_RETURN_TYPE:
     :param obj: The object to convert to json
     :return: The JSON string
     """
+    if isinstance(obj, dict):
+        json_type = obj.get(JSON_TYPE_NAME, None)
+        if json_type is not None:
+            return obj
 
-    if isinstance(obj, leaf_types):
+    if isinstance(obj, (leaf_types)):
         return obj
 
     if isinstance(obj, list_like_classes):
@@ -238,12 +247,12 @@ class JSONAttributeDiff(SubclassJSONSerializer):
     The name of the attribute that has changed.
     """
 
-    added_values: List[Any] = field(default_factory=list)
+    added_values: List[JSONData] = field(default_factory=list)
     """
     The items that have been added to the attribute.
     """
 
-    removed_values: List[Any] = field(default_factory=list)
+    removed_values: List[JSONData] = field(default_factory=list)
     """
     The items that have been removed from the attribute.
     """
@@ -253,16 +262,16 @@ class JSONAttributeDiff(SubclassJSONSerializer):
         return {
             JSON_TYPE_NAME: get_full_class_name(self.__class__),
             "attribute_name": self.attribute_name,
-            "removed_values": to_json(self.removed_values),
-            "added_values": to_json(self.added_values),
+            "removed_values": self.removed_values,
+            "added_values": self.added_values,
         }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(
             attribute_name=data["attribute_name"],
-            removed_values=from_json(data["removed_values"], **kwargs),
-            added_values=from_json(data["added_values"], **kwargs),
+            removed_values=data["removed_values"],
+            added_values=data["added_values"],
         )
 
 
@@ -305,12 +314,10 @@ def _compute_attribute_diff(
     if not isinstance(original_value, list_like_classes):
         if original_value == new_value:
             return None
-        return JSONAttributeDiff(
-            attribute_name=key, added_values=[from_json(new_value, **kwargs)]
-        )
+        return JSONAttributeDiff(attribute_name=key, added_values=[new_value])
 
-    add = [from_json(x, **kwargs) for x in new_value if x not in original_value]
-    remove = [from_json(x, **kwargs) for x in original_value if x not in new_value]
+    add = [x for x in new_value if x not in original_value]
+    remove = [x for x in original_value if x not in new_value]
     if not (add or remove):
         return None
     return JSONAttributeDiff(

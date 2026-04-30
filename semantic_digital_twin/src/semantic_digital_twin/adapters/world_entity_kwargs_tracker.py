@@ -10,6 +10,7 @@ from typing_extensions import Optional, TYPE_CHECKING, Self, ClassVar
 from semantic_digital_twin.exceptions import (
     WorldEntityWithIDNotInKwargs,
     WorldEntityWithIDNotFoundError,
+    MissingWorldError,
 )
 
 if TYPE_CHECKING:
@@ -61,6 +62,8 @@ class WorldEntityWithIDKwargsTracker:
         Create a new tracker from a world.
         :param world: A world instance that will be used as a backup to look for world entities.
         """
+        if world is None:
+            raise MissingWorldError()
         tracker = cls()
         tracker._world = world
         return tracker
@@ -95,7 +98,7 @@ class WorldEntityWithIDKwargsTracker:
         try:
             self.get_world_entity_with_id(id)
             return True
-        except WorldEntityWithIDNotInKwargs:
+        except (WorldEntityWithIDNotInKwargs, MissingWorldError):
             return False
 
     def get_world_entity_with_id(self, id: UUID) -> WorldEntityWithID:
@@ -113,9 +116,10 @@ class WorldEntityWithIDKwargsTracker:
         result = self._world_entities_with_id.get(id)
         if result is not None:
             return result
-        if self._world is not None:
-            try:
-                return self._world.get_world_entity_with_id_by_id(id)
-            except WorldEntityWithIDNotFoundError:
-                pass
+        if self._world is None:
+            raise MissingWorldError()
+        try:
+            return self._world.get_world_entity_with_id_by_id(id)
+        except WorldEntityWithIDNotFoundError:
+            pass
         raise WorldEntityWithIDNotInKwargs(id)

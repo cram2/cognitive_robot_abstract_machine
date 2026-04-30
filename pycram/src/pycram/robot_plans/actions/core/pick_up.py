@@ -28,6 +28,7 @@ from pycram.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
+from semantic_digital_twin.robots.abstract_robot import HasMobileBase
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -101,9 +102,13 @@ class ReachAction(ActionDescription):
             pose_sequence_reachability_validator(
                 grasp_pose_sequence,
                 manipulator.tool_frame,
-                context.robot.from_world(test_world),
+                test_world.get_semantic_annotations_by_type(type(context.robot))[0],
                 test_world,
-                context.robot.full_body_controlled,
+                (
+                    context.robot.full_body_controlled
+                    if isinstance(context.robot, HasMobileBase)
+                    else False
+                ),
             ),
         )
 
@@ -203,9 +208,13 @@ class PickUpAction(ActionDescription):
             pose_sequence_reachability_validator(
                 grasp_pose_sequence,
                 manipulator.tool_frame,
-                context.robot.from_world(test_world),
+                test_world.get_semantic_annotations_by_type(type(context.robot))[0],
                 test_world,
-                context.robot.full_body_controlled,
+                (
+                    context.robot.full_body_controlled
+                    if isinstance(context.robot, HasMobileBase)
+                    else False
+                ),
             ),
         )
 
