@@ -343,8 +343,9 @@ def test_shallow_diff_json_nested():
     diffs = shallow_diff_json(orig, new)
     assert len(diffs) == 1
     assert diffs[0].attribute_name == "pet"
-    assert isinstance(diffs[0].added_values[0], Dog)
-    assert diffs[0].added_values[0].name == "Max"
+    added_values = from_json(diffs[0].added_values)
+    assert isinstance(added_values[0], Dog)
+    assert added_values[0].name == "Max"
 
 
 def test_nparray():

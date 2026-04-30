@@ -7,7 +7,9 @@ from rclpy.node import Node
 from rclpy.service import Service
 from std_srvs.srv import Trigger
 
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 
@@ -156,7 +158,11 @@ def fetch_world_from_service(
         )
 
     # fetch world
-    response = client.call(Trigger.Request())
+    response = client.call(Trigger.Request(), timeout_sec=remaining)
+    if response is None:
+        raise TimeoutError(
+            f"WorldFetcher service '{chosen_service}' did not respond after {remaining} seconds"
+        )
 
     # New format is an object {"modifications": [...], "state": {...}}.
     world = World()

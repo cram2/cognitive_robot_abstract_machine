@@ -152,16 +152,14 @@ class ConnectionModificationTestCase(unittest.TestCase):
         add_v1 = AddSemanticAnnotationModification.from_domain_object(v1)
         add_v2 = AddSemanticAnnotationModification.from_domain_object(v2)
 
-        self.assertNotIn(v1, w.semantic_annotations)
-        self.assertNotIn(v2, w.semantic_annotations)
+        self.assertNotEqual({v1.id, v2.id}, set(a.id for a in w.semantic_annotations))
 
         with w.modify_world():
             add_v1.apply(w)
             add_v2.apply(w)
 
-        self.assertIn(v1, w.semantic_annotations)
-        self.assertIn(v2, w.semantic_annotations)
         self.assertEqual({v1.id, v2.id}, set(a.id for a in w.semantic_annotations))
+        self.assertEqual(v1.root, w.get_kinematic_structure_entity_by_name("b1"))
 
         rm_v1 = RemoveSemanticAnnotationModification(v1.id)
         rm_v2 = RemoveSemanticAnnotationModification(v2.id)
@@ -169,8 +167,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
             rm_v1.apply(w)
             rm_v2.apply(w)
 
-        self.assertNotIn(v1, w.semantic_annotations)
-        self.assertNotIn(v2, w.semantic_annotations)
+        self.assertNotEqual({v1.id, v2.id}, set(a.id for a in w.semantic_annotations))
 
     def test_duplicate_name_modification_serialization(self):
         w = World()

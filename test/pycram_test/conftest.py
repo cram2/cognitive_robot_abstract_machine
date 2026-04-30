@@ -28,7 +28,7 @@ def viz_marker_publisher():
 @pytest.fixture(scope="function")
 def mutable_model_world(pr2_apartment_world):
     world = deepcopy(pr2_apartment_world)
-    pr2 = PR2.from_world(world)
+    pr2 = world.get_semantic_annotations_by_type(PR2)[0]
     return world, pr2, Context(world, pr2)
 
 

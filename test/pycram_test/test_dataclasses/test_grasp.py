@@ -48,20 +48,20 @@ def tracy_milk_world(tracy_world):
         tracy_copy.add_connection(connection)
         connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1, 0, 1)
 
-    return tracy_copy, Tracy.from_world(tracy_copy)
+    return tracy_copy, tracy_copy.get_semantic_annotations_by_type(Tracy)[0]
 
 
 @pytest.fixture(scope="session")
 def immutable_simple_pr2_holding_world(simple_pr2_world_setup):
     world, robot_view, context = simple_pr2_world_setup
     copy_world = deepcopy(world)
+    robot_view = copy_world.get_semantic_annotation_by_id(robot_view.id)
 
     milk = copy_world.get_body_by_name("milk.stl")
     tcp = copy_world.get_body_by_name("l_gripper_tool_frame")
     with copy_world.modify_world():
         copy_world.move_branch(milk, tcp)
-    view = PR2.from_world(copy_world)
-    return copy_world, view, Context(copy_world, view)
+    return copy_world, robot_view, Context(copy_world, robot_view)
 
 
 def test_grasp_pose_front(immutable_simple_pr2_world):

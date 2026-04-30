@@ -10,7 +10,7 @@ from typing_extensions import TypeVar, Type
 
 from giskardpy.motion_statechart.graph_node import Task
 from pycram.plans.designator import Designator
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from ...alternative_motion_mapping import AlternativeMotion
 
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ from typing_extensions import TypeVar, ClassVar, TYPE_CHECKING, Optional, Type
 from krrood.ormatic.data_access_objects.base import HasGeneric
 from .datastructures.enums import ExecutionType
 from .motion_executor import MotionExecutor
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 if TYPE_CHECKING:
     from .robot_plans import BaseMotion

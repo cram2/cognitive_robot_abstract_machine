@@ -20,7 +20,7 @@ from giskardpy.middleware.ros2.ros2_interface import (
 from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.tree.branches.giskard_bt import GiskardBT
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (

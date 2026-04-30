@@ -21,6 +21,10 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.robots.robot_parts import (
+        AbstractRobot,
+        AbstractRobotPart,
+    )
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.geometry import Scale
     from semantic_digital_twin.world_description.world_entity import (
@@ -279,6 +283,14 @@ class InvalidPlaneDimensions(UsageError):
 
 
 @dataclass
+class UselessConceptError(UsageError):
+    """
+    Used to indicate that the operation the user is trying to perform is not useful in the current context, even
+    though it might be technically possible.
+    """
+
+
+@dataclass
 class InvalidHingeActiveAxis(UsageError):
     """
     Raised when an invalid axis is provided.
@@ -356,6 +368,29 @@ class DuplicateWorldEntityError(UsageError):
 
 
 @dataclass
+class DuplicateRobotAssignmentsError(UsageError):
+    """
+    Raised when a robot part is assigned to multiple robots, which should not happen.
+    """
+
+    robot_part: AbstractRobotPart
+    """
+    The robot part that is assigned to multiple robots.
+    """
+
+    robots: list[AbstractRobot]
+    """
+    The robots that are already assigned to the robot part.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Robot part {self.robot_part} is assigned to multiple robots: {self.robots}."
+            f" Each robot part should be assigned to at most one robot."
+        )
+
+
+@dataclass
 class DuplicateKinematicStructureEntityError(UsageError):
     names: List[PrefixedName]
 
@@ -417,6 +452,31 @@ class WorldEntityNotFoundError(UsageError):
 
 
 @dataclass
+class MissingDefaultCameraError(UsageError):
+    """
+    Raised when trying to access the default camera of a robot that does not have a default camera.
+    """
+
+    robot: Type[AbstractRobot]
+    """
+    The robot that does not have a default camera.
+    """
+
+    def __post_init__(self):
+        self.message = f"Robot {self.robot.name} does not have a default camera."
+
+
+@dataclass
+class MissingWorldError(UsageError):
+    """
+    Raised when trying to access a world that is None, but a world is required for the operation.
+    """
+
+    def __post_init__(self):
+        self.message = f"The world you are trying to access is None."
+
+
+@dataclass
 class WorldEntityWithIDNotFoundError(UsageError):
     id: UUID
 
@@ -431,6 +491,21 @@ class AlreadyBelongsToAWorldError(UsageError):
 
     def __post_init__(self):
         self.message = f"Cannot add a {self.type_trying_to_add} that already belongs to another world {self.world.name}."
+
+
+@dataclass
+class DoesNotBelongToAWorldError(UsageError):
+    """
+    Raised when trying to use a world entity that does not belong to any world in a context where it must belong to a world.
+    """
+
+    world_entity: WorldEntity
+    """
+    The world entity that does not belong to a world.
+    """
+
+    def __post_init__(self):
+        self.message = f"WorldEntity {self.world_entity} does not belong to a world."
 
 
 class NotJsonSerializable(JSONSerializationError): ...

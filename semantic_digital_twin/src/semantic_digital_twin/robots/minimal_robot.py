@@ -4,16 +4,16 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Self
 
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import (
+from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
 )
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import OmniDrive, ActiveConnection
-from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
+from semantic_digital_twin.world_description.connections import ActiveConnection
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
 
 
-@dataclass
+@dataclass(eq=False)
 class MinimalRobot(AbstractRobot):
     """
     Creates the bare minimum semantic annotation.
@@ -22,23 +22,36 @@ class MinimalRobot(AbstractRobot):
 
     bodies_of_branch: list[KinematicStructureEntity] = field(default_factory=list)
 
-    def __hash__(self):
-        return hash(
-            tuple(
-                [self.__class__]
-                + sorted([kse.name for kse in self.kinematic_structure_entities])
-            )
-        )
-
-    def _setup_semantic_annotations(self): ...
+    @classmethod
+    def get_ros_file_path(cls) -> str:
+        return ""
 
     @classmethod
-    def _init_empty_robot(cls, world: World) -> Self:
-        return cls(
-            name=PrefixedName(name="generic_robot", prefix=world.name),
-            root=world.root,
-            _world=world,
-            bodies_of_branch=world.get_kinematic_structure_entities_of_branch(world.root)
+    def _get_root_body_name(cls) -> str:
+        # Minimal robot uses the world root as the robot root
+        return ""
+
+    @classmethod
+    def from_branch_in_world(cls, branch_root: KinematicStructureEntity) -> Self:
+        """
+        Creates a robot from a branch in a world.
+        This is useful when you have multiple of the same robots in the same world, which would normally cause naming conflicts.
+        """
+        world = branch_root._world
+        with world.modify_world():
+            self = cls(
+                root=branch_root,
+            )
+            world.add_semantic_annotation(self)
+            self.setup_robot_part_semantic_annotations()
+            for robot_part in self._robot_parts:
+                robot_part.setup_hardware_interfaces()
+                robot_part.setup_joint_states()
+            return self
+
+    def setup_robot_part_semantic_annotations(self):
+        self.bodies_of_branch = self._world.get_kinematic_structure_entities_of_branch(
+            self.root
         )
 
     def _setup_collision_rules(self):

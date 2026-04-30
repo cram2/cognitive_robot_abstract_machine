@@ -1,17 +1,16 @@
-import os
 from collections import defaultdict
 
 import numpy as np
 import pytest
-from importlib.resources import files
-from pathlib import Path
 from typing_extensions import List
 
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.orm.ormatic_interface import *  # noqa
 from semantic_digital_twin.reasoning.predicates import LeftOf
-from semantic_digital_twin.robots.abstract_robot import KinematicChain
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.robot_parts import KinematicChain
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_computations.ik_solver import (
     MaxIterationsException,
@@ -28,7 +27,6 @@ from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
     RevoluteConnection,
 )
-from semantic_digital_twin.orm.ormatic_interface import *  # noqa
 
 
 def test_compute_chain_of_bodies_pr2(pr2_world_state_reset):
@@ -415,19 +413,17 @@ def test_pr2_semantic_annotation(pr2_world_state_reset):
     # Ensure there are no loose bodies
     pr2_world_state_reset._notify_model_change()
 
-    assert len(pr2.manipulators) == 2
-    assert len(pr2.manipulator_chains) == 2
+    assert len(pr2.end_effectors) == 2
+    assert len(pr2.arms) == 2
     assert len(pr2.sensors) == 1
-    assert len(pr2.sensor_chains) == 1
-    assert pr2.neck == list(pr2.sensor_chains)[0]
     assert pr2.torso.name.name == "torso"
-    assert len(pr2.torso.sensors) == 0
-    assert list(pr2.sensor_chains)[0].sensors == pr2.sensors
+    assert len(pr2.torso.sensors) == 1
     assert pr2.left_arm and pr2.right_arm
     assert pr2.left_arm != pr2.right_arm
+    assert pr2.sensors[0] == pr2.get_default_camera()
 
 
-def test_specifies_left_right_arm_mixin(pr2_world_state_reset):
+def test_has_left_right_arm_mixin(pr2_world_state_reset):
     pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
     left_arm_chain = list(pr2.left_arm.bodies)
     right_arm_chain = list(pr2.right_arm.bodies)
@@ -452,25 +448,18 @@ def test_tracy_semantic_annotation(tracy_world):
 
     tracy_world._notify_model_change()
 
-    assert len(tracy.manipulators) == 2
-    assert len(tracy.manipulator_chains) == 2
+    assert len(tracy.end_effectors) == 2
     assert len(tracy.sensors) == 1
-    assert len(tracy.sensor_chains) == 1
-    assert tracy.torso is None
-    assert list(tracy.sensor_chains)[0].sensors == tracy.sensors
 
 
 def test_hsrb_semantic_annotation(hsr_world_setup):
     hsrb = hsr_world_setup.get_semantic_annotations_by_type(HSRB)[0]
     hsr_world_setup._notify_model_change()
 
-    assert len(hsrb.manipulators) == 1
-    assert len(hsrb.manipulator_chains) == 1
-    assert hsrb.neck is not None
+    assert len(hsrb.end_effector) == 1
     assert len(hsrb.arms) == 1
 
     assert len(hsrb.sensors) == 5
-    assert len(hsrb.sensor_chains) == 2
     assert hsrb.torso is not None
 
 
@@ -545,3 +534,11 @@ def test_split_chain_of_connections(pr2_world_state_reset):
     ]
     assert result1_names == chain1
     assert result2_names == chain2
+
+
+def test_robots_and_validate(supported_abstract_robots):
+    for abstract_robot in supported_abstract_robots:
+        print(f"Testing robot: {abstract_robot.__name__}")
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).parse()
+        robot = abstract_robot.from_world(world)
+        robot.validate()
