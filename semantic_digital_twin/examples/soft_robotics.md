@@ -52,10 +52,10 @@ Build a standard uniform snake where every section has the same dimensions.
 ```{code-cell} ipython3
 world_pcc = World()
 
-trunk_pcc, kappas, phis = SoftTrunk.build_pcc(
+trunk_pcc, kappas, phis = SoftTrunk.build_piecewise_constant_curvature(
     world_pcc, 
     num_sections=3, 
-    segs_per_section=10, 
+    segments_per_section=10, 
     total_length=1.0,
     radius=0.02
 )
@@ -80,7 +80,7 @@ lengths = [0.2, 0.3, 0.5]
 radii = [0.08, 0.04, 0.02]
 res = [5, 10, 15]
 
-trunk_pcc, kappas, phis = SoftTrunk.build_custom_pcc(world_pcc, lengths, radii, res)
+trunk_pcc, kappas, phis = SoftTrunk.build_custom_piecewise_constant_curvature(world_pcc, lengths, radii, res)
 
 tf_pcc = TFPublisher(_world=world_pcc, node=node)
 viz_pcc = VizMarkerPublisher(_world=world_pcc, node=node)
@@ -102,7 +102,7 @@ try:
             world_pcc.state[phis[s].id].position = t * 0.5 # Make it spiral by rotating the phis
             
         update_visualization(world_pcc, tf_pcc, viz_pcc)
-        time.sleep(0.05)
+        time.sleep(0.03)
 except KeyboardInterrupt:
     print("Stopped.")
 ```
@@ -116,10 +116,10 @@ Build a standard uniform snake where every section has the same dimensions.
 ```{code-cell} ipython3
 world_cosserat = World()
 
-trunk_cos, uxs, uys, uzs, vzs = SoftTrunk.build_cosserat(
+trunk_cos, all_bx, all_by, all_tor, all_ext = SoftTrunk.build_cosserat(
     world_cosserat, 
     num_sections=3,
-    segs_per_section=10,
+    segments_per_section=10,
     total_length=1.0,
     radius=0.02
 )
@@ -147,7 +147,7 @@ c_lengths = [0.4, 0.4, 0.4]
 c_radii = [0.06, 0.04, 0.02]
 c_res = [10, 10, 10]
 
-trunk_cos, uxs, uys, uzs, vzs = SoftTrunk.build_custom_cosserat(world_cosserat, c_lengths, c_radii, c_res)
+trunk_cos, all_bx, all_by, all_tor, all_ext = SoftTrunk.build_custom_cosserat(world_cosserat, c_lengths, c_radii, c_res)
 
 tf_cos = TFPublisher(_world=world_cosserat, node=node)
 viz_cos = VizMarkerPublisher(_world=world_cosserat, node=node)
@@ -162,11 +162,11 @@ update_visualization(world_cosserat, tf_cos, viz_cos)
 try:
     print("Starting Cosserat Animation")
     for t in np.linspace(0, 10, 200):
-        for s in range(len(uxs)): # Update world state for each section
-            world_cosserat.state[uxs[s].id].position = 2.0 * np.sin(t) # Curvature (Bending X)
-            world_cosserat.state[uys[s].id].position = 2.0 * np.cos(t) # Curvature (Bending Y)
-            world_cosserat.state[uzs[s].id].position = 1.5 * np.sin(t * 0.5) # Torsion (Twisting)      
-            world_cosserat.state[vzs[s].id].position = 1.0 + 0.5 * np.sin(t) # Strecthing
+        for s in range(len(all_bx)): # Update world state for each section
+            world_cosserat.state[all_bx[s].id].position = 2.0 * np.sin(t) # Curvature (Bending X)
+            world_cosserat.state[all_by[s].id].position = 2.0 * np.cos(t) # Curvature (Bending Y)
+            world_cosserat.state[all_tor[s].id].position = 1.5 * np.sin(t * 0.5) # Torsion (Twisting)      
+            world_cosserat.state[all_ext[s].id].position = 1.0 + 0.5 * np.sin(t) # Strecthing
         update_visualization(world_cosserat, tf_cos, viz_cos)
         time.sleep(0.03)
 except KeyboardInterrupt:
