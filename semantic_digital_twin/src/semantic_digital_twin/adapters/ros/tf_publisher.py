@@ -187,7 +187,7 @@ class TFPublisher(StateChangeCallback):
         :param node: The ROS2 node used to create the publisher.
         """
         tf_wrapper = TFWrapper(node=node)
-        sleep(2)
+        sleep(5)
         all_frames = set(tf_wrapper.get_tf_frames())
         if len(all_frames) == 0:
             logging.info("Could not find any tf frames, publishing all tf")

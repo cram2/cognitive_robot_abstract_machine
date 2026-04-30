@@ -17,8 +17,9 @@ from pycram.locations.locations import CostmapLocation
 from pycram.motion_executor import real_robot, simulated_robot, ExecutionEnvironment
 from pycram.plans.factories import execute_single, sequential
 from pycram.robot_plans import MoveToolCenterPointMotion, MoveGripperMotion
-from pycram.robot_plans.actions.core.navigation import NavigateAction
+from pycram.robot_plans.actions.core.navigation import NavigateAction, LookAtAction
 from pycram.robot_plans.actions.core.pick_up import ReachAction, PickUpAction
+from pycram.robot_plans.actions.core.placing import PlaceAction
 from pycram.robot_plans.actions.core.robot_body import (
     MoveTorsoAction,
     SetGripperAction,
@@ -58,7 +59,7 @@ executor.add_node(node)
 thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
 thread.start()
 
-exec_type = ExecutionType.SIMULATED
+exec_type = ExecutionType.REAL
 
 exec_env = ExecutionEnvironment(exec_type)
 
@@ -94,7 +95,7 @@ if not world.is_entity_in_world_by_name("breakfast_cereal.stl"):
                 world.root,
                 box,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    -0.05, 0.7, 0.285, yaw=0.12
+                    -0.05, 1.2, 0.285, yaw=0
                 ),
             )
         )
@@ -108,7 +109,7 @@ if not world.is_entity_in_world_by_name("breakfast_cereal.stl"):
                 world.root,
                 box,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    0.3, -2.08, 0.285, yaw=0.12
+                    0.05, -1.6, 0.285, yaw=0.0
                 ),
             )
         )
@@ -122,7 +123,7 @@ if not world.is_entity_in_world_by_name("breakfast_cereal.stl"):
                 world.root,
                 cereal.root,
                 HomogeneousTransformationMatrix.from_xyz_rpy(
-                    -0.04, 0.69, 0.7, yaw=1.57, reference_frame=world.root
+                    -0.04, 1.15, 0.7, yaw=1.57, reference_frame=world.root
                 ),
             ),
         )
@@ -141,36 +142,30 @@ grasp_desc = GraspDescription(
     robot_annotation.arm.manipulator,
 )
 
+input("Ready ...")
+
 plan = sequential(
     [
-        # ParkArmsAction(Arms.BOTH),
-        # SetGripperAction(Arms.BOTH, GripperState.CLOSE),
-        SetGripperAction(Arms.BOTH, GripperState.OPEN),
-        # MoveGripperMotion(GripperState.OPEN, gripper=Arms.BOTH),
-        # MoveGripperMotion(GripperState.CLOSE, gripper=Arms.BOTH)
-        # MoveTorsoAction(TorsoState.HIGH),
-        #                    ReachAction(Pose.from_xyz_rpy(0.6, -1, 0.7, reference_frame=world.root), arm=Arms.LEFT,
-        #                                grasp_description=GraspDescription(ApproachDirection.FRONT, VerticalAlignment.NoAlignment, robot_annotation.arm.manipulator))
+        # LookAtAction(Pose.from_xyz_rpy(-0.04, 0.69, 0.7, reference_frame=world.root)),
+        ParkArmsAction(Arms.BOTH),
         NavigateAction(
-            Pose.from_xyz_rpy(0, 0, 0, yaw=1.57, reference_frame=world.root)
+            Pose.from_xyz_rpy(0.0, 0.4, 0, yaw=1.57, reference_frame=world.root)
         ),
-        # underspecified(NavigateAction)(
-        #     target_location=variable(
-        #         Pose,
-        #         domain=CostmapLocation(
-        #             target=world.get_body_by_name("breakfast_cereal.stl").global_pose,
-        #             reachable_arm=Arms.LEFT,
-        #             reachable=True,
-        #             context=context,
-        #             grasp_description=grasp_desc),
-        #         ),
-        #     ),
-        #     keep_joint_states=True,
-        # ),
-        # MoveToolCenterPointMotion(Pose.from_xyz_rpy(2.3, 0.38, 0.5, reference_frame=world.root), arm=Arms.LEFT, movement_type=MovementType.TRANSLATION)
         PickUpAction(
             world.get_body_by_name("breakfast_cereal.stl"), Arms.LEFT, grasp_desc
         ),
+        ParkArmsAction(Arms.BOTH),
+        NavigateAction(
+            Pose.from_xyz_rpy(0.17, -0.9, 0, yaw=-1.57, reference_frame=world.root)
+        ),
+        PlaceAction(
+            object_designator=world.get_body_by_name("breakfast_cereal.stl"),
+            target_location=Pose.from_xyz_rpy(
+                0.05, -1.6, 0.7, yaw=-1.57, reference_frame=world.root
+            ),
+            arm=Arms.LEFT,
+        ),
+        ParkArmsAction(Arms.BOTH),
     ],
     context,
 ).plan

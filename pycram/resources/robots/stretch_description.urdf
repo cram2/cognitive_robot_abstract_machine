@@ -691,7 +691,7 @@
     <child link="link_head_tilt"/>
     <axis xyz="0 0 1"/>
     <!-- unconstrained range for now -->
-    <limit effort="100" lower="-1.53" upper="0.79" velocity="1.0"/>
+    <limit effort="100" lower="-1.53" upper="0.79" velocity="10.0"/>
   </joint>
   <link name="link_aruco_right_base">
     <inertial>
