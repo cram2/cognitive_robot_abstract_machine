@@ -203,7 +203,9 @@ def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> b
 
 
 @symbolic_function
-def compute_euclidean_planar_distance(body1: Body, body2: Body, ignore_dimension: Vector3):
+def compute_euclidean_planar_distance(
+    body1: Body, body2: Body, ignore_dimension: Vector3
+):
     """
     Computes the Euclidean distance between two bodies in 2D space, ignoring a specific dimension
     specified by the user. The ignored dimension is set to zero before the distance calculation. This
@@ -234,10 +236,7 @@ def compute_euclidean_planar_distance(body1: Body, body2: Body, ignore_dimension
         body1_position.z = 0.0
         body2_position.z = 0.0
 
-
-    return body1_position.euclidean_distance(
-        body2_position
-    )
+    return body1_position.euclidean_distance(body2_position)
 
 
 @symbolic_function
@@ -280,6 +279,7 @@ def is_supported_by(
     z_intersection: Interval = intersection[SpatialVariables.z.value]
     size = sum([si.upper - si.lower for si in z_intersection.simple_sets])
     return size < max_intersection_height
+
 
 @symbolic_function
 def is_supporting(supporting_body: Body, max_intersection_height: float = 0.1) -> bool:
@@ -378,7 +378,7 @@ class PointSpatialRelation(Symbol, ABC):
 @dataclass
 class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
 
-    point_of_semantic_annotation: HomogeneousTransformationMatrix
+    point_of_view: HomogeneousTransformationMatrix
     """
     The reference spot from where to look at the bodies.
     """
@@ -401,14 +401,14 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
             the spatial relation is computed.
         :return: The signed distance between the first and the second points along the given direction.
         """
-        ref_np = self.point_of_semantic_annotation.to_np()
+        ref_np = self.point_of_view.to_np()
         front_world = ref_np[:3, index]
         front_norm = front_world / (np.linalg.norm(front_world) + self.eps)
         front_norm = Vector3(
             x=front_norm[0],
             y=front_norm[1],
             z=front_norm[2],
-            reference_frame=self.point_of_semantic_annotation.reference_frame,
+            reference_frame=self.point_of_view.reference_frame,
         )
 
         s_body = front_norm.dot(self.point.to_vector3())

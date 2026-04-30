@@ -1,38 +1,36 @@
 from __future__ import annotations
 
 import logging
+import time
+from functools import reduce
+from operator import or_
 
 import matplotlib.pyplot as plt
+import numpy as np
+import plotly.graph_objects as go
+import rustworkx as rx
+from rtree import index
+from sortedcontainers import SortedSet
+from typing_extensions import List, Optional, Dict, Sequence
+from typing_extensions import Self
+
+from random_events.interval import reals, Interval, SimpleInterval
+from random_events.product_algebra import Event
+from random_events.product_algebra import SimpleEvent
+from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import Point3
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
-from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     SemanticEnvironmentAnnotation,
 )
 
 logger = logging.getLogger(__name__)
-
-import time
-from functools import reduce
-from operator import or_
-from typing_extensions import List, Optional, Dict, Sequence
-
-# typing.Self is available starting with Python 3.11
-from typing_extensions import Self
-
-import numpy as np
-import plotly.graph_objects as go
-import rustworkx as rx
-from random_events.interval import reals
-from random_events.product_algebra import SimpleEvent, Event
-from rtree import index
-from sortedcontainers import SortedSet
-
-from semantic_digital_twin.spatial_types import Point3, HomogeneousTransformationMatrix
 
 
 class PoseOccupiedError(Exception):
@@ -184,7 +182,9 @@ class GraphOfConvexSets:
         Plot the free space of the environment in blue.
         :return: A list of traces that can be put into a plotly figure.
         """
-        free_space = Event.from_simple_sets(*[node.simple_event for node in self.graph.nodes()])
+        free_space = Event.from_simple_sets(
+            *[node.simple_event for node in self.graph.nodes()]
+        )
         return free_space.plot(color="blue")
 
     def plot_and_show_free_space(self) -> None:
@@ -197,7 +197,9 @@ class GraphOfConvexSets:
         Plot the occupied space of the environment in red.
         :return: A list of traces that can be put into a plotly figure.
         """
-        free_space = Event.from_simple_sets(*[node.simple_event for node in self.graph.nodes()])
+        free_space = Event.from_simple_sets(
+            *[node.simple_event for node in self.graph.nodes()]
+        )
         occupied_space = ~free_space & self.search_space.event
         return occupied_space.plot(color="red")
 
@@ -563,7 +565,9 @@ class GraphOfConvexSets:
 
         SimpleEvent.from_data({SpatialVariables.z.value: reals()})
         # create floor level
-        z_event = SimpleEvent.from_data({SpatialVariables.z.value: reals()}).as_composite_set()
+        z_event = SimpleEvent.from_data(
+            {SpatialVariables.z.value: reals()}
+        ).as_composite_set()
         z_event.fill_missing_variables(SpatialVariables.xy)
         free_space.fill_missing_variables(SortedSet([SpatialVariables.z.value]))
         free_space &= z_event
@@ -615,3 +619,39 @@ class GraphOfConvexSets:
             tolerance=tolerance,
             bloat_obstacles=bloat_obstacles,
         )
+
+
+def translate_event_to(
+    event: Event,
+    position: Point3,
+) -> Event:
+    """
+    Translates an event by a given position.
+    A translation is a change in the position of an entity in space without altering its shape or orientation.
+
+    :param event: The event to translate.
+    :param position: The position to translate the event by.
+    :return: The translated event.
+    """
+    variable_to_offset = {
+        SpatialVariables.x.value: position.x,
+        SpatialVariables.y.value: position.y,
+        SpatialVariables.z.value: position.z,
+    }
+    results = []
+    for simple_event in event.simple_sets:
+        data = dict()
+        for v, offset in variable_to_offset.items():
+            data[v] = Interval.from_simple_sets(
+                *[
+                    SimpleInterval.from_data(
+                        lower=simple_interval.lower + offset,
+                        upper=simple_interval.upper + offset,
+                        left=simple_interval.left,
+                        right=simple_interval.right,
+                    )
+                    for simple_interval in simple_event[v]
+                ]
+            )
+        results.append(SimpleEvent.from_data(data))
+    return Event.from_simple_sets(*results)
