@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
 
-from typing_extensions import List, Iterator, Optional
+from typing_extensions import List, Iterator, Optional, Iterable
 
 from krrood.entity_query_language.predicate import Predicate
 from pycram.datastructures.dataclasses import Context
@@ -22,7 +22,7 @@ logger = logging.getLogger("pycram")
 
 
 @dataclass
-class Location:
+class Location(Iterable[Pose]):
     """
     Base for all locations that can be used to plan movements.
     """

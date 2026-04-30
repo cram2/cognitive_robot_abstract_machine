@@ -165,3 +165,17 @@ class GiskardLocationBackend(PoseGeneratorBackend):
                 pass
 
             yield self.robot.root.global_pose
+
+
+@dataclass
+class GraspPoseGenerator(PoseGeneratorBackend):
+
+    generator: PoseGeneratorBackend
+
+    arm: Arms
+
+    grasp_description: GraspDescription
+
+    def __iter__(self):
+        for pose_candidate in self.generator:
+            yield pose_candidate

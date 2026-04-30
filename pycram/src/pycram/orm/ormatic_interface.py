@@ -90,6 +90,7 @@ import pycram.datastructures.grasp
 import pycram.datastructures.trajectory
 import pycram.exceptions
 import pycram.language
+import pycram.locations.backends
 import pycram.locations.base
 import pycram.locations.locations
 import pycram.locations.pose_validator
@@ -3526,48 +3527,6 @@ class EdgeSpecDAO(
     color: Mapped[builtins.str] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
-
-
-class EfficientTransportActionDAO(
-    ActionDescriptionDAO,
-    DataAccessObject[
-        pycram.robot_plans.actions.composite.transporting.EfficientTransportAction
-    ],
-):
-
-    __tablename__ = "EfficientTransportActionDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(ActionDescriptionDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    object_designator_id: Mapped[int] = mapped_column(
-        ForeignKey("BodyDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    target_location_id: Mapped[int] = mapped_column(
-        ForeignKey("PoseMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    object_designator: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
-    )
-    target_location: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO",
-        uselist=False,
-        foreign_keys=[target_location_id],
-        post_update=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "EfficientTransportActionDAO",
-        "inherit_condition": database_id == ActionDescriptionDAO.database_id,
-    }
 
 
 class ExecutionCanceledExceptionDAO(
@@ -8529,6 +8488,118 @@ class PoseGeneratorBackendDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "PoseGeneratorBackendDAO",
+    }
+
+
+class GiskardLocationBackendDAO(
+    PoseGeneratorBackendDAO,
+    DataAccessObject[pycram.locations.backends.GiskardLocationBackend],
+):
+
+    __tablename__ = "GiskardLocationBackendDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(PoseGeneratorBackendDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    arm: Mapped[pycram.datastructures.enums.Arms] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+
+    grasp_description_id: Mapped[int] = mapped_column(
+        ForeignKey("GraspDescriptionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    robot_id: Mapped[int] = mapped_column(
+        ForeignKey("AbstractRobotDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    grasp_description: Mapped[GraspDescriptionDAO] = relationship(
+        "GraspDescriptionDAO",
+        uselist=False,
+        foreign_keys=[grasp_description_id],
+        post_update=True,
+    )
+    robot: Mapped[AbstractRobotDAO] = relationship(
+        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+    )
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GiskardLocationBackendDAO",
+        "inherit_condition": database_id == PoseGeneratorBackendDAO.database_id,
+    }
+
+
+class GraspPoseGeneratorDAO(
+    PoseGeneratorBackendDAO,
+    DataAccessObject[pycram.locations.backends.GraspPoseGenerator],
+):
+
+    __tablename__ = "GraspPoseGeneratorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(PoseGeneratorBackendDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    arm: Mapped[pycram.datastructures.enums.Arms] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+
+    generator_id: Mapped[int] = mapped_column(
+        ForeignKey("PoseGeneratorBackendDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    grasp_description_id: Mapped[int] = mapped_column(
+        ForeignKey("GraspDescriptionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    generator: Mapped[PoseGeneratorBackendDAO] = relationship(
+        "PoseGeneratorBackendDAO",
+        uselist=False,
+        foreign_keys=[generator_id],
+        post_update=True,
+    )
+    grasp_description: Mapped[GraspDescriptionDAO] = relationship(
+        "GraspDescriptionDAO",
+        uselist=False,
+        foreign_keys=[grasp_description_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GraspPoseGeneratorDAO",
+        "inherit_condition": database_id == PoseGeneratorBackendDAO.database_id,
+    }
+
 
 class PoseReachedDAO(
     MotionStatechartNodeDAO,
@@ -12988,9 +13059,9 @@ class TransportActionDAO(
         use_existing_column=True,
     )
 
-    arm: Mapped[typing.Optional[pycram.datastructures.enums.Arms]] = mapped_column(
+    arm: Mapped[pycram.datastructures.enums.Arms] = mapped_column(
         krrood.ormatic.custom_types.PolymorphicEnumType,
-        nullable=True,
+        nullable=False,
         use_existing_column=True,
     )
 

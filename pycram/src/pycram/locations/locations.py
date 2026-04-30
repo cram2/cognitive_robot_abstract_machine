@@ -1,9 +1,7 @@
 import logging
-from abc import abstractmethod, ABC
 from copy import deepcopy
 from dataclasses import dataclass, field
 
-import numpy as np
 from typing_extensions import List, Optional, Iterator
 
 from giskardpy.executor import Executor
@@ -17,44 +15,23 @@ from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.exceptions import InfeasibleException
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from krrood.adapters.json_serializer import list_like_classes
-from pycram.config.action_conf import ActionConfig
-from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     Arms,
-    ApproachDirection,
-    VerticalAlignment,
 )
 from pycram.datastructures.grasp import GraspDescription, GraspPose
 from pycram.locations.base import Location
-from pycram.plans.failures import RobotInCollision
 from pycram.locations.costmaps import (
     OccupancyCostmap,
-    VisibilityCostmap,
     GaussianCostmap,
     Costmap,
-    OrientationGenerator,
-    RingCostmap,
 )
-from pycram.locations.pose_validator import (
-    visibility_validator,
-    pose_sequence_reachability_validator,
-)
-from pycram.utils import link_pose_for_joint_config
 from pycram.view_manager import ViewManager
-from semantic_digital_twin.adapters.ros.visualization.pose_publisher import (
-    PosePublisher,
-)
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
 )
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger("pycram")
