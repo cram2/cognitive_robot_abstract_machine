@@ -1,14 +1,21 @@
 import os
+
 import numpy as np
 import pytest
-import rustworkx
-from sqlalchemy import select
-
-from pycram.datastructures.grasp import GraspDescription
-from pycram.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
-from pycram.view_manager import ViewManager
+from nltk.corpus import wordnet
 from requests import HTTPError
 
+from krrood.entity_query_language.factories import *
+from pycram.datastructures.dataclasses import Context
+from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from pycram.datastructures.grasp import GraspDescription
+from pycram.motion_executor import simulated_robot
+from pycram.plans.factories import sequential
+from pycram.robot_plans.actions.core.navigation import NavigateAction
+from pycram.robot_plans.actions.core.pick_up import PickUpAction
+from pycram.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
+from pycram.view_manager import ViewManager
+from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
     ShapeSource,
@@ -16,48 +23,23 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from semantic_digital_twin.adapters.sage_10k_dataset.loader import (
     Sage10kDatasetLoader,
 )
+from semantic_digital_twin.adapters.sage_10k_dataset.schema import Sage10kScene
 from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
     Sage10kTypeNameCleaner,
     NaturalLanguageDescriptionWithTypeDescription,
 )
-from semantic_digital_twin.adapters.sage_10k_dataset.schema import Sage10kScene
-from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
+from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer import (
     BoxDecomposer,
 )
 from semantic_digital_twin.pipeline.pipeline import Pipeline
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.semantic_annotations.natural_language import (
-    NaturalLanguageDescription,
+    most_similar_synonym,
 )
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Book,
-    BookFront,
-    Bowl,
-    Cup,
-)
-from semantic_digital_twin.world import World
-
-from semantic_digital_twin.adapters.mesh import STLParser
-
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
-    Pose,
 )
-
-from pycram.motion_executor import simulated_robot
-
-from pycram.plans.factories import execute_single, sequential
-
-from pycram.robot_plans.actions.core.navigation import NavigateAction
-
-from pycram.datastructures.dataclasses import Context
-
-from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-
-from pycram.robot_plans.actions.core.pick_up import PickUpAction
-
-from semantic_digital_twin.datastructures.definitions import TorsoState
+from semantic_digital_twin.world import World
 
 
 def verify_scene(world: World, scene: Sage10kScene):
@@ -84,9 +66,7 @@ def verify_scene(world: World, scene: Sage10kScene):
 
 
 def get_body_height(body) -> float:
-    return (
-        body.collision.as_bounding_box_collection_in_frame(body).bounding_box().height
-    )
+    return body.global_pose.z
 
 
 def has_book_in_prefix(body) -> bool:
@@ -94,12 +74,23 @@ def has_book_in_prefix(body) -> bool:
 
 
 def get_book_body_by_height(world: World, target_height: float, atol: float = 1e-5):
-    candidates = [book.root for book in world.get_semantic_annotations_by_type(Book)]
-    candidates.extend(
-        book_front.root
-        for book_front in world.get_semantic_annotations_by_type(BookFront)
-    )
 
+    book = wordnet.synsets("Book")[1]
+
+    natural_language_annotations = world.get_semantic_annotations_by_type(
+        NaturalLanguageDescriptionWithTypeDescription
+    )
+    types_of_world = {a.type_description for a in natural_language_annotations}
+
+    object_type_description = variable_from(types_of_world)
+    book_type_description = max(
+        object_type_description, key=lambda t: most_similar_synonym(t, book)[0]
+    ).tolist()[0]
+    candidates = [
+        a
+        for a in natural_language_annotations
+        if a.type_description == book_type_description
+    ]
     if not candidates:
         candidates = [body for body in world.bodies if has_book_in_prefix(body)]
 
@@ -114,9 +105,9 @@ def get_book_body_by_height(world: World, target_height: float, atol: float = 1e
         )
 
     exact_matches = [
-        body
-        for body in candidates
-        if np.isclose(get_body_height(body), target_height, atol=atol)
+        candidate.root
+        for candidate in candidates
+        if np.isclose(get_body_height(candidate.root), target_height, atol=atol)
     ]
 
     if len(exact_matches) == 1:
@@ -187,29 +178,7 @@ def test_loader_with_robot(rclpy_node, sage10k_scene, pr2_world_copy):
     except HTTPError as e:
         return "Sage10k dataset not available"
 
-    world = scene.create_world()
-
-    cup = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "..",
-            "pycram",
-            "resources",
-            "objects",
-            "jeroen_cup.stl",
-        )
-    ).parse()
-
-    with pr2_world.modify_world():
-        pr2_world.merge_world(world)
-        pr2_world.merge_world_at_pose(
-            cup,
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                4, 6.8, 0.87, reference_frame=world.root, yaw=np.pi / 2
-            ),
-        )
+    world = scene.create_world(type_name_cleaner=Sage10kTypeNameCleaner())
 
     VizMarkerPublisher(
         _world=pr2_world,
