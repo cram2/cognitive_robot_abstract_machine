@@ -25,6 +25,14 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 def _make_default_occupancy_costmap(context: Context, target: Pose) -> OccupancyCostmap:
+    """
+    Creates an occupancy cost map with the default parameters.
+
+    :param context: The context for which the map is created.
+    :param target: The target pose for the occupancy cost map.
+    :returns: A occupancy cost map with default parameters.
+
+    """
     ground_pose = deepcopy(target)
     ground_pose.z = 0
 
