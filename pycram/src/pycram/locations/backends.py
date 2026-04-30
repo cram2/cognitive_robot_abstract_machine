@@ -1,7 +1,7 @@
 from copy import deepcopy
 from dataclasses import dataclass
 
-from typing_extensions import List, Union
+from typing_extensions import List, Union, Iterable
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -33,16 +33,38 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 @dataclass
 class GiskardLocationBackend(PoseGeneratorBackend):
+    """
+    Pose generator backend that uses full-body control to steer the robot to a base pose from which the target should be
+    reachable.
+
+    .. warning:: This backend uses collision avoidance, so if you use the global_pose of a body instead of the body itself
+    the backend will fail because the collision avoidance will keep the gripper and body apart.
+    """
 
     target: Union[Pose, Body]
+    """
+    The target pose or body which should be reachable by the end effector 
+    """
 
     arm: Arms
+    """
+    Arm of the which should be used 
+    """
 
     grasp_description: GraspDescription
+    """
+    Grasp description of how to approach the target
+    """
 
     robot: AbstractRobot
+    """
+    Robot for which base poses should be found  
+    """
 
     world: World
+    """
+    The world in which to sample 
+    """
 
     def setup_costmap(self, pose: Pose) -> Costmap:
         """
@@ -169,13 +191,25 @@ class GiskardLocationBackend(PoseGeneratorBackend):
 
 @dataclass
 class GraspPoseGenerator(PoseGeneratorBackend):
+    """
+    A PoseGeneratorBackend that wraps another backend and creates GraspPoses from the samples poses of the backend.
+    """
 
     generator: PoseGeneratorBackend
+    """
+    Pose generator from which to sample
+    """
 
     arm: Arms
+    """
+    Arm that should be used for the GraspPose
+    """
 
     grasp_description: GraspDescription
+    """
+    Grasp Description that should be used for the GraspPose
+    """
 
-    def __iter__(self):
+    def __iter__(self) -> Iterable[GraspPose]:
         for pose_candidate in self.generator:
             yield pose_candidate

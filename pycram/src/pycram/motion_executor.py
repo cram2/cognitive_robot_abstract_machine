@@ -98,7 +98,7 @@ class MotionExecutor:
         executor.compile(self.motion_state_chart)
         # execute the motion state chart until it is done
         counter = 0
-        while counter < 2000:
+        while counter < len(self.motions) * 1000:
             if self.plan_node.is_interrupted:
                 return
             elif self.plan_node.is_paused:
