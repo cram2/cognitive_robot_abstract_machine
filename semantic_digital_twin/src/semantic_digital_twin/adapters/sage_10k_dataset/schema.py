@@ -958,7 +958,7 @@ class Sage10kScene(Sage10kWithID):
         """
         world = World()
 
-        root = Body(name=PrefixedName(name="root"))
+        root = Body(name=PrefixedName(name="map"))
 
         with world.modify_world():
             world.add_body(root)
