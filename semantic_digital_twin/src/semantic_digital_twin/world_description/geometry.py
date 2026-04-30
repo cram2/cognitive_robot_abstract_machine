@@ -87,6 +87,50 @@ class Color:
         return (self.R, self.G, self.B)
 
     @classmethod
+    def RED(self):
+        return Color(1, 0, 0)
+
+    @classmethod
+    def YELLOW(self):
+        return Color(1, 1, 0)
+
+    @classmethod
+    def GREEN(self):
+        return Color(0, 1, 0)
+
+    @classmethod
+    def CYAN(self):
+        return Color(0, 1, 1)
+
+    @classmethod
+    def BLUE(self):
+        return Color(0, 0, 1)
+
+    @classmethod
+    def MAGENTA(self):
+        return Color(1, 0, 1)
+
+    @classmethod
+    def WHITE(self):
+        return Color(1, 1, 1)
+
+    @classmethod
+    def BLACK(self):
+        return Color(0, 0, 0)
+
+    @classmethod
+    def GRAY(self):
+        return Color(0.498, 0.498, 0.498)
+
+    @classmethod
+    def BEIGE(self):
+        return Color(1, 0.827, 0.6078)
+
+    @classmethod
+    def ORANGE(self):
+        return Color(1, 0.647, 0)
+
+    @classmethod
     def from_list(cls, color: List[float]):
         """
         Set the rgba_color from a list of RGBA values.
@@ -541,6 +585,27 @@ class Mesh(Shape):
             shutil.rmtree(subdir, ignore_errors=True)
         except OSError:
             pass
+
+    @classmethod
+    def box(
+        cls,
+        extents: Tuple[float, float, float] = (1.0, 1.0, 1.0),
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        scale: Optional[Scale] = None,
+    ) -> "Mesh":
+        """
+        Create a box-shaped Mesh.
+
+        :param extents: Side lengths of the box along x, y, z.
+        :param origin: Origin of the mesh.
+        :param scale: Scale of the mesh.
+        :return: Mesh wrapping a box trimesh.
+        """
+        return cls.from_trimesh(
+            mesh=trimesh.creation.box(extents=extents),
+            origin=origin,
+            scale=scale,
+        )
 
     @classmethod
     def from_vertices_and_faces(

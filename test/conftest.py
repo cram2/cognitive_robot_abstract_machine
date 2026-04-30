@@ -1,17 +1,17 @@
-import gc
-import linecache
 import os
 import threading
 import time
-import tracemalloc
 from copy import deepcopy
-from functools import _lru_cache_wrapper
 
 import numpy as np
 import objgraph
 import pytest
 
-from pycram.datastructures.dataclasses import Context
+try:
+    from pycram.datastructures.dataclasses import Context
+except ModuleNotFoundError:
+    # ROS dependencies.
+    Context = None
 from semantic_digital_twin.adapters.package_resolver import PathResolver
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
@@ -24,8 +24,6 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.utils import recursive_subclasses
-
-# from pycram.datastructures.dataclasses import Context  # type: ignore
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -36,7 +34,8 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk, Table, Apple, Orange, Carrot, Lettuce, \
+    Banana
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.utils import rclpy_installed, tracy_installed
 from semantic_digital_twin.world import World
@@ -51,7 +50,7 @@ from semantic_digital_twin.world_description.geometry import (
     Box,
     Scale,
     Cylinder,
-    Sphere,
+    Sphere, Color,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import (
@@ -116,12 +115,8 @@ def cleanup_after_test():
 @pytest.fixture(autouse=True, scope="module")
 def count_worlds():
     yield
-    unreachable = gc.collect()
     world_in_mem = objgraph.count("World")
-    print(f"Number of worlds after test: {objgraph.count("World")}")
     if world_in_mem > 30:
-        print("Unreachable objects found:", unreachable)
-        print(f"Number of worlds after test: {objgraph.count("World")}")
         raise MemoryError(
             "Something is leaking worlds, there are more than 20 worlds in memory after the test"
         )
@@ -741,3 +736,118 @@ def rclpy_node():
 
         # Shut down the ROS client library
         rclpy.shutdown()
+
+
+@pytest.fixture(scope="session")
+def kitchen_environment_fixture():
+    world = World()
+    all_elements_connections = []
+    root = Body(name=PrefixedName("root"))
+
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        fruit_table = Table.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("fruit_table"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, z=0),
+            scale=Scale(2, 2, 1),
+        )
+
+        vegetable_table = Table.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("vegetable_table"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, z=2),
+            scale=Scale(2, 2, 1),
+        )
+
+        empty_table = Table.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("empty_table"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, z=4),
+            scale=Scale(2, 2, 1),
+        )
+
+        empty_table2 = Table.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("empty_table2"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, z=6),
+            scale=Scale(2, 2, 1),
+        )
+
+
+        apple = Apple.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("apple"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, z=0.55),
+            scale=Scale(0.10, 0.10, 0.10),
+        )
+        for color in apple.bodies[0].visual.shapes:
+            color.color = Color.RED()
+
+        orange = Orange.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("orange"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=0.5, z=0.55),
+            scale=Scale(0.10, 0.10, 0.10),
+        )
+        for color in orange.bodies[0].visual.shapes:
+            color.color = Color.ORANGE()
+
+        banana1 = Banana.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("banana1"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=0.6, z=0.75),
+            scale=Scale(0.10, 0.10, 0.60),
+        )
+        for color in banana1.bodies[0].visual.shapes:
+            color.color = Color.YELLOW()
+
+        carrot = Carrot.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("carrot"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, z=2.6),
+            scale=Scale(0.05, 0.05, 0.20),
+        )
+        for color in carrot.bodies[0].visual.shapes:
+            color.color = Color.ORANGE()
+
+        lettuce = Lettuce.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("lettuce"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1.5, z=2.55),
+            scale=Scale(0.15, 0.15, 0.10),
+        )
+        for color in lettuce.bodies[0].visual.shapes:
+            color.color = Color.GREEN()
+
+        banana = Banana.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("banana"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=10, y=10, z=10),
+            scale=Scale(0.20, 0.05, 0.05),
+        )
+        for color in banana.bodies[0].visual.shapes:
+            color.color = Color.YELLOW()
+
+
+    fake_robot = Cylinder(width=0.45, height=1.5)
+    shape_geometry = ShapeCollection([fake_robot])
+    fake_robot_body = Body(
+        name=PrefixedName("base_link_body"),
+        collision=shape_geometry,
+        visual=shape_geometry,
+    )
+
+    root_C_fake_robot = FixedConnection(
+        parent=root,
+        child=fake_robot_body,
+        parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(),
+    )
+    all_elements_connections.append(root_C_fake_robot)
+
+
+    with world.modify_world():
+        for conn in all_elements_connections:
+            world.add_connection(conn)
+
+    return world
