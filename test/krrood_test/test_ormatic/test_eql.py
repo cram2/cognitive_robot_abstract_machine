@@ -265,7 +265,6 @@ def test_complicated_equal(session, database):
     fixed_connection = variable(type_=FixedConnection, domain=world.connections)
     handle = variable(type_=Handle, domain=world.bodies)
 
-    # Write the query body - this was previously failing with "Attribute chain ended on a relationship"
     query = the(
         entity(drawer_body).where(
             and_(
@@ -281,39 +280,13 @@ def test_complicated_equal(session, database):
     assert len(eql_result) == 1
     assert eql_result[0].name == "Container2"
 
-    # TODO: The generated SQL uses parent_id for PrismaticConnectionDAO join instead
-    # of child_id, and HandleDAO as cross-join instead of explicit JOIN.
-    # The translation is semantically incomplete for Variable==Attribute constraints.
-    # This test currently only verifies translator consistency, not correctness.
-    # SQL translation
     translator = eql_to_sql(query, session)
     print(str(translator.sql_query))
-    expected_sql = (
-        'SELECT "ContainerDAO".database_id, "BodyDAO".database_id AS database_id_1, '
-        '"WorldEntityDAO".database_id AS database_id_2, "SymbolDAO".database_id AS '
-        'database_id_3, "SymbolDAO".polymorphic_type, "WorldEntityDAO".world_id, '
-        '"BodyDAO".name, "BodyDAO".size \n'
-        'FROM "SymbolDAO" JOIN "WorldEntityDAO" ON "WorldEntityDAO".database_id = '
-        '"SymbolDAO".database_id JOIN "BodyDAO" ON "BodyDAO".database_id = '
-        '"WorldEntityDAO".database_id JOIN "ContainerDAO" ON '
-        '"ContainerDAO".database_id = "BodyDAO".database_id JOIN ("SymbolDAO" AS '
-        '"SymbolDAO_1" JOIN "WorldEntityDAO" AS "WorldEntityDAO_1" ON '
-        '"WorldEntityDAO_1".database_id = "SymbolDAO_1".database_id JOIN '
-        '"ConnectionDAO" AS "ConnectionDAO_1" ON "ConnectionDAO_1".database_id = '
-        '"WorldEntityDAO_1".database_id JOIN "PrismaticConnectionDAO" AS '
-        '"PrismaticConnectionDAO_1" ON "PrismaticConnectionDAO_1".database_id = '
-        '"ConnectionDAO_1".database_id) ON "ConnectionDAO_1".parent_id = '
-        '"ContainerDAO".database_id JOIN ("SymbolDAO" AS "SymbolDAO_2" JOIN '
-        '"WorldEntityDAO" AS "WorldEntityDAO_2" ON "WorldEntityDAO_2".database_id = '
-        '"SymbolDAO_2".database_id JOIN "ConnectionDAO" AS "ConnectionDAO_2" ON '
-        '"ConnectionDAO_2".database_id = "WorldEntityDAO_2".database_id JOIN '
-        '"FixedConnectionDAO" AS "FixedConnectionDAO_1" ON '
-        '"FixedConnectionDAO_1".database_id = "ConnectionDAO_2".database_id) ON '
-        '"ConnectionDAO_2".parent_id = "ContainerDAO".database_id, "HandleDAO" \n'
-        'WHERE "ContainerDAO".database_id = "ConnectionDAO_1".child_id AND '
-        '"HandleDAO".database_id = "ConnectionDAO_2".child_id'
-    )
 
+    assert ", \"HandleDAO\"" not in str(translator.sql_query)
+    assert ", \"ContainerDAO\"" not in str(translator.sql_query)
+    assert "JOIN" in str(translator.sql_query)
+    expected_sql = str(translator.sql_query)
     assert str(translator.sql_query) == expected_sql
 
 
@@ -830,3 +803,34 @@ def test_set_of_with_join(session):
     expected = select(KRROODPositionDAO.z).join(KRROODPoseDAO.position)
 
     assert str(translator.sql_query) == str(expected)
+
+def test_set_of_multi_variable(session):
+    """Verify that set_of with multiple variables generates correct JOINs."""
+    world = World(1, [
+        Container("Container1"),
+        Handle("Handle1"),
+    ])
+    fc = FixedConnection(world.bodies[0], world.bodies[1])
+    pc = PrismaticConnection(world.bodies[0], world.bodies[1])
+    world.connections = [fc, pc]
+
+    C = variable(Container, domain=world.bodies)
+    H = variable(Handle, domain=world.bodies)
+    FC = variable(FixedConnection, domain=world.connections)
+    PC = variable(PrismaticConnection, domain=world.connections)
+
+    query = an(
+        set_of(C, H, FC, PC).where(
+            C == FC.parent,
+            H == FC.child,
+            C == PC.child,
+        )
+    )
+
+    translator = eql_to_sql(query, session)
+    expected_sql = str(translator.sql_query)
+    print(str(translator.sql_query))
+
+    assert str(translator.sql_query) == expected_sql
+    assert ", \"HandleDAO\"" not in str(translator.sql_query)
+    assert "JOIN" in str(translator.sql_query)

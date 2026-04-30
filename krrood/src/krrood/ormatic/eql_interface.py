@@ -452,31 +452,46 @@ class EQLTranslator:
             self.sql_query = self.sql_query.distinct()
 
     def _translate_set_of(self) -> None:
-        """Translate logic for set_of() queries — selects individual columns."""
-        first_var = self.select_like._selected_variables_[0]
-        if not isinstance(first_var, Attribute):
+        """
+        Translate logic for set_of() queries.
+
+        Supports two cases:
+        1. Attribute variables: set_of(b.size, b.name) → SELECT size, name FROM BodyDAO
+        2. Entity variables: set_of(C, H, FC, PC).where(...) → SELECT C.*, H.*, FC.*, PC.*
+        with JOINs derived from the WHERE conditions
+        """
+        selected = self.select_like._selected_variables_
+
+        all_attributes = all(isinstance(v, Attribute) for v in selected)
+        all_variables = all(isinstance(v, Variable) and not isinstance(v, Attribute)
+                            for v in selected)
+
+        if all_attributes:
+            resolver = AttributeChainResolver()
+            base_dao = resolver.extract_base_dao(selected[0])
+            if base_dao is None:
+                raise MissingDAOError(f"No DAO class found for {selected[0]}")
+
+            self.sql_query = select(base_dao)
+            columns = [self.translate_attribute(var) for var in selected]
+            self.sql_query = self.sql_query.with_only_columns(*columns)
+
+        elif all_variables:
+            dao_classes = []
+            for var in selected:
+                dao_class = get_dao_class(var._type_)
+                if dao_class is None:
+                    raise MissingDAOError(
+                        f"No DAO class found for {var._type_}"
+                    )
+                dao_classes.append(dao_class)
+
+            self.sql_query = select(*dao_classes)
+
+        else:
             raise UnsupportedQueryTypeError(
-                f"set_of() only supports Attribute variables, got {type(first_var)}"
+                "set_of() must contain either all Attribute or all Variable expressions"
             )
-
-        resolver = AttributeChainResolver()
-        base_dao = resolver.extract_base_dao(first_var)
-        if base_dao is None:
-            raise MissingDAOError(
-                f"No DAO class found for {first_var}"
-            )
-
-        self.sql_query = select(base_dao)
-        columns = []
-        for var in self.select_like._selected_variables_:
-            if isinstance(var, Attribute):
-                col = self.translate_attribute(var)
-                columns.append(col)
-            else:
-                raise UnsupportedQueryTypeError(
-                    f"set_of() only supports Attribute variables, got {type(var)}"
-                )
-        self.sql_query = self.sql_query.with_only_columns(*columns)
 
         self._apply_where()
         self._apply_order_by()
@@ -728,6 +743,11 @@ class EQLTranslator:
                 self.sql_query = self.sql_query.join(attr_dao, onclause=onclause)
                 self.join_manager.add_table_join(attr_dao)
                 return True
+            elif not self.join_manager.is_table_joined(var_dao):
+                onclause = fk == var_dao.database_id
+                self.sql_query = self.sql_query.join(var_dao, onclause=onclause)
+                self.join_manager.add_table_join(var_dao)
+                return True
             else:
                 # Table already joined — add as WHERE condition instead
                 return None
@@ -753,14 +773,21 @@ class EQLTranslator:
         if left_rel is None or right_rel is None:
             return None
 
-        anchor_dao = get_dao_class(self.select_like.selected_variable._type_)
-        if anchor_dao is None:
-            raise MissingDAOError("Selected variable has no DAO class")
-
-        if left_dao is anchor_dao:
-            target_dao, target_fk, anchor_fk = right_dao, right_fk, left_fk
+        if isinstance(self.select_like, Entity):
+            anchor_dao = get_dao_class(self.select_like.selected_variable._type_)
+            if anchor_dao is None:
+                raise MissingDAOError("Selected variable has no DAO class")
+            if left_dao is anchor_dao:
+                target_dao, target_fk, anchor_fk = right_dao, right_fk, left_fk
+            else:
+                target_dao, target_fk, anchor_fk = left_dao, left_fk, right_fk
         else:
-            target_dao, target_fk, anchor_fk = left_dao, left_fk, right_fk
+            if not self.join_manager.is_table_joined(left_dao):
+                target_dao, target_fk, anchor_fk = left_dao, left_fk, right_fk
+            elif not self.join_manager.is_table_joined(right_dao):
+                target_dao, target_fk, anchor_fk = right_dao, right_fk, left_fk
+            else:
+                return None
 
         if not self.join_manager.is_table_joined(target_dao):
             onclause = target_fk == anchor_fk
