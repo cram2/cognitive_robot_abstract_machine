@@ -16,7 +16,6 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
 
-
 logger = logging.getLogger(__name__)
 
 try:
@@ -36,14 +35,7 @@ def setup_world() -> World:
         "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     ).parse()
     apartment_world = URDFParser.from_file(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "resources",
-            "worlds",
-            "apartment.urdf",
-        )
+        "package://iai_apartment/urdf/apartment.urdf"
     ).parse()
     milk_world = STLParser(
         os.path.join(

@@ -1,3 +1,4 @@
+import os
 import threading
 
 import rclpy
@@ -59,15 +60,15 @@ executor.add_node(node)
 thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
 thread.start()
 
-exec_type = ExecutionType.REAL
+exec_type = ExecutionType.SIMULATED
 
 exec_env = ExecutionEnvironment(exec_type)
 
 if exec_type == ExecutionType.SIMULATED:
-    stretch_paerse = URDFParser.from_file(
-        "/home/stretch/cognitive_robot_abstract_machine/pycram/resources/robots/stretch_description.urdf"
+    stretch_parse = URDFParser.from_file(
+        "package://stretch_description/urdf/stretch_description_RE2V0_tool_stretch_dex_wrist.xacro"
     )
-    world = stretch_paerse.parse()
+    world = stretch_parse.parse()
     Stretch.from_world(world)
     with world.modify_world():
 
@@ -115,7 +116,14 @@ if not world.is_entity_in_world_by_name("breakfast_cereal.stl"):
         )
 
         cereal = STLParser(
-            "/home/stretch/cognitive_robot_abstract_machine/pycram/resources/objects/breakfast_cereal.stl"
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "resources",
+                "objects",
+                "breakfast_cereal.stl",
+            )
         ).parse()
         world.merge_world(
             cereal,
@@ -142,7 +150,7 @@ grasp_desc = GraspDescription(
     robot_annotation.arm.manipulator,
 )
 
-input("Ready ...")
+# input("Ready ...")
 
 plan = sequential(
     [
