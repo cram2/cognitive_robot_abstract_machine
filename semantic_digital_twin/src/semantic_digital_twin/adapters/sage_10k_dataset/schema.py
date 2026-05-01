@@ -15,6 +15,7 @@ from krrood.utils import get_full_class_name
 from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
     Sage10kTypeNameCleaner,
     NaturalLanguageDescriptionWithTypeDescription,
+    RoomWithWallsAndDoors,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.natural_language import (
@@ -26,6 +27,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
     Handle,
     Hinge,
+    Room,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
@@ -818,20 +820,25 @@ class Sage10kRoom(Sage10kWithID):
         parent: KinematicStructureEntity,
         **kwargs,
     ) -> Body:
-        self._create_floor(world, directory, parent)
+        floor_annotation = self._create_floor(world, directory, parent)
 
-        # create walls
+        walls_of_room = []
+        doors_of_room = []
+
         for wall in self.walls:
             wall_annotation = wall.create_in_world(world, directory, parent)
+            walls_of_room.append(wall_annotation)
             doors_of_this_wall = [
                 door for door in self.doors if door.wall_id == wall.id
             ]  # join doors on this wall
 
             # create doors
-            for door in doors_of_this_wall:
+            doors_of_room += [
                 door.create_in_world(
                     world, directory, wall_annotation.root, wall, wall_annotation
                 )
+                for door in doors_of_this_wall
+            ]
 
             # After all doors are added and the mesh is modified, re-project UVs and set texture
             wall_length, _ = wall.wall_length_and_yaw
@@ -858,6 +865,16 @@ class Sage10kRoom(Sage10kWithID):
             )
             body.collision = geometry_with_texture
             body.visual = geometry_with_texture
+
+        room_annotation = RoomWithWallsAndDoors(
+            floor=floor_annotation,
+            walls=walls_of_room,
+            doors=doors_of_room,
+            room_type=self.room_type,
+        )
+
+        with world.modify_world():
+            world.add_annotation(room_annotation)
 
         # create the objects
         for sage_object in self.objects:

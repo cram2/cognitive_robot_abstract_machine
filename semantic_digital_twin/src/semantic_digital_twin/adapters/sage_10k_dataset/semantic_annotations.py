@@ -4,12 +4,17 @@ import logging
 from dataclasses import dataclass, field
 from enum import StrEnum
 from itertools import takewhile
-from typing import Optional
+from typing import Optional, List
 
 import enchant
 
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageDescription,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Room,
+    Wall,
+    Door,
 )
 
 logger = logging.getLogger(__name__)
@@ -212,3 +217,22 @@ class Sage10kNonShittyScenes(StrEnum):
     SOUTHWESTERN_STORE = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_123747_layout_2d89d0a5.zip"
     BRUTALIST_STORE = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_153933_layout_50ffb500.zip"
     AMERICAN_BUFFET_RESTAURANT = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_172548_layout_edf26267.zip"
+
+
+@dataclass(eq=False)
+class RoomWithWallsAndDoors(Room):
+
+    room_type: Optional[str] = field(kw_only=True, default=None)
+    """
+    Description of the type of the room in natural language.
+    """
+
+    walls: List[Wall] = field(kw_only=True, default_factory=list)
+    """
+    The walls enclosing this room.
+    """
+
+    doors: List[Door] = field(kw_only=True, default_factory=list)
+    """
+    The doors of the room.
+    """
