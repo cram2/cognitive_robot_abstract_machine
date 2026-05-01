@@ -669,7 +669,7 @@ class Sage10kDoor(Sage10kWithID):
         """
         door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
             y=0.1,
-            yaw=0 if self.opens_inward else np.pi,
+            yaw=np.pi if self.opens_inward else 0.0,
             reference_frame=door.root,
         )
         world_root_T_handle = world.transform(door_T_handle, world.root)
