@@ -10,12 +10,6 @@ from sqlalchemy.orm import Session
 from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
     Sage10kTypeNameCleaner,
 )
-from semantic_digital_twin.orm.ormatic_interface import (
-    Sage10kSceneDAO,
-    Sage10kSceneDAO_rooms_association,
-    Sage10kRoomDAO,
-    Sage10kObjectDAO,
-)
 
 
 @dataclass
@@ -37,6 +31,13 @@ class SceneObjectTypeHistogram:
         :param session: The SQLAlchemy session to use for querying.
         :return: A SceneObjectTypeHistogram instance.
         """
+        from semantic_digital_twin.orm.ormatic_interface import (
+            Sage10kSceneDAO,
+            Sage10kSceneDAO_rooms_association,
+            Sage10kRoomDAO,
+            Sage10kObjectDAO,
+        )
+
         instance = cls()
 
         query = (

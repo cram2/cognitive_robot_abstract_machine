@@ -236,3 +236,8 @@ class RoomWithWallsAndDoors(Room):
     """
     The doors of the room.
     """
+
+
+@dataclass(eq=False)
+class DoorWithType(Door):
+    type_description: Optional[str] = field(kw_only=True, default=None)

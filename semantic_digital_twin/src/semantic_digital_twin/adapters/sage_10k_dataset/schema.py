@@ -16,6 +16,7 @@ from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import
     Sage10kTypeNameCleaner,
     NaturalLanguageDescriptionWithTypeDescription,
     RoomWithWallsAndDoors,
+    DoorWithType,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.natural_language import (
@@ -619,12 +620,13 @@ class Sage10kDoor(Sage10kWithID):
         world_root_T_self = world.transform(parent_T_body, world.root)
 
         with world.modify_world():
-            annotation = Door.create_with_new_body_in_world(
+            annotation = DoorWithType.create_with_new_body_in_world(
                 name=name,
                 scale=scale,
                 world=world,
                 world_root_T_self=world_root_T_self,
             )
+            annotation.type_description = self.door_type
 
         body = annotation.root
         door_mesh = body.collision.combined_mesh
@@ -666,7 +668,8 @@ class Sage10kDoor(Sage10kWithID):
         :return: The handle of the door.
         """
         door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
-            y=0.1 if self.opens_inward else -0.1,
+            y=0.1,
+            yaw=0 if self.opens_inward else np.pi,
             reference_frame=door.root,
         )
         world_root_T_handle = world.transform(door_T_handle, world.root)
@@ -874,7 +877,7 @@ class Sage10kRoom(Sage10kWithID):
         )
 
         with world.modify_world():
-            world.add_annotation(room_annotation)
+            world.add_semantic_annotation(room_annotation)
 
         # create the objects
         for sage_object in self.objects:
