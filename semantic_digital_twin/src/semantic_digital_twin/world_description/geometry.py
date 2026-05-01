@@ -420,9 +420,12 @@ class Mesh(Shape):
         origin = from_json(data["origin"], **kwargs)
         scale = from_json(data["scale"], **kwargs)
         file_type = data["file_type"]
-        return cls.from_trimesh(
+        color = from_json(data["color"], **kwargs)
+        instance = cls.from_trimesh(
             mesh=mesh, origin=origin, scale=scale, file_type=file_type
         )
+        instance.color = color
+        return instance
 
     @classmethod
     def add_uv(cls, mesh: trimesh.Trimesh, uv: np.ndarray) -> trimesh.Trimesh:
@@ -467,7 +470,8 @@ class Mesh(Shape):
         """
         mesh = trimesh.load_mesh(self.filename)
         mesh.apply_scale(self.scale.to_np())
-        mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
+        if not isinstance(mesh.visual, TextureVisuals):
+            mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
         return mesh
 
     @classmethod
@@ -585,6 +589,27 @@ class Mesh(Shape):
             shutil.rmtree(subdir, ignore_errors=True)
         except OSError:
             pass
+
+    @classmethod
+    def box(
+        cls,
+        extents: Tuple[float, float, float] = (1.0, 1.0, 1.0),
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        scale: Optional[Scale] = None,
+    ) -> "Mesh":
+        """
+        Create a box-shaped Mesh.
+
+        :param extents: Side lengths of the box along x, y, z.
+        :param origin: Origin of the mesh.
+        :param scale: Scale of the mesh.
+        :return: Mesh wrapping a box trimesh.
+        """
+        return cls.from_trimesh(
+            mesh=trimesh.creation.box(extents=extents),
+            origin=origin,
+            scale=scale,
+        )
 
     @classmethod
     def from_vertices_and_faces(

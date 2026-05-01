@@ -413,7 +413,6 @@ class Sage10kObject(Sage10kWithID):
         world: World,
         directory: Path,
         parent: KinematicStructureEntity,
-        type_name_cleaner: Sage10kTypeNameCleaner,
         **kwargs,
     ) -> Body:
         ply_file = directory / "objects" / f"{self.source_id}.ply"
@@ -460,16 +459,10 @@ class Sage10kObject(Sage10kWithID):
             world.add_body(body)
             world.add_connection(root_C_body)
 
-        # create semantic annotation if it exists
-        cleaned_type = type_name_cleaner.clean(self.type)
-        if not cleaned_type:
-            annotation = NaturalLanguageDescription(
-                root=body, description=self.description
-            )
-        else:
-            annotation = NaturalLanguageDescriptionWithTypeDescription(
-                root=body, description=self.description, type_description=cleaned_type
-            )
+        # create semantic annotation
+        annotation = NaturalLanguageDescriptionWithTypeDescription(
+            root=body, description=self.description, type_description=self.type
+        )
 
         with world.modify_world():
             world.add_semantic_annotation(annotation)
@@ -534,7 +527,7 @@ class Sage10kDoor(Sage10kWithID):
 
     position_on_wall: float
     """
-    Position on wall w. r. t. its starting point in meters?
+    Position on wall w. r. t. its starting point as percentage of the wall length.
     """
 
     width: float
@@ -617,7 +610,7 @@ class Sage10kDoor(Sage10kWithID):
         wall_length, _ = sage_10k_wall.wall_length_and_yaw
 
         parent_T_body = HomogeneousTransformationMatrix.from_xyz_rpy(
-            y=-self.position_on_wall,
+            y=-wall_length / 2 + (self.position_on_wall * wall_length),
             z=self.height / 2,
             reference_frame=parent,
         )
@@ -671,7 +664,7 @@ class Sage10kDoor(Sage10kWithID):
         :return: The handle of the door.
         """
         door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
-            y=0.1,
+            y=0.1 if self.opens_inward else -0.1,
             reference_frame=door.root,
         )
         world_root_T_handle = world.transform(door_T_handle, world.root)
@@ -823,7 +816,6 @@ class Sage10kRoom(Sage10kWithID):
         world: World,
         directory: Path,
         parent: KinematicStructureEntity,
-        type_name_cleaner: Sage10kTypeNameCleaner,
         **kwargs,
     ) -> Body:
         self._create_floor(world, directory, parent)
@@ -869,9 +861,7 @@ class Sage10kRoom(Sage10kWithID):
 
         # create the objects
         for sage_object in self.objects:
-            sage_object.create_in_world(
-                world, directory, parent=parent, type_name_cleaner=type_name_cleaner
-            )
+            sage_object.create_in_world(world, directory, parent=parent)
 
         return world.root
 
@@ -962,14 +952,13 @@ class Sage10kScene(Sage10kWithID):
             rooms=[Sage10kRoom._from_json(r, **kwargs) for r in data["rooms"]],
         )
 
-    def create_world(self, type_name_cleaner: Sage10kTypeNameCleaner) -> World:
+    def create_world(self) -> World:
         """
-        :param type_name_cleaner: This is used to assign the semantic annotations to the bodies.
         :return: The semantically annotated world.
         """
         world = World()
 
-        root = Body(name=PrefixedName(name="root"))
+        root = Body(name=PrefixedName(name="map"))
 
         with world.modify_world():
             world.add_body(root)
@@ -979,7 +968,6 @@ class Sage10kScene(Sage10kWithID):
                 world=world,
                 directory=self.directory,
                 parent=root,
-                type_name_cleaner=type_name_cleaner,
             )
 
         return world
