@@ -45,6 +45,7 @@ from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
     Region,
 )
+from semantic_digital_twin.world_description.world_modification import synchronized_attribute_modification
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
@@ -71,6 +72,7 @@ class SemanticRobotAnnotation(RootedSemanticAnnotation, ABC):
         if self._world is not None:
             self._world.add_semantic_annotation(self)
 
+    @synchronized_attribute_modification
     def add_joint_state(self, joint_state: JointState):
         """
         Adds a joint state to this semantic annotation.

@@ -147,7 +147,7 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             _world=self._world,
         )
 
-        self.add_kinematic_chain(neck)
+        self.add_neck(neck)
 
     def _setup_collision_rules(self):
         srdf_path = os.path.join(
@@ -226,7 +226,7 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                         for c in self.right_arm.connections
                         if type(c) != FixedConnection
                     ],
-                    [3.72, -2.07, -1.17, 4.0, 0.82, 0.75],
+                    [3.72, -2.07, -0.9, 4.0, 0.82, 0.75],
                 )
             ),
             state_type=StaticJointState.PARK,

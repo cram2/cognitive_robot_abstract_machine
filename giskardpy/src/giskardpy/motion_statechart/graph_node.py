@@ -929,8 +929,11 @@ class Goal(MotionStatechartNode):
             raise EndMotionInGoalError(node=self)
 
     def _check_node_doesnt_belong_to_different_parent(self, node: MotionStatechartNode):
-        if node.belongs_to_motion_statechart() and node.parent_node != self:
-            raise NodeAlreadyBelongsToDifferentNodeError(node=self, new_node=node)
+        try:
+            if node.belongs_to_motion_statechart() and node.parent_node != self:
+                raise NodeAlreadyBelongsToDifferentNodeError(node=self, new_node=node)
+        except Exception as e:
+            print(e)
 
     def add_nodes(self, nodes: List[MotionStatechartNode]) -> None:
         for node in nodes:

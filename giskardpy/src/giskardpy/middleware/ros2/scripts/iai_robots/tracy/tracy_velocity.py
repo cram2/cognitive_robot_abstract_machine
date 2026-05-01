@@ -18,10 +18,15 @@ def main():
             namespace="", parameters=[("robot_description", Parameter.Type.STRING)]
         )
         robot_description = rospy.node.get_parameter_or("robot_description").value
+        if robot_description is None:
+            robot_description = load_xacro(
+                "package://iai_tracy_description/urdf/tracy.urdf.xacro"
+            )
     except ParameterUninitializedException as e:
         robot_description = load_xacro(
             "package://iai_tracy_description/urdf/tracy.urdf.xacro"
         )
+
     giskard = Giskard(
         world_config=WorldWithTracyConfig(urdf=robot_description),
         robot_interface_config=TracyVelocityInterface(),
