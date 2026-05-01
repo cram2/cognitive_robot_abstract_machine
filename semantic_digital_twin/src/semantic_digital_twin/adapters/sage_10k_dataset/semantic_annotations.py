@@ -229,10 +229,33 @@ class Sage10kNonShittyScenesDemoConfig:
     """
 
     scene_url: str
+    """
+    The URL of the scene to use for the demo.
+    """
+
     world_P_object_of_interest: Point3
+    """
+    Approximate position of the object we want to pick up. Must be within 10cm euclidian distance of the actual object,
+    and no other object is allowed to be within that radius. If thats a problem to do, chose another object.
+    Use the "publish point" functionality in RVIZ to to get the coordinates: click the button, hover over the center of 
+    the object you want to grasp, and read the coordinates from the bottom left of RViz, right next to the reset button. 
+    """
+
     pickup_navigation_pose: Pose
+    """
+    Nav pose from where we want to pick up
+    """
+
     place_pose: Pose
+    """
+    Pose where we want to place the object. also get this from RViz using publish point on the surface.
+    Do not add any object height here, it will be added automatically.
+    """
+
     place_navigation_pose: Pose
+    """
+    Nav pose from where we want to place the object
+    """
 
     @classmethod
     def GYM(cls):
