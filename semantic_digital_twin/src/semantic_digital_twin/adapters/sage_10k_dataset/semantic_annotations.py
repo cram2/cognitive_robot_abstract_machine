@@ -3,13 +3,18 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from itertools import takewhile
-from typing import Optional
+from typing import Optional, List
 
 import enchant
 import numpy as np
 
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageDescription,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Room,
+    Wall,
+    Door,
 )
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -216,13 +221,6 @@ class Sage10kNonShittyScenes(StrEnum):
     AMERICAN_BUFFET_RESTAURANT = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_172548_layout_edf26267.zip"
 
 
-# class Sage10kNoneShittyScenesDemoConfig(Enum):
-#     """
-#     Configuration for the Sage10k non-shitty scenes demo.
-#     Is a Tuple of (scene_url, world_P_object_of_interest, pickup_navigation_pose, place_pose, place_navigation_pose)
-#     """
-
-
 @dataclass
 class Sage10kNonShittyScenesDemoConfig:
     """
@@ -248,3 +246,27 @@ class Sage10kNonShittyScenesDemoConfig:
 
 
 sage_10k_non_shitty_scenes_demo_configs = [Sage10kNonShittyScenesDemoConfig.GYM()]
+
+
+@dataclass(eq=False)
+class RoomWithWallsAndDoors(Room):
+
+    room_type: Optional[str] = field(kw_only=True, default=None)
+    """
+    Description of the type of the room in natural language.
+    """
+
+    walls: List[Wall] = field(kw_only=True, default_factory=list)
+    """
+    The walls enclosing this room.
+    """
+
+    doors: List[Door] = field(kw_only=True, default_factory=list)
+    """
+    The doors of the room.
+    """
+
+
+@dataclass(eq=False)
+class DoorWithType(Door):
+    type_description: Optional[str] = field(kw_only=True, default=None)

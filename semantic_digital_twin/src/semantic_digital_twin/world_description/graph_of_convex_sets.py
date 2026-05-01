@@ -14,7 +14,7 @@ from sortedcontainers import SortedSet
 from typing_extensions import List, Optional, Dict, Sequence
 from typing_extensions import Self
 
-from random_events.interval import reals, Interval, SimpleInterval
+from random_events.interval import reals, Interval, SimpleInterval, closed
 from random_events.product_algebra import Event
 from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
@@ -28,6 +28,7 @@ from semantic_digital_twin.world_description.shape_collection import (
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     SemanticEnvironmentAnnotation,
+    Body,
 )
 
 logger = logging.getLogger(__name__)
@@ -182,10 +183,8 @@ class GraphOfConvexSets:
         Plot the free space of the environment in blue.
         :return: A list of traces that can be put into a plotly figure.
         """
-        free_space = Event.from_simple_sets(
-            *[node.simple_event for node in self.graph.nodes()]
-        )
-        return free_space.plot(color="blue")
+
+        return self.free_space_event.plot(color="blue")
 
     def plot_and_show_free_space(self) -> None:
         import plotly.graph_objects as go
@@ -620,6 +619,12 @@ class GraphOfConvexSets:
             bloat_obstacles=bloat_obstacles,
         )
 
+    @property
+    def free_space_event(self) -> Event:
+        return Event.from_simple_sets(
+            *[node.simple_event for node in self.graph.nodes()]
+        )
+
 
 def translate_event_to(
     event: Event,
@@ -655,3 +660,43 @@ def translate_event_to(
             )
         results.append(SimpleEvent.from_data(data))
     return Event.from_simple_sets(*results)
+
+
+def navigation_map_at_target(
+    target: Body,
+    search_range_x: float = 2.0,
+    search_range_y: float = 2.0,
+    max_height: float = 2.0,
+) -> GraphOfConvexSets:
+    """
+    Create a navigation map around the target.
+    The navigation map is a Graph of Convex Sets that represents the navigable space around the target.
+    The search space is constructed as a box around the target with the specified search ranges in the x and y directions.
+
+    :param target: The target around which the navigation map is created.
+    :param search_range_x: The search range in the x-direction.
+    :param search_range_y: The search range in the y-direction.
+    :param max_height: The maximum height of the navigation map from the floor.
+    :return: The navigation map as a Graph of Convex Sets.
+    """
+    search_space = BoundingBoxCollection.from_simple_event(
+        reference_frame=target,
+        simple_event=SimpleEvent.from_data(
+            {
+                SpatialVariables.x.value: closed(
+                    -search_range_x / 2, search_range_x / 2
+                ),
+                SpatialVariables.y.value: closed(
+                    -search_range_y / 2, search_range_y / 2
+                ),
+                SpatialVariables.z.value: closed(
+                    -target.global_pose.z, max_height - target.global_pose.z
+                ),
+            }
+        ),
+    )
+
+    gcs = GraphOfConvexSets.navigation_map_from_world(
+        world=target._world, search_space=search_space, bloat_obstacles=0.1
+    )
+    return gcs
