@@ -23,6 +23,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     IsPerceivable,
     HasRootBody,
     HasStorageSpace,
+    HasShelfLayers,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
@@ -825,7 +826,14 @@ class Armchair(Chair):
 
 
 @dataclass(eq=False)
-class ShelvingUnit(Furniture):
+class ShelfLayer(HasSupportingSurface):
+    """
+    A horizontal surface used for storing objects, typically found inside cabinets or on walls.
+    """
+
+
+@dataclass(eq=False)
+class Shelf(Cabinet, HasShelfLayers):
     """
     A shelving unit.
     """
