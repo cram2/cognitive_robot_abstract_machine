@@ -1,4 +1,6 @@
+from copy import deepcopy
 from datetime import datetime
+from types import EllipsisType
 
 import pytest
 from sqlalchemy.orm import sessionmaker
@@ -9,6 +11,7 @@ from krrood.entity_query_language.backends import (
     ProbabilisticBackend,
     EntityQueryLanguageBackend,
 )
+from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.factories import (
     variable,
     entity,
@@ -18,21 +21,25 @@ from krrood.entity_query_language.factories import (
 )
 from krrood.entity_query_language.query_graph import QueryGraph
 from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.entity_query_language.core.variable import Variable as KRROODVariable
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
+from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import ApproachDirection
 from pycram.datastructures.grasp import GraspDescription
 from pycram.robot_plans.actions.composite.transporting import MoveAndPickUpAction
 from pycram.robot_plans.actions.core.misc import MoveToReach
-from random_events.interval import Interval, reals
+from random_events.interval import Interval, reals, singleton
 from random_events.set import Set
-from random_events.variable import Symbolic
+from random_events.variable import Symbolic, Variable
 from semantic_digital_twin.orm.model import (
     PoseMapping,
     Point3Mapping,
     QuaternionMapping,
 )
+from semantic_digital_twin.robots.abstract_robot import Manipulator
+from semantic_digital_twin.robots.pr2 import PR2
 from ..dataset.example_classes import (
     KRROODPose,
     KRROODPosition,
@@ -41,6 +48,79 @@ from ..dataset.example_classes import (
     Element,
 )
 from ..dataset.ormatic_interface import *  # type: ignore
+from ..test_ripple_down_rules.test_results.datasets_physical_object_is_a_robot import (
+    physical_object_is_a_robot_output__scrdr,
+)
+
+
+@pytest.fixture(scope="function")
+def mutable_model_world(pr2_apartment_world):
+    world = deepcopy(pr2_apartment_world)
+    pr2 = PR2.from_world(world)
+    return world, pr2, Context(world, pr2)
+
+
+def test_nested_action(mutable_model_world):
+    world, robot_view, context = mutable_model_world
+    milk = world.get_body_by_name("milk.stl")
+
+    milk_variable = variable_from([milk])
+
+    manipulation_offset = 0.05
+    prob_q = underspecified(MoveAndPickUpAction)(
+        keep_joint_states=...,
+        standing_position=underspecified(
+            PoseMapping.from_point_mapping_quaternion_mapping
+        )(
+            position=underspecified(Point3Mapping)(
+                x=..., y=..., z=..., reference_frame=None
+            ),
+            orientation=underspecified(QuaternionMapping)(
+                x=..., y=..., z=..., w=..., reference_frame=None
+            ),
+            reference_frame=variable_from([robot_view.root]),
+        ),
+        object_designator=milk_variable,
+        arm=...,
+        grasp_description=underspecified(GraspDescription)(
+            approach_direction=...,
+            vertical_alignment=...,
+            rotate_gripper=...,
+            manipulation_offset=manipulation_offset,
+            manipulator=variable(Manipulator, world.semantic_annotations),
+        ),
+    )
+    parameters = UnderspecifiedParameters(prob_q)
+    variables = parameters.variables
+    names_of_actual_specified_parameters = [
+        match.name_from_variable_access_path
+        for match in parameters.statement.matches_with_variables
+        if (
+            isinstance(match.assigned_variable, Literal)
+            or isinstance(match.assigned_variable, KRROODVariable)
+        )
+        and not isinstance(match.assigned_value, EllipsisType)
+        and not match.assigned_value is None
+    ]
+    random_events_names = [
+        name
+        for name, variable in variables.items()
+        if isinstance(variable, Symbolic)
+        and name in names_of_actual_specified_parameters
+    ]
+
+    assert names_of_actual_specified_parameters == [
+        "MoveAndPickUpAction.object_designator",
+        "MoveAndPickUpAction.standing_position.reference_frame",
+        "MoveAndPickUpAction.grasp_description.manipulation_offset",
+        "MoveAndPickUpAction.grasp_description.manipulator",
+    ]
+    assert (
+        variables[
+            "MoveAndPickUpAction.grasp_description.manipulation_offset"
+        ].domain.simple_sets
+        == singleton(manipulation_offset).simple_sets
+    )
 
 
 def test_selective_query_multiple_backends(session, database):

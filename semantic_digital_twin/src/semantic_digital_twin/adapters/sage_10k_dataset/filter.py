@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -10,12 +10,14 @@ from sqlalchemy.orm import Session
 from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
     Sage10kTypeNameCleaner,
 )
-from semantic_digital_twin.orm.ormatic_interface import (
-    Sage10kSceneDAO,
-    Sage10kSceneDAO_rooms_association,
-    Sage10kRoomDAO,
-    Sage10kObjectDAO,
-)
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.orm.ormatic_interface import (
+        Sage10kSceneDAO,
+        Sage10kSceneDAO_rooms_association,
+        Sage10kRoomDAO,
+        Sage10kObjectDAO,
+    )
 
 
 @dataclass

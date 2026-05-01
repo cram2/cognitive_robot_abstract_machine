@@ -20,6 +20,7 @@ import enum
 import krrood.adapters.json_serializer
 import krrood.ormatic.custom_types
 import krrood.ormatic.type_dict
+import semantic_digital_twin.adapters.sage_10k_dataset.filter
 import semantic_digital_twin.adapters.sage_10k_dataset.loader
 import semantic_digital_twin.adapters.sage_10k_dataset.schema
 import semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations
@@ -4009,6 +4010,33 @@ class ScaleDAO(
     z: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
+class SceneObjectTypeHistogramDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.sage_10k_dataset.filter.SceneObjectTypeHistogram
+    ],
+):
+
+    __tablename__ = "SceneObjectTypeHistogramDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    cleaner_id: Mapped[int] = mapped_column(
+        ForeignKey("Sage10kTypeNameCleanerDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    cleaner: Mapped[Sage10kTypeNameCleanerDAO] = relationship(
+        "Sage10kTypeNameCleanerDAO",
+        uselist=False,
+        foreign_keys=[cleaner_id],
+        post_update=True,
+    )
+
+
 class SelfCollisionMatrixRuleDAO(
     AllowCollisionRuleDAO,
     DataAccessObject[
@@ -5421,7 +5449,7 @@ class ViewDependentSpatialRelationDAO(
         use_existing_column=True
     )
 
-    point_of_semantic_annotation_id: Mapped[int] = mapped_column(
+    point_of_view_id: Mapped[int] = mapped_column(
         ForeignKey(
             "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
         ),
@@ -5429,13 +5457,11 @@ class ViewDependentSpatialRelationDAO(
         use_existing_column=True,
     )
 
-    point_of_semantic_annotation: Mapped[HomogeneousTransformationMatrixMappingDAO] = (
-        relationship(
-            "HomogeneousTransformationMatrixMappingDAO",
-            uselist=False,
-            foreign_keys=[point_of_semantic_annotation_id],
-            post_update=True,
-        )
+    point_of_view: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
+        "HomogeneousTransformationMatrixMappingDAO",
+        uselist=False,
+        foreign_keys=[point_of_view_id],
+        post_update=True,
     )
 
     __mapper_args__ = {
