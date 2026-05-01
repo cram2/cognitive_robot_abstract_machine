@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import StrEnum
 from itertools import takewhile
 from typing import Optional
 
 import enchant
+import numpy as np
 
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageDescription,
 )
+from semantic_digital_twin.spatial_types import Point3
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 logger = logging.getLogger(__name__)
 
@@ -212,3 +214,37 @@ class Sage10kNonShittyScenes(StrEnum):
     SOUTHWESTERN_STORE = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_123747_layout_2d89d0a5.zip"
     BRUTALIST_STORE = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_153933_layout_50ffb500.zip"
     AMERICAN_BUFFET_RESTAURANT = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_172548_layout_edf26267.zip"
+
+
+# class Sage10kNoneShittyScenesDemoConfig(Enum):
+#     """
+#     Configuration for the Sage10k non-shitty scenes demo.
+#     Is a Tuple of (scene_url, world_P_object_of_interest, pickup_navigation_pose, place_pose, place_navigation_pose)
+#     """
+
+
+@dataclass
+class Sage10kNonShittyScenesDemoConfig:
+    """
+    Configuration for the Sage10k non-shitty scenes demo.
+    Is a Tuple of (scene_url, world_P_object_of_interest, pickup_navigation_pose, place_pose, place_navigation_pose)
+    """
+
+    scene_url: str
+    world_P_object_of_interest: Point3
+    pickup_navigation_pose: Pose
+    place_pose: Pose
+    place_navigation_pose: Pose
+
+    @classmethod
+    def GYM(cls):
+        return cls(
+            scene_url=Sage10kNonShittyScenes.GYM,
+            world_P_object_of_interest=Point3(1.03, -0.716, 0.203),
+            pickup_navigation_pose=Pose.from_xyz_rpy(0.94, 0.2, 0, yaw=-np.pi / 2),
+            place_pose=Pose.from_xyz_rpy(-0.15, 4.55, 0.865, yaw=np.pi / 2),
+            place_navigation_pose=Pose.from_xyz_rpy(-0.12, 4, 0, yaw=np.pi / 2),
+        )
+
+
+sage_10k_non_shitty_scenes_demo_configs = [Sage10kNonShittyScenesDemoConfig.GYM()]

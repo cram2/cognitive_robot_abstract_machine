@@ -85,6 +85,8 @@ class VizMarkerPublisher(ModelChangeCallback):
     )
     """QoS profile for the publisher."""
 
+    _tf_publisher: Optional[TFPublisher] = field(init=False, default=None)
+
     def __post_init__(self):
         super().__post_init__()
 
@@ -99,7 +101,7 @@ class VizMarkerPublisher(ModelChangeCallback):
         """
         Launches a tf publisher in conjunction with the VizMarkerPublisher.
         """
-        TFPublisher(_world=self._world, node=self.node)
+        self._tf_publisher = TFPublisher(_world=self._world, node=self.node)
 
     def _select_shapes(self, body):
         if self.shape_source is ShapeSource.VISUAL_ONLY:

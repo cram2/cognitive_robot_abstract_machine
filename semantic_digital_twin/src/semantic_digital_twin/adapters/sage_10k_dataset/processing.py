@@ -1,3 +1,7 @@
+import os
+from importlib.resources import files
+from pathlib import Path
+
 from krrood.entity_query_language.factories import *
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
@@ -10,6 +14,7 @@ from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.pipeline.pipeline import BodyFilter, Pipeline
 from semantic_digital_twin.reasoning.predicates import is_supported_by
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.natural_language import (
@@ -136,3 +141,30 @@ def create_pr2_in_world(world: World):
 
     pr2 = PR2.from_world(world)
     return pr2
+
+
+def create_hsrb_in_world(world: World):
+
+    urdf_dir = os.path.join(
+        Path(files("semantic_digital_twin")).parent.parent.parent,
+        "pycram",
+        "resources",
+        "robots",
+    )
+    hsr = os.path.join(urdf_dir, "hsrb.urdf")
+
+    hsrb_parser = URDFParser.from_file(file_path=hsr)
+    world_with_hsrb = hsrb_parser.parse()
+    with world_with_hsrb.modify_world():
+        hsrb_root = world_with_hsrb.root
+        localization_body = Body(name=PrefixedName("odom_combined"))
+        world_with_hsrb.add_kinematic_structure_entity(localization_body)
+        c_root_bf = OmniDrive.create_with_dofs(
+            parent=localization_body, child=hsrb_root, world=world_with_hsrb
+        )
+        world_with_hsrb.add_connection(c_root_bf)
+
+    world.merge_world(world_with_hsrb)
+
+    hsrb = HSRB.from_world(world)
+    return hsrb
