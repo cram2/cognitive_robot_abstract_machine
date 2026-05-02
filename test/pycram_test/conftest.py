@@ -14,6 +14,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.stretch import Stretch
 
 
 @pytest.fixture(scope="session")
@@ -69,3 +70,16 @@ def pycram_testing_session():
     drop_database(session.bind)
     session.close()
     engine.dispose()
+
+
+@pytest.fixture(scope="function")
+def immutable_stretch_apartment_world(stretch_apartment_world):
+    context = Context(
+        stretch_apartment_world,
+        Stretch.from_world(stretch_apartment_world),
+    )
+    state = deepcopy(stretch_apartment_world.state._data)
+
+    yield stretch_apartment_world, context.robot, context
+
+    stretch_apartment_world.state._data[:] = state

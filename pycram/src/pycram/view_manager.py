@@ -17,11 +17,12 @@ class ViewManager:
 
     @staticmethod
     @symbolic_function
-    def get_end_effector_view(
-        arm: Arms, robot_view: AbstractRobot
-    ) -> Optional[Manipulator]:
+    def get_end_effector_view(arm: Arms, robot_view: AbstractRobot) -> Manipulator:
         arm = ViewManager.get_arm_view(arm, robot_view)
-        return arm.manipulator
+        man = arm.manipulator
+        if not man:
+            raise ValueError(f"The robot view {robot_view} has no manipulator.")
+        return man
 
     @staticmethod
     def get_arm_view(arm: Arms, robot_view: AbstractRobot) -> Optional[KinematicChain]:

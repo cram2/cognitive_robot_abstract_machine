@@ -13,6 +13,7 @@ from matplotlib import colors
 from skimage.measure import label
 from typing_extensions import Tuple, List, Optional, Iterator, Callable
 
+from pycram.locations.base import PoseGeneratorBackend
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import (
@@ -24,7 +25,7 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vect
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pycram")
 
 
 class OrientationGenerator:
@@ -114,7 +115,7 @@ class Rectangle:
 
 
 @dataclass
-class Costmap:
+class Costmap(PoseGeneratorBackend):
     """
     The base class of all Costmaps.
     Costmaps describe regions in the world that are suitable for a certaint task.
@@ -308,6 +309,9 @@ class Costmap:
             raise ValueError(
                 f"Can only combine two locations other type was {type(other)}"
             )
+
+    def __and__(self, other):
+        return self.merge(other)
 
     def partitioning_rectangles(self) -> List[Rectangle]:
         """

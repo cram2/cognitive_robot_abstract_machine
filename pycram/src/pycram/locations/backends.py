@@ -1,13 +1,13 @@
-import logging
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from typing_extensions import List, Optional, Iterator
+from typing_extensions import List, Union, Iterable
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
+    UpdateTemporaryCollisionRules,
 )
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
@@ -15,53 +15,55 @@ from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.exceptions import InfeasibleException
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from pycram.datastructures.enums import (
-    Arms,
-)
+from pycram.datastructures.enums import Arms
 from pycram.datastructures.grasp import GraspDescription, GraspPose
-from pycram.locations.base import Location
-from pycram.locations.costmaps import (
-    OccupancyCostmap,
-    GaussianCostmap,
-    Costmap,
-)
+from pycram.locations.base import Location, PoseGeneratorBackend
+from pycram.locations.costmaps import Costmap, OccupancyCostmap, GaussianCostmap
 from pycram.view_manager import ViewManager
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
+    AllowCollisionRule,
+    AllowCollisionBetweenGroups,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Manipulator
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
-logger = logging.getLogger("pycram")
-
 
 @dataclass
-class GiskardLocation(Location):
+class GiskardLocationBackend(PoseGeneratorBackend):
     """
-    Finds a standing pose for a robot such that the TCP of the given arm can reach the target_pose. This Location
-    Designator uses Giskard and full body control to find a pose for the robot base.
+    Pose generator backend that uses full-body control to steer the robot to a base pose from which the target should be
+    reachable.
+
+    .. warning:: This backend uses collision avoidance, so if you use the global_pose of a body instead of the body itself
+    the backend will fail because the collision avoidance will keep the gripper and body apart.
     """
 
-    target_pose: Pose
+    target: Union[Pose, Body]
     """
-    Target pose for which a standing pose should be found. 
-    """
-
-    arm: Arms = None
-    """
-    Arm which should read the target pose
+    The target pose or body which should be reachable by the end effector 
     """
 
-    grasp_description: Optional[GraspDescription] = None
+    arm: Arms
     """
-    The grasp description which should be used to grasp the target pose, used if there is a body at the pose
+    Arm of the which should be used 
     """
 
-    threshold: float = field(default=0.02)
+    grasp_description: GraspDescription
     """
-    Threshold between the TCP of the arm and the target pose at which a stand pose if deemed successfull
+    Grasp description of how to approach the target
+    """
+
+    robot: AbstractRobot
+    """
+    Robot for which base poses should be found  
+    """
+
+    world: World
+    """
+    The world in which to sample 
     """
 
     def setup_costmap(self, pose: Pose) -> Costmap:
@@ -80,7 +82,7 @@ class GiskardLocation(Location):
             world=self.world,
             robot_view=self.robot,
             origin=ground_pose,
-            distance_to_obstacle=(base_bb.width / 2 + base_bb.depth / 2) / 2,
+            distance_to_obstacle=(base_bb.width / 2 + base_bb.depth / 2) / 2 + 0.5,
         )
         gaussian_map = GaussianCostmap(
             resolution=0.02,
@@ -91,7 +93,7 @@ class GiskardLocation(Location):
         )
 
         reachability_map = occupancy_map + gaussian_map
-        reachability_map.number_of_samples = 10
+        reachability_map.number_of_samples = 5
 
         return reachability_map
 
@@ -100,7 +102,7 @@ class GiskardLocation(Location):
         pose_sequence: List[Pose],
         world: World,
         robot_view: AbstractRobot,
-        end_effector: Body,
+        end_effector: Manipulator,
     ) -> Executor:
         """
         Setup the Giskard executor for a specific pose sequence and a given world.
@@ -115,7 +117,7 @@ class GiskardLocation(Location):
             nodes=[
                 CartesianPose(
                     root_link=world.root,
-                    tip_link=end_effector,
+                    tip_link=end_effector.tool_frame,
                     goal_pose=pose,
                 )
                 for pose in pose_sequence
@@ -132,6 +134,16 @@ class GiskardLocation(Location):
         msc.add_nodes(
             [
                 pose_seq,
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AllowCollisionBetweenGroups(
+                            body_group_a=end_effector.bodies_with_collision,
+                            body_group_b=(
+                                [self.target] if isinstance(self.target, Body) else []
+                            ),
+                        )
+                    ]
+                ),
                 ExternalCollisionAvoidance(
                     robot=robot_view, cancel_if_collision_violated=False
                 ),
@@ -151,60 +163,53 @@ class GiskardLocation(Location):
 
         return executor
 
-    def __iter__(self) -> Iterator[GraspPose]:
+    def __iter__(self):
+        with self.world.modify_world():
+            self.robot._setup_collision_rules()
 
-        reachability_map = self.setup_costmap(self.target_pose)
+        target_pose = (
+            self.target if isinstance(self.target, Pose) else self.target.global_pose
+        )
 
-        ee = ViewManager.get_arm_view(self.arm, self.robot)
+        test_ee = ViewManager.get_end_effector_view(self.arm, self.robot)
+        target_sequence = self.grasp_description._pose_sequence(target_pose)
 
-        test_world = deepcopy(self.world)
-        test_world.name = "Test World"
+        executor = self.setup_giskard_executor(
+            target_sequence, self.world, self.robot, test_ee
+        )
 
-        test_robot = self.robot.__class__.from_world(test_world)
-        test_ee = test_world._get_world_entity_by_hash(hash(ee.manipulator.tool_frame))
-        with test_world.modify_world():
-            test_robot._setup_collision_rules()
+        for pose_candidate in self.setup_costmap(target_pose):
+            self.robot.root.parent_connection.origin = pose_candidate
 
-        for candidate in reachability_map:
+            try:
+                executor.tick_until_end(3_000)
+            except (TimeoutError, InfeasibleException) as e:
+                pass
 
-            grasp_descriptions = (
-                [self.grasp_description]
-                if self.grasp_description
-                else GraspDescription.calculate_grasp_descriptions(
-                    (
-                        test_robot.left_arm.manipulator
-                        if self.arm == Arms.LEFT
-                        else test_robot.right_arm.manipulator
-                    ),
-                    self.target_pose,
-                )
-            )
+            yield self.robot.root.global_pose
 
-            for grasp_desc in grasp_descriptions:
 
-                target_sequence = grasp_desc._pose_sequence(self.target_pose)
+@dataclass
+class GraspPoseGenerator(PoseGeneratorBackend):
+    """
+    A PoseGeneratorBackend that wraps another backend and creates GraspPoses from the samples poses of the backend.
+    """
 
-                test_robot.root.parent_connection.origin = candidate
+    generator: PoseGeneratorBackend
+    """
+    Pose generator from which to sample
+    """
 
-                executor = self.setup_giskard_executor(
-                    target_sequence, test_world, test_robot, test_ee
-                )
+    arm: Arms
+    """
+    Arm that should be used for the GraspPose
+    """
 
-                try:
-                    executor.tick_until_end()
-                except (TimeoutError, InfeasibleException) as e:
-                    pass
+    grasp_description: GraspDescription
+    """
+    Grasp Description that should be used for the GraspPose
+    """
 
-                dist = test_ee.global_pose.to_position().euclidean_distance(
-                    target_sequence[-1].to_position()
-                )
-
-                if dist > 0.02:
-                    continue
-
-                ret = GraspPose.from_pose(
-                    test_robot.root.global_pose,
-                    grasp_description=grasp_desc,
-                    arm=self.arm,
-                )
-                yield ret
+    def __iter__(self) -> Iterable[GraspPose]:
+        for pose_candidate in self.generator:
+            yield pose_candidate
