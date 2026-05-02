@@ -7,17 +7,21 @@ from dataclasses import dataclass
 from typing_extensions import Any, Dict
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.factories import and_, or_, not_, variable_from
+from krrood.entity_query_language.factories import (
+    and_,
+    or_,
+    not_,
+    variable_from,
+    ConditionType,
+)
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     Arms,
     MovementType,
 )
 from pycram.datastructures.grasp import GraspDescription
+from pycram.locations.pose_validator import ReachabilitySequenceValidator
 from pycram.plans.factories import sequential, execute_single
-from pycram.locations.pose_validator import (
-    pose_sequence_reachability_validator,
-)
 from pycram.querying.predicates import GripperIsFree
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.motions.gripper import (
@@ -86,7 +90,7 @@ class ReachAction(ActionDescription):
     @staticmethod
     def pre_condition(
         variables, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression:
+    ) -> ConditionType:
         """
         The sequence in which the robot would reach the target pose needs to be achiveable
         """
@@ -98,19 +102,18 @@ class ReachAction(ActionDescription):
             reverse=kwargs["reverse_reach_order"],
         )
         return and_(
-            pose_sequence_reachability_validator(
-                grasp_pose_sequence,
-                manipulator.tool_frame,
-                context.robot.from_world(test_world),
-                test_world,
-                context.robot.full_body_controlled,
+            ReachabilitySequenceValidator(
+                world=test_world,
+                robot=context.robot.from_world(test_world),
+                pose_sequence=grasp_pose_sequence,
+                tip_link=manipulator.tool_frame,
             ),
         )
 
     @staticmethod
     def post_condition(
         variables, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression | bool:
+    ) -> ConditionType | bool:
         """
         The end effector needs to be close to the target pose
         """
@@ -189,7 +192,7 @@ class PickUpAction(ActionDescription):
     @staticmethod
     def pre_condition(
         variables: Dict, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression:
+    ) -> ConditionType:
         """
         The gripper with which to grasp the object needs to be free and the object needs to be reachable
         """
@@ -200,12 +203,11 @@ class PickUpAction(ActionDescription):
         )
         return and_(
             GripperIsFree(manipulator),
-            pose_sequence_reachability_validator(
-                grasp_pose_sequence,
-                manipulator.tool_frame,
-                context.robot.from_world(test_world),
-                test_world,
-                context.robot.full_body_controlled,
+            ReachabilitySequenceValidator(
+                world=test_world,
+                robot=context.robot.from_world(test_world),
+                pose_sequence=grasp_pose_sequence,
+                tip_link=manipulator.tool_frame,
             ),
         )
 

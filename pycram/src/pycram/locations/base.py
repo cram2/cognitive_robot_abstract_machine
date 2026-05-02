@@ -85,7 +85,10 @@ class Location(Iterable[Pose]):
                 logger.debug(f"Candidate pose in collision, skipping")
                 continue
 
-            if all(validator() for validator in self.validators):
+            if all(
+                validator(pose_candidate=pose_candidate)
+                for validator in self.validators
+            ):
                 yield pose_candidate
 
     def merge(self, other: Location) -> Location:
@@ -147,5 +150,5 @@ class PoseValidator(Predicate):
     """
 
     @abstractmethod
-    def __call__(self) -> bool:
+    def __call__(self, *args, **kwargs) -> bool:
         pass
