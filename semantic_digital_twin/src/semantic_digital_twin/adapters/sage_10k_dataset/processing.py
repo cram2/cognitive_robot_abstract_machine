@@ -3,6 +3,7 @@ from importlib.resources import files
 from pathlib import Path
 
 from krrood.entity_query_language.factories import *
+from pycram.robot_plans.actions.base import ActionDescription
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
@@ -25,6 +26,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.world_description.graph_of_convex_sets import (
     GraphOfConvexSets,
+    navigation_map_at_target,
 )
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
@@ -100,27 +102,6 @@ def bottles_on_benches(
         )
     )
     return bottles.tolist(), benches.tolist()
-
-
-def open_door(robot: AbstractRobot, door: Door): ...
-
-
-def create_gcs(world: World):
-    search_space = BoundingBoxCollection.from_simple_event(
-        reference_frame=world.root,
-        simple_event=SimpleEvent.from_data(
-            {
-                SpatialVariables.x.value: closed(-10, 10),
-                SpatialVariables.y.value: closed(-10, 10),
-                SpatialVariables.z.value: closed(0.05, 2),
-            }
-        ),
-    )
-
-    gcs = GraphOfConvexSets.free_space_from_world(
-        world=world, search_space=search_space, bloat_obstacles=0.1
-    )
-    return gcs
 
 
 def create_pr2_in_world(world: World):

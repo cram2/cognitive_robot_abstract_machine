@@ -8,6 +8,7 @@ from krrood.ormatic.utils import create_engine, drop_database
 from semantic_digital_twin.adapters.sage_10k_dataset.loader import Sage10kDatasetLoader
 from semantic_digital_twin.adapters.sage_10k_dataset.processing import (
     create_pr2_in_world,
+    create_hsrb_in_world,
 )
 from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
     Sage10kNonShittyScenes,
@@ -29,8 +30,8 @@ world = scene.create_world()
 print(f"Loading the scene took {time.time() - current_time:.2f} seconds")
 current_time = time.time()
 print("loading robot")
-pr2 = create_pr2_in_world(world)
-print(f"Loading the PR2 took {time.time() - current_time:.2f} seconds")
+pr2 = create_hsrb_in_world(world)
+print(f"Loading the robot took {time.time() - current_time:.2f} seconds")
 print("saving to database")
 dao = to_dao(world)
 

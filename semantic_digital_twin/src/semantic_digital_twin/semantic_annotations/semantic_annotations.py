@@ -37,6 +37,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -129,6 +130,12 @@ class Handle(HasRootBody):
                 SpatialVariables.y.value: y_interval,
                 SpatialVariables.z.value: z_interval,
             }
+        )
+
+    def pre_grasp_pose(self) -> Pose:
+        bb = self.root.collision.combined_mesh
+        return Pose.from_xyz_rpy(
+            reference_frame=self.root,
         )
 
 
