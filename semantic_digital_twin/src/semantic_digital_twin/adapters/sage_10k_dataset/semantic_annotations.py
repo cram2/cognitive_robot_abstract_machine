@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import StrEnum
 from itertools import takewhile
 from typing import Optional, List
 
 import enchant
+import numpy as np
 
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageDescription,
@@ -16,6 +16,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
     Door,
 )
+from semantic_digital_twin.spatial_types import Point3
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +219,56 @@ class Sage10kNonShittyScenes(StrEnum):
     SOUTHWESTERN_STORE = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_123747_layout_2d89d0a5.zip"
     BRUTALIST_STORE = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_153933_layout_50ffb500.zip"
     AMERICAN_BUFFET_RESTAURANT = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_172548_layout_edf26267.zip"
+
+
+@dataclass
+class Sage10kNonShittyScenesDemoConfig:
+    """
+    Configuration for the Sage10k non-shitty scenes demo.
+    Is a Tuple of (scene_url, world_P_object_of_interest, pickup_navigation_pose, place_pose, place_navigation_pose)
+    """
+
+    scene_url: str
+    """
+    The URL of the scene to use for the demo.
+    """
+
+    world_P_object_of_interest: Point3
+    """
+    Approximate position of the object we want to pick up. Must be within 10cm euclidian distance of the actual object,
+    and no other object is allowed to be within that radius. If thats a problem to do, chose another object.
+    Use the "publish point" functionality in RVIZ to to get the coordinates: click the button, hover over the center of 
+    the object you want to grasp, and read the coordinates from the bottom left of RViz, right next to the reset button. 
+    """
+
+    pickup_navigation_pose: Pose
+    """
+    Nav pose from where we want to pick up
+    """
+
+    place_pose: Pose
+    """
+    Pose where we want to place the object. also get this from RViz using publish point on the surface.
+    Do not add any object height here, it will be added automatically.
+    """
+
+    place_navigation_pose: Pose
+    """
+    Nav pose from where we want to place the object
+    """
+
+    @classmethod
+    def GYM(cls):
+        return cls(
+            scene_url=Sage10kNonShittyScenes.GYM,
+            world_P_object_of_interest=Point3(1.03, -0.716, 0.203),
+            pickup_navigation_pose=Pose.from_xyz_rpy(0.94, 0.2, 0, yaw=-np.pi / 2),
+            place_pose=Pose.from_xyz_rpy(-0.15, 4.55, 0.865, yaw=np.pi / 2),
+            place_navigation_pose=Pose.from_xyz_rpy(-0.12, 4, 0, yaw=np.pi / 2),
+        )
+
+
+sage_10k_non_shitty_scenes_demo_configs = [Sage10kNonShittyScenesDemoConfig.GYM()]
 
 
 @dataclass(eq=False)
