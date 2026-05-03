@@ -12,6 +12,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.graph_of_convex_sets import (
     navigation_map_at_target,
+    translate_free_space_to_where_condition,
 )
 
 
@@ -34,14 +35,16 @@ class Sage10kOpenDoor(ActionDescription):
         This method creates a navigation map around the door handle and then
         performs a sequential plan of reaching the handle and opening the door.
         """
-        navigation_map_at_target(target=self.door.handle.root)
+        gcs = navigation_map_at_target(target=self.door.handle.root)
 
         arm = Arms.LEFT
 
-        reach_action = underspecified(MoveToReach)(
-            target_pose=Pose.from_xyz_rpy(x=0.25, reference_frame=self.door.handle.root),
-            robot_x=0.8,
-            robot_y=0.0,
+        reach_query = underspecified(MoveToReach)(
+            target_pose=Pose.from_xyz_rpy(
+                x=0.25, reference_frame=self.door.handle.root
+            ),
+            robot_x=...,
+            robot_y=...,
             hip_rotation=0.0,
             grasp_description=underspecified(GraspDescription)(
                 approach_direction=...,
@@ -50,6 +53,22 @@ class Sage10kOpenDoor(ActionDescription):
             ),
         )
 
+        where_condition = translate_free_space_to_where_condition(
+            gcs.free_space_event,
+            reach_query.expression,
+            x_variable_name="MoveToReach.robot_x",
+            y_variable_name="MoveToReach.robot_y",
+        )
+
+        reach_action = reach_query.where(where_condition)
+
         open_action = OpenAction(object_designator=self.door.handle.root, arm=arm)
 
-        self.add_subplan(sequential([reach_action, open_action])).perform()
+        self.add_subplan(
+            sequential(
+                [
+                    reach_action,
+                    # open_action
+                ]
+            )
+        ).perform()

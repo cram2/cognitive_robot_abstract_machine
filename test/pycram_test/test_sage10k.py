@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from pycram.datastructures.dataclasses import Context
 from pycram.motion_executor import simulated_robot
@@ -103,7 +104,7 @@ def test_door_opening(wall_door_handle_world, hsr_world_setup, rclpy_node):
     viz_marker_publisher = VizMarkerPublisher(node=rclpy_node, _world=world)
     viz_marker_publisher.with_tf_publisher()
 
-    context = Context.from_world(world)
+    context = Context.from_world(world, query_backend=ProbabilisticBackend())
 
     with simulated_robot:
         execute_single(Sage10kOpenDoor(door), context=context).perform()
