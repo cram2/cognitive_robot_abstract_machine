@@ -273,12 +273,16 @@ class Plan:
         :param other: The plan to steal nodes from
         :return: The root node of the other plan mounted in this plan
         """
-        other_plans_edge = other.edges
+        # other_plans_edge = other.edges
         root_ref = other.root
-        other.plan_graph.clear()
+        # other.plan_graph.clear()
+        #
+        # for edge in other_plans_edge:
+        #     self.add_edge(edge[0], edge[1])
 
-        for edge in other_plans_edge:
-            self.add_edge(edge[0], edge[1])
+        for layer in other.layers:
+            for node in layer:
+                self.add_edges_from([(node, child) for child in node.children])
 
         return root_ref
 

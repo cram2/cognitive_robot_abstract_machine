@@ -14,7 +14,9 @@ from pycram.datastructures.enums import (
     MovementType,
 )
 from pycram.datastructures.grasp import GraspDescription
+from pycram.plans.attachment_nodes import ModelChangeNode
 from pycram.plans.factories import sequential, execute_single
+from pycram.plans.plan_node import PlanNode
 from pycram.pose_validator import (
     pose_sequence_reachability_validator,
 )
@@ -62,26 +64,48 @@ class ReachAction(ActionDescription):
 
     reverse_reach_order: bool = False
 
-    def execute(self) -> None:
-
+    @property
+    def action_plan(self) -> PlanNode:
         target_pre_pose, target_pose, _ = self.grasp_description._pose_sequence(
             self.target_pose, self.object_designator, reverse=self.reverse_reach_order
         )
-        self.add_subplan(
-            sequential(
-                children=[
-                    MoveToolCenterPointMotion(
-                        target_pre_pose, self.arm, allow_gripper_collision=False
-                    ),
-                    MoveToolCenterPointMotion(
-                        target_pose,
-                        self.arm,
-                        allow_gripper_collision=False,
-                        movement_type=MovementType.CARTESIAN,
-                    ),
-                ]
-            )
-        ).perform()
+        return sequential(
+            children=[
+                MoveToolCenterPointMotion(
+                    target_pre_pose, self.arm, allow_gripper_collision=False
+                ),
+                MoveToolCenterPointMotion(
+                    target_pose,
+                    self.arm,
+                    allow_gripper_collision=False,
+                    movement_type=MovementType.CARTESIAN,
+                ),
+            ]
+        )
+
+    def execute(self) -> Any:
+        self.add_subplan(self.action_plan).perform()
+
+    # def execute(self) -> None:
+    #
+    # target_pre_pose, target_pose, _ = self.grasp_description._pose_sequence(
+    #     self.target_pose, self.object_designator, reverse=self.reverse_reach_order
+    # )
+    # self.add_subplan(
+    #     sequential(
+    #         children=[
+    #             MoveToolCenterPointMotion(
+    #                 target_pre_pose, self.arm, allow_gripper_collision=False
+    #             ),
+    #             MoveToolCenterPointMotion(
+    #                 target_pose,
+    #                 self.arm,
+    #                 allow_gripper_collision=False,
+    #                 movement_type=MovementType.CARTESIAN,
+    #             ),
+    #         ]
+    #     )
+    # ).perform()
 
     @staticmethod
     def pre_condition(
@@ -149,42 +173,76 @@ class PickUpAction(ActionDescription):
     The GraspDescription that should be used for picking up the object
     """
 
-    def execute(self) -> None:
-        self.add_subplan(
-            sequential(
-                children=[
-                    MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm),
-                    ReachAction(
-                        target_pose=self.object_designator.global_pose,
-                        object_designator=self.object_designator,
-                        arm=self.arm,
-                        grasp_description=self.grasp_description,
-                    ),
-                    MoveGripperMotion(motion=GripperState.CLOSE, gripper=self.arm),
-                ]
-            )
-        ).perform()
-        end_effector = ViewManager.get_end_effector_view(self.arm, self.robot)
-
-        # Attach the object to the end effector
-        with self.world.modify_world():
-            self.world.move_branch_with_fixed_connection(
-                self.object_designator, end_effector.tool_frame
-            )
+    @property
+    def action_plan(self) -> PlanNode:
 
         _, _, lift_to_pose = self.grasp_description.grasp_pose_sequence(
             self.object_designator
         )
-        self.add_subplan(
-            execute_single(
+        return sequential(
+            children=[
+                MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm),
+                ReachAction(
+                    target_pose=self.object_designator.global_pose,
+                    object_designator=self.object_designator,
+                    arm=self.arm,
+                    grasp_description=self.grasp_description,
+                ).action_plan,
+                MoveGripperMotion(motion=GripperState.CLOSE, gripper=self.arm),
+                ModelChangeNode(
+                    body=self.object_designator,
+                    new_parent=ViewManager.get_end_effector_view(
+                        self.arm, self.robot
+                    ).tool_frame,
+                ),
                 MoveToolCenterPointMotion(
                     lift_to_pose,
                     self.arm,
                     allow_gripper_collision=True,
                     movement_type=MovementType.TRANSLATION,
-                )
-            )
-        ).perform()
+                ),
+            ]
+        )
+
+    def execute(self) -> Any:
+        self.add_subplan(self.action_plan).perform()
+
+    # def execute(self) -> None:
+    #     self.add_subplan(
+    #         sequential(
+    #             children=[
+    #                 MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm),
+    #                 ReachAction(
+    #                     target_pose=self.object_designator.global_pose,
+    #                     object_designator=self.object_designator,
+    #                     arm=self.arm,
+    #                     grasp_description=self.grasp_description,
+    #                 ),
+    #                 MoveGripperMotion(motion=GripperState.CLOSE, gripper=self.arm),
+    #             ]
+    #         )
+    #     ).perform()
+    #     end_effector = ViewManager.get_end_effector_view(self.arm, self.robot)
+    #
+    #     # Attach the object to the end effector
+    #     with self.world.modify_world():
+    #         self.world.move_branch_with_fixed_connection(
+    #             self.object_designator, end_effector.tool_frame
+    #         )
+    #
+    #     _, _, lift_to_pose = self.grasp_description.grasp_pose_sequence(
+    #         self.object_designator
+    #     )
+    #     self.add_subplan(
+    #         execute_single(
+    #             MoveToolCenterPointMotion(
+    #                 lift_to_pose,
+    #                 self.arm,
+    #                 allow_gripper_collision=True,
+    #                 movement_type=MovementType.TRANSLATION,
+    #             )
+    #         )
+    #     ).perform()
 
     @staticmethod
     def pre_condition(
