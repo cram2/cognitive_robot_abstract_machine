@@ -32,6 +32,7 @@ from semantic_digital_twin.world_description.world_entity import (
     SemanticEnvironmentAnnotation,
     Body,
     Region,
+    Agent,
 )
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
@@ -341,14 +342,34 @@ class GraphOfConvexSets:
                 return bb.bloat(0, bloat_walls, 0.01)
 
         world_root = search_space.reference_frame
+        world = world_root._world
 
-        bloated_obstacles: BoundingBoxCollection = BoundingBoxCollection(
-            [
-                bloat_obstacle(bb)
-                for bb in semantic_obstacle_annotation.as_bounding_box_collection_at_origin(
-                    HomogeneousTransformationMatrix(reference_frame=world_root)
-                )
-            ],
+        agents = world.get_semantic_annotations_by_type(Agent)
+        agent_entities = set()
+        for agent in agents:
+            agent_entities.update(agent.kinematic_structure_entities)
+
+        entities_to_consider = [
+            entity
+            for entity in semantic_obstacle_annotation.kinematic_structure_entities
+            if isinstance(entity, Body)
+            and entity.has_collision()
+            and entity not in agent_entities
+        ]
+
+        collections = [
+            entity.collision.as_bounding_box_collection_at_origin(
+                HomogeneousTransformationMatrix(reference_frame=world_root)
+            )
+            for entity in entities_to_consider
+        ]
+
+        bbs = BoundingBoxCollection([], world_root)
+        for bb_collection in collections:
+            bbs = bbs.merge(bb_collection)
+
+        bloated_obstacles = BoundingBoxCollection(
+            [bloat_obstacle(bb) for bb in bbs],
             world_root,
         )
 
