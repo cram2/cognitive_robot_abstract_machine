@@ -134,9 +134,7 @@ class Handle(HasRootBody):
 
     def pre_grasp_pose(self) -> Pose:
         bb = self.root.collision.combined_mesh
-        return Pose.from_xyz_rpy(
-            reference_frame=self.root,
-        )
+        return Pose.from_xyz_rpy(reference_frame=self.root, x=0.3)
 
 
 @dataclass(eq=False)

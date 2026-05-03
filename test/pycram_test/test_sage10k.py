@@ -55,7 +55,7 @@ def wall_door_handle_world():
         door = Door.create_with_new_body_in_world(
             name=PrefixedName("door"),
             world=world,
-            scale=Scale(0.1, 1, 2),
+            scale=Scale(0.11, 1, 2),
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0),
         )
         door.root.visual.dye_shapes(Color(R=0.55, G=0.27, B=0.07))
@@ -68,7 +68,7 @@ def wall_door_handle_world():
             name=PrefixedName("handle"),
             world=world,
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                z=1.0, y=0.25
+                z=1.0, y=0.25, x=0.06
             ),
             scale=Scale(0.1, 0.1, 0.05),
         )
@@ -105,7 +105,7 @@ def test_door_opening(wall_door_handle_world, hsr_world_setup, rclpy_node):
     viz_marker_publisher = VizMarkerPublisher(node=rclpy_node, _world=world)
     viz_marker_publisher.with_tf_publisher()
 
-    publish_pose(handle.pre_grasp_pose(), rclpy_node)
+    # publish_pose(handle.pre_grasp_pose(), rclpy_node)
 
     context = Context.from_world(world, query_backend=ProbabilisticBackend())
 
