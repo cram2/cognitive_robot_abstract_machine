@@ -130,7 +130,7 @@ class PosePublisher(ModelChangeCallback):
                     action=Marker.ADD,
                     type=Marker.TEXT_VIEW_FACING,
                     text=self.text,
-                    ns=str(self.pose.reference_frame.name),
+                    ns=f"pose/{self.pose.reference_frame.name}/{id(self)}",
                     id=4,
                     frame_locked=True,
                     pose=p,
@@ -179,7 +179,7 @@ class PosePublisher(ModelChangeCallback):
 
         m.scale = RosVector3(x=0.025, y=0.05, z=0.1)
         m.color = color
-        m.ns = str(self.pose.reference_frame.name)
+        m.ns = f"pose/{self.pose.reference_frame.name}/{id(self)}"
         m.frame_locked = True
 
         return m
