@@ -23,15 +23,19 @@ from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.geometry import BoundingBox
-from semantic_digital_twin.world_description.shape_collection import (
-    BoundingBoxCollection,
-)
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     SemanticEnvironmentAnnotation,
     Body,
+    Region,
 )
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import BoundingBox, Box, Scale
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+    ShapeCollection,
+)
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 logger = logging.getLogger(__name__)
 
@@ -626,6 +630,49 @@ class GraphOfConvexSets:
         return Event.from_simple_sets(
             *[node.simple_event for node in self.graph.nodes()]
         )
+
+    def spawn_as_region(self, name: Optional[PrefixedName] = None) -> Region:
+        """
+        Spawn the GCS as a region (world_entity) connected with a fixed connection with the root of the GCS search space.
+        The geometry should be all boxes extracted from its free space.
+
+        :param name: The name of the region.
+        :return: The region.
+        """
+        if name is None:
+            name = PrefixedName("gcs_region")
+
+        shapes = []
+        for box in self.graph.nodes():
+            center_x = (box.min_x + box.max_x) / 2
+            center_y = (box.min_y + box.max_y) / 2
+            center_z = (box.min_z + box.max_z) / 2
+
+            box_origin = box.origin @ HomogeneousTransformationMatrix.from_xyz_rpy(
+                center_x, center_y, center_z
+            )
+
+            shapes.append(
+                Box(
+                    origin=box_origin,
+                    scale=Scale(
+                        box.max_x - box.min_x,
+                        box.max_y - box.min_y,
+                        box.max_z - box.min_z,
+                    ),
+                )
+            )
+
+        region = Region.from_shape_collection(name, ShapeCollection(shapes))
+        self.world.add_region(region)
+
+        self.world.add_connection(
+            FixedConnection(
+                parent=self.search_space.reference_frame,
+                child=region,
+            )
+        )
+        return region
 
 
 def translate_event_to(
