@@ -35,3 +35,42 @@ def test_marker_array(rclpy_node, cylinder_bot_world):
 
     assert marker.markers[1].points[1].y == 0.5
     assert marker.markers[2].points[1].z == 0.5
+
+
+def test_publish_pose_convenience(rclpy_node, cylinder_bot_world):
+    from semantic_digital_twin.adapters.ros.visualization.pose_publisher import (
+        publish_pose,
+    )
+
+    pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+        1, 1, 1, reference_frame=cylinder_bot_world.root
+    )
+
+    publisher = publish_pose(pose=pose, node=rclpy_node, lifetime=0)
+    assert isinstance(publisher, PosePublisher)
+    assert publisher.pose == pose
+
+
+def test_publish_pose_with_semdt_pose(rclpy_node, cylinder_bot_world):
+    from semantic_digital_twin.adapters.ros.visualization.pose_publisher import (
+        publish_pose,
+    )
+    from semantic_digital_twin.spatial_types import Pose as SemDTPose
+
+    pose = SemDTPose.from_xyz_rpy(1, 1, 1, reference_frame=cylinder_bot_world.root)
+
+    publisher = publish_pose(pose=pose, node=rclpy_node, lifetime=0)
+    assert isinstance(publisher, PosePublisher)
+    assert isinstance(publisher.pose, HomogeneousTransformationMatrix)
+    # Pose is not a subclass of HomogeneousTransformationMatrix, so this check is valid
+    assert not isinstance(publisher.pose, SemDTPose)
+    assert publisher.pose.reference_frame == cylinder_bot_world.root
+
+
+def test_pose_publisher_direct_with_pose(rclpy_node, cylinder_bot_world):
+    from semantic_digital_twin.spatial_types import Pose as SemDTPose
+
+    pose = SemDTPose.from_xyz_rpy(1, 1, 1, reference_frame=cylinder_bot_world.root)
+    publisher = PosePublisher(pose=pose, node=rclpy_node, lifetime=0)
+    assert isinstance(publisher.pose, HomogeneousTransformationMatrix)
+    assert not isinstance(publisher.pose, SemDTPose)

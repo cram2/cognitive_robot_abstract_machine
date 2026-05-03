@@ -12,6 +12,7 @@ from pycram.plans.factories import execute_single
 from pycram.robot_plans.actions.composite.sage10k_actions import Sage10kOpenDoor
 from pycram.robot_plans.actions.core.misc import MoveToReach
 from random_events.variable import Continuous
+from semantic_digital_twin.adapters.ros.visualization.pose_publisher import publish_pose
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -103,6 +104,8 @@ def test_door_opening(wall_door_handle_world, hsr_world_setup, rclpy_node):
 
     viz_marker_publisher = VizMarkerPublisher(node=rclpy_node, _world=world)
     viz_marker_publisher.with_tf_publisher()
+
+    publish_pose(handle.pre_grasp_pose(), rclpy_node)
 
     context = Context.from_world(world, query_backend=ProbabilisticBackend())
 

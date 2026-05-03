@@ -7,7 +7,7 @@ import numpy as np
 import rclpy
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from std_msgs.msg import ColorRGBA, Header
-from typing_extensions import List, Any, Dict
+from typing_extensions import List, Any, Dict, Union
 from visualization_msgs.msg import MarkerArray, Marker
 
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
@@ -15,18 +15,21 @@ from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
     ModelChangeCallback,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose as SemDTPose,
+)
 from geometry_msgs.msg import (
-    Vector3,
-    Pose,
-    Point,
-    Quaternion,
+    Vector3 as RosVector3,
+    Pose as RosPose,
+    Point as RosPoint,
+    Quaternion as RosQuaternion,
 )
 
 
 @dataclass
 class PosePublisher(ModelChangeCallback):
-    pose: Pose = field(kw_only=True)
+    pose: HomogeneousTransformationMatrix = field(kw_only=True)
     """
     The pose to publish.
     """
@@ -83,7 +86,7 @@ class PosePublisher(ModelChangeCallback):
 
     def with_tf_publisher(self):
         """
-        Launches a tf publisher in conjunction with the VizMarkerPublisher.
+        Launches a tf publisher in conjunction with the PosePublisher.
         """
         TFPublisher(_world=self._world, node=self.node)
 
@@ -96,9 +99,9 @@ class PosePublisher(ModelChangeCallback):
         position = self.pose.to_position().to_np()[:3]
         orientation = self.pose.to_rotation_matrix().to_quaternion().to_np()
 
-        p = Pose(
-            position=Point(**dict(zip(["x", "y", "z"], position.tolist()))),
-            orientation=Quaternion(
+        p = RosPose(
+            position=RosPoint(**dict(zip(["x", "y", "z"], position.tolist()))),
+            orientation=RosQuaternion(
                 **dict(zip(["x", "y", "z", "w"], orientation.tolist()))
             ),
         )
@@ -110,14 +113,14 @@ class PosePublisher(ModelChangeCallback):
 
             c = ColorRGBA(**dict(zip(["r", "g", "b", "a"], color)))
 
-            end_point = Point(**dict(zip(["x", "y", "z"], np.array(axis).tolist())))
+            end_point = RosPoint(**dict(zip(["x", "y", "z"], np.array(axis).tolist())))
 
             marker_array.markers.append(
                 self._create_marker(
                     c,
                     i,
                     p,
-                    Point(),
+                    RosPoint(),
                     end_point,
                 )
             )
@@ -131,7 +134,7 @@ class PosePublisher(ModelChangeCallback):
                     id=4,
                     frame_locked=True,
                     pose=p,
-                    scale=Vector3(z=0.1),
+                    scale=RosVector3(z=0.1),
                     lifetime=Duration(
                         sec=(
                             round(self.end_time - time.time())
@@ -151,9 +154,9 @@ class PosePublisher(ModelChangeCallback):
         self,
         color: ColorRGBA,
         _id: int,
-        pose: Pose,
-        start_point: Point,
-        end_point: Point,
+        pose: RosPose,
+        start_point: RosPoint,
+        end_point: RosPoint,
     ) -> Marker:
         """
         Creates a visualization marker for one axis of the pose.
@@ -174,7 +177,7 @@ class PosePublisher(ModelChangeCallback):
         )
         m.points = [start_point, end_point]
 
-        m.scale = Vector3(x=0.025, y=0.05, z=0.1)
+        m.scale = RosVector3(x=0.025, y=0.05, z=0.1)
         m.color = color
         m.ns = str(self.pose.reference_frame.name)
         m.frame_locked = True
@@ -183,3 +186,25 @@ class PosePublisher(ModelChangeCallback):
 
     def __hash__(self):
         return hash(id(self))
+
+
+def publish_pose(
+    pose: Union[SemDTPose, HomogeneousTransformationMatrix],
+    node: rclpy.node.Node,
+    lifetime: int = 0,
+    text: str = None,
+) -> PosePublisher:
+    """
+    Convenience function to publish a single pose in RViz2.
+
+    :param pose: The pose to publish.
+    :param node: ROS node handle, used to create the publisher.
+    :param lifetime: Lifetime of the pose marker in seconds. If 0, it stays indefinitely.
+    :param text: Optional text to display at the pose position.
+    :return: The created PosePublisher instance.
+    """
+    if isinstance(pose, SemDTPose):
+        pose = HomogeneousTransformationMatrix(
+            pose, reference_frame=pose.reference_frame
+        )
+    return PosePublisher(pose=pose, node=node, lifetime=lifetime, text=text)
