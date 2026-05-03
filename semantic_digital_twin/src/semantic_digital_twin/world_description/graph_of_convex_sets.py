@@ -706,6 +706,7 @@ def navigation_map_at_target(
     search_range_x: float = 2.0,
     search_range_y: float = 2.0,
     max_height: float = 2.0,
+    bloat_obstacles: float = 0.02,
 ) -> GraphOfConvexSets:
     """
     Create a navigation map around the target.
@@ -716,6 +717,7 @@ def navigation_map_at_target(
     :param search_range_x: The search range in the x-direction.
     :param search_range_y: The search range in the y-direction.
     :param max_height: The maximum height of the navigation map from the floor.
+    :param bloat_obstacles: The amount to bloat obstacles in the navigation map.
     :return: The navigation map as a Graph of Convex Sets.
     """
     search_space = BoundingBoxCollection.from_simple_event(
@@ -736,7 +738,7 @@ def navigation_map_at_target(
     )
 
     gcs = GraphOfConvexSets.navigation_map_from_world(
-        world=target._world, search_space=search_space, bloat_obstacles=0.1
+        world=target._world, search_space=search_space, bloat_obstacles=bloat_obstacles
     )
     return gcs
 

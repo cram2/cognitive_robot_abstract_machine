@@ -133,8 +133,14 @@ class Handle(HasRootBody):
         )
 
     def pre_grasp_pose(self) -> Pose:
-        bb = self.root.collision.combined_mesh
-        return Pose.from_xyz_rpy(reference_frame=self.root, x=0.3)
+        """
+        The pre grasp pose of the handle.
+
+        :return: The pre grasp pose.
+        """
+        return Pose.from_xyz_rpy(
+            reference_frame=self.root, x=self.root.collision.max_point.x + 0.05
+        )
 
 
 @dataclass(eq=False)

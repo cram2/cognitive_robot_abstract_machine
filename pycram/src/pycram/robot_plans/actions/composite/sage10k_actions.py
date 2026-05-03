@@ -44,10 +44,14 @@ class Sage10kOpenDoor(ActionDescription):
         arm = Arms.LEFT
         pre_grasp_pose = self.door.handle.pre_grasp_pose()
 
-        target_node = gcs.node_of_point(pre_grasp_pose.position)
+        # Find a node in free space that is near the pre-grasp pose.
+        # Since the navigation map bloats obstacles, the pre-grasp pose itself might be
+        # inside an obstacle. We use a point further away from the handle to find
+        # the connected component of the free space.
+        target_node = gcs.node_of_point(self.door.handle.pre_grasp_pose().position)
         if target_node is None:
             raise ValueError(
-                f"Target node not found for door handle: {self.door.handle.root}"
+                f"Target node not found for door handle pre grasp pose: {self.door.handle.pre_grasp_pose()}"
             )
 
         gcs = gcs.create_subgraph(
