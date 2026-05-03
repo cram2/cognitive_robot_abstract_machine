@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import rustworkx
 
 from krrood.entity_query_language.factories import underspecified, variable
-from pycram.datastructures.enums import Arms
+from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
 from pycram.plans.factories import sequential
 from pycram.robot_plans.actions.base import ActionDescription
@@ -14,6 +14,7 @@ from semantic_digital_twin.robots.abstract_robot import Manipulator
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
 from semantic_digital_twin.spatial_computations.ik_solver import UnreachableException
 from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.graph_of_convex_sets import (
     navigation_map_at_target,
     translate_free_space_to_where_condition,
@@ -62,16 +63,17 @@ class Sage10kOpenDoor(ActionDescription):
             )
         )
 
+        region = gcs.spawn_as_region()
         reach_query = underspecified(MoveToReach)(
             target_pose=pre_grasp_pose,
             robot_x=...,
-            robot_y=...,
+            robot_y=0.0,
             hip_rotation=0.0,
             grasp_description=underspecified(GraspDescription)(
-                approach_direction=...,
-                vertical_alignment=...,
+                approach_direction=ApproachDirection.FRONT,
+                vertical_alignment=VerticalAlignment.NoAlignment,
                 manipulator=variable(Manipulator, self.world.semantic_annotations),
-                rotate_gripper=...,
+                rotate_gripper=True,
             ),
         )
 

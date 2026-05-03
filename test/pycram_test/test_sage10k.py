@@ -68,7 +68,7 @@ def wall_door_handle_world():
             name=PrefixedName("handle"),
             world=world,
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                z=1.0, y=0.25, x=0.06
+                z=0.6, y=0.25, x=0.06
             ),
             scale=Scale(0.1, 0.1, 0.05),
         )
