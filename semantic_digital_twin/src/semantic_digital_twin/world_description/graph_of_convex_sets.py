@@ -15,7 +15,11 @@ from typing_extensions import List, Optional, Dict, Sequence
 from typing_extensions import Self
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.operators.core_logical_operators import OR, AND, chained_logic
+from krrood.entity_query_language.operators.core_logical_operators import (
+    OR,
+    AND,
+    chained_logic,
+)
 from random_events.interval import reals, Interval, SimpleInterval, closed, Bound
 from random_events.product_algebra import Event
 from random_events.product_algebra import SimpleEvent
@@ -642,36 +646,22 @@ class GraphOfConvexSets:
         if name is None:
             name = PrefixedName("gcs_region")
 
-        shapes = []
-        for box in self.graph.nodes():
-            center_x = (box.min_x + box.max_x) / 2
-            center_y = (box.min_y + box.max_y) / 2
-            center_z = (box.min_z + box.max_z) / 2
+        bbox_collection = BoundingBoxCollection(
+            shapes=list(self.graph.nodes()),
+            reference_frame=self.search_space.reference_frame,
+        )
 
-            box_origin = box.origin @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                center_x, center_y, center_z
-            )
+        region = Region.from_shape_collection(name, bbox_collection.as_shapes())
 
-            shapes.append(
-                Box(
-                    origin=box_origin,
-                    scale=Scale(
-                        box.max_x - box.min_x,
-                        box.max_y - box.min_y,
-                        box.max_z - box.min_z,
-                    ),
+        with self.world.modify_world():
+            self.world.add_region(region)
+
+            self.world.add_connection(
+                FixedConnection(
+                    parent=self.search_space.reference_frame,
+                    child=region,
                 )
             )
-
-        region = Region.from_shape_collection(name, ShapeCollection(shapes))
-        self.world.add_region(region)
-
-        self.world.add_connection(
-            FixedConnection(
-                parent=self.search_space.reference_frame,
-                child=region,
-            )
-        )
         return region
 
 
@@ -770,11 +760,12 @@ def translate_free_space_to_where_condition(
     :param y_variable_name: The name of the Y variable in the expression
     :return: The where condition describing the constraints of X and Y variables
     """
+
     def resolve_variable(expr: SymbolicExpression, name: str) -> SymbolicExpression:
         if hasattr(expr, "selected_variable"):
             var = expr.selected_variable
             if name.startswith(var._name_ + "."):
-                name = name[len(var._name_) + 1:]
+                name = name[len(var._name_) + 1 :]
                 expr = var
 
         for part in name.split("."):
@@ -794,10 +785,28 @@ def translate_free_space_to_where_condition(
 
         for si_x in x_interval.simple_sets:
             for si_y in y_interval.simple_sets:
-                x_low = x_var >= si_x.lower if si_x.left == Bound.CLOSED else x_var > si_x.lower
-                x_high = x_var <= si_x.upper if si_x.right == Bound.CLOSED else x_var < si_x.upper
-                y_low = y_var >= si_y.lower if si_y.left == Bound.CLOSED else y_var > si_y.lower
-                y_high = y_var <= si_y.upper if si_y.right == Bound.CLOSED else y_var < si_y.upper
-                simple_event_conditions.append(chained_logic(AND, x_low, x_high, y_low, y_high))
+                x_low = (
+                    x_var >= si_x.lower
+                    if si_x.left == Bound.CLOSED
+                    else x_var > si_x.lower
+                )
+                x_high = (
+                    x_var <= si_x.upper
+                    if si_x.right == Bound.CLOSED
+                    else x_var < si_x.upper
+                )
+                y_low = (
+                    y_var >= si_y.lower
+                    if si_y.left == Bound.CLOSED
+                    else y_var > si_y.lower
+                )
+                y_high = (
+                    y_var <= si_y.upper
+                    if si_y.right == Bound.CLOSED
+                    else y_var < si_y.upper
+                )
+                simple_event_conditions.append(
+                    chained_logic(AND, x_low, x_high, y_low, y_high)
+                )
 
     return chained_logic(OR, *simple_event_conditions)
