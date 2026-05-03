@@ -63,17 +63,18 @@ class Sage10kOpenDoor(ActionDescription):
             )
         )
 
-        region = gcs.spawn_as_region()
+        gcs.spawn_as_region()
+
         reach_query = underspecified(MoveToReach)(
             target_pose=pre_grasp_pose,
             robot_x=...,
-            robot_y=0.0,
+            robot_y=...,
             hip_rotation=0.0,
             grasp_description=underspecified(GraspDescription)(
                 approach_direction=ApproachDirection.FRONT,
                 vertical_alignment=VerticalAlignment.NoAlignment,
                 manipulator=variable(Manipulator, self.world.semantic_annotations),
-                rotate_gripper=True,
+                rotate_gripper=False,
             ),
         )
 
@@ -88,11 +89,4 @@ class Sage10kOpenDoor(ActionDescription):
 
         open_action = OpenAction(object_designator=self.door.handle.root, arm=arm)
 
-        self.add_subplan(
-            sequential(
-                [
-                    reach_action,
-                    # open_action
-                ]
-            )
-        ).perform()
+        self.add_subplan(sequential([reach_action, open_action])).perform()

@@ -60,6 +60,7 @@ class NavigateAction(ActionDescription):
         """
         The robot needs to be within 3 cm of the target location
         """
+
         return allclose(
             context.robot.root.global_pose,
             kwargs["target_location"],

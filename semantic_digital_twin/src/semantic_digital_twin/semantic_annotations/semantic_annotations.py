@@ -47,7 +47,7 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.world_description.geometry import Scale, Mesh
+from semantic_digital_twin.world_description.geometry import Scale, Mesh, Color
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
     ShapeCollection,
@@ -116,13 +116,13 @@ class Handle(HasRootBody):
         :param thickness: The thickness of the handle walls.
         """
 
-        x_interval = closed(0, scale.x - thickness)
-        y_interval = closed(
-            -scale.y / 2 + thickness,
-            scale.y / 2 - thickness,
+        x_interval = closed(-scale.x + thickness, 0)
+        z_interval = closed(
+            -scale.z / 2 + thickness,
+            scale.z / 2 - thickness,
         )
 
-        z_interval = closed(-scale.z / 2, scale.z / 2)
+        y_interval = closed(-scale.y / 2, scale.y / 2)
 
         return SimpleEvent.from_data(
             {
@@ -139,7 +139,7 @@ class Handle(HasRootBody):
         :return: The pre grasp pose.
         """
         return Pose.from_xyz_rpy(
-            reference_frame=self.root, x=self.root.collision.max_point.x + 0.05
+            reference_frame=self.root, x=(self.root.collision.min_point.x - 0.05)
         )
 
 
@@ -271,10 +271,12 @@ class Door(HasHandle, HasHinge):
         entry_way_region_name = PrefixedName(
             name.name + "entry_way_region", name.prefix
         )
+
         entry_way_region = Region(
             name=entry_way_region_name,
             area=ShapeCollection([Mesh.from_trimesh(mesh=door_body.combined_mesh)]),
         )
+        entry_way_region.area.dye_shapes(Color(R=1.0, G=1.0, B=1.0, A=0.2))
         entry_way = EntryWay(name=entry_way_name, root=entry_way_region)
         world.add_region(entry_way.root)
         world.add_connection(FixedConnection(door_body, entry_way.root))

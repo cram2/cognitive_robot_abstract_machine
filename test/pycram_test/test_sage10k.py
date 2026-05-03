@@ -68,9 +68,12 @@ def wall_door_handle_world():
             name=PrefixedName("handle"),
             world=world,
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                z=0.6, y=0.25, x=0.06
+                z=0.6,
+                y=0.25,
+                x=0.06,
+                yaw=np.pi,
             ),
-            scale=Scale(0.1, 0.1, 0.05),
+            scale=Scale(0.05, 0.02, 0.2),
         )
         handle.root.visual.dye_shapes(Color(R=0.8, G=0.8, B=0.1))
         door.add_handle(handle)
