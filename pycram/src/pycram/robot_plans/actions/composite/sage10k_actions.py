@@ -51,8 +51,10 @@ class Sage10kOpenDoor(ActionDescription):
             )
 
         gcs = gcs.create_subgraph(
-            rustworkx.node_connected_component(
-                gcs.graph, gcs.box_to_index_map[target_node]
+            list(
+                rustworkx.node_connected_component(
+                    gcs.graph, gcs.box_to_index_map[target_node]
+                )
             )
         )
 
