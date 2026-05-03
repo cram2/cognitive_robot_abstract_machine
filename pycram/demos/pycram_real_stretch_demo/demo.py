@@ -128,15 +128,15 @@ if not world.is_entity_in_world_by_name("breakfast_cereal.stl"):
             scale=Scale(0.305, 0.85, 0.018),
         )
         shelf.add_shelf_layer(shelf_layer2)
-        shelf_layer3 = ShelfLayer.create_with_new_body_in_world(
-            world=world,
-            name=PrefixedName("shelf_layer3"),
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                0.455 + (0.85 / 2), 0, 1.265, yaw=-np.pi / 2, reference_frame=world.root
-            ),
-            scale=Scale(0.305, 0.85, 0.018),
-        )
-        shelf.add_shelf_layer(shelf_layer3)
+        # shelf_layer3 = ShelfLayer.create_with_new_body_in_world(
+        #     world=world,
+        #     name=PrefixedName("shelf_layer3"),
+        #     world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+        #         0.455 + (0.85 / 2), 0, 1.265, yaw=-np.pi / 2, reference_frame=world.root
+        #     ),
+        #     scale=Scale(0.305, 0.85, 0.018),
+        # )
+        # shelf.add_shelf_layer(shelf_layer3)
         shelf_layer4 = ShelfLayer.create_with_new_body_in_world(
             world=world,
             name=PrefixedName("shelf_layer4"),
@@ -303,6 +303,7 @@ grasp_desc = GraspDescription(
     VerticalAlignment.TOP,
     robot_annotation.arm.manipulator,
     rotate_gripper=True,
+    manipulation_offset=0.1,
 )
 
 # input("Ready ...")
@@ -316,12 +317,12 @@ plan = sequential(
             world.get_body_by_name("breakfast_cereal.stl"), Arms.LEFT, grasp_desc
         ),
         ParkArmsAction(Arms.BOTH),
-        NavigateAction(Pose.from_xyz_rpy(2, 2.25, 0, reference_frame=world.root)),
+        NavigateAction(
+            Pose.from_xyz_rpy(2, 2.4, 0, yaw=np.pi, reference_frame=world.root)
+        ),
         PlaceAction(
             object_designator=world.get_body_by_name("breakfast_cereal.stl"),
-            target_location=Pose.from_xyz_rpy(
-                2, 3, 0.46, yaw=-1.57, reference_frame=world.root
-            ),
+            target_location=Pose.from_xyz_rpy(2, 2.9, 0.46, reference_frame=world.root),
             arm=Arms.LEFT,
         ),
         ParkArmsAction(Arms.BOTH),
