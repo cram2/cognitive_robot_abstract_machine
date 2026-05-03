@@ -34,7 +34,12 @@ from semantic_digital_twin.world_description.world_entity import (
     Region,
 )
 from semantic_digital_twin.world_description.connections import FixedConnection
-from semantic_digital_twin.world_description.geometry import BoundingBox, Box, Scale
+from semantic_digital_twin.world_description.geometry import (
+    BoundingBox,
+    Box,
+    Scale,
+    Color,
+)
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
     ShapeCollection,
@@ -635,12 +640,17 @@ class GraphOfConvexSets:
             *[node.simple_event for node in self.graph.nodes()]
         )
 
-    def spawn_as_region(self, name: Optional[PrefixedName] = None) -> Region:
+    def spawn_as_region(
+        self,
+        name: Optional[PrefixedName] = None,
+        color: Color = Color(0.5, 1.0, 0.5, 0.5),
+    ) -> Region:
         """
         Spawn the GCS as a region (world_entity) connected with a fixed connection with the root of the GCS search space.
         The geometry should be all boxes extracted from its free space.
 
         :param name: The name of the region.
+        :param color: The color of the region.
         :return: The region.
         """
         if name is None:
@@ -651,7 +661,9 @@ class GraphOfConvexSets:
             reference_frame=self.search_space.reference_frame,
         )
 
-        region = Region.from_shape_collection(name, bbox_collection.as_shapes())
+        shapes = bbox_collection.as_shapes()
+        shapes.dye_shapes(color)
+        region = Region.from_shape_collection(name, shapes)
 
         with self.world.modify_world():
             self.world.add_region(region)
