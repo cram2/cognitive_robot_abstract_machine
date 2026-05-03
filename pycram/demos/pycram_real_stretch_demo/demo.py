@@ -285,7 +285,7 @@ if not world.is_entity_in_world_by_name("breakfast_cereal.stl"):
                 shelf_layer2.root,
                 cereal.root,
                 HomogeneousTransformationMatrix.from_xyz_rpy(
-                    z=0.105, yaw=np.pi / 2, reference_frame=shelf_layer2.root
+                    z=0.105, yaw=-np.pi / 2, reference_frame=shelf_layer2.root
                 ),
             ),
         )
@@ -316,7 +316,7 @@ plan = sequential(
             world.get_body_by_name("breakfast_cereal.stl"), Arms.LEFT, grasp_desc
         ),
         ParkArmsAction(Arms.BOTH),
-        NavigateAction(Pose.from_xyz_rpy(2, 2.5, 0, reference_frame=world.root)),
+        NavigateAction(Pose.from_xyz_rpy(2, 2.25, 0, reference_frame=world.root)),
         PlaceAction(
             object_designator=world.get_body_by_name("breakfast_cereal.stl"),
             target_location=Pose.from_xyz_rpy(
