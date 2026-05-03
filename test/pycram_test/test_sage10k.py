@@ -4,6 +4,9 @@ import numpy as np
 import pytest
 
 from pycram.datastructures.dataclasses import Context
+from pycram.motion_executor import simulated_robot
+from pycram.plans.factories import execute_single
+from pycram.robot_plans.actions.composite.sage10k_actions import Sage10kOpenDoor
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -97,4 +100,7 @@ def test_door_opening(wall_door_handle_world, hsr_world_setup, rclpy_node):
 
     context = Context.from_world(world)
 
-    assert door.hinge.root.parent_connection.position == np.pi / 2
+    with simulated_robot:
+        execute_single(Sage10kOpenDoor(door), context=context).perform()
+
+    assert np.isclose(door.hinge.root.parent_connection.position, np.pi / 2, atol=2e-2)
