@@ -16,7 +16,7 @@ from typing_extensions import Self
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.operators.core_logical_operators import OR, AND, chained_logic
-from random_events.interval import reals, Interval, SimpleInterval, closed
+from random_events.interval import reals, Interval, SimpleInterval, closed, Bound
 from random_events.product_algebra import Event
 from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
@@ -723,8 +723,21 @@ def translate_free_space_to_where_condition(
     :param y_variable_name: The name of the Y variable in the expression
     :return: The where condition describing the constraints of X and Y variables
     """
-    x_var = getattr(expression, x_variable_name)
-    y_var = getattr(expression, y_variable_name)
+    def resolve_variable(expr: SymbolicExpression, name: str) -> SymbolicExpression:
+        if hasattr(expr, "selected_variable"):
+            var = expr.selected_variable
+            if name.startswith(var._name_ + "."):
+                name = name[len(var._name_) + 1:]
+                expr = var
+
+        for part in name.split("."):
+            expr = getattr(expr, part)
+        return expr
+
+    x_var = resolve_variable(expression, x_variable_name)
+    y_var = resolve_variable(expression, y_variable_name)
+
+    free_space = free_space.marginal(SpatialVariables.xy)
 
     simple_event_conditions = []
 
@@ -732,16 +745,12 @@ def translate_free_space_to_where_condition(
         x_interval = simple_event[SpatialVariables.x.value]
         y_interval = simple_event[SpatialVariables.y.value]
 
-        x_conds = []
-        for si in x_interval.simple_sets:
-            x_conds.append(chained_logic(AND, x_var >= si.lower, x_var <= si.upper))
-        x_cond = chained_logic(OR, *x_conds)
-
-        y_conds = []
-        for si in y_interval.simple_sets:
-            y_conds.append(chained_logic(AND, y_var >= si.lower, y_var <= si.upper))
-        y_cond = chained_logic(OR, *y_conds)
-
-        simple_event_conditions.append(chained_logic(AND, x_cond, y_cond))
+        for si_x in x_interval.simple_sets:
+            for si_y in y_interval.simple_sets:
+                x_low = x_var >= si_x.lower if si_x.left == Bound.CLOSED else x_var > si_x.lower
+                x_high = x_var <= si_x.upper if si_x.right == Bound.CLOSED else x_var < si_x.upper
+                y_low = y_var >= si_y.lower if si_y.left == Bound.CLOSED else y_var > si_y.lower
+                y_high = y_var <= si_y.upper if si_y.right == Bound.CLOSED else y_var < si_y.upper
+                simple_event_conditions.append(chained_logic(AND, x_low, x_high, y_low, y_high))
 
     return chained_logic(OR, *simple_event_conditions)
