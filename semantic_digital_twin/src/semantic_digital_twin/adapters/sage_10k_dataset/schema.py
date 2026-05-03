@@ -669,7 +669,8 @@ class Sage10kDoor(Sage10kWithID):
         """
         door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
             y=0.1,
-            yaw=np.pi if self.opens_inward else 0.0,
+            x=door.root.collision.min_point.x,
+            yaw=np.pi if not self.opens_inward else 0.0,
             reference_frame=door.root,
         )
         world_root_T_handle = world.transform(door_T_handle, world.root)
@@ -680,7 +681,7 @@ class Sage10kDoor(Sage10kWithID):
                 name=handle_name,
                 world=world,
                 world_root_T_self=world_root_T_handle,
-                scale=Scale(x=0.1, y=0.1, z=0.05),
+                scale=Scale(0.05, 0.02, 0.2),
             )
             door.add_handle(handle)
         return handle

@@ -22,19 +22,22 @@ drop_database(engine)
 Base.metadata.create_all(engine)
 session = sessionmaker(engine)()
 print(f"creating the database took {time.time() - current_time:.2f} seconds")
+
 current_time = time.time()
 print("loading scene")
 loader = Sage10kDatasetLoader()
 scene = loader.create_scene(Sage10kNonShittyScenes.GYM)
 world = scene.create_world()
 print(f"Loading the scene took {time.time() - current_time:.2f} seconds")
+
 current_time = time.time()
 print("loading robot")
 pr2 = create_hsrb_in_world(world)
 print(f"Loading the robot took {time.time() - current_time:.2f} seconds")
+
+current_time = time.time()
 print("saving to database")
 dao = to_dao(world)
-
 session.add(dao)
 session.commit()
 print(f"Saving to database took {time.time() - current_time:.2f} seconds")
