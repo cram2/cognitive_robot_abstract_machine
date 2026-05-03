@@ -2,6 +2,8 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
+
+from pycram.datastructures.dataclasses import Context
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -93,5 +95,6 @@ def test_door_opening(wall_door_handle_world, hsr_world_setup, rclpy_node):
     viz_marker_publisher = VizMarkerPublisher(node=rclpy_node, _world=world)
     viz_marker_publisher.with_tf_publisher()
 
-    door.hinge.root.parent_connection.position = np.pi / 2
+    context = Context.from_world(world)
+
     assert door.hinge.root.parent_connection.position == np.pi / 2
