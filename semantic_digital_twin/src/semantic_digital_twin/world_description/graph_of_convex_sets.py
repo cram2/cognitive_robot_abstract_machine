@@ -15,7 +15,7 @@ from typing_extensions import List, Optional, Dict, Sequence
 from typing_extensions import Self
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.operators.core_logical_operators import OR
+from krrood.entity_query_language.operators.core_logical_operators import OR, AND, chained_logic
 from random_events.interval import reals, Interval, SimpleInterval, closed
 from random_events.product_algebra import Event
 from random_events.product_algebra import SimpleEvent
@@ -723,3 +723,25 @@ def translate_free_space_to_where_condition(
     :param y_variable_name: The name of the Y variable in the expression
     :return: The where condition describing the constraints of X and Y variables
     """
+    x_var = getattr(expression, x_variable_name)
+    y_var = getattr(expression, y_variable_name)
+
+    simple_event_conditions = []
+
+    for simple_event in free_space.simple_sets:
+        x_interval = simple_event[SpatialVariables.x.value]
+        y_interval = simple_event[SpatialVariables.y.value]
+
+        x_conds = []
+        for si in x_interval.simple_sets:
+            x_conds.append(chained_logic(AND, x_var >= si.lower, x_var <= si.upper))
+        x_cond = chained_logic(OR, *x_conds)
+
+        y_conds = []
+        for si in y_interval.simple_sets:
+            y_conds.append(chained_logic(AND, y_var >= si.lower, y_var <= si.upper))
+        y_cond = chained_logic(OR, *y_conds)
+
+        simple_event_conditions.append(chained_logic(AND, x_cond, y_cond))
+
+    return chained_logic(OR, *simple_event_conditions)
