@@ -11,13 +11,14 @@ from pycram.robot_plans.actions.sage10k_actions import (
     Sage10kCraftsmanLobbyDemo,
     Sage10kTropicalWarehouse,
     Sage10kVaporwave,
+    Sage10kEclecticResidence,
 )
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from semantic_digital_twin.orm.ormatic_interface import *  # type: ignore
 
-demo = Sage10kVaporwave()
+demo = Sage10kEclecticResidence()
 demo.create_world()
 if not rclpy.ok():
     rclpy.init()
