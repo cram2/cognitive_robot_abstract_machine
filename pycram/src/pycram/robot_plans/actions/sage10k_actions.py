@@ -509,6 +509,130 @@ class Sage10kVaporwave(Sage10kAbstractDemo):
 
 
 @dataclass
+class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemo):
+    scene_url = Sage10kNonShittyScenes.SOUTHWESTERN_STORE
+
+    @property
+    def plan(self):
+        arm = Arms.RIGHT
+        context = Context.from_world(self.world, query_backend=ProbabilisticBackend())
+        grasp_description = GraspDescription(
+            ApproachDirection.RIGHT,
+            VerticalAlignment.NoAlignment,
+            self.robot.arm.manipulator,
+        )
+        open_door = Sage10kOpenDoor(self.main_entrance)
+
+        plan = sequential(
+            [
+                open_door,
+                ParkArmsAction(Arms.BOTH),
+                NavigateAction(
+                    target_location=Pose.from_xyz_rpy(
+                        x=0.81, y=4.81, reference_frame=self.world.root
+                    )
+                ),
+                MoveAndPickUpAction(
+                    object_designator=self.world_P_object_of_interest,
+                    standing_position=self.pickup_navigation_pose,
+                    arm=arm,
+                    grasp_description=grasp_description,
+                ),
+                ParkArmsAction(Arms.BOTH),
+                NavigateAction(
+                    target_location=Pose.from_xyz_rpy(
+                        x=0.81, y=4.81, reference_frame=self.world.root
+                    )
+                ),
+                MoveAndPlaceAction(
+                    object_designator=self.world_P_object_of_interest,
+                    standing_position=self.place_navigation_pose,
+                    arm=arm,
+                    target_location=self.place_pose,
+                ),
+                ParkArmsAction(Arms.BOTH),
+                NavigateAction(
+                    target_location=Pose.from_xyz_rpy(
+                        x=0.48, y=4.81, reference_frame=self.world.root
+                    )
+                ),
+            ],
+            context=context,
+        ).plan
+        return plan
+
+    @property
+    def world_P_object_of_interest(self):
+        @symbolic_function
+        def planar_distance(point1: Point3, point2: Point3):
+            return point1.euclidean_distance(point2)
+
+        near_pose = Pose.from_xyz_rpy(
+            x=1.7, y=0.49, z=1.17, reference_frame=self.world.root
+        )
+        v_final = variable(
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
+        )
+        bottle = (
+            an(entity(v_final)).where(
+                contains(v_final.type_description, "toyshelf"),
+                planar_distance(v_final.root.global_pose.position, near_pose.position)
+                < 0.9,
+            )
+        ).first()
+
+        return bottle.root
+
+    @property
+    def robot_starting_pose(self):
+        return Pose.from_xyz_rpy(3.8, 6.5)
+
+    @property
+    def pickup_navigation_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(
+            0.63, 0.70, 0, yaw=np.pi / 2, reference_frame=self.world.root
+        )
+
+    @property
+    def place_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(4.41, 4.46, z=0.368, reference_frame=self.world.root)
+
+    @property
+    def place_navigation_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(3.99, 4.66, 0, reference_frame=self.world.root)
+
+    @cached_property
+    def main_entrance(self):
+        room = variable(RoomWithWallsAndDoors, self.world.semantic_annotations)
+        store = an(entity(room).where(contains(room.room_type, "toy store"))).first()
+        main_entrance: DoorWithType = an(
+            entity(v := variable_from(store.doors)).where(
+                contains(v.type_description, "main")
+            )
+        ).first()
+        return main_entrance
+
+    def preprocess_world(self):
+        super().preprocess_world()
+        v = variable(
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
+        )
+        obstacles_of_main_entrance = an(
+            entity(v).where(
+                compute_euclidean_planar_distance(
+                    v.root, self.main_entrance.root, Vector3.Z()
+                )
+                < 0.9
+            )
+        )
+        benches = an(entity(v).where(contains(v.type_description, "bench")))
+        self.remove_rooted_annotations(obstacles_of_main_entrance.evaluate())
+        self.remove_rooted_annotations(benches.evaluate())
+
+
+@dataclass
 class Sage10kBrutalistStoreDemo(Sage10kAbstractDemo):
     scene_url = Sage10kNonShittyScenes.BRUTALIST_STORE
 
