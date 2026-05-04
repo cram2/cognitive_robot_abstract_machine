@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from abc import abstractmethod, ABC
+from abc import abstractmethod, ABC, abstractproperty
 from dataclasses import dataclass, fields, Field
 from functools import cached_property
 
@@ -67,6 +67,16 @@ class ActionDescription(Designator):
         result = self.execute()
 
         return result
+
+    @property
+    @abstractmethod
+    def action_plan(self) -> PlanNode: ...
+
+    """
+    Creates the whole plan for this action. 
+    
+    :return: The root not of the plan of this action 
+    """
 
     @abstractmethod
     def execute(self) -> Any:
