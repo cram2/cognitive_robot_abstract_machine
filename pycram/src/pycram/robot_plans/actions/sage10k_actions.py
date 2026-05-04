@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import field
 from functools import cached_property
 
 import numpy as np
@@ -21,6 +22,9 @@ from pycram.robot_plans.actions.composite.transporting import (
 )
 from pycram.robot_plans.actions.core.robot_body import ParkArmsAction
 from semantic_digital_twin.adapters.sage_10k_dataset.loader import Sage10kDatasetLoader
+from semantic_digital_twin.adapters.sage_10k_dataset.processing import (
+    create_hsrb_in_world,
+)
 from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
     Sage10kNonShittyScenes,
     NaturalLanguageDescriptionWithTypeDescription,
@@ -36,32 +40,31 @@ from semantic_digital_twin.spatial_types import Point3, Pose, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
-
-@dataclass
-class OpenWithHandleMotion(BaseMotion):
-    """
-    Designator for opening container
-    """
-
-    handle: Body
-
-    manipulator: Manipulator
-
-    @property
-    def _motion_chart(self):
-        return Open(tip_link=self.manipulator.tool_frame, environment_link=self.handle)
-
-
-@dataclass
-class OpenWithHandleAction(ActionDescription):
-    """
-    Opens a container like object
-    """
-
-    handle: Handle
-    manipulator: Manipulator
-
-    def execute(self) -> None: ...
+# @dataclass
+# class OpenWithHandleMotion(BaseMotion):
+#     """
+#     Designator for opening container
+#     """
+#
+#     handle: Body
+#
+#     manipulator: Manipulator
+#
+#     @property
+#     def _motion_chart(self):
+#         return Open(tip_link=self.manipulator.tool_frame, environment_link=self.handle)
+#
+#
+# @dataclass
+# class OpenWithHandleAction(ActionDescription):
+#     """
+#     Opens a container like object
+#     """
+#
+#     handle: Handle
+#     manipulator: Manipulator
+#
+#     def execute(self) -> None: ...
 
 
 @dataclass
@@ -162,7 +165,39 @@ class Sage10kNonShittyScenesDemoConfig:
 @dataclass
 class Sage10kGymDemo:
     scene_url: str = Sage10kNonShittyScenes.GYM
-    _world: Optional[World] = None
+    world: Optional[World] = None
+
+    world_P_object_of_interest: Point3 = field(
+        default_factory=lambda: Point3(1.03, -0.716, 0.203),
+    )
+    """
+    Approximate position of the object we want to pick up. Must be within 10cm euclidian distance of the actual object,
+    and no other object is allowed to be within that radius. If thats a problem to do, chose another object.
+    Use the "publish point" functionality in RVIZ to to get the coordinates: click the button, hover over the center of 
+    the object you want to grasp, and read the coordinates from the bottom left of RViz, right next to the reset button. 
+    """
+
+    pickup_navigation_pose: Pose = field(
+        default_factory=lambda: Point3(1.03, -0.716, 0.203),
+    )
+    """
+    Nav pose from where we want to pick up
+    """
+
+    place_pose: Pose = field(
+        default_factory=lambda: Pose.from_xyz_rpy(-0.15, 4.55, 0.865, yaw=np.pi / 2),
+    )
+    """
+    Pose where we want to place the object. also get this from RViz using publish point on the surface.
+    Do not add any object height here, it will be added automatically.
+    """
+
+    place_navigation_pose: Pose = field(
+        default_factory=lambda: Pose.from_xyz_rpy(-0.12, 4, 0, yaw=np.pi / 2),
+    )
+    """
+    Nav pose from where we want to place the object
+    """
 
     @cached_property
     def main_entrance(self):
@@ -175,25 +210,22 @@ class Sage10kGymDemo:
         ).first()
         return main_entrance
 
-    @cached_property
-    def world(self) -> World:
+    def create_world(self) -> World:
         loader = Sage10kDatasetLoader()
         world = loader.create_scene(scene_url=self.scene_url).create_world()
-
-        v = variable(
-            NaturalLanguageDescriptionWithTypeDescription, world.semantic_annotations
-        )
-        self._world = world
+        self.world = world
+        self.preprocess_world()
+        create_hsrb_in_world(self.world)
         return world
 
     @cached_property
     def robot(self) -> HSRB:
-        arm = Arms.RIGHT
-        return world.get_semantic_annotations_by_type(HSRB)[0]
+        return self.world.get_semantic_annotations_by_type(HSRB)[0]
 
     def preprocess_world(self):
         v = variable(
-            NaturalLanguageDescriptionWithTypeDescription, world.semantic_annotations
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
         )
         obstacles_of_main_entrance = an(
             entity(v).where(
@@ -209,21 +241,22 @@ class Sage10kGymDemo:
     def remove_rooted_annotations(self, semantic_annotations: Iterable[HasRootBody]):
         with self.world.modify_world():
             for annotation in semantic_annotations:
-                world.remove_kinematic_structure_entity(annotation.root)
-                world.remove_semantic_annotation(annotation)
+                self.world.remove_kinematic_structure_entity(annotation.root)
+                self.world.remove_semantic_annotation(annotation)
 
+    @property
     def plan(self):
-        self.preprocess_world()
+        arm = Arms.RIGHT
         context = Context.from_world(self.world, query_backend=ProbabilisticBackend())
         grasp_description = GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
-            robot.arm.manipulator,
+            self.robot.arm.manipulator,
         )
         open_door = Sage10kOpenDoor(self.main_entrance)
 
-        [body] = world.get_bodies_by_global_position(
-            config.world_P_object_of_interest, 0.1
+        [body] = self.world.get_bodies_by_global_position(
+            self.world_P_object_of_interest, 0.1
         )
 
         plan = sequential(
@@ -232,17 +265,18 @@ class Sage10kGymDemo:
                 ParkArmsAction(Arms.BOTH),
                 MoveAndPickUpAction(
                     object_designator=body,
-                    standing_position=config.pickup_navigation_pose,
+                    standing_position=self.pickup_navigation_pose,
                     arm=arm,
                     grasp_description=grasp_description,
                 ),
                 ParkArmsAction(Arms.BOTH),
                 MoveAndPlaceAction(
                     object_designator=body,
-                    standing_position=config.place_navigation_pose,
+                    standing_position=self.place_navigation_pose,
                     arm=arm,
-                    target_location=config.place_pose,
+                    target_location=self.place_pose,
                 ),
             ],
             context=context,
         ).plan
+        return plan

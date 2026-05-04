@@ -1,44 +1,30 @@
-import os
+import threading
 import time
 
-from sqlalchemy.orm import sessionmaker
+import rclpy
+from rclpy.executors import SingleThreadedExecutor
 
-from krrood.ormatic.data_access_objects.helper import to_dao
-from krrood.ormatic.utils import create_engine, drop_database
-from semantic_digital_twin.adapters.sage_10k_dataset.loader import Sage10kDatasetLoader
-from semantic_digital_twin.adapters.sage_10k_dataset.processing import (
-    create_pr2_in_world,
-    create_hsrb_in_world,
+from pycram.motion_executor import simulated_robot
+from pycram.robot_plans.actions.sage10k_actions import Sage10kGymDemo
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
 )
-from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
-    Sage10kNonShittyScenes,
-)
-from semantic_digital_twin.orm.ormatic_interface import *
 
-current_time = time.time()
-print("creating database")
-engine = create_engine(os.getenv("SAGE10k_DATABASE_URI"))
-drop_database(engine)
-Base.metadata.create_all(engine)
-session = sessionmaker(engine)()
-print(f"creating the database took {time.time() - current_time:.2f} seconds")
+demo = Sage10kGymDemo()
+demo.create_world()
+if not rclpy.ok():
+    rclpy.init()
+node = rclpy.create_node("test_node")
 
-current_time = time.time()
-print("loading scene")
-loader = Sage10kDatasetLoader()
-scene = loader.create_scene(Sage10kNonShittyScenes.GYM)
-world = scene.create_world()
-print(f"Loading the scene took {time.time() - current_time:.2f} seconds")
+executor = SingleThreadedExecutor()
+executor.add_node(node)
 
-current_time = time.time()
-print("loading robot")
-pr2 = create_hsrb_in_world(world)
-print(f"Loading the robot took {time.time() - current_time:.2f} seconds")
+thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
+thread.start()
+time.sleep(0.1)
 
-current_time = time.time()
-print("saving to database")
-dao = to_dao(world)
-session.add(dao)
-session.commit()
-print(f"Saving to database took {time.time() - current_time:.2f} seconds")
-print(f"Added world to database with database_id: {dao.database_id}")
+viz_marker_publisher = VizMarkerPublisher(_world=demo.world, node=node)
+viz_marker_publisher.with_tf_publisher()
+
+with simulated_robot:
+    demo.plan.perform()
