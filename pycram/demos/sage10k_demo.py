@@ -9,6 +9,7 @@ from pycram.robot_plans.actions.sage10k_actions import Sage10kGymDemo
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
+from semantic_digital_twin.orm.ormatic_interface import *  # type: ignore
 
 demo = Sage10kGymDemo()
 demo.create_world()
