@@ -17,6 +17,7 @@ from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import
     DoorWithType,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Floor,
     Wall,
@@ -661,12 +662,31 @@ class Sage10kDoor(Sage10kWithID):
         :param door: The door to create the handle for.
         :return: The handle of the door.
         """
+
+        floor = world.get_semantic_annotations_by_type(Floor)[0]
+
         door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
             y=0.1,
             x=door.root.collision.min_point.x,
-            yaw=np.pi if not self.opens_inward else 0.0,
             reference_frame=door.root,
         )
+
+        door_T_world = world.transform(door_T_handle, world.root)
+        floor_bounding_box = floor.root.collision.as_bounding_box_collection_at_origin(
+            world.root.global_pose
+        )
+        is_handle_in_room = floor_bounding_box.event.marginal(
+            SpatialVariables.xy
+        ).contains((door_T_world.x, door_T_world.y))
+
+        if is_handle_in_room and self.opens_inward:
+            door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
+                y=0.1,
+                x=door.root.collision.min_point.x,
+                reference_frame=door.root,
+                yaw=np.pi,
+            )
+
         world_root_T_handle = world.transform(door_T_handle, world.root)
         handle_name = PrefixedName(name=f"{self.id}_handle", prefix=self.id)
 

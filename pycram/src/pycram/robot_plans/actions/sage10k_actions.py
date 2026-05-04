@@ -5,17 +5,13 @@ from functools import cached_property
 
 import numpy as np
 
-from giskardpy.motion_statechart.goals.open_close import Open
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import *
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
-from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import sequential
 from pycram.plans.plan import Plan
-from pycram.robot_plans import BaseMotion
-from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.composite.sage10k_actions import Sage10kOpenDoor
 from pycram.robot_plans.actions.composite.transporting import (
     MoveAndPickUpAction,
@@ -33,39 +29,10 @@ from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import
     DoorWithType,
 )
 from semantic_digital_twin.reasoning.predicates import compute_euclidean_planar_distance
-from semantic_digital_twin.robots.abstract_robot import Manipulator
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.spatial_types import Point3, Pose, Vector3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.world_entity import Body
-
-# @dataclass
-# class OpenWithHandleMotion(BaseMotion):
-#     """
-#     Designator for opening container
-#     """
-#
-#     handle: Body
-#
-#     manipulator: Manipulator
-#
-#     @property
-#     def _motion_chart(self):
-#         return Open(tip_link=self.manipulator.tool_frame, environment_link=self.handle)
-#
-#
-# @dataclass
-# class OpenWithHandleAction(ActionDescription):
-#     """
-#     Opens a container like object
-#     """
-#
-#     handle: Handle
-#     manipulator: Manipulator
-#
-#     def execute(self) -> None: ...
 
 
 @dataclass
