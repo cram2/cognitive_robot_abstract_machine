@@ -45,6 +45,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Shelf,
     ShelfLayer,
     Wall,
+    Cereal,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -95,7 +96,7 @@ else:
     ModelSynchronizer(_world=world, node=node)
     StateSynchronizer(_world=world, node=node)
 
-if not world.is_entity_in_world_by_name("breakfast_cereal.stl"):
+if not world.is_entity_in_world_by_name("cheeze_it.obj"):
     with world.modify_world():
         shelf = Shelf.create_with_new_body_in_world(
             world=world,
@@ -128,15 +129,15 @@ if not world.is_entity_in_world_by_name("breakfast_cereal.stl"):
             scale=Scale(0.305, 0.85, 0.018),
         )
         shelf.add_shelf_layer(shelf_layer2)
-        # shelf_layer3 = ShelfLayer.create_with_new_body_in_world(
-        #     world=world,
-        #     name=PrefixedName("shelf_layer3"),
-        #     world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-        #         0.455 + (0.85 / 2), 0, 1.265, yaw=-np.pi / 2, reference_frame=world.root
-        #     ),
-        #     scale=Scale(0.305, 0.85, 0.018),
-        # )
-        # shelf.add_shelf_layer(shelf_layer3)
+        shelf_layer3 = ShelfLayer.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("shelf_layer3"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                0.455 + (0.85 / 2), 0, 1.265, yaw=-np.pi / 2, reference_frame=world.root
+            ),
+            scale=Scale(0.305, 0.85, 0.018),
+        )
+        shelf.add_shelf_layer(shelf_layer3)
         shelf_layer4 = ShelfLayer.create_with_new_body_in_world(
             world=world,
             name=PrefixedName("shelf_layer4"),
@@ -157,20 +158,19 @@ if not world.is_entity_in_world_by_name("breakfast_cereal.stl"):
         )
         sofa_world = STLParser(
             file_path=CompositePathResolver().resolve(
-                "package://iai_apartment/meshes/visual/sofa.dae"
+                "package://iai_apartment/meshes/visual/sofa_bed.obj"
             )
         ).parse()
-        root: Body = sofa_world.root
-        sofa_mesh_to_real_scale = 0.8
-        root.collision.shapes[0].scale = Scale(
-            sofa_mesh_to_real_scale, sofa_mesh_to_real_scale, sofa_mesh_to_real_scale
+        sofa_height = (
+            sofa_world.root.collision.max_point[2]
+            - sofa_world.root.collision.min_point[2]
         )
-        root.visual.shapes[0].scale = Scale(
-            sofa_mesh_to_real_scale, sofa_mesh_to_real_scale, sofa_mesh_to_real_scale
-        )
-
         world_T_sofa = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=1.0, y=3.25, yaw=-np.pi / 24, reference_frame=world.root
+            x=1.0,
+            y=3.45,
+            z=sofa_height / 2,
+            yaw=13 * (-np.pi / 24),
+            reference_frame=world.root,
         )
         world.merge_world_at_pose(sofa_world, world_T_sofa)
 
@@ -270,15 +270,11 @@ if not world.is_entity_in_world_by_name("breakfast_cereal.stl"):
         )
 
         cereal = STLParser(
-            os.path.join(
-                os.path.dirname(__file__),
-                "..",
-                "..",
-                "resources",
-                "objects",
-                "breakfast_cereal.stl",
+            file_path=CompositePathResolver().resolve(
+                "package://iai_apartment/meshes/visual/cheeze_it.obj"
             )
         ).parse()
+
         world.merge_world(
             cereal,
             FixedConnection(
@@ -289,7 +285,6 @@ if not world.is_entity_in_world_by_name("breakfast_cereal.stl"):
                 ),
             ),
         )
-
 
 print(len(world.bodies))
 
@@ -303,7 +298,6 @@ grasp_desc = GraspDescription(
     VerticalAlignment.TOP,
     robot_annotation.arm.manipulator,
     rotate_gripper=True,
-    manipulation_offset=0.1,
 )
 
 # input("Ready ...")
@@ -313,15 +307,13 @@ plan = sequential(
         # LookAtAction(Pose.from_xyz_rpy(-0.04, 0.69, 0.7, reference_frame=world.root)),
         ParkArmsAction(Arms.BOTH),
         NavigateAction(Pose.from_xyz_rpy(1.0, 0.45, 0, reference_frame=world.root)),
-        PickUpAction(
-            world.get_body_by_name("breakfast_cereal.stl"), Arms.LEFT, grasp_desc
-        ),
+        PickUpAction(world.get_body_by_name("cheeze_it.obj"), Arms.LEFT, grasp_desc),
         ParkArmsAction(Arms.BOTH),
         NavigateAction(
             Pose.from_xyz_rpy(2, 2.4, 0, yaw=np.pi, reference_frame=world.root)
         ),
         PlaceAction(
-            object_designator=world.get_body_by_name("breakfast_cereal.stl"),
+            object_designator=world.get_body_by_name("cheeze_it.obj"),
             target_location=Pose.from_xyz_rpy(2, 2.9, 0.46, reference_frame=world.root),
             arm=Arms.LEFT,
         ),
