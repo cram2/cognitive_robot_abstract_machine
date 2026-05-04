@@ -14,7 +14,7 @@ from pycram.datastructures.enums import (
     MovementType,
 )
 from pycram.datastructures.grasp import GraspDescription
-from pycram.plans.attachment_nodes import ModelChangeNode
+from pycram.plans.attachment_nodes import AttachNode
 from pycram.plans.factories import sequential, execute_single
 from pycram.plans.plan_node import PlanNode
 from pycram.pose_validator import (
@@ -189,7 +189,7 @@ class PickUpAction(ActionDescription):
                     grasp_description=self.grasp_description,
                 ).action_plan,
                 MoveGripperMotion(motion=GripperState.CLOSE, gripper=self.arm),
-                ModelChangeNode(
+                AttachNode(
                     body=self.object_designator,
                     new_parent=ViewManager.get_end_effector_view(
                         self.arm, self.robot

@@ -34,6 +34,7 @@ from pycram.plans.plan_node import (
 from pycram.robot_plans import *
 from pycram.robot_plans.actions.core.navigation import NavigateAction
 from pycram.robot_plans.actions.core.pick_up import PickUpAction
+from pycram.robot_plans.actions.core.placing import PlaceAction
 from pycram.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
@@ -495,16 +496,18 @@ def test_motion_order_pick_up(mutable_model_world):
 def test_motion_order_place(mutable_model_world):
     world, robot_view, context = mutable_model_world
 
-    grasp_description = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        robot_view.left_arm.manipulator,
-    )
-
     milk_body = world.get_body_by_name("milk.stl")
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        1, -2, 0.6, reference_frame=world.root
-    )
+    milk_body.parent_connection.origin = world.get_body_by_name(
+        "l_gripper_tool_frame"
+    ).global_pose
+
+    with world.modify_world():
+
+        world.move_branch_with_fixed_connection(
+            world.get_body_by_name("milk.stl"),
+            world.get_body_by_name("l_gripper_tool_frame"),
+        )
+
     robot_view.root.parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(
             0.3, -2.4, 0, reference_frame=world.root
@@ -514,8 +517,10 @@ def test_motion_order_place(mutable_model_world):
 
     root = sequential(
         [
-            PickUpAction(
-                world.get_body_by_name("milk.stl"), Arms.LEFT, grasp_description
+            PlaceAction(
+                world.get_body_by_name("milk.stl"),
+                Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+                Arms.LEFT,
             ),
         ],
         context,
@@ -537,9 +542,8 @@ def test_motion_order_place(mutable_model_world):
     motion_names = [motion.name for motion in all_motions]
 
     assert motion_names == [
+        "MoveTCP",
+        "MoveTCP",
         "OpenGripper",
-        "MoveTCP",
-        "MoveTCP",
-        "CloseGripper",
         "MoveTCP",
     ]

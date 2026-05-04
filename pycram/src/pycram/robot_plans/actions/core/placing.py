@@ -14,7 +14,9 @@ from pycram.datastructures.enums import (
     VerticalAlignment,
 )
 from pycram.datastructures.grasp import GraspDescription
+from pycram.plans.attachment_nodes import AttachNode, DetachNode
 from pycram.plans.factories import sequential, execute_single
+from pycram.plans.plan_node import PlanNode
 from pycram.querying.predicates import GripperIsFree
 from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
 from pycram.robot_plans.actions.core.pick_up import PickUpAction, ReachAction
@@ -50,7 +52,8 @@ class PlaceAction(ActionDescription):
     Arm that is currently holding the object
     """
 
-    def execute(self) -> None:
+    @property
+    def action_plan(self) -> PlanNode:
         arm = ViewManager.get_arm_view(self.arm, self.robot)
         manipulator = arm.manipulator
 
@@ -65,41 +68,96 @@ class PlaceAction(ActionDescription):
             )
         )
 
-        self.add_subplan(
-            sequential(
-                [
-                    ReachAction(
-                        self.target_location,
-                        self.arm,
-                        previous_grasp,
-                        self.object_designator,
-                        reverse_reach_order=True,
-                    ),
-                    MoveGripperMotion(GripperState.OPEN, self.arm),
-                ]
-            )
-        ).perform()
-
-        # Detaches the object from the robot
-        world_root = self.world.root
-        obj_transform = self.world.compute_forward_kinematics(
-            world_root, self.object_designator
-        )
-        with self.world.modify_world():
-            self.world.remove_connection(self.object_designator.parent_connection)
-            connection = Connection6DoF.create_with_dofs(
-                parent=world_root, child=self.object_designator, world=self.world
-            )
-            self.world.add_connection(connection)
-            connection.origin = obj_transform
-
         _, _, retract_pose = previous_grasp._pose_sequence(
             self.target_location, self.object_designator, reverse=True
         )
 
-        self.add_subplan(
-            execute_single(MoveToolCenterPointMotion(retract_pose, self.arm))
-        ).perform()
+        return sequential(
+            [
+                ReachAction(
+                    self.target_location,
+                    self.arm,
+                    previous_grasp,
+                    self.object_designator,
+                    reverse_reach_order=True,
+                ).action_plan,
+                MoveGripperMotion(GripperState.OPEN, self.arm),
+                DetachNode(body=self.object_designator, new_parent=self.world.root),
+                MoveToolCenterPointMotion(retract_pose, self.arm),
+            ],
+            self.context,
+        )
+
+        # # Detaches the object from the robot
+        # world_root = self.world.root
+        # obj_transform = self.world.compute_forward_kinematics(
+        #     world_root, self.object_designator
+        # )
+        # with self.world.modify_world():
+        #     self.world.remove_connection(self.object_designator.parent_connection)
+        #     connection = Connection6DoF.create_with_dofs(
+        #         parent=world_root, child=self.object_designator, world=self.world
+        #     )
+        #     self.world.add_connection(connection)
+        #     connection.origin = obj_transform
+
+        # self.add_subplan(
+        #     execute_single(MoveToolCenterPointMotion(retract_pose, self.arm))
+        # ).perform()
+
+    def execute(self) -> Any:
+        self.add_subplan(self.action_plan).perform()
+
+    # def execute(self) -> None:
+    #     arm = ViewManager.get_arm_view(self.arm, self.robot)
+    #     manipulator = arm.manipulator
+    #
+    #     previous_pick = self.plan_node.get_previous_node_by_designator_type(
+    #         PickUpAction
+    #     )
+    #     previous_grasp = (
+    #         previous_pick.designator.grasp_description
+    #         if previous_pick
+    #         else GraspDescription(
+    #             ApproachDirection.FRONT, VerticalAlignment.NoAlignment, manipulator
+    #         )
+    #     )
+    #
+    #     self.add_subplan(
+    #         sequential(
+    #             [
+    #                 ReachAction(
+    #                     self.target_location,
+    #                     self.arm,
+    #                     previous_grasp,
+    #                     self.object_designator,
+    #                     reverse_reach_order=True,
+    #                 ),
+    #                 MoveGripperMotion(GripperState.OPEN, self.arm),
+    #             ]
+    #         )
+    #     ).perform()
+    #
+    #     # Detaches the object from the robot
+    #     world_root = self.world.root
+    #     obj_transform = self.world.compute_forward_kinematics(
+    #         world_root, self.object_designator
+    #     )
+    #     with self.world.modify_world():
+    #         self.world.remove_connection(self.object_designator.parent_connection)
+    #         connection = Connection6DoF.create_with_dofs(
+    #             parent=world_root, child=self.object_designator, world=self.world
+    #         )
+    #         self.world.add_connection(connection)
+    #         connection.origin = obj_transform
+    #
+    #     _, _, retract_pose = previous_grasp._pose_sequence(
+    #         self.target_location, self.object_designator, reverse=True
+    #     )
+    #
+    #     self.add_subplan(
+    #         execute_single(MoveToolCenterPointMotion(retract_pose, self.arm))
+    #     ).perform()
 
     @staticmethod
     def pre_condition(
