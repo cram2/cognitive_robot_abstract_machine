@@ -98,6 +98,7 @@ from krrood.ormatic.data_access_objects.dao import (
     AssociationDataAccessObject,
 )
 from krrood.ormatic.custom_types import TypeType
+from pycram.robot_plans.actions import sage10k_actions
 
 
 class Base(DeclarativeBase):
@@ -3623,9 +3624,7 @@ class Sage10kDatasetLoaderDAO(
 
 class Sage10kNonShittyScenesDemoConfigDAO(
     Base,
-    DataAccessObject[
-        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.Sage10kNonShittyScenesDemoConfig
-    ],
+    DataAccessObject[sage10k_actions.Sage10kNonShittyScenesDemoConfig],
 ):
 
     __tablename__ = "Sage10kNonShittyScenesDemoConfigDAO"

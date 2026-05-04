@@ -10,25 +10,19 @@ from typing_extensions import Optional, Tuple, assert_never
 
 from krrood.adapters.exceptions import JSON_TYPE_NAME
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json
-from krrood.ripple_down_rules.utils import recursive_subclasses
 from krrood.utils import get_full_class_name
 from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
-    Sage10kTypeNameCleaner,
     NaturalLanguageDescriptionWithTypeDescription,
     RoomWithWallsAndDoors,
     DoorWithType,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.semantic_annotations.natural_language import (
-    NaturalLanguageDescription,
-)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Floor,
     Wall,
     Door,
     Handle,
     Hinge,
-    Room,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
