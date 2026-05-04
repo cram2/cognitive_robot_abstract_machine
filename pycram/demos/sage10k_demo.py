@@ -5,13 +5,16 @@ import rclpy
 from rclpy.executors import SingleThreadedExecutor
 
 from pycram.motion_executor import simulated_robot
-from pycram.robot_plans.actions.sage10k_actions import Sage10kGymDemo
+from pycram.robot_plans.actions.sage10k_actions import (
+    Sage10kGymDemo,
+    Sage10kTVStudioDemo,
+)
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from semantic_digital_twin.orm.ormatic_interface import *  # type: ignore
 
-demo = Sage10kGymDemo()
+demo = Sage10kTVStudioDemo()
 demo.create_world()
 if not rclpy.ok():
     rclpy.init()

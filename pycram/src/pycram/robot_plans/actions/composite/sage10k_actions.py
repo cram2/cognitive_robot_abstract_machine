@@ -52,7 +52,7 @@ class Sage10kOpenDoor(ActionDescription):
         target_node = gcs.node_of_point(self.door.handle.pre_grasp_pose().position)
         if target_node is None:
             raise ValueError(
-                f"Target node not found for door handle pre grasp pose: {self.door.handle.pre_grasp_pose()}"
+                f"Target node not found for door handle pre grasp pose: {self.world.transform(self.door.handle.pre_grasp_pose(), self.world.root)}"
             )
 
         gcs = gcs.create_subgraph(

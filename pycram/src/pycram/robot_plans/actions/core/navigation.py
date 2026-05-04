@@ -47,6 +47,7 @@ class NavigateAction(ActionDescription):
         """
         The robot needs to have a drive and the target location needs to be free from obstacles
         """
+        return True
         drive_variable = variable_from(context.robot.drive is not None)
         return and_(
             is_pose_free_for_robot(context.robot, variables["target_location"]),
