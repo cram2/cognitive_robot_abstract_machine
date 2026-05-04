@@ -12,6 +12,7 @@ from pycram.robot_plans.actions.sage10k_actions import (
     Sage10kTropicalWarehouse,
     Sage10kVaporwave,
     Sage10kEclecticResidence,
+    Sage10kAbstractDemo,
 )
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
@@ -19,20 +20,29 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from semantic_digital_twin.orm.ormatic_interface import *  # type: ignore
 
 demo = Sage10kEclecticResidence()
-demo.create_world()
-if not rclpy.ok():
-    rclpy.init()
-node = rclpy.create_node("test_node")
 
-executor = SingleThreadedExecutor()
-executor.add_node(node)
 
-thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
-thread.start()
-time.sleep(0.1)
+def run_demo(demo: Sage10kAbstractDemo):
+    demo.create_world()
+    if not rclpy.ok():
+        rclpy.init()
+    node = rclpy.create_node("test_node")
 
-viz_marker_publisher = VizMarkerPublisher(_world=demo.world, node=node)
-viz_marker_publisher.with_tf_publisher()
+    executor = SingleThreadedExecutor()
+    executor.add_node(node)
 
-with simulated_robot:
-    demo.plan.perform()
+    thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
+    thread.start()
+    time.sleep(0.1)
+
+    viz_marker_publisher = VizMarkerPublisher(_world=demo.world, node=node)
+    viz_marker_publisher.with_tf_publisher()
+
+    with simulated_robot:
+        demo.plan.perform()
+
+    viz_marker_publisher.stop()
+    del demo
+
+
+run_demo(demo)
