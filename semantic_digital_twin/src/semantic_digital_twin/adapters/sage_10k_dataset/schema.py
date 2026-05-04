@@ -682,7 +682,7 @@ class Sage10kDoor(Sage10kWithID):
         if is_handle_in_room and self.opens_inward:
             door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
                 y=0.1,
-                x=door.root.collision.min_point.x,
+                x=door.root.collision.max_point.x,
                 reference_frame=door.root,
                 yaw=np.pi,
             )
