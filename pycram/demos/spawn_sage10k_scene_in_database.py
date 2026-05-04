@@ -25,7 +25,7 @@ print(f"creating the database took {time.time() - current_time:.2f} seconds")
 current_time = time.time()
 print("loading scene")
 loader = Sage10kDatasetLoader()
-scene = loader.create_scene(Sage10kNonShittyScenes.TV_STUDIO)
+scene = loader.create_scene(Sage10kNonShittyScenes.AMERICAN_BUFFET_RESTAURANT)
 world = scene.create_world()
 print(f"Loading the scene took {time.time() - current_time:.2f} seconds")
 
