@@ -85,6 +85,8 @@ class VizMarkerPublisher(ModelChangeCallback):
     )
     """QoS profile for the publisher."""
 
+    _tf_publisher: Optional[TFPublisher] = field(init=False, default=None)
+
     def __post_init__(self):
         super().__post_init__()
 
@@ -99,7 +101,7 @@ class VizMarkerPublisher(ModelChangeCallback):
         """
         Launches a tf publisher in conjunction with the VizMarkerPublisher.
         """
-        TFPublisher(_world=self._world, node=self.node)
+        self._tf_publisher = TFPublisher(_world=self._world, node=self.node)
 
     def _select_shapes(self, body):
         if self.shape_source is ShapeSource.VISUAL_ONLY:
@@ -114,15 +116,21 @@ class VizMarkerPublisher(ModelChangeCallback):
         self.markers = MarkerArray()
         for body in self._world.bodies:
             shapes = self._select_shapes(body)
-            if not shapes:
-                continue
-            marker_ns = str(body.name)
-            for i, shape in enumerate(shapes):
-                marker = SemDTToRos2Converter.convert(shape)
-                if not marker.mesh_use_embedded_materials:
-                    marker.color.a = self.alpha
-                marker.frame_locked = True
-                marker.id = i
-                marker.ns = marker_ns
-                self.markers.markers.append(marker)
+            self._add_markers_for_shapes(shapes, str(body.name))
+
+        for region in self._world.regions:
+            self._add_markers_for_shapes(region.area.shapes, str(region.name))
+
         self.pub.publish(self.markers)
+
+    def _add_markers_for_shapes(self, shapes, marker_ns):
+        if not shapes:
+            return
+        for i, shape in enumerate(shapes):
+            marker = SemDTToRos2Converter.convert(shape)
+            if not marker.mesh_use_embedded_materials:
+                marker.color.a *= self.alpha
+            marker.frame_locked = True
+            marker.id = i
+            marker.ns = marker_ns
+            self.markers.markers.append(marker)

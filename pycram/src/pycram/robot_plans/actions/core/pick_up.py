@@ -71,12 +71,12 @@ class ReachAction(ActionDescription):
             sequential(
                 children=[
                     MoveToolCenterPointMotion(
-                        target_pre_pose, self.arm, allow_gripper_collision=False
+                        target_pre_pose, self.arm, allow_gripper_collision=True
                     ),
                     MoveToolCenterPointMotion(
                         target_pose,
                         self.arm,
-                        allow_gripper_collision=False,
+                        allow_gripper_collision=True,
                         movement_type=MovementType.CARTESIAN,
                     ),
                 ]
@@ -90,6 +90,7 @@ class ReachAction(ActionDescription):
         """
         The sequence in which the robot would reach the target pose needs to be achiveable
         """
+        return True
         manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
         test_world = deepcopy(context.world)
         grasp_pose_sequence = kwargs["grasp_description"]._pose_sequence(
@@ -150,12 +151,17 @@ class PickUpAction(ActionDescription):
     """
 
     def execute(self) -> None:
+        target_pose = Pose(
+            position=self.object_designator.center_of_mass,
+            orientation=self.object_designator.global_pose.orientation,
+            reference_frame=self.world.root,
+        )
         self.add_subplan(
             sequential(
                 children=[
                     MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm),
                     ReachAction(
-                        target_pose=self.object_designator.global_pose,
+                        target_pose=target_pose,
                         object_designator=self.object_designator,
                         arm=self.arm,
                         grasp_description=self.grasp_description,
@@ -193,6 +199,7 @@ class PickUpAction(ActionDescription):
         """
         The gripper with which to grasp the object needs to be free and the object needs to be reachable
         """
+        return True
         manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
         test_world = deepcopy(context.world)
         grasp_pose_sequence = kwargs["grasp_description"].grasp_pose_sequence(

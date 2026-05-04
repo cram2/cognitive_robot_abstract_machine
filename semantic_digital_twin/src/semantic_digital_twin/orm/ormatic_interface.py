@@ -1008,6 +1008,32 @@ class DrawerDAO_objects_association(Base, AssociationDataAccessObject):
     )
 
 
+class RoomWithWallsAndDoorsDAO_walls_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "_59279835155553331916320829121624451516437301546125700947447732"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_roomwithwallsanddoorsdao_id: Mapped[int] = mapped_column(
+        ForeignKey("RoomWithWallsAndDoorsDAO.database_id")
+    )
+    target_walldao_id: Mapped[int] = mapped_column(ForeignKey("WallDAO.database_id"))
+
+    target: Mapped[WallDAO] = relationship("WallDAO", foreign_keys=[target_walldao_id])
+
+
+class RoomWithWallsAndDoorsDAO_doors_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "_41651222075607285598093561901844381163868576790321323113299336"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_roomwithwallsanddoorsdao_id: Mapped[int] = mapped_column(
+        ForeignKey("RoomWithWallsAndDoorsDAO.database_id")
+    )
+    target_doordao_id: Mapped[int] = mapped_column(ForeignKey("DoorDAO.database_id"))
+
+    target: Mapped[DoorDAO] = relationship("DoorDAO", foreign_keys=[target_doordao_id])
+
+
 class AbstractRobotDAO_manipulators_association(Base, AssociationDataAccessObject):
 
     __tablename__ = "_52106895998347648170461778904010683448969600053998871081561893"
@@ -3593,6 +3619,67 @@ class Sage10kDatasetLoaderDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class Sage10kNonShittyScenesDemoConfigDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.Sage10kNonShittyScenesDemoConfig
+    ],
+):
+
+    __tablename__ = "Sage10kNonShittyScenesDemoConfigDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    scene_url: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    world_P_object_of_interest_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    pickup_navigation_pose_id: Mapped[int] = mapped_column(
+        ForeignKey("PoseMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    place_pose_id: Mapped[int] = mapped_column(
+        ForeignKey("PoseMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    place_navigation_pose_id: Mapped[int] = mapped_column(
+        ForeignKey("PoseMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world_P_object_of_interest: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[world_P_object_of_interest_id],
+        post_update=True,
+    )
+    pickup_navigation_pose: Mapped[PoseMappingDAO] = relationship(
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[pickup_navigation_pose_id],
+        post_update=True,
+    )
+    place_pose: Mapped[PoseMappingDAO] = relationship(
+        "PoseMappingDAO", uselist=False, foreign_keys=[place_pose_id], post_update=True
+    )
+    place_navigation_pose: Mapped[PoseMappingDAO] = relationship(
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[place_navigation_pose_id],
+        post_update=True,
     )
 
 
@@ -7975,6 +8062,29 @@ class DoorDAO(
     }
 
 
+class DoorWithTypeDAO(
+    DoorDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.DoorWithType
+    ],
+):
+
+    __tablename__ = "DoorWithTypeDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(DoorDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    type_description: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "DoorWithTypeDAO",
+        "inherit_condition": database_id == DoorDAO.database_id,
+    }
+
+
 class HasStorageSpaceDAO(
     HasRootBodyDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasStorageSpace],
@@ -9266,6 +9376,46 @@ class LivingRoomDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "LivingRoomDAO",
+        "inherit_condition": database_id == RoomDAO.database_id,
+    }
+
+
+class RoomWithWallsAndDoorsDAO(
+    RoomDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.RoomWithWallsAndDoors
+    ],
+):
+
+    __tablename__ = "RoomWithWallsAndDoorsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoomDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    room_type: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    walls: Mapped[builtins.list[RoomWithWallsAndDoorsDAO_walls_association]] = (
+        relationship(
+            "RoomWithWallsAndDoorsDAO_walls_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[RoomWithWallsAndDoorsDAO_walls_association.source_roomwithwallsanddoorsdao_id]",
+        )
+    )
+    doors: Mapped[builtins.list[RoomWithWallsAndDoorsDAO_doors_association]] = (
+        relationship(
+            "RoomWithWallsAndDoorsDAO_doors_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[RoomWithWallsAndDoorsDAO_doors_association.source_roomwithwallsanddoorsdao_id]",
+        )
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "RoomWithWallsAndDoorsDAO",
         "inherit_condition": database_id == RoomDAO.database_id,
     }
 
