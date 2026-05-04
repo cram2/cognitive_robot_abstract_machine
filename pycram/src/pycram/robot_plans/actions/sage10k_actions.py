@@ -63,6 +63,20 @@ class Sage10kAbstractDemo:
 
     def preprocess_world(self):
         self.robot.root.parent_connection.origin = self.robot_starting_pose
+        v = variable(
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
+        )
+        obstacles_of_main_entrance = an(
+            entity(v).where(
+                compute_euclidean_planar_distance(
+                    v.root, self.main_entrance.root, Vector3.Z()
+                )
+                < 0.9
+            )
+        )
+
+        self.remove_rooted_annotations(obstacles_of_main_entrance.evaluate())
 
     @cached_property
     def robot(self) -> HSRB:
@@ -133,23 +147,6 @@ class Sage10kGymDemo(Sage10kAbstractDemo):
             )
         ).first()
         return main_entrance
-
-    def preprocess_world(self):
-        super().preprocess_world()
-        v = variable(
-            NaturalLanguageDescriptionWithTypeDescription,
-            self.world.semantic_annotations,
-        )
-        obstacles_of_main_entrance = an(
-            entity(v).where(
-                compute_euclidean_planar_distance(
-                    v.root, self.main_entrance.root, Vector3.Z()
-                )
-                < 0.9
-            )
-        )
-
-        self.remove_rooted_annotations(obstacles_of_main_entrance.evaluate())
 
     @property
     def plan(self):
@@ -507,23 +504,6 @@ class Sage10kEclecticResidence(Sage10kAbstractDemo):
     """
 
     scene_url: ClassVar[str] = Sage10kNonShittyScenes.ECLECTIC_RESIDENCE
-
-    def preprocess_world(self):
-        super().preprocess_world()
-        v = variable(
-            NaturalLanguageDescriptionWithTypeDescription,
-            self.world.semantic_annotations,
-        )
-        obstacles_of_main_entrance = an(
-            entity(v).where(
-                compute_euclidean_planar_distance(
-                    v.root, self.main_entrance.root, Vector3.Z()
-                )
-                < 0.9
-            )
-        )
-
-        self.remove_rooted_annotations(obstacles_of_main_entrance.evaluate())
 
     @property
     def robot_starting_pose(self) -> Pose:
