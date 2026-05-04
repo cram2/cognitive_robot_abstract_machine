@@ -78,6 +78,12 @@ class Sage10kAbstractDemo:
     def robot_starting_pose(self) -> Pose:
         raise NotImplementedError
 
+    @cached_property
+    def main_entrance(self):
+        door_v = variable(DoorWithType, self.world.semantic_annotations)
+        main_entrance: DoorWithType = an(entity(door_v)).first()
+        return main_entrance
+
     @property
     def plan(self) -> Plan:
         pass
@@ -85,6 +91,10 @@ class Sage10kAbstractDemo:
 
 @dataclass
 class Sage10kGymDemo(Sage10kAbstractDemo):
+    """
+    Collect a bottle from the bench and put it in the bin.
+    """
+
     scene_url: ClassVar[str] = Sage10kNonShittyScenes.GYM
 
     @property
@@ -201,12 +211,6 @@ class Sage10kTVStudioDemo(Sage10kAbstractDemo):
             reference_frame=self.world.root,
         )
 
-    @cached_property
-    def main_entrance(self):
-        door_v = variable(DoorWithType, self.world.semantic_annotations)
-        main_entrance: DoorWithType = an(entity(door_v)).first()
-        return main_entrance
-
     @property
     def book_to_pick(self) -> Body:
         @symbolic_function
@@ -261,3 +265,157 @@ class Sage10kTVStudioDemo(Sage10kAbstractDemo):
         present_book = NavigateAction(target_location=self.robot_starting_pose)
 
         return sequential([open_door, mpa, present_book], context=context).plan
+
+
+@dataclass
+class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemo):
+    """
+    Put something to read next to the clean couch.
+    """
+
+    scene_url: ClassVar[str] = Sage10kNonShittyScenes.CRAFTSMAN_LOBBY
+
+    @property
+    def robot_starting_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(x=14, y=6, z=0, reference_frame=self.world.root)
+
+    @property
+    def pickup_navigation_pose(self):
+        return Pose.from_xyz_rpy(
+            x=6.83,
+            y=5.38,
+            z=self.robot.root.global_pose.z,
+            yaw=1.78,
+            reference_frame=self.world.root,
+        )
+
+    @property
+    def book_to_pick(self) -> Body:
+        @symbolic_function
+        def closes_to_border(target) -> float:
+            return self.world.transform(target.global_pose, couch_table.root).y
+
+        v = variable(
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
+        )
+        couch_table = an(
+            entity(v).where(contains(v.description, "coffee table"))
+        ).first()
+
+        v = variable(
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
+        )
+        target = an(
+            entity(v)
+            .where(
+                contains(v.type_description, "book"),
+                is_supported_by(v.root, couch_table.root),
+            )
+            .ordered_by(
+                v,
+                key=lambda x: closes_to_border(
+                    x.root,
+                ),
+                descending=False,
+            )
+        )
+        book = target.first()
+        return book.root
+
+    @property
+    def plan(self):
+        target_pose = Pose.from_xyz_rpy(
+            x=5.48, y=7.46, z=0.8, reference_frame=self.world.root
+        )
+        context = Context.from_world(self.world, query_backend=ProbabilisticBackend())
+        open_door = Sage10kOpenDoor(self.main_entrance)
+        grasp_description = GraspDescription(
+            approach_direction=ApproachDirection.BACK,
+            vertical_alignment=VerticalAlignment.NoAlignment,
+            manipulator=context.robot.arm.manipulator,
+            rotate_gripper=True,
+        )
+        mpu = MoveAndPickUpAction(
+            standing_position=self.pickup_navigation_pose,
+            object_designator=self.book_to_pick,
+            arm=Arms.LEFT,
+            grasp_description=grasp_description,
+        )
+        mpp = MoveAndPlaceAction(
+            standing_position=Pose.from_xyz_rpy(
+                x=5.48, y=6.96, yaw=np.pi / 2, reference_frame=self.world.root
+            ),
+            object_designator=self.book_to_pick,
+            target_location=target_pose,
+            arm=Arms.LEFT,
+        )
+
+        return sequential([open_door, mpu, mpp], context=context).plan
+
+
+@dataclass
+class Sage10kTropicalWarehouse(Sage10kAbstractDemo):
+    """
+    Sage10k demo for the tropical warehouse environment.
+    """
+
+    scene_url: ClassVar[str] = Sage10kNonShittyScenes.TROPICAL_WAREHOUSE
+
+    @property
+    def robot_starting_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(x=14, y=4.5, z=0, reference_frame=self.world.root)
+
+    @property
+    def pickup_navigation_pose(self):
+        return Pose.from_xyz_rpy(
+            x=2.45265, y=7.28, yaw=2.16, reference_frame=self.world.root
+        )
+
+    @property
+    def target_to_pick(self) -> Body:
+
+        @symbolic_function
+        def planar_distance(point1: Point3, point2: Point3):
+            return point1.euclidean_distance(point2)
+
+        point_guess = Pose.from_xyz_rpy(
+            x=2.19, y=7.64, z=0.35, reference_frame=self.world.root
+        ).position
+        target_v = variable(
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
+        )
+        target = (
+            an(entity(target_v).where(target_v.type_description == "cup"))
+            .ordered_by(
+                variable=target_v,
+                key=lambda x: planar_distance(x.root.global_pose.position, point_guess),
+                descending=False,
+            )
+            .first()
+        )
+        return target.root
+
+    @property
+    def plan(self) -> Plan:
+        context = Context.from_world(self.world, query_backend=ProbabilisticBackend())
+        grasp_description = GraspDescription(
+            approach_direction=ApproachDirection.RIGHT,
+            vertical_alignment=VerticalAlignment.NoAlignment,
+            manipulator=context.robot.arm.manipulator,
+            rotate_gripper=False,
+        )
+        mpu = MoveAndPickUpAction(
+            standing_position=self.pickup_navigation_pose,
+            object_designator=self.target_to_pick,
+            arm=Arms.LEFT,
+            grasp_description=grasp_description,
+        )
+
+        open_door = Sage10kOpenDoor(self.main_entrance)
+        park_arms = ParkArmsAction(arm=Arms.LEFT)
+        present = NavigateAction(target_location=self.robot_starting_pose)
+
+        return sequential([open_door, park_arms, mpu, present], context=context).plan

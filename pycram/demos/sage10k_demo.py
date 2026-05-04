@@ -8,13 +8,15 @@ from pycram.motion_executor import simulated_robot
 from pycram.robot_plans.actions.sage10k_actions import (
     Sage10kGymDemo,
     Sage10kTVStudioDemo,
+    Sage10kCraftsmanLobbyDemo,
+    Sage10kTropicalWarehouse,
 )
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from semantic_digital_twin.orm.ormatic_interface import *  # type: ignore
 
-demo = Sage10kTVStudioDemo()
+demo = Sage10kTropicalWarehouse()
 demo.create_world()
 if not rclpy.ok():
     rclpy.init()
