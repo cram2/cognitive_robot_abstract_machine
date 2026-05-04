@@ -149,7 +149,7 @@ class _TiltStraightTask(Task):
         artifacts.constraints.add_vector_goal_constraints(
             frame_V_current=root_V_cylinder_z,
             frame_V_goal=self.root_V_up,
-            reference_velocity=0.01, # 0.001 was to small, the real robot would not move
+            reference_velocity=0.025, # 0.001 was to small, the real robot would not move
             quadratic_weight=self.weight,
         )
         artifacts.observation = tilt_error <= 0.01

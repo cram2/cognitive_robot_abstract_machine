@@ -226,7 +226,7 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                         for c in self.right_arm.connections
                         if type(c) != FixedConnection
                     ],
-                    [3.72, -2.07, -0.9, 4.0, 0.82, 0.75],
+                    [3.77, -2.05, -0.9, 3.8, 0.76, -2.28],
                 )
             ),
             state_type=StaticJointState.PARK,
