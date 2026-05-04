@@ -34,7 +34,7 @@ print(f"Loading the scene took {time.time() - current_time:.2f} seconds")
 
 current_time = time.time()
 print("loading robot")
-# pr2 = create_hsrb_in_world(demo.world)
+# pr2 = create_hsrb_in_world(world)
 print(f"Loading the robot took {time.time() - current_time:.2f} seconds")
 
 current_time = time.time()
