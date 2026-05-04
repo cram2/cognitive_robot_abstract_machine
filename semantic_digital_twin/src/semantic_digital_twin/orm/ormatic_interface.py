@@ -772,6 +772,23 @@ class HasAperturesDAO_apertures_association(Base, AssociationDataAccessObject):
     )
 
 
+class HasShelfLayersDAO_shelf_layers_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "_54703373473658244154819138253524161660384356065723532229307845"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_hasshelflayersdao_id: Mapped[int] = mapped_column(
+        ForeignKey("HasShelfLayersDAO.database_id")
+    )
+    target_shelflayerdao_id: Mapped[int] = mapped_column(
+        ForeignKey("ShelfLayerDAO.database_id")
+    )
+
+    target: Mapped[ShelfLayerDAO] = relationship(
+        "ShelfLayerDAO", foreign_keys=[target_shelflayerdao_id]
+    )
+
+
 class HasStorageSpaceDAO_objects_association(Base, AssociationDataAccessObject):
 
     __tablename__ = "_25874083443521766617770704172931011793368795308247254903290268"
@@ -877,6 +894,21 @@ class FridgeDAO_doors_association(Base, AssociationDataAccessObject):
     target_doordao_id: Mapped[int] = mapped_column(ForeignKey("DoorDAO.database_id"))
 
     target: Mapped[DoorDAO] = relationship("DoorDAO", foreign_keys=[target_doordao_id])
+
+
+class ShelfDAO_shelf_layers_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "_78764951245036932274925644158670879451856819978182812236416879"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_shelfdao_id: Mapped[int] = mapped_column(ForeignKey("ShelfDAO.database_id"))
+    target_shelflayerdao_id: Mapped[int] = mapped_column(
+        ForeignKey("ShelfLayerDAO.database_id")
+    )
+
+    target: Mapped[ShelfLayerDAO] = relationship(
+        "ShelfLayerDAO", foreign_keys=[target_shelflayerdao_id]
+    )
 
 
 class WardrobeDAO_doors_association(Base, AssociationDataAccessObject):
@@ -6576,25 +6608,6 @@ class OfficeChairDAO(
     }
 
 
-class ShelvingUnitDAO(
-    FurnitureDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.ShelvingUnit
-    ],
-):
-
-    __tablename__ = "ShelvingUnitDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FurnitureDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "ShelvingUnitDAO",
-        "inherit_condition": database_id == FurnitureDAO.database_id,
-    }
-
-
 class SofaDAO(
     FurnitureDAO,
     DataAccessObject[
@@ -7753,6 +7766,34 @@ class DoorDAO(
     }
 
 
+class HasShelfLayersDAO(
+    HasRootBodyDAO,
+    DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasShelfLayers],
+):
+
+    __tablename__ = "HasShelfLayersDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    shelf_layers: Mapped[builtins.list[HasShelfLayersDAO_shelf_layers_association]] = (
+        relationship(
+            "HasShelfLayersDAO_shelf_layers_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[HasShelfLayersDAO_shelf_layers_association.source_hasshelflayersdao_id]",
+        )
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HasShelfLayersDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+    }
+
+
 class HasStorageSpaceDAO(
     HasRootBodyDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasStorageSpace],
@@ -8018,6 +8059,34 @@ class FridgeDAO(
     }
 
 
+class ShelfDAO(
+    CabinetDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Shelf
+    ],
+):
+
+    __tablename__ = "ShelfDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(CabinetDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    shelf_layers: Mapped[builtins.list[ShelfDAO_shelf_layers_association]] = (
+        relationship(
+            "ShelfDAO_shelf_layers_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[ShelfDAO_shelf_layers_association.source_shelfdao_id]",
+        )
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ShelfDAO",
+        "inherit_condition": database_id == CabinetDAO.database_id,
+    }
+
+
 class WardrobeDAO(
     CabinetDAO,
     DataAccessObject[
@@ -8067,6 +8136,27 @@ class PlateDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "PlateDAO",
+        "inherit_condition": database_id == HasSupportingSurfaceDAO.database_id,
+    }
+
+
+class ShelfLayerDAO(
+    HasSupportingSurfaceDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.ShelfLayer
+    ],
+):
+
+    __tablename__ = "ShelfLayerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasSupportingSurfaceDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ShelfLayerDAO",
         "inherit_condition": database_id == HasSupportingSurfaceDAO.database_id,
     }
 

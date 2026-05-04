@@ -66,6 +66,12 @@ class PlaceAction(ActionDescription):
             )
         )
 
+        object_height = (
+            self.object_designator.collision.max_point[2]
+            - self.object_designator.collision.min_point[2]
+        )
+        self.target_location.z += object_height / 2
+
         target_pre_pose, target_pose, retract_pose = previous_grasp._pose_sequence(
             self.target_location, self.object_designator, reverse=True
         )
