@@ -1,19 +1,18 @@
-import time
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from datetime import datetime
 
 from geometry_msgs.msg import PoseStamped
 
-from typing_extensions import Optional, List, Union, Type
+from typing_extensions import Optional, List
 
 from segmind.datastructures.mixins import HasPrimaryTrackedObject, HasPrimaryAndSecondaryTrackedObjects
 from segmind.datastructures.object_tracker import ObjectTrackerFactory
 from semantic_digital_twin.orm.ormatic_interface import BodyDAO
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Aperture
 from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.world_description.geometry import BoundingBox, Color
-from semantic_digital_twin.world_description.world_entity import Body, Agent
+from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
