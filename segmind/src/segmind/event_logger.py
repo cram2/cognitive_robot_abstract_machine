@@ -61,10 +61,6 @@ class EventLogger:
     """
     A dictionary that maps event types to a list of callbacks that should be called when the event occurs.
     """
-    timeline_per_thread: Dict[str, List[DetectionEvent]] = field(default_factory=dict, init=False)
-    """
-    A dictionary that maps thread names to a list of events.
-    """
     timeline: List[DetectionEvent] = field(default_factory=list, init=False)
     """
     A list of all events.
@@ -169,12 +165,7 @@ class EventLogger:
 
         :param event: The event to add.
         """
-        thread_id = str(event.detector_thread_id)
-        with self.timeline_lock:
-            if thread_id not in self.timeline_per_thread:
-                self.timeline_per_thread[thread_id] = []
-            self.timeline_per_thread[thread_id].append(event)
-            self.timeline.append(event)
+        self.timeline.append(event)
 
     def is_event_in_timeline(self, event: DetectionEvent) -> bool:
         """

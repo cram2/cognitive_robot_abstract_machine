@@ -21,10 +21,6 @@ class DetectionEvent(ABC):
     """
     The time at which the event occurred, defaults to current time.
     """
-    detector_thread_id: Optional[int] = field(default=None)
-    """
-    The id of the detector that detected the event.
-    """
 
     @abstractmethod
     def __eq__(self, other):
@@ -124,28 +120,18 @@ class EventWithTwoTrackedObjects(EventWithTrackedObjects, HasPrimaryAndSecondary
 
 
 @dataclass(unsafe_hash=True)
-class DefaultEventWithTwoTrackedObjects(EventWithTwoTrackedObjects):
-    """
-    A default implementation of EventWithTwoTrackedObjects that does not require a with_object.
-    This is useful for events that only involve one tracked object.
-    """
-
-
-@dataclass(unsafe_hash=True)
-class SupportEvent(DefaultEventWithTwoTrackedObjects):
+class SupportEvent(EventWithTwoTrackedObjects):
     """
     The SupportEvent class is used to represent an event that involves an object that is supported by another object.
     """
-    ...
 
 
 @dataclass(unsafe_hash=True)
-class LossOfSupportEvent(DefaultEventWithTwoTrackedObjects):
+class LossOfSupportEvent(EventWithTwoTrackedObjects):
     """
     The LossOfSupportEvent class is used to represent an event that involves an object that was supported by another
     object and then lost support.
     """
-    ...
 
 
 @dataclass(unsafe_hash=True)
@@ -155,10 +141,17 @@ class MotionEvent(EventWithOneTrackedObject, ABC):
     vice versa.
     """
     start_pose: Pose = field(default_factory=Pose)
+    """
+    The pose of the object at the start of the event.
+    """
     current_pose: Pose = field(default_factory=Pose)
+    """
+    The pose of the object at the end of the event.
+    """
 
     def __post_init__(self):
         super().__post_init__()
+
 
 @dataclass(init=False, unsafe_hash=True)
 class TranslationEvent(MotionEvent):
@@ -291,7 +284,7 @@ class InsertionEvent(EventWithTwoTrackedObjects):
     List of objects into which the object was inserted.
     """
 
-    inserted_into_objects_frozen_cp: List[BodyDAO] = field(default_factory=list)
+    inserted_into_objects_frozen_copy: List[BodyDAO] = field(default_factory=list)
     """
     Will be set to a copy of inserted_into_objects, to be used by ORMatic and the NEEMInterface.
     """
@@ -314,14 +307,14 @@ class InsertionEvent(EventWithTwoTrackedObjects):
         return f"{self.__class__.__name__}: {self.tracked_object.name.name}{with_object_name} - {self.timestamp}"
 
 @dataclass(unsafe_hash=True)
-class ContainmentEvent(DefaultEventWithTwoTrackedObjects):
+class ContainmentEvent(EventWithTwoTrackedObjects):
     """
     Represents an event where an object is contained in another object.
     """
     ...
 
 @dataclass(unsafe_hash=True)
-class LossOfContainmentEvent(DefaultEventWithTwoTrackedObjects):
+class LossOfContainmentEvent(EventWithTwoTrackedObjects):
     """
     Represents an event where an object is no longer contained in another object.
     """
