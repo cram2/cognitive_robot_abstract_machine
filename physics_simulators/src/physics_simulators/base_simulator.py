@@ -120,6 +120,15 @@ class SimulatorCallback:
         self.__name__ = callback.__name__
 
     def __call__(self, *args, render: bool = True, **kwargs) -> SimulatorCallbackResult:
+        """
+        Call the callback function and return the result,
+        it also checks if the result is of type SimulatorCallbackResult and if the first argument is of type BaseSimulator.
+
+        :param render: Whether to trigger rendering, used for modification on the simulator.
+        :param kwargs: Additional keyword arguments for the callback function.
+
+        :return: The result of the callback function.
+        """
         result = self._call(*args, **kwargs)
         if not isinstance(result, SimulatorCallbackResult):
             raise TypeError("Callback function must return SimulatorCallbackResult")
