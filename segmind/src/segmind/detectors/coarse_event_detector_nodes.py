@@ -51,35 +51,35 @@ class PlacingDetector(AbstractInteractionDetector):
         :param obj: List of bodies to analyze for potential placing events.
         :return: List of generated placing events based on observed interactions.
         """
-        stop_translation_event = [
-            i
-            for i in segmind_context.logger.get_events()
-            if isinstance(i, StopTranslationEvent)
+        stop_translation_events = [
+            event
+            for event in segmind_context.logger.get_events()
+            if isinstance(event, StopTranslationEvent)
         ]
-        support_event = [
-            i for i in segmind_context.logger.get_events() if isinstance(i, SupportEvent)
+        support_events = [
+            event for event in segmind_context.logger.get_events() if isinstance(event, SupportEvent)
         ]
 
         events = []
 
         by_object = defaultdict(list)
-        for j in stop_translation_event:
-            by_object[j.tracked_object].append(j)
+        for event in stop_translation_events:
+            by_object[event.tracked_object].append(event)
 
-        for i in support_event:
-            for j in by_object.get(i.tracked_object, []):
-                if abs(i.timestamp - j.timestamp) >= self.shift_threshold:
+        for support_event in support_events:
+            for event in by_object.get(support_event.tracked_object, []):
+                if abs(support_event.timestamp - event.timestamp) >= self.shift_threshold:
                     continue
 
-                key = (i.tracked_object.id, i.with_object.id)
+                key = (support_event.tracked_object.id, support_event.with_object.id)
                 if key in segmind_context.placing_pairs:
                     continue
 
                 segmind_context.placing_pairs.add(key)
                 events.append(
                     PlacingEvent(
-                        tracked_object=j.tracked_object,
-                        with_object=i.with_object,
+                        tracked_object=event.tracked_object,
+                        with_object=support_event.with_object,
                     )
                 )
                 break
@@ -112,25 +112,25 @@ class PickUpDetector(AbstractInteractionDetector):
         :param obj: List of bodies to analyze for potential pickup events.
         :return: List of generated pickup events based on observed interactions.
         """
-        translation_event = [
-            i
-            for i in segmind_context.logger.get_events()
-            if isinstance(i, TranslationEvent)
+        translation_events = [
+            event
+            for event in segmind_context.logger.get_events()
+            if isinstance(event, TranslationEvent)
         ]
-        loss_of_support_event = [
-            i for i in segmind_context.logger.get_events() if isinstance(i, LossOfSupportEvent)
+        loss_of_support_events = [
+            event for event in segmind_context.logger.get_events() if isinstance(event, LossOfSupportEvent)
         ]
         events = []
         by_object = defaultdict(list)
-        for j in translation_event:
-            by_object[j.tracked_object].append(j)
+        for event in translation_events:
+            by_object[event.tracked_object].append(event)
 
-        for i in loss_of_support_event:
-            for j in by_object.get(i.tracked_object, []):
-                if abs(i.timestamp - j.timestamp) >= self.shift_threshold:
+        for loss_of_support_event in loss_of_support_events:
+            for event in by_object.get(loss_of_support_event.tracked_object, []):
+                if abs(loss_of_support_event.timestamp - event.timestamp) >= self.shift_threshold:
                     continue
 
-                key = (i.tracked_object.id, i.with_object.id)
+                key = (loss_of_support_event.tracked_object.id, loss_of_support_event.with_object.id)
                 if key in segmind_context.placing_pairs:
                     continue
 
@@ -138,7 +138,7 @@ class PickUpDetector(AbstractInteractionDetector):
 
                 events.append(
                     PickUpEvent(
-                        tracked_object=j.tracked_object,
+                        tracked_object=event.tracked_object,
                     )
                 )
                 break

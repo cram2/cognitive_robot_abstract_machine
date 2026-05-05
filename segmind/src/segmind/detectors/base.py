@@ -24,8 +24,6 @@ class DetectorStateChart(MotionStatechart):
     functionality from MotionStatechart.
     """
 
-    pass
-
 
 IndexedBodyPairs = Dict[Body, Set[Body]]
 """

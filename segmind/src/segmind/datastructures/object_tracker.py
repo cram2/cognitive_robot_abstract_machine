@@ -109,10 +109,10 @@ class ObjectEventTracker:
         :param event_type: The type of the event to search for.
         :return: The most recent event of the specified type if found, otherwise None.
         """
-        for event in reversed(self._event_history):
-            if isinstance(event, event_type):
-                return event
-        return None
+        return next(
+                    (event for event in reversed(self._event_history) if isinstance(event, event_type)),
+                    None,
+                )
 
 
     def get_first_event_before(self, timestamp: float) -> Optional[DetectionEvent]:
@@ -190,7 +190,7 @@ class ObjectEventTracker:
             return self._event_history[nearest_event_index]
 
 
-    def _get_nearest_index(self, time_stamps: np.ndarray,
+    def _get_nearest_index(self, time_stamps: list[float],
                            timestamp: float, tolerance: Optional[timedelta] = None) -> Optional[int]:
         """
         Finds the nearest index to a timestamp.

@@ -190,9 +190,6 @@ class DetectionEventDAO(
     )
 
     timestamp: Mapped[datetime.datetime] = mapped_column(use_existing_column=True)
-    detector_thread_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        use_existing_column=True
-    )
 
     polymorphic_type: Mapped[str] = mapped_column(
         String(255), nullable=False, use_existing_column=True
@@ -536,12 +533,12 @@ class ContactEventDAO(
     }
 
 
-class DefaultEventWithTwoTrackedObjectsDAO(
+class ContainmentEventDAO(
     EventWithTwoTrackedObjectsDAO,
-    DataAccessObject[segmind.datastructures.events.DefaultEventWithTwoTrackedObjects],
+    DataAccessObject[segmind.datastructures.events.ContainmentEvent],
 ):
 
-    __tablename__ = "DefaultEventWithTwoTrackedObjectsDAO"
+    __tablename__ = "ContainmentEventDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(EventWithTwoTrackedObjectsDAO.database_id),
@@ -550,28 +547,8 @@ class DefaultEventWithTwoTrackedObjectsDAO(
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "DefaultEventWithTwoTrackedObjectsDAO",
-        "inherit_condition": database_id == EventWithTwoTrackedObjectsDAO.database_id,
-    }
-
-
-class ContainmentEventDAO(
-    DefaultEventWithTwoTrackedObjectsDAO,
-    DataAccessObject[segmind.datastructures.events.ContainmentEvent],
-):
-
-    __tablename__ = "ContainmentEventDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(DefaultEventWithTwoTrackedObjectsDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
         "polymorphic_identity": "ContainmentEventDAO",
-        "inherit_condition": database_id
-        == DefaultEventWithTwoTrackedObjectsDAO.database_id,
+        "inherit_condition": database_id == EventWithTwoTrackedObjectsDAO.database_id,
     }
 
 
@@ -714,22 +691,21 @@ class LossOfContainmentDetectorDAO(
 
 
 class LossOfContainmentEventDAO(
-    DefaultEventWithTwoTrackedObjectsDAO,
+    EventWithTwoTrackedObjectsDAO,
     DataAccessObject[segmind.datastructures.events.LossOfContainmentEvent],
 ):
 
     __tablename__ = "LossOfContainmentEventDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(DefaultEventWithTwoTrackedObjectsDAO.database_id),
+        ForeignKey(EventWithTwoTrackedObjectsDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "LossOfContainmentEventDAO",
-        "inherit_condition": database_id
-        == DefaultEventWithTwoTrackedObjectsDAO.database_id,
+        "inherit_condition": database_id == EventWithTwoTrackedObjectsDAO.database_id,
     }
 
 
@@ -755,22 +731,21 @@ class LossOfSupportDetectorDAO(
 
 
 class LossOfSupportEventDAO(
-    DefaultEventWithTwoTrackedObjectsDAO,
+    EventWithTwoTrackedObjectsDAO,
     DataAccessObject[segmind.datastructures.events.LossOfSupportEvent],
 ):
 
     __tablename__ = "LossOfSupportEventDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(DefaultEventWithTwoTrackedObjectsDAO.database_id),
+        ForeignKey(EventWithTwoTrackedObjectsDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "LossOfSupportEventDAO",
-        "inherit_condition": database_id
-        == DefaultEventWithTwoTrackedObjectsDAO.database_id,
+        "inherit_condition": database_id == EventWithTwoTrackedObjectsDAO.database_id,
     }
 
 
@@ -1122,22 +1097,21 @@ class SupportDetectorDAO(
 
 
 class SupportEventDAO(
-    DefaultEventWithTwoTrackedObjectsDAO,
+    EventWithTwoTrackedObjectsDAO,
     DataAccessObject[segmind.datastructures.events.SupportEvent],
 ):
 
     __tablename__ = "SupportEventDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(DefaultEventWithTwoTrackedObjectsDAO.database_id),
+        ForeignKey(EventWithTwoTrackedObjectsDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "SupportEventDAO",
-        "inherit_condition": database_id
-        == DefaultEventWithTwoTrackedObjectsDAO.database_id,
+        "inherit_condition": database_id == EventWithTwoTrackedObjectsDAO.database_id,
     }
 
 

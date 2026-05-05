@@ -44,14 +44,14 @@ class HasPrimaryTrackedObject:
     The tracked object.
     """
 
-    tracked_object_frozen_cp: Optional[BodyDAO] = field(init=False, default=None, repr=False, hash=False)
+    tracked_object_frozen_copy: Optional[BodyDAO] = field(init=False, default=None, repr=False, hash=False)
     """
-    The tracked object as a Data Access Object.
+    The tracked object as a Data Access Object, to be used by ORMatic and the NEEMInterface.
     """
 
-    world_frozen_cp: Optional[WorldDAO] = field(init=False, default=None, repr=False, hash=False)
+    world_frozen_copy: Optional[WorldDAO] = field(init=False, default=None, repr=False, hash=False)
     """
-    The world as a Data Access Object.
+    The world as a Data Access Object, to be used by ORMatic and the NEEMInterface.
     """
 
     def __post_init__(self):
