@@ -6,6 +6,8 @@ from typing import Self
 from importlib.resources import files
 from pathlib import Path
 
+import numpy as np
+
 from semantic_digital_twin.robots.abstract_robot import (
     AbstractRobot,
     Arm,
@@ -217,7 +219,7 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
                 self._world.get_connection_by_name("joint_arm_l1"): 0.0,
                 self._world.get_connection_by_name("joint_arm_l2"): 0.0,
                 self._world.get_connection_by_name("joint_arm_l3"): 0.0,
-                self._world.get_connection_by_name("joint_wrist_yaw"): 2.0,
+                self._world.get_connection_by_name("joint_wrist_yaw"): np.pi / 2,
                 self._world.get_connection_by_name("joint_wrist_pitch"): 0.0,
                 self._world.get_connection_by_name("joint_wrist_roll"): 0.0,
             },
