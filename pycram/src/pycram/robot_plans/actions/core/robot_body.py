@@ -87,7 +87,6 @@ class SetGripperAction(ActionDescription):
         ).perform()
 
 
-
 @dataclass
 class ParkArmsAction(ActionDescription):
     """
@@ -118,6 +117,103 @@ class ParkArmsAction(ActionDescription):
             names.extend([c.name.name for c in joint_state.connections])
             values.extend(joint_state.target_values)
         return names, values
+
+
+@dataclass
+class StretchExtendArm(ActionDescription):
+
+    def execute(self) -> None:
+        arm_joint_states = 0.0725
+        self.add_subplan(
+            execute_single(
+                MoveJointsMotion(
+                    names=[
+                        "joint_arm_l0",
+                        "joint_arm_l1",
+                        "joint_arm_l2",
+                        "joint_arm_l3",
+                    ],
+                    positions=[
+                        arm_joint_states,
+                        arm_joint_states,
+                        arm_joint_states,
+                        arm_joint_states,
+                    ],
+                ),
+            )
+        ).perform()
+
+
+@dataclass
+class StretchRetractArm(ActionDescription):
+
+    def execute(self) -> None:
+        self.add_subplan(
+            execute_single(
+                MoveJointsMotion(
+                    names=[
+                        "joint_arm_l0",
+                        "joint_arm_l1",
+                        "joint_arm_l2",
+                        "joint_arm_l3",
+                    ],
+                    positions=[
+                        0,
+                        0,
+                        0,
+                        0,
+                    ],
+                ),
+            )
+        ).perform()
+
+
+@dataclass
+class StretchTorsoHeightDirectlyBelowShelf(ActionDescription):
+
+    def execute(self) -> None:
+        self.add_subplan(
+            execute_single(
+                MoveJointsMotion(
+                    names=[
+                        "joint_lift",
+                    ],
+                    positions=[1.02],
+                ),
+            )
+        ).perform()
+
+
+@dataclass
+class StretchTorsoShelfPickPlaceHeight(ActionDescription):
+
+    def execute(self) -> None:
+        self.add_subplan(
+            execute_single(
+                MoveJointsMotion(
+                    names=[
+                        "joint_lift",
+                    ],
+                    positions=[0.85],
+                ),
+            )
+        ).perform()
+
+
+@dataclass
+class StretchTorsoTablePickPlaceHeight(ActionDescription):
+
+    def execute(self) -> None:
+        self.add_subplan(
+            execute_single(
+                MoveJointsMotion(
+                    names=[
+                        "joint_lift",
+                    ],
+                    positions=[0.66],
+                ),
+            )
+        ).perform()
 
 
 @dataclass
