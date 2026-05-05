@@ -19,45 +19,53 @@ from semantic_digital_twin.world_description.world_entity import Body
 logger = logging.getLogger(__name__)
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class JSONPlayer(FilePlayer):
     """
     Plays the episode from a JSON file.
     """
-
-    data_object_names: Set[str] = field(default=None)
+    scene_id: int = 1
     """
-    contains the names of the objects in the episode.
+    ID of the scene to play.
     """
 
-    def __init__(self, file_path: str, scene_id: int = 1, world: Optional[World] = None,
-                 mesh_scale: float = 0.001,
-                 time_between_frames: datetime.timedelta = datetime.timedelta(milliseconds=50),
-                 obj_id_to_name: Optional[Dict[int, str]] = None):
-        """
-        Initializes the FAMEEpisodePlayer with the specified json file and scene id.
+    mesh_scale: float = 0.001
+    """
+    Sets the scale of the meshes.
+    """
 
-        :param file_path: The json file that contains the data frames.
-        :param scene_id: The scene id.
-        :param world: The world that is used to replay the episode.
-        :param mesh_scale: The scale of the mesh.
-        :param time_between_frames: The time between frames.
-        :param objects_to_ignore: A list of object ids to ignore.
-        """
+    obj_id_to_name: Optional[Dict[int, str]] = None
+    """
+    Mapping from object ID to object name.
+    """
 
+    data_object_names: Set[str] = field(default=None, init=False)
+    """
+    The names of the objects in the file.
+    """
 
-        self.scene_id = scene_id
+    object_meshes: Dict[Body, Geometry] = field(default_factory=dict, init=False)
+    """
+    Meshes of the objects in the file.
+    """
 
-        super().__init__(time_between_frames=time_between_frames, world=world, stop_after_ready=False,
-                         use_realtime=False,
-                         file_path=file_path)
+    correction_quaternions: Dict[Body, np.ndarray] = field(default_factory=dict, init=False)
+    """
+    Correction quaternions for the objects in the file.
+    """
 
-        self.mesh_scale = mesh_scale
-        self.obj_id_to_name: Optional[Dict[int, str]] = obj_id_to_name
-        self.object_meshes: Dict[Body, Geometry] = {}
-        self.correction_quaternions: Dict[Body, np.ndarray] = {}
-        self.base_origin_of_objects: Dict[Body, np.ndarray] = {}
-        self.average_rotation_correction_matrix: Optional[np.ndarray] = None
+    base_origin_of_objects: Dict[Body, np.ndarray] = field(default_factory=dict, init=False)
+    """
+    Sets the origin of the objects to the base of the robot.
+    """
+
+    average_rotation_correction_matrix: Optional[np.ndarray] = field(default=None, init=False)
+    """
+    Correction matrix for the average rotation of the objects.
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
 
     def get_frame_data_generator(self):
         """

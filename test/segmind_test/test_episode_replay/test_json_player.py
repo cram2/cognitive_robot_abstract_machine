@@ -20,9 +20,12 @@ def test_json_player_context():
 
     json_file = f"{Path(segmind.__file__).parent.parent.parent}/resources/fame_episodes/alessandro_with_ycp_objects_in_max_room_2/refined_poses.json"
     obj_id_to_name = {1: "obj_000001", 3: "obj_000003", 4: "obj_000004", 6: "obj_000006"}
-    json_file_player = JSONPlayer(json_file, world=world,
-                             time_between_frames=datetime.timedelta(milliseconds=1),
-                             obj_id_to_name=obj_id_to_name)
+    json_file_player = JSONPlayer(
+        file_path=json_file,
+        world=world,
+        time_between_frames=datetime.timedelta(milliseconds=1),
+        obj_id_to_name=obj_id_to_name,
+    )
     print("JSONPlayer symbol:", JSONPlayer)
     print("Constructed type:", type(json_file_player))
     print("MRO:", type(json_file_player).mro())

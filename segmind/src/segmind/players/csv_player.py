@@ -1,32 +1,32 @@
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
-
 import pandas as pd
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3, Quaternion
+
+from segmind.players.data_player import FilePlayer, FrameData
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import Dict, Set
-from .data_player import FilePlayer, FrameData
 
 logger = logging.getLogger(__name__)
 
-@dataclass(unsafe_hash=True, init=False)
+@dataclass(eq=False)
 class CSVEpisodePlayer(FilePlayer):
     """
-    This class is used to play a CSV file containing the data of an episode.
+    Plays the episode from a CSV file.
     """
 
-    data_frames: pd.DataFrame = field(default=None)
+    data_frames: pd.DataFrame = field(default=None, init=False, hash=False, compare=False)
     """
-    The data frames of the episode.
+    The data frames of the CSV file.
     """
 
-    data_object_names: Set[str] = field(default=None)
+    data_object_names: Set[str] = field(default=None, init=False, hash=False, compare=False)
     """
-    The name of the objects in the episode.
+    The names of the objects in the CSV file.
     """
+
+    def __post_init__(self):
+        super().__post_init__()
 
     def get_frame_data_generator(self):
         """
@@ -44,12 +44,15 @@ class CSVEpisodePlayer(FilePlayer):
                 frame_idx=i,
             )
 
-    def get_joint_states(self, frame_data: FrameData) -> Dict[str, float]:
-        return {}
+    def _pause(self):
+        """
+        Pauses the episode player.
+        """
 
-    def _pause(self): ...
-
-    def _resume(self): ...
+    def _resume(self):
+        """
+        Resumes the episode player.
+        """
 
     def get_objects_poses(self, frame_data: FrameData) -> Dict[Body, Pose]:
         """
@@ -70,7 +73,6 @@ class CSVEpisodePlayer(FilePlayer):
                 obj_orientation[3],
                 obj_orientation[0],
             )
-            # Transform object quaternion to euler
             obj_pose = Pose.from_xyz_quaternion(
                 pos_x=obj_position[0],
                 pos_y=obj_position[1],

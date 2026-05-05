@@ -32,7 +32,7 @@ class FrameData:
     """
     The time of the frame.
     """
-    objects_data: Dict
+    objects_data: Dict[str, float]
     """
     The objects data which contains the poses of the objects.
     """
@@ -45,29 +45,26 @@ class FrameData:
 FrameDataGenerator = Generator[FrameData, None, None]
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class DataPlayer(EpisodePlayer, ABC):
     """
-    A class that represents the thread that steps the world from a data generator.
+    Abstract class for players that play the episode from a data source.
     """
 
-    def __init__(
-        self,
-        world: World,
-        time_between_frames: Optional[timedelta] = None,
-        use_realtime: bool = False,
-        stop_after_ready: bool = False,
-    ):
-        super().__init__(
-            time_between_frames=time_between_frames,
-            use_realtime=use_realtime,
-            stop_after_ready=stop_after_ready,
-            world=world,
-        )
-        self.world = world
-        self.frame_callbacks: List[Callable[[float], None]] = []
-        self.frame_data_generator: FrameDataGenerator = self.get_frame_data_generator()
-        self.sync_robot_only: bool = False
+    frame_callbacks: List[Callable[[float], None]] = field(default_factory=list, hash=False, compare=False)
+    """
+    Callbacks that will be called every time a new frame is processed.
+    """
+
+    sync_robot_only: bool = False
+    """
+    If True, only the robot will be synchronized.
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not hasattr(self, 'frame_data_generator'):
+            self.frame_data_generator: FrameDataGenerator = self.get_frame_data_generator()
 
     def reset(self):
         """
@@ -83,7 +80,6 @@ class DataPlayer(EpisodePlayer, ABC):
         """
         :return: the frame data generator.
         """
-        pass
 
 
     def _run(self):
@@ -143,61 +139,17 @@ class DataPlayer(EpisodePlayer, ABC):
         """
         pass
 
-    @abstractmethod
-    def get_joint_states(self, frame_data: FrameData) -> Dict[str, float]:
-        # Not implemented
-        pass
-
-
-@dataclass(unsafe_hash=True, init=False)
+@dataclass(eq=False)
 class FilePlayer(DataPlayer, ABC):
     """
     Plays the episode from a file.
     """
 
-    file_path: str = field(default="")
-    """
-    file path to the episode.
-    """
+    file_path: str = ""
+    models_dir: Optional[str] = None
+    position_shift: Optional[Vector3] = None
 
-    models_dir: Optional[str] = field(default=None)
-    """
-    models directory.
-    """
-
-    def __init__(
-        self,
-        file_path: str,
-        world: World,
-        models_dir: Optional[str] = None,
-        time_between_frames: Optional[timedelta] = None,
-        use_realtime: bool = False,
-        stop_after_ready: bool = False,
-        position_shift: Optional[Vector3] = None,
-    ):
-        """
-        Initializes the FilePlayer with the specified file.
-
-        :param file_path: The file that contains the data frames.
-        :param world: The world that is used to replay the episode.
-        :param time_between_frames: The time between frames.
-        :param use_realtime: Whether to use realtime.
-        :param stop_after_ready: Whether to stop the player after it is ready.
-        :param models_dir: The directory that contains the model files.
-        :param position_shift: The position shift to apply to the objects.
-        """
-        self.file_path = file_path
-        super().__init__(
-            time_between_frames=time_between_frames,
-            use_realtime=use_realtime,
-            world=world,
-            stop_after_ready=stop_after_ready,
-        )
-
-        self.models_dir = models_dir or os.path.join(
-            os.path.dirname(self.file_path), "models"
-        )
-
-        self.position_shift: Optional[Vector3] = position_shift
-
-
+    def __post_init__(self):
+        super().__post_init__()
+        if self.models_dir is None:
+            self.models_dir = os.path.join(os.path.dirname(self.file_path), "models")

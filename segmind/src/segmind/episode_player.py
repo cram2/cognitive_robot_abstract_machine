@@ -4,7 +4,7 @@ import datetime
 import logging
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from threading import RLock
 from typing import Any, Callable, ClassVar, Optional
 
@@ -21,62 +21,65 @@ except ImportError:
     RDRCaseViewer = None
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class EpisodePlayer(PropagatingThread, ABC):
     """
-    A class that represents the thread that steps the world.
+    The EpisodePlayer class is a base class for all episode players.
+    It provides common functionality and properties for episode players.
+    """
+
+    world: Optional[World] = None
+    """
+    The world associated with the episode player.
+    """
+
+    time_between_frames: Optional[datetime.timedelta] = None
+    """
+    The time between frames of the episode player.
+    """
+
+    use_realtime: bool = False
+    """
+    Whether to use realtime or fixed time step.
+    """
+
+    stop_after_ready: bool = False
+    """
+    If True, the episode player will stop after it is ready.
+    """
+
+    rdr_viewer: Optional[RDRCaseViewer] = None
+    """
+    The RDRCaseViewer instance.
     """
 
     _instances: ClassVar[dict[type, EpisodePlayer]] = {}
     """
-    The singleton dictionary that stores the instances of the player.
+    The instances of the EpisodePlayer class, representing the running episode players.
     """
 
-    pause_resume_lock: ClassVar[RLock] = RLock()
+    pause_resume_lock: ClassVar[RLock] = field(default=RLock(), init=False)
     """
-    The lock for pausing and resuming the player.
+    A lock for pausing and resuming the episode player.
     """
+
+    def __post_init__(self):
+        if self._initialized:
+            return
+        super().__post_init__()
+        self._ready: bool = False
+        self._status = PlayerStatus.CREATED
+        if self.time_between_frames is None:
+            self.time_between_frames = datetime.timedelta(seconds=0.01)
+        self._initialized = True
 
     def __new__(cls, *args, **kwargs):
         if cls not in EpisodePlayer._instances:
-            # Create the instance and store it under its specific class key
             instance = super().__new__(cls)
             EpisodePlayer._instances[cls] = instance
             instance._initialized = False
-
         return EpisodePlayer._instances[cls]
 
-    def __init__(
-        self,
-        time_between_frames: Optional[datetime.timedelta] = None,
-        use_realtime: bool = False,
-        stop_after_ready: bool = False,
-        world: Optional[World] = None,
-        rdr_viewer: Optional[RDRCaseViewer] = None,
-    ):
-        """
-        Initializes the episode player.
-
-        :param time_between_frames: The time between frames.
-        :param use_realtime: Whether to use realtime.
-        :param stop_after_ready: Whether to stop after ready.
-        :param world: The world.
-        :param rdr_viewer: The RDR case viewer.
-        """
-        if not self._initialized:
-            super().__init__()
-            self.rdr_viewer: Optional[RDRCaseViewer] = rdr_viewer
-            self.stop_after_ready: bool = stop_after_ready
-            self.world: World = world
-            self._ready: bool = False
-            self._status = PlayerStatus.CREATED
-            self.time_between_frames: datetime.timedelta = (
-                time_between_frames
-                if time_between_frames is not None
-                else datetime.timedelta(seconds=0.01)
-            )
-            self.use_realtime: bool = use_realtime
-            self._initialized = True
 
     @property
     def status(self) -> PlayerStatus:

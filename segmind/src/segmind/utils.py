@@ -3,15 +3,25 @@ from __future__ import annotations
 import logging
 import threading
 from abc import ABC, abstractmethod
+from dataclasses import field, dataclass
+
 from typing_extensions import Optional
 
 logger = logging.getLogger(__name__)
 
+@dataclass(eq=False)
 class PropagatingThread(threading.Thread, ABC):
-    exc: Optional[Exception] = None
+    """
+    Thread that propagates exceptions.
+    """
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    exc: Optional[Exception] = field(default=None, init=False)
+    """
+    Exception that was raised in the thread.
+    """
+
+    def __post_init__(self):
+        super().__init__()  # calls threading.Thread.__init__()
         self.kill_event = threading.Event()
 
     def run(self):
