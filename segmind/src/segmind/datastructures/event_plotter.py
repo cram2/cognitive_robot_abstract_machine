@@ -49,7 +49,6 @@ class EventPlotter:
         """
         data_dict = defaultdict(list)
         for event in events:
-            # ...
             data_dict['event'].append(event.__class__.__name__)
 
             tracked_objects = getattr(event, 'tracked_objects', [])
@@ -61,14 +60,6 @@ class EventPlotter:
 
         return data_dict
 
-
-    def _get_timestamp(self, timestamp: Union[datetime, float]) -> float:
-        """
-        Convert a timestamp to a float.
-        """
-        if isinstance(timestamp, datetime):
-            return timestamp.timestamp()
-        return timestamp
 
     def _create_dataframe(self, data_dict: dict) -> pd.DataFrame:
         """
