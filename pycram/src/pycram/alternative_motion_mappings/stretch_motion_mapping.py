@@ -9,7 +9,10 @@ from giskardpy.motion_statechart.goals.open_close import Close
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.ros2_nodes.ros_tasks import NavigateActionServerTask
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPose,
+    CartesianOrientation,
+)
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from pycram.datastructures.enums import ExecutionType
@@ -18,7 +21,11 @@ from pycram.robot_plans.motions.base import AlternativeMotion
 from pycram.view_manager import ViewManager
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import (
+    Vector3,
+    HomogeneousTransformationMatrix,
+    RotationMatrix,
+)
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
@@ -62,16 +69,15 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
                 # ),
                 Parallel(
                     [
-                        # AlignPlanes(
-                        #     root_link=self.world.root,
-                        #     tip_link=self.robot.root,
-                        #     tip_normal=Vector3(
-                        #         1, 0, 0, reference_frame=self.robot.root
-                        #     ),
-                        #     goal_normal=Vector3(
-                        #         -1, 0, 0, reference_frame=self.world.root
-                        #     ),
-                        # ),
+                        CartesianOrientation(
+                            root_link=self.world.root,
+                            tip_link=self.robot.root,
+                            goal_orientation=RotationMatrix(
+                                reference_frame=self.robot.root
+                            ),
+                            binding_policy=GoalBindingPolicy.Bind_on_start,
+                            weight=DefaultWeights.WEIGHT_ABOVE_CA,
+                        ),
                         CartesianPose(
                             root_link=self.world.root,
                             tip_link=tip,

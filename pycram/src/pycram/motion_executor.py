@@ -68,19 +68,19 @@ class MotionExecutor:
     def construct_msc(self):
         self.motion_state_chart = MotionStatechart()
         sequence_node = Sequence(nodes=self.motions)
-        self.motion_state_chart.add_node(ExternalCollisionAvoidance())
-        manipulator_bodies = []
-        for manipulator in self.world.get_semantic_annotations_by_type(Manipulator):
-            manipulator_bodies.extend(manipulator.bodies_with_collision)
-        self.motion_state_chart.add_node(
-            UpdateTemporaryCollisionRules(
-                temporary_rules=[
-                    AllowCollisionBetweenGroups(
-                        self.world.bodies_with_collision, manipulator_bodies
-                    )
-                ]
-            )
-        )
+        # self.motion_state_chart.add_node(ExternalCollisionAvoidance())
+        # manipulator_bodies = []
+        # for manipulator in self.world.get_semantic_annotations_by_type(Manipulator):
+        #     manipulator_bodies.extend(manipulator.bodies_with_collision)
+        # self.motion_state_chart.add_node(
+        #     UpdateTemporaryCollisionRules(
+        #         temporary_rules=[
+        #             AllowCollisionBetweenGroups(
+        #                 self.world.bodies_with_collision, manipulator_bodies
+        #             )
+        #         ]
+        #     )
+        # )
         self.motion_state_chart.add_node(sequence_node)
 
         self.motion_state_chart.add_node(EndMotion.when_true(sequence_node))

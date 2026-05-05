@@ -25,7 +25,7 @@ def main():
         robot_interface_config=StretchVelocityInterface(),
         behavior_tree_config=ClosedLoopBTConfig(),
         qp_controller_config=QPControllerConfig(
-            target_frequency=25, prediction_horizon=30
+            target_frequency=25, prediction_horizon=50
         ),
     )
     giskard.live()
