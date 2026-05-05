@@ -106,6 +106,9 @@ from semantic_digital_twin.world_description.world_modification import (
 from semantic_digital_twin.world_description.world_state import WorldState
 from krrood.utils import memoize, clear_memoization_cache
 
+from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
+from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
+
 if TYPE_CHECKING:
     from semantic_digital_twin.spatial_types import GenericSpatialType
 
@@ -392,6 +395,15 @@ class World(HasSimulatorProperties):
     Class that manages collision detection related stuff for this world.
     """
 
+    mesh_decomposer: Optional[MeshDecomposer] = field(
+        default_factory=VHACDMeshDecomposer, kw_only=True
+    )
+    """
+    Decomposer used by the Bullet collision detector to split non-convex meshes into
+    convex parts. Defaults to VHACD; pass ``None`` to skip decomposition (non-convex
+    meshes will then be treated as their convex hulls).
+    """
+
     _current_active_atomic_world_modification: Optional[Callable] = field(
         init=False, default=None
     )
@@ -436,7 +448,10 @@ class World(HasSimulatorProperties):
         self.state = WorldState(_world=self)
         self._forward_kinematic_manager = ForwardKinematicsManager(_world=self)
         self.collision_manager = CollisionManager(
-            _world=self, collision_detector=BulletCollisionDetector(_world=self)
+            _world=self,
+            collision_detector=BulletCollisionDetector(
+                _world=self, mesh_decomposer=self.mesh_decomposer
+            ),
         )
 
     def __hash__(self):

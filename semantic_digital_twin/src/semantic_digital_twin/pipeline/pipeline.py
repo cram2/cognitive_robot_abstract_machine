@@ -1,21 +1,25 @@
+from __future__ import annotations
+
 import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Callable
+from typing import List, Callable, TYPE_CHECKING
 
 import numpy as np
 
-from semantic_digital_twin.semantic_annotations.mixins import (
-    HasRootKinematicStructureEntity,
-)
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.semantic_annotations.mixins import (
+        HasRootKinematicStructureEntity,
+    )
+    from semantic_digital_twin.world import World
 
 
 @dataclass
