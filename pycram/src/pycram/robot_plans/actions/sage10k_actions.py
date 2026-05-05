@@ -559,6 +559,12 @@ class Sage10kEclecticResidence(Sage10kAbstractDemo):
             manipulator=context.robot.arm.manipulator,
             rotate_gripper=True,
         )
+        navigate1 = NavigateAction(
+            Pose.from_xyz_rpy(x=1.27, y=4.45, reference_frame=self.world.root)
+        )
+        navigate2 = NavigateAction(
+            Pose.from_xyz_rpy(x=1.27, y=4.45, reference_frame=self.world.root)
+        )
         mpu = MoveAndPickUpAction(
             standing_position=self.pickup_navigation_pose,
             object_designator=self.target_to_pick,
@@ -571,7 +577,15 @@ class Sage10kEclecticResidence(Sage10kAbstractDemo):
         present = NavigateAction(target_location=self.robot_starting_pose)
 
         return sequential(
-            [open_door, park_arms, mpu, ParkArmsAction(arm=Arms.LEFT), present],
+            [
+                open_door,
+                navigate1,
+                park_arms,
+                mpu,
+                ParkArmsAction(arm=Arms.LEFT),
+                navigate2,
+                present,
+            ],
             context=context,
         ).plan
 

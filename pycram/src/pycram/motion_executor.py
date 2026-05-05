@@ -107,7 +107,6 @@ class MotionExecutor:
 
             executor.tick()
             counter += 1
-            time.sleep(0.01)
             if executor.motion_statechart.is_end_motion():
                 break
 
