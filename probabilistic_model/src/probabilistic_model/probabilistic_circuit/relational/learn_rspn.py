@@ -98,7 +98,6 @@ def get_features_of_class_bfs(
 
         specification = RSPNSpecification(type(current_instance))
 
-        # Process attributes (same as before)
         for attribute in specification.attributes:
             value = getattr(current_instance, attribute.key)
 

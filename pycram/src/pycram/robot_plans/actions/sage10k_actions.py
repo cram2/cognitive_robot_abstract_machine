@@ -18,6 +18,9 @@ from pycram.robot_plans.actions.composite.transporting import (
     MoveAndPlaceAction,
 )
 from pycram.robot_plans.actions.core.navigation import NavigateAction
+from pycram.robot_plans.actions.core.misc import MoveToReach
+from pycram.robot_plans.actions.core.navigation import NavigateAction
+from pycram.robot_plans.actions.core.pick_up import PickUpAction
 from pycram.robot_plans.actions.core.robot_body import ParkArmsAction
 from semantic_digital_twin.adapters.sage_10k_dataset.loader import Sage10kDatasetLoader
 from semantic_digital_twin.adapters.sage_10k_dataset.processing import (
@@ -29,6 +32,11 @@ from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import
     RoomWithWallsAndDoors,
     DoorWithType,
 )
+from semantic_digital_twin.reasoning.predicates import (
+    compute_euclidean_planar_distance,
+    is_supported_by,
+)
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.reasoning.predicates import (
     compute_euclidean_planar_distance,
     is_supported_by,
@@ -566,3 +574,351 @@ class Sage10kEclecticResidence(Sage10kAbstractDemo):
             [open_door, park_arms, mpu, ParkArmsAction(arm=Arms.LEFT), present],
             context=context,
         ).plan
+
+
+@dataclass
+class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemo):
+    scene_url = Sage10kNonShittyScenes.SOUTHWESTERN_STORE
+
+    @property
+    def plan(self):
+        arm = Arms.RIGHT
+        context = Context.from_world(self.world, query_backend=ProbabilisticBackend())
+        grasp_description = GraspDescription(
+            ApproachDirection.RIGHT,
+            VerticalAlignment.NoAlignment,
+            self.robot.arm.manipulator,
+        )
+        open_door = Sage10kOpenDoor(self.main_entrance)
+
+        plan = sequential(
+            [
+                open_door,
+                ParkArmsAction(Arms.BOTH),
+                NavigateAction(
+                    target_location=Pose.from_xyz_rpy(
+                        x=0.81, y=4.81, reference_frame=self.world.root
+                    )
+                ),
+                MoveAndPickUpAction(
+                    object_designator=self.world_P_object_of_interest,
+                    standing_position=self.pickup_navigation_pose,
+                    arm=arm,
+                    grasp_description=grasp_description,
+                ),
+                ParkArmsAction(Arms.BOTH),
+                NavigateAction(
+                    target_location=Pose.from_xyz_rpy(
+                        x=0.81, y=4.81, reference_frame=self.world.root
+                    )
+                ),
+                MoveAndPlaceAction(
+                    object_designator=self.world_P_object_of_interest,
+                    standing_position=self.place_navigation_pose,
+                    arm=arm,
+                    target_location=self.place_pose,
+                ),
+                ParkArmsAction(Arms.BOTH),
+                NavigateAction(
+                    target_location=Pose.from_xyz_rpy(
+                        x=0.48, y=4.81, reference_frame=self.world.root
+                    )
+                ),
+            ],
+            context=context,
+        ).plan
+        return plan
+
+    @property
+    def world_P_object_of_interest(self):
+        @symbolic_function
+        def planar_distance(point1: Point3, point2: Point3):
+            return point1.euclidean_distance(point2)
+
+        near_pose = Pose.from_xyz_rpy(
+            x=1.7, y=0.49, z=1.17, reference_frame=self.world.root
+        )
+        v_final = variable(
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
+        )
+        bottle = (
+            an(entity(v_final)).where(
+                contains(v_final.type_description, "toyshelf"),
+                planar_distance(v_final.root.global_pose.position, near_pose.position)
+                < 0.9,
+            )
+        ).first()
+
+        return bottle.root
+
+    @property
+    def robot_starting_pose(self):
+        return Pose.from_xyz_rpy(3.8, 6.5)
+
+    @property
+    def pickup_navigation_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(
+            0.63, 0.70, 0, yaw=np.pi / 2, reference_frame=self.world.root
+        )
+
+    @property
+    def place_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(4.41, 4.46, z=0.368, reference_frame=self.world.root)
+
+    @property
+    def place_navigation_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(3.99, 4.66, 0, reference_frame=self.world.root)
+
+    @cached_property
+    def main_entrance(self):
+        room = variable(RoomWithWallsAndDoors, self.world.semantic_annotations)
+        store = an(entity(room).where(contains(room.room_type, "toy store"))).first()
+        main_entrance: DoorWithType = an(
+            entity(v := variable_from(store.doors)).where(
+                contains(v.type_description, "main")
+            )
+        ).first()
+        return main_entrance
+
+    def preprocess_world(self):
+        super().preprocess_world()
+        v = variable(
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
+        )
+        obstacles_of_main_entrance = an(
+            entity(v).where(
+                compute_euclidean_planar_distance(
+                    v.root, self.main_entrance.root, Vector3.Z()
+                )
+                < 0.9
+            )
+        )
+        benches = an(entity(v).where(contains(v.type_description, "bench")))
+        self.remove_rooted_annotations(obstacles_of_main_entrance.evaluate())
+        self.remove_rooted_annotations(benches.evaluate())
+
+
+@dataclass
+class Sage10kBrutalistStoreDemo(Sage10kAbstractDemo):
+    scene_url = Sage10kNonShittyScenes.BRUTALIST_STORE
+
+    @property
+    def plan(self):
+        arm = Arms.RIGHT
+        context = Context.from_world(self.world, query_backend=ProbabilisticBackend())
+        grasp_description = GraspDescription(
+            ApproachDirection.RIGHT,
+            VerticalAlignment.NoAlignment,
+            self.robot.arm.manipulator,
+        )
+        open_door = Sage10kOpenDoor(self.main_entrance)
+
+        plan = sequential(
+            [
+                open_door,
+                ParkArmsAction(Arms.BOTH),
+                NavigateAction(
+                    target_location=Pose.from_xyz_rpy(
+                        x=12, y=8.13, reference_frame=self.world.root
+                    )
+                ),
+                MoveAndPickUpAction(
+                    object_designator=self.world_P_object_of_interest,
+                    standing_position=self.pickup_navigation_pose,
+                    arm=arm,
+                    grasp_description=grasp_description,
+                ),
+                ParkArmsAction(Arms.BOTH),
+                MoveAndPlaceAction(
+                    object_designator=self.world_P_object_of_interest,
+                    standing_position=self.place_navigation_pose,
+                    arm=arm,
+                    target_location=self.place_pose,
+                ),
+                NavigateAction(
+                    target_location=Pose.from_xyz_rpy(
+                        x=12, y=8.13, reference_frame=self.world.root
+                    )
+                ),
+            ],
+            context=context,
+        ).plan
+        return plan
+
+    @property
+    def world_P_object_of_interest(self):
+        @symbolic_function
+        def planar_distance(point1: Point3, point2: Point3):
+            return point1.euclidean_distance(point2)
+
+        near_pose = Pose.from_xyz_rpy(
+            x=8.28, y=0.35, z=0.69, reference_frame=self.world.root
+        )
+        v_final = variable(
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
+        )
+        bottle = (
+            an(entity(v_final)).where(
+                contains(v_final.type_description, "bottle"),
+                planar_distance(v_final.root.global_pose.position, near_pose.position)
+                < 0.9,
+            )
+        ).first()
+
+        return bottle.root
+
+    @property
+    def robot_starting_pose(self):
+        return Pose.from_xyz_rpy(18.5, 8)
+
+    @property
+    def pickup_navigation_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(
+            8.31, 0.82, 0, yaw=np.pi, reference_frame=self.world.root
+        )
+
+    @property
+    def place_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(
+            0.32, 5.81, 0.588, yaw=np.pi / 2, reference_frame=self.world.root
+        )
+
+    @property
+    def place_navigation_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(
+            0.66, 5.81, 0, yaw=np.pi / 2, reference_frame=self.world.root
+        )
+
+    @cached_property
+    def main_entrance(self):
+        room = variable(RoomWithWallsAndDoors, self.world.semantic_annotations)
+        store = an(
+            entity(room).where(contains(room.room_type, "grocery_store"))
+        ).first()
+        main_entrance: DoorWithType = an(
+            entity(v := variable_from(store.doors)).where(
+                contains(v.type_description, "main")
+            )
+        ).first()
+        return main_entrance
+
+
+@dataclass
+class Sage10kAmericanBuffetDemo(Sage10kAbstractDemo):
+    scene_url = Sage10kNonShittyScenes.AMERICAN_BUFFET_RESTAURANT
+
+    @property
+    def plan(self):
+        arm = Arms.RIGHT
+        context = Context.from_world(self.world, query_backend=ProbabilisticBackend())
+        grasp_description = GraspDescription(
+            ApproachDirection.LEFT,
+            VerticalAlignment.NoAlignment,
+            self.robot.arm.manipulator,
+        )
+        open_door = Sage10kOpenDoor(self.main_entrance)
+        navigate = Pose.from_xyz_rpy(x=5.14, y=2.85, reference_frame=self.world.root)
+        # self.robot.root. = self.robot_starting_pose
+
+        plan = sequential(
+            [
+                open_door,
+                ParkArmsAction(Arms.BOTH),
+                MoveAndPickUpAction(
+                    object_designator=self.world_P_object_of_interest,
+                    standing_position=self.pickup_navigation_pose,
+                    arm=arm,
+                    grasp_description=grasp_description,
+                ),
+                NavigateAction(target_location=navigate),
+                ParkArmsAction(Arms.BOTH),
+                MoveAndPlaceAction(
+                    object_designator=self.world_P_object_of_interest,
+                    standing_position=self.place_navigation_pose,
+                    arm=arm,
+                    target_location=self.place_pose,
+                ),
+            ],
+            context=context,
+        ).plan
+        return plan
+
+    @property
+    def robot_starting_pose(self):
+        return Pose.from_xyz_rpy(3.00, 15.00, reference_frame=self.world.root)
+
+    @property
+    def world_P_object_of_interest(self) -> Body:
+        @symbolic_function
+        def planar_distance(point1: Point3, point2: Point3):
+            return point1.euclidean_distance(point2)
+
+        pose = Pose.from_xyz_rpy(x=4.06, y=8.64, reference_frame=self.world.root)
+        v_table = variable(
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
+        )
+        v_cup = variable(
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
+        )
+        table = an(entity(v_table)).where(
+            v_table.type_description == "table",
+            planar_distance(v_table.root.global_pose.position, pose.position) < 0.9,
+        )
+
+        cup = (
+            an(entity(v_cup)).where(
+                contains(v_cup.type_description, "cup"),
+                is_supported_by(v_cup.root, table.root, 0.05),
+            )
+        ).first()
+        return cup.root
+
+    @property
+    def pickup_navigation_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(4.66, 8.62, 0, yaw=0, reference_frame=self.world.root)
+
+    @property
+    def place_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(
+            7.61, 0.997, 0.6, yaw=np.pi / 2, reference_frame=self.world.root
+        )
+
+    @property
+    def place_navigation_pose(self) -> Pose:
+        return Pose.from_xyz_rpy(
+            7.23, 1.16, 0, yaw=np.pi / 2, reference_frame=self.world.root
+        )
+
+    @cached_property
+    def main_entrance(self):
+        room = variable(RoomWithWallsAndDoors, self.world.semantic_annotations)
+        gym = an(
+            entity(room).where(contains(room.room_type, "buffet restaurant"))
+        ).first()
+        main_entrance: DoorWithType = an(
+            entity(v := variable_from(gym.doors)).where(
+                contains(v.type_description, "main")
+            )
+        ).first()
+        return main_entrance
+
+    def preprocess_world(self):
+        v = variable(
+            NaturalLanguageDescriptionWithTypeDescription,
+            self.world.semantic_annotations,
+        )
+        obstacles_of_main_entrance = an(
+            entity(v).where(
+                compute_euclidean_planar_distance(
+                    v.root, self.main_entrance.root, Vector3.Z()
+                )
+                < 0.9
+            )
+        )
+
+        self.remove_rooted_annotations(obstacles_of_main_entrance.evaluate())
