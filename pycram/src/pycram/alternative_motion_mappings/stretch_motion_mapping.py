@@ -104,8 +104,9 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
 
     @property
     def _motion_chart(self):
-
-        return DifferentialDriveBaseGoal(goal_pose=self.target, threshold=0.1)
+        world_T_target = self.world.transform(self.target, self.world.root)
+        world_T_target.z = 0
+        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.05)
 
 
 class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
@@ -120,7 +121,9 @@ class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
 
     @property
     def _motion_chart(self) -> NavigateActionServerTask:
-        return DifferentialDriveBaseGoal(goal_pose=self.target, threshold=0.1)
+        world_T_target = self.world.transform(self.target, self.world.root)
+        world_T_target.z = 0
+        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.1)
         return NavigateActionServerTask(
             target_pose=self.target,
             base_link=self.robot.root,

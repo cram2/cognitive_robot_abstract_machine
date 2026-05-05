@@ -1,4 +1,6 @@
-import os
+import threading
+from time import sleep
+
 import threading
 from time import sleep
 
@@ -6,29 +8,31 @@ import numpy as np
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 
-from krrood.entity_query_language.factories import underspecified, variable
+import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     Arms,
     ApproachDirection,
     VerticalAlignment,
-    MovementType,
     ExecutionType,
     DetectionTechnique,
 )
 from pycram.datastructures.grasp import GraspDescription
-from pycram.locations.locations import CostmapLocation
-from pycram.motion_executor import real_robot, simulated_robot, ExecutionEnvironment
-from pycram.plans.factories import execute_single, sequential
-from pycram.robot_plans import MoveToolCenterPointMotion, MoveGripperMotion
+from pycram.motion_executor import ExecutionEnvironment
+from pycram.plans.factories import sequential
+from pycram.robot_plans import (
+    MoveJointsMotion,
+    MoveGripperMotion,
+)
 from pycram.robot_plans.actions.core.misc import DetectAction
 from pycram.robot_plans.actions.core.navigation import NavigateAction, LookAtAction
-from pycram.robot_plans.actions.core.pick_up import ReachAction, PickUpAction
-from pycram.robot_plans.actions.core.placing import PlaceAction
 from pycram.robot_plans.actions.core.robot_body import (
-    MoveTorsoAction,
-    SetGripperAction,
     ParkArmsAction,
+    StretchExtendArm,
+    StretchRetractArm,
+    StretchTorsoHeightDirectlyBelowShelf,
+    StretchTorsoShelfPickPlaceHeight,
+    StretchTorsoTablePickPlaceHeight,
 )
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.package_resolver import CompositePathResolver
@@ -41,27 +45,21 @@ from semantic_digital_twin.adapters.ros.world_synchronizer import (
     StateSynchronizer,
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.datastructures.definitions import TorsoState, GripperState
+from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Shelf,
     ShelfLayer,
     Wall,
-    Cereal,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
-import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     DifferentialDrive,
-    OmniDrive,
-    Connection6DoF,
 )
-from semantic_digital_twin.world_description.geometry import Box, Scale
-from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
 
 rclpy.init()
@@ -74,6 +72,7 @@ thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executo
 thread.start()
 
 exec_type = ExecutionType.REAL
+demo_start_of_table_instead_of_shelf = False
 
 exec_env = ExecutionEnvironment(exec_type)
 
@@ -324,18 +323,35 @@ if not world.is_entity_in_world_by_name("cheeze_it.obj"):
     ).parse()
 
     with world.modify_world():
+        if demo_start_of_table_instead_of_shelf:
+            parent = world.get_body_by_name("bedside_table.dae")
+            bedside_height = (
+                parent.collision.max_point[2] - parent.collision.min_point[2]
+            )
+            surface_T_cereal = HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=0.10,
+                y=0.0,
+                # frame is at the bottom, not the middle
+                z=bedside_height + 0.105,
+                yaw=np.pi / 2,
+                reference_frame=parent,
+            )
+        else:
+            parent = shelf_layer2.root
+            surface_T_cereal = HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=-0.10,
+                y=0.0,
+                z=0.115,
+                yaw=-np.pi / 2,
+                reference_frame=parent,
+            )
+
         world.merge_world(
             cereal,
             FixedConnection(
-                shelf_layer2.root,
+                parent,
                 cereal.root,
-                HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-0.10,
-                    y=0.0,
-                    z=0.105,
-                    yaw=-np.pi / 2,
-                    reference_frame=shelf_layer2.root,
-                ),
+                surface_T_cereal,
             ),
         )
 
@@ -354,39 +370,187 @@ grasp_desc = GraspDescription(
 )
 
 # input("Ready ...")
+cereal_body = world.get_body_by_name("cheeze_it.obj")
+shelf_body = shelf_layer2.root
+bedside_table_body = world.get_body_by_name("bedside_table.dae")
 
-plan = sequential(
-    [
-        # ParkArmsAction(Arms.BOTH),
-        # NavigateAction(
-        #     Pose.from_xyz_rpy(
-        #         x=1.0, y=0.5, z=0, yaw=-np.pi / 2, reference_frame=world.root
-        #     )
-        # ),
-        LookAtAction(Pose.from_xyz_rpy(1.0, 0.2, 1.0, reference_frame=world.root)),
-        DetectAction(
-            technique=DetectionTechnique.TYPES,
-        ),
-        # NavigateAction(
-        #     Pose.from_xyz_rpy(x=1.0, y=0.5, z=0, reference_frame=world.root)
-        # ),
-        # PickUpAction(world.get_body_by_name("cheeze_it.obj"), Arms.LEFT, grasp_desc),
-        # ParkArmsAction(Arms.BOTH),
-        #     NavigateAction(
-        #         Pose.from_xyz_rpy(1.9, 2.1, 0, yaw=np.pi, reference_frame=world.root)
-        #     ),
-        #     PlaceAction(
-        #         object_designator=world.get_body_by_name("cheeze_it.obj"),
-        #         target_location=Pose.from_xyz_rpy(2, 2.6, 0.46, reference_frame=world.root),
-        #         arm=Arms.LEFT,
-        #     ),
-        #     ParkArmsAction(Arms.BOTH),
-    ],
-    context,
-).plan
+nav_perceive_pose_relative_to_cereal = Pose.from_xyz_rpy(
+    y=-0.55, yaw=np.pi / 2, reference_frame=cereal_body
+)
+nav_grasp_pose_relative_to_cereal = Pose.from_xyz_rpy(
+    y=-0.35, yaw=np.pi, reference_frame=cereal_body
+)
+nav_place_pose_relative_to_bedside_table = Pose.from_xyz_rpy(
+    x=0.45, yaw=-np.pi / 2, reference_frame=bedside_table_body
+)
+nav_place_pose_relative_to_shelf = Pose.from_xyz_rpy(
+    x=-0.45, yaw=np.pi / 2, reference_frame=shelf_body
+)
 
-with exec_env:
-    plan.perform()
 
-sleep(15)
+def detect_cereal():
+    plan = sequential(
+        [
+            ParkArmsAction(Arms.BOTH),
+            NavigateAction(nav_perceive_pose_relative_to_cereal),
+            LookAtAction(cereal_body.global_pose),
+            DetectAction(
+                technique=DetectionTechnique.TYPES,
+            ),
+        ],
+        context,
+    )
+    with exec_env:
+        plan.perform()
+
+
+# %% Shelf Pickup
+def shelf_pickup():
+    if not demo_start_of_table_instead_of_shelf:
+        detect_cereal()
+        start_action = [NavigateAction(nav_grasp_pose_relative_to_cereal)]
+    else:
+        start_action = []
+    plan = sequential(
+        [
+            *start_action,
+            MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
+            StretchTorsoHeightDirectlyBelowShelf(),
+            StretchExtendArm(),
+            StretchTorsoShelfPickPlaceHeight(),
+            MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
+        ],
+        context,
+    ).plan
+
+    with exec_env:
+        plan.perform()
+
+    with world.modify_world():
+        world.move_branch_with_fixed_connection(
+            cereal_body, robot_annotation.arm.manipulator.tool_frame
+        )
+
+    plan = sequential(
+        [
+            ParkArmsAction(Arms.BOTH),
+        ],
+        context,
+    ).plan
+
+    with exec_env:
+        plan.perform()
+
+
+# %% Table Place
+def table_place():
+    plan = sequential(
+        [
+            NavigateAction(nav_place_pose_relative_to_bedside_table),
+            StretchExtendArm(),
+            StretchTorsoTablePickPlaceHeight(),
+            MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
+        ],
+        context,
+    ).plan
+
+    with exec_env:
+        plan.perform()
+
+    with world.modify_world():
+        world.move_branch_with_fixed_connection(cereal_body, bedside_table_body)
+
+    plan = sequential(
+        [
+            StretchTorsoHeightDirectlyBelowShelf(),
+            MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
+            ParkArmsAction(Arms.BOTH),
+        ],
+        context,
+    ).plan
+
+    with exec_env:
+        plan.perform()
+
+
+# %% Table Pickup
+def table_pickup():
+    if demo_start_of_table_instead_of_shelf:
+        detect_cereal()
+        start_action = [NavigateAction(nav_grasp_pose_relative_to_cereal)]
+    else:
+        start_action = []
+    plan = sequential(
+        [
+            *start_action,
+            StretchExtendArm(),
+            MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
+            StretchTorsoTablePickPlaceHeight(),
+            MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
+        ],
+        context,
+    ).plan
+
+    with exec_env:
+        plan.perform()
+
+    with world.modify_world():
+        world.move_branch_with_fixed_connection(
+            cereal_body, robot_annotation.arm.manipulator.tool_frame
+        )
+
+    plan = sequential(
+        [
+            StretchTorsoHeightDirectlyBelowShelf(),
+            ParkArmsAction(Arms.BOTH),
+        ],
+        context,
+    ).plan
+    with exec_env:
+        plan.perform()
+
+
+# %% Shelf Place
+def shelf_place():
+    plan = sequential(
+        [
+            NavigateAction(nav_place_pose_relative_to_shelf),
+            StretchTorsoHeightDirectlyBelowShelf(),
+            StretchExtendArm(),
+            StretchTorsoShelfPickPlaceHeight(),
+            MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
+        ],
+        context,
+    ).plan
+
+    with exec_env:
+        plan.perform()
+
+    with world.modify_world():
+        world.move_branch_with_fixed_connection(cereal_body, shelf_body)
+
+    plan = sequential(
+        [
+            StretchTorsoHeightDirectlyBelowShelf(),
+            StretchRetractArm(),
+            ParkArmsAction(Arms.BOTH),
+        ],
+        context,
+    ).plan
+
+    with exec_env:
+        plan.perform()
+
+
+if demo_start_of_table_instead_of_shelf:
+    table_pickup()
+    shelf_place()
+    shelf_pickup()
+    table_place()
+else:
+    shelf_pickup()
+    table_place()
+    table_pickup()
+    shelf_place()
+
 rclpy.shutdown()
