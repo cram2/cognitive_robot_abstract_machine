@@ -2,24 +2,18 @@ import threading
 import time
 
 import rclpy
+import tqdm
 from rclpy.executors import SingleThreadedExecutor
 
+from krrood.utils import recursive_subclasses
 from pycram.motion_executor import simulated_robot
-from pycram.robot_plans.actions.sage10k_actions import (
-    Sage10kGymDemo,
-    Sage10kTVStudioDemo,
-    Sage10kCraftsmanLobbyDemo,
-    Sage10kTropicalWarehouse,
-    Sage10kVaporwave,
-    Sage10kEclecticResidence,
-    Sage10kAbstractDemo,
-)
+from pycram.robot_plans.actions.sage10k_actions import *
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from semantic_digital_twin.orm.ormatic_interface import *  # type: ignore
 
-demo = Sage10kEclecticResidence()
+demo = Sage10kCraftsmanLobbyDemo()
 
 
 def run_demo(demo: Sage10kAbstractDemo):
@@ -45,4 +39,5 @@ def run_demo(demo: Sage10kAbstractDemo):
     del demo
 
 
-run_demo(demo)
+for demo in tqdm.tqdm(recursive_subclasses(Sage10kAbstractDemo)):
+    run_demo(demo())

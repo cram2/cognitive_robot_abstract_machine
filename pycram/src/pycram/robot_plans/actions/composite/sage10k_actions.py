@@ -63,8 +63,6 @@ class Sage10kOpenDoor(ActionDescription):
             )
         )
 
-        gcs.spawn_as_region()
-
         reach_query = underspecified(MoveToReach)(
             target_pose=pre_grasp_pose,
             robot_x=...,
