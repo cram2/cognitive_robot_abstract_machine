@@ -71,7 +71,8 @@ executor.add_node(node)
 thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
 thread.start()
 
-exec_type = ExecutionType.SIMULATED
+exec_type = ExecutionType.REAL
+demo_start_of_table_instead_of_shelf = False
 
 exec_env = ExecutionEnvironment(exec_type)
 
@@ -322,18 +323,35 @@ if not world.is_entity_in_world_by_name("cheeze_it.obj"):
     ).parse()
 
     with world.modify_world():
+        if demo_start_of_table_instead_of_shelf:
+            parent = world.get_body_by_name("bedside_table.dae")
+            bedside_height = (
+                parent.collision.max_point[2] - parent.collision.min_point[2]
+            )
+            surface_T_cereal = HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=0.10,
+                y=0.0,
+                # frame is at the bottom, not the middle
+                z=bedside_height + 0.105,
+                yaw=np.pi / 2,
+                reference_frame=parent,
+            )
+        else:
+            parent = shelf_layer2.root
+            surface_T_cereal = HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=-0.10,
+                y=0.0,
+                z=0.115,
+                yaw=-np.pi / 2,
+                reference_frame=parent,
+            )
+
         world.merge_world(
             cereal,
             FixedConnection(
-                shelf_layer2.root,
+                parent,
                 cereal.root,
-                HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-0.10,
-                    y=0.0,
-                    z=0.115,
-                    yaw=-np.pi / 2,
-                    reference_frame=shelf_layer2.root,
-                ),
+                surface_T_cereal,
             ),
         )
 
@@ -369,130 +387,170 @@ nav_place_pose_relative_to_shelf = Pose.from_xyz_rpy(
     x=-0.45, yaw=np.pi / 2, reference_frame=shelf_body
 )
 
-# %% Shelf Pickup
-plan = sequential(
-    [
-        ParkArmsAction(Arms.BOTH),
-        NavigateAction(nav_perceive_pose_relative_to_cereal),
-        LookAtAction(cereal_body.global_pose),
-        DetectAction(
-            technique=DetectionTechnique.TYPES,
-        ),
-        NavigateAction(nav_grasp_pose_relative_to_cereal),
-        MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
-        StretchTorsoHeightDirectlyBelowShelf(),
-        StretchExtendArm(),
-        StretchTorsoShelfPickPlaceHeight(),
-        MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
-    ],
-    context,
-).plan
 
-with exec_env:
-    plan.perform()
-
-with world.modify_world():
-    world.move_branch_with_fixed_connection(
-        cereal_body, robot_annotation.arm.manipulator.tool_frame
+def detect_cereal():
+    plan = sequential(
+        [
+            ParkArmsAction(Arms.BOTH),
+            NavigateAction(nav_perceive_pose_relative_to_cereal),
+            LookAtAction(cereal_body.global_pose),
+            DetectAction(
+                technique=DetectionTechnique.TYPES,
+            ),
+        ],
+        context,
     )
+    with exec_env:
+        plan.perform()
 
-plan = sequential(
-    [
-        ParkArmsAction(Arms.BOTH),
-    ],
-    context,
-).plan
 
-with exec_env:
-    plan.perform()
+# %% Shelf Pickup
+def shelf_pickup():
+    if not demo_start_of_table_instead_of_shelf:
+        detect_cereal()
+        start_action = [NavigateAction(nav_grasp_pose_relative_to_cereal)]
+    else:
+        start_action = []
+    plan = sequential(
+        [
+            *start_action,
+            MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
+            StretchTorsoHeightDirectlyBelowShelf(),
+            StretchExtendArm(),
+            StretchTorsoShelfPickPlaceHeight(),
+            MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
+        ],
+        context,
+    ).plan
+
+    with exec_env:
+        plan.perform()
+
+    with world.modify_world():
+        world.move_branch_with_fixed_connection(
+            cereal_body, robot_annotation.arm.manipulator.tool_frame
+        )
+
+    plan = sequential(
+        [
+            ParkArmsAction(Arms.BOTH),
+        ],
+        context,
+    ).plan
+
+    with exec_env:
+        plan.perform()
+
 
 # %% Table Place
-plan = sequential(
-    [
-        NavigateAction(nav_place_pose_relative_to_bedside_table),
-        StretchExtendArm(),
-        StretchTorsoTablePickPlaceHeight(),
-        MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
-    ],
-    context,
-).plan
+def table_place():
+    plan = sequential(
+        [
+            NavigateAction(nav_place_pose_relative_to_bedside_table),
+            StretchExtendArm(),
+            StretchTorsoTablePickPlaceHeight(),
+            MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
+        ],
+        context,
+    ).plan
 
-with exec_env:
-    plan.perform()
+    with exec_env:
+        plan.perform()
 
-with world.modify_world():
-    world.move_branch_with_fixed_connection(cereal_body, bedside_table_body)
+    with world.modify_world():
+        world.move_branch_with_fixed_connection(cereal_body, bedside_table_body)
 
-plan = sequential(
-    [
-        StretchTorsoHeightDirectlyBelowShelf(),
-        MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
-        ParkArmsAction(Arms.BOTH),
-    ],
-    context,
-).plan
+    plan = sequential(
+        [
+            StretchTorsoHeightDirectlyBelowShelf(),
+            MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
+            ParkArmsAction(Arms.BOTH),
+        ],
+        context,
+    ).plan
 
-with exec_env:
-    plan.perform()
+    with exec_env:
+        plan.perform()
+
 
 # %% Table Pickup
-plan = sequential(
-    [
-        StretchExtendArm(),
-        MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
-        StretchTorsoTablePickPlaceHeight(),
-        MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
-    ],
-    context,
-).plan
+def table_pickup():
+    if demo_start_of_table_instead_of_shelf:
+        detect_cereal()
+        start_action = [NavigateAction(nav_grasp_pose_relative_to_cereal)]
+    else:
+        start_action = []
+    plan = sequential(
+        [
+            *start_action,
+            StretchExtendArm(),
+            MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
+            StretchTorsoTablePickPlaceHeight(),
+            MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
+        ],
+        context,
+    ).plan
 
-with exec_env:
-    plan.perform()
+    with exec_env:
+        plan.perform()
 
-with world.modify_world():
-    world.move_branch_with_fixed_connection(
-        cereal_body, robot_annotation.arm.manipulator.tool_frame
-    )
+    with world.modify_world():
+        world.move_branch_with_fixed_connection(
+            cereal_body, robot_annotation.arm.manipulator.tool_frame
+        )
 
-plan = sequential(
-    [
-        StretchTorsoHeightDirectlyBelowShelf(),
-        ParkArmsAction(Arms.BOTH),
-    ],
-    context,
-).plan
-with exec_env:
-    plan.perform()
+    plan = sequential(
+        [
+            StretchTorsoHeightDirectlyBelowShelf(),
+            ParkArmsAction(Arms.BOTH),
+        ],
+        context,
+    ).plan
+    with exec_env:
+        plan.perform()
+
 
 # %% Shelf Place
-plan = sequential(
-    [
-        NavigateAction(nav_place_pose_relative_to_shelf),
-        StretchTorsoHeightDirectlyBelowShelf(),
-        StretchExtendArm(),
-        StretchTorsoShelfPickPlaceHeight(),
-        MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
-    ],
-    context,
-).plan
+def shelf_place():
+    plan = sequential(
+        [
+            NavigateAction(nav_place_pose_relative_to_shelf),
+            StretchTorsoHeightDirectlyBelowShelf(),
+            StretchExtendArm(),
+            StretchTorsoShelfPickPlaceHeight(),
+            MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
+        ],
+        context,
+    ).plan
 
-with exec_env:
-    plan.perform()
+    with exec_env:
+        plan.perform()
 
-with world.modify_world():
-    world.move_branch_with_fixed_connection(cereal_body, shelf_body)
+    with world.modify_world():
+        world.move_branch_with_fixed_connection(cereal_body, shelf_body)
 
-plan = sequential(
-    [
-        StretchTorsoHeightDirectlyBelowShelf(),
-        StretchRetractArm(),
-        ParkArmsAction(Arms.BOTH),
-        NavigateAction(nav_perceive_pose_relative_to_cereal),
-    ],
-    context,
-).plan
+    plan = sequential(
+        [
+            StretchTorsoHeightDirectlyBelowShelf(),
+            StretchRetractArm(),
+            ParkArmsAction(Arms.BOTH),
+        ],
+        context,
+    ).plan
 
-with exec_env:
-    plan.perform()
+    with exec_env:
+        plan.perform()
+
+
+if demo_start_of_table_instead_of_shelf:
+    table_pickup()
+    shelf_place()
+    shelf_pickup()
+    table_place()
+else:
+    shelf_pickup()
+    table_place()
+    table_pickup()
+    shelf_place()
 
 rclpy.shutdown()
