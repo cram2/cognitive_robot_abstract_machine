@@ -330,7 +330,7 @@ if not world.is_entity_in_world_by_name("cheeze_it.obj"):
                 shelf_layer2.root,
                 cereal.root,
                 HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=0.0,
+                    x=-0.10,
                     y=0.0,
                     z=0.105,
                     yaw=-np.pi / 2,
@@ -358,31 +358,29 @@ grasp_desc = GraspDescription(
 plan = sequential(
     [
         ParkArmsAction(Arms.BOTH),
-        # NavigateAction(
-        #     Pose.from_xyz_rpy(
-        #         x=1.0, y=0.5, z=0, yaw=-np.pi / 2, reference_frame=world.root
-        #     )
-        # ),
-        # # MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
-        # # MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
-        # LookAtAction(Pose.from_xyz_rpy(1.0, 0.2, 1.0, reference_frame=world.root)),
-        # DetectAction(
-        #     technique=DetectionTechnique.TYPES,
-        # ),
-        # NavigateAction(
-        #     Pose.from_xyz_rpy(x=1.0, y=0.5, z=0, reference_frame=world.root)
-        # ),
-        # PickUpAction(world.get_body_by_name("cheeze_it.obj"), Arms.LEFT, grasp_desc),
-        # ParkArmsAction(Arms.BOTH),
-        # NavigateAction(
-        #     Pose.from_xyz_rpy(2, 2.4, 0, yaw=np.pi, reference_frame=world.root)
-        # ),
-        # PlaceAction(
-        #     object_designator=world.get_body_by_name("cheeze_it.obj"),
-        #     target_location=Pose.from_xyz_rpy(2, 2.9, 0.46, reference_frame=world.root),
-        #     arm=Arms.LEFT,
-        # ),
-        # ParkArmsAction(Arms.BOTH),
+        NavigateAction(
+            Pose.from_xyz_rpy(
+                x=1.0, y=0.5, z=0, yaw=-np.pi / 2, reference_frame=world.root
+            )
+        ),
+        LookAtAction(Pose.from_xyz_rpy(1.0, 0.2, 1.0, reference_frame=world.root)),
+        DetectAction(
+            technique=DetectionTechnique.TYPES,
+        ),
+        NavigateAction(
+            Pose.from_xyz_rpy(x=1.0, y=0.5, z=0, reference_frame=world.root)
+        ),
+        PickUpAction(world.get_body_by_name("cheeze_it.obj"), Arms.LEFT, grasp_desc),
+        ParkArmsAction(Arms.BOTH),
+        NavigateAction(
+            Pose.from_xyz_rpy(1.9, 2.1, 0, yaw=np.pi, reference_frame=world.root)
+        ),
+        PlaceAction(
+            object_designator=world.get_body_by_name("cheeze_it.obj"),
+            target_location=Pose.from_xyz_rpy(2, 2.6, 0.46, reference_frame=world.root),
+            arm=Arms.LEFT,
+        ),
+        ParkArmsAction(Arms.BOTH),
     ],
     context,
 ).plan

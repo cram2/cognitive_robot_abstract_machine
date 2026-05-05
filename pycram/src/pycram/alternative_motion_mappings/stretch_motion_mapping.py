@@ -96,9 +96,7 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
     @property
     def _motion_chart(self):
 
-        return DifferentialDriveBaseGoal(
-            goal_pose=self.target,
-        )
+        return DifferentialDriveBaseGoal(goal_pose=self.target, threshold=0.1)
 
 
 class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
