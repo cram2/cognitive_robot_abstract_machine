@@ -332,7 +332,7 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemo):
     @property
     def plan(self):
         target_pose = Pose.from_xyz_rpy(
-            x=5.48, y=7.46, z=0.8, reference_frame=self.world.root
+            x=5.48, y=7.46, z=0.8, yaw=-np.pi / 2, reference_frame=self.world.root
         )
         context = Context.from_world(self.world, query_backend=ProbabilisticBackend())
         open_door = Sage10kOpenDoor(self.main_entrance)
@@ -350,7 +350,7 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemo):
         )
         mpp = MoveAndPlaceAction(
             standing_position=Pose.from_xyz_rpy(
-                x=5.48, y=6.96, yaw=np.pi / 2, reference_frame=self.world.root
+                x=5.48, y=6.96, reference_frame=self.world.root
             ),
             object_designator=self.book_to_pick,
             target_location=target_pose,

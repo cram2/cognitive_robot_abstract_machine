@@ -39,5 +39,8 @@ def run_demo(demo: Sage10kAbstractDemo):
     del demo
 
 
-for demo in tqdm.tqdm(recursive_subclasses(Sage10kAbstractDemo)):
+# pbar = tqdm.tqdm(recursive_subclasses(Sage10kAbstractDemo))
+pbar = tqdm.tqdm([Sage10kCraftsmanLobbyDemo])
+for demo in pbar:
+    pbar.set_postfix({"Current Scene": demo.scene_url.name})
     run_demo(demo())
