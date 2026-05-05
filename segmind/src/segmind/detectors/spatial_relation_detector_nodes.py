@@ -91,22 +91,21 @@ class LossOfSupportDetector(AbstractDetector):
         events = []
         latest_support = segmind_context.latest_support
         new_support_pairs = self.get_relation(context, objects_to_check, is_supported_by)
+
         for body, support in list(latest_support.items()):
-            loss_supports = (
-                support.copy()
-                if body not in new_support_pairs
-                else support - new_support_pairs[body]
+            loss_supports = support - new_support_pairs.get(body, set())
+
+            if not loss_supports:
+                continue
+
+            segmind_context.latest_support[body] -= loss_supports
+            if not segmind_context.latest_support[body]:
+                segmind_context.latest_support.pop(body)
+
+            events.extend(
+                LossOfSupportEvent(tracked_object=body, with_object=s)
+                for s in loss_supports
             )
-            if loss_supports:
-                segmind_context.latest_support[body] -= loss_supports
-                if not segmind_context.latest_support[body]:
-                    segmind_context.latest_support.pop(body)
-                events.extend(
-                    [
-                        LossOfSupportEvent(tracked_object=body, with_object=s)
-                        for s in loss_supports
-                    ]
-                )
 
         return events
 
@@ -136,14 +135,17 @@ class BaseContainmentDetector(AbstractDetector):
         """
         containment_pairs: Dict[Body, Set[Body]] = {}
         bodies_with_collision = context.world.bodies_with_collision
-        for obj in tracked_objects:
-            for body in bodies_with_collision:
-                if obj is body:
-                    continue
-                if InsideOf(obj, body).compute_containment_ratio() > self.containment_threshold:
-                    containment_pairs.setdefault(obj, set()).add(body)
-        return containment_pairs
 
+        for obj in tracked_objects:
+            containers = {
+                body for body in bodies_with_collision
+                if obj is not body
+                   and InsideOf(obj, body).compute_containment_ratio() > self.containment_threshold
+            }
+            if containers:
+                containment_pairs[obj] = containers
+
+        return containment_pairs
 
 @dataclass(eq=False, repr=False)
 class ContainmentDetector(BaseContainmentDetector):
@@ -173,20 +175,18 @@ class ContainmentDetector(BaseContainmentDetector):
         new_containment_pairs = self.get_containment_pairs(context, objects_to_check)
         latest_containment = segmind_context.latest_containments
         events = []
+
         for obj, containment_list in new_containment_pairs.items():
-            new_containments = (
-                containment_list
-                if obj not in latest_containment
-                else containment_list - latest_containment[obj]
+            new_containments = containment_list - latest_containment.get(obj, set())
+
+            if not new_containments:
+                continue
+
+            latest_containment.setdefault(obj, set()).update(new_containments)
+            events.extend(
+                ContainmentEvent(tracked_object=obj, with_object=c)
+                for c in new_containments
             )
-            if new_containments:
-                latest_containment.setdefault(obj, set()).update(new_containments)
-                events.extend(
-                    [
-                        ContainmentEvent(tracked_object=obj, with_object=c)
-                        for c in new_containments
-                    ]
-                )
 
         return events
 

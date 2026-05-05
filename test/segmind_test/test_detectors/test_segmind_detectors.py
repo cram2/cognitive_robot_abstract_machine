@@ -26,7 +26,6 @@ from segmind.detectors.spatial_relation_detector_nodes import SupportDetector, L
     ContainmentDetector, LossOfContainmentDetector, InsertionDetector
 from segmind.episode_segmenter import EpisodeSegmenterExecutor
 from segmind.statecharts.segmind_statechart import SegmindStatechart
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection

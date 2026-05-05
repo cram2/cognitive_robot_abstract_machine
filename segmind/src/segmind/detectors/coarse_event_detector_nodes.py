@@ -1,12 +1,13 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import List
+from typing import List, Callable, Any
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from segmind.datastructures.events import (
     SupportEvent,
     DetectionEvent,
-    PlacingEvent, TranslationEvent, LossOfSupportEvent, PickUpEvent, StopTranslationEvent,
+    PlacingEvent, TranslationEvent, LossOfSupportEvent, PickUpEvent, StopTranslationEvent, ContactEvent,
+    ContainmentEvent, InsertionEvent,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from segmind.detectors.base import AbstractDetector, SegmindContext
@@ -25,6 +26,61 @@ class AbstractInteractionDetector(AbstractDetector):
     """
     The threshold for the time difference between two events to be considered an interaction.
     """
+
+    def _find_interaction_events(
+            self,
+            segmind_context: SegmindContext,
+            primary_event_type: type,
+            secondary_event_type: type,
+            make_event: Callable[[Any, Any], DetectionEvent],
+    ) -> List[DetectionEvent]:
+        """
+        Scans logged events for correlated pairs of primary and secondary event types
+        and emits a detection event for each new, unseen pairing.
+
+        For each secondary event, this method searches for a primary event on the same
+        tracked object whose timestamp is within :attr:`shift_threshold`. If such a pair
+        is found and has not been recorded in ``segmind_context.placing_pairs`` before,
+        the pair is registered and a detection event is produced via ``make_event``.
+
+        :param segmind_context: The shared context holding the event logger and
+            previously seen interaction pairs.
+        :param primary_event_type: The event type to use as the primary signal
+            (e.g. ``StopTranslationEvent`` for placing, ``TranslationEvent`` for pickup).
+        :param secondary_event_type: The event type to correlate against the primary
+            (e.g. ``SupportEvent`` for placing, ``LossOfSupportEvent`` for pickup).
+        :param make_event: Factory called with ``(primary, secondary)`` to produce the
+            outgoing :class:`DetectionEvent`. Only called once per unique pair.
+        :return: List of newly detected interaction events.
+        """
+        primary_events = [
+            e for e in segmind_context.logger.get_events()
+            if isinstance(e, primary_event_type)
+        ]
+        secondary_events = [
+            e for e in segmind_context.logger.get_events()
+            if isinstance(e, secondary_event_type)
+        ]
+
+        events = []
+        by_object = defaultdict(list)
+        for e in primary_events:
+            by_object[e.tracked_object].append(e)
+
+        for secondary in secondary_events:
+            for primary in by_object.get(secondary.tracked_object, []):
+                if abs(secondary.timestamp - primary.timestamp) >= self.shift_threshold:
+                    continue
+
+                key = (secondary.tracked_object.id, secondary.with_object.id)
+                if key in segmind_context.placing_pairs:
+                    continue
+
+                segmind_context.placing_pairs.add(key)
+                events.append(make_event(primary, secondary))
+                break
+
+        return events
 
 
 @dataclass
@@ -51,40 +107,15 @@ class PlacingDetector(AbstractInteractionDetector):
         :param obj: List of bodies to analyze for potential placing events.
         :return: List of generated placing events based on observed interactions.
         """
-        stop_translation_events = [
-            event
-            for event in segmind_context.logger.get_events()
-            if isinstance(event, StopTranslationEvent)
-        ]
-        support_events = [
-            event for event in segmind_context.logger.get_events() if isinstance(event, SupportEvent)
-        ]
-
-        events = []
-
-        by_object = defaultdict(list)
-        for event in stop_translation_events:
-            by_object[event.tracked_object].append(event)
-
-        for support_event in support_events:
-            for event in by_object.get(support_event.tracked_object, []):
-                if abs(support_event.timestamp - event.timestamp) >= self.shift_threshold:
-                    continue
-
-                key = (support_event.tracked_object.id, support_event.with_object.id)
-                if key in segmind_context.placing_pairs:
-                    continue
-
-                segmind_context.placing_pairs.add(key)
-                events.append(
-                    PlacingEvent(
-                        tracked_object=event.tracked_object,
-                        with_object=support_event.with_object,
-                    )
-                )
-                break
-
-        return events
+        return self._find_interaction_events(
+            segmind_context,
+            primary_event_type=StopTranslationEvent,
+            secondary_event_type=SupportEvent,
+            make_event=lambda primary, secondary: PlacingEvent(
+                tracked_object=primary.tracked_object,
+                with_object=secondary.with_object,
+            ),
+        )
 
 
 @dataclass
@@ -112,35 +143,70 @@ class PickUpDetector(AbstractInteractionDetector):
         :param obj: List of bodies to analyze for potential pickup events.
         :return: List of generated pickup events based on observed interactions.
         """
-        translation_events = [
-            event
-            for event in segmind_context.logger.get_events()
-            if isinstance(event, TranslationEvent)
-        ]
-        loss_of_support_events = [
-            event for event in segmind_context.logger.get_events() if isinstance(event, LossOfSupportEvent)
-        ]
-        events = []
-        by_object = defaultdict(list)
-        for event in translation_events:
-            by_object[event.tracked_object].append(event)
+        return self._find_interaction_events(
+            segmind_context,
+            primary_event_type=TranslationEvent,
+            secondary_event_type=LossOfSupportEvent,
+            make_event=lambda primary, secondary: PickUpEvent(
+                tracked_object=primary.tracked_object,
+            ),
+        )
 
-        for loss_of_support_event in loss_of_support_events:
-            for event in by_object.get(loss_of_support_event.tracked_object, []):
-                if abs(loss_of_support_event.timestamp - event.timestamp) >= self.shift_threshold:
-                    continue
+    @dataclass(eq=False, repr=False)
+    class InsertionDetector(AbstractInteractionDetector):
+        """
+        Detects insertion events based on object interaction context.
 
-                key = (loss_of_support_event.tracked_object.id, loss_of_support_event.with_object.id)
-                if key in segmind_context.placing_pairs:
-                    continue
+        The InsertionDetector class is used to analyze the interaction between tracked
+        objects and identify insertion events. It tracks specific events such as
+        contacts and containment, and generates an InsertionEvent when specific
+        conditions are met. The class leverages a context that holds relevant
+        event logs and tracked objects.
+        """
 
-                segmind_context.placing_pairs.add(key)
+        def update_context_and_events(self, context: MotionStatechartContext, segmind_context: SegmindContext,
+                                      tracked_objs: List[Body]) -> List[DetectionEvent]:
+            """
+            Updates context and processes tracked objects to generate a list of events.
 
-                events.append(
-                    PickUpEvent(
-                        tracked_object=event.tracked_object,
+            This method analyzes contact and containment events within the tracked objects,
+            compares their timestamps with a threshold, and generates insertion events if
+            specific conditions are met. It modifies the context state to track insertion
+            pairs that have already been processed and ensures exclusivity during event
+            generation.
+
+            :param context: The current motion statechart context.
+            :param segmind_context: The shared SegmindContext containing the information required to track events.
+            :param tracked_objs: List of Body objects to analyze for insertion events.
+            :return List of InsertionEvent objects representing detected insertions.
+            """
+            events = []
+            contact_events = [i for i in segmind_context.logger.get_events() if isinstance(i, ContactEvent)]
+            contact_events_with_holes = [i for i in contact_events if i.with_object in segmind_context.holes]
+            containment_event = [i for i in segmind_context.logger.get_events() if isinstance(i, ContainmentEvent)]
+
+            by_object = defaultdict(list)
+            for i in contact_events_with_holes:
+                by_object[i.tracked_object].append(i)
+
+            for j in containment_event:
+                for i in by_object.get(j.tracked_object, []):
+                    if abs(i.timestamp - j.timestamp) >= self.shift_threshold:
+                        continue
+
+                    key = (i.tracked_object.id, i.with_object.id)
+                    if key in segmind_context.insertion_pairs:
+                        continue
+
+                    segmind_context.insertion_pairs.add(key)
+
+                    events.append(
+                        InsertionEvent(
+                            tracked_object=i.tracked_object,
+                            with_object=i.with_object,
+                            inserted_into_objects=[j.with_object],
+                        )
                     )
-                )
-                break
+                    break
 
-        return events
+            return events
