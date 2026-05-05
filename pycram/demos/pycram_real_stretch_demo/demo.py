@@ -347,8 +347,8 @@ context = Context(
 )
 
 grasp_desc = GraspDescription(
-    ApproachDirection.LEFT,
-    VerticalAlignment.TOP,
+    ApproachDirection.FRONT,
+    VerticalAlignment.NoAlignment,
     robot_annotation.arm.manipulator,
     rotate_gripper=True,
 )
@@ -357,12 +357,12 @@ grasp_desc = GraspDescription(
 
 plan = sequential(
     [
-        ParkArmsAction(Arms.BOTH),
-        NavigateAction(
-            Pose.from_xyz_rpy(
-                x=1.0, y=0.5, z=0, yaw=-np.pi / 2, reference_frame=world.root
-            )
-        ),
+        # ParkArmsAction(Arms.BOTH),
+        # NavigateAction(
+        #     Pose.from_xyz_rpy(
+        #         x=1.0, y=0.5, z=0, yaw=-np.pi / 2, reference_frame=world.root
+        #     )
+        # ),
         LookAtAction(Pose.from_xyz_rpy(1.0, 0.2, 1.0, reference_frame=world.root)),
         DetectAction(
             technique=DetectionTechnique.TYPES,

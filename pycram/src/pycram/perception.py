@@ -95,8 +95,31 @@ class PerceptionQuery:
         logger.info("Waiting for action server /robokudo/query")
         self._client.wait_for_server()
 
-        future = self._client.send_goal_async(Query.Goal())
-        future.add_done_callback(self.get_result_callback)
+        result = self._client.send_goal(Query.Goal()).result
+        # future.add_done_callback(self.get_result_callback)
+
+        with self.world.modify_world():
+            for obj in result.res:
+                if obj.type == "cracker_cheezit_box_original":
+                    cheezits = self.world.get_body_by_name("cheeze_it.obj")
+                    original_parent = cheezits.parent_kinematic_structure_entity
+                    new_pose = self.world.transform(
+                        PoseStampedToSemDTConverter.convert(obj.pose[0], self.world),
+                        cheezits.parent_kinematic_structure_entity,
+                    )
+                    new_pose = Pose.from_xyz_quaternion(
+                        new_pose.x,
+                        new_pose.y,
+                        new_pose.z,
+                        *cheezits.parent_connection.origin.to_quaternion().to_np(),
+                        reference_frame=new_pose.reference_frame,
+                    )
+                    self.world.remove_connection(cheezits.parent_connection)
+                    self.world.add_connection(
+                        FixedConnection(
+                            original_parent, cheezits, new_pose.to_homogeneous_matrix()
+                        )
+                    )
 
     def get_result_callback(self, future):
         goal_handle = future.result()

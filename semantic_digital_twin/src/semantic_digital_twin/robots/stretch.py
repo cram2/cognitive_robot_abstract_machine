@@ -219,7 +219,7 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
                 self._world.get_connection_by_name("joint_arm_l1"): 0.0,
                 self._world.get_connection_by_name("joint_arm_l2"): 0.0,
                 self._world.get_connection_by_name("joint_arm_l3"): 0.0,
-                self._world.get_connection_by_name("joint_wrist_yaw"): np.pi / 2,
+                self._world.get_connection_by_name("joint_wrist_yaw"): 0.0,
                 self._world.get_connection_by_name("joint_wrist_pitch"): 0.0,
                 self._world.get_connection_by_name("joint_wrist_roll"): 0.0,
             },

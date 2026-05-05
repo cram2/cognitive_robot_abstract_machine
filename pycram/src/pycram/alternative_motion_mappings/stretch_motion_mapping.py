@@ -7,6 +7,7 @@ from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.goals.open_close import Close
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
+from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.ros2_nodes.ros_tasks import NavigateActionServerTask
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
@@ -83,7 +84,9 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
                             tip_link=tip,
                             goal_pose=self.target,
                         ),
+                        LocalMinimumReached(),
                     ],
+                    minimum_success=2,
                 ),
             ]
         )
