@@ -347,7 +347,7 @@ context = Context(
 )
 
 grasp_desc = GraspDescription(
-    ApproachDirection.RIGHT,
+    ApproachDirection.LEFT,
     VerticalAlignment.TOP,
     robot_annotation.arm.manipulator,
     rotate_gripper=True,
@@ -358,21 +358,21 @@ grasp_desc = GraspDescription(
 plan = sequential(
     [
         ParkArmsAction(Arms.BOTH),
-        NavigateAction(
-            Pose.from_xyz_rpy(
-                x=1.0, y=0.7, z=0, yaw=-np.pi / 2, reference_frame=world.root
-            )
-        ),
-        MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
-        MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
-        LookAtAction(Pose.from_xyz_rpy(1.0, 0.2, 1.0, reference_frame=world.root)),
-        DetectAction(
-            technique=DetectionTechnique.TYPES,
-        ),
-        NavigateAction(
-            Pose.from_xyz_rpy(x=1.0, y=0.7, z=0, reference_frame=world.root)
-        ),
-        PickUpAction(world.get_body_by_name("cheeze_it.obj"), Arms.LEFT, grasp_desc),
+        # NavigateAction(
+        #     Pose.from_xyz_rpy(
+        #         x=1.0, y=0.5, z=0, yaw=-np.pi / 2, reference_frame=world.root
+        #     )
+        # ),
+        # # MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
+        # # MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
+        # LookAtAction(Pose.from_xyz_rpy(1.0, 0.2, 1.0, reference_frame=world.root)),
+        # DetectAction(
+        #     technique=DetectionTechnique.TYPES,
+        # ),
+        # NavigateAction(
+        #     Pose.from_xyz_rpy(x=1.0, y=0.5, z=0, reference_frame=world.root)
+        # ),
+        # PickUpAction(world.get_body_by_name("cheeze_it.obj"), Arms.LEFT, grasp_desc),
         # ParkArmsAction(Arms.BOTH),
         # NavigateAction(
         #     Pose.from_xyz_rpy(2, 2.4, 0, yaw=np.pi, reference_frame=world.root)
