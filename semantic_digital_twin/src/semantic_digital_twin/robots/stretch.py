@@ -183,8 +183,8 @@ class Stretch(AbstractRobot, HasArms, HasNeck):
             0.01
         )
         vel_limits[self._world.get_connection_by_name("joint_wrist_yaw")] = 0.4
-        vel_limits[self._world.get_connection_by_name("joint_head_tilt")] = 10.0
-        vel_limits[self._world.get_connection_by_name("joint_head_pan")] = 1.0
+        vel_limits[self._world.get_connection_by_name("joint_head_tilt")] = 0.5
+        vel_limits[self._world.get_connection_by_name("joint_head_pan")] = 0.5
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
     def _setup_hardware_interfaces(self):

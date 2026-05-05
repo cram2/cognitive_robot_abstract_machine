@@ -15,8 +15,18 @@ import numpy as np
 import trimesh
 import trimesh.exchange.stl
 from PIL import Image
+from trimesh.visual import ColorVisuals
 from trimesh.visual.texture import TextureVisuals, SimpleMaterial
-from typing_extensions import Optional, List, Dict, Any, Self, Tuple, TYPE_CHECKING
+from typing_extensions import (
+    Optional,
+    List,
+    Dict,
+    Any,
+    Self,
+    Tuple,
+    TYPE_CHECKING,
+    assert_never,
+)
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from random_events.interval import SimpleInterval, Bound, closed
@@ -373,6 +383,12 @@ class Mesh(Shape):
             faces=data["mesh"]["faces"],
             process=False,
         )
+        # TODO correctly sync color/texture of DAE
+        if True or mesh.visual.vertex_colors is None:
+            mesh.visual.vertex_colors = np.tile(
+                np.array([1.0, 1.0, 1.0]).reshape(1, 3), (len(mesh.vertices), 1)
+            )
+
         origin = from_json(data["origin"], **kwargs)
         scale = from_json(data["scale"], **kwargs)
         file_type = data["file_type"]

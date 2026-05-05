@@ -8,6 +8,7 @@ import uuid
 from copy import deepcopy, copy
 from dataclasses import dataclass, field
 from functools import wraps, lru_cache, cached_property
+from time import sleep
 from uuid import UUID
 
 import numpy as np
@@ -189,7 +190,8 @@ class WorldModelUpdateContextManager:
                 model_manager._current_modifications_will_be_published,
                 self.publish_changes,
             )
-
+        for state_callback in self.world.state.state_change_callbacks:
+            state_callback.pause()
         self.world.world_is_being_modified = True
         model_manager._active_world_model_update_context_manager_ids.append(self._id)
 
@@ -217,6 +219,9 @@ class WorldModelUpdateContextManager:
 
             self.world.world_is_being_modified = False
             model_manager._current_modifications_will_be_published = None
+            for state_callback in self.world.state.state_change_callbacks:
+                state_callback.resume()
+            self.world.notify_state_change(publish_changes=self.publish_changes)
 
         # keep outside the if block, as it needs to be released as many times as it was acquired
         self.world._world_lock.release()
@@ -1181,7 +1186,8 @@ class World(HasSimulatorProperties):
             other_root_id = other.root.id
             if other._model_manager.current_model_modification_block:
                 other._model_manager.model_modification_blocks.append(
-                    other._model_manager.current_model_modification_block)
+                    other._model_manager.current_model_modification_block
+                )
             other._clear_world_entities()
             for modification in other._model_manager.model_modification_blocks:
                 modification.apply(self)

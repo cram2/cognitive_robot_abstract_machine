@@ -70,7 +70,7 @@ class DetectAction(ActionDescription):
         if not self.object_sem_annotation:
             self.object_sem_annotation = SemanticEnvironmentAnnotation
         query = PerceptionQuery(
-            self.object_sem_annotation, region_bb, self.robot, self.world
+            self.object_sem_annotation, region_bb, self.robot, self.world, self.context
         )
 
         return (

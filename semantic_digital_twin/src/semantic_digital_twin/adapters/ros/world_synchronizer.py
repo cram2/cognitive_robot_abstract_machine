@@ -371,7 +371,10 @@ class StateSynchronizer(StateChangeCallback, SynchronizerOnCallback):
         :param msg: The message containing the new state information.
         """
         # Parse incoming states: WorldState has 'states' only
-        indices = [self._world.state._index[_id] for _id in msg.ids]
+        try:
+            indices = [self._world.state._index[_id] for _id in msg.ids]
+        except KeyError as e:
+            raise e
 
         if indices:
             with self._world._world_lock:
@@ -385,7 +388,7 @@ class StateSynchronizer(StateChangeCallback, SynchronizerOnCallback):
         """
         Publish the current world state to the ROS topic.
         """
-        if not publish_changes:
+        if not publish_changes or self._is_paused:
             return
 
         changes = self.compute_state_changes()

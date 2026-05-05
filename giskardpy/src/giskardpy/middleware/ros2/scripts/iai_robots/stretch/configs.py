@@ -65,7 +65,7 @@ class StretchVelocityInterface(RobotInterfaceConfig):
             "joint_wrist_pitch",
             "joint_wrist_roll",
             "joint_head_pan",
-            "joint_head_pan",
+            "joint_head_tilt",
             "joint_gripper_finger_left",
             "joint_right_wheel",
             "joint_left_wheel",
