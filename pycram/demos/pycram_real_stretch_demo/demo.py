@@ -356,9 +356,6 @@ cereal_body = world.get_body_by_name("cheeze_it.obj")
 shelf_body = shelf_layer2.root
 bedside_table_body = world.get_body_by_name("bedside_table.dae")
 
-
-arm_joint_states = 0.0725
-
 nav_perceive_pose_relative_to_cereal = Pose.from_xyz_rpy(
     y=-0.55, yaw=np.pi / 2, reference_frame=cereal_body
 )
@@ -372,6 +369,7 @@ nav_place_pose_relative_to_shelf = Pose.from_xyz_rpy(
     x=-0.45, yaw=np.pi / 2, reference_frame=shelf_body
 )
 
+# %% Shelf Pickup
 plan = sequential(
     [
         ParkArmsAction(Arms.BOTH),
@@ -408,6 +406,7 @@ plan = sequential(
 with exec_env:
     plan.perform()
 
+# %% Table Place
 plan = sequential(
     [
         NavigateAction(nav_place_pose_relative_to_bedside_table),
@@ -436,6 +435,7 @@ plan = sequential(
 with exec_env:
     plan.perform()
 
+# %% Table Pickup
 plan = sequential(
     [
         StretchExtendArm(),
@@ -458,6 +458,15 @@ plan = sequential(
     [
         StretchTorsoHeightDirectlyBelowShelf(),
         ParkArmsAction(Arms.BOTH),
+    ],
+    context,
+).plan
+with exec_env:
+    plan.perform()
+
+# %% Shelf Place
+plan = sequential(
+    [
         NavigateAction(nav_place_pose_relative_to_shelf),
         StretchTorsoHeightDirectlyBelowShelf(),
         StretchExtendArm(),
