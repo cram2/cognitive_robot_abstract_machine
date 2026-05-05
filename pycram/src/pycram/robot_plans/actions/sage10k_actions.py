@@ -833,8 +833,8 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemo):
                     arm=arm,
                     grasp_description=grasp_description,
                 ),
-                NavigateAction(target_location=navigate),
                 ParkArmsAction(Arms.BOTH),
+                NavigateAction(target_location=navigate),
                 MoveAndPlaceAction(
                     object_designator=self.world_P_object_of_interest,
                     standing_position=self.place_navigation_pose,
@@ -848,7 +848,7 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemo):
 
     @property
     def robot_starting_pose(self):
-        return Pose.from_xyz_rpy(3.00, 15.00, reference_frame=self.world.root)
+        return Pose.from_xyz_rpy(5.45, 13.00, reference_frame=self.world.root)
 
     @property
     def world_P_object_of_interest(self) -> Body:
@@ -906,19 +906,3 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemo):
             )
         ).first()
         return main_entrance
-
-    def preprocess_world(self):
-        v = variable(
-            NaturalLanguageDescriptionWithTypeDescription,
-            self.world.semantic_annotations,
-        )
-        obstacles_of_main_entrance = an(
-            entity(v).where(
-                compute_euclidean_planar_distance(
-                    v.root, self.main_entrance.root, Vector3.Z()
-                )
-                < 0.9
-            )
-        )
-
-        self.remove_rooted_annotations(obstacles_of_main_entrance.evaluate())
