@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 @dataclass(eq=False)
 class PropagatingThread(threading.Thread, ABC):
     """
-    Thread that propagates exceptions.
+    A dataclass-compatible thread base that supports cooperative stopping via a kill event.
+    ``eq=False`` preserves identity-based hashing, which ``threading.Thread`` requires
+    when registering instances internally on initialization.
     """
 
     exc: Optional[Exception] = field(default=None, init=False)

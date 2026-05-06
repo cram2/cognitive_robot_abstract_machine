@@ -1,7 +1,4 @@
 import numpy as np
-import pytest
-import rclpy
-
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from segmind.datastructures.events import (
     ContactEvent,

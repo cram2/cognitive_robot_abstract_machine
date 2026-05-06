@@ -90,66 +90,62 @@ class EpisodeSegmenterExecutor(Executor):
             if "hole" in o.name.name:
                 segmind_context.holes.append(o)
 
-
     def spawn_scene(self, models_dir, file_resolver: Optional[FileUriResolver] = None):
         """
-        Spawns a scene by loading URDF and STL files from a specified directory and integrating them
-        into the world context. The function processes all URDF and STL files for integration,
-        skipping the model "iCub" during the process. URDF files are parsed and added to the world,
-        with special handling for objects labeled as "scene". STL files are processed and added as
-        bodies with their respective visual and collision shapes.
+        Spawns the scene from the given directory.
 
-        Parameters:
-            models_dir (str): The directory containing the URDF and STL files to be loaded.
-
-        Raises:
-            Exception: If file parsing or world integration encounters an unexpected issue.
+        :param models_dir: The directory containing the models to spawn.
+        :param file_resolver: The file resolver to use for resolving file URIs.
         """
         directory = Path(models_dir)
-        urdf_files = [f.name for f in directory.glob("*.urdf")]
-        stl_files = [f.name for f in directory.glob("*.stl")]
-        if urdf_files:
-            for file in urdf_files:
-                file_path = models_dir + file
-                obj_name = Path(file).stem
+        for file in directory.glob("*.urdf"):
+            self._load_urdf(file, file_resolver)
+        for file in directory.glob("*.stl"):
+            self._load_stl(file)
 
-                if obj_name in self.ignored_objects:
-                    continue
-                try:
-                    resolver_kwargs = {}
-                    if file_resolver is not None:
-                        resolver_kwargs["path_resolver"] = FileUriResolver(
-                            base_directory=os.path.dirname(file_path)
-                        )
+    def _load_urdf(self, file: Path, file_resolver: Optional[FileUriResolver] = None):
+        """
+        Loads an URDF file into the simulation world.
 
-                    obj_world = URDFParser.from_file(
-                        file_path,
-                        **resolver_kwargs
-                    ).parse()
+        :param file: The path to the URDF file to load.
+        :param file_resolver: The file resolver to use for resolving file URIs.
+        """
+        obj_name = file.stem
+        if obj_name in self.ignored_objects:
+            return
+        try:
+            resolver_kwargs = (
+                {"path_resolver": FileUriResolver(base_directory=str(file.parent))}
+                if file_resolver is not None
+                else {}
+            )
+            obj_world = URDFParser.from_file(str(file), **resolver_kwargs).parse()
+            connection = (
+                FixedConnection(parent=self.context.world.root, child=obj_world.root)
+                if obj_name in self.fixed_objects
+                else None
+            )
+            with self.context.world.modify_world():
+                self.context.world.merge_world(obj_world, *([connection] if connection else []))
+        except (FileNotFoundError, OSError) as e:
+            logger.warning(f"File issue with {file}: {e}")
 
-                    if obj_name in self.fixed_objects:
-                        world_C_scene = FixedConnection(
-                            parent=self.context.world.root, child=obj_world.root
-                        )
-                        with self.context.world.modify_world():
-                            self.context.world.merge_world(obj_world, world_C_scene)
-                    else:
-                        with self.context.world.modify_world():
-                            self.context.world.merge_world(obj_world)
+    def _load_stl(self, file: Path):
+        """
+        Loads an STL file into the simulation world.
 
-
-                except (FileNotFoundError, OSError) as e:
-                    logger.warning(f"File issue with {file_path}: {e}")
-
-
-        if stl_files:
-            for file in stl_files:
-                file_path = models_dir + file
-                obj_name = Path(file).stem
-
-
-                new_body = Body(name=PrefixedName(obj_name), visual=ShapeCollection([Mesh.from_file(file_path)]), collision=ShapeCollection([Mesh.from_file(file_path)]))
-                with self.context.world.modify_world():
-                    new_body_C_root = Connection6DoF.create_with_dofs(world=self.context.world,
-                                                                  parent=self.context.world.root, child=new_body)
-                    self.context.world.add_connection(new_body_C_root)
+        :param file: The path to the STL file to load.
+        """
+        mesh = Mesh.from_file(str(file))
+        new_body = Body(
+            name=PrefixedName(file.stem),
+            visual=ShapeCollection([mesh]),
+            collision=ShapeCollection([mesh]),
+        )
+        with self.context.world.modify_world():
+            connection = Connection6DoF.create_with_dofs(
+                world=self.context.world,
+                parent=self.context.world.root,
+                child=new_body,
+            )
+            self.context.world.add_connection(connection)
