@@ -9,7 +9,7 @@ from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from pycram.datastructures.dataclasses import Context
 from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import execute_single
-from pycram.robot_plans.actions.composite.sage10k_actions import Sage10kOpenDoor
+from pycram.sage_10k.sage10k_actions import Sage10kOpenDoor
 from pycram.robot_plans.actions.core.misc import MoveToReach
 from random_events.variable import Continuous
 from semantic_digital_twin.adapters.ros.visualization.pose_publisher import publish_pose
@@ -29,7 +29,6 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -119,10 +118,6 @@ def test_door_opening(wall_door_handle_world, hsr_world_setup, rclpy_node):
 
 
 def test_translate_free_space_to_where_condition(wall_door_handle_world):
-    from krrood.entity_query_language.factories import variable
-    from krrood.entity_query_language.operators.core_logical_operators import (
-        LogicalOperator,
-    )
     from semantic_digital_twin.world_description.graph_of_convex_sets import (
         navigation_map_at_target,
         translate_free_space_to_where_condition,

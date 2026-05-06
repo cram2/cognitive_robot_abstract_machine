@@ -5,9 +5,8 @@ import rclpy
 import tqdm
 from rclpy.executors import SingleThreadedExecutor
 
-from krrood.utils import recursive_subclasses
 from pycram.motion_executor import simulated_robot
-from pycram.robot_plans.actions.sage10k_actions import *
+from pycram.sage_10k.demos import *
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )

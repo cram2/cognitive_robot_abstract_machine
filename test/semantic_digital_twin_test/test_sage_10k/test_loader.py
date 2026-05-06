@@ -33,9 +33,9 @@ from semantic_digital_twin.adapters.sage_10k_dataset.processing import (
     create_hsrb_in_world,
 )
 from semantic_digital_twin.adapters.sage_10k_dataset.schema import Sage10kScene
-from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
+from semantic_digital_twin.adapters.sage_10k_dataset.utils import (
     Sage10kTypeNameCleaner,
-    NaturalLanguageDescriptionWithTypeDescription,
+    NaturalLanguageWithTypeDescription,
     sage_10k_non_shitty_scenes_demo_configs,
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState
@@ -92,7 +92,7 @@ def get_book_body_by_height(world: World, target_height: float, atol: float = 1e
     book = wordnet.synsets("Book")[1]
 
     natural_language_annotations = world.get_semantic_annotations_by_type(
-        NaturalLanguageDescriptionWithTypeDescription
+        NaturalLanguageWithTypeDescription
     )
     types_of_world = {a.type_description for a in natural_language_annotations}
 
@@ -171,11 +171,7 @@ def test_loader(rclpy_node, sage10k_scene):
     pub.with_tf_publisher()
     verify_scene(world, scene)
     assert (
-        len(
-            world.get_semantic_annotations_by_type(
-                NaturalLanguageDescriptionWithTypeDescription
-            )
-        )
+        len(world.get_semantic_annotations_by_type(NaturalLanguageWithTypeDescription))
         > 0
     )
 

@@ -2,16 +2,10 @@
 
 from __future__ import annotations
 from sqlalchemy import (
-    Column,
     ForeignKey,
     Integer,
     String,
-    Float,
-    Boolean,
-    DateTime,
-    Enum,
     JSON,
-    Table,
 )
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 
@@ -103,7 +97,7 @@ import pycram.robot_plans.actions.core.navigation
 import pycram.robot_plans.actions.core.pick_up
 import pycram.robot_plans.actions.core.placing
 import pycram.robot_plans.actions.core.robot_body
-import pycram.robot_plans.actions.sage10k_actions
+import pycram.sage_10k.demos
 import pycram.robot_plans.motions.base
 import pycram.robot_plans.motions.container
 import pycram.robot_plans.motions.gripper
@@ -115,7 +109,7 @@ import pycram.view_manager
 import semantic_digital_twin.adapters.sage_10k_dataset.filter
 import semantic_digital_twin.adapters.sage_10k_dataset.loader
 import semantic_digital_twin.adapters.sage_10k_dataset.schema
-import semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations
+import semantic_digital_twin.adapters.sage_10k_dataset.utils
 import semantic_digital_twin.callbacks.callback
 import semantic_digital_twin.collision_checking.collision_detector
 import semantic_digital_twin.collision_checking.collision_groups
@@ -184,7 +178,6 @@ import test.krrood_test.dataset.alternative_mappings_construction_order
 import test.krrood_test.dataset.example_classes
 import trimesh.base
 import typing
-import typing_extensions
 import uuid
 
 
@@ -17702,7 +17695,7 @@ class NaturalLanguageDescriptionDAO(
 class NaturalLanguageDescriptionWithTypeDescriptionDAO(
     NaturalLanguageDescriptionDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.NaturalLanguageDescriptionWithTypeDescription
+        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.NaturalLanguageWithTypeDescription
     ],
 ):
 

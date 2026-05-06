@@ -23,7 +23,7 @@ import krrood.ormatic.type_dict
 import semantic_digital_twin.adapters.sage_10k_dataset.filter
 import semantic_digital_twin.adapters.sage_10k_dataset.loader
 import semantic_digital_twin.adapters.sage_10k_dataset.schema
-import semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations
+import semantic_digital_twin.adapters.sage_10k_dataset.utils
 import semantic_digital_twin.callbacks.callback
 import semantic_digital_twin.collision_checking.collision_detector
 import semantic_digital_twin.collision_checking.collision_groups
@@ -8761,7 +8761,7 @@ class NaturalLanguageDescriptionDAO(
 class NaturalLanguageDescriptionWithTypeDescriptionDAO(
     NaturalLanguageDescriptionDAO,
     DataAccessObject[
-        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.NaturalLanguageDescriptionWithTypeDescription
+        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.NaturalLanguageWithTypeDescription
     ],
 ):
 

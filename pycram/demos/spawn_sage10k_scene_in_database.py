@@ -5,14 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine, drop_database
-from pycram.robot_plans.actions.sage10k_actions import Sage10kSouthwesternStoreDemo
-from semantic_digital_twin.adapters.sage_10k_dataset.loader import Sage10kDatasetLoader
-from semantic_digital_twin.adapters.sage_10k_dataset.processing import (
-    create_hsrb_in_world,
-)
-from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
-    Sage10kNonShittyScenes,
-)
+from pycram.sage_10k.demos import Sage10kSouthwesternStoreDemo
 from semantic_digital_twin.orm.ormatic_interface import *
 
 current_time = time.time()

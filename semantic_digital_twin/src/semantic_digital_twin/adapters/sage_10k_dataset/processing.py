@@ -6,8 +6,8 @@ from krrood.entity_query_language.factories import *
 from pycram.robot_plans.actions.base import ActionDescription
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
-from semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations import (
-    NaturalLanguageDescriptionWithTypeDescription,
+from semantic_digital_twin.adapters.sage_10k_dataset.utils import (
+    NaturalLanguageWithTypeDescription,
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -36,7 +36,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 def remove_clutter(
     cluttered_world: World,
-    non_clutter: List[NaturalLanguageDescriptionWithTypeDescription],
+    non_clutter: List[NaturalLanguageWithTypeDescription],
 ):
     """
     Remove every body not in the non_clutter list and not where there is no structural annotation pointing to
@@ -51,13 +51,7 @@ def remove_clutter(
     structural_annotation = variable(HasRootBody, cluttered_world.semantic_annotations)
     structural_annotations = (
         an(entity(structural_annotation))
-        .where(
-            not_(
-                HasType(
-                    structural_annotation, NaturalLanguageDescriptionWithTypeDescription
-                )
-            )
-        )
+        .where(not_(HasType(structural_annotation, NaturalLanguageWithTypeDescription)))
         .tolist()
     )
     kept_bodies = [
@@ -83,18 +77,14 @@ def remove_clutter(
 def bottles_on_benches(
     world,
 ) -> Tuple[
-    List[NaturalLanguageDescriptionWithTypeDescription],
-    List[NaturalLanguageDescriptionWithTypeDescription],
+    List[NaturalLanguageWithTypeDescription],
+    List[NaturalLanguageWithTypeDescription],
 ]:
 
-    bench = variable(
-        NaturalLanguageDescriptionWithTypeDescription, world.semantic_annotations
-    )
+    bench = variable(NaturalLanguageWithTypeDescription, world.semantic_annotations)
     benches = an(entity(bench).where(contains(bench.type_description, "bench")))
 
-    bottle = variable(
-        NaturalLanguageDescriptionWithTypeDescription, world.semantic_annotations
-    )
+    bottle = variable(NaturalLanguageWithTypeDescription, world.semantic_annotations)
     bottles = an(
         entity(bottle).where(
             contains(bottle.type_description, "bottle"),
