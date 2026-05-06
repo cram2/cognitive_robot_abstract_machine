@@ -5,6 +5,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from functools import wraps
 from threading import RLock
 from typing import Any, Callable, ClassVar, Optional
 
@@ -183,46 +184,40 @@ class EpisodePlayer(PropagatingThread, ABC):
     @classmethod
     def pause_resume_with_condition(cls, condition: Callable[[Any], bool]) -> Callable:
         """
-        A decorator for pausing the player before a function call given a condition and then resuming it after the call
-         ends.
+        A decorator that pauses the player before the decorated function call if
+        the condition is met, then resumes it afterward.
 
         :param condition: The condition to check before pausing the player.
         :return: The wrapped callable.
         """
 
-        def condition_wrapper(func: Callable) -> Callable:
-            """
-            A decorator for pausing the player before a function call and then resuming it after the call ends.
-
-            :param func: The callable to wrap with the decorator.
-            :return: The wrapped callable.
-            """
-
+        def decorator(func: Callable) -> Callable:
+            @wraps(func)
             def wrapper(*args, **kwargs) -> Any:
                 if not condition(*args, **kwargs):
                     return func(*args, **kwargs)
                 with cls.pause_resume_lock:
                     instance = cls.get_instance()
-                    if instance.status == PlayerStatus.PLAYING:
-                        logger.debug("Pausing player")
-                        instance.pause()
-                        result = func(*args, **kwargs)
-                        instance.resume()
-                        logger.debug("Resuming player")
-                        return result
-                    else:
+                    if instance.status != PlayerStatus.PLAYING:
                         return func(*args, **kwargs)
+                    logger.debug("Pausing player")
+                    instance.pause()
+                    result = func(*args, **kwargs)
+                    instance.resume()
+                    logger.debug("Resuming player")
+                    return result
 
             return wrapper
 
-        return condition_wrapper
+        return decorator
 
     @classmethod
     def pause_resume(cls, func: Callable) -> Callable:
         """
-        A decorator for pausing the player before a function call and then resuming it after the call ends.
+        A decorator that unconditionally pauses the player before the decorated
+        function call and resumes it afterward.
 
-        :param func: The callable to wrap with the decorator.
+        :param func: The callable to wrap.
         :return: The wrapped callable.
         """
         return cls.pause_resume_with_condition(lambda *args, **kwargs: True)(func)

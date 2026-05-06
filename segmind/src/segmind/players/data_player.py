@@ -83,6 +83,10 @@ class DataPlayer(EpisodePlayer, ABC):
 
 
     def _run(self):
+        """
+        Starts the episode player and processes the frames, while also setting the time between frames.
+        """
+
         is_first_frame = True
         start_time: float = 0.0
         for frame_data in self.frame_data_generator:
@@ -121,12 +125,11 @@ class DataPlayer(EpisodePlayer, ABC):
         :param frame_data: The frame data.
         """
         objects_poses = self.get_objects_poses(frame_data)
-        if len(objects_poses):
-            for obj in self.world.bodies_with_collision:
-                if obj in objects_poses:
-                    obj.parent_connection.origin = (
-                        objects_poses[obj].to_homogeneous_matrix()
-                    )
+        if not objects_poses:
+            return
+        for obj in self.world.bodies_with_collision:
+            if obj in objects_poses:
+                obj.parent_connection.origin = objects_poses[obj].to_homogeneous_matrix()
 
 
     @abstractmethod
