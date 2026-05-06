@@ -42,6 +42,8 @@ from krrood.entity_query_language.factories import (
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
+from pycram.robot_plans.actions.core.pick_up import PickUpAction
+from pycram.orm.ormatic_interface import PickUpActionDAO, GraspDescriptionDAO
 
 
 def test_translate_simple_greater(session, database):
@@ -834,3 +836,23 @@ def test_set_of_multi_variable(session):
     assert str(translator.sql_query) == expected_sql
     assert ", \"HandleDAO\"" not in str(translator.sql_query)
     assert "JOIN" in str(translator.sql_query)
+
+
+def test_set_of_transitive_attributes(session):
+    """Verify that set_of with transitive attributes generates a JOIN.
+    Uses PickUpActionDAO.grasp_description as Sorin suggested."""
+    pu = variable(type_=PickUpAction, domain=[])
+    query = an(set_of(
+        pu.arm,
+        pu.grasp_description.rotate_gripper,
+        pu.grasp_description.approach_direction,
+        pu.grasp_description.manipulation_offset,
+    ))
+
+    translator = eql_to_sql(query, session)
+    print(str(translator.sql_query))
+
+    assert "GraspDescriptionDAO" in str(translator.sql_query)
+    assert "JOIN" in str(translator.sql_query)
+    assert "arm" in str(translator.sql_query)
+    assert "rotate_gripper" in str(translator.sql_query)
