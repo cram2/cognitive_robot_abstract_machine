@@ -178,7 +178,7 @@ class StretchTorsoShelfPickPlaceHeight(ActionDescription):
                     names=[
                         "joint_lift",
                     ],
-                    positions=[0.75],
+                    positions=[0.6],
                 ),
             )
         ).perform()
