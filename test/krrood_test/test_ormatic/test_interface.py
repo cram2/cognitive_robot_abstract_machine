@@ -4,14 +4,14 @@ from sqlalchemy import select, inspect
 from krrood.ormatic.data_access_objects.alternative_mappings import (
     FunctionMapping,
 )
+from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.data_access_objects.helper import (
     to_dao,
     get_dao_class,
 )
-from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
-from krrood.ormatic.utils import is_data_column
 from krrood.ormatic.exceptions import NoDAOFoundError, UncallableFunction
+from krrood.ormatic.utils import is_data_column
 from ..dataset.alternative_mappings_construction_order import (
     Entrypoint,
     BuildFirst,
@@ -852,3 +852,16 @@ def test_class_dependencies(session, database):
     assert edges == {
         (BuildFirstMapping, EntryPointMapping),
     }
+
+
+def test_path_custom_type(session, database):
+    path = PathAssociation(Path.home())
+
+    dao = to_dao(path)
+    session.add(dao)
+    session.commit()
+
+    queried = session.scalars(select(PathAssociationDAO)).one()
+    reconstructed = queried.from_dao()
+    assert isinstance(reconstructed.path, Path)
+    assert reconstructed == path
