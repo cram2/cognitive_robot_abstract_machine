@@ -45,7 +45,8 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass
 class Sage10kAbstractDemo:
     """
-    Configuration for the Sage10k non-shitty scenes demo.
+    Base class for all Sage10k demos with the HSRB robot.
+    Extend this class to create a new demo.
     """
 
     scene_url: ClassVar[str]
@@ -58,12 +59,23 @@ class Sage10kAbstractDemo:
     The world to execute the demo in. Only available after """
 
     def create_world(self):
+        """
+        Create the world and the HSRB robot.
+        Updated self.world `in-place`.
+        """
         loader = Sage10kDatasetLoader()
         self.world = loader.create_scene(scene_url=self.scene_url).create_world()
         create_hsrb_in_world(self.world)
         self.preprocess_world()
 
     def preprocess_world(self):
+        """
+        Preprocess the world before executing the demo `in-place`.
+        Removes every body associated with a NaturalLanguageWithTypeDescription too close to the
+        main entrance.
+
+        Can only be used after the world has been created.
+        """
         self.robot.root.parent_connection.origin = self.robot_starting_pose
         v = variable(
             NaturalLanguageWithTypeDescription,
@@ -85,6 +97,12 @@ class Sage10kAbstractDemo:
         return self.world.get_semantic_annotations_by_type(HSRB)[0]
 
     def remove_rooted_annotations(self, semantic_annotations: Iterable[HasRootBody]):
+        """
+        Remove the given semantic annotations and their root bodies from the world.
+        Updated self.world `in-place`.
+
+        :param semantic_annotations: The semantic annotations to remove.
+        """
         with self.world.modify_world():
             for annotation in semantic_annotations:
                 self.world.remove_kinematic_structure_entity(annotation.root)
@@ -95,7 +113,7 @@ class Sage10kAbstractDemo:
         raise NotImplementedError
 
     @cached_property
-    def main_entrance(self):
+    def main_entrance(self) -> DoorWithType:
         door_v = variable(DoorWithType, self.world.semantic_annotations)
         main_entrance: DoorWithType = an(entity(door_v)).first()
         return main_entrance
@@ -201,16 +219,6 @@ class Sage10kTVStudioDemo(Sage10kAbstractDemo):
         return Pose.from_xyz_rpy(x=12.5, y=3, z=0, reference_frame=self.world.root)
 
     @property
-    def pickup_navigation_pose(self):
-        return Pose.from_xyz_rpy(
-            x=6.83,
-            y=5.38,
-            z=self.robot.root.global_pose.z,
-            yaw=1.78,
-            reference_frame=self.world.root,
-        )
-
-    @property
     def book_to_pick(self) -> Body:
         @symbolic_function
         def closes_to_border(target) -> float:
@@ -256,7 +264,13 @@ class Sage10kTVStudioDemo(Sage10kAbstractDemo):
         )
         open_door = Sage10kOpenDoor(self.main_entrance)
         mpa = MoveAndPickUpAction(
-            standing_position=self.pickup_navigation_pose,
+            standing_position=Pose.from_xyz_rpy(
+                x=6.83,
+                y=5.38,
+                z=self.robot.root.global_pose.z,
+                yaw=1.78,
+                reference_frame=self.world.root,
+            ),
             object_designator=self.book_to_pick,
             arm=Arms.LEFT,
             grasp_description=grasp_description,
@@ -829,7 +843,6 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemo):
         )
         open_door = Sage10kOpenDoor(self.main_entrance)
         navigate = Pose.from_xyz_rpy(x=5.14, y=2.85, reference_frame=self.world.root)
-        # self.robot.root. = self.robot_starting_pose
 
         plan = sequential(
             [
