@@ -30,7 +30,6 @@ from pycram.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     StretchExtendArm,
     StretchRetractArm,
-    StretchTorsoHeightDirectlyBelowShelf,
     StretchTorsoShelfPickPlaceHeight,
     StretchTorsoTablePickPlaceHeight,
 )
@@ -342,7 +341,6 @@ if not world.is_entity_in_world_by_name("cheeze_it.obj"):
                 x=-0.10,
                 y=0.0,
                 z=0.115,
-                yaw=-np.pi / 2,
                 reference_frame=parent,
             )
 
@@ -374,50 +372,29 @@ cereal_body = world.get_body_by_name("cheeze_it.obj")
 shelf_body = shelf_layer2.root
 bedside_table_body = world.get_body_by_name("bedside_table.dae")
 
-nav_perceive_pose_relative_to_cereal = Pose.from_xyz_rpy(
-    y=-0.55, yaw=np.pi / 2, reference_frame=cereal_body
-)
-nav_grasp_pose_relative_to_cereal = Pose.from_xyz_rpy(
-    y=-0.35, yaw=np.pi, reference_frame=cereal_body
-)
 nav_place_pose_relative_to_bedside_table = Pose.from_xyz_rpy(
     x=0.45, yaw=-np.pi / 2, reference_frame=bedside_table_body
 )
 nav_place_pose_relative_to_shelf = Pose.from_xyz_rpy(
-    x=-0.45, yaw=np.pi / 2, reference_frame=shelf_body
+    x=-0.95, yaw=np.pi / 2, reference_frame=shelf_body
 )
-
-
-def detect_cereal():
-    plan = sequential(
-        [
-            ParkArmsAction(Arms.BOTH),
-            NavigateAction(nav_perceive_pose_relative_to_cereal),
-            LookAtAction(cereal_body.global_pose),
-            DetectAction(
-                technique=DetectionTechnique.TYPES,
-            ),
-        ],
-        context,
-    )
-    with exec_env:
-        plan.perform()
 
 
 # %% Shelf Pickup
 def shelf_pickup():
     if not demo_start_of_table_instead_of_shelf:
-        detect_cereal()
-        start_action = [NavigateAction(nav_grasp_pose_relative_to_cereal)]
+        start_action = [
+            ParkArmsAction(Arms.BOTH),
+            NavigateAction(nav_place_pose_relative_to_shelf),
+        ]
     else:
         start_action = []
     plan = sequential(
         [
             *start_action,
             MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
-            StretchTorsoHeightDirectlyBelowShelf(),
-            StretchExtendArm(),
             StretchTorsoShelfPickPlaceHeight(),
+            StretchExtendArm(),
             MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
         ],
         context,
@@ -462,7 +439,7 @@ def table_place():
 
     plan = sequential(
         [
-            StretchTorsoHeightDirectlyBelowShelf(),
+            StretchTorsoShelfPickPlaceHeight(),
             MoveGripperMotion(motion=GripperState.CLOSE, gripper=Arms.LEFT),
             ParkArmsAction(Arms.BOTH),
         ],
@@ -476,8 +453,10 @@ def table_place():
 # %% Table Pickup
 def table_pickup():
     if demo_start_of_table_instead_of_shelf:
-        detect_cereal()
-        start_action = [NavigateAction(nav_grasp_pose_relative_to_cereal)]
+        start_action = [
+            ParkArmsAction(Arms.BOTH),
+            NavigateAction(nav_place_pose_relative_to_bedside_table),
+        ]
     else:
         start_action = []
     plan = sequential(
@@ -501,7 +480,7 @@ def table_pickup():
 
     plan = sequential(
         [
-            StretchTorsoHeightDirectlyBelowShelf(),
+            StretchTorsoShelfPickPlaceHeight(),
             ParkArmsAction(Arms.BOTH),
         ],
         context,
@@ -515,7 +494,7 @@ def shelf_place():
     plan = sequential(
         [
             NavigateAction(nav_place_pose_relative_to_shelf),
-            StretchTorsoHeightDirectlyBelowShelf(),
+            StretchTorsoShelfPickPlaceHeight(),
             StretchExtendArm(),
             StretchTorsoShelfPickPlaceHeight(),
             MoveGripperMotion(motion=GripperState.OPEN, gripper=Arms.LEFT),
@@ -531,7 +510,7 @@ def shelf_place():
 
     plan = sequential(
         [
-            StretchTorsoHeightDirectlyBelowShelf(),
+            StretchTorsoShelfPickPlaceHeight(),
             StretchRetractArm(),
             ParkArmsAction(Arms.BOTH),
         ],

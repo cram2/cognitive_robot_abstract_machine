@@ -169,22 +169,6 @@ class StretchRetractArm(ActionDescription):
 
 
 @dataclass
-class StretchTorsoHeightDirectlyBelowShelf(ActionDescription):
-
-    def execute(self) -> None:
-        self.add_subplan(
-            execute_single(
-                MoveJointsMotion(
-                    names=[
-                        "joint_lift",
-                    ],
-                    positions=[1.02],
-                ),
-            )
-        ).perform()
-
-
-@dataclass
 class StretchTorsoShelfPickPlaceHeight(ActionDescription):
 
     def execute(self) -> None:
@@ -194,7 +178,7 @@ class StretchTorsoShelfPickPlaceHeight(ActionDescription):
                     names=[
                         "joint_lift",
                     ],
-                    positions=[0.85],
+                    positions=[0.75],
                 ),
             )
         ).perform()
