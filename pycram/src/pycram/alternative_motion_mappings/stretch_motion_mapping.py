@@ -50,35 +50,26 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
         goal_point.z = 0
         return Sequence(
             [
-                # Parallel(
-                #     [
-                #         Pointing(
-                #             root_link=self.world.root,
-                #             tip_link=self.robot.root,
-                #             goal_point=goal_point,
-                #             pointing_axis=Vector3(
-                #                 0, -1, 0, reference_frame=self.robot.root
-                #             ),
-                #             binding_policy=GoalBindingPolicy.Bind_at_build,
-                #         ),
-                #         JointPositionList(
-                #             goal_state=JointState.from_str_dict(
-                #                 {"joint_wrist_yaw": 0.0}, world=self.world
-                #             )
-                #         ),
-                #     ]
-                # ),
                 Parallel(
                     [
-                        CartesianOrientation(
+                        Pointing(
                             root_link=self.world.root,
                             tip_link=self.robot.root,
-                            goal_orientation=RotationMatrix(
-                                reference_frame=self.robot.root
+                            goal_point=goal_point,
+                            pointing_axis=Vector3(
+                                0, -1, 0, reference_frame=self.robot.root
                             ),
-                            binding_policy=GoalBindingPolicy.Bind_on_start,
-                            weight=DefaultWeights.WEIGHT_ABOVE_CA,
+                            binding_policy=GoalBindingPolicy.Bind_at_build,
                         ),
+                        JointPositionList(
+                            goal_state=JointState.from_str_dict(
+                                {"joint_wrist_yaw": 0.0}, world=self.world
+                            )
+                        ),
+                    ]
+                ),
+                Parallel(
+                    [
                         CartesianPose(
                             root_link=self.world.root,
                             tip_link=tip,
@@ -123,7 +114,7 @@ class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
     def _motion_chart(self) -> NavigateActionServerTask:
         world_T_target = self.world.transform(self.target, self.world.root)
         world_T_target.z = 0
-        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.1)
+        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.05)
         return NavigateActionServerTask(
             target_pose=self.target,
             base_link=self.robot.root,
