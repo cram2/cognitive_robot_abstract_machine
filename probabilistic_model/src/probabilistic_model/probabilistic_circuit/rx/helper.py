@@ -151,12 +151,14 @@ def fully_factorized(
     return root.probabilistic_circuit
 
 
-def expand_distribution(
+def multiply_distributions(
     distribution: ProbabilisticCircuit, expansion: ProbabilisticCircuit
 ):
     """
     Expand the `distribution` by the `expansion` using factorization.
     `distribution` is expanded in-place.
+
+    The resulting distribution is the product of the expansion and the distribution.
 
     :param distribution: The probabilistic circuit to expand
     :param expansion: The probabilistic circuit to use for expansion

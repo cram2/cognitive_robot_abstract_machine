@@ -5,6 +5,7 @@ import rclpy
 import tqdm
 from rclpy.executors import SingleThreadedExecutor
 
+from krrood.utils import recursive_subclasses
 from pycram.motion_executor import simulated_robot
 from pycram.sage_10k.demos import *
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -23,22 +24,6 @@ def run_demo(demo: Sage10kAbstractDemo):
         rclpy.init()
     node = rclpy.create_node("test_node")
 
-    with demo.world.modify_world():
-        camera_frame = Body(name=PrefixedName("camera_link"))
-        robot = demo.world.get_semantic_annotations_by_type(HSRB)[0]
-        camera_to_robot_connection = FixedConnection(
-            parent=robot.root,
-            child=camera_frame,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=-0.28,
-                y=0.33,
-                z=0,
-                yaw=np.pi,
-                pitch=np.pi / 4,
-                roll=0,
-            ),
-        )
-        demo.world.add_connection(camera_to_robot_connection)
     executor = SingleThreadedExecutor()
     executor.add_node(node)
 
@@ -56,20 +41,9 @@ def run_demo(demo: Sage10kAbstractDemo):
     del demo
 
 
-demos = [
-    Sage10kGymDemo,
-    Sage10kTVStudioDemo,
-    Sage10kCraftsmanLobbyDemo,
-    Sage10kTropicalWarehouse,
-    Sage10kVaporwave,
-    Sage10kEclecticResidence,
-    Sage10kSouthwesternStoreDemo,
-    Sage10kBrutalistStoreDemo,
-    Sage10kAmericanBuffetDemo,
-]
+if __name__ == "__main__":
 
-# pbar = tqdm.tqdm(recursive_subclasses(Sage10kAbstractDemo))
-pbar = tqdm.tqdm([Sage10kEclecticResidence], mininterval=1)
-for demo in pbar:
-    pbar.set_postfix({"Current Scene": demo.scene_url.name})
-    run_demo(demo())
+    pbar = tqdm.tqdm(recursive_subclasses(Sage10kAbstractDemo))
+    for demo in pbar:
+        pbar.set_postfix({"Current Scene": demo.scene_url.name})
+        run_demo(demo())

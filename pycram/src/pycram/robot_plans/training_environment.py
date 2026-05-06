@@ -17,7 +17,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 )
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     fully_factorized,
-    expand_distribution,
+    multiply_distributions,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProductUnit,
@@ -262,6 +262,8 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         distribution_for_variables_not_in_parameters = fully_factorized(
             variables_not_in_parameters
         )
-        expand_distribution(distribution, distribution_for_variables_not_in_parameters)
+        multiply_distributions(
+            distribution, distribution_for_variables_not_in_parameters
+        )
 
         return ProbabilisticBackend(DictRegistry({self.action_type: distribution}))
