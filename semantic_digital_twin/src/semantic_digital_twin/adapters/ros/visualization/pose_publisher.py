@@ -1,29 +1,26 @@
 import time
 from dataclasses import dataclass, field
-from uuid import UUID, uuid4
 
-from builtin_interfaces.msg import Duration
 import numpy as np
 import rclpy
-from rclpy.qos import QoSProfile, DurabilityPolicy
-from std_msgs.msg import ColorRGBA, Header
-from typing_extensions import List, Any, Dict, Union
-from visualization_msgs.msg import MarkerArray, Marker
-
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
-from semantic_digital_twin.callbacks.callback import (
-    StateChangeCallback,
-    ModelChangeCallback,
-)
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose as SemDTPose,
-)
+from builtin_interfaces.msg import Duration
 from geometry_msgs.msg import (
     Vector3 as RosVector3,
     Pose as RosPose,
     Point as RosPoint,
     Quaternion as RosQuaternion,
+)
+from rclpy.qos import QoSProfile, DurabilityPolicy
+from std_msgs.msg import ColorRGBA, Header
+from typing_extensions import Any
+from visualization_msgs.msg import MarkerArray, Marker
+
+from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
+from semantic_digital_twin.callbacks.callback import (
+    ModelChangeCallback,
+)
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
 )
 
 
@@ -186,25 +183,3 @@ class PosePublisher(ModelChangeCallback):
 
     def __hash__(self):
         return hash(id(self))
-
-
-def publish_pose(
-    pose: Union[SemDTPose, HomogeneousTransformationMatrix],
-    node: rclpy.node.Node,
-    lifetime: int = 0,
-    text: str = None,
-) -> PosePublisher:
-    """
-    Convenience function to publish a single pose in RViz2.
-
-    :param pose: The pose to publish.
-    :param node: ROS node handle, used to create the publisher.
-    :param lifetime: Lifetime of the pose marker in seconds. If 0, it stays indefinitely.
-    :param text: Optional text to display at the pose position.
-    :return: The created PosePublisher instance.
-    """
-    if isinstance(pose, SemDTPose):
-        pose = HomogeneousTransformationMatrix(
-            pose, reference_frame=pose.reference_frame
-        )
-    return PosePublisher(pose=pose, node=node, lifetime=lifetime, text=text)

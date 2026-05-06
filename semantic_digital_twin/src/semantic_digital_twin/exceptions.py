@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.spatial_types.spatial_types import (
         SpatialType,
     )
-    from semantic_digital_twin.spatial_types import Vector3
+    from semantic_digital_twin.spatial_types import Vector3, Point3
     from semantic_digital_twin.world_description.degree_of_freedom import (
         DegreeOfFreedomLimits,
     )
@@ -545,3 +545,18 @@ class AtomicWorldModificationNotAtomic(DataclassException):
             f"{self.modification.__name__} tried to perform an atomic world modification anyways."
         )
         super().__post_init__()
+
+
+@dataclass
+class PointOccupiedError(DataclassException):
+    """
+    Error that is raised when a pose is occupied or not in the search space of a Connectivity Graphs.
+    """
+
+    point: Point3
+    """
+    The point that is occupied.
+    """
+
+    def __post_init__(self):
+        self.message = f"The point {self.point} is occupied."

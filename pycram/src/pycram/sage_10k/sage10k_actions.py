@@ -14,8 +14,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
 from semantic_digital_twin.world_description.graph_of_convex_sets import (
     navigation_map_at_target,
     translate_free_space_to_where_condition,
-    PoseOccupiedError,
 )
+from semantic_digital_twin.exceptions import PointOccupiedError
 
 
 @dataclass
@@ -45,7 +45,7 @@ class Sage10kOpenDoor(ActionDescription):
         # Find a node in free space that is near the pre-grasp pose.
         target_node = gcs.node_of_point(self.door.handle.pre_grasp_pose().position)
         if target_node is None:
-            raise PoseOccupiedError(
+            raise PointOccupiedError(
                 self.world.transform(
                     self.door.handle.pre_grasp_pose(), self.world.root
                 ).position

@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 import rustworkx as rx
+
 from rtree import index
 from sortedcontainers import SortedSet
 from typing_extensions import List, Optional, Dict, Sequence
@@ -24,6 +25,7 @@ from random_events.interval import reals, Interval, SimpleInterval, closed, Boun
 from random_events.product_algebra import Event
 from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.exceptions import PointOccupiedError
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.world import World
@@ -37,31 +39,14 @@ from semantic_digital_twin.world_description.world_entity import (
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
     BoundingBox,
-    Box,
-    Scale,
     Color,
 )
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
-    ShapeCollection,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 logger = logging.getLogger(__name__)
-
-
-class PoseOccupiedError(Exception):
-    """
-    Error that is raised when a pose is occupied or not in the search space of a Connectivity Graphs.
-    """
-
-    def __init__(self, point: Point3):
-        """
-        Construct a new pose occupied error.
-        :param pose: The pose that is occupied.
-        """
-        super().__init__(f"The pose {point} is occupied.")
-        self.point = point
 
 
 class GraphOfConvexSets:
@@ -249,9 +234,9 @@ class GraphOfConvexSets:
 
         # validate if the poses are part of the graph
         if start_node is None:
-            raise PoseOccupiedError(start)
+            raise PointOccupiedError(start)
         if goal_node is None:
-            raise PoseOccupiedError(goal)
+            raise PointOccupiedError(goal)
 
         if start_node == goal_node:
             return [start, goal]

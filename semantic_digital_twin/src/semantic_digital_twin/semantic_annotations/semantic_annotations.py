@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Self, Tuple
+from typing import Iterable, Optional, Self, Tuple, List
 
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
@@ -1069,3 +1069,34 @@ class LiquidCap(HasRootBody):
     """
     A liquid cap.
     """
+
+
+@dataclass(eq=False)
+class RoomWithWallsAndDoors(Room):
+    """
+    A room with a type description (e.g., Ktichen) and walls and doors.
+    """
+
+    room_type: Optional[str] = field(kw_only=True, default=None)
+    """
+    Description of the type of the room in natural language.
+    """
+
+    walls: List[Wall] = field(kw_only=True, default_factory=list)
+    """
+    The walls enclosing this room.
+    """
+
+    doors: List[Door] = field(kw_only=True, default_factory=list)
+    """
+    The doors of the room.
+    """
+
+
+@dataclass(eq=False)
+class DoorWithType(Door):
+    """
+    A Door that has a type description, e.g. "main entrance"
+    """
+
+    type_description: Optional[str] = field(kw_only=True, default=None)

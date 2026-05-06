@@ -29,14 +29,11 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from semantic_digital_twin.adapters.sage_10k_dataset.loader import (
     Sage10kDatasetLoader,
 )
-from semantic_digital_twin.adapters.sage_10k_dataset.processing import (
-    create_hsrb_in_world,
-)
 from semantic_digital_twin.adapters.sage_10k_dataset.schema import Sage10kScene
 from semantic_digital_twin.adapters.sage_10k_dataset.utils import (
     Sage10kTypeNameCleaner,
-    NaturalLanguageWithTypeDescription,
     sage_10k_non_shitty_scenes_demo_configs,
+    create_hsrb_in_world,
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer import (
@@ -48,6 +45,7 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.natural_language import (
     most_similar_synonym,
+    NaturalLanguageWithTypeDescription,
 )
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,

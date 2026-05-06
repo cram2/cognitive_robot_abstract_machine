@@ -20,7 +20,6 @@ import enum
 import krrood.adapters.json_serializer
 import krrood.ormatic.custom_types
 import krrood.ormatic.type_dict
-import semantic_digital_twin.adapters.sage_10k_dataset.filter
 import semantic_digital_twin.adapters.sage_10k_dataset.loader
 import semantic_digital_twin.adapters.sage_10k_dataset.schema
 import semantic_digital_twin.adapters.sage_10k_dataset.utils
@@ -99,6 +98,10 @@ from krrood.ormatic.data_access_objects.dao import (
     AssociationDataAccessObject,
 )
 from krrood.ormatic.custom_types import TypeType
+from semantic_digital_twin.semantic_annotations import (
+    natural_language,
+    semantic_annotations,
+)
 
 
 class Base(DeclarativeBase):
@@ -3702,20 +3705,6 @@ class Sage10kSizeDAO(
     }
 
 
-class Sage10kTypeNameCleanerDAO(
-    Base,
-    DataAccessObject[
-        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.Sage10kTypeNameCleaner
-    ],
-):
-
-    __tablename__ = "Sage10kTypeNameCleanerDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-
 class Sage10kWithIDDAO(
     Sage10kBaseDAO,
     DataAccessObject[
@@ -4034,33 +4023,6 @@ class ScaleDAO(
     x: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     y: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     z: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-
-class SceneObjectTypeHistogramDAO(
-    Base,
-    DataAccessObject[
-        semantic_digital_twin.adapters.sage_10k_dataset.filter.SceneObjectTypeHistogram
-    ],
-):
-
-    __tablename__ = "SceneObjectTypeHistogramDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    cleaner_id: Mapped[int] = mapped_column(
-        ForeignKey("Sage10kTypeNameCleanerDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    cleaner: Mapped[Sage10kTypeNameCleanerDAO] = relationship(
-        "Sage10kTypeNameCleanerDAO",
-        uselist=False,
-        foreign_keys=[cleaner_id],
-        post_update=True,
-    )
 
 
 class SelfCollisionMatrixRuleDAO(
@@ -8003,9 +7965,7 @@ class DoorDAO(
 
 class DoorWithTypeDAO(
     DoorDAO,
-    DataAccessObject[
-        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.DoorWithType
-    ],
+    DataAccessObject[semantic_annotations.DoorWithType],
 ):
 
     __tablename__ = "DoorWithTypeDAO"
@@ -8758,14 +8718,12 @@ class NaturalLanguageDescriptionDAO(
     }
 
 
-class NaturalLanguageDescriptionWithTypeDescriptionDAO(
+class NaturalLanguageWithTypeDescriptionDAO(
     NaturalLanguageDescriptionDAO,
-    DataAccessObject[
-        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.NaturalLanguageWithTypeDescription
-    ],
+    DataAccessObject[natural_language.NaturalLanguageWithTypeDescription],
 ):
 
-    __tablename__ = "NaturalLanguageDescriptionWithTypeDescriptionDAO"
+    __tablename__ = "NaturalLanguageWithTypeDescriptionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(NaturalLanguageDescriptionDAO.database_id),
@@ -8778,7 +8736,7 @@ class NaturalLanguageDescriptionWithTypeDescriptionDAO(
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "NaturalLanguageDescriptionWithTypeDescriptionDAO",
+        "polymorphic_identity": "NaturalLanguageWithTypeDescriptionDAO",
         "inherit_condition": database_id == NaturalLanguageDescriptionDAO.database_id,
     }
 
@@ -9321,9 +9279,7 @@ class LivingRoomDAO(
 
 class RoomWithWallsAndDoorsDAO(
     RoomDAO,
-    DataAccessObject[
-        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.RoomWithWallsAndDoors
-    ],
+    DataAccessObject[semantic_annotations.RoomWithWallsAndDoors],
 ):
 
     __tablename__ = "RoomWithWallsAndDoorsDAO"

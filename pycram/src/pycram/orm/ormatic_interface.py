@@ -186,6 +186,7 @@ from krrood.ormatic.data_access_objects.dao import (
     AssociationDataAccessObject,
 )
 from krrood.ormatic.custom_types import TypeType
+from semantic_digital_twin.semantic_annotations import natural_language
 
 
 class Base(DeclarativeBase):
@@ -17694,9 +17695,7 @@ class NaturalLanguageDescriptionDAO(
 
 class NaturalLanguageDescriptionWithTypeDescriptionDAO(
     NaturalLanguageDescriptionDAO,
-    DataAccessObject[
-        semantic_digital_twin.adapters.sage_10k_dataset.semantic_annotations.NaturalLanguageWithTypeDescription
-    ],
+    DataAccessObject[natural_language.NaturalLanguageWithTypeDescription],
 ):
 
     __tablename__ = "NaturalLanguageDescriptionWithTypeDescriptionDAO"

@@ -1,32 +1,20 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Optional, List
+import os
+from importlib.resources import files
+from pathlib import Path
 from enum import StrEnum
 
-from semantic_digital_twin.semantic_annotations.natural_language import (
-    NaturalLanguageDescription,
-)
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Room,
-    Wall,
-    Door,
-)
+from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.hsrb import HSRB
+
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import OmniDrive
+from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(eq=False)
-class NaturalLanguageWithTypeDescription(NaturalLanguageDescription):
-    """
-    A natural language description of a Sage10k object including the type information of the object.
-    """
-
-    type_description: Optional[str] = field(default=None)
-    """
-    The cleaned description of the type of the object.
-    """
 
 
 class Sage10kActionableScenes(StrEnum):
@@ -45,25 +33,28 @@ class Sage10kActionableScenes(StrEnum):
     AMERICAN_BUFFET_RESTAURANT = "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/20251213_172548_layout_edf26267.zip"
 
 
-@dataclass(eq=False)
-class RoomWithWallsAndDoors(Room):
+def create_hsrb_in_world(world: World):
 
-    room_type: Optional[str] = field(kw_only=True, default=None)
-    """
-    Description of the type of the room in natural language.
-    """
+    urdf_dir = os.path.join(
+        Path(files("semantic_digital_twin")).parent.parent.parent,
+        "pycram",
+        "resources",
+        "robots",
+    )
+    hsr = os.path.join(urdf_dir, "hsrb.urdf")
 
-    walls: List[Wall] = field(kw_only=True, default_factory=list)
-    """
-    The walls enclosing this room.
-    """
+    hsrb_parser = URDFParser.from_file(file_path=hsr)
+    world_with_hsrb = hsrb_parser.parse()
+    with world_with_hsrb.modify_world():
+        hsrb_root = world_with_hsrb.root
+        localization_body = Body(name=PrefixedName("odom_combined"))
+        world_with_hsrb.add_kinematic_structure_entity(localization_body)
+        c_root_bf = OmniDrive.create_with_dofs(
+            parent=localization_body, child=hsrb_root, world=world_with_hsrb
+        )
+        world_with_hsrb.add_connection(c_root_bf)
 
-    doors: List[Door] = field(kw_only=True, default_factory=list)
-    """
-    The doors of the room.
-    """
+    world.merge_world(world_with_hsrb)
 
-
-@dataclass(eq=False)
-class DoorWithType(Door):
-    type_description: Optional[str] = field(kw_only=True, default=None)
+    hsrb = HSRB.from_world(world)
+    return hsrb

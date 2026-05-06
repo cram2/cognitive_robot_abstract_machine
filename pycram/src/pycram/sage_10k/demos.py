@@ -20,14 +20,16 @@ from pycram.robot_plans.actions.composite.transporting import (
 from pycram.robot_plans.actions.core.navigation import NavigateAction
 from pycram.robot_plans.actions.core.robot_body import ParkArmsAction
 from semantic_digital_twin.adapters.sage_10k_dataset.loader import Sage10kDatasetLoader
-from semantic_digital_twin.adapters.sage_10k_dataset.processing import (
-    create_hsrb_in_world,
-)
 from semantic_digital_twin.adapters.sage_10k_dataset.utils import (
     Sage10kActionableScenes,
-    NaturalLanguageWithTypeDescription,
+    create_hsrb_in_world,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     RoomWithWallsAndDoors,
     DoorWithType,
+)
+from semantic_digital_twin.semantic_annotations.natural_language import (
+    NaturalLanguageWithTypeDescription,
 )
 from semantic_digital_twin.reasoning.predicates import (
     compute_euclidean_planar_distance,
